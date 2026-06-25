@@ -25,8 +25,8 @@ Prove the engine end-to-end by porting a few MVP checks as real rules, and intro
 
 1. Register **proof rules** through the registry/primitives to validate the whole path, e.g.:
    - a reference rule (`REF-001` link resolution — reuses MVP link logic);
-   - one of the preserved LLM rules (`SIZE-001` max bytes/tokens, [D3](../index.md)) to prove
-     the LLM features survive the re-platform.
+   - one of the preserved LLM rules (`SIZE-001` bytes/lines/tokens with per-metric `warn`/`error`
+     thresholds, [D3](../index.md)) to prove the LLM features survive the re-platform.
 2. Add the `lint` command to the commander program: default command
    ([D4](../index.md)), `--config`/`--format`/`--fail-on`, exit codes (0 pass / 1 findings /
    2 operational), running `lintFiles` + structured/text formatters.

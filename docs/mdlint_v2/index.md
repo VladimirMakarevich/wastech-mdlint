@@ -137,7 +137,7 @@ stand at their recommendation as defaults unless changed.
 | --- | --- | --- |
 | **D1** ✅ | **Monorepo vs single package.** | **Monorepo (npm workspaces)** — `packages/core` + `cli` + `mcp-server`. Required to ship MCP + CLI separately and to honor the core-hosts-the-pipeline decision. |
 | **D2** ✅ | **Config model migration.** | **Clean replace**, no compatibility layer (still `v0.0.0`, no real users). New `{ include, rules[], compile }`; **JSON-only** (drop `.cjs/.mjs`). One-time migration note in the README. |
-| **D3** ✅ | **Fate of MVP LLM features** (size, eager `@import` budget, per-entrypoint token budget) — absent from the 21-rule set. | **Preserve as first-class rules** in the new engine (e.g. `SIZE-001` max bytes/tokens, `LLM-001` eager-import budget). Keeps the original PLAN.md mission (LLM context hygiene) on top of doc-integrity. |
+| **D3** ✅ | **Fate of MVP LLM features** (size, eager `@import` budget, per-entrypoint token budget) — absent from the 21-rule set. | **Preserve as first-class rules** in the new engine (`SIZE-001` checks bytes/lines/tokens each with independent per-metric `warn`/`error` thresholds; `LLM-001` eager-import budget). Keeps the original PLAN.md mission (LLM context hygiene) on top of doc-integrity. |
 | **Order** ✅ | **What ships first after the foundation.** | **Lint parity first** — P3 (all 21 rules + the LLM rules) before graph/agents. M1→M2 is the priority path. |
 | **D4** | **`scan` command.** MVP uses `scan`; target uses `lint` (default). | **Default to `lint`, keep `scan` as a hidden alias** for one minor version, then deprecate. |
 | **D5** | **CLI framework.** | **Adopt `commander` + `@inquirer/prompts`** (matches reference, needed for `init`'s interactive flow). |

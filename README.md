@@ -90,10 +90,12 @@ export default {
   include: ["**/*.md"],
   exclude: ["node_modules/**", "dist/**", ".git/**"],
   size: {
-    maxBytesDefault: 64 * 1024,
+    bytes:  { warn: 48 * 1024, error: 64 * 1024 },
+    lines:  { warn: 300, error: 500 },
+    tokens: { warn: 1500, error: 3000 },
     overrides: [
-      { pattern: "CLAUDE.md", maxBytes: 32 * 1024 },
-      { pattern: "skills/**/SKILL.md", maxBytes: 24 * 1024 }
+      { pattern: "CLAUDE.md",          bytes: { warn: 24 * 1024, error: 32 * 1024 } },
+      { pattern: "skills/**/SKILL.md", bytes: { warn: 18 * 1024, error: 24 * 1024 } }
     ]
   },
   llm: {
@@ -123,7 +125,7 @@ Notes:
 V1 emits these rule ids:
 
 - `links/broken-links`: broken local Markdown files or anchors.
-- `size/max-file-size`: file byte limit exceeded.
+- `size/max-file-size`: file byte, line, or token limit exceeded (`warning` when only the `warn` threshold is crossed; `error` when the `error` threshold is crossed).
 - `structure/orphan-docs`: a Markdown file has no incoming Markdown links and is not exempt.
 - `graph/dependencies`: dependency cycle in the Markdown link graph.
 - `llm/eager-imports`: missing eager import or eager import cycle.

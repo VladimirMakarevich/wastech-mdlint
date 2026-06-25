@@ -12,7 +12,7 @@ These instructions apply to the entire repository.
 - parse Markdown links and headings;
 - validate local file links and anchors;
 - build a Markdown dependency graph;
-- report file size, orphan docs, graph cycles, eager imports, and context budgets;
+- report file size and line count, orphan docs, graph cycles, eager imports, and context budgets;
 - emit text and JSON reports;
 - support CI-friendly exit codes.
 
@@ -42,7 +42,7 @@ Include in v1:
 - Config files: `wastech-ctxlint.config.json`, `.cjs`, `.mjs`.
 - Local Markdown file links and anchors.
 - Directed file dependency graph.
-- Size limits with glob overrides.
+- Size limits (bytes, lines, tokens) with per-metric two-tier `warn`/`error` thresholds and glob overrides.
 - Orphan docs and dependency cycles. Orphan docs are `error` by default and configurable through `structure.orphanDocs: "error" | "warning" | "off"`.
 - `CLAUDE.md`, `AGENTS.md`, and `skills/**/SKILL.md` style LLM entrypoints.
 - `@path/to/file.md` eager imports.
@@ -89,7 +89,7 @@ Use focused fixtures rather than this repository's real Markdown files as test d
 - Markdown link and heading parsing;
 - GitHub-style slug generation;
 - broken local links and anchors;
-- size limits;
+- size and line-count limits (warn/error thresholds per metric: bytes, lines, tokens);
 - graph edges, orphan docs, and cycles;
 - eager import traversal;
 - context budget totals;

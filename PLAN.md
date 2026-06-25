@@ -50,12 +50,16 @@ wastech-ctxlint graph [path] --out graph.json
 
 - For every `.md` file:
   - count file size in bytes;
+  - count source line count;
   - estimate tokens when a tokenizer or estimator is available.
-- Config:
-  - `maxBytesDefault`, for example `64 KB`;
-  - `overrides` by glob pattern, for example `CLAUDE.md` can use `32 KB`.
+- Config — per-metric two-tier thresholds:
+  - `bytes?: { warn?, error? }` — soft (warning) and hard (error) byte limit;
+  - `lines?: { warn?, error? }` — soft and hard line-count limit;
+  - `tokens?: { warn?, error? }` — soft and hard estimated-token limit;
+  - `overrides` by glob pattern, each entry accepting the same `bytes`/`lines`/`tokens` shape.
 - Behavior:
-  - if a file exceeds its limit, report a warning or error depending on config.
+  - crossing only the `warn` threshold emits a console warning; does not block CI under `--fail-on error`;
+  - crossing the `error` threshold emits an error that triggers a non-zero exit under `--fail-on error`.
 
 ***
 
@@ -161,10 +165,12 @@ export default {
   exclude: ["node_modules/**", "dist/**"],
 
   size: {
-    maxBytesDefault: 64 * 1024,
+    bytes:  { warn: 48 * 1024, error: 64 * 1024 },
+    lines:  { warn: 300, error: 500 },
+    tokens: { warn: 1500, error: 3000 },
     overrides: [
-      { pattern: "CLAUDE.md", maxBytes: 32 * 1024 },
-      { pattern: "skills/**/SKILL.md", maxBytes: 24 * 1024 },
+      { pattern: "CLAUDE.md",          bytes: { warn: 24 * 1024, error: 32 * 1024 } },
+      { pattern: "skills/**/SKILL.md", bytes: { warn: 18 * 1024, error: 24 * 1024 } },
     ],
   },
 
