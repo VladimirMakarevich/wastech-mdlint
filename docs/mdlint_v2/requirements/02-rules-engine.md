@@ -13,7 +13,7 @@
 | **R2** | Auto-fix hook (`fix?`) + CLI `--fix` | ✅ Accepted | Design the hook now; implement for a safe rule subset incrementally. |
 | **R3** | Structured findings | ✅ Accepted | `column?`, `endLine?`, `fixable?`, `data?`, `helpUri?` on `LintMessage`. Enables SARIF + machine action. |
 | **R4** | Fail-fast instead of silent no-op when `documents` missing | ✅ Accepted | Core always passes `documents`; absence is a programming error. |
-| **R5** | One `ContextGraph` for all graph rules | ✅ Accepted | `GRP-002/003` + `REF-006` consume `buildContextGraph` extended with `exclude`/`entryPoints`/`siteRouter`. Ties to [C5](01-configuration.md). |
+| **R5** | One `ContextGraph` for all graph rules | ✅ Accepted | `GRP-002/003` + `REF-003` consume `buildContextGraph` extended with `exclude`/`entryPoints`/`siteRouter`. Ties to [C5](01-configuration.md). |
 | **R6** | Single source of rule metadata | ✅ Accepted | `category`, `defaultSeverity`, `fixable`, `docsUrl`, messages → generates `schema.json`, README, `describeRules`, `init` categories. |
 | **R7** | Shared `files`/`exclude` options base for every rule | ✅ Accepted | Uniform scoping across all rules. |
 | **R8** | Inline suppression directives | ✅ Accepted | `<!-- wastech-ctxlint-disable[-next-line] RULE-ID -->`. Parser captures comments + positions. |
@@ -26,7 +26,7 @@ tests + docs and publishing a new version. v2 must let teams add custom invarian
 **instantly, from config, with no rebuild and no publish.** Three flexibility tiers:
 
 ### Tier 0 — built-ins as templates (already true)
-Most of the 21 rules are parameterized engines (`TBL-003` allowed values, `TBL-004`
+Most of the 22 rules are parameterized engines (`TBL-004` allowed values, `TBL-003`
 regex, `SEC-001` required sections). Users already "author rules" via options — but
 cannot express a *new kind* of invariant.
 

@@ -18,18 +18,18 @@ traceability — reusing MVP link logic and the [P3.01](01-shared-rule-utils.md)
 | ID | Scope | Severity | Checks | Key options |
 | --- | --- | --- | --- | --- |
 | REF-001 | document | error | relative links resolve | `exclude?`, `siteRouter?` |
-| REF-002 | project | error | ID traceability (refs↔definitions) | `definitions`, `references`, `idColumn`, `idPattern` |
-| REF-003 | project | warning | stability consistency | `stabilityColumn`, `stabilityOrder`, `definitions`, `references`, `idColumn?`, `idPattern?` |
+| REF-002 | document | error | anchors match heading slugs | `files?` |
+| REF-003 | document | error | images resolve | `exclude?` |
 | REF-004 | document | error | cross-zone links declared in zone Dependencies | `zonesDir`, `dependencySection?` |
-| REF-005 | document | error | anchors match heading slugs | `files?` |
-| REF-006 | document | error | images resolve | `exclude?` |
+| REF-005 | project | error | ID traceability (refs↔definitions) | `definitions`, `references`, `idColumn`, `idPattern` |
+| REF-006 | project | warning | stability consistency | `stabilityColumn`, `stabilityOrder`, `definitions`, `references`, `idColumn?`, `idPattern?` |
 
 ## Deliverables / steps
 
-1. REF-001/006 compose `linkResolves`/`imageResolves` (existsSync + `documents` + site-router).
-2. REF-005 validates link anchors against heading slugs from `ParsedDocument`
+1. REF-001/003 compose `linkResolves`/`imageResolves` (existsSync + `documents` + site-router).
+2. REF-002 validates link anchors against heading slugs from `ParsedDocument`
    ([P1.02](../P1-parsed-document/02-block-structure.md)).
-3. REF-002/003 are project-scope traceability over table cells (definitions vs references),
+3. REF-005/006 are project-scope traceability over table cells (definitions vs references),
    reporting dangling refs (error) and orphan defs (warning).
 4. `siteRouter` from `settings` with per-rule override ([C5](../requirements/01-configuration.md)).
 
@@ -44,7 +44,7 @@ traceability — reusing MVP link logic and the [P3.01](01-shared-rule-utils.md)
 ## Exit criteria
 
 - [ ] All six REF rules pass unit + fixture tests.
-- [ ] REF-005 anchor slugs match GitHub semantics; REF-002 reports dangling vs orphan correctly.
+- [ ] REF-002 anchor slugs match GitHub semantics; REF-005 reports dangling vs orphan correctly.
 
 ## Hand-off to next
 

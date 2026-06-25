@@ -31,7 +31,7 @@ is the raw material for the semantic graph.
    - keep the link **label text** for explainability ([G3](../requirements/03-context-graph.md));
    - split `#anchor`; classify `kind` (local-file / same-file-anchor / external / mailto / other)
      as the MVP does.
-2. **Images** → `{ rawTarget, line }` (relative images; for REF-006).
+2. **Images** → `{ rawTarget, line }` (relative images; for REF-003).
 3. **Eager imports** → `{ rawTarget, line, column? }` from the `@path.md` syntax
    ([D3](../index.md)); these become `import` graph edges in P4.
 4. Reuse MVP reference-style definition handling and non-ASCII anchor decoding.

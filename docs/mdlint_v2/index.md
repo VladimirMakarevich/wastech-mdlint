@@ -19,7 +19,7 @@ model and rule model are **fundamentally different** from the target product.
 
 The target is a substantially larger product (**`wastech-ctxlint`**):
 
-- a **`@wastech-ctxlint/core`** engine with a **registry of 21 schema-validated
+- a **`@wastech-ctxlint/core`** engine with a **registry of 22 schema-validated
   rules** across 7 categories (`TBL`, `SEC`, `STR`, `REF`, `CHK`, `CTX`, `GRP`);
 - a richer **`ParsedDocument`** (tables, sections, checklists, images) and a
   **`ContextGraph`** with `slice` / `impact` / `topological-sort` / `components`;
@@ -76,25 +76,25 @@ Each capability area has a locked requirements doc under [requirements/](require
 
 ### 3.1 Rule inventory (the bulk of the work)
 
-21 rules, registered statically, each with a Zod options schema, `document` or
+22 rules, registered statically, each with a Zod options schema, `document` or
 `project` scope, and a fixed severity (`error` | `warning`):
 
-- **TBL (tables, 6)** — `TBL-001` required columns · `TBL-002` non-empty cells ·
-  `TBL-003` allowed values · `TBL-004` cell regex · `TBL-005` cross-column
-  conditional · `TBL-006` unique IDs across files *(project)*.
-- **SEC (sections, 2)** — `SEC-001` required sections · `SEC-002` section order.
+- **TBL (tables, 6)** — `TBL-001` required columns · `TBL-002` cross-column
+  conditional · `TBL-003` cell regex · `TBL-004` allowed values · `TBL-005`
+  non-empty cells · `TBL-006` unique IDs across files *(project)*.
+- **SEC (sections, 3)** — `SEC-001` required sections · `SEC-002` section order · `SEC-003` template conformance *(project)*.
 - **STR (structure, 1)** — `STR-001` required files exist *(project)*.
-- **REF (references, 6)** — `REF-001` relative links resolve · `REF-002` ID
-  traceability *(project)* · `REF-003` stability consistency *(project)* ·
-  `REF-004` cross-zone link declaration · `REF-005` anchor/heading slugs ·
-  `REF-006` images resolve.
+- **REF (references, 6)** — `REF-001` relative links resolve · `REF-002`
+  anchor/heading slugs · `REF-003` images resolve · `REF-004` cross-zone link
+  declaration · `REF-005` ID traceability *(project)* · `REF-006` stability
+  consistency *(project)*.
 - **CHK (checklist, 1)** — `CHK-001` all checklist items checked.
 - **CTX (content quality, 2)** — `CTX-001` no placeholder/empty sections ·
   `CTX-002` glossary alias usage *(project)*.
 - **GRP (graph integrity, 3)** — `GRP-001` ID chain across stages *(project)* ·
   `GRP-002` no cycles *(project)* · `GRP-003` no orphan docs *(project)*.
 
-Note: MVP's `links/broken-links` ≈ `REF-001`+`REF-005`+`REF-006`; MVP's
+Note: MVP's `links/broken-links` ≈ `REF-001`+`REF-002`+`REF-003`; MVP's
 `graph/dependencies` cycles ≈ `GRP-002`; MVP's `structure/orphan-docs` ≈
 `GRP-003`. The MVP's **size / eager-imports / context-budget** features have **no
 direct equivalent** in the 21-rule taxonomy — see Decision D3 in §5.
@@ -207,7 +207,7 @@ right package.
 - **Maps to:** [rules](requirements/02-rules-engine.md) + [config](requirements/01-configuration.md) requirements.
 - **Exit:** engine runs an empty + a small ruleset end-to-end; config errors are clear.
 
-### Phase 3 — Implement the 21 rules + shared utils · `L` · reuse: Medium
+### Phase 3 — Implement the 22 rules + shared utils · `L` · reuse: Medium
 **Goal:** full rule coverage. Sub-sequence by category; each rule ships with its
 own `*.test.ts` and a fixture.
 - Utils first: `glob-match` (picomatch `{dot:true}`), `find-line-number`,
@@ -216,7 +216,7 @@ own `*.test.ts` and a fixture.
   **3d REF** (001–006, reuses MVP link logic) · **3e CHK** (001) ·
   **3f CTX** (001–002) · **3g GRP** (001–003, reuses MVP cycle/orphan logic).
 - **Maps to:** [rules requirements](requirements/02-rules-engine.md); rule inventory in §3.1 above.
-- **Exit:** all 21 rules pass unit + fixture tests; documented in README + schema.
+- **Exit:** all 22 rules pass unit + fixture tests; documented in README + schema.
 
 ### Phase 4 — `ContextGraph` + `graph`/`slice`/`impact` · `M` · reuse: High
 **Goal:** the graph as a first-class primitive and its three CLI surfaces.

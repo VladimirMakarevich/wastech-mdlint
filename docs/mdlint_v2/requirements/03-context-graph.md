@@ -78,7 +78,7 @@
 - **Parser (P1):** expose anchors, defined IDs, and `@import` targets so G1 edges can be
   built; keep link label text for G3.
 - **Rule engine (P2/P3):** `GRP-002/003` consume the shared graph + cycle data (R5/G6);
-  `REF-002`/`id-ref` rules can read id-ref edges instead of re-scanning tables.
+  `REF-005`/`id-ref` rules can read id-ref edges instead of re-scanning tables.
 - **CLI (P4):** `graph` gains `--format mermaid|dot` (G9); `slice` uses the deterministic
   index (G4); coverage diagnostics surfaced (G5).
 - **MCP (P7):** `context-slice` / `impact-analysis` call the unified query layer (G2) and

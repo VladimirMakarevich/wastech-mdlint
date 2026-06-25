@@ -20,10 +20,10 @@ Implement the six table rules as presets over the table primitives from
 | ID | Scope | Severity | Checks | Key options |
 | --- | --- | --- | --- | --- |
 | TBL-001 | document | error | required columns present | `requiredColumns`, `section?`, `files?` |
-| TBL-002 | document | warning | target cells non-empty | `columns?`, `files?` |
-| TBL-003 | document | error | cell values in allowed set | `column`, `values`, `files?` |
-| TBL-004 | document | error | cell values match regex | `column`, `pattern`, `files?` |
-| TBL-005 | document | error | cross-column conditional (when→then) | `when`, `then`, `section?`, `files?` |
+| TBL-002 | document | error | cross-column conditional (when→then) | `when`, `then`, `section?`, `files?` |
+| TBL-003 | document | error | cell values match regex | `column`, `pattern`, `files?` |
+| TBL-004 | document | error | cell values in allowed set | `column`, `values`, `files?` |
+| TBL-005 | document | warning | target cells non-empty | `columns?`, `files?` |
 | TBL-006 | project | error | column IDs unique across files | `files`, `column`, `idPattern?` |
 
 ## Deliverables / steps
@@ -31,7 +31,7 @@ Implement the six table rules as presets over the table primitives from
 1. Register each rule via `defineRule(metadata, schema, factory)` (P2.03), composing the
    matching primitive (`requiredColumns`, `columnNotEmpty`, `columnInSet`, `columnMatches`,
    `crossColumn`, `columnUnique`).
-2. Mark `fixable` where deterministic (e.g. TBL-002 empty cell → `TODO`,
+2. Mark `fixable` where deterministic (e.g. TBL-005 empty cell → `TODO`,
    [R2](../requirements/02-rules-engine.md)).
 3. Fixtures per rule (focused), structured findings with offending column/value (`data`).
 
