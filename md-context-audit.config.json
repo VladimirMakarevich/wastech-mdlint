@@ -1,0 +1,29 @@
+{
+  "include": ["**/*.md"],
+  "exclude": ["node_modules/**", "dist/**", ".git/**", "test/fixtures/**"],
+  "size": {
+    "maxBytesDefault": 5000,
+    "overrides": [
+      {
+        "pattern": "CLAUDE.md",
+        "maxBytes": 2000
+      },
+      {
+        "pattern": "skills/**/SKILL.md",
+        "maxBytes": 5000
+      }
+    ]
+  },
+  "llm": {
+    "entrypoints": ["CLAUDE.md", "AGENTS.md", "skills/**/SKILL.md"],
+    "maxTokensPerEntrypoint": 5000
+  },
+  "links": {
+    "checkExternal": false,
+    "ignorePatterns": []
+  },
+  "structure": {
+    "orphanDocs": "error",
+    "orphanExemptions": ["README.md", "index.md", "CLAUDE.md", "AGENTS.md", "skills/**/SKILL.md"]
+  }
+}

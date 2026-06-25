@@ -1,0 +1,13 @@
+{
+  "size": {
+    "overrides": [
+      {
+        "pattern": "CLAUDE.md",
+        "maxBytes": 8
+      }
+    ]
+  },
+  "structure": {
+    "orphanDocs": "off"
+  }
+}

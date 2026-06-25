@@ -1,0 +1,68 @@
+{
+  "name": "wastech-ctxlint",
+  "version": "0.0.0",
+  "description": "CLI for auditing Markdown context in repositories.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VladimirMakarevich/wastech-ctxlint.git"
+  },
+  "homepage": "https://github.com/VladimirMakarevich/wastech-ctxlint#readme",
+  "bugs": {
+    "url": "https://github.com/VladimirMakarevich/wastech-ctxlint/issues"
+  },
+  "keywords": [
+    "markdown",
+    "audit",
+    "cli",
+    "documentation",
+    "llm",
+    "agents"
+  ],
+  "type": "module",
+  "bin": {
+    "wastech-ctxlint": "./dist/cli.js"
+  },
+  "engines": {
+    "node": ">=24.17.0 <25"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint .",
+    "format": "prettier --check .",
+    "postinstall": "node ./scripts/install-default-config.mjs",
+    "prepack": "npm run build",
+    "release:check": "npm run typecheck && npm test && npm run build && npm pack --dry-run"
+  },
+  "files": [
+    "dist",
+    "wastech-ctxlint.config.example.json",
+    "scripts/install-default-config.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public",
+    "provenance": true
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.30.1",
+    "@types/node": "^24.0.10",
+    "eslint": "^9.30.1",
+    "globals": "^16.3.0",
+    "github-slugger": "^2.0.0",
+    "micromatch": "^4.0.8",
+    "prettier": "^3.6.2",
+    "remark": "^15.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.35.1",
+    "unist-util-visit": "^5.0.0",
+    "vitest": "^3.2.4",
+    "zod": "^3.25.76"
+  }
+}

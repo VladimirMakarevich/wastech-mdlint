@@ -1,0 +1,8 @@
+{
+  "llm": {
+    "maxTokensPerEntrypoint": 1
+  },
+  "structure": {
+    "orphanDocs": "off"
+  }
+}
