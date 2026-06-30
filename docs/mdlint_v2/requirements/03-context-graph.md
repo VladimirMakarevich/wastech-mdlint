@@ -14,7 +14,7 @@
 | **G3** | Edge metadata (`text`, `rawTarget`) | ✅ Accepted | Explainability for CLI/MCP/`--fix`. |
 | **G4** | Honest deterministic ID/anchor/heading index for `slice` | ✅ Accepted | Real index, no fuzzy/LLM. Fixes the "search" misnomer. |
 | **G5** | Coverage signal when graph input is incomplete | ✅ Accepted | Warn on linked-to on-disk files outside `include`. |
-| **G6** | Explicit cycle detection (reuse MVP Tarjan SCC) | ✅ Accepted | Replaces silent Kahn truncation; feeds `GRP-002`. |
+| **G6** | Explicit cycle detection (reuse MVP Tarjan SCC) | ✅ Accepted | Replaces silent Kahn truncation; feeds `GRP-001`. |
 | **G7** | Collapse duplicate edges with `count` | 🔵 Backlog | Next implementation iteration. |
 | **G8** | Incremental / cached graph rebuild | 🔵 Backlog | Next iteration; design loader so a cache can slot in. |
 | **G9** | `graph` export to Mermaid / DOT | ✅ Accepted | `--format mermaid\|dot` alongside JSON. |
@@ -56,7 +56,7 @@
 
 - **G6 — explicit cycles.** `topologicalSort` silently returns a shortened array on
   cycles. v2 surfaces cycles as data via SCC/DFS (reusing the MVP's Tarjan
-  implementation) and shares it with `GRP-002` ([R5](02-rules-engine.md)). Honest reading
+  implementation) and shares it with `GRP-001` ([R5](02-rules-engine.md)). Honest reading
   order + cycle list.
 
 - **G9 — diagram export.** `graph --format mermaid|dot` in addition to JSON. PLAN.md
@@ -77,7 +77,7 @@
 
 - **Parser (P1):** expose anchors, defined IDs, and `@import` targets so G1 edges can be
   built; keep link label text for G3.
-- **Rule engine (P2/P3):** `GRP-002/003` consume the shared graph + cycle data (R5/G6);
+- **Rule engine (P2/P3):** `GRP-001/002` consume the shared graph + cycle data (R5/G6);
   `REF-005`/`id-ref` rules can read id-ref edges instead of re-scanning tables.
 - **CLI (P4):** `graph` gains `--format mermaid|dot` (G9); `slice` uses the deterministic
   index (G4); coverage diagnostics surfaced (G5).

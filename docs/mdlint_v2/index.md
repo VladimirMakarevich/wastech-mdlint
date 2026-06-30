@@ -79,24 +79,23 @@ Each capability area has a locked requirements doc under [requirements/](require
 22 rules, registered statically, each with a Zod options schema, `document` or
 `project` scope, and a fixed severity (`error` | `warning`):
 
-- **TBL (tables, 6)** — `TBL-001` required columns · `TBL-002` cross-column
-  conditional · `TBL-003` cell regex · `TBL-004` allowed values · `TBL-005`
-  non-empty cells · `TBL-006` unique IDs across files *(project)*.
+- **TBL (tables, 6)** — `TBL-001` required columns · `TBL-002` non-empty
+  cells · `TBL-003` allowed values · `TBL-004` cell regex · `TBL-005`
+  cross-column conditional · `TBL-006` unique IDs across files *(project)*.
 - **SEC (sections, 3)** — `SEC-001` required sections · `SEC-002` section order · `SEC-003` template conformance *(project)*.
 - **STR (structure, 1)** — `STR-001` required files exist *(project)*.
 - **REF (references, 6)** — `REF-001` relative links resolve · `REF-002`
   anchor/heading slugs · `REF-003` images resolve · `REF-004` cross-zone link
   declaration · `REF-005` ID traceability *(project)* · `REF-006` stability
   consistency *(project)*.
-- **CHK (checklist, 1)** — `CHK-001` all checklist items checked.
-- **CTX (content quality, 2)** — `CTX-001` no placeholder/empty sections ·
-  `CTX-002` glossary alias usage *(project)*.
-- **GRP (graph integrity, 3)** — `GRP-001` ID chain across stages *(project)* ·
-  `GRP-002` no cycles *(project)* · `GRP-003` no orphan docs *(project)*.
+- **CTX (content quality, 3)** — `CTX-001` no placeholder/empty sections ·
+  `CTX-002` all checklist items checked · `CTX-003` glossary alias usage *(project)*.
+- **GRP (graph integrity, 3)** — `GRP-001` no cycles *(project)* ·
+  `GRP-002` no orphan docs *(project)* · `GRP-003` ID chain across stages *(project)*.
 
 Note: MVP's `links/broken-links` ≈ `REF-001`+`REF-002`+`REF-003`; MVP's
-`graph/dependencies` cycles ≈ `GRP-002`; MVP's `structure/orphan-docs` ≈
-`GRP-003`. The MVP's **size / eager-imports / context-budget** features have **no
+`graph/dependencies` cycles ≈ `GRP-001`; MVP's `structure/orphan-docs` ≈
+`GRP-002`. The MVP's **size / eager-imports / context-budget** features have **no
 direct equivalent** in the 21-rule taxonomy — see Decision D3 in §5.
 
 ---

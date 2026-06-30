@@ -20,16 +20,16 @@ build now; [P4](../index.md) refactors them onto the shared `ContextGraph`
 
 | ID | Scope | Severity | Checks | Key options |
 | --- | --- | --- | --- | --- |
-| GRP-001 | project | warning | ID chain across stages (stage N IDs appear at N+1) | `chain[{stage,files,idColumn?,refColumn}]`, `idPattern?` |
-| GRP-002 | project | error | no circular references | `files?`, `exclude?`, `siteRouter?` |
-| GRP-003 | project | warning | every doc has ≥1 incoming ref (except entry points) | `files?`, `entryPoints?`, `siteRouter?` |
+| GRP-001 | project | error | no circular references | `files?`, `exclude?`, `siteRouter?` |
+| GRP-002 | project | warning | every doc has ≥1 incoming ref (except entry points) | `files?`, `entryPoints?`, `siteRouter?` |
+| GRP-003 | project | warning | ID chain across stages (stage N IDs appear at N+1) | `chain[{stage,files,idColumn?,refColumn}]`, `idPattern?` |
 
 ## Deliverables / steps
 
-1. GRP-002 cycle detection (DFS color-marking / reuse MVP Tarjan SCC); canonicalize cycles to
+1. GRP-001 cycle detection (DFS color-marking / reuse MVP Tarjan SCC); canonicalize cycles to
    avoid duplicate reports; attribute to the first arc.
-2. GRP-003 incoming-reference count with `entryPoints` allowlist + site-router resolution.
-3. GRP-001 chain traversal across stage files by ID/ref columns.
+2. GRP-002 incoming-reference count with `entryPoints` allowlist + site-router resolution.
+3. GRP-003 chain traversal across stage files by ID/ref columns.
 4. **Sequencing note:** in P3 these may build a local adjacency (reference behavior) to hit
    lint parity; [P4](../index.md) replaces that with the shared `ContextGraph` + explicit
    cycle data ([R5](../requirements/02-rules-engine.md)/[G6](../requirements/03-context-graph.md)).

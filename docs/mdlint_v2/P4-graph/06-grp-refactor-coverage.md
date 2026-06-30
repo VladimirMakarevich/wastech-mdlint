@@ -17,8 +17,8 @@ coverage signal.
 
 ## Deliverables / steps
 
-1. Refactor **GRP-002** to consume the explicit cycle list (P4.02/[G6](../requirements/03-context-graph.md)).
-2. Refactor **GRP-003** to use `inDegree` from the shared graph (+ `entryPoints`/site-router).
+1. Refactor **GRP-001** to consume the explicit cycle list (P4.02/[G6](../requirements/03-context-graph.md)).
+2. Refactor **GRP-002** to use `inDegree` from the shared graph (+ `entryPoints`/site-router).
 3. Pass the shared graph via `RuleContext.graph` (wired in [P2.05](../P2-rule-engine/05-orchestration-lintfiles.md));
    remove the duplicate adjacency logic.
 4. **Coverage signal** ([G5](../requirements/03-context-graph.md)): warn when on-disk Markdown
@@ -32,7 +32,7 @@ coverage signal.
 
 ## Exit criteria
 
-- [ ] GRP-002/003 produce identical (or better) results using the shared graph; no duplicate
+- [ ] GRP-001/002 produce identical (or better) results using the shared graph; no duplicate
       traversal code remains.
 - [ ] Coverage signal emitted on incomplete `include`.
 
