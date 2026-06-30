@@ -19,7 +19,7 @@ topo order.
 2. `getComponents(graph)` — undirected BFS connected components, sorted.
 3. **Explicit cycles** ([G6](../requirements/03-context-graph.md)): SCC/DFS (reuse the existing
    Tarjan implementation now in `core`) returning the cycle list as data — not just a shorter
-   topo array. Shared with GRP-002 (P4.06).
+   topo array. Shared with GRP-001 (P4.06).
 4. `formatContextGraphSummary(graph)` — counts, entry points (`inDegree === 0`), top hubs.
 
 ## Decisions applied
@@ -33,4 +33,4 @@ topo order.
 
 ## Hand-off to next
 
-P4.03 builds the traversal/query layer; P4.06 feeds the cycle list to GRP-002.
+P4.03 builds the traversal/query layer; P4.06 feeds the cycle list to GRP-001.

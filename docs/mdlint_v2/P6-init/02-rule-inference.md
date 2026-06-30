@@ -19,8 +19,8 @@ categories to concrete canonical rule IDs with rationale.
 1. Read 3–5 sample files per cluster; detect patterns (cross-refs, tables, ADR triplets,
    checklists, placeholders, potential cycles).
 2. Category → rule mapping (canonical IDs, [C3](../requirements/01-configuration.md)), e.g.:
-   `ref` → REF-001/002/003, `tbl` → TBL-005, `chk` → CHK-001, `ctx` → CTX-001,
-   `grp` → GRP-002/003. Source the mapping from the rule **metadata** so it stays in sync
+   `ref` → REF-001/002/003, `tbl` → TBL-002, `ctx` → CTX-001/002,
+   `grp` → GRP-001/002. Source the mapping from the rule **metadata** so it stays in sync
    ([R6](../requirements/02-rules-engine.md)).
 3. Produce a draft rule set + per-rule rationale string for the prompt step.
 

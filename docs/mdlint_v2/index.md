@@ -5,7 +5,7 @@
 > This document is the top-level roadmap for turning the current single-package implementation into the
 > production-ready target product. It defines the gap, the target architecture, the
 > phased plan, and the decisions we confirmed before deep work. Each phase has its own
-> detailed folder under `docs/mdlint_v2/` (meta `index.md` + numbered task files), the same way
+> detailed folder under `docs/ctxlint_v2/` (meta `index.md` + numbered task files), the same way
 > [docs/plan/](../plan/00-meta-plan.md) broke v1 into 16 tasks.
 
 ---
@@ -80,25 +80,25 @@ Each capability area has a locked requirements doc under [requirements/](require
 22 built-in rules, registered statically, each with a Zod options schema, `document` or
 `project` scope, and a fixed severity (`error` | `warning`):
 
-- **TBL (tables, 6)** — `TBL-001` required columns · `TBL-002` cross-column
-  conditional · `TBL-003` cell regex · `TBL-004` allowed values · `TBL-005`
-  non-empty cells · `TBL-006` unique IDs across files *(project)*.
+- **TBL (tables, 6)** — `TBL-001` required columns · `TBL-002` non-empty
+  cells · `TBL-003` allowed values · `TBL-004` cell regex · `TBL-005`
+  cross-column conditional · `TBL-006` unique IDs across files *(project)*.
 - **SEC (sections, 3)** — `SEC-001` required sections · `SEC-002` section order · `SEC-003` template conformance *(project)*.
 - **STR (structure, 1)** — `STR-001` required files exist *(project)*.
 - **REF (references, 6)** — `REF-001` relative links resolve · `REF-002`
   anchor/heading slugs · `REF-003` images resolve · `REF-004` cross-zone link
   declaration · `REF-005` ID traceability *(project)* · `REF-006` stability
   consistency *(project)*.
-- **CHK (checklist, 1)** — `CHK-001` all checklist items checked.
-- **CTX (content quality, 2)** — `CTX-001` no placeholder/empty sections ·
-  `CTX-002` glossary alias usage *(project)*.
-- **GRP (graph integrity, 3)** — `GRP-001` ID chain across stages *(project)* ·
-  `GRP-002` no cycles *(project)* · `GRP-003` no orphan docs *(project)*.
+- **CTX (content quality, 3)** — `CTX-001` no placeholder/empty sections ·
+  `CTX-002` all checklist items checked · `CTX-003` glossary alias usage *(project)*.
+- **GRP (graph integrity, 3)** — `GRP-001` no cycles *(project)* ·
+  `GRP-002` no orphan docs *(project)* · `GRP-003` ID chain across stages *(project)*.
 
-Note: current implementation's `links/broken-links` ≈ `REF-001`+`REF-002`+`REF-003`; current implementation's
-`graph/dependencies` cycles ≈ `GRP-002`; current implementation's `structure/orphan-docs` ≈
-`GRP-003`. The current implementation's **size / eager-imports / context-budget** features have **no
-direct equivalent** in the 22-rule taxonomy — see Decision D3 in §5.
+Note: the current `links/broken-links` behavior maps roughly to
+`REF-001` + `REF-002` + `REF-003`; current `graph/dependencies` cycle checks map to
+`GRP-001`; current orphan-doc handling maps to `GRP-002`. The current
+size / eager-import / context-budget behavior has **no direct equivalent** in the
+22 built-in rule taxonomy — see Decision D3 in §5.
 
 ---
 
@@ -151,7 +151,7 @@ stand at their recommendation as defaults unless changed.
 ## 5b. Refined requirements
 
 A point-by-point requirements pass (2026-06-21) locked the v2 improvements. These live in
-**[docs/mdlint_v2/requirements/](requirements/index.md)** and are authoritative wherever the plan
+**[docs/ctxlint_v2/requirements/](requirements/index.md)** and are authoritative wherever the plan
 is otherwise ambiguous. Headlines that reshape the phases
 below: **declarative custom rules** (no rebuild/publish), a **`--fix` engine**, **semantic
 graph edges** (ID/anchor/import), **local-only `$schema`**, **structured MCP output**, a
@@ -332,7 +332,7 @@ Recommended milestones:
 ## 10. Next steps
 
 1. ✅ **Decisions D1–D3 + milestone order confirmed** (§5). D4–D7 default-resolved.
-2. **Expand the critical-path phases into `docs/mdlint_v2/NN-*.md` task files** (mirroring
+2. **Expand the critical-path phases into `docs/ctxlint_v2/NN-*.md` task files** (mirroring
    the v1 `docs/plan/` granularity), in this order:
    - **P0** — workspace/monorepo bootstrap (gates everything);
    - **P2** — rule engine + new config model (the engine core);

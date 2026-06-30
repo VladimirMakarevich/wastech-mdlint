@@ -30,7 +30,7 @@ start from a clear map.
 3. Confirm the current `postinstall` is gone and install writes no config ([I1](../requirements/06-installation.md)).
 4. Add a short "Workspace layout" section to the repo `README.md` (packages, bins, how to
    build/test) and, with the owner's approval, update [AGENTS.md](../../../AGENTS.md)
-   "Sources Of Truth" to point at `docs/mdlint_v2/`.
+   "Sources Of Truth" to point at `docs/ctxlint_v2/`.
 5. Mark P0 tasks done in the [phase index](index.md).
 
 ## Decisions applied

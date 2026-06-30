@@ -20,7 +20,7 @@ Lock the graph behavior end-to-end so P5 (compile) and P7 (MCP) build on a trust
    plus an "outside-corpus" file to assert the coverage signal (G5).
 3. e2e: `graph`/`slice`/`impact` over the fixture (human + JSON + Mermaid/DOT); determinism
    check on output ordering.
-4. Confirm GRP-002/003 (refactored, P4.06) still pass against the same fixtures.
+4. Confirm GRP-001/002 (refactored, P4.06) still pass against the same fixtures.
 
 ## Decisions applied
 

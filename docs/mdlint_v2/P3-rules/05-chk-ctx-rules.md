@@ -1,4 +1,4 @@
-# P3.05 · Checklist + content-quality rules (CHK-001, CTX-001/002)
+# P3.05 · Content-quality rules (CTX-001/002/003)
 
 > Phase: [P3 — Rules](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Not started**.
 
@@ -17,16 +17,16 @@ primitives.
 
 | ID | Scope | Severity | Checks | Key options |
 | --- | --- | --- | --- | --- |
-| CHK-001 | document | warning | all checklist items checked | `section?`, `files?` |
 | CTX-001 | document | warning | no empty/placeholder sections | `section?`, `placeholders?`, `files?` |
-| CTX-002 | project | warning | glossary alias usage → canonical | `glossary`, `termColumn`, `aliasColumn?`, `section?`, `files?` |
+| CTX-002 | document | warning | all checklist items checked | `section?`, `files?` |
+| CTX-003 | project | warning | glossary alias usage → canonical | `glossary`, `termColumn`, `aliasColumn?`, `section?`, `files?` |
 
 ## Deliverables / steps
 
-1. CHK-001 composes `allChecked` over `checkItems` (optionally scoped to a section).
-2. CTX-001 composes `noPlaceholders` (default set `TBD/TODO/WIP/FIXME/N/A`, extensible via
+1. CTX-001 composes `noPlaceholders` (default set `TBD/TODO/WIP/FIXME/N/A`, extensible via
    `placeholders`) plus empty-section detection via `extract-section-body`.
-3. CTX-002 is project-scope: read glossary table → build alias→canonical map → scan `content`
+2. CTX-002 composes `allChecked` over `checkItems` (optionally scoped to a section).
+3. CTX-003 is project-scope: read glossary table → build alias→canonical map → scan `content`
    of matched files → warn on alias usage with the canonical replacement.
 
 ## Decisions applied
@@ -36,8 +36,8 @@ primitives.
 
 ## Exit criteria
 
-- [ ] CHK-001, CTX-001, CTX-002 pass unit + fixture tests.
-- [ ] CTX-002 reports canonical replacement for each alias usage.
+- [ ] CTX-001, CTX-002, CTX-003 pass unit + fixture tests.
+- [ ] CTX-003 reports canonical replacement for each alias usage.
 
 ## Hand-off to next
 

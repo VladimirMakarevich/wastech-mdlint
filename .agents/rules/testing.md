@@ -1,6 +1,6 @@
 # Testing Rules
 
-The testing source of truth is the v2 roadmap in `docs/mdlint_v2/` plus the repository's
+The testing source of truth is the v2 roadmap in `docs/ctxlint_v2/` plus the repository's
 Vitest-based test suite.
 
 ## Test Framework

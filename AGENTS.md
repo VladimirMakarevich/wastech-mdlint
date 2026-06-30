@@ -9,7 +9,7 @@ These instructions apply to the entire repository.
 `wastech-ctxlint` is being rebuilt from the current single-package implementation into the v2 production target.
 
 - The current repository still contains the single-package codebase in `src/` and `test/`.
-- The target product is the v2 monorepo/workspace design documented under `docs/mdlint_v2/`.
+- The target product is the v2 monorepo/workspace design documented under `docs/ctxlint_v2/`.
 - Treat the current filesystem state as truth for where code lives today.
 - Treat the v2 roadmap as truth for where the product is going next.
 
@@ -19,13 +19,13 @@ to that phase. Likewise, do not preserve legacy single-package behavior once a v
 ## Sources Of Truth
 
 The production v2 effort is the current focus. Its authoritative planning lives under
-`docs/mdlint_v2/`:
+`docs/ctxlint_v2/`:
 
-- Roadmap: `docs/mdlint_v2/index.md`
-- Locked requirements: `docs/mdlint_v2/requirements/` with index at
-  `docs/mdlint_v2/requirements/index.md`
-- Architectural decisions: `docs/mdlint_v2/decisions/`
-- Phase task plans: `docs/mdlint_v2/P0-foundations/` through `docs/mdlint_v2/P9-release/`
+- Roadmap: `docs/ctxlint_v2/index.md`
+- Locked requirements: `docs/ctxlint_v2/requirements/` with index at
+  `docs/ctxlint_v2/requirements/index.md`
+- Architectural decisions: `docs/ctxlint_v2/decisions/`
+- Phase task plans: `docs/ctxlint_v2/P0-foundations/` through `docs/ctxlint_v2/P9-release/`
 
 When documents disagree, use this precedence:
 
@@ -37,7 +37,7 @@ When documents disagree, use this precedence:
 If a contradiction changes implementation behavior, surface it explicitly instead of guessing.
 
 Historical v1 planning remains in `PLAN.md` and `docs/plan/`, but it is background context only
-when it conflicts with `docs/mdlint_v2/`.
+when it conflicts with `docs/ctxlint_v2/`.
 
 ## Delivery Order
 

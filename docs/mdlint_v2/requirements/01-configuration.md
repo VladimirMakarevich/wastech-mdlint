@@ -39,8 +39,8 @@
   "rules": [
     // C3 — canonical ID; C2 — per-rule severity override
     { "rule": "REF-001", "severity": "warning", "options": { "exclude": ["legacy/**"] } },
-    { "rule": "GRP-002" },                                // default severity from the rule
-    { "rule": "GRP-003", "severity": "off" },             // documented but disabled
+    { "rule": "GRP-001" },                                // default severity from the rule
+    { "rule": "GRP-002", "severity": "off" },             // documented but disabled
     { "rule": "REF-001", "options": { /* may override settings.siteRouter locally */ } }
   ],
 
@@ -75,7 +75,7 @@
   tolerate comments (most do).
 
 - **C5 — shared `settings.siteRouter`.** The spec notes `siteRouter` is duplicated
-  across `REF-001`/`GRP-002`/`GRP-003`. v2 lifts it to `settings.siteRouter`,
+  across `REF-001`/`GRP-001`/`GRP-002`. v2 lifts it to `settings.siteRouter`,
   inherited via `RuleContext`, with per-rule override. Single source of truth for
   SSG routing. → requires `RuleContext` to carry resolved `settings` (Phase 2).
 

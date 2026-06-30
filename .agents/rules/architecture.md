@@ -1,10 +1,10 @@
 # Architecture Rules
 
-The architectural source of truth is `docs/mdlint_v2/`, especially:
+The architectural source of truth is `docs/ctxlint_v2/`, especially:
 
-- `docs/mdlint_v2/index.md`
-- `docs/mdlint_v2/requirements/`
-- `docs/mdlint_v2/decisions/core-hosts-the-pipeline.md`
+- `docs/ctxlint_v2/index.md`
+- `docs/ctxlint_v2/requirements/`
+- `docs/ctxlint_v2/decisions/core-hosts-the-pipeline.md`
 
 These invariants should guide implementation work.
 
@@ -30,7 +30,7 @@ These invariants should guide implementation work.
 - Shared computational behavior belongs in core, not in host packages.
 
 This is enforced by the accepted decision in
-`docs/mdlint_v2/decisions/core-hosts-the-pipeline.md`.
+`docs/ctxlint_v2/decisions/core-hosts-the-pipeline.md`.
 
 ## Pipeline Invariants
 
@@ -72,4 +72,4 @@ This is enforced by the accepted decision in
 - Do not introduce non-deterministic reporting behavior.
 - Do not add local agent skills, repo hooks, or other automation surfaces unless the task
   explicitly targets that scope.
-- Do not guess future architecture from memory when `docs/mdlint_v2/` already states it.
+- Do not guess future architecture from memory when `docs/ctxlint_v2/` already states it.

@@ -17,7 +17,7 @@ actionable findings.
 ## Deliverables / steps
 
 1. `skills/wastech-ctxlint-impact/SKILL.md` with valid frontmatter.
-2. Workflow: verify setup (recommend REF-001/GRP-002 enabled) → resolve target (file or ID →
+2. Workflow: verify setup (recommend REF-001/GRP-001 enabled) → resolve target (file or ID →
    containing file) → run `impact <file> --format json` **or** prefer the MCP
    `impact-analysis` tool when available → group direct/transitive, highlight hubs/cycles →
    recommend follow-ups (often `-fix`).

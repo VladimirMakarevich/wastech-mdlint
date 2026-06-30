@@ -3,7 +3,7 @@
 > Roadmap: [v2 Index](../index.md) · Phase **P0** · Size **M** · Status **Not started**
 >
 > **Goal:** stand up the monorepo and shared tooling so every later phase lands in the
-> right package, then lift-and-shift the current implementation into `@wastech-ctxlint/core` **without
+> right package, then lift-and-shift the current implementatctxlinto `@wastech-ctxlint/core` **without
 > changing its behavior**. P0 ships no new product features — it is purely structural.
 
 ## Why this phase exists
@@ -47,7 +47,7 @@ P0.05 (cli) and P0.06 (mcp-server) both depend only on P0.04 and can run in para
 
 - [ ] `npm run typecheck && npm test && npm run build` are green across the whole workspace.
 - [ ] `packages/{core,cli,mcp-server}` exist with correct names, bins, and `publishConfig`.
-- [ ] Current behavior preserved: `wastech-ctxlint scan` and `graph` produce the same output
+- [ ] Current behavior preserved: `wastctxlintlint scan` and `graph` produce the same output
       as before the migration (parity check).
 - [ ] The current `postinstall` auto-config is removed (I1).
 - [ ] CI runs the workspace matrix on Node 24; `npm pack --dry-run` is clean per package.
