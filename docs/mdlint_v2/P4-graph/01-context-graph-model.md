@@ -5,18 +5,18 @@
 ## Goal
 
 Build the first-class `ContextGraph` with **semantic edges** and **edge metadata**, extending
-the MVP graph builder.
+the current implementation graph builder.
 
 ## Sequence
 
 - **Previous:** [P3.09 — Rule tests & cutover](../P3-rules/09-rule-tests-and-cutover.md)
-  completed the rule engine; the MVP graph build is already in `core`.
+  completed the rule engine; the current implementation graph build is already in `core`.
 - **Next:** [P4.02 — Graph algorithms](02-graph-algorithms.md).
 - **Depends on:** P3 done + `ParsedDocument` references/anchors/imports (P1) · **Blocks:** all of P4.
 
 ## Inputs (from previous work)
 
-- MVP `graph/build.ts` (in core), `ParsedDocument.{links,images,imports}` + heading slugs (P1).
+- current `graph/build.ts` (in core), `ParsedDocument.{links,images,imports}` + heading slugs (P1).
 
 ## Deliverables / steps
 

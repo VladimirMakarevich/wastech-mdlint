@@ -4,7 +4,7 @@
 
 ## Goal
 
-Preserve the MVP's LLM context-hygiene features ([D3](../index.md)) as first-class rules in
+Preserve the current implementation's LLM context-hygiene features ([D3](../index.md)) as first-class rules in
 the new engine, so the original PLAN.md mission rides on top of the doc-integrity rules.
 
 ## Sequence
@@ -12,7 +12,7 @@ the new engine, so the original PLAN.md mission rides on top of the doc-integrit
 - **Previous:** [P2.07 — First rules + `lint`](../P2-rule-engine/07-first-rules-lint-command.md)
   already introduced SIZE-001 as the engine proof; this task finishes it and adds LLM-001.
 - **Next:** [P3.08 — custom rule](08-custom-rule.md), [P3.09 — cutover](09-rule-tests-and-cutover.md).
-- **Depends on:** P2.07 + the relocated MVP `llm/{imports,budget}` ([P0.04](../P0-foundations/04-migrate-mvp-to-core.md)) ·
+- **Depends on:** P2.07 + the relocated current `llm/{imports,budget}` ([P0.04](../P0-foundations/04-relocate-current-source-into-core.md)) ·
   **Parallel with:** P3.02–P3.06 · **Blocks:** P3.09.
 
 ## Rules
@@ -57,7 +57,7 @@ Threshold semantics:
 1. SIZE-001: per-file **byte / line / token** check.
    - **Line count:** count `\n` occurrences in the raw source (or `ParsedDocument` line metadata if
      available).
-   - **Token estimate:** reuse MVP `estimateTokens = ceil(len/4)`, kept behind one function so a
+   - **Token estimate:** reuse the current `estimateTokens = ceil(len/4)`, kept behind one function so a
      real tokenizer can replace it later.
    - **Two-tier thresholds:** each metric (`bytes`, `lines`, `tokens`) may declare an optional
      `warn` threshold and/or an optional `error` threshold independently. A finding is emitted at
@@ -71,7 +71,7 @@ Threshold semantics:
      SIZE-001 `LintMessage`.
 2. LLM-001: build the eager-import tree from `ParsedDocument.imports`
    ([P1.03](../P1-parsed-document/03-references-extraction.md)), sum own+imported tokens per
-   entrypoint, report over-limit with percentage; surface cycles/missing imports as the MVP did.
+   entrypoint, report over-limit with percentage; surface cycles/missing imports as the current implementation did.
 3. Express both through the engine (metadata + options schema), not as bespoke pipeline steps.
 
 ## Decisions applied
@@ -82,7 +82,7 @@ Threshold semantics:
 ## Exit criteria
 
 - [ ] SIZE-001 and LLM-001 pass unit + fixture tests (overrides, budgets, cycles).
-- [ ] The MVP's size / eager-import / context-budget behavior is fully represented.
+- [ ] The current implementation's size / eager-import / context-budget behavior is fully represented.
 
 ## Hand-off to next
 

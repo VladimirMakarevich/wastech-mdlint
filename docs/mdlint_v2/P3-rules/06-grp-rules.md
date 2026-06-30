@@ -12,8 +12,8 @@ build now; [P4](../index.md) refactors them onto the shared `ContextGraph`
 
 - **Previous:** [P3.01 — Shared rule utils](01-shared-rule-utils.md).
 - **Next:** [P3.08 — custom rule](08-custom-rule.md), [P3.09 — cutover](09-rule-tests-and-cutover.md).
-- **Depends on:** P3.01 + the relocated MVP graph build (cycle/orphan logic from
-  [P0.04](../P0-foundations/04-migrate-mvp-to-core.md)) · **Blocks:** P3.08, P3.09 ·
+- **Depends on:** P3.01 + the relocated current graph build (cycle/orphan logic from
+  [P0.04](../P0-foundations/04-relocate-current-source-into-core.md)) · **Blocks:** P3.08, P3.09 ·
   **Refactored by:** [P4](../index.md) (R5/G6).
 
 ## Rules
@@ -26,7 +26,7 @@ build now; [P4](../index.md) refactors them onto the shared `ContextGraph`
 
 ## Deliverables / steps
 
-1. GRP-002 cycle detection (DFS color-marking / reuse MVP Tarjan SCC); canonicalize cycles to
+1. GRP-002 cycle detection (DFS color-marking / reuse the existing Tarjan SCC); canonicalize cycles to
    avoid duplicate reports; attribute to the first arc.
 2. GRP-003 incoming-reference count with `entryPoints` allowlist + site-router resolution.
 3. GRP-001 chain traversal across stage files by ID/ref columns.

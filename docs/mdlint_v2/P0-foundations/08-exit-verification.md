@@ -18,7 +18,7 @@ start from a clear map.
 
 ## Inputs (from previous work)
 
-- The full workspace (`core` + `cli` + `mcp-server`), migrated MVP modules, and CI from
+- The full workspace (`core` + `cli` + `mcp-server`), migrated current modules, and CI from
   P0.01–P0.07.
 
 ## Deliverables / steps
@@ -27,10 +27,10 @@ start from a clear map.
    all green.
 2. **Parity check:** run `wastech-ctxlint scan` and `graph` on a fixture (and on this repo)
    and diff against pre-migration output — must be identical.
-3. Confirm the MVP `postinstall` is gone and install writes no config ([I1](../requirements/06-installation.md)).
+3. Confirm the current `postinstall` is gone and install writes no config ([I1](../requirements/06-installation.md)).
 4. Add a short "Workspace layout" section to the repo `README.md` (packages, bins, how to
    build/test) and, with the owner's approval, update [AGENTS.md](../../../AGENTS.md)
-   "Sources Of Truth" to point at `docs/v2/`.
+   "Sources Of Truth" to point at `docs/mdlint_v2/`.
 5. Mark P0 tasks done in the [phase index](index.md).
 
 ## Decisions applied
@@ -41,7 +41,7 @@ start from a clear map.
 ## Exit criteria
 
 - [ ] Workspace-wide typecheck/test/build green.
-- [ ] `scan`/`graph` output parity with the MVP confirmed.
+- [ ] `scan`/`graph` output parity with the current implementation confirmed.
 - [ ] Layout documented; AGENTS.md pointer updated (with approval).
 - [ ] [Phase index](index.md) exit checklist fully ticked.
 

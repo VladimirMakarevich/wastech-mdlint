@@ -58,7 +58,7 @@ arbitrary user code would be dangerous).
 - **checklist:** `allChecked`
 - **link/image:** `linkResolves`, `imageResolves`
 
-**Key consequence:** the **21 built-in rules are re-expressed as named presets over
+**Key consequence:** the **22 built-in rules are re-expressed as named presets over
 these same primitives.** Built-ins and custom rules share one execution engine.
 Because the vocabulary is closed, the published `schema.json` can validate the
 `custom` shape generically (see C9).

@@ -69,7 +69,7 @@
   (case-insensitive, dash optional) and always emits canonical `REF-001`. The
   `schema.json` sync test must normalize before comparing.
 
-- **C4 — JSONC.** Hand-authoring a 21-rule config is painful; inline rationale
+- **C4 — JSONC.** Hand-authoring a 22-rule config is painful; inline rationale
   comments and trailing commas are a big ergonomics win. File extension stays
   `.json`; a tolerant parser handles comments. Editor `$schema` validation must
   tolerate comments (most do).

@@ -5,7 +5,7 @@
 ## Goal
 
 Close the lint-parity milestone: full test coverage, generated docs/schema, and the
-`scan → lint` cutover that removes the legacy MVP pipeline.
+`scan → lint` cutover that removes the legacy legacy pipeline.
 
 ## Sequence
 
@@ -25,7 +25,7 @@ Close the lint-parity milestone: full test coverage, generated docs/schema, and 
 2. **Generated docs:** README rule table generated from the metadata source
    ([R6](../requirements/02-rules-engine.md)); `schema.json` regenerated; **sync test green**.
 3. **`scan → lint` cutover** ([D4](../index.md)): make `scan` a hidden alias of `lint`,
-   **remove the legacy MVP pipeline** and the old sectioned-config code paths (greenfield,
+   **remove the legacy legacy pipeline** and the old sectioned-config code paths (greenfield,
    [D2](../index.md)). Update `--help`.
 4. Verify exit codes (0 pass / 1 findings / 2 operational) across the full ruleset.
 5. Tick the Phase P3 [exit criteria](index.md).
@@ -37,7 +37,7 @@ Close the lint-parity milestone: full test coverage, generated docs/schema, and 
 
 ## Exit criteria
 
-- [ ] All 21 + LLM + custom rules covered by tests; integration test green.
+- [ ] All 22 built-in + LLM + custom rules covered by tests; integration test green.
 - [ ] README rule table + `schema.json` generated and in sync.
 - [ ] `scan` is a hidden alias of `lint`; legacy pipeline removed; no dead code.
 - [ ] **Milestone M2 (lint parity+) reached.**

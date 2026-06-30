@@ -22,7 +22,7 @@ repo's sources of truth at v2.
 2. Embed the **generated** rule table ([R6](../requirements/02-rules-engine.md)) and MCP tool
    list ([M3](../requirements/05-mcp-server.md)) so docs can't drift.
 3. CHANGELOG; **no migration guide** ([I8 — greenfield](../requirements/06-installation.md)).
-4. Update [AGENTS.md](../../../AGENTS.md) "Sources Of Truth" to point at `docs/v2/`
+4. Update [AGENTS.md](../../../AGENTS.md) "Sources Of Truth" to point at `docs/mdlint_v2/`
    (roadmap + requirements + phase folders).
 
 ## Decisions applied

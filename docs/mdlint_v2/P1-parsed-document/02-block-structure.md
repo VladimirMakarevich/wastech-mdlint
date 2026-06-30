@@ -19,7 +19,7 @@ content.
 
 ## Inputs (from previous work)
 
-- MVP `markdown/parse.ts` (remark + remark-gfm + unist-util-visit + github-slugger), already
+- current `markdown/parse.ts` (remark + remark-gfm + unist-util-visit + github-slugger), already
   in `core`, currently extracting links/headings/anchors.
 
 ## Deliverables / steps

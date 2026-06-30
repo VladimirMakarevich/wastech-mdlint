@@ -1,7 +1,7 @@
 # Phase P4 — ContextGraph + graph / slice / impact
 
 > Roadmap: [v2 Index](../index.md) · Phase **P4** · Size **M** · Status **Not started** ·
-> Reuse from MVP: **High**.
+> Reuse from current implementation: **High**.
 >
 > **Goal:** make the document graph a first-class primitive with **semantic edges**, a
 > **unified query layer**, and **honest deterministic search**, then expose `graph`, `slice`,
@@ -9,7 +9,7 @@
 
 ## Why this phase exists
 
-The MVP graph models only link/image edges and slice does table-cell-only "search". P4
+The current implementation graph models only link/image edges and slice does table-cell-only "search". P4
 implements the [context-graph requirements](../requirements/03-context-graph.md): semantic
 edges (ID/anchor/import, [G1](../requirements/03-context-graph.md)), one query layer
 ([G2](../requirements/03-context-graph.md)), a real ID/anchor/heading index

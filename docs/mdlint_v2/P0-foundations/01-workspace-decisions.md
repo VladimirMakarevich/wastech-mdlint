@@ -25,14 +25,14 @@ not code.
 2. **Package set & names:** `@wastech-ctxlint/core`, `@wastech-ctxlint/cli`
    (bin `wastech-ctxlint`), `@wastech-ctxlint/mcp-server` (bin `wastech-ctxlint-mcp`).
 3. **Runtime/engines:** Node `>=24.17.0 <25` on every package (I5).
-4. **Zod version:** pin one version shared by `core` + `mcp-server` (reference uses Zod v4;
-   MVP uses v3). Decide v4 to match the MCP SDK examples → record the chosen version.
+4. **Zod version:** pin one version shared by `core` + `mcp-server` (the current codebase uses
+   Zod v3). Decide v4 to match the MCP SDK examples → record the chosen version.
 5. **TypeScript build strategy:** single `tsconfig.base.json` + per-package `tsconfig` that
    `extends` it; decide whether to use project references (recommended for incremental
    builds) or independent `tsc` per package.
 6. **Test/lint/format:** Vitest workspace, ESLint flat config + Prettier at the root, run
    per package via root scripts.
-7. **Module format:** ESM (`"type": "module"`), NodeNext resolution (carry over from MVP).
+7. **Module format:** ESM (`"type": "module"`), NodeNext resolution (already present today).
 
 ## Deliverables
 

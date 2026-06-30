@@ -12,14 +12,14 @@ P1.02–P1.05 just fill it.
 ## Sequence
 
 - **Previous:** [P0.08 — Phase exit verification](../P0-foundations/08-exit-verification.md)
-  delivered a clean monorepo with the MVP parser/types relocated into `core`.
+  delivered a clean monorepo with the current implementation parser/types relocated into `core`.
 - **Next:** [P1.02 — Block structure](02-block-structure.md) implements the headings/sections/
   tables/checklist part of this contract.
 - **Depends on:** P0 complete · **Blocks:** all of P1.02–P1.06.
 
 ## Inputs (from previous work)
 
-- MVP `types.ts` (`MarkdownFile`, `MarkdownLink`, `AnchorIndex`, …) now in `core`.
+- current `types.ts` (`MarkdownFile`, `MarkdownLink`, `AnchorIndex`, …) now in `core`.
 - The four consumer requirements this contract must satisfy:
   [R8](../requirements/02-rules-engine.md), [R9](../requirements/02-rules-engine.md),
   [G1](../requirements/03-context-graph.md)/[G3](../requirements/03-context-graph.md),

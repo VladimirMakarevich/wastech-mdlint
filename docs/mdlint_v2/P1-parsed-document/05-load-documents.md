@@ -18,7 +18,7 @@ Provide the deterministic entry point the whole pipeline uses: glob → read →
 
 ## Inputs (from previous work)
 
-- MVP `discovery/{discover,globs}.ts` (micromatch globbing, path normalization), in `core`.
+- current `discovery/{discover,globs}.ts` (micromatch globbing, path normalization), in `core`.
 - The parser pipeline from P1.02–P1.04.
 
 ## Deliverables / steps
@@ -33,7 +33,7 @@ Provide the deterministic entry point the whole pipeline uses: glob → read →
 3. Deterministic ordering of map insertion and any derived arrays.
 
 > **Boundary note:** P1's loader takes explicit patterns/options so it has no dependency on
-> the (still-MVP) config. P2 connects it to the new `{ include, exclude, … }` config.
+> the (current) config. P2 connects it to the new `{ include, exclude, … }` config.
 
 ## Decisions applied
 

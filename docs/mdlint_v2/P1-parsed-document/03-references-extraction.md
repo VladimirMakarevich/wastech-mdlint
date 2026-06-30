@@ -20,8 +20,8 @@ is the raw material for the semantic graph.
 
 ## Inputs (from previous work)
 
-- MVP link/image classification and anchor decoding from `markdown/parse.ts`.
-- MVP eager-import regex from `llm/imports.ts`
+- current link/image classification and anchor decoding from `markdown/parse.ts`.
+- current eager-import regex from `llm/imports.ts`
   (`@path/to/file.md`, `@/root/path.md`).
 - Heading slugs from P1.02 (for resolving `file.md#anchor`).
 
@@ -30,11 +30,11 @@ is the raw material for the semantic graph.
 1. **Links** → `{ rawTarget, text, anchor?, kind, line, column? }`:
    - keep the link **label text** for explainability ([G3](../requirements/03-context-graph.md));
    - split `#anchor`; classify `kind` (local-file / same-file-anchor / external / mailto / other)
-     as the MVP does.
+     as the current implementation does.
 2. **Images** → `{ rawTarget, line }` (relative images; for REF-003).
 3. **Eager imports** → `{ rawTarget, line, column? }` from the `@path.md` syntax
    ([D3](../index.md)); these become `import` graph edges in P4.
-4. Reuse MVP reference-style definition handling and non-ASCII anchor decoding.
+4. Reuse the current reference-style definition handling and non-ASCII anchor decoding.
 5. Keep the extraction in the same single traversal as P1.02.
 
 > **Out of scope here:** resolving anchors against headings, building id-ref edges, and the
@@ -50,7 +50,7 @@ is the raw material for the semantic graph.
 
 - [ ] Links carry label text, anchor, kind, and position.
 - [ ] Images and eager imports extracted with positions.
-- [ ] Reference-style definitions and non-ASCII anchors handled (MVP parity or better).
+- [ ] Reference-style definitions and non-ASCII anchors handled (current-behavior parity or better).
 
 ## Hand-off to next
 

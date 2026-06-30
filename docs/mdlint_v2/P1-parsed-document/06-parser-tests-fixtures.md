@@ -18,7 +18,7 @@ Lock the parser behavior with focused fixtures and unit tests so P2+ build on a 
 ## Inputs (from previous work)
 
 - The full parser + loader from P1.02–P1.05.
-- MVP fixture pattern under `test/fixtures/*` (carried into `core`).
+- current fixture pattern under `test/fixtures/*` (carried into `core`).
 
 ## Deliverables / steps
 

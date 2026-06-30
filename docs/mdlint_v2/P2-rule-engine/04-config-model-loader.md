@@ -5,7 +5,7 @@
 
 ## Goal
 
-Replace the MVP sectioned config with the new rule-driven model and a JSONC-tolerant loader,
+Replace the current implementation sectioned config with the new rule-driven model and a JSONC-tolerant loader,
 implementing the locked [configuration requirements](../requirements/01-configuration.md).
 
 ## Sequence
@@ -18,7 +18,7 @@ implementing the locked [configuration requirements](../requirements/01-configur
 
 ## Inputs (from previous work)
 
-- MVP `config/{defaults,load}.ts` (Zod-based) in `core` — to be **replaced**, not extended
+- current `config/{defaults,load}.ts` (Zod-based) in `core` — to be **replaced**, not extended
   ([D2](../index.md), greenfield).
 - The full config shape from [01-configuration.md](../requirements/01-configuration.md).
 

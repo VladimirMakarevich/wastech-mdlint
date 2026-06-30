@@ -4,100 +4,104 @@
 
 These instructions apply to the entire repository.
 
-## Project
+## Project State
 
-`wastech-ctxlint` is planned as a TypeScript CLI for auditing Markdown context in repositories. The v1 runtime target is Node.js 24.17.0 LTS. The v1 goal is deterministic local analysis for LLM/agent context hygiene:
+`wastech-ctxlint` is being rebuilt from the current single-package implementation into the v2 production target.
 
-- discover Markdown files;
-- parse Markdown links and headings;
-- validate local file links and anchors;
-- build a Markdown dependency graph;
-- report file size and line count, orphan docs, graph cycles, eager imports, and context budgets;
-- emit text and JSON reports;
-- support CI-friendly exit codes.
+- The current repository still contains the single-package codebase in `src/` and `test/`.
+- The target product is the v2 monorepo/workspace design documented under `docs/mdlint_v2/`.
+- Treat the current filesystem state as truth for where code lives today.
+- Treat the v2 roadmap as truth for where the product is going next.
+
+Do not invent post-P0 package layout in implementation work unless the task explicitly belongs
+to that phase. Likewise, do not preserve legacy single-package behavior once a v2 phase explicitly replaces it.
 
 ## Sources Of Truth
 
-The production (**v2**) effort is the current focus; its planning lives under `docs/v2/`:
+The production v2 effort is the current focus. Its authoritative planning lives under
+`docs/mdlint_v2/`:
 
-- **Roadmap:** `docs/v2/index.md` — gap analysis, target architecture, decisions (D1–D7), phases (P0–P9), milestones (M1–M4).
-- **Refined requirements:** `docs/v2/requirements/` (index: `docs/v2/requirements/index.md`) — the locked, point-by-point v2 requirements. Authoritative wherever the plan is otherwise ambiguous.
-- **Architectural decisions:** `docs/v2/decisions/` — load-bearing decisions referenced throughout (e.g. core-hosts-the-pipeline, vendor-neutral skill distribution).
-- **Phase task plans:** `docs/v2/P0-foundations/` … `docs/v2/P9-release/` — one folder per phase, each with a meta `index.md` plus numbered task files. Every task declares its `Previous` / `Next` / `Depends on` / `Blocks` chain.
+- Roadmap: `docs/mdlint_v2/index.md`
+- Locked requirements: `docs/mdlint_v2/requirements/` with index at
+  `docs/mdlint_v2/requirements/index.md`
+- Architectural decisions: `docs/mdlint_v2/decisions/`
+- Phase task plans: `docs/mdlint_v2/P0-foundations/` through `docs/mdlint_v2/P9-release/`
 
-Historical (**v1** MVP / PoC), retained for context — superseded by the v2 roadmap for current work:
+When documents disagree, use this precedence:
 
-- Original product idea: `PLAN.md`.
-- v1 implementation breakdown: `docs/plan/00-meta-plan.md` and `docs/plan/01-project-scaffold.md` through `docs/plan/16-npm-publishing.md`.
+1. The specific phase task file for the work you are doing
+2. The relevant locked requirements document
+3. The relevant decision document
+4. The roadmap summary
 
-When implementing v2, follow the phase order (P0 → P9) and each task's sequence links unless the user explicitly asks for a different slice. The "V1 Boundaries" section below describes the original MVP scope and is superseded by the v2 roadmap.
+If a contradiction changes implementation behavior, surface it explicitly instead of guessing.
 
-## V1 Boundaries
+Historical v1 planning remains in `PLAN.md` and `docs/plan/`, but it is background context only
+when it conflicts with `docs/mdlint_v2/`.
 
-Include in v1:
+## Delivery Order
 
-- `wastech-ctxlint scan [path] --config <file> --format text|json --fail-on error|warning|off`.
-- `wastech-ctxlint graph [path] --out graph.json`.
-- Node.js 24.17.0 LTS, with future `package.json` `engines.node` set to `>=24.17.0 <25`.
-- Config files: `wastech-ctxlint.config.json`, `.cjs`, `.mjs`.
-- Local Markdown file links and anchors.
-- Directed file dependency graph.
-- Size limits (bytes, lines, tokens) with per-metric two-tier `warn`/`error` thresholds and glob overrides.
-- Orphan docs and dependency cycles. Orphan docs are `error` by default and configurable through `structure.orphanDocs: "error" | "warning" | "off"`.
-- `CLAUDE.md`, `AGENTS.md`, and `skills/**/SKILL.md` style LLM entrypoints.
-- `@path/to/file.md` eager imports.
-- Deterministic heuristic token estimates.
+Unless the user explicitly asks for a different slice, follow the v2 phase order and task
+dependency chains:
 
-Do not include in v1 unless the user explicitly changes scope:
+`P0 Foundations -> P1 ParsedDocument -> P2 Rule engine -> P3 Rules -> P4 Graph -> P5 Compile -> P6 Init -> P7 MCP server -> P8 Skills -> P9 Release`
 
-- HTTP checks for external links.
-- External link cache.
-- Runtime loading of TypeScript config files.
-- Full `structure.requiredSections` enforcement.
-- Visualization UI.
-- Watch mode.
+For implementation sequencing, respect each task file's `Previous`, `Next`, `Depends on`, and
+`Blocks` links.
 
-## Engineering Guidelines
+## Architecture Invariants
 
-- Prefer small modules with explicit data handoff between CLI, config, discovery, parsing, rules, graph, budgets, and reporting.
-- Keep rule modules pure where practical: inputs in, findings out.
-- Use normalized repository-relative POSIX paths in public data structures and reports.
-- Keep JSON output deterministic by sorting arrays before rendering.
-- Avoid ad hoc Markdown parsing when a parser library can provide correct links, headings, and positions.
-- Keep token estimation isolated so a real tokenizer can replace the heuristic later.
-- Do not introduce broad abstractions before the first concrete rule or pipeline needs them.
+- `@wastech-ctxlint/core` is the single owner of parsing, config loading, lint orchestration,
+  graph construction, compile logic, and result formatting.
+- `@wastech-ctxlint/cli` and `@wastech-ctxlint/mcp-server` are thin adapters over core. They do
+  not re-implement the pipeline.
+- Runtime surfaces in `core`, `cli`, and `mcp-server` must behave correctly on Windows, macOS,
+  and Linux.
+- `ParsedDocument` is produced from one parse pass and feeds rules, graph, compile, and inline
+  suppression behavior.
+- The rule system is registry-driven: structured metadata, Zod-validated options, shared
+  assertion primitives, and deterministic findings.
+- `ContextGraph` is shared infrastructure for graph commands, impact/slice logic, and graph-aware
+  rules. Do not create parallel traversal implementations.
+- Public/report output uses normalized repository-relative POSIX paths and deterministic ordering.
+- v2 config is JSONC in `wastech-ctxlint.config.json` with a local `$schema`. Do not introduce
+  remote schema URLs, runtime TypeScript config loading, or `.cjs`/`.mjs` config support in v2
+  work unless the roadmap changes.
 
-## Expected Core Types
+## Implementation Guidance
 
-The implementation should converge on these public/internal contracts:
+- Prefer small modules with explicit data handoff between parser, config, engine, rules, graph,
+  compile, CLI, and MCP.
+- Keep rule logic pure where practical: parsed inputs in, structured findings or edits out.
+- Use explicit public types for load-bearing contracts such as `ParsedDocument`, `Rule`,
+  `RuleContext`, `LintMessage`, `ContextGraph`, and compile outputs.
+- Treat path normalization, glob handling, newline behavior, and report rendering as
+  cross-platform correctness concerns, not platform-specific polish.
+- Reuse parser libraries and structured AST traversal instead of ad hoc Markdown parsing.
+- Keep token estimation isolated so the current heuristic can be replaced later without
+  refactoring unrelated code.
+- Do not add broad abstractions before the phase plan creates a concrete need for them.
+- Do not add new skills, `.claude/skills/`, hooks, LSP support, docs-site work, external HTTP
+  link checking, external link caches, or code-plugin execution unless the user explicitly asks
+  for that scope.
 
-- `AuditConfig`
-- `Finding`
-- `FindingSeverity`
-- `MarkdownFile`
-- `MarkdownLink`
-- `AnchorIndex`
-- `DependencyGraph`
-- `EntrypointBudget`
+## Testing And Verification
 
-## Testing
+Prefer focused fixtures over this repository's real Markdown files.
 
-Use focused fixtures rather than this repository's real Markdown files as test data. Cover:
+Expected coverage areas across the roadmap:
 
-- config defaults and overrides;
-- file discovery and path normalization;
-- Markdown link and heading parsing;
-- GitHub-style slug generation;
-- broken local links and anchors;
-- size and line-count limits (warn/error thresholds per metric: bytes, lines, tokens);
-- graph edges, orphan docs, and cycles;
-- eager import traversal;
-- context budget totals;
-- text and JSON scan output;
-- `graph --out`;
-- `--fail-on error|warning|off`.
+- config loading, defaults, diagnostics, and schema generation
+- Markdown parsing: headings, tables, sections, links, images, checklist items, imports,
+  inline-disable directives
+- rule fixtures per rule family
+- graph algorithms, slice, impact, and coverage reporting
+- CLI command behavior and exit codes
+- MCP stdio integration and structured output
+- compile/init deterministic output
+- generated docs/schema sync checks
 
-After the project scaffold exists, prefer these checks before finishing code changes:
+Before finishing code changes, prefer these commands when they apply:
 
 ```bash
 npm run typecheck
@@ -105,9 +109,15 @@ npm test
 npm run build
 ```
 
+Use `npm run lint` and `npm run format` when the touched scope or task requires style
+verification.
+
 ## Repository Hygiene
 
-- Do not rewrite existing user changes unless explicitly requested.
-- Keep documentation changes in `docs/plan/` when they describe implementation sequencing.
-- Keep user-facing usage docs in `README.md`.
-- Keep implementation details aligned with the task files; update the relevant task file if implementation decisions intentionally diverge.
+- Do not rewrite or revert existing user changes unless explicitly requested.
+- Keep documentation aligned with the current v2 phase/task files when implementation decisions
+  intentionally diverge.
+- Keep user-facing product documentation in `README.md`.
+- Keep agent-operation guidance in `AGENTS.md`, `CLAUDE.md`, and `.agents/rules/`.
+- If a task is documentation-only, do not change product code, public interfaces, package
+  metadata, or dependencies unless the user explicitly expands scope.

@@ -6,7 +6,7 @@
 ## Goal
 
 Implement the closed, Zod-validated set of assertion **primitives** over `ParsedDocument`.
-These are the shared executors that both the 21 built-in rules (as presets, [P3](../index.md))
+These are the shared executors that both the 22 built-in rules (as presets, [P3](../index.md))
 and declarative **custom rules** ([R9](../requirements/02-rules-engine.md)) run on.
 
 ## Sequence
@@ -56,5 +56,5 @@ and declarative **custom rules** ([R9](../requirements/02-rules-engine.md)) run 
 
 ## Hand-off to next
 
-P2.03 registers built-in rules as named presets over these primitives; P3 wires the full 21
+P2.03 registers built-in rules as named presets over these primitives; P3 wires the full 22
 plus the `custom` rule directly onto this vocabulary.

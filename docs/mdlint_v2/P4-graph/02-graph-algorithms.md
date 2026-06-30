@@ -17,14 +17,14 @@ topo order.
 
 1. `topologicalSort(graph)` — Kahn's algorithm with a sorted zero-in-degree queue.
 2. `getComponents(graph)` — undirected BFS connected components, sorted.
-3. **Explicit cycles** ([G6](../requirements/03-context-graph.md)): SCC/DFS (reuse the MVP
+3. **Explicit cycles** ([G6](../requirements/03-context-graph.md)): SCC/DFS (reuse the existing
    Tarjan implementation now in `core`) returning the cycle list as data — not just a shorter
    topo array. Shared with GRP-002 (P4.06).
 4. `formatContextGraphSummary(graph)` — counts, entry points (`inDegree === 0`), top hubs.
 
 ## Decisions applied
 
-- [G6](../requirements/03-context-graph.md) explicit cycles (reuse MVP Tarjan).
+- [G6](../requirements/03-context-graph.md) explicit cycles (reuse the existing Tarjan implementation).
 
 ## Exit criteria
 

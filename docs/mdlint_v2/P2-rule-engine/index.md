@@ -5,12 +5,12 @@
 >
 > **Goal:** build the central computational layer (rule engine + assertion primitives +
 > registry + orchestration) and the new config model that drives it. This is the engine the
-> 21 rules ([P3](../index.md)) and the agent hosts ([P4–P7](../index.md)) all run on.
+> 22 built-in rules ([P3](../index.md)) and the agent hosts ([P4–P7](../index.md)) all run on.
 
 ## Why this phase exists
 
-The MVP has three hardcoded rule functions and a sectioned config. The target is a
-schema-validated registry over a closed **assertion-primitive vocabulary**, where the 21
+The current implementation has three hardcoded rule functions and a sectioned config. The target is a
+schema-validated registry over a closed **assertion-primitive vocabulary**, where the 22
 built-ins are *presets* and users add **declarative custom rules** with no rebuild
 ([R9](../requirements/02-rules-engine.md)). Severity resolution ([R1](../requirements/02-rules-engine.md)/[C2](../requirements/01-configuration.md)),
 inline-disable ([R8](../requirements/02-rules-engine.md)), structured findings
@@ -57,6 +57,6 @@ P2.06 depends on P2.03 (metadata) + P2.04 (config shape) and can be built alongs
 
 ## What P2 unblocks
 
-- **P3** — implement all 21 built-ins as presets over the primitives + the `custom` rule + LLM/SIZE rules.
+- **P3** — implement all 22 built-ins as presets over the primitives + the `custom` rule + LLM/SIZE rules.
 - **P4** — graph rules + the shared `ContextGraph` plug into `lintFiles`.
 - **P7** — MCP `lint`/`lint-files` call this engine; structured findings feed `structuredContent`.

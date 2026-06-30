@@ -22,7 +22,7 @@ full single-tag release automation is [P9](../index.md).
 
 - Three buildable packages (`core`, `cli`, `mcp-server`) and the root workspace scripts
   from P0.02.
-- The MVP CI workflows in `.github/workflows/` (`ci.yml`, `publish.yml`) as a starting point.
+- The current implementation CI workflows in `.github/workflows/` (`ci.yml`, `publish.yml`) as a starting point.
 
 ## Deliverables / steps
 

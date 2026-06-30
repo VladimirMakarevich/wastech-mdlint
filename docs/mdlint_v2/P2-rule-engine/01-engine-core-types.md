@@ -46,7 +46,7 @@ with structured findings, orchestrator-owned severity, and a fix hook.
 
 - [ ] All engine types compile and are exported from core.
 - [ ] `runRules` throws (not no-ops) on missing `documents` for project rules.
-- [ ] `LintMessage` is a strict superset of the MVP `Finding` shape.
+- [ ] `LintMessage` is a strict superset of the current `Finding` shape.
 
 ## Hand-off to next
 

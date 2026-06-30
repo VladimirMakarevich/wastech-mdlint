@@ -3,12 +3,12 @@
 > Roadmap: [v2 Index](../index.md) · Phase **P0** · Size **M** · Status **Not started**
 >
 > **Goal:** stand up the monorepo and shared tooling so every later phase lands in the
-> right package, then lift-and-shift the MVP into `@wastech-ctxlint/core` **without
+> right package, then lift-and-shift the current implementation into `@wastech-ctxlint/core` **without
 > changing its behavior**. P0 ships no new product features — it is purely structural.
 
 ## Why this phase exists
 
-The MVP is a single package with a hand-rolled CLI. The target ([D1](../index.md))
+The current implementation is a single package with a hand-rolled CLI. The target ([D1](../index.md))
 is a workspace with `@wastech-ctxlint/{core,cli,mcp-server}` so the MCP server and CLI
 publish separately and all hosts import one core ([core-hosts-the-pipeline](../decisions/core-hosts-the-pipeline.md)).
 Everything in [P1+](../index.md) (parser upgrade, rule engine, graph, compile, MCP) assumes
@@ -21,7 +21,7 @@ this layout already exists.
 | [P0.01](01-workspace-decisions.md) | Workspace layout & tooling decisions (design) | S | — |
 | [P0.02](02-root-scaffolding.md) | Root workspace + shared config baseline | M | P0.01 |
 | [P0.03](03-core-package-skeleton.md) | `@wastech-ctxlint/core` package skeleton | S | P0.02 |
-| [P0.04](04-migrate-mvp-to-core.md) | Migrate MVP source into core (behavior-preserving) | M | P0.03 |
+| [P0.04](04-relocate-current-source-into-core.md) | Relocate current source into core (behavior-preserving) | M | P0.03 |
 | [P0.05](05-cli-package-commander.md) | `@wastech-ctxlint/cli` + commander scaffold (port scan/graph) | M | P0.04 |
 | [P0.06](06-mcp-server-skeleton.md) | `@wastech-ctxlint/mcp-server` package skeleton (stub) | S | P0.04 |
 | [P0.07](07-ci-packaging-baseline.md) | CI matrix & packaging/publish baseline | M | P0.05, P0.06 |
@@ -47,9 +47,9 @@ P0.05 (cli) and P0.06 (mcp-server) both depend only on P0.04 and can run in para
 
 - [ ] `npm run typecheck && npm test && npm run build` are green across the whole workspace.
 - [ ] `packages/{core,cli,mcp-server}` exist with correct names, bins, and `publishConfig`.
-- [ ] MVP behavior preserved: `wastech-ctxlint scan` and `graph` produce the same output
+- [ ] Current behavior preserved: `wastech-ctxlint scan` and `graph` produce the same output
       as before the migration (parity check).
-- [ ] The MVP `postinstall` auto-config is removed (I1).
+- [ ] The current `postinstall` auto-config is removed (I1).
 - [ ] CI runs the workspace matrix on Node 24; `npm pack --dry-run` is clean per package.
 - [ ] No new product features were added (P0 is structural only).
 

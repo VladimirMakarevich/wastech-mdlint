@@ -5,7 +5,7 @@
 ## Goal
 
 Implement the six reference-integrity rules — link/anchor/image resolution and ID
-traceability — reusing MVP link logic and the [P3.01](01-shared-rule-utils.md) utils.
+traceability — reusing current link logic and the [P3.01](01-shared-rule-utils.md) utils.
 
 ## Sequence
 

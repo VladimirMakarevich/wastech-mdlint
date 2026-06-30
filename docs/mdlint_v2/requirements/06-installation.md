@@ -16,11 +16,11 @@
 | **I5** | Per-package supply chain | ✅ Accepted | npm provenance on all packages, `engines.node`, `files` allowlist, lockfile CI. |
 | **I6** | First-class GitHub Action / reusable CI workflow | ✅ Accepted | Publishable Action; `init` can drop `.github/workflows/wastech-ctxlint.yml`. |
 | **I7** | Documented `gh skill install … --pin` + compatibility frontmatter | ✅ Accepted | Reproducible, version-coupled skill install. |
-| **I8** | MVP→v2 config migration (guide / `migrate` command) | ⛔ Not needed | **Greenfield** — no prior users; reinforces [D2](../index.md) clean replace. |
+| **I8** | legacy-to-v2 config migration (guide / `migrate` command) | ⛔ Not needed | **Greenfield** — no prior users; reinforces [D2](../index.md) clean replace. |
 
 ## Detail & rationale
 
-- **I1 — no `postinstall`.** The MVP silently writes a default config on install
+- **I1 — no `postinstall`.** The current implementation silently writes a default config on install
   (`install-default-config.mjs`). A `postinstall` that writes files is an anti-pattern: it
   runs on transitive/CI installs and can clobber. v2 removes it; configuration is created
   only by the explicit `init` command.
@@ -40,7 +40,7 @@
   one `vX.Y.Z` tag publishes `@wastech-ctxlint/{core,cli,mcp-server}` and tags the skills
   together. Prevents version skew between CLI/MCP and the skills that target the CLI surface.
 
-- **I5 — supply chain.** Extend the MVP's npm provenance to every package; pin `engines.node`
+- **I5 — supply chain.** Extend the current implementation's npm provenance to every package; pin `engines.node`
   (`>=24.17.0 <25`), set per-package `files` allowlists, and run lockfile-based CI for
   reproducible builds.
 

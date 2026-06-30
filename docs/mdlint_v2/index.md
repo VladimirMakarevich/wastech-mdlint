@@ -2,25 +2,26 @@
 
 > **Status:** Draft for review · **Owner:** TBD · **Created:** 2026-06-21
 >
-> This document is the top-level roadmap for turning the current MVP/PoC into the
+> This document is the top-level roadmap for turning the current single-package implementation into the
 > production-ready target product. It defines the gap, the target architecture, the
 > phased plan, and the decisions we confirmed before deep work. Each phase has its own
-> detailed folder under `docs/v2/` (meta `index.md` + numbered task files), the same way
+> detailed folder under `docs/mdlint_v2/` (meta `index.md` + numbered task files), the same way
 > [docs/plan/](../plan/00-meta-plan.md) broke v1 into 16 tasks.
 
 ---
 
 ## 1. TL;DR
 
-The MVP ([PLAN.md](../PLAN.md)) shipped a **single-package CLI** with two commands
+The current implementation ([PLAN.md](../PLAN.md)) shipped a **single-package CLI** with two commands
 (`scan`, `graph`) and five hardcoded checks (size, broken links, orphan docs,
 eager imports, context budget). It is clean and well-factored, but its config
 model and rule model are **fundamentally different** from the target product.
 
 The target is a substantially larger product (**`wastech-ctxlint`**):
 
-- a **`@wastech-ctxlint/core`** engine with a **registry of 22 schema-validated
-  rules** across 7 categories (`TBL`, `SEC`, `STR`, `REF`, `CHK`, `CTX`, `GRP`);
+- a **`@wastech-ctxlint/core`** engine with a **registry of 22 built-in
+  schema-validated rules** across 7 categories (`TBL`, `SEC`, `STR`, `REF`, `CHK`, `CTX`,
+  `GRP`), plus `SIZE-001`, `LLM-001`, and the declarative `custom` rule;
 - a richer **`ParsedDocument`** (tables, sections, checklists, images) and a
   **`ContextGraph`** with `slice` / `impact` / `topological-sort` / `components`;
 - a **`@wastech-ctxlint/cli`** with `lint` (default) · `init` · `graph` · `slice`
@@ -32,14 +33,14 @@ The target is a substantially larger product (**`wastech-ctxlint`**):
 - npm + skill + MCP **distribution channels** under one version tag.
 
 **v2 is therefore a re-platforming, not an extension.** We keep and reuse the
-MVP's strong primitives (remark parsing, graph building, discovery, token
+current implementation's strong primitives (remark parsing, graph building, discovery, token
 heuristic, deterministic sorting) but rebuild the config model, rule model, CLI
 framework, and packaging to match the target. The plan below sequences that work
 so each phase ships something runnable.
 
 ---
 
-## 2. Current state (MVP) — what we keep
+## 2. Current state — what we keep
 
 Single package `wastech-ctxlint`, Node 24.17 LTS, ESM, TypeScript NodeNext.
 
@@ -67,8 +68,8 @@ Each capability area has a locked requirements doc under [requirements/](require
 
 | Area | What it defines | New in v2? |
 | --- | --- | --- |
-| [Context graph & search](requirements/03-context-graph.md) | `ContextGraph`, `slice`, `impact`, topo-sort, components | Extends MVP graph |
-| [Rules & rule engine](requirements/02-rules-engine.md) | `Rule`/`RuleContext`/`runRules`, registry, 21 rules | **New engine** |
+| [Context graph & search](requirements/03-context-graph.md) | `ContextGraph`, `slice`, `impact`, topo-sort, components | Extends the current graph implementation |
+| [Rules & rule engine](requirements/02-rules-engine.md) | `Rule`/`RuleContext`/`runRules`, registry, 22 built-in rules | **New engine** |
 | [Configuration](requirements/01-configuration.md) | `{ include, rules[], compile }`, `findConfig`, JSON schema | **New model** |
 | [MCP server](requirements/05-mcp-server.md) | 6 stdio tools over core | **New package** |
 | [Skills & compile](requirements/04-skills-compile.md) | static skills + generated `SKILL.md` (compile) | **New** |
@@ -76,7 +77,7 @@ Each capability area has a locked requirements doc under [requirements/](require
 
 ### 3.1 Rule inventory (the bulk of the work)
 
-22 rules, registered statically, each with a Zod options schema, `document` or
+22 built-in rules, registered statically, each with a Zod options schema, `document` or
 `project` scope, and a fixed severity (`error` | `warning`):
 
 - **TBL (tables, 6)** — `TBL-001` required columns · `TBL-002` cross-column
@@ -94,10 +95,10 @@ Each capability area has a locked requirements doc under [requirements/](require
 - **GRP (graph integrity, 3)** — `GRP-001` ID chain across stages *(project)* ·
   `GRP-002` no cycles *(project)* · `GRP-003` no orphan docs *(project)*.
 
-Note: MVP's `links/broken-links` ≈ `REF-001`+`REF-002`+`REF-003`; MVP's
-`graph/dependencies` cycles ≈ `GRP-002`; MVP's `structure/orphan-docs` ≈
-`GRP-003`. The MVP's **size / eager-imports / context-budget** features have **no
-direct equivalent** in the 21-rule taxonomy — see Decision D3 in §5.
+Note: current implementation's `links/broken-links` ≈ `REF-001`+`REF-002`+`REF-003`; current implementation's
+`graph/dependencies` cycles ≈ `GRP-002`; current implementation's `structure/orphan-docs` ≈
+`GRP-003`. The current implementation's **size / eager-imports / context-budget** features have **no
+direct equivalent** in the 22-rule taxonomy — see Decision D3 in §5.
 
 ---
 
@@ -111,7 +112,8 @@ pipeline.
 
 ```
 @wastech-ctxlint/core        ← parser, ParsedDocument, ContextGraph, rule engine,
-                                 registry (21 rules), config, compiler, formatters
+                                 registry (22 built-in rules + LLM/custom), config,
+                                 compiler, formatters
         ├── @wastech-ctxlint/cli         ← commander: lint|init|graph|slice|impact|compile
         ├── @wastech-ctxlint/mcp-server  ← stdio: 6 tools
         └── (optional) @wastech-ctxlint/lsp-server   ← stretch / out of v2 scope
@@ -137,9 +139,9 @@ stand at their recommendation as defaults unless changed.
 | --- | --- | --- |
 | **D1** ✅ | **Monorepo vs single package.** | **Monorepo (npm workspaces)** — `packages/core` + `cli` + `mcp-server`. Required to ship MCP + CLI separately and to honor the core-hosts-the-pipeline decision. |
 | **D2** ✅ | **Config model migration.** | **Clean replace**, no compatibility layer (still `v0.0.0`, no real users). New `{ include, rules[], compile }`; **JSON-only** (drop `.cjs/.mjs`). One-time migration note in the README. |
-| **D3** ✅ | **Fate of MVP LLM features** (size, eager `@import` budget, per-entrypoint token budget) — absent from the 21-rule set. | **Preserve as first-class rules** in the new engine (`SIZE-001` checks bytes/lines/tokens each with independent per-metric `warn`/`error` thresholds; `LLM-001` eager-import budget). Keeps the original PLAN.md mission (LLM context hygiene) on top of doc-integrity. |
-| **Order** ✅ | **What ships first after the foundation.** | **Lint parity first** — P3 (all 21 rules + the LLM rules) before graph/agents. M1→M2 is the priority path. |
-| **D4** | **`scan` command.** MVP uses `scan`; target uses `lint` (default). | **Default to `lint`, keep `scan` as a hidden alias** for one minor version, then deprecate. |
+| **D3** ✅ | **Fate of current LLM features** (size, eager `@import` budget, per-entrypoint token budget) — absent from the 22 built-in rule set. | **Preserve as first-class rules** in the new engine (`SIZE-001` checks bytes/lines/tokens each with independent per-metric `warn`/`error` thresholds; `LLM-001` eager-import budget). Keeps the original PLAN.md mission (LLM context hygiene) on top of doc-integrity. |
+| **Order** ✅ | **What ships first after the foundation.** | **Lint parity first** — P3 (all 22 built-in rules + the LLM rules) before graph/agents. M1→M2 is the priority path. |
+| **D4** | **`scan` command.** The current CLI uses `scan`; target uses `lint` (default). | **Default to `lint`, keep `scan` as a hidden alias** for one minor version, then deprecate. |
 | **D5** | **CLI framework.** | **Adopt `commander` + `@inquirer/prompts`** (matches reference, needed for `init`'s interactive flow). |
 | **D6** | **LSP server** (`lsp-server/config-loader.ts` in the spec). | **Out of v2 scope** (stretch). Keep `core` LSP-friendly (sync, no `process.exit` in library code). |
 | **D7** | **Docs site** (reference ships Astro/Starlight). | **Out of v2 core scope**; README + schema + skills suffice for launch. |
@@ -149,7 +151,7 @@ stand at their recommendation as defaults unless changed.
 ## 5b. Refined requirements
 
 A point-by-point requirements pass (2026-06-21) locked the v2 improvements. These live in
-**[docs/v2/requirements/](requirements/index.md)** and are authoritative wherever the plan
+**[docs/mdlint_v2/requirements/](requirements/index.md)** and are authoritative wherever the plan
 is otherwise ambiguous. Headlines that reshape the phases
 below: **declarative custom rules** (no rebuild/publish), a **`--fix` engine**, **semantic
 graph edges** (ID/anchor/import), **local-only `$schema`**, **structured MCP output**, a
@@ -161,7 +163,7 @@ decision log and backlog.
 
 Each phase is an epic detailed in its own folder (meta `index.md` + numbered task files, each
 with an explicit prev/next/depends/blocks chain). Effort is a rough T-shirt size
-(S < 2d, M ≈ 2–5d, L > 5d). "Reuse" = how much MVP code carries over.
+(S < 2d, M ≈ 2–5d, L > 5d). "Reuse" = how much current implementation code carries over.
 
 **Detailed task plans:**
 [P0 Foundations](P0-foundations/index.md) ·
@@ -179,11 +181,11 @@ with an explicit prev/next/depends/blocks chain). Effort is a rough T-shirt size
 **Goal:** establish the monorepo and shared tooling so subsequent phases land in the
 right package.
 - Convert to npm workspaces: `packages/core`, `packages/cli`, `packages/mcp-server`.
-- Move MVP `src/*` into `packages/core/src` (parser, graph, discovery, token est.).
+- Move the current `src/*` tree into `packages/core/src` (parser, graph, discovery, token est.).
 - Shared `tsconfig` base, ESLint/Prettier, Vitest, CI matrix (Node 24).
 - Decide Zod version (align on the version `core` + `mcp-server` share).
 - Bin/package names, `engines.node`, `publishConfig` per package.
-- **Exit:** `npm run typecheck && npm test && npm run build` green across the workspace; CLI still runs MVP behavior.
+- **Exit:** `npm run typecheck && npm test && npm run build` green across the workspace; CLI still runs current behavior.
 
 ### Phase 1 — `ParsedDocument` & parser upgrade · `M` · reuse: High
 **Goal:** one parse pass produces everything every rule needs.
@@ -203,20 +205,20 @@ right package.
 - `lintFiles()` orchestration: split `document` vs `project` scope; project rules
   run once over the `documents` map with file-attributed messages.
 - `schema.json` + sync test (every registered rule has a schema entry and vice-versa).
-- Migrate the 3 MVP checks + D3 size/LLM rules into the engine as the first rules.
+- Migrate the 3 existing checks + D3 size/LLM rules into the engine as the first rules.
 - **Maps to:** [rules](requirements/02-rules-engine.md) + [config](requirements/01-configuration.md) requirements.
 - **Exit:** engine runs an empty + a small ruleset end-to-end; config errors are clear.
 
-### Phase 3 — Implement the 22 rules + shared utils · `L` · reuse: Medium
+### Phase 3 — Implement the 22 built-in rules + shared utils · `L` · reuse: Medium
 **Goal:** full rule coverage. Sub-sequence by category; each rule ships with its
 own `*.test.ts` and a fixture.
 - Utils first: `glob-match` (picomatch `{dot:true}`), `find-line-number`,
   `extract-section-body`, `regex-string` (Zod), `site-router` (Starlight preset).
 - **3a TBL** (001–006) · **3b SEC** (001–002) · **3c STR** (001) ·
-  **3d REF** (001–006, reuses MVP link logic) · **3e CHK** (001) ·
-  **3f CTX** (001–002) · **3g GRP** (001–003, reuses MVP cycle/orphan logic).
+  **3d REF** (001–006, reuses current link logic) · **3e CHK** (001) ·
+  **3f CTX** (001–002) · **3g GRP** (001–003, reuses current cycle/orphan logic).
 - **Maps to:** [rules requirements](requirements/02-rules-engine.md); rule inventory in §3.1 above.
-- **Exit:** all 22 rules pass unit + fixture tests; documented in README + schema.
+- **Exit:** all 22 built-in rules pass unit + fixture tests; documented in README + schema.
 
 ### Phase 4 — `ContextGraph` + `graph`/`slice`/`impact` · `M` · reuse: High
 **Goal:** the graph as a first-class primitive and its three CLI surfaces.
@@ -246,7 +248,7 @@ own `*.test.ts` and a fixture.
 - Interactive (`@inquirer/prompts`): language, include patterns, rule categories →
   writes `wastech-ctxlint.config.json` with a sensible zero-config rule set.
 - Package-manager detection from lockfiles; local `$schema` wiring (no remote URL).
-- Reconcile/remove the MVP `postinstall` default-config script (init replaces it).
+- Reconcile/remove the current `postinstall` default-config script (init replaces it).
 - **Maps to:** [installation requirements](requirements/06-installation.md).
 - **Exit:** `init` produces a valid config that lints cleanly on a fresh repo.
 
@@ -294,7 +296,7 @@ CLI/MCP surface stable. P9 closes out.
 
 Recommended milestones:
 - **M1 "Engine":** P0–P2 — workspace + new config + rule engine + first rules runnable.
-- **M2 "Lint parity+":** P3 — all 21 rules + MVP LLM rules; this is a usable linter.
+- **M2 "Lint parity+":** P3 — all 22 built-in rules + current LLM rules; this is a usable linter.
 - **M3 "Graph & agents":** P4–P5 + P7 — slice/impact/compile + MCP.
 - **M4 "Launch":** P6, P8, P9 — init, skills, packaging, release.
 
@@ -302,12 +304,12 @@ Recommended milestones:
 
 ## 8. Cross-cutting concerns
 
-- **Determinism:** sort all output arrays before rendering (already an MVP habit; keep it).
+- **Determinism:** sort all output arrays before rendering (already an repository habit; keep it).
 - **Paths:** repo-relative POSIX paths in public data/reports; normalize `\`→`/`.
 - **Testing layers:** unit (per rule / per algorithm) → core pipeline integration →
   CLI/MCP e2e on fixture repos. Keep fixtures focused, not the real repo docs.
 - **Severity model:** two levels (`error`/`warning`); exit codes `0` pass / `1` lint
-  findings / `2` operational error. (MVP's `info` severity drops or maps to warning.)
+  findings / `2` operational error. (current implementation's `info` severity drops or maps to warning.)
 - **i18n:** skill triggers and `init` prompts are multilingual; the
   generated/skill English scaffold stays English, data is passed through.
 - **Token estimation:** keep isolated behind one function so a real tokenizer can
@@ -330,11 +332,11 @@ Recommended milestones:
 ## 10. Next steps
 
 1. ✅ **Decisions D1–D3 + milestone order confirmed** (§5). D4–D7 default-resolved.
-2. **Expand the critical-path phases into `docs/v2/NN-*.md` task files** (mirroring
+2. **Expand the critical-path phases into `docs/mdlint_v2/NN-*.md` task files** (mirroring
    the v1 `docs/plan/` granularity), in this order:
    - **P0** — workspace/monorepo bootstrap (gates everything);
    - **P2** — rule engine + new config model (the engine core);
-   - **P3** — the 21 rules + the two preserved LLM rules (the lint-parity milestone, M2).
+   - **P3** — the 22 built-in rules + the two preserved LLM rules (the lint-parity milestone, M2).
    P1/P4 can be detailed in parallel once P0 is drafted.
 3. Update [AGENTS.md](../../AGENTS.md) "Sources Of Truth" to point at this roadmap.
 
@@ -345,7 +347,7 @@ Recommended milestones:
 | Requirement area | Primary phase(s) |
 | --- | --- |
 | Configuration | P2 (model), P6 (init writes it) |
-| Rules & rule engine | P2 (engine), P3 (21 rules) |
+| Rules & rule engine | P2 (engine), P3 (22 built-in rules) |
 | Context graph & search | P1 (parse), P4 (graph/slice/impact) |
 | Skills (generated) | P5 (compile) |
 | MCP server | P7 |

@@ -14,7 +14,7 @@
 | **G3** | Edge metadata (`text`, `rawTarget`) | ✅ Accepted | Explainability for CLI/MCP/`--fix`. |
 | **G4** | Honest deterministic ID/anchor/heading index for `slice` | ✅ Accepted | Real index, no fuzzy/LLM. Fixes the "search" misnomer. |
 | **G5** | Coverage signal when graph input is incomplete | ✅ Accepted | Warn on linked-to on-disk files outside `include`. |
-| **G6** | Explicit cycle detection (reuse MVP Tarjan SCC) | ✅ Accepted | Replaces silent Kahn truncation; feeds `GRP-002`. |
+| **G6** | Explicit cycle detection (reuse the existing Tarjan SCC) | ✅ Accepted | Replaces silent Kahn truncation; feeds `GRP-002`. |
 | **G7** | Collapse duplicate edges with `count` | 🔵 Backlog | Next implementation iteration. |
 | **G8** | Incremental / cached graph rebuild | 🔵 Backlog | Next iteration; design loader so a cache can slot in. |
 | **G9** | `graph` export to Mermaid / DOT | ✅ Accepted | `--format mermaid\|dot` alongside JSON. |
@@ -55,7 +55,7 @@
   outside the corpus." Prevents silently-wrong impact/orphan results.
 
 - **G6 — explicit cycles.** `topologicalSort` silently returns a shortened array on
-  cycles. v2 surfaces cycles as data via SCC/DFS (reusing the MVP's Tarjan
+  cycles. v2 surfaces cycles as data via SCC/DFS (reusing the current implementation's Tarjan
   implementation) and shares it with `GRP-002` ([R5](02-rules-engine.md)). Honest reading
   order + cycle list.
 

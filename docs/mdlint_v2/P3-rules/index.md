@@ -1,9 +1,9 @@
-# Phase P3 — The 21 rules + LLM rules + custom rule
+# Phase P3 — The 22 built-in rules + LLM rules + custom rule
 
 > Roadmap: [v2 Index](../index.md) · Phase **P3** · Size **L** · Status **Not started** ·
 > **Milestone M2 — lint parity+.**
 >
-> **Goal:** implement all 21 built-in rules as presets over the [P2 primitives](../P2-rule-engine/02-assertion-primitives.md),
+> **Goal:** implement all 22 built-in rules as presets over the [P2 primitives](../P2-rule-engine/02-assertion-primitives.md),
 > add the preserved **LLM rules** ([D3](../index.md)), expose the **declarative `custom`
 > rule** ([R9](../requirements/02-rules-engine.md)), and close out the `scan → lint` cutover.
 > After this phase the tool is a complete, usable linter.
@@ -20,7 +20,7 @@ new algorithms. See the [rules requirements](../requirements/02-rules-engine.md)
 | --- | --- | --- | --- |
 | [P3.01](01-shared-rule-utils.md) | Shared rule utils | glob-match, find-line-number, extract-section-body, regex-string, site-router | P2 done |
 | [P3.02](02-tbl-rules.md) | Table rules | TBL-001…006 | P3.01 |
-| [P3.03](03-sec-str-rules.md) | Section + structure rules | SEC-001/002, STR-001 | P3.01 |
+| [P3.03](03-sec-str-rules.md) | Section + structure rules | SEC-001/002/003, STR-001 | P3.01 |
 | [P3.04](04-ref-rules.md) | Reference rules | REF-001…006 | P3.01 |
 | [P3.05](05-chk-ctx-rules.md) | Checklist + content quality | CHK-001, CTX-001/002 | P3.01 |
 | [P3.06](06-grp-rules.md) | Graph integrity | GRP-001/002/003 | P3.01 |
@@ -51,11 +51,11 @@ P3.02–P3.07 are independent once the utils (P3.01) exist and can be done in pa
 
 ## Phase exit criteria
 
-- [ ] All 21 built-in rules implemented as presets, each with options schema + fixtures + tests.
+- [ ] All 22 built-in rules implemented as presets, each with options schema + fixtures + tests.
 - [ ] LLM rules (SIZE-001, LLM-001) implemented; the [D3](../index.md) LLM features fully preserved.
 - [ ] `custom` rule works from config over the primitive vocabulary (no rebuild).
 - [ ] README rule table + `schema.json` are generated and in sync ([R6](../requirements/02-rules-engine.md)).
-- [ ] `scan` is now a hidden alias of `lint`; the legacy MVP pipeline is removed ([D4](../index.md)).
+- [ ] `scan` is now a hidden alias of `lint`; the legacy legacy pipeline is removed ([D4](../index.md)).
 
 ## What P3 unblocks
 

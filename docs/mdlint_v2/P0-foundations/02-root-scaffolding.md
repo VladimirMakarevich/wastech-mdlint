@@ -19,7 +19,7 @@ inherits, so package skeletons (P0.03+) are trivial.
 
 ## Inputs (from previous work)
 
-- The MVP root files: `package.json`, `tsconfig.json`, `eslint.config.js`,
+- The current implementation root files: `package.json`, `tsconfig.json`, `eslint.config.js`,
   `.prettierrc.json`, `.nvmrc`, `.node-version`, `vitest.config.ts`.
 
 ## Deliverables / steps
@@ -27,11 +27,11 @@ inherits, so package skeletons (P0.03+) are trivial.
 1. Root `package.json`: add `"workspaces": ["packages/*"]`, set `"private": true`, keep
    `"type": "module"` and `engines.node`. Move build/test/typecheck/lint/format scripts to
    run across the workspace (`npm run <script> --workspaces` or project-reference build).
-2. **Remove the MVP `postinstall`** (`scripts/install-default-config.mjs`) per
+2. **Remove the current `postinstall` script** (`scripts/install-default-config.mjs`) per
    [I1](../requirements/06-installation.md); `init` (P6) replaces it. Delete the script and
    its `files`/scripts references.
 3. `tsconfig.base.json` at the root with the shared compiler options (ESM/NodeNext, strict,
-   the MVP's settings); per-package tsconfigs will `extends` it.
+   the current implementation's settings); per-package tsconfigs will `extends` it.
 4. Root ESLint flat config + Prettier config shared by all packages.
 5. Root Vitest workspace config that discovers each package's tests.
 6. Keep `.nvmrc` / `.node-version` at Node 24.17.0.

@@ -11,7 +11,7 @@ task ships only a minimal, buildable stub.
 
 ## Sequence
 
-- **Previous:** [P0.04 — Migrate MVP source into core](04-migrate-mvp-to-core.md) made core
+- **Previous:** [P0.04 — Relocate current source into core](04-relocate-current-source-into-core.md) made core
   importable; [P0.05 — cli package](05-cli-package-commander.md) is the parallel sibling host.
 - **Next:** [P0.07 — CI & packaging baseline](07-ci-packaging-baseline.md) packs and tests
   all three packages.

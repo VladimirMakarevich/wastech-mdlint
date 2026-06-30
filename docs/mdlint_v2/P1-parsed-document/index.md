@@ -1,10 +1,10 @@
 # Phase P1 — `ParsedDocument` & parser upgrade
 
 > Roadmap: [v2 Index](../index.md) · Phase **P1** · Size **M** · Status **Not started** ·
-> Reuse from MVP: **High**.
+> Reuse from current implementation: **High**.
 >
 > **Goal:** one parse pass produces *everything* every downstream consumer needs. Extend the
-> remark parser (now in `@wastech-ctxlint/core` after [P0.04](../P0-foundations/04-migrate-mvp-to-core.md))
+> remark parser (now in `@wastech-ctxlint/core` after [P0.04](../P0-foundations/04-relocate-current-source-into-core.md))
 > into a rich `ParsedDocument` and a deterministic `loadDocuments()` loader.
 
 ## Why this phase exists
@@ -44,7 +44,7 @@ consumer.
 
 - [R8](../requirements/02-rules-engine.md) inline-disable · [R9](../requirements/02-rules-engine.md)
   primitive vocabulary source · [G1](../requirements/03-context-graph.md)/[G3](../requirements/03-context-graph.md)
-  semantic-edge inputs · [D3](../index.md) eager imports · GitHub-style slugs (carry over from MVP).
+  semantic-edge inputs · [D3](../index.md) eager imports · GitHub-style slugs (already present today).
 
 ## Phase exit criteria
 

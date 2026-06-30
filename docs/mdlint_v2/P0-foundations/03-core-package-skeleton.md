@@ -6,15 +6,15 @@
 ## Goal
 
 Create an empty-but-buildable `@wastech-ctxlint/core` package that the CLI and MCP server
-will depend on. No MVP logic moves yet — just the shell.
+will depend on. No existing logic moves yet — just the shell.
 
 ## Sequence
 
 - **Previous:** [P0.02 — Root scaffolding](02-root-scaffolding.md) declared the `packages/*`
   workspace, the shared `tsconfig.base.json`, and the lint/test baseline. This task adds the
   first package into that workspace.
-- **Next:** [P0.04 — Migrate MVP source into core](04-migrate-mvp-to-core.md) fills this
-  skeleton with the relocated MVP modules.
+- **Next:** [P0.04 — Relocate current source into core](04-relocate-current-source-into-core.md) fills this
+  skeleton with the relocated current modules.
 - **Depends on:** P0.02 · **Blocks:** P0.04 (fills it), P0.05 & P0.06 (depend on it).
 
 ## Inputs (from previous work)
@@ -42,5 +42,5 @@ will depend on. No MVP logic moves yet — just the shell.
 
 ## Hand-off to next
 
-P0.04 has a typed, buildable target to move the MVP modules into, with the dependency
+P0.04 has a typed, buildable target to move the current implementation modules into, with the dependency
 (Zod) and build/test plumbing already in place.

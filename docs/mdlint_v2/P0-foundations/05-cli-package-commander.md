@@ -6,12 +6,12 @@
 ## Goal
 
 Create the `@wastech-ctxlint/cli` package, adopt `commander` ([D5](../index.md)), and port
-the MVP `scan` and `graph` commands onto it **with identical behavior**, importing all logic
+the current `scan` and `graph` commands onto it **with identical behavior**, importing all logic
 from `@wastech-ctxlint/core`.
 
 ## Sequence
 
-- **Previous:** [P0.04 — Migrate MVP source into core](04-migrate-mvp-to-core.md) put the
+- **Previous:** [P0.04 — Relocate current source into core](04-relocate-current-source-into-core.md) put the
   pipeline (config, discovery, parse, rules, graph, reporting) inside `@wastech-ctxlint/core`
   and exported it.
 - **Next:** [P0.06 — mcp-server skeleton](06-mcp-server-skeleton.md) (parallel sibling, also
@@ -30,7 +30,7 @@ from `@wastech-ctxlint/core`.
    (and `@inquirer/prompts` reserved for the P6 `init`).
 2. Set up a `commander` program with subcommands `scan` and `graph`, mapping the existing
    options (`--config`, `--format`, `--fail-on`, `--out`) and exit-code logic 1:1 onto the
-   MVP behavior. Reuse, don't reimplement, the handlers (delegate to core).
+   current behavior. Reuse, don't reimplement, the handlers (delegate to core).
 3. Relocate `src/cli.ts` logic into `packages/cli/src/`; remove the old root entry.
 4. Preserve exit codes (0 success / 1 findings / 2 usage) exactly.
 
@@ -45,7 +45,7 @@ from `@wastech-ctxlint/core`.
 
 ## Exit criteria
 
-- [ ] `wastech-ctxlint scan` and `graph` produce byte-identical output to the MVP (parity).
+- [ ] `wastech-ctxlint scan` and `graph` produce byte-identical output to the current implementation (parity).
 - [ ] Exit codes unchanged.
 - [ ] CLI imports only from `@wastech-ctxlint/core` (no duplicated pipeline logic).
 
