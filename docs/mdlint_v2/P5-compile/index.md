@@ -46,7 +46,7 @@ requirements](../requirements/04-skills-compile.md).
 - [ ] Generated `SKILL.md`: frontmatter (schema-validated, S1), host-neutral command block
       (preset `claude|generic|none`, S2), context-budget summary (S6), and a
       "generated from N docs, M rules" header + hash (S4).
-- [ ] CLI `compile` with `--outdir`/`--dry-run`, default `.claude/skills/wastech-ctxlint/`;
+- [ ] CLI `compile` with `--outdir`/`--dry-run`, default `.claude/skills/wastech-mdlint/`;
       missing `config.compile` exits 2.
 
 ## What P5 unblocks

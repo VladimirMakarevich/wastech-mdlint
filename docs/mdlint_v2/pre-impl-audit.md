@@ -24,7 +24,7 @@ These are unresolved decisions that prevent starting Phase 0.
 
 ### 1.1 Zod version not chosen
 
-**File:** `docs/ctxlint_v2/P0-foundations/01-workspace-decisions.md`
+**File:** `docs/mdlint_v2/P0-foundations/01-workspace-decisions.md`
 
 The file explicitly says "decide v4 to match the MCP SDK examples → record the chosen version" but leaves the field blank. MVP uses Zod v3; MCP SDK examples use Zod v4. The APIs are incompatible (`.parse` vs `.safeParse` semantics differ; `.optional()` chaining changed; `.brand()` available in v4 only).
 
@@ -36,7 +36,7 @@ Choosing v3 means MCP server examples need porting. Choosing v4 means migrating 
 
 ### 1.2 TypeScript build strategy not chosen
 
-**File:** `docs/ctxlint_v2/P0-foundations/01-workspace-decisions.md`
+**File:** `docs/mdlint_v2/P0-foundations/01-workspace-decisions.md`
 
 The file says: "decide whether to use project references (recommended for incremental builds) or independent `tsc` per package." No decision recorded.
 
@@ -48,7 +48,7 @@ Project references change how `tsconfig.json` files are structured, how `cli` im
 
 ### 1.3 Decisions D4–D7 not formally confirmed
 
-**File:** `docs/ctxlint_v2/index.md`, §5
+**File:** `docs/mdlint_v2/index.md`, §5
 
 D1–D3 are confirmed (monorepo, clean config replace, preserve LLM rules). D4–D7 stand at "recommended defaults unless changed" — no explicit sign-off.
 
@@ -87,7 +87,7 @@ Option A is cheaper and aligns with the "one parse pass" design goal.
 
 ### 2.2 GRP rules in P3 build a local adjacency that P4 replaces
 
-**File:** `docs/ctxlint_v2/P3-rules/06-grp-rules.md`
+**File:** `docs/mdlint_v2/P3-rules/06-grp-rules.md`
 
 P3.06 says GRP-001/002/003 "may build a local adjacency (reference behavior)" and that P4 replaces it with the shared `ContextGraph`. This means:
 
@@ -127,7 +127,7 @@ No guidance exists on whether:
 
 The spec says: "Capture position so `disable-next-line` can be scoped to the following line and block-level `disable` to its range." But "block" is not defined:
 
-- Does `<!-- wastech-ctxlint-disable -->` apply to the next paragraph? Next section? Until EOF?
+- Does `<!-- wastech-mdlint-disable -->` apply to the next paragraph? Next section? Until EOF?
 - How does the rule engine consume disable ranges? (Line range on `ParsedDocument`? A `Set<number>` of disabled lines per rule?)
 
 This affects both the shape of `ParsedDocument` (P1) and the rule-runner filter logic (P2).
@@ -158,7 +158,7 @@ These are literal `TBD`, `?`, or blanks in task files that block implementation.
 
 ### 3.1 CTX-001 default placeholder set
 
-**File:** `docs/ctxlint_v2/P3-rules/05-chk-ctx-rules.md`
+**File:** `docs/mdlint_v2/P3-rules/05-chk-ctx-rules.md`
 
 Quote: "`placeholders?` (default set **TBD/TODO/WIP/FIXME/N/A**, extensible...)"
 
@@ -170,7 +170,7 @@ The word "TBD" is used both as a placeholder word *and* to signal the decision i
 
 ### 3.2 LLM-001 per-type limits
 
-**File:** `docs/ctxlint_v2/P3-rules/07-llm-rules.md`
+**File:** `docs/mdlint_v2/P3-rules/07-llm-rules.md`
 
 "per-type limits?" — question mark left in the spec, no answer. Does LLM-001 support a single total budget per entrypoint, or per-category budgets (e.g., separate limits for `@import` of rule docs vs. reference docs)?
 
@@ -182,7 +182,7 @@ The configuration schema for LLM-001 options is incomplete.
 
 ### 3.3 Node role thresholds for the compiler
 
-**File:** `docs/ctxlint_v2/P5-compile/01-graph-analysis.md`
+**File:** `docs/mdlint_v2/P5-compile/01-graph-analysis.md`
 
 `classifyNodes` assigns roles `entry | hub | leaf | isolated | bridge`. No formal thresholds are given (e.g., "inDegree ≥ 3 && outDegree ≥ 1 → hub"). Without thresholds the implementation is arbitrary and the generated `SKILL.md` will vary across corpora unpredictably.
 
@@ -192,7 +192,7 @@ The configuration schema for LLM-001 options is incomplete.
 
 ### 3.4 Compile preset examples missing
 
-**File:** `docs/ctxlint_v2/P5-compile/04-synthesize.md`
+**File:** `docs/mdlint_v2/P5-compile/04-synthesize.md`
 
 `compile --preset claude|generic|none` is specified but no example output is shown for any preset. "generic" and "none" are particularly vague. Without examples, the synthesise step cannot be validated against expected output.
 
@@ -202,7 +202,7 @@ The configuration schema for LLM-001 options is incomplete.
 
 ### 3.5 Custom rule ID namespace
 
-**File:** `docs/ctxlint_v2/P3-rules/08-custom-rule.md`
+**File:** `docs/mdlint_v2/P3-rules/08-custom-rule.md`
 
 "Enforce a **namespaced `id`** that cannot collide with built-in canonical IDs." The namespace prefix is not defined. Is it `CUSTOM-*`? A user-chosen prefix? A regex pattern? This affects both the Zod schema (P2.03/P3.08) and the generated `schema.json` (P2.06).
 
@@ -224,7 +224,7 @@ P6.04 generates a project-local `$schema` for projects with custom rules. It dep
 
 ### 4.2 P3 `--fix` engine → P8.03 `-fix` skill
 
-The `wastech-ctxlint-fix` skill delegates repairs to the core `--fix` engine. The skill's fix policy (per rule prefix) assumes stable CLI exit behaviour. If P3's `--fix` API changes after P8 starts, the skill's prompts and action sequences break.
+The `wastech-mdlint-fix` skill delegates repairs to the core `--fix` engine. The skill's fix policy (per rule prefix) assumes stable CLI exit behaviour. If P3's `--fix` API changes after P8 starts, the skill's prompts and action sequences break.
 
 **Mitigation:** document which rules support `--fix` and with what behaviour before starting P8.03.
 
@@ -262,7 +262,7 @@ The MVP already has `github-slugger` — the question is whether its exact dedup
 
 ### 5.2 Transitive impact has no depth bound
 
-**File:** `docs/ctxlint_v2/P4-graph/05-impact-analysis.md`
+**File:** `docs/mdlint_v2/P4-graph/05-impact-analysis.md`
 
 `transitivelyAffected (with via)` traverses the reverse graph. No maximum depth or visited-set constraint is documented. In a graph with cycles (which GRP-001 reports but does not prevent), this is an infinite loop.
 
@@ -331,7 +331,7 @@ Column-based is cheaper and explicit. Pattern-based enables discovery without co
 
 ### P6 — `init` config merge semantics
 
-When `init` runs over a repo that already has a `wastech-ctxlint.config.json`, the spec says "overwrite / merge / skip" but does not define merge semantics. Does merge:
+When `init` runs over a repo that already has a `wastech-mdlint.config.json`, the spec says "overwrite / merge / skip" but does not define merge semantics. Does merge:
 - preserve existing rules and append inferred rules (additive)?
 - replace the `rules[]` array with the inferred set?
 - prompt per-rule?

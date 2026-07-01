@@ -15,14 +15,14 @@ repo's sources of truth at v2.
 
 ## Deliverables / steps
 
-1. Rewrite `README.md`: the three install channels — CLI (`npm i -D @wastech-ctxlint/cli`),
-   MCP (`npx @wastech-ctxlint/mcp-server` + host snippet), skills
-   (`gh skill install VladimirMakarevich/wastech-ctxlint <skill> --pin vX.Y.Z`,
+1. Rewrite `README.md`: the three install channels — CLI (`npm i -D @wastech-mdlint/cli`),
+   MCP (`npx @wastech-mdlint/mcp-server` + host snippet), skills
+   (`gh skill install VladimirMakarevich/wastech-mdlint <skill> --pin vX.Y.Z`,
    [I7](../requirements/06-installation.md)); quick-start; commands; config.
 2. Embed the **generated** rule table ([R6](../requirements/02-rules-engine.md)) and MCP tool
    list ([M3](../requirements/05-mcp-server.md)) so docs can't drift.
 3. CHANGELOG; **no migration guide** ([I8 — greenfield](../requirements/06-installation.md)).
-4. Update [AGENTS.md](../../../AGENTS.md) "Sources Of Truth" to point at `docs/ctxlint_v2/`
+4. Update [AGENTS.md](../../../AGENTS.md) "Sources Of Truth" to point at `docs/mdlint_v2/`
    (roadmap + requirements + phase folders).
 
 ## Decisions applied

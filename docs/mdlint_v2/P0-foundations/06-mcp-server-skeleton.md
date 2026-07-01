@@ -1,11 +1,11 @@
-# P0.06 · `@wastech-ctxlint/mcp-server` package skeleton (stub)
+# P0.06 · `@wastech-mdlint/mcp-server` package skeleton (stub)
 
 > Phase: [P0 — Workspace & Foundations](index.md) · Roadmap: [v2 Index](../index.md) ·
 > Size **S** · Status **Not started**.
 
 ## Goal
 
-Create the `@wastech-ctxlint/mcp-server` package shell so the 3-package workspace shape and
+Create the `@wastech-mdlint/mcp-server` package shell so the 3-package workspace shape and
 its publish config are locked. The real tools are built later in [P7](../index.md) — this
 task ships only a minimal, buildable stub.
 
@@ -23,8 +23,8 @@ task ships only a minimal, buildable stub.
 
 ## Deliverables / steps
 
-1. `packages/mcp-server/package.json`: name `@wastech-ctxlint/mcp-server`, bin
-   `wastech-ctxlint-mcp` → `dist/index.js`, deps `@wastech-ctxlint/core` (`workspace:*`),
+1. `packages/mcp-server/package.json`: name `@wastech-mdlint/mcp-server`, bin
+   `wastech-mdlint-mcp` → `dist/index.js`, deps `@wastech-mdlint/core` (`workspace:*`),
    `@modelcontextprotocol/sdk`, the shared Zod version; `files: ["dist"]`,
    `publishConfig.access: "public"`.
 2. `packages/mcp-server/src/index.ts` minimal stub: create an `McpServer`, connect a

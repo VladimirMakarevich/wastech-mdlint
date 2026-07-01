@@ -52,7 +52,7 @@ P2.06 depends on P2.03 (metadata) + P2.04 (config shape) and can be built alongs
 - [ ] Registry + single metadata source; rule IDs canonical ([C3](../requirements/01-configuration.md)).
 - [ ] New config `{ $schema?, include?, exclude?, respectGitignore?, settings?, rules:[{rule,severity?,options?}], compile? }` parsed (JSONC), validated two-stage, with rich diagnostics.
 - [ ] `lintFiles()` resolves severity (incl. `"off"`), applies inline-disable, fails fast on missing `documents`.
-- [ ] `schema.json` generated from metadata + sync test; `wastech-ctxlint schema` writes a local schema; `$schema` is local (no remote URL).
+- [ ] `schema.json` generated from metadata + sync test; `wastech-mdlint schema` writes a local schema; `$schema` is local (no remote URL).
 - [ ] `lint` runs the new engine on a few proof rules; `scan` alias plan recorded for end of P3.
 
 ## What P2 unblocks

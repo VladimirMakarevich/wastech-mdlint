@@ -31,8 +31,8 @@ sync with the registry, and ship it as a **local** `$schema` — never a remote 
    schema entry and vice versa; comparisons normalize canonical IDs
    ([C3](../requirements/01-configuration.md)).
 3. Ship `schema.json` inside the published package; default `$schema` is a **relative local
-   path** (`./node_modules/@wastech-ctxlint/cli/schema.json`).
-4. `wastech-ctxlint schema` command writes a **project-local** schema (incl. custom-rule
+   path** (`./node_modules/@wastech-mdlint/cli/schema.json`).
+4. `wastech-mdlint schema` command writes a **project-local** schema (incl. custom-rule
    IDs); used by `init` in P6. **No remote URL emitted anywhere** ([C9](../requirements/01-configuration.md)).
 
 ## Decisions applied
@@ -45,7 +45,7 @@ sync with the registry, and ship it as a **local** `$schema` — never a remote 
 
 - [ ] `schema.json` is generated, not hand-written; sync test green.
 - [ ] Schema validates built-in rules and the generic `custom` shape.
-- [ ] `wastech-ctxlint schema` writes a local project schema; no remote URL anywhere.
+- [ ] `wastech-mdlint schema` writes a local project schema; no remote URL anywhere.
 
 ## Hand-off to next
 

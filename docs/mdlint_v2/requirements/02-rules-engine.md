@@ -16,7 +16,7 @@
 | **R5** | One `ContextGraph` for all graph rules | ✅ Accepted | `GRP-001/002` + `REF-003` consume `buildContextGraph` extended with `exclude`/`entryPoints`/`siteRouter`. Ties to [C5](01-configuration.md). |
 | **R6** | Single source of rule metadata | ✅ Accepted | `category`, `defaultSeverity`, `fixable`, `docsUrl`, messages → generates `schema.json`, README, `describeRules`, `init` categories. |
 | **R7** | Shared `files`/`exclude` options base for every rule | ✅ Accepted | Uniform scoping across all rules. |
-| **R8** | Inline suppression directives | ✅ Accepted | `<!-- wastech-ctxlint-disable[-next-line] RULE-ID -->`. Parser captures comments + positions. |
+| **R8** | Inline suppression directives | ✅ Accepted | `<!-- wastech-mdlint-disable[-next-line] RULE-ID -->`. Parser captures comments + positions. |
 | **R9** | **Custom rules without rebuild/publish** | ✅ Accepted (declarative) | Declarative `custom` rule composes a fixed primitive vocabulary. Code-plugins **deferred** (interface kept open). |
 
 ## R9 — Custom rules (the headline change)
@@ -91,7 +91,7 @@ built once and shared (R5).
 ## Schema generation (cross-ref C9)
 
 `schema.json` is generated from the rule-metadata source (R6) and includes the
-declarative-rule vocabulary (R9 Tier 1). `init`/`wastech-ctxlint schema` writes a
+declarative-rule vocabulary (R9 Tier 1). `init`/`wastech-mdlint schema` writes a
 project-local copy when custom rules are present so editors validate custom IDs.
 **No remote `$schema` URL.**
 
@@ -111,7 +111,7 @@ project-local copy when custom rules are present so editors validate custom IDs.
   inputs so graph rules reuse it (R5).
 - **Compile (P5):** `describeRules` reads the rule-metadata source (R6) and must
   describe custom rules too.
-- **CLI (P6+):** `--fix` flag (R2); `wastech-ctxlint schema` command (C9).
+- **CLI (P6+):** `--fix` flag (R2); `wastech-mdlint schema` command (C9).
 - **MCP (P7):** never loads code-plugins; declarative custom rules work unchanged.
 - **Skill `-fix` (P8):** delegates mechanical fixes to deterministic core `--fix`;
   keeps only judgement calls for the AI.

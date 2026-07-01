@@ -1,11 +1,11 @@
-# P0.03 · `@wastech-ctxlint/core` package skeleton
+# P0.03 · `@wastech-mdlint/core` package skeleton
 
 > Phase: [P0 — Workspace & Foundations](index.md) · Roadmap: [v2 Index](../index.md) ·
 > Size **S** · Status **Not started**.
 
 ## Goal
 
-Create an empty-but-buildable `@wastech-ctxlint/core` package that the CLI and MCP server
+Create an empty-but-buildable `@wastech-mdlint/core` package that the CLI and MCP server
 will depend on. No existing logic moves yet — just the shell.
 
 ## Sequence
@@ -23,7 +23,7 @@ will depend on. No existing logic moves yet — just the shell.
 
 ## Deliverables / steps
 
-1. `packages/core/package.json`: name `@wastech-ctxlint/core`, `"type": "module"`,
+1. `packages/core/package.json`: name `@wastech-mdlint/core`, `"type": "module"`,
    `exports` (`"."` → `./dist/index.js` + types), `engines.node`, `files: ["dist"]`,
    `publishConfig.access: "public"`. Add the chosen Zod version (P0.01) as a dependency.
 2. `packages/core/tsconfig.json` extending `tsconfig.base.json`, emitting to `dist`.

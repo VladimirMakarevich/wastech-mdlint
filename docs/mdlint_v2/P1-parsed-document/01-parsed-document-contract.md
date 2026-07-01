@@ -5,7 +5,7 @@
 
 ## Goal
 
-Define the full `ParsedDocument` TypeScript contract in `@wastech-ctxlint/core` — the single
+Define the full `ParsedDocument` TypeScript contract in `@wastech-mdlint/core` — the single
 shape every later consumer reads. No extraction logic yet; this fixes the interface so
 P1.02–P1.05 just fill it.
 

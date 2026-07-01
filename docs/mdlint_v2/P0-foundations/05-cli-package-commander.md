@@ -1,18 +1,18 @@
-# P0.05 · `@wastech-ctxlint/cli` + commander scaffold
+# P0.05 · `@wastech-mdlint/cli` + commander scaffold
 
 > Phase: [P0 — Workspace & Foundations](index.md) · Roadmap: [v2 Index](../index.md) ·
 > Size **M** · Status **Not started**.
 
 ## Goal
 
-Create the `@wastech-ctxlint/cli` package, adopt `commander` ([D5](../index.md)), and port
+Create the `@wastech-mdlint/cli` package, adopt `commander` ([D5](../index.md)), and port
 the current `scan` and `graph` commands onto it **with identical behavior**, importing all logic
-from `@wastech-ctxlint/core`.
+from `@wastech-mdlint/core`.
 
 ## Sequence
 
 - **Previous:** [P0.04 — Relocate current source into core](04-relocate-current-source-into-core.md) put the
-  pipeline (config, discovery, parse, rules, graph, reporting) inside `@wastech-ctxlint/core`
+  pipeline (config, discovery, parse, rules, graph, reporting) inside `@wastech-mdlint/core`
   and exported it.
 - **Next:** [P0.06 — mcp-server skeleton](06-mcp-server-skeleton.md) (parallel sibling, also
   on core) and then [P0.07 — CI & packaging](07-ci-packaging-baseline.md).
@@ -25,8 +25,8 @@ from `@wastech-ctxlint/core`.
 
 ## Deliverables / steps
 
-1. `packages/cli/package.json`: name `@wastech-ctxlint/cli`, bin `wastech-ctxlint` →
-   `dist/index.js`, dependency `@wastech-ctxlint/core` (`workspace:*`) + `commander`
+1. `packages/cli/package.json`: name `@wastech-mdlint/cli`, bin `wastech-mdlint` →
+   `dist/index.js`, dependency `@wastech-mdlint/core` (`workspace:*`) + `commander`
    (and `@inquirer/prompts` reserved for the P6 `init`).
 2. Set up a `commander` program with subcommands `scan` and `graph`, mapping the existing
    options (`--config`, `--format`, `--fail-on`, `--out`) and exit-code logic 1:1 onto the
@@ -45,9 +45,9 @@ from `@wastech-ctxlint/core`.
 
 ## Exit criteria
 
-- [ ] `wastech-ctxlint scan` and `graph` produce byte-identical output to the current implementation (parity).
+- [ ] `wastech-mdlint scan` and `graph` produce byte-identical output to the current implementation (parity).
 - [ ] Exit codes unchanged.
-- [ ] CLI imports only from `@wastech-ctxlint/core` (no duplicated pipeline logic).
+- [ ] CLI imports only from `@wastech-mdlint/core` (no duplicated pipeline logic).
 
 ## Hand-off to next
 

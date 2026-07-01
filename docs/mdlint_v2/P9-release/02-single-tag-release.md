@@ -15,7 +15,7 @@ One `vX.Y.Z` tag publishes all npm packages and tags the skills together — no 
 
 ## Deliverables / steps
 
-1. Release tooling (e.g. changesets) coupling `@wastech-ctxlint/{core,cli,mcp-server}` to a
+1. Release tooling (e.g. changesets) coupling `@wastech-mdlint/{core,cli,mcp-server}` to a
    single version; publish on tag.
 2. Tag the `skills/*` together with the same `vX.Y.Z`; set each skill's `compatibility` to the
    CLI version ([I7](../requirements/06-installation.md)).

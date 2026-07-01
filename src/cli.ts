@@ -58,13 +58,13 @@ export class CliUsageError extends Error {
   }
 }
 
-const HELP_TEXT = `wastech-ctxlint
+const HELP_TEXT = `wastech-mdlint
 
 Usage:
-  wastech-ctxlint scan [path] [--config <file>] [--format text|json] [--fail-on error|warning|off]
-  wastech-ctxlint graph [path] [--config <file>] --out <file>
-  wastech-ctxlint --help
-  wastech-ctxlint --version`;
+  wastech-mdlint scan [path] [--config <file>] [--format text|json] [--fail-on error|warning|off]
+  wastech-mdlint graph [path] [--config <file>] --out <file>
+  wastech-mdlint --help
+  wastech-mdlint --version`;
 
 const SCAN_FORMATS = new Set<OutputFormat>(["text", "json"]);
 const FAIL_ON_VALUES = new Set<FailOn>(["error", "warning", "off"]);

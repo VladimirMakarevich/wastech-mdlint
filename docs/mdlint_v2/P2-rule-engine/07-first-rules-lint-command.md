@@ -42,7 +42,7 @@ Prove the engine end-to-end by porting a few existing checks as real rules, and 
 
 ## Exit criteria
 
-- [ ] `wastech-ctxlint lint` runs the new engine on the proof rules with correct exit codes.
+- [ ] `wastech-mdlint lint` runs the new engine on the proof rules with correct exit codes.
 - [ ] A reference rule and an LLM rule both produce structured findings.
 - [ ] Coexistence/alias plan for `scan` recorded for P3 to finish.
 - [ ] Phase P2 [exit criteria](index.md) satisfied.

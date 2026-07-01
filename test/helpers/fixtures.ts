@@ -19,7 +19,7 @@ afterEach(async () => {
 
 export async function copyFixture(fixtureName: string): Promise<string> {
   const sourceDir = path.resolve("test/fixtures", fixtureName);
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-ctxlint-fixture-"));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-fixture-"));
   tempDirs.push(tempDir);
   await cp(sourceDir, tempDir, { recursive: true });
   return tempDir;

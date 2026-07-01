@@ -122,9 +122,9 @@ describe("CLI smoke", () => {
   });
 
   it("returns a usage error for an invalid config file", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-ctxlint-cli-"));
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-cli-"));
     tempDirs.push(tempDir);
-    const configPath = path.join(tempDir, "wastech-ctxlint.config.json");
+    const configPath = path.join(tempDir, "wastech-mdlint.config.json");
     const stdout = createMemoryWriter();
     const stderr = createMemoryWriter();
 
@@ -155,7 +155,7 @@ describe("CLI smoke", () => {
   });
 
   it("writes the graph file", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-ctxlint-"));
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-"));
     tempDirs.push(tempDir);
     const outFile = path.join(tempDir, "nested", "graph.json");
     await writeFile(path.join(tempDir, "README.md"), "# Root\n", "utf8");
@@ -178,7 +178,7 @@ describe("CLI smoke", () => {
   });
 
   it("refuses to overwrite a directory path for graph output", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-ctxlint-"));
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-"));
     tempDirs.push(tempDir);
     const outDir = path.join(tempDir, "output-dir");
     const stdout = createMemoryWriter();
@@ -198,14 +198,14 @@ describe("CLI smoke", () => {
   });
 
   it("includes llm budgets in json scan output", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-ctxlint-cli-"));
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-cli-"));
     tempDirs.push(tempDir);
 
     await writeFile(path.join(tempDir, "CLAUDE.md"), "@docs/context.md\n", "utf8");
     await (await import("node:fs/promises")).mkdir(path.join(tempDir, "docs"), { recursive: true });
     await writeFile(path.join(tempDir, "docs", "context.md"), "abcdefgh", "utf8");
     await writeFile(
-      path.join(tempDir, "wastech-ctxlint.config.json"),
+      path.join(tempDir, "wastech-mdlint.config.json"),
       JSON.stringify({ structure: { orphanDocs: "off" } }),
       "utf8"
     );
@@ -261,7 +261,7 @@ describe("CLI smoke", () => {
   });
 
   it("exits 0 for completed scans when --fail-on off", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-ctxlint-cli-"));
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-cli-"));
     tempDirs.push(tempDir);
     const stdout = createMemoryWriter();
     const stderr = createMemoryWriter();
@@ -279,7 +279,7 @@ describe("CLI smoke", () => {
   });
 
   it("exits 1 for warnings when --fail-on warning", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-ctxlint-cli-"));
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-cli-"));
     tempDirs.push(tempDir);
     const stdout = createMemoryWriter();
     const stderr = createMemoryWriter();
@@ -297,7 +297,7 @@ describe("CLI smoke", () => {
   });
 
   it("exits 0 for warning-only scans when --fail-on error", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-ctxlint-cli-"));
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-cli-"));
     tempDirs.push(tempDir);
     const stdout = createMemoryWriter();
     const stderr = createMemoryWriter();
@@ -315,7 +315,7 @@ describe("CLI smoke", () => {
   });
 
   it("exits 1 by default when scan finds orphan-doc errors", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-ctxlint-cli-"));
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-cli-"));
     tempDirs.push(tempDir);
     const stdout = createMemoryWriter();
     const stderr = createMemoryWriter();

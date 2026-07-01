@@ -17,7 +17,7 @@ Expose compilation through config + the CLI, writing the skill to disk with prev
 1. Config `compile` section (validated in P2.04): `{ outdir?, skill: { name, description },
    sections?: { architecture?, rules?, dependencies?, workflow? }, commandPreset? }`.
 2. CLI `compile`: `--config`, `--outdir`, `--dry-run`, `--cwd`; resolve outdir as
-   `--outdir` → `config.compile.outdir` → `.claude/skills/wastech-ctxlint/`.
+   `--outdir` → `config.compile.outdir` → `.claude/skills/wastech-mdlint/`.
 3. Require `config.compile`; if absent, exit **2** with a clear message (compileContext
    throws — surface it, don't emit empty output).
 4. `--dry-run` prints the would-be `SKILL.md` without writing.

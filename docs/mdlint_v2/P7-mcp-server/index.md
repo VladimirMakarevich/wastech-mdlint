@@ -4,7 +4,7 @@
 > Depends on [P2](../index.md), [P4](../index.md), [P5](../index.md).
 >
 > **Goal:** fill the [P0.06 stub](../P0-foundations/06-mcp-server-skeleton.md) with the 6
-> deterministic MCP tools — a **thin stdio adapter over `@wastech-ctxlint/core`** with
+> deterministic MCP tools — a **thin stdio adapter over `@wastech-mdlint/core`** with
 > **structured output**, honest descriptions, and safety annotations.
 
 ## Why this phase exists

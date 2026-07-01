@@ -39,7 +39,7 @@ inherits, so package skeletons (P0.03+) are trivial.
 ## Decisions applied
 
 - [D1](../index.md) workspaces · [I1](../requirements/06-installation.md) no postinstall ·
-  [D2](../index.md) greenfield (the existing root `wastech-ctxlint.config.json` is a sample,
+  [D2](../index.md) greenfield (the existing root `wastech-mdlint.config.json` is a sample,
   freely rewritten later).
 
 ## Exit criteria

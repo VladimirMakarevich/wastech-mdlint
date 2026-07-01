@@ -15,14 +15,14 @@ Write the final config and wire it to the **local** schema, optionally dropping 
 
 ## Deliverables / steps
 
-1. Write `wastech-ctxlint.config.json` in `cwd`: `$schema` (local path), `include`/`exclude`,
+1. Write `wastech-mdlint.config.json` in `cwd`: `$schema` (local path), `include`/`exclude`,
    and `rules` using **canonical IDs** ([C3](../requirements/01-configuration.md)); optionally
    add rationale **comments** (JSONC, [C4](../requirements/01-configuration.md)).
 2. **Schema wiring** ([I3](../requirements/06-installation.md)/[C9](../requirements/01-configuration.md)):
    default `$schema` to the local package path; if custom rules exist, run the schema
    generator to write a project-local schema and point `$schema` there. **No remote URL.**
 3. Optional ([I6](../requirements/06-installation.md)): offer to drop
-   `.github/workflows/wastech-ctxlint.yml` referencing the published GitHub Action (P9) —
+   `.github/workflows/wastech-mdlint.yml` referencing the published GitHub Action (P9) —
    ask first, don't write silently.
 4. Print a summary of what was written.
 

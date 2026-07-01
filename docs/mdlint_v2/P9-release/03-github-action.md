@@ -4,7 +4,7 @@
 
 ## Goal
 
-Ship a publishable/reusable GitHub Action so consumers run `wastech-ctxlint` in CI in one
+Ship a publishable/reusable GitHub Action so consumers run `wastech-mdlint` in CI in one
 step — a major adoption lever ([I6](../requirements/06-installation.md)).
 
 ## Sequence
@@ -15,9 +15,9 @@ step — a major adoption lever ([I6](../requirements/06-installation.md)).
 
 ## Deliverables / steps
 
-1. A reusable composite Action (`wastech-ctxlint`) that installs and runs `lint` with
+1. A reusable composite Action (`wastech-mdlint`) that installs and runs `lint` with
    configurable `--fail-on`/`--config`/`--format`, surfacing findings in CI.
-2. A documented workflow snippet (`.github/workflows/wastech-ctxlint.yml`) that the
+2. A documented workflow snippet (`.github/workflows/wastech-mdlint.yml`) that the
    [`init` P6.04](../P6-init/04-config-writer-schema.md) optionally drops into a repo.
 3. (Optional) SARIF output mapping from structured findings
    ([R3](../requirements/02-rules-engine.md)) so results appear in GitHub code scanning.

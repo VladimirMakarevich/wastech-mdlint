@@ -24,7 +24,7 @@ async function createRepoFiles(fileMap: Record<string, string>): Promise<{
   rootPath: string;
   files: MarkdownFile[];
 }> {
-  const rootPath = await mkdtemp(path.join(os.tmpdir(), "wastech-ctxlint-llm-imports-"));
+  const rootPath = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-llm-imports-"));
   tempDirs.push(rootPath);
 
   const files: MarkdownFile[] = [];

@@ -19,8 +19,8 @@ references.
 1. CI test: every `skills/*/SKILL.md` frontmatter validates against the schema
    ([P8.01](01-frontmatter-schema-model.md)/[S1](../requirements/04-skills-compile.md)).
 2. **Host-neutrality check** ([S7](../requirements/04-skills-compile.md)): no Claude-specific
-   command-injection syntax; placeholders (`vladimir-makarevich` / `wastech-ctxlint.dev`) are
-   gone, replaced with `VladimirMakarevich/wastech-ctxlint`.
+   command-injection syntax; placeholders (`vladimir-makarevich` / `wastech-mdlint.dev`) are
+   gone, replaced with `VladimirMakarevich/wastech-mdlint`.
 3. Sanity-check referenced commands/tools exist in the actual CLI/MCP surface
    (a guard against skill ↔ product drift).
 

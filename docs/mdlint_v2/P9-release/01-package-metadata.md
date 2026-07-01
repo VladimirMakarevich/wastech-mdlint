@@ -16,7 +16,7 @@ Make every package correctly publishable, building on the [P0.07 baseline](../P0
 
 ## Deliverables / steps
 
-1. Per-package `package.json`: `name`, `bin` (`wastech-ctxlint`, `wastech-ctxlint-mcp`),
+1. Per-package `package.json`: `name`, `bin` (`wastech-mdlint`, `wastech-mdlint-mcp`),
    `exports` (+ types), `files` allowlist, `engines.node` (`>=24.17.0 <25`),
    `publishConfig.access: "public"` + **provenance** ([I5](../requirements/06-installation.md)).
 2. Ensure `core` is a published dependency of `cli`/`mcp-server` (resolve `workspace:*` on

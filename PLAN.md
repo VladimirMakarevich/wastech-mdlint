@@ -1,6 +1,6 @@
 ## Name And Goal
 
-**Working name:** `wastech-ctxlint`
+**Working name:** `wastech-mdlint`
 
 **Goal:** static analysis for `.md` files in a repository, focused on LLM/agent context quality: size, links, dependency graph, and basic LLM-specific invariants.
 
@@ -21,21 +21,21 @@ All `.md` files are analyzed:
 ### `scan` Command
 
 ```bash
-wastech-ctxlint scan [path] [options]
+wastech-mdlint scan [path] [options]
 ```
 
 **Purpose:** run all checks and print a human-readable report and/or JSON.
 
 Options:
 
-- `--config <file>`: path to `wastech-ctxlint.config.(json|cjs|mjs)`;
+- `--config <file>`: path to `wastech-mdlint.config.(json|cjs|mjs)`;
 - `--format text|json`: output format, default is `text`;
 - `--fail-on error|warning|off`: minimum severity that should produce a non-zero exit code.
 
 ### `graph` Command
 
 ```bash
-wastech-ctxlint graph [path] --out graph.json
+wastech-mdlint graph [path] --out graph.json
 ```
 
 **Purpose:** build a file dependency graph where nodes are files and edges are links, then save it as JSON for later visualization or processing.
@@ -148,7 +148,7 @@ wastech-ctxlint graph [path] --out graph.json
     - explicitly configured entrypoints.
 - Default behavior for `scan`:
   - orphan docs are reported as `error`;
-  - therefore `wastech-ctxlint scan` exits non-zero with the default `--fail-on error`;
+  - therefore `wastech-mdlint scan` exits non-zero with the default `--fail-on error`;
   - severity can be configured as `error`, `warning`, or `off`.
 - Report:
   - list of orphan files with a recommendation: delete, link from a table of contents, or mark as `@standalone` if that annotation is added later.
@@ -157,7 +157,7 @@ wastech-ctxlint graph [path] --out graph.json
 
 ## Config
 
-`wastech-ctxlint.config.json|cjs|mjs`:
+`wastech-mdlint.config.json|cjs|mjs`:
 
 ```ts
 export default {

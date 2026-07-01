@@ -47,7 +47,7 @@ Match the repository's actual tooling and configuration unless a phase task expl
 
 - Prefer parser libraries and AST traversal over ad hoc Markdown parsing.
 - Use structured validation for config and rule options; prefer Zod where the repo already does.
-- For v2 config work, target JSONC `wastech-ctxlint.config.json` with local `$schema` support.
+- For v2 config work, target JSONC `wastech-mdlint.config.json` with local `$schema` support.
 - Do not add remote schema dependencies or runtime code execution to configuration paths.
 
 ## Repository Structure

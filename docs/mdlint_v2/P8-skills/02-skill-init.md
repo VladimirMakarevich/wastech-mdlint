@@ -1,4 +1,4 @@
-# P8.02 · `wastech-ctxlint-init` skill
+# P8.02 · `wastech-mdlint-init` skill
 
 > Phase: [P8 — Static skills](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Not started**.
 
@@ -16,9 +16,9 @@ on top — an AI-driven wrapper over a now self-sufficient CLI.
 
 ## Deliverables / steps
 
-1. `skills/wastech-ctxlint-init/SKILL.md` with valid frontmatter (P8.01).
+1. `skills/wastech-mdlint-init/SKILL.md` with valid frontmatter (P8.01).
 2. Workflow: detect existing config → run smart CLI `init` ([P6](../P6-init/index.md), which
-   now does cluster detection + inference) → confirm draft → install `@wastech-ctxlint/cli`
+   now does cluster detection + inference) → confirm draft → install `@wastech-mdlint/cli`
    via the detected package manager → run `lint` once → **offer** GitHub Actions + README
    (ask first).
 3. Since the CLI `init` is smart ([I2](../requirements/06-installation.md)), the skill

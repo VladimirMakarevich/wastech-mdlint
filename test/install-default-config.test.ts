@@ -18,7 +18,7 @@ afterEach(async () => {
 });
 
 async function createTempDir(): Promise<string> {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-ctxlint-install-"));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-install-"));
   tempDirs.push(tempDir);
   return tempDir;
 }
@@ -27,8 +27,8 @@ describe("copyDefaultConfigIfMissing", () => {
   it("copies the default config when the destination does not exist", async () => {
     const sourceDir = await createTempDir();
     const destinationDir = await createTempDir();
-    const sourcePath = path.join(sourceDir, "wastech-ctxlint.config.json");
-    const destinationPath = path.join(destinationDir, "wastech-ctxlint.config.json");
+    const sourcePath = path.join(sourceDir, "wastech-mdlint.config.json");
+    const destinationPath = path.join(destinationDir, "wastech-mdlint.config.json");
 
     await writeFile(sourcePath, "{\"structure\":{\"orphanDocs\":\"warning\"}}\n", "utf8");
 
@@ -49,8 +49,8 @@ describe("copyDefaultConfigIfMissing", () => {
   it("does not overwrite an existing destination config", async () => {
     const sourceDir = await createTempDir();
     const destinationDir = await createTempDir();
-    const sourcePath = path.join(sourceDir, "wastech-ctxlint.config.json");
-    const destinationPath = path.join(destinationDir, "wastech-ctxlint.config.json");
+    const sourcePath = path.join(sourceDir, "wastech-mdlint.config.json");
+    const destinationPath = path.join(destinationDir, "wastech-mdlint.config.json");
 
     await writeFile(sourcePath, "{\"structure\":{\"orphanDocs\":\"warning\"}}\n", "utf8");
     await writeFile(destinationPath, "{\"structure\":{\"orphanDocs\":\"off\"}}\n", "utf8");

@@ -14,7 +14,7 @@
 | **I3** | `init` wires the local `$schema` + generates project schema | ✅ Accepted | Ties to [C9](01-configuration.md). |
 | **I4** | One version tag publishes core+cli+mcp and tags skills | ✅ Accepted | the vendor-neutral skill distribution decision version coupling; changesets / release workflow. |
 | **I5** | Per-package supply chain | ✅ Accepted | npm provenance on all packages, `engines.node`, `files` allowlist, lockfile CI. |
-| **I6** | First-class GitHub Action / reusable CI workflow | ✅ Accepted | Publishable Action; `init` can drop `.github/workflows/wastech-ctxlint.yml`. |
+| **I6** | First-class GitHub Action / reusable CI workflow | ✅ Accepted | Publishable Action; `init` can drop `.github/workflows/wastech-mdlint.yml`. |
 | **I7** | Documented `gh skill install … --pin` + compatibility frontmatter | ✅ Accepted | Reproducible, version-coupled skill install. |
 | **I8** | legacy-to-v2 config migration (guide / `migrate` command) | ⛔ Not needed | **Greenfield** — no prior users; reinforces [D2](../index.md) clean replace. |
 
@@ -30,14 +30,14 @@
   the CLI alone produce a weak config and pushes the good experience onto the AI host. v2
   moves the smart inference into the CLI `init` itself — detect doc clusters, sample files,
   suggest rule categories, detect the package manager — with a non-interactive `--yes` mode
-  for CI. The `wastech-ctxlint-init` skill then orchestrates and layers GH Actions + README
+  for CI. The `wastech-mdlint-init` skill then orchestrates and layers GH Actions + README
   on top (S7/S8).
 
 - **I3 — local schema in `init`.** `init` sets `$schema` to the local path and, when custom
   rules exist, generates the project-local schema ([C9](01-configuration.md)). No remote URL.
 
 - **I4 — single-tag release.** Per [vendor-neutral skill distribution](../decisions/vendor-neutral-skill-distribution.md),
-  one `vX.Y.Z` tag publishes `@wastech-ctxlint/{core,cli,mcp-server}` and tags the skills
+  one `vX.Y.Z` tag publishes `@wastech-mdlint/{core,cli,mcp-server}` and tags the skills
   together. Prevents version skew between CLI/MCP and the skills that target the CLI surface.
 
 - **I5 — supply chain.** Extend the current implementation's npm provenance to every package; pin `engines.node`
@@ -49,7 +49,7 @@
   `init` can optionally drop the workflow file.
 
 - **I7 — skill install.** Document
-  `gh skill install VladimirMakarevich/wastech-ctxlint <skill> --pin vX.Y.Z`; the skill
+  `gh skill install VladimirMakarevich/wastech-mdlint <skill> --pin vX.Y.Z`; the skill
   `compatibility` frontmatter matches the CLI version, coupled to I4.
 
 ## Not needed

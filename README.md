@@ -1,6 +1,6 @@
-# wastech-ctxlint
+# wastech-mdlint
 
-`wastech-ctxlint` is a TypeScript CLI for auditing Markdown context in repositories. It targets Node.js `24.17.0` LTS and focuses on deterministic local checks for docs and agent-facing context files such as `README.md`, `CLAUDE.md`, `AGENTS.md`, and `skills/**/SKILL.md`.
+`wastech-mdlint` is a TypeScript CLI for auditing Markdown context in repositories. It targets Node.js `24.17.0` LTS and focuses on deterministic local checks for docs and agent-facing context files such as `README.md`, `CLAUDE.md`, `AGENTS.md`, and `skills/**/SKILL.md`.
 
 V1 covers:
 
@@ -32,7 +32,7 @@ node dist/cli.js --help
 
 After npm publishing is set up, the publishing workflow will be documented in [docs/plan/16-npm-publishing.md](docs/plan/16-npm-publishing.md).
 
-Running `npm install` in a fresh checkout also creates `wastech-ctxlint.config.json` from the bundled example if it is missing, and it leaves an existing config file untouched.
+Running `npm install` in a fresh checkout also creates `wastech-mdlint.config.json` from the bundled example if it is missing, and it leaves an existing config file untouched.
 
 ## Quick Start
 
@@ -59,14 +59,14 @@ node dist/cli.js graph . --out graph.json
 ## CLI
 
 ```bash
-wastech-ctxlint scan [path] [--config <file>] [--format text|json] [--fail-on error|warning|off]
-wastech-ctxlint graph [path] [--config <file>] --out graph.json
+wastech-mdlint scan [path] [--config <file>] [--format text|json] [--fail-on error|warning|off]
+wastech-mdlint graph [path] [--config <file>] --out graph.json
 ```
 
 `scan`:
 
 - `path` defaults to the current working directory
-- `--config <file>` loads `wastech-ctxlint.config.json`, `.cjs`, or `.mjs`
+- `--config <file>` loads `wastech-mdlint.config.json`, `.cjs`, or `.mjs`
 - `--format text|json` defaults to `text`
 - `--fail-on error|warning|off` defaults to `error`
 
@@ -79,11 +79,11 @@ wastech-ctxlint graph [path] [--config <file>] --out graph.json
 
 Supported config files:
 
-- `wastech-ctxlint.config.json`
-- `wastech-ctxlint.config.cjs`
-- `wastech-ctxlint.config.mjs`
+- `wastech-mdlint.config.json`
+- `wastech-mdlint.config.cjs`
+- `wastech-mdlint.config.mjs`
 
-Example `wastech-ctxlint.config.mjs`:
+Example `wastech-mdlint.config.mjs`:
 
 ```js
 export default {

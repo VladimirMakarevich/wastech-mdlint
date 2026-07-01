@@ -1,15 +1,15 @@
 {
-  "name": "wastech-ctxlint",
+  "name": "wastech-mdlint",
   "version": "0.0.0",
   "description": "CLI for auditing Markdown context in repositories.",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/VladimirMakarevich/wastech-ctxlint.git"
+    "url": "git+https://github.com/VladimirMakarevich/wastech-mdlint.git"
   },
-  "homepage": "https://github.com/VladimirMakarevich/wastech-ctxlint#readme",
+  "homepage": "https://github.com/VladimirMakarevich/wastech-mdlint#readme",
   "bugs": {
-    "url": "https://github.com/VladimirMakarevich/wastech-ctxlint/issues"
+    "url": "https://github.com/VladimirMakarevich/wastech-mdlint/issues"
   },
   "keywords": [
     "markdown",
@@ -21,7 +21,7 @@
   ],
   "type": "module",
   "bin": {
-    "wastech-ctxlint": "./dist/cli.js"
+    "wastech-mdlint": "./dist/cli.js"
   },
   "engines": {
     "node": ">=24.17.0 <25"
@@ -38,7 +38,7 @@
   },
   "files": [
     "dist",
-    "wastech-ctxlint.config.example.json",
+    "wastech-mdlint.config.example.json",
     "scripts/install-default-config.mjs",
     "README.md",
     "LICENSE"

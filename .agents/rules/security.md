@@ -13,7 +13,7 @@ inside that boundary unless the roadmap or the user explicitly expands scope.
 
 ## Config And Validation Safety
 
-- v2 config targets JSONC `wastech-ctxlint.config.json`.
+- v2 config targets JSONC `wastech-mdlint.config.json`.
 - Validate config and rule options structurally before execution.
 - For declarative custom rules, keep the execution model data-driven and closed over a fixed
   primitive vocabulary.

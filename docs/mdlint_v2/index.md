@@ -1,11 +1,11 @@
-# wastech-ctxlint v2 — Production Roadmap
+# wastech-mdlint v2 — Production Roadmap
 
 > **Status:** Draft for review · **Owner:** TBD · **Created:** 2026-06-21
 >
 > This document is the top-level roadmap for turning the current single-package implementation into the
 > production-ready target product. It defines the gap, the target architecture, the
 > phased plan, and the decisions we confirmed before deep work. Each phase has its own
-> detailed folder under `docs/ctxlint_v2/` (meta `index.md` + numbered task files), the same way
+> detailed folder under `docs/mdlint_v2/` (meta `index.md` + numbered task files), the same way
 > [docs/plan/](../plan/00-meta-plan.md) broke v1 into 16 tasks.
 
 ---
@@ -17,16 +17,16 @@ The current implementation ([PLAN.md](../PLAN.md)) shipped a **single-package CL
 eager imports, context budget). It is clean and well-factored, but its config
 model and rule model are **fundamentally different** from the target product.
 
-The target is a substantially larger product (**`wastech-ctxlint`**):
+The target is a substantially larger product (**`wastech-mdlint`**):
 
-- a **`@wastech-ctxlint/core`** engine with a **registry of 22 built-in
+- a **`@wastech-mdlint/core`** engine with a **registry of 22 built-in
   schema-validated rules** across 7 categories (`TBL`, `SEC`, `STR`, `REF`, `CHK`, `CTX`,
   `GRP`), plus `SIZE-001`, `LLM-001`, and the declarative `custom` rule;
 - a richer **`ParsedDocument`** (tables, sections, checklists, images) and a
   **`ContextGraph`** with `slice` / `impact` / `topological-sort` / `components`;
-- a **`@wastech-ctxlint/cli`** with `lint` (default) · `init` · `graph` · `slice`
+- a **`@wastech-mdlint/cli`** with `lint` (default) · `init` · `graph` · `slice`
   · `impact` · `compile`;
-- a **`@wastech-ctxlint/mcp-server`** exposing 6 deterministic tools over stdio;
+- a **`@wastech-mdlint/mcp-server`** exposing 6 deterministic tools over stdio;
 - a **context compiler** that generates a project-specific `SKILL.md`;
 - **3 hand-authored Agent Skills** (`-init`, `-fix`, `-impact`) distributed via
   agentskills.io;
@@ -42,7 +42,7 @@ so each phase ships something runnable.
 
 ## 2. Current state — what we keep
 
-Single package `wastech-ctxlint`, Node 24.17 LTS, ESM, TypeScript NodeNext.
+Single package `wastech-mdlint`, Node 24.17 LTS, ESM, TypeScript NodeNext.
 
 | Module | Status | Reuse in v2 |
 | --- | --- | --- |
@@ -111,20 +111,20 @@ MCP, future LSP) is a thin adapter that imports core and never re-implements the
 pipeline.
 
 ```
-@wastech-ctxlint/core        ← parser, ParsedDocument, ContextGraph, rule engine,
+@wastech-mdlint/core        ← parser, ParsedDocument, ContextGraph, rule engine,
                                  registry (22 built-in rules + LLM/custom), config,
                                  compiler, formatters
-        ├── @wastech-ctxlint/cli         ← commander: lint|init|graph|slice|impact|compile
-        ├── @wastech-ctxlint/mcp-server  ← stdio: 6 tools
-        └── (optional) @wastech-ctxlint/lsp-server   ← stretch / out of v2 scope
-skills/                       ← wastech-ctxlint-{init,fix,impact}/SKILL.md (agentskills.io)
+        ├── @wastech-mdlint/cli         ← commander: lint|init|graph|slice|impact|compile
+        ├── @wastech-mdlint/mcp-server  ← stdio: 6 tools
+        └── (optional) @wastech-mdlint/lsp-server   ← stretch / out of v2 scope
+skills/                       ← wastech-mdlint-{init,fix,impact}/SKILL.md (agentskills.io)
 schema.json                   ← JSON Schema mirror of the config (editor + CI sync test)
 ```
 
 This requires moving from a single package to a **workspace/monorepo** (npm
-workspaces). See Decision D1. Naming throughout: bins `wastech-ctxlint` and
-`wastech-ctxlint-mcp`, config `wastech-ctxlint.config.json`, org/repo
-`VladimirMakarevich/wastech-ctxlint` (replace any leftover `contextlint` or
+workspaces). See Decision D1. Naming throughout: bins `wastech-mdlint` and
+`wastech-mdlint-mcp`, config `wastech-mdlint.config.json`, org/repo
+`VladimirMakarevich/wastech-mdlint` (replace any leftover `contextlint` or
 placeholder-org strings from early drafts).
 
 ---
@@ -151,7 +151,7 @@ stand at their recommendation as defaults unless changed.
 ## 5b. Refined requirements
 
 A point-by-point requirements pass (2026-06-21) locked the v2 improvements. These live in
-**[docs/ctxlint_v2/requirements/](requirements/index.md)** and are authoritative wherever the plan
+**[docs/mdlint_v2/requirements/](requirements/index.md)** and are authoritative wherever the plan
 is otherwise ambiguous. Headlines that reshape the phases
 below: **declarative custom rules** (no rebuild/publish), a **`--fix` engine**, **semantic
 graph edges** (ID/anchor/import), **local-only `$schema`**, **structured MCP output**, a
@@ -239,14 +239,14 @@ own `*.test.ts` and a fixture.
   `extractDocProfile` (outline, table schemas, ID-pattern detection, refs in/out),
   `describeRules`, `synthesize` → `CompileResult{ skillContent, metadata }`.
 - Config `compile` section (skill name/description, section flags); CLI `compile`
-  with `--outdir` / `--dry-run`, default `.claude/skills/wastech-ctxlint/`.
+  with `--outdir` / `--dry-run`, default `.claude/skills/wastech-mdlint/`.
 - **Maps to:** [skills & compile requirements](requirements/04-skills-compile.md) (generated skill).
 - **Exit:** compile produces deterministic `SKILL.md`; `--dry-run` + custom outdir tested.
 
 ### Phase 6 — `init` command · `M` · depends on: D5 · reuse: Low
 **Goal:** zero-to-config bootstrap.
 - Interactive (`@inquirer/prompts`): language, include patterns, rule categories →
-  writes `wastech-ctxlint.config.json` with a sensible zero-config rule set.
+  writes `wastech-mdlint.config.json` with a sensible zero-config rule set.
 - Package-manager detection from lockfiles; local `$schema` wiring (no remote URL).
 - Reconcile/remove the current `postinstall` default-config script (init replaces it).
 - **Maps to:** [installation requirements](requirements/06-installation.md).
@@ -254,16 +254,16 @@ own `*.test.ts` and a fixture.
 
 ### Phase 7 — MCP server package · `M` · depends on: P2, P4, P5 · reuse: n/a
 **Goal:** agent access to the same deterministic operations.
-- `@wastech-ctxlint/mcp-server`: stdio transport, 6 tools — `lint`, `lint-files`,
+- `@wastech-mdlint/mcp-server`: stdio transport, 6 tools — `lint`, `lint-files`,
   `context-graph`, `context-slice`, `impact-analysis`, `compile-context` — each a
   thin wrapper over core; Zod input schemas; text/JSON-in-text responses; `isError`.
-- README + host config snippet (`npx @wastech-ctxlint/mcp-server`).
+- README + host config snippet (`npx @wastech-mdlint/mcp-server`).
 - **Maps to:** [MCP requirements](requirements/05-mcp-server.md) + [installation](requirements/06-installation.md).
 - **Exit:** tool-layer tests over core green; manual stdio smoke test in one host.
 
 ### Phase 8 — Static skills · `S–M` · depends on: P6, P7 · reuse: n/a
 **Goal:** ship the 3 hand-authored Agent Skills.
-- `skills/wastech-ctxlint-{init,fix,impact}/SKILL.md` with frontmatter
+- `skills/wastech-mdlint-{init,fix,impact}/SKILL.md` with frontmatter
   (`name`, `description`, `license`, `compatibility`, `metadata.{homepage,source}`).
 - Encode the workflows (init bootstrap; fix-by-rule-prefix policy; impact blast-radius).
 - Keep host-neutral per [vendor-neutral skill distribution](decisions/vendor-neutral-skill-distribution.md); replace upstream placeholders.
@@ -332,7 +332,7 @@ Recommended milestones:
 ## 10. Next steps
 
 1. ✅ **Decisions D1–D3 + milestone order confirmed** (§5). D4–D7 default-resolved.
-2. **Expand the critical-path phases into `docs/ctxlint_v2/NN-*.md` task files** (mirroring
+2. **Expand the critical-path phases into `docs/mdlint_v2/NN-*.md` task files** (mirroring
    the v1 `docs/plan/` granularity), in this order:
    - **P0** — workspace/monorepo bootstrap (gates everything);
    - **P2** — rule engine + new config model (the engine core);

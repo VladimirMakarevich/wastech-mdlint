@@ -17,7 +17,7 @@ development and consolidated into core.
 
 ## Decision
 
-`@wastech-ctxlint/core` is the **single source of truth** for:
+`@wastech-mdlint/core` is the **single source of truth** for:
 
 - the lint pipeline (`lint-files.ts`);
 - config loading (`findConfig`, `loadConfig`);

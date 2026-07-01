@@ -22,7 +22,7 @@
 
 ```jsonc
 {
-  "$schema": "./node_modules/@wastech-ctxlint/cli/schema.json",   // C9 — local, version-matched, offline; NO remote URL
+  "$schema": "./node_modules/@wastech-mdlint/cli/schema.json",   // C9 — local, version-matched, offline; NO remote URL
 
   "include": ["**/*.md"],
   "exclude": ["node_modules/**", "dist/**", ".git/**"],   // C1 — exclude wins over include
@@ -45,7 +45,7 @@
   ],
 
   "compile": {
-    "outdir": ".claude/skills/wastech-ctxlint",
+    "outdir": ".claude/skills/wastech-mdlint",
     "skill": { "name": "...", "description": "..." }
   }
 }
@@ -93,8 +93,8 @@
   1. ships `schema.json` inside the published package (always matches the installed
      version);
   2. defaults `$schema` to a **relative local path**
-     (`./node_modules/@wastech-ctxlint/cli/schema.json`) — offline + version-matched;
-  3. provides a generator (`wastech-ctxlint schema`, also run by `init` when custom
+     (`./node_modules/@wastech-mdlint/cli/schema.json`) — offline + version-matched;
+  3. provides a generator (`wastech-mdlint schema`, also run by `init` when custom
      rules are present) that writes a **project-local** `schema.json` including the
      declarative custom-rule vocabulary, and repoints `$schema` to it.
 

@@ -11,9 +11,9 @@ Lift-and-shift the current implementation's reusable modules from `src/*` into `
 ## Sequence
 
 - **Previous:** [P0.03 — core package skeleton](03-core-package-skeleton.md) created the
-  buildable `@wastech-ctxlint/core` shell with Zod and build/test wiring.
+  buildable `@wastech-mdlint/core` shell with Zod and build/test wiring.
 - **Next:** [P0.05 — cli package + commander](05-cli-package-commander.md) imports these
-  relocated modules from `@wastech-ctxlint/core` instead of relative `src` paths.
+  relocated modules from `@wastech-mdlint/core` instead of relative `src` paths.
 - **Depends on:** P0.03 · **Blocks:** P0.05, P0.06 (both import core).
 
 ## Inputs (from previous work)
@@ -50,6 +50,6 @@ Modules to relocate from the current implementation (all currently clean and reu
 
 ## Hand-off to next
 
-P0.05 can build the CLI purely on top of `@wastech-ctxlint/core`'s exports; P0.06 can
+P0.05 can build the CLI purely on top of `@wastech-mdlint/core`'s exports; P0.06 can
 stub the MCP server against the same core. The parser/graph/config now live where P1/P2
 will extend them.

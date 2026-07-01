@@ -16,11 +16,11 @@ Agent Skills can be distributed several ways:
 
 ## Decision
 
-Ship Agent Skills under `skills/<skill-name>/SKILL.md` in the `wastech-ctxlint` repo,
+Ship Agent Skills under `skills/<skill-name>/SKILL.md` in the `wastech-mdlint` repo,
 following the agentskills.io specification.
 
 - The repo itself is the distribution channel — no separate marketplace repo.
-- Users install with `gh skill install VladimirMakarevich/wastech-ctxlint <skill> [--pin vX.Y.Z]`.
+- Users install with `gh skill install VladimirMakarevich/wastech-mdlint <skill> [--pin vX.Y.Z]`.
 - Skills coordinate releases with the npm packages: a single `vX.Y.Z` git tag drives both.
 - Avoid Claude-Code-specific syntax inside `SKILL.md` (e.g. dynamic command injection) so
   skills stay portable across all agentskills.io clients.

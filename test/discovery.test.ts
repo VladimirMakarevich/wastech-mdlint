@@ -20,7 +20,7 @@ afterEach(async () => {
 });
 
 async function createTempRepo(): Promise<string> {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-ctxlint-discovery-"));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-discovery-"));
   tempDirs.push(tempDir);
   return tempDir;
 }

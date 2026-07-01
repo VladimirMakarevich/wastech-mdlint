@@ -22,8 +22,8 @@ not code.
 
 1. **Workspace manager:** npm workspaces (per D1). Confirm npm (not pnpm) to keep CI simple
    and match the reference `workspace:*` style.
-2. **Package set & names:** `@wastech-ctxlint/core`, `@wastech-ctxlint/cli`
-   (bin `wastech-ctxlint`), `@wastech-ctxlint/mcp-server` (bin `wastech-ctxlint-mcp`).
+2. **Package set & names:** `@wastech-mdlint/core`, `@wastech-mdlint/cli`
+   (bin `wastech-mdlint`), `@wastech-mdlint/mcp-server` (bin `wastech-mdlint-mcp`).
 3. **Runtime/engines:** Node `>=24.17.0 <25` on every package (I5).
 4. **Zod version:** pin one version shared by `core` + `mcp-server` (the current codebase uses
    Zod v3). Decide v4 to match the MCP SDK examples → record the chosen version.

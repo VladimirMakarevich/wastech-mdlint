@@ -25,8 +25,8 @@ only *extracts* them; the engine *applies* them.
 ## Deliverables / steps
 
 1. Recognize HTML-comment directives in Markdown:
-   - `<!-- wastech-ctxlint-disable RULE-ID[, RULE-ID…] -->`
-   - `<!-- wastech-ctxlint-disable-next-line RULE-ID[, RULE-ID…] -->`
+   - `<!-- wastech-mdlint-disable RULE-ID[, RULE-ID…] -->`
+   - `<!-- wastech-mdlint-disable-next-line RULE-ID[, RULE-ID…] -->`
 2. Emit `directives: { kind, ruleIds, line }[]` on `ParsedDocument`.
 3. Normalize rule IDs to canonical form ([C3](../requirements/01-configuration.md):
    `REF-001`, case-insensitive, dash-optional) so the engine matches reliably.

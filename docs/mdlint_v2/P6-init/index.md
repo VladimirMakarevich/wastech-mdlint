@@ -4,7 +4,7 @@
 > Depends on [D5](../index.md).
 >
 > **Goal:** a **smart, self-sufficient** `init` that scans the repo, infers a sensible rule
-> set, and writes a valid `wastech-ctxlint.config.json` with a local `$schema` — so the CLI
+> set, and writes a valid `wastech-mdlint.config.json` with a local `$schema` — so the CLI
 > stands on its own without the AI skill.
 
 ## Why this phase exists
@@ -48,7 +48,7 @@ and replaces the removed `postinstall` ([I1](../requirements/06-installation.md)
 
 - [ ] `init` detects doc clusters + the package manager and proposes a rule set with rationale.
 - [ ] Interactive flow (language, include, categories) + non-interactive `--yes`; Ctrl+C exits 0.
-- [ ] Writes a valid `wastech-ctxlint.config.json` (canonical IDs, optional rationale
+- [ ] Writes a valid `wastech-mdlint.config.json` (canonical IDs, optional rationale
       comments) with a **local** `$schema`; generates a project schema when custom rules exist.
 - [ ] The produced config lints cleanly on a fresh repo.
 

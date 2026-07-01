@@ -20,7 +20,7 @@ afterEach(async () => {
 });
 
 async function createRepoFiles(fileMap: Record<string, string>): Promise<MarkdownFile[]> {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-ctxlint-graph-"));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-graph-"));
   tempDirs.push(tempDir);
 
   const files: MarkdownFile[] = [];

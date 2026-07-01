@@ -1,4 +1,4 @@
-# P8.03 · `wastech-ctxlint-fix` skill
+# P8.03 · `wastech-mdlint-fix` skill
 
 > Phase: [P8 — Static skills](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
 
@@ -16,7 +16,7 @@ core `--fix` and reserves judgement calls for the AI.
 
 ## Deliverables / steps
 
-1. `skills/wastech-ctxlint-fix/SKILL.md` with valid frontmatter.
+1. `skills/wastech-mdlint-fix/SKILL.md` with valid frontmatter.
 2. Workflow: verify setup → run `lint --format json` → **apply core `--fix`** for mechanical
    cases ([S8](../requirements/04-skills-compile.md)) → handle the rest by rule prefix:
    - REF-* fix typos, ask for genuinely missing targets;

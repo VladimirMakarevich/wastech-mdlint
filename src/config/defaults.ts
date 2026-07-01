@@ -1,9 +1,9 @@
 import type { AuditConfig, ConfigFileName } from "../types.js";
 
 export const SUPPORTED_CONFIG_FILE_NAMES: ConfigFileName[] = [
-  "wastech-ctxlint.config.json",
-  "wastech-ctxlint.config.cjs",
-  "wastech-ctxlint.config.mjs"
+  "wastech-mdlint.config.json",
+  "wastech-mdlint.config.cjs",
+  "wastech-mdlint.config.mjs"
 ];
 
 export const DEFAULT_CONFIG: AuditConfig = {

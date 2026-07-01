@@ -1,9 +1,9 @@
 export type FindingSeverity = "error" | "warning" | "info";
 
 export type ConfigFileName =
-  | "wastech-ctxlint.config.json"
-  | "wastech-ctxlint.config.cjs"
-  | "wastech-ctxlint.config.mjs";
+  | "wastech-mdlint.config.json"
+  | "wastech-mdlint.config.cjs"
+  | "wastech-mdlint.config.mjs";
 
 export type SizeOverride = {
   pattern: string;

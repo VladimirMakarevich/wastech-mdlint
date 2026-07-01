@@ -14,11 +14,11 @@ async function pathExists(filePath) {
 export async function copyDefaultConfigIfMissing(params = {}) {
   const scriptDir = path.dirname(fileURLToPath(import.meta.url));
   const sourcePath = path.resolve(
-    params.sourcePath ?? path.join(scriptDir, "..", "wastech-ctxlint.config.example.json")
+    params.sourcePath ?? path.join(scriptDir, "..", "wastech-mdlint.config.example.json")
   );
   const destinationRoot = path.resolve(params.destinationRoot ?? process.env.INIT_CWD ?? process.cwd());
   const destinationPath =
-    path.resolve(params.destinationPath ?? path.join(destinationRoot, "wastech-ctxlint.config.json"));
+    path.resolve(params.destinationPath ?? path.join(destinationRoot, "wastech-mdlint.config.json"));
 
   if (sourcePath === destinationPath) {
     return { copied: false, destinationPath };
@@ -39,7 +39,7 @@ async function main() {
     await copyDefaultConfigIfMissing();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.warn(`wastech-ctxlint: unable to copy default config: ${message}`);
+    console.warn(`wastech-mdlint: unable to copy default config: ${message}`);
   }
 }
 

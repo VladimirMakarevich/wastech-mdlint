@@ -4,7 +4,7 @@
 > (Phase **P5** compile, **P8** static skills).
 >
 > Two layers: **A** generated `SKILL.md` (via `compileContext()`), **B** hand-authored
-> static skills (`skills/wastech-ctxlint-{init,fix,impact}/`). Locked v2 requirement;
+> static skills (`skills/wastech-mdlint-{init,fix,impact}/`). Locked v2 requirement;
 > authoritative where the plan is otherwise ambiguous.
 
 ## Decisions
@@ -17,7 +17,7 @@
 | **S4** | Deterministic, stable generated output | A | ✅ Accepted | Sorted, no timestamps; "generated from N docs, M rules" header + content hash → clean git diffs. |
 | **S5** | Unified typed skill model/registry | both | ✅ Accepted | `{ id, kind: "static"\|"generated", path, frontmatter }`. |
 | **S6** | LLM context-budget summary inside generated skill | A | ✅ Accepted | Reuses the D3 SIZE/LLM estimator; differentiator tying budget into compile. |
-| **S7** | Host-neutral static skills + replace upstream placeholders | B | ✅ Accepted | Swap `vladimir-makarevich` / `wastech-ctxlint.dev` for our repo; no Claude-specific syntax (the vendor-neutral skill distribution decision). |
+| **S7** | Host-neutral static skills + replace upstream placeholders | B | ✅ Accepted | Swap `vladimir-makarevich` / `wastech-mdlint.dev` for our repo; no Claude-specific syntax (the vendor-neutral skill distribution decision). |
 | **S8** | `-fix` skill delegates to deterministic `--fix` | B | ✅ Accepted | Mechanical fixes → core `--fix` (R2); AI handles only judgement. |
 | **S9** | A 4th skill (`-compile` / `-review`) | B | 🔵 Backlog | Next version; keep 3 skills (init/fix/impact) in v2. |
 
@@ -32,7 +32,7 @@
   the spec says is missing (with S5).
 
 - **S2 — host-neutral commands.** The generated skill hardcodes
-  `!npx wastech-ctxlint impact $ARGUMENTS` (Claude-Code command-injection style). The
+  `!npx wastech-mdlint impact $ARGUMENTS` (Claude-Code command-injection style). The
   spec flags this as less protocol-neutral than the vendor-neutral skill distribution decision wants, and agentskills.io targets
   35+ clients. v2 makes the dynamic-command block a template with host presets
   (`claude` | `generic` | `none`); default emits plain instructions + an MCP-tool
@@ -51,7 +51,7 @@
 ### B. Static skills
 
 - **S7 — host-neutral + placeholders.** Replace upstream `vladimir-makarevich` /
-  `wastech-ctxlint.dev` with `VladimirMakarevich/wastech-ctxlint`; keep all 3 skills
+  `wastech-mdlint.dev` with `VladimirMakarevich/wastech-mdlint`; keep all 3 skills
   free of Claude-Code-specific syntax per [vendor-neutral skill distribution](../decisions/vendor-neutral-skill-distribution.md).
 
 - **S8 — `-fix` delegates to `--fix`.** With deterministic core `--fix`

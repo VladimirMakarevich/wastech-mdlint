@@ -13,7 +13,7 @@ start from a clear map.
 - **Previous:** [P0.07 — CI & packaging baseline](07-ci-packaging-baseline.md) made the
   workspace continuously verified and publish-shaped.
 - **Next:** **Phase P1 — `ParsedDocument` & parser upgrade** (see the [roadmap](../index.md));
-  it extends the parser now living in `@wastech-ctxlint/core`.
+  it extends the parser now living in `@wastech-mdlint/core`.
 - **Depends on:** all of P0 · **Blocks:** start of P1.
 
 ## Inputs (from previous work)
@@ -25,12 +25,12 @@ start from a clear map.
 
 1. Run the full gate: `npm run typecheck && npm test && npm run build` across the workspace —
    all green.
-2. **Parity check:** run `wastech-ctxlint scan` and `graph` on a fixture (and on this repo)
+2. **Parity check:** run `wastech-mdlint scan` and `graph` on a fixture (and on this repo)
    and diff against pre-migration output — must be identical.
 3. Confirm the current `postinstall` is gone and install writes no config ([I1](../requirements/06-installation.md)).
 4. Add a short "Workspace layout" section to the repo `README.md` (packages, bins, how to
    build/test) and, with the owner's approval, update [AGENTS.md](../../../AGENTS.md)
-   "Sources Of Truth" to point at `docs/ctxlint_v2/`.
+   "Sources Of Truth" to point at `docs/mdlint_v2/`.
 5. Mark P0 tasks done in the [phase index](index.md).
 
 ## Decisions applied
@@ -48,5 +48,5 @@ start from a clear map.
 ## Hand-off to next
 
 Phase P1 begins from a clean, verified monorepo: the parser, graph, discovery, config, and
-token estimator all live in `@wastech-ctxlint/core`, ready to be extended into the richer
+token estimator all live in `@wastech-mdlint/core`, ready to be extended into the richer
 `ParsedDocument` without touching package structure.

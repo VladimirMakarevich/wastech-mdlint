@@ -20,7 +20,7 @@ Prove the server works at the wire level and ship its docs from a single source.
    error shapes — not just the core computational layer.
 2. **Generated tool docs** ([M3](../requirements/05-mcp-server.md)): the README tool inventory
    is generated from registration so it can't drift (no "5 vs 6" mismatch).
-3. README + host-config snippet (`npx @wastech-ctxlint/mcp-server`) for common MCP hosts.
+3. README + host-config snippet (`npx @wastech-mdlint/mcp-server`) for common MCP hosts.
 4. Confirm the 6-tool surface (no `fix`/`schema` — [M5 backlog](../requirements/05-mcp-server.md)).
 
 ## Decisions applied

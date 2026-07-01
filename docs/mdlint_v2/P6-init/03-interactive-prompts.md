@@ -34,5 +34,5 @@ config before writing.
 
 ## Hand-off to next
 
-P6.04 serializes the confirmed selections into `wastech-ctxlint.config.json` and wires the
+P6.04 serializes the confirmed selections into `wastech-mdlint.config.json` and wires the
 local schema.

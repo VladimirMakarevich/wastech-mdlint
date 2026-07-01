@@ -1,4 +1,4 @@
-# P8.04 · `wastech-ctxlint-impact` skill
+# P8.04 · `wastech-mdlint-impact` skill
 
 > Phase: [P8 — Static skills](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Not started**.
 
@@ -16,7 +16,7 @@ actionable findings.
 
 ## Deliverables / steps
 
-1. `skills/wastech-ctxlint-impact/SKILL.md` with valid frontmatter.
+1. `skills/wastech-mdlint-impact/SKILL.md` with valid frontmatter.
 2. Workflow: verify setup (recommend REF-001/GRP-001 enabled) → resolve target (file or ID →
    containing file) → run `impact <file> --format json` **or** prefer the MCP
    `impact-analysis` tool when available → group direct/transitive, highlight hubs/cycles →

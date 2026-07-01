@@ -1,10 +1,10 @@
 # Architecture Rules
 
-The architectural source of truth is `docs/ctxlint_v2/`, especially:
+The architectural source of truth is `docs/mdlint_v2/`, especially:
 
-- `docs/ctxlint_v2/index.md`
-- `docs/ctxlint_v2/requirements/`
-- `docs/ctxlint_v2/decisions/core-hosts-the-pipeline.md`
+- `docs/mdlint_v2/index.md`
+- `docs/mdlint_v2/requirements/`
+- `docs/mdlint_v2/decisions/core-hosts-the-pipeline.md`
 
 These invariants should guide implementation work.
 
@@ -12,9 +12,9 @@ These invariants should guide implementation work.
 
 - The current repository still contains current single-package single-package code in `src/`.
 - The target architecture is an npm-workspaces monorepo with:
-  - `@wastech-ctxlint/core`
-  - `@wastech-ctxlint/cli`
-  - `@wastech-ctxlint/mcp-server`
+  - `@wastech-mdlint/core`
+  - `@wastech-mdlint/cli`
+  - `@wastech-mdlint/mcp-server`
 - Do not fake future package boundaries before the relevant roadmap phase. Follow the actual
   filesystem for today's edits and the phase plan for tomorrow's shape.
 
@@ -30,7 +30,7 @@ These invariants should guide implementation work.
 - Shared computational behavior belongs in core, not in host packages.
 
 This is enforced by the accepted decision in
-`docs/ctxlint_v2/decisions/core-hosts-the-pipeline.md`.
+`docs/mdlint_v2/decisions/core-hosts-the-pipeline.md`.
 
 ## Pipeline Invariants
 
@@ -47,7 +47,7 @@ This is enforced by the accepted decision in
 
 ## Config And Surface Rules
 
-- v2 config is JSONC in `wastech-ctxlint.config.json`.
+- v2 config is JSONC in `wastech-mdlint.config.json`.
 - v2 config uses a local `$schema`; do not introduce remote schema URLs.
 - `.cjs`, `.mjs`, and runtime TypeScript config loading are legacy single-package concerns, not target v2
   behavior.
@@ -72,4 +72,4 @@ This is enforced by the accepted decision in
 - Do not introduce non-deterministic reporting behavior.
 - Do not add local agent skills, repo hooks, or other automation surfaces unless the task
   explicitly targets that scope.
-- Do not guess future architecture from memory when `docs/ctxlint_v2/` already states it.
+- Do not guess future architecture from memory when `docs/mdlint_v2/` already states it.

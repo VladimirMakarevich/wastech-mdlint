@@ -112,7 +112,7 @@ No findings.
     ]);
     expect(normalizeFixtureOutput(graph.output, graph.rootPath)).toBe(`{
   "root": "<ROOT>",
-  "configPath": "<ROOT>/wastech-ctxlint.config.json",
+  "configPath": "<ROOT>/wastech-mdlint.config.json",
   "graph": {
     "nodes": [
       {
@@ -152,7 +152,7 @@ No findings.
         "scan",
         "<ROOT>",
         "--config",
-        path.join("<ROOT>", "wastech-ctxlint.invalid.json")
+        path.join("<ROOT>", "wastech-mdlint.invalid.json")
       ]
     });
 

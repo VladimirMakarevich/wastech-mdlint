@@ -19,7 +19,7 @@ afterEach(async () => {
 });
 
 async function createMarkdownFile(relativePath: string, text: string): Promise<MarkdownFile> {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-ctxlint-markdown-"));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-markdown-"));
   tempDirs.push(tempDir);
 
   const absolutePath = path.join(tempDir, relativePath);

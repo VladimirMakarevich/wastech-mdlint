@@ -20,7 +20,7 @@ Prove the whole release works end-to-end across all three channels before taggin
    skill-frontmatter validation; `npm pack --dry-run` clean per package.
 2. **End-to-end smoke** across the three channels:
    - CLI: install the packed `cli`, run `init` → `lint` → `graph`/`slice`/`impact` → `compile`;
-   - MCP: boot `wastech-ctxlint-mcp`, call each of the 6 tools;
+   - MCP: boot `wastech-mdlint-mcp`, call each of the 6 tools;
    - Skill: `gh skill install … --pin` resolves and references real commands/tools.
 3. Dry-run the single-tag release ([P9.02](02-single-tag-release.md)) without publishing.
 4. Tick the Phase P9 [exit criteria](index.md); confirm **Milestone M4 (launch)**.

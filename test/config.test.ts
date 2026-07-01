@@ -18,7 +18,7 @@ afterEach(async () => {
 });
 
 async function createTempRepo(): Promise<string> {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-ctxlint-config-"));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-config-"));
   tempDirs.push(tempDir);
   return tempDir;
 }
@@ -36,7 +36,7 @@ describe("loadConfig", () => {
 
   it("prefers an explicit config path over discovered files", async () => {
     const repoRoot = await createTempRepo();
-    const discoveredConfigPath = path.join(repoRoot, "wastech-ctxlint.config.json");
+    const discoveredConfigPath = path.join(repoRoot, "wastech-mdlint.config.json");
     const explicitConfigPath = path.join(repoRoot, "custom-config.json");
 
     await writeFile(discoveredConfigPath, JSON.stringify({ include: ["docs/**/*.md"] }), "utf8");
@@ -53,7 +53,7 @@ describe("loadConfig", () => {
 
   it("loads json config files", async () => {
     const repoRoot = await createTempRepo();
-    const configPath = path.join(repoRoot, "wastech-ctxlint.config.json");
+    const configPath = path.join(repoRoot, "wastech-mdlint.config.json");
 
     await writeFile(
       configPath,
@@ -73,7 +73,7 @@ describe("loadConfig", () => {
 
   it("loads cjs config files", async () => {
     const repoRoot = await createTempRepo();
-    const configPath = path.join(repoRoot, "wastech-ctxlint.config.cjs");
+    const configPath = path.join(repoRoot, "wastech-mdlint.config.cjs");
 
     await writeFile(
       configPath,
@@ -89,7 +89,7 @@ describe("loadConfig", () => {
 
   it("loads mjs config files", async () => {
     const repoRoot = await createTempRepo();
-    const configPath = path.join(repoRoot, "wastech-ctxlint.config.mjs");
+    const configPath = path.join(repoRoot, "wastech-mdlint.config.mjs");
 
     await writeFile(
       configPath,
@@ -105,7 +105,7 @@ describe("loadConfig", () => {
 
   it("replaces arrays instead of merging them", async () => {
     const repoRoot = await createTempRepo();
-    const configPath = path.join(repoRoot, "wastech-ctxlint.config.json");
+    const configPath = path.join(repoRoot, "wastech-mdlint.config.json");
 
     await writeFile(
       configPath,
@@ -124,7 +124,7 @@ describe("loadConfig", () => {
 
   it("deep merges nested objects", async () => {
     const repoRoot = await createTempRepo();
-    const configPath = path.join(repoRoot, "wastech-ctxlint.config.json");
+    const configPath = path.join(repoRoot, "wastech-mdlint.config.json");
 
     await writeFile(
       configPath,
@@ -148,7 +148,7 @@ describe("loadConfig", () => {
 
   it("rejects unknown top-level keys", async () => {
     const repoRoot = await createTempRepo();
-    const configPath = path.join(repoRoot, "wastech-ctxlint.config.json");
+    const configPath = path.join(repoRoot, "wastech-mdlint.config.json");
 
     await writeFile(
       configPath,
@@ -163,7 +163,7 @@ describe("loadConfig", () => {
 
   it("rejects invalid types", async () => {
     const repoRoot = await createTempRepo();
-    const configPath = path.join(repoRoot, "wastech-ctxlint.config.json");
+    const configPath = path.join(repoRoot, "wastech-mdlint.config.json");
 
     await writeFile(
       configPath,
@@ -180,7 +180,7 @@ describe("loadConfig", () => {
 
   it("allows only specific orphan severities", async () => {
     const repoRoot = await createTempRepo();
-    const configPath = path.join(repoRoot, "wastech-ctxlint.config.json");
+    const configPath = path.join(repoRoot, "wastech-mdlint.config.json");
 
     await writeFile(
       configPath,
@@ -209,7 +209,7 @@ describe("loadConfig", () => {
 
   it("rejects explicit ts config files in v1", async () => {
     const repoRoot = await createTempRepo();
-    const configPath = path.join(repoRoot, "wastech-ctxlint.config.ts");
+    const configPath = path.join(repoRoot, "wastech-mdlint.config.ts");
 
     await writeFile(configPath, "export default {};\n", "utf8");
 
@@ -223,7 +223,7 @@ describe("loadConfig", () => {
 
   it("accepts requiredSections for compatibility", async () => {
     const repoRoot = await createTempRepo();
-    const configPath = path.join(repoRoot, "wastech-ctxlint.config.json");
+    const configPath = path.join(repoRoot, "wastech-mdlint.config.json");
 
     await writeFile(
       configPath,
@@ -253,7 +253,7 @@ describe("loadConfig", () => {
   it("supports explicit Windows-like absolute config paths", async () => {
     const repoRoot = await createTempRepo();
     const windowsRoot = path.join(repoRoot, "C-drive", "repo");
-    const configPath = path.join(windowsRoot, "wastech-ctxlint.config.mjs");
+    const configPath = path.join(windowsRoot, "wastech-mdlint.config.mjs");
 
     await mkdir(windowsRoot, { recursive: true });
     await writeFile(configPath, "export default { include: ['docs/**/*.md'] };\n", "utf8");

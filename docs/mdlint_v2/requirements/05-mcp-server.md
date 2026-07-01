@@ -2,7 +2,7 @@
 
 > **Status:** Locked 2026-06-21 · Part of the [v2 roadmap](../index.md) (Phase **P7**).
 >
-> The server stays a **thin stdio adapter over `@wastech-ctxlint/core`** (the
+> The server stays a **thin stdio adapter over `@wastech-mdlint/core`** (the
 > [core-hosts-the-pipeline](../decisions/core-hosts-the-pipeline.md) decision). Locked v2
 > requirement; authoritative where the plan is otherwise ambiguous.
 

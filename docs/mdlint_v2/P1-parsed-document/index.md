@@ -4,7 +4,7 @@
 > Reuse from current implementation: **High**.
 >
 > **Goal:** one parse pass produces *everything* every downstream consumer needs. Extend the
-> remark parser (now in `@wastech-ctxlint/core` after [P0.04](../P0-foundations/04-relocate-current-source-into-core.md))
+> remark parser (now in `@wastech-mdlint/core` after [P0.04](../P0-foundations/04-relocate-current-source-into-core.md))
 > into a rich `ParsedDocument` and a deterministic `loadDocuments()` loader.
 
 ## Why this phase exists
