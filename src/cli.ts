@@ -4,17 +4,23 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ConfigError, loadConfig } from "./config/load.js";
-import { discoverMarkdownFiles, DiscoveryError } from "./discovery/discover.js";
-import { buildDependencyGraph } from "./graph/build.js";
-import { buildEntrypointBudgets } from "./llm/budget.js";
-import { analyzeLlmImports } from "./llm/imports.js";
-import { parseMarkdownFiles } from "./markdown/parse.js";
-import { createAuditResult, renderAuditResultJson, renderAuditResultText } from "./reporting/render.js";
-import { checkLocalLinks } from "./rules/local-links.js";
-import { checkFileSizes } from "./rules/size.js";
-import { checkStructureRules } from "./rules/structure.js";
-import type { AuditResult } from "./types.js";
+import {
+  analyzeLlmImports,
+  buildDependencyGraph,
+  buildEntrypointBudgets,
+  checkFileSizes,
+  checkLocalLinks,
+  checkStructureRules,
+  ConfigError,
+  createAuditResult,
+  discoverMarkdownFiles,
+  DiscoveryError,
+  loadConfig,
+  parseMarkdownFiles,
+  renderAuditResultJson,
+  renderAuditResultText
+} from "@wastech-mdlint/core";
+import type { AuditResult } from "@wastech-mdlint/core";
 
 export const EXIT_CODE_SUCCESS = 0;
 export const EXIT_CODE_RUNTIME_ERROR = 1;
