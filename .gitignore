@@ -8,3 +8,7 @@ yarn-error.log
 
 # wastech-orchestrator runtime home (auto-appended by `worc install`)
 .worc/
+
+# orchestrator task files: authored/moved locally, committed by worc on the task branch
+# (not tracked on main — avoids pending->done lifecycle churn on the base branch)
+tasks/
