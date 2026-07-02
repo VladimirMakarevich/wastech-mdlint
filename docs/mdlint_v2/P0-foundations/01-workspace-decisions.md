@@ -24,6 +24,8 @@ not code.
    and match the reference `workspace:*` style.
 2. **Package set & names:** `@wastech-mdlint/core`, `@wastech-mdlint/cli`
    (bin `wastech-mdlint`), `@wastech-mdlint/mcp-server` (bin `wastech-mdlint-mcp`).
+   Confirmed against requirement **I4** ([../requirements/06-installation.md](../requirements/06-installation.md))
+   and roadmap §4 ([../index.md](../index.md)).
 3. **Runtime/engines:** `engines.node` = `>=24.17.0` on every package (I5). _No upper bound_
    (decided 2026-07-02, audit — P9 engines gap): don't lock out future majors; CI validates on
    the Node 24 LTS line (`.nvmrc`/`.node-version` pin 24.17.0), newer at users' discretion.
@@ -60,7 +62,11 @@ not code.
 
 - [x] Zod version chosen and written down. → **v4** (`zod@^4`), decided 2026-07-02.
 - [x] Build strategy (project references vs independent `tsc`) chosen. → **project references** (`tsc -b`), decided 2026-07-02.
-- [ ] Package names/bins confirmed against the requirements.
+- [x] Package names/bins confirmed against the requirements. → `@wastech-mdlint/core`,
+  `@wastech-mdlint/cli` (bin `wastech-mdlint`), `@wastech-mdlint/mcp-server`
+  (bin `wastech-mdlint-mcp`), confirmed 2026-07-02 against requirement **I4**
+  ([requirements/06-installation.md](../requirements/06-installation.md)) and roadmap §4
+  ([../index.md](../index.md)). No conflict found.
 
 ## Hand-off to next
 
