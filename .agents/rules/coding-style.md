@@ -21,6 +21,20 @@ Match the repository's actual tooling and configuration unless a phase task expl
 - Do not build extension points for hypothetical future needs. Add them only when a concrete
   phase task requires them.
 
+## Comments And Rationale
+
+- Treat comments as part of the deliverable: all new code must be documented where it is
+  introduced, not left for a later cleanup pass.
+- Follow the rule `why, not what`: write comments to explain why the code exists, why a
+  constraint matters, or why a specific shape was chosen.
+- Prefer rationale, invariants, tradeoffs, cross-platform notes, and bug-prevention context over
+  narrating what the syntax already says.
+- Do not add comments that merely restate names, types, assignments, loops, or conditionals.
+- When behavior is non-obvious, surprising, or roadmap-constrained, capture that reason next to
+  the relevant code path.
+- If a block is hard to justify with a short why-comment, simplify or restructure it until the
+  intent and rationale are clear.
+
 ## Types And Contracts
 
 - Keep public and cross-module contracts explicit and strongly typed.

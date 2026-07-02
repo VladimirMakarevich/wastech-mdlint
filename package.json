@@ -20,6 +20,10 @@
     "agents"
   ],
   "type": "module",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "bin": {
     "wastech-mdlint": "./dist/cli.js"
   },
@@ -27,19 +31,16 @@
     "node": ">=24.17.0 <25"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -b",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc -b && tsc --noEmit -p tsconfig.src.json",
     "lint": "eslint .",
     "format": "prettier --check .",
-    "postinstall": "node ./scripts/install-default-config.mjs",
     "prepack": "npm run build",
     "release:check": "npm run typecheck && npm test && npm run build && npm pack --dry-run"
   },
   "files": [
     "dist",
-    "wastech-mdlint.config.example.json",
-    "scripts/install-default-config.mjs",
     "README.md",
     "LICENSE"
   ],
