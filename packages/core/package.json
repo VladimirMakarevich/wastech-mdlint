@@ -1,0 +1,29 @@
+{
+  "name": "@wastech-mdlint/core",
+  "version": "0.0.0",
+  "description": "Core pipeline for wastech-mdlint: parsing, config, rules, graph, and compile.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "engines": {
+    "node": ">=24.17.0 <25"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
