@@ -41,13 +41,13 @@ Run a text scan for the current repository:
 ```bash
 npm install
 npm run build
-node dist/cli.js scan .
+node dist/cli.js lint .
 ```
 
 Run JSON output instead:
 
 ```bash
-node dist/cli.js scan . --format json
+node dist/cli.js lint . --format json
 ```
 
 Write the Markdown dependency graph to a file:
@@ -59,11 +59,11 @@ node dist/cli.js graph . --out graph.json
 ## CLI
 
 ```bash
-wastech-mdlint scan [path] [--config <file>] [--format text|json] [--fail-on error|warning|off]
+wastech-mdlint lint [path] [--config <file>] [--format text|json] [--fail-on error|warning|off]
 wastech-mdlint graph [path] [--config <file>] --out graph.json
 ```
 
-`scan`:
+`lint` (aliased as `scan` for backward compatibility):
 
 - `path` defaults to the current working directory
 - `--config <file>` loads `wastech-mdlint.config.json`, `.cjs`, or `.mjs`
@@ -172,7 +172,7 @@ JSON output includes:
 Generate JSON:
 
 ```bash
-node dist/cli.js scan . --format json > report.json
+node dist/cli.js lint . --format json > report.json
 ```
 
 ## CI
@@ -180,19 +180,19 @@ node dist/cli.js scan . --format json > report.json
 Fail CI on warnings and errors:
 
 ```bash
-node dist/cli.js scan . --format text --fail-on warning
+node dist/cli.js lint . --format text --fail-on warning
 ```
 
 Fail only on error-level findings:
 
 ```bash
-node dist/cli.js scan . --format text --fail-on error
+node dist/cli.js lint . --format text --fail-on error
 ```
 
 Always produce a report but never fail the job:
 
 ```bash
-node dist/cli.js scan . --format json --fail-on off
+node dist/cli.js lint . --format json --fail-on off
 ```
 
 ## Development Checks
@@ -229,14 +229,14 @@ node --version
 npm run typecheck
 npm test
 npm run build
-node dist/cli.js scan .
+node dist/cli.js lint .
 npm pack --dry-run
 ```
 
 Checklist:
 
 - confirm `node --version` reports `v24.17.0`
-- confirm `scan` works on this repository
+- confirm `lint` works on this repository
 - inspect `npm pack --dry-run` contents before publishing
 - follow npm publishing workflow setup in [docs/plan/16-npm-publishing.md](docs/plan/16-npm-publishing.md)
 

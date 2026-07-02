@@ -95,6 +95,16 @@ describe("parseArgv", () => {
       new CliUsageError("Missing required option --out for graph.")
     );
   });
+
+  it("treats lint as an alias for scan with the default path", () => {
+    expect(parseArgv(["lint"], "/repo")).toEqual(parseArgv(["scan"], "/repo"));
+  });
+
+  it("treats lint as an alias for scan with options", () => {
+    const args = ["docs", "--config", "config.json", "--format", "json", "--fail-on", "warning"];
+
+    expect(parseArgv(["lint", ...args], "/repo")).toEqual(parseArgv(["scan", ...args], "/repo"));
+  });
 });
 
 describe("CLI smoke", () => {
@@ -109,7 +119,34 @@ describe("CLI smoke", () => {
 
     expect(exitCode).toBe(EXIT_CODE_SUCCESS);
     expect(stdout.read()).toContain("Usage:");
+    expect(stdout.read()).toContain("wastech-mdlint lint");
+    expect(stdout.read()).toContain("Backward-compatible alias for lint.");
     expect(stderr.read()).toBe("");
+  });
+
+  it("produces byte-identical output for lint and scan", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-cli-"));
+    tempDirs.push(tempDir);
+
+    await writeFile(path.join(tempDir, "README.md"), "[Missing](docs/missing.md)\n", "utf8");
+
+    const lintStdout = createMemoryWriter();
+    const lintStderr = createMemoryWriter();
+    const scanStdout = createMemoryWriter();
+    const scanStderr = createMemoryWriter();
+
+    const lintExitCode = await runCli(["lint", tempDir], {
+      stdout: lintStdout.stream,
+      stderr: lintStderr.stream
+    });
+    const scanExitCode = await runCli(["scan", tempDir], {
+      stdout: scanStdout.stream,
+      stderr: scanStderr.stream
+    });
+
+    expect(lintExitCode).toBe(scanExitCode);
+    expect(lintStdout.read()).toBe(scanStdout.read());
+    expect(lintStderr.read()).toBe(scanStderr.read());
   });
 
   it("prints version", async () => {
