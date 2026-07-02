@@ -15,5 +15,13 @@ export default tseslint.config(
       sourceType: "module",
       globals: globals.node
     }
+  },
+  {
+    files: ["**/*.{js,mjs,cjs}"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: globals.node
+    }
   }
 );
