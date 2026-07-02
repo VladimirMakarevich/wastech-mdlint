@@ -61,10 +61,14 @@ export class CliUsageError extends Error {
 const HELP_TEXT = `wastech-mdlint
 
 Usage:
-  wastech-mdlint scan [path] [--config <file>] [--format text|json] [--fail-on error|warning|off]
+  wastech-mdlint lint [path] [--config <file>] [--format text|json] [--fail-on error|warning|off]
   wastech-mdlint graph [path] [--config <file>] --out <file>
   wastech-mdlint --help
-  wastech-mdlint --version`;
+  wastech-mdlint --version
+
+Commands:
+  lint    Analyze Markdown files (primary command).
+  scan    Backward-compatible alias for lint.`;
 
 const SCAN_FORMATS = new Set<OutputFormat>(["text", "json"]);
 const FAIL_ON_VALUES = new Set<FailOn>(["error", "warning", "off"]);
@@ -208,7 +212,7 @@ export function parseArgv(argv: string[], cwd: string = process.cwd()): ParsedCo
     return { kind: "version" };
   }
 
-  if (command === "scan") {
+  if (command === "lint" || command === "scan") {
     return parseScanCommand(tokens, cwd);
   }
 
