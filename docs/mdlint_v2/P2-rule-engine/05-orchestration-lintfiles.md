@@ -32,14 +32,22 @@ resolve severity, apply inline-disable, and return file-attributed results.
 2. **Severity resolution** ([R1](../requirements/02-rules-engine.md)/[C2](../requirements/01-configuration.md)):
    apply per-rule `severity` override over `defaultSeverity`; **filter out `"off"`** rules
    before running.
-3. **Inline-disable** ([R8](../requirements/02-rules-engine.md)): consult
-   `document.directives` and drop messages whose `(ruleId, line)` falls under a matching
-   `disable` / `disable-next-line`.
+3. **Inline-disable** ([R8](../requirements/02-rules-engine.md); semantics decided 2026-07-02,
+   audit 2.4, markdownlint-style): from the line-ordered `document.directives`, compute per-rule
+   disabled ranges — `disable [rules]` opens a range at its line, a later `enable [rules]`
+   closes it (else it runs to EOF), and `disable-next-line [rules]` disables only the next line.
+   A directive with empty `ruleIds` applies to **all rules**. Drop each message whose
+   `(ruleId, line)` is suppressed via an `isSuppressed(ruleId, line)` check over those ranges.
+   The parser stays extraction-only; this range logic lives here.
 4. **Fail-fast** ([R4](../requirements/02-rules-engine.md)): project rules without `documents`
    throw (programming error), never silently no-op.
-5. Pass the shared `ContextGraph` through `RuleContext.graph` once available
-   ([R5](../requirements/02-rules-engine.md), built in P4); until then graph rules are
-   inert/injected.
+5. **Graph injection** ([R5](../requirements/02-rules-engine.md)): `lintFiles` builds (or
+   receives) a `ContextGraph` and injects it through `RuleContext.graph` **from P3 onward** —
+   using the relocated legacy graph builder in P3, swapped to the semantic `buildContextGraph`
+   ([P4.01](../P4-graph/01-context-graph-model.md)) in P4 without touching rule code.
+   Graph-consuming rules (GRP-001/002) read this injected graph; **no rule builds its own
+   adjacency** (audit 2.2/2.3 — avoids parallel traversal). In P2 itself there are no graph
+   rules yet, so the injection point exists but is exercised starting P3.06.
 6. Deterministic ordering of results.
 
 ## Decisions applied
@@ -52,7 +60,8 @@ resolve severity, apply inline-disable, and return file-attributed results.
 
 - [ ] `lintFiles` runs document + project rules with correct file attribution.
 - [ ] `"off"` rules skipped; per-rule severity overrides applied.
-- [ ] Inline-disable suppresses exactly the targeted `(rule, line)` messages.
+- [ ] Inline-disable suppresses exactly the targeted `(rule, line)` messages, including
+      `disable`→`enable` ranges, `disable` to EOF, and bare (all-rules) directives.
 - [ ] Missing `documents` for a project rule throws.
 
 ## Hand-off to next

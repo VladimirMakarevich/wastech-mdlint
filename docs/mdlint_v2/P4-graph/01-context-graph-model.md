@@ -23,11 +23,21 @@ the current implementation graph builder.
 1. `GraphNode { filePath, inDegree, outDegree }`;
    `GraphEdge { source, target, type: "link"|"image"|"anchor"|"id-ref"|"import", line, text?, rawTarget? }`
    ([G1](../requirements/03-context-graph.md)/[G3](../requirements/03-context-graph.md)).
-2. `buildContextGraph(documents, { exclude?, entryPoints?, siteRouter? })`
+2. `buildContextGraph(documents, { exclude?, entryPoints?, siteRouter?, idRef? })`
    ([R5](../requirements/02-rules-engine.md)): resolve relative links/images; materialize
-   **anchor** edges (heading-slug match), **import** edges (`@path.md`), and **id-ref** edges
-   (table-cell/heading IDs referenced elsewhere, using config `idPattern`).
-3. Skip self-refs/missing targets; keep deterministic sorting of nodes/edges.
+   **anchor** edges (heading-slug match), **import** edges (`@path.md`), and **id-ref** edges.
+   **id-ref discovery is column-based (decided 2026-07-02, audit 5.5):** defined IDs come from
+   the declared `definitions`/`idColumn` columns (+ headings), the **same model as REF-005** —
+   `idPattern` validates the token *within* those cells, it does not scan arbitrary cells. The
+   graph therefore receives `idRef: { idPattern, definitions, idColumn }` (from REF-005-style
+   config); with no such config, no id-ref edges are built. Resolve defined IDs via the shared
+   `extractDefinedIds(doc, idRef)` helper over the parsed `tables`/`headings` (audit 2.1) — no
+   re-parse; `ParsedDocument` has no `ids` field.
+3. **One edge per source construct**, typed per the taxonomy in
+   [requirements/03](../requirements/03-context-graph.md) (audit 2.5): a `#fragment` makes it
+   `anchor`, otherwise `link`; `image`/`import`/`id-ref` by their own construct. Skip
+   self-refs (incl. same-file `#frag` anchors) and missing targets; keep deterministic sorting
+   of nodes/edges.
 4. (Edge de-dup with `count` is [G7 backlog](../requirements/03-context-graph.md) — keep
    reference multiplicity for now.)
 

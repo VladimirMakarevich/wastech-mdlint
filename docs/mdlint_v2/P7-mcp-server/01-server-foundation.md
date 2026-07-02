@@ -24,6 +24,17 @@ helper, and the output/error/annotation conventions every tool follows.
    ([M1](../requirements/05-mcp-server.md)) plus a text summary; an error contract
    `{ code, message, hint }` with `isError: true` ([M6](../requirements/05-mcp-server.md));
    tool annotations (`readOnlyHint`, etc., [M7](../requirements/05-mcp-server.md)).
+   - **Error code taxonomy (decided 2026-07-02, audit — P7 error-taxonomy gap).** A closed set,
+     defined **once in core** (the M6 structured error type) and shared by CLI + MCP:
+     - `CONFIG_NOT_FOUND` — no config resolved at `configPath`/`cwd`.
+     - `CONFIG_INVALID` — config failed JSONC/schema validation (`hint` = failing path, C7).
+     - `FILE_NOT_IN_CORPUS` — requested file/path outside the resolved `include` set (`hint` =
+       check include patterns).
+     - `TARGET_NOT_FOUND` — a `slice`/`impact` query or file argument resolved to nothing.
+     - `COMPILE_CONFIG_MISSING` — `config.compile` absent for `compile-context` (audit 4.4).
+     - `INVALID_INPUT` — tool arguments failed semantic validation beyond the input schema.
+     - `INTERNAL_ERROR` — unexpected failure; message is **sanitized and never leaks a stack
+       trace** (M6/security). All non-taxonomy throwables are wrapped as this.
 4. **Transport:** stdio only; readiness to stderr; **never** load code-plugins
    ([M8](../requirements/05-mcp-server.md)).
 

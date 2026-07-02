@@ -15,11 +15,15 @@ Expose compilation through config + the CLI, writing the skill to disk with prev
 ## Deliverables / steps
 
 1. Config `compile` section (validated in P2.04): `{ outdir?, skill: { name, description },
-   sections?: { architecture?, rules?, dependencies?, workflow? }, commandPreset? }`.
+   sections?: { architecture?, rules?, dependencies?, workflow? }, commandPreset?,
+   hubMinInDegree? }`. `hubMinInDegree` (default **3**) is the node-role hub threshold used by
+   `classifyNodes` ([P5.01](01-graph-analysis.md), audit 3.3).
 2. CLI `compile`: `--config`, `--outdir`, `--dry-run`, `--cwd`; resolve outdir as
    `--outdir` → `config.compile.outdir` → `.claude/skills/wastech-mdlint/`.
-3. Require `config.compile`; if absent, exit **2** with a clear message (compileContext
-   throws — surface it, don't emit empty output).
+3. Require `config.compile`; if absent, exit **2** with a clear message. `compileContext`
+   throws the typed `CompileConfigMissingError` (code `COMPILE_CONFIG_MISSING`, [P5.04 frozen
+   types](04-synthesize.md), audit 4.4) — the CLI surfaces its message; the same error powers
+   the MCP `{ code, message, hint }` contract, so both hosts stay consistent.
 4. `--dry-run` prints the would-be `SKILL.md` without writing.
 5. CLI only handles file I/O; generation stays in core (the core-hosts-the-pipeline decision).
 

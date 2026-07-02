@@ -17,7 +17,8 @@ Make every package correctly publishable, building on the [P0.07 baseline](../P0
 ## Deliverables / steps
 
 1. Per-package `package.json`: `name`, `bin` (`wastech-mdlint`, `wastech-mdlint-mcp`),
-   `exports` (+ types), `files` allowlist, `engines.node` (`>=24.17.0 <25`),
+   `exports` (+ types), `files` allowlist, `engines.node` (`>=24.17.0`, **no upper bound** —
+   audit P9 engines gap; don't lock out future majors, CI validates on the Node 24 LTS line),
    `publishConfig.access: "public"` + **provenance** ([I5](../requirements/06-installation.md)).
 2. Ensure `core` is a published dependency of `cli`/`mcp-server` (resolve `workspace:*` on
    publish to the real version).

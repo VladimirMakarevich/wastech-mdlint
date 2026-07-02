@@ -4,9 +4,12 @@
 
 ## Goal
 
-Implement the three graph-integrity rules to reach lint parity. They use the available graph
-build now; [P4](../index.md) refactors them onto the shared `ContextGraph`
-([R5](../requirements/02-rules-engine.md)/[G6](../requirements/03-context-graph.md)).
+Implement the three graph-integrity rules to reach lint parity. GRP-001/002 **consume the
+`ContextGraph` injected via `RuleContext.graph`** (built by the orchestrator, [P2.05](../P2-rule-engine/05-orchestration-lintfiles.md));
+they do **not** build their own adjacency. In P3 the orchestrator uses the relocated legacy
+builder; [P4.06](../P4-graph/06-grp-refactor-coverage.md) swaps in the semantic `ContextGraph`
+([R5](../requirements/02-rules-engine.md)/[G6](../requirements/03-context-graph.md)) with no
+change to this rule code (audit 2.2).
 
 ## Sequence
 
@@ -30,9 +33,14 @@ build now; [P4](../index.md) refactors them onto the shared `ContextGraph`
    avoid duplicate reports; attribute to the first arc.
 2. GRP-002 incoming-reference count with `entryPoints` allowlist + site-router resolution.
 3. GRP-003 chain traversal across stage files by ID/ref columns.
-4. **Sequencing note:** in P3 these may build a local adjacency (reference behavior) to hit
-   lint parity; [P4](../index.md) replaces that with the shared `ContextGraph` + explicit
-   cycle data ([R5](../requirements/02-rules-engine.md)/[G6](../requirements/03-context-graph.md)).
+4. **Graph source (decided 2026-07-02, audit 2.2):** GRP-001 reads the graph's explicit cycle
+   list and GRP-002 reads node `inDegree` from `RuleContext.graph` — **no local adjacency in
+   rule code**. The orchestrator ([P2.05](../P2-rule-engine/05-orchestration-lintfiles.md))
+   builds and injects that graph: the relocated legacy builder in P3, the semantic
+   `buildContextGraph` from [P4.06](../P4-graph/06-grp-refactor-coverage.md) later. Because the
+   rules code against the injected graph's read shape, only the builder changes in P4 — rule
+   code and its (output-focused) tests stay put. GRP-003 is graph-independent: it walks the
+   `chain[]` ID/ref columns directly.
 
 ## Decisions applied
 

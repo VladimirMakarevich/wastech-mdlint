@@ -18,8 +18,10 @@ Expose `compileContext` over MCP, returning the generated skill content + a meta
 1. `compile-context` — `{ configPath?, cwd? }`: load config → require `config.compile` →
    `compileContext` → return **two content blocks**: the `skillContent` and a metadata block
    (`Documents: N, Rules: M, Components: K`).
-2. Missing `config.compile` → error contract `{ code, message, hint }`
-   ([M6](../requirements/05-mcp-server.md)), not empty output.
+2. Missing `config.compile` → format the core `CompileConfigMissingError` (code
+   `COMPILE_CONFIG_MISSING`, [P5.04](../P5-compile/04-synthesize.md), audit 4.4) into the
+   `{ code, message, hint }` error contract ([M6](../requirements/05-mcp-server.md)), not empty
+   output. The tool consumes the frozen `CompileResult` type; it does not invent its own error.
 3. Same deterministic content as the CLI `compile` ([S4](../requirements/04-skills-compile.md));
    read-only annotation ([M7](../requirements/05-mcp-server.md)).
 

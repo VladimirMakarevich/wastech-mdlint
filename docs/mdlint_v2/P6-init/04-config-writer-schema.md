@@ -17,10 +17,14 @@ Write the final config and wire it to the **local** schema, optionally dropping 
 
 1. Write `wastech-mdlint.config.json` in `cwd`: `$schema` (local path), `include`/`exclude`,
    and `rules` using **canonical IDs** ([C3](../requirements/01-configuration.md)); optionally
-   add rationale **comments** (JSONC, [C4](../requirements/01-configuration.md)).
+   add rationale **comments** (JSONC, [C4](../requirements/01-configuration.md)). On **merge**
+   ([P6.03](03-interactive-prompts.md), audit — P6 merge gap) apply *additive, existing-wins*:
+   preserve every existing `rules[]` entry (severity/options) and only append inferred rules
+   whose canonical ID is absent; do not touch existing `include`/`exclude`/`settings`.
 2. **Schema wiring** ([I3](../requirements/06-installation.md)/[C9](../requirements/01-configuration.md)):
-   default `$schema` to the local package path; if custom rules exist, run the schema
-   generator to write a project-local schema and point `$schema` there. **No remote URL.**
+   default `$schema` to the local package path; if custom rules exist, call the frozen
+   `generateConfigSchema({ customRules })` ([P2.06 frozen API](../P2-rule-engine/06-schema-generation.md),
+   audit 4.1) to write a project-local schema and point `$schema` there. **No remote URL.**
 3. Optional ([I6](../requirements/06-installation.md)): offer to drop
    `.github/workflows/wastech-mdlint.yml` referencing the published GitHub Action (P9) —
    ask first, don't write silently.

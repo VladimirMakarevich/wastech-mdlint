@@ -16,7 +16,10 @@ index, not table-cell-only matching ([G4](../requirements/03-context-graph.md)).
 ## Deliverables / steps
 
 1. Build a deterministic index over: defined IDs (table cells / headings matching
-   `idPattern`), heading slugs/anchors, and file paths.
+   `idPattern`), heading slugs/anchors, and file paths. Heading/anchor keys use the **canonical
+   github-slugger slugs** from `ParsedDocument` ([P1.02 slug contract](../P1-parsed-document/02-block-structure.md),
+   audit 5.1) — same dedup (`-1`/`-2`, document order) as REF-002 and anchor edges, so `#heading`
+   resolves identically everywhere.
 2. `getContextSlice(graph, documents, query, depth=2)`: resolve `query` via the index (exact,
    no fuzzy/LLM), then `query(graph, { start, forward, depth })`.
 3. If a value resolves to multiple start files, include all (deterministic order).

@@ -28,7 +28,8 @@ full single-tag release automation is [P9](../index.md).
 
 1. Update `.github/workflows/ci.yml` to run **across the workspace** on Node 24:
    `typecheck`, `test`, `build`, `lint`, plus `npm pack --dry-run` per package.
-2. Per-package packaging baseline: `engines.node` (`>=24.17.0 <25`), `files` allowlists,
+2. Per-package packaging baseline: `engines.node` (`>=24.17.0`, no upper bound — audit P9
+   engines gap), `files` allowlists,
    `publishConfig.access: "public"`, and **npm provenance** on all three (I5).
 3. Keep `publish.yml` as a placeholder; note that **single-tag release** publishing
    core+cli+mcp and tagging skills together is wired in [P9](../index.md) ([I4](../requirements/06-installation.md)).

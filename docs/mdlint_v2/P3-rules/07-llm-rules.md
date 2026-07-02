@@ -20,7 +20,7 @@ the new engine, so the original PLAN.md mission rides on top of the doc-integrit
 | ID | Scope | Severity | Checks | Key options |
 | --- | --- | --- | --- | --- |
 | SIZE-001 | document | configurable | file over byte / line / token budget | `bytes?:{warn?,error?}`, `lines?:{warn?,error?}`, `tokens?:{warn?,error?}`, `overrides[{pattern,bytes?,lines?,tokens?}]` |
-| LLM-001 | project | configurable | eager-import budget per entrypoint over limit | `entrypoints`, `maxTokensPerEntrypoint`, per-type limits? |
+| LLM-001 | project | configurable | eager-import budget per entrypoint over limit | `entrypoints`, `maxTokensPerEntrypoint` |
 
 ## SIZE-001 — Configuration schema
 
@@ -52,6 +52,26 @@ Threshold semantics:
 - Each `overrides` entry supplies independent per-metric thresholds; unspecified metrics fall back to
   the top-level `bytes`/`lines`/`tokens` options.
 
+## LLM-001 — Configuration schema
+
+**Single total budget per entrypoint (locked 2026-07-02, audit 3.2)** — parity with the current
+`llm/budget` (`maxTokensPerEntrypoint: number`, one `overLimit` per entrypoint):
+
+```jsonc
+{
+  "rule": "LLM-001",
+  "options": {
+    "entrypoints": ["CLAUDE.md", "AGENTS.md"],   // globs; which docs to budget
+    "maxTokensPerEntrypoint": 8000               // own + all eager-imported tokens, summed
+  }
+}
+```
+
+**Per-type limits are out of scope for v2** (backlog). There is no per-import "type"
+classification in the model, D3 only requires preserving the current single-budget behavior, and
+adding category budgets would be a premature extension point. If ever wanted, it needs a separate
+import-classification design first.
+
 ## Deliverables / steps
 
 1. SIZE-001: per-file **byte / line / token** check.
@@ -71,7 +91,8 @@ Threshold semantics:
      SIZE-001 `LintMessage`.
 2. LLM-001: build the eager-import tree from `ParsedDocument.imports`
    ([P1.03](../P1-parsed-document/03-references-extraction.md)), sum own+imported tokens per
-   entrypoint, report over-limit with percentage; surface cycles/missing imports as the current implementation did.
+   entrypoint, compare against the single `maxTokensPerEntrypoint` and report over-limit with
+   percentage; surface cycles/missing imports as the current implementation did.
 3. Express both through the engine (metadata + options schema), not as bespoke pipeline steps.
 
 ## Decisions applied

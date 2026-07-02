@@ -30,6 +30,71 @@ budget-aware — and return `CompileResult`.
 5. **Frontmatter schema** ([S1](../requirements/04-skills-compile.md)): validate the emitted
    frontmatter against the shared SKILL.md schema.
 
+## Command-block presets (S2) — expected output
+
+The **Document Dependencies** section ends with a command block templated by
+`compile.commandPreset`; default is `generic`. Presets change **only** this block — the
+computed dependency data above it is identical across presets, and every block is static text
+(no timestamps, no host detection), preserving S4 byte-stability. Canonical rendering (examples
+locked 2026-07-02, audit 3.4):
+
+**`generic`** (default — host-neutral: plain instructions + MCP-tool reference):
+
+```markdown
+### Working with dependencies
+
+- Trace what a change affects: run `wastech-mdlint impact <file>`, or call the
+  `impact-analysis` MCP tool with `{ "file": "<file>" }`.
+- Pull the context slice for a topic: run `wastech-mdlint slice <query>`, or call the
+  `context-slice` MCP tool with `{ "query": "<query>" }`.
+```
+
+**`claude`** (Claude-Code command-injection style — the pre-v2 hardcoded form):
+
+```markdown
+### Working with dependencies
+
+- Trace what a change affects:
+
+  !npx wastech-mdlint impact $ARGUMENTS
+
+- Pull the context slice for a topic:
+
+  !npx wastech-mdlint slice $ARGUMENTS
+```
+
+**`none`** (no command block): the **Document Dependencies** section renders the computed
+dependency listing (reading order + per-file references) **only** — no "Working with
+dependencies" heading, no runnable commands.
+
+## Frozen types + error contract (audit 4.4)
+
+`CompileResult` is a **public core type, frozen before P7 & P8 depend on it**. The top-level
+`compileContext` is the entry both hosts call; `synthesize` is the inner assembly:
+
+```ts
+// @wastech-mdlint/core
+export interface CompileResult {
+  skillContent: string; // full SKILL.md text — deterministic, byte-stable (S4)
+  metadata: {
+    documentCount: number;
+    ruleCount: number;
+    componentCount: number;
+    contentHash: string; // S4 provenance hash (also embedded in the skillContent header)
+  };
+}
+
+export function compileContext(config: Config, cwd: string): CompileResult;
+// throws CompileConfigMissingError (typed, carries a stable `code`) when config.compile is absent
+export function synthesize(/* analysis + profiles + rules */): CompileResult;
+```
+
+**Error contract is core-owned**, so both hosts format one source: `compileContext` throws a
+typed `CompileConfigMissingError` (code `COMPILE_CONFIG_MISSING`) when `config.compile` is
+missing. The CLI ([P5.05](05-compile-config-cli.md)) maps it to **exit 2** with the message; the
+MCP tool ([P7.04](../P7-mcp-server/04-compile-tool.md)) maps it to `{ code, message, hint }`.
+That `code` is one entry in the P7 MCP error taxonomy.
+
 ## Decisions applied
 
 - [S1, S2, S4, S6](../requirements/04-skills-compile.md) · ([S3 skipped — English scaffold](../requirements/04-skills-compile.md)).

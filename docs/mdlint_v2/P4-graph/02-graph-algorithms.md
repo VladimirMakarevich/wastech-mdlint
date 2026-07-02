@@ -16,10 +16,16 @@ topo order.
 ## Deliverables / steps
 
 1. `topologicalSort(graph)` — Kahn's algorithm with a sorted zero-in-degree queue.
-2. `getComponents(graph)` — undirected BFS connected components, sorted.
+2. `getComponents(graph)` — undirected BFS connected components, sorted **by size descending,
+   then by the component's lexicographically-smallest node path (repo-relative POSIX) ascending**
+   (audit — P4 component-sort gap) — deterministic across filesystems.
 3. **Explicit cycles** ([G6](../requirements/03-context-graph.md)): SCC/DFS (reuse the existing
    Tarjan implementation now in `core`) returning the cycle list as data — not just a shorter
-   topo array. Shared with GRP-001 (P4.06).
+   topo array. Shared with GRP-001 (P4.06). **Edge multiplicity & cycles (audit — P4 edge-dedup
+   gap):** duplicate edges do not multiply cycles — SCC is defined over node reachability, so
+   several `A→B` edges plus a `B→A` form **one** cycle (the SCC `{A,B}`), reported once (GRP-001
+   canonicalizes). Edge multiplicity is retained only for `references`/degree counts; collapsing
+   duplicates is [G7 backlog](../requirements/03-context-graph.md).
 4. `formatContextGraphSummary(graph)` — counts, entry points (`inDegree === 0`), top hubs.
 
 ## Decisions applied

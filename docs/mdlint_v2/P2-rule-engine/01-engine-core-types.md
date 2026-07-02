@@ -29,7 +29,14 @@ with structured findings, orchestrator-owned severity, and a fix hook.
    ([R2](../requirements/02-rules-engine.md)).
 2. `RuleContext { document, filePath, projectFiles?, documents?, settings, graph?, report() }`
    — `settings` carries inherited config (e.g. `siteRouter`, [C5](../requirements/01-configuration.md));
-   `graph` is the shared `ContextGraph` (wired in P4, [R5](../requirements/02-rules-engine.md)).
+   `graph` is the shared `ContextGraph`, **injected by the orchestrator (P2.05) starting in P3**
+   — the relocated legacy builder in P3, swapped to the semantic `buildContextGraph` in P4
+   ([R5](../requirements/02-rules-engine.md)). It stays typed as `graph?` (document-scope rules
+   ignore it), but graph rules consume it directly rather than building a local adjacency
+   (audit 2.2). The minimal read shape GRP-001/002 depend on — the explicit cycle list
+   ([G6](../requirements/03-context-graph.md)) and node `inDegree`/`outDegree` — is part of the
+   `ContextGraph` type ([P4.01](../P4-graph/01-context-graph-model.md)) and does not change when
+   the builder is swapped.
 3. `LintMessage { ruleId, severity, message, line, column?, endLine?, filePath?, fixable?,
    data?, helpUri? }` — structured fields per [R3](../requirements/02-rules-engine.md);
    existing fields unchanged (superset).

@@ -34,7 +34,10 @@ metadata source that also generates `schema.json` and docs ([R6](../requirements
    docsUrl, optionsSchema, messages }` — consumed by the registry, `schema.json` generation
    (P2.06), README, `describeRules` (P5), and `init` categories (P6).
 3. Registry stays **static** (no code-plugins, [R9 Tier 2 deferred](../requirements/02-rules-engine.md)),
-   but the `custom` rule (P3) is registered as a first-class entry over the primitives.
+   but the `custom` rule (P3) is registered as a first-class entry over the primitives. The
+   registry also exposes the set of **reserved built-in prefixes** — derived from the canonical
+   IDs of all built-in rules — so the `custom` rule ([P3.08](../P3-rules/08-custom-rule.md)) can
+   reject any user ID whose prefix shadows a built-in namespace (audit 3.5).
 
 ## Decisions applied
 

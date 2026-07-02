@@ -30,6 +30,11 @@ Prove the engine end-to-end by porting a few existing checks as real rules, and 
 2. Add the `lint` command to the commander program: default command
    ([D4](../index.md)), `--config`/`--format`/`--fail-on`, exit codes (0 pass / 1 findings /
    2 operational), running `lintFiles` + structured/text formatters.
+   - **`--fix` contract (audit 4.2):** the `--fix` flag ([R2](../requirements/02-rules-engine.md))
+     joins this command in **P3** — when the first `fixable` rule lands, not "P6+". Behavior
+     (ESLint-style): apply the deterministic `fix?` edits in place, then re-report the
+     **remaining** findings and exit on those (same 0/1/2 codes). P8.03's `-fix` skill relies on
+     this stable contract.
 3. **Coexistence plan:** keep the legacy `scan` pipeline running until P3 completes; at the
    **end of P3**, make `scan` a hidden alias of `lint` and remove the old pipeline
    ([D4](../index.md)). Record this explicitly so P3 closes it out.

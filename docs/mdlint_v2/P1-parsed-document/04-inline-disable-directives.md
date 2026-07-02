@@ -24,14 +24,21 @@ only *extracts* them; the engine *applies* them.
 
 ## Deliverables / steps
 
-1. Recognize HTML-comment directives in Markdown:
-   - `<!-- wastech-mdlint-disable RULE-ID[, RULE-ID…] -->`
-   - `<!-- wastech-mdlint-disable-next-line RULE-ID[, RULE-ID…] -->`
-2. Emit `directives: { kind, ruleIds, line }[]` on `ParsedDocument`.
+1. Recognize HTML-comment directives in Markdown (markdownlint-style, decided 2026-07-02 —
+   audit 2.4):
+   - `<!-- wastech-mdlint-disable [RULE-ID, RULE-ID…] -->`
+   - `<!-- wastech-mdlint-enable [RULE-ID, RULE-ID…] -->`
+   - `<!-- wastech-mdlint-disable-next-line [RULE-ID, RULE-ID…] -->`
+
+   A directive with **no rule IDs applies to all rules**.
+2. Emit `directives: { kind: "disable" | "enable" | "disable-next-line", ruleIds, line }[]` on
+   `ParsedDocument` (`ruleIds` empty ⇒ all rules).
 3. Normalize rule IDs to canonical form ([C3](../requirements/01-configuration.md):
    `REF-001`, case-insensitive, dash-optional) so the engine matches reliably.
-4. Capture position so `disable-next-line` can be scoped to the following line and
-   block-level `disable` to its range.
+4. Capture `kind` + position so the engine can scope directives (range logic is engine-side,
+   P2.05): `disable-next-line` → the following line only; `disable` → from its line until the
+   matching `enable` for the same rule(s), or EOF if none; `enable` → re-enables from its line.
+   The parser only records `{ kind, ruleIds, line }` — **no new `ParsedDocument` field**.
 
 > The actual suppression (matching directive ranges against reported message lines) is engine
 > logic in P2 — keep this task to extraction + normalization only.
@@ -43,7 +50,8 @@ only *extracts* them; the engine *applies* them.
 
 ## Exit criteria
 
-- [ ] `disable` and `disable-next-line` comments are extracted with line + rule IDs.
+- [ ] `disable`, `enable`, and `disable-next-line` comments are extracted with kind + line + rule IDs.
+- [ ] A directive with no rule IDs is recorded as "all rules" (empty `ruleIds`).
 - [ ] Rule IDs normalized to canonical form.
 - [ ] Malformed/unknown directives are tolerated (ignored, not fatal).
 

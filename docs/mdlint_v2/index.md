@@ -132,8 +132,9 @@ placeholder-org strings from early drafts).
 ## 5. Decisions
 
 Pivotal forks that shape the roadmap. **D1–D3 and the milestone order were
-confirmed by the owner on 2026-06-21** (all on the recommended option). D4–D7
-stand at their recommendation as defaults unless changed.
+confirmed by the owner on 2026-06-21** (all on the recommended option).
+**D4–D7 were confirmed by the owner on 2026-07-02** (all on the recommended
+option).
 
 | # | Decision | Resolution |
 | --- | --- | --- |
@@ -141,10 +142,10 @@ stand at their recommendation as defaults unless changed.
 | **D2** ✅ | **Config model migration.** | **Clean replace**, no compatibility layer (still `v0.0.0`, no real users). New `{ include, rules[], compile }`; **JSON-only** (drop `.cjs/.mjs`). One-time migration note in the README. |
 | **D3** ✅ | **Fate of current LLM features** (size, eager `@import` budget, per-entrypoint token budget) — absent from the 22 built-in rule set. | **Preserve as first-class rules** in the new engine (`SIZE-001` checks bytes/lines/tokens each with independent per-metric `warn`/`error` thresholds; `LLM-001` eager-import budget). Keeps the original PLAN.md mission (LLM context hygiene) on top of doc-integrity. |
 | **Order** ✅ | **What ships first after the foundation.** | **Lint parity first** — P3 (all 22 built-in rules + the LLM rules) before graph/agents. M1→M2 is the priority path. |
-| **D4** | **`scan` command.** The current CLI uses `scan`; target uses `lint` (default). | **Default to `lint`, keep `scan` as a hidden alias** for one minor version, then deprecate. |
-| **D5** | **CLI framework.** | **Adopt `commander` + `@inquirer/prompts`** (matches reference, needed for `init`'s interactive flow). |
-| **D6** | **LSP server** (`lsp-server/config-loader.ts` in the spec). | **Out of v2 scope** (stretch). Keep `core` LSP-friendly (sync, no `process.exit` in library code). |
-| **D7** | **Docs site** (reference ships Astro/Starlight). | **Out of v2 core scope**; README + schema + skills suffice for launch. |
+| **D4** ✅ | **`scan` command.** The current CLI uses `scan`; target uses `lint` (default). | **Default to `lint`, keep `scan` as a hidden alias** for one minor version, then deprecate. |
+| **D5** ✅ | **CLI framework.** | **Adopt `commander` + `@inquirer/prompts`** (matches reference, needed for `init`'s interactive flow). |
+| **D6** ✅ | **LSP server** (`lsp-server/config-loader.ts` in the spec). | **Out of v2 scope** (stretch). Keep `core` LSP-friendly (sync, no `process.exit` in library code). |
+| **D7** ✅ | **Docs site** (reference ships Astro/Starlight). | **Out of v2 core scope**; README + schema + skills suffice for launch. |
 
 ---
 

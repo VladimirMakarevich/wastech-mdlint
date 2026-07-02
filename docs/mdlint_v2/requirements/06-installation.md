@@ -40,9 +40,10 @@
   one `vX.Y.Z` tag publishes `@wastech-mdlint/{core,cli,mcp-server}` and tags the skills
   together. Prevents version skew between CLI/MCP and the skills that target the CLI surface.
 
-- **I5 — supply chain.** Extend the current implementation's npm provenance to every package; pin `engines.node`
-  (`>=24.17.0 <25`), set per-package `files` allowlists, and run lockfile-based CI for
-  reproducible builds.
+- **I5 — supply chain.** Extend the current implementation's npm provenance to every package; set `engines.node`
+  (`>=24.17.0`, **no upper bound** — audit P9 engines gap: don't lock out future majors; CI
+  validates on the Node 24 LTS line), set per-package `files` allowlists, and run lockfile-based
+  CI for reproducible builds.
 
 - **I6 — GitHub Action.** The init skill already offers a CI workflow; v2 makes it
   first-class as a publishable/reusable Action — a major "production" adoption lever — and

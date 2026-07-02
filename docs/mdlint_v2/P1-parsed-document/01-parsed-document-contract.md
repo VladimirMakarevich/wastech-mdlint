@@ -42,6 +42,16 @@ positions where applicable:
 
 Document which field feeds which consumer (rule primitive / graph edge / directive / import).
 
+**Defined IDs are intentionally _not_ a field** (decided 2026-07-02, audit 2.1). Table-cell /
+heading identifiers are *derived* from the already-parsed `tables` and `headings` by a shared
+`extractDefinedIds(doc, idRef)` helper in `core` (where `idRef = { idPattern, definitions,
+idColumn }`), consumed by both the graph builder ([P4.01](../P4-graph/01-context-graph-model.md)
+id-ref edges) and `REF-005`. Discovery is **column-based** (definitions come from the declared
+columns; `idPattern` validates the token within them — audit 5.5), not a scan of arbitrary
+cells. This keeps the parser config-light (`idPattern` is config, not a parse input) and
+avoids duplicating the `tables` data. P4 therefore does **not** re-parse Markdown — it re-scans
+the parsed `tables`/`headings` via that one helper.
+
 ## Decisions applied
 
 - [R9](../requirements/02-rules-engine.md) primitives · [G1](../requirements/03-context-graph.md)/[G3](../requirements/03-context-graph.md)

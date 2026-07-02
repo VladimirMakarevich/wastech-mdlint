@@ -14,7 +14,11 @@ Compute the blast radius of changing a file: which docs are directly vs transiti
 
 ## Deliverables / steps
 
-1. `getImpactSet(graph, file)` — reverse BFS over `query`.
+1. `getImpactSet(graph, file)` — reverse BFS over `query` with **no depth limit** (full
+   transitive closure). The query layer's mandatory visited-set guarantees termination on
+   cyclic graphs (audit 5.2); no artificial depth cap (capping would drop genuinely-affected
+   files). A hub referenced by almost everything legitimately yields a large set — that is
+   correct, and the traversal stays bounded to O(nodes+edges) by the visited-set.
 2. `classifyImpact(graph, file)` — `directlyAffected` (with `references` count) +
    `transitivelyAffected` (with `via`).
 3. `relativizeImpact(impact, cwd)` for output; reuse `topologicalSort` to produce a reading
@@ -31,6 +35,7 @@ Compute the blast radius of changing a file: which docs are directly vs transiti
 ## Exit criteria
 
 - [ ] Direct/transitive sets correct with `references`/`via`.
+- [ ] Reverse traversal terminates on cyclic graphs (visited-set) and returns the full transitive closure.
 - [ ] Affected-subgraph reading order produced.
 - [ ] Out-of-corpus file → actionable error.
 

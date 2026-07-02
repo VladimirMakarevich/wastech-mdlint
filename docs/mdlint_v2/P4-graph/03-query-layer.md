@@ -16,8 +16,12 @@ consumer ([G2](../requirements/03-context-graph.md)).
 
 ## Deliverables / steps
 
-1. `query(graph, { start, direction: "forward"|"reverse", depth, edgeTypes? })` returning a
-   deterministic, sorted visited set + traversal metadata (depth/`via`).
+1. `query(graph, { start, direction: "forward"|"reverse", depth?, edgeTypes? })` returning a
+   deterministic, sorted visited set + traversal metadata (depth/`via`). **Cycle-safe by
+   construction (audit 5.2):** an internal `visited` set expands each node **at most once**, so
+   traversal always terminates even on cyclic graphs (GRP-001 *reports* cycles but does not
+   remove them). `depth` is **optional** — a number bounds hops (`slice` uses `depth: 2`);
+   omitted ⇒ traverse to exhaustion (full closure, used by `impact`).
 2. `edgeTypes` filter leverages the typed edges from P4.01 (e.g. follow only `import` edges,
    or all but `image`).
 3. Both `slice` (forward) and `impact` (reverse) are thin wrappers over this.

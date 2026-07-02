@@ -121,3 +121,5 @@ verification.
 - Keep agent-operation guidance in `AGENTS.md`, `CLAUDE.md`, and `.agents/rules/`.
 - If a task is documentation-only, do not change product code, public interfaces, package
   metadata, or dependencies unless the user explicitly expands scope.
+
+@RTK.md

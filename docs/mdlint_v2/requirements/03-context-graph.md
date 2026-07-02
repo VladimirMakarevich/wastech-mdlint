@@ -34,6 +34,25 @@
   impact catches "REQ-001 is referenced in design.md" with no Markdown link). This is
   the core agent value and the spec's own extension point #2.
 
+  **Edge-type taxonomy (decided 2026-07-02, audit 2.5).** Nodes are files, so every edge is
+  file→file. **Exactly one edge is materialized per source construct**, typed by the construct —
+  the types are mutually exclusive:
+
+  | Type | Source construct | Target | Example |
+  | --- | --- | --- | --- |
+  | `link` | Markdown link **without** a `#fragment` | target file | `[API](api.md)` → edge to `api.md` |
+  | `anchor` | Markdown link **with** a `#fragment` | target file | `[API](api.md#auth)` → `anchor` edge to `api.md` |
+  | `image` | `![alt](img)` | image target | `![d](d.png)` → `image` edge |
+  | `import` | `@path.md` eager import (D3) | imported file | `@glossary.md` → `import` edge |
+  | `id-ref` | plain-text token matching an ID defined elsewhere (via `extractDefinedIds`) | defining file | `REQ-001` in `design.md` → `id-ref` edge to the doc defining `REQ-001` |
+
+  Rules: the presence of a `#fragment` decides `link` vs `anchor` (so `file.md#sec` is **one**
+  `anchor` edge, never `link`+`anchor`). `@import` is exclusively `import` (its own syntax, not a
+  link); `image` never overlaps `link`. **Same-file anchors** (`#frag` with no file part) are
+  file-level self-references → **not materialized** as edges (P4.01 skips self-refs); their
+  existence is validated by `REF-002`, not by the graph. Traversal (`slice`/`impact`) uses all
+  edge types by default; `edgeTypes?` (G2) opts into a subset.
+
 - **G2 — unified query layer.** One `query(graph, { start, direction, depth, edgeTypes })`
   that `slice`, `impact`, MCP tools, and `compile` all call (spec extension #3). Edge-type
   filtering (from G1) lives here. Removes today's bespoke BFS in slice/impact and the
@@ -75,8 +94,13 @@
 
 ## Downstream impact
 
-- **Parser (P1):** expose anchors, defined IDs, and `@import` targets so G1 edges can be
-  built; keep link label text for G3.
+- **Parser (P1):** expose anchors (heading slugs), the raw table cells, and `@import`
+  targets so G1 edges can be built; keep link label text for G3. **Defined IDs are not a
+  parser field** — they are derived from the exposed `tables`/`headings` by a shared
+  `extractDefinedIds(doc, idRef)` helper (`idRef = { idPattern, definitions, idColumn }`), since
+  that config is not a parse input and the parser stays config-light (decided 2026-07-02, audit
+  2.1). Discovery is **column-based** — definitions come from the declared columns, the same
+  model as REF-005 (audit 5.5) — not a scan of arbitrary cells.
 - **Rule engine (P2/P3):** `GRP-001/002` consume the shared graph + cycle data (R5/G6);
   `REF-005`/`id-ref` rules can read id-ref edges instead of re-scanning tables.
 - **CLI (P4):** `graph` gains `--format mermaid|dot` (G9); `slice` uses the deterministic

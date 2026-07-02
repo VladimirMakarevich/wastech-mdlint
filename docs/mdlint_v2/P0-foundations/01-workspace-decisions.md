@@ -24,12 +24,28 @@ not code.
    and match the reference `workspace:*` style.
 2. **Package set & names:** `@wastech-mdlint/core`, `@wastech-mdlint/cli`
    (bin `wastech-mdlint`), `@wastech-mdlint/mcp-server` (bin `wastech-mdlint-mcp`).
-3. **Runtime/engines:** Node `>=24.17.0 <25` on every package (I5).
-4. **Zod version:** pin one version shared by `core` + `mcp-server` (the current codebase uses
-   Zod v3). Decide v4 to match the MCP SDK examples → record the chosen version.
-5. **TypeScript build strategy:** single `tsconfig.base.json` + per-package `tsconfig` that
-   `extends` it; decide whether to use project references (recommended for incremental
-   builds) or independent `tsc` per package.
+3. **Runtime/engines:** `engines.node` = `>=24.17.0` on every package (I5). _No upper bound_
+   (decided 2026-07-02, audit — P9 engines gap): don't lock out future majors; CI validates on
+   the Node 24 LTS line (`.nvmrc`/`.node-version` pin 24.17.0), newer at users' discretion.
+4. **Zod version:** **v4** (`zod@^4`), a single version shared by `core` + `mcp-server`.
+   _Decided 2026-07-02._ Rationale: Zod v4 ships a native `z.toJSONSchema()`, which is what
+   `schema.json` generation ([P2.06](../P2-rule-engine/06-schema-generation.md)) needs — this
+   removes the third-party `zod-to-json-schema` dependency and keeps schema output under our
+   control. It also matches the MCP SDK examples, so no porting is required there. The current
+   v3 usage lives only in `src/config/load.ts`; it is migrated to the v4 API when that code
+   relocates into `core` ([P0.04](04-relocate-current-source-into-core.md)). The surface used
+   there (`z.string/number/array/enum`, `.optional()`, `.safeParse()`, `z.infer`, `z.ZodError`)
+   is near-identical in v4, so the migration is mechanical.
+5. **TypeScript build strategy:** **project references**, built with `tsc -b`.
+   _Decided 2026-07-02._ A single `tsconfig.base.json` holds the shared compiler options; each
+   package's `tsconfig.json` `extends` it and sets `composite: true`; a root `tsconfig.json`
+   lists all three packages under `references` (`core`; `cli` and `mcp-server` each reference
+   `core`). Rationale: packages resolve each other through compiled `dist/` + `.d.ts`
+   ([P0.03](03-core-package-skeleton.md), [P0.05](05-cli-package-commander.md)), so `core` must
+   build before `cli`/`mcp-server`; `tsc -b` enforces that order automatically and rebuilds
+   incrementally via `.tsbuildinfo`. Independent per-package `tsc` was rejected: `npm run
+   --workspaces` does not guarantee topological order (cli could build before core) and gives
+   no cross-package incremental caching.
 6. **Test/lint/format:** Vitest workspace, ESLint flat config + Prettier at the root, run
    per package via root scripts.
 7. **Module format:** ESM (`"type": "module"`), NodeNext resolution (already present today).
@@ -42,8 +58,8 @@ not code.
 
 ## Exit criteria
 
-- [ ] Zod version chosen and written down.
-- [ ] Build strategy (project references vs independent `tsc`) chosen.
+- [x] Zod version chosen and written down. → **v4** (`zod@^4`), decided 2026-07-02.
+- [x] Build strategy (project references vs independent `tsc`) chosen. → **project references** (`tsc -b`), decided 2026-07-02.
 - [ ] Package names/bins confirmed against the requirements.
 
 ## Hand-off to next

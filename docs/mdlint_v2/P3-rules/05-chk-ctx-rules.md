@@ -23,8 +23,14 @@ primitives.
 
 ## Deliverables / steps
 
-1. CTX-001 composes `noPlaceholders` (default set `TBD/TODO/WIP/FIXME/N/A`, extensible via
-   `placeholders`) plus empty-section detection via `extract-section-body`.
+1. CTX-001 composes `noPlaceholders` + empty-section detection via `extract-section-body`.
+   **Placeholder set (locked 2026-07-02, audit 3.1):**
+   - Default set: `["TBD", "TODO", "WIP", "FIXME", "N/A"]` (these five, exactly).
+   - The `placeholders` option **extends** the default set (union — honoring "extensible");
+     it does not replace it.
+   - **Matching is case-insensitive and whole-body:** a section is flagged when its trimmed
+     body is empty/whitespace, or equals one of the placeholder tokens (optionally with a
+     trailing `:`). **Not substring** — prose that merely mentions "TODO" is not flagged.
 2. CTX-002 composes `allChecked` over `checkItems` (optionally scoped to a section).
 3. CTX-003 is project-scope: read glossary table → build alias→canonical map → scan `content`
    of matched files → warn on alias usage with the canonical replacement.
@@ -37,6 +43,7 @@ primitives.
 ## Exit criteria
 
 - [ ] CTX-001, CTX-002, CTX-003 pass unit + fixture tests.
+- [ ] CTX-001 flags empty + whole-body placeholder sections (case-insensitive), does not flag prose that only mentions a token, and unions `placeholders` with the locked default set.
 - [ ] CTX-003 reports canonical replacement for each alias usage.
 
 ## Hand-off to next

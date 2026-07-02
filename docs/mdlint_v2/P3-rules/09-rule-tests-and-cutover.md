@@ -22,8 +22,18 @@ Close the lint-parity milestone: full test coverage, generated docs/schema, and 
 
 1. **Coverage:** every rule has unit + focused-fixture tests; add a core-pipeline integration
    test running a representative ruleset over a fixture repo.
+   - **Graph-rule test strategy (audit 2.3):** the only graph-dependent rules are **GRP-001/002**.
+     They are tested with the **real graph injected by the orchestrator** ([P2.05](../P2-rule-engine/05-orchestration-lintfiles.md)) —
+     the relocated legacy builder in P3 — **not mock graphs**, and not deferred to P4. All other
+     rules, including **REF-005/006** (ID traceability) and **GRP-003** (chain columns), are
+     graph-independent: they run over the `documents` map + table cells via the shared
+     `extractDefinedIds` helper (audit 2.1) and config columns, so they are tested directly.
 2. **Generated docs:** README rule table generated from the metadata source
    ([R6](../requirements/02-rules-engine.md)); `schema.json` regenerated; **sync test green**.
+   - **Fix-support table (audit 4.2):** generate a per-rule `fixable` column from metadata.
+     The **locked v2 deterministic-fixable subset is `SEC-*` (missing-section scaffold) and
+     `TBL-002` (empty cell → `TODO`)**; every other rule is `fixable: false`. The P8.03 `-fix`
+     skill reads this generated table rather than hardcoding a policy.
 3. **`scan → lint` cutover** ([D4](../index.md)): make `scan` a hidden alias of `lint`,
    **remove the legacy legacy pipeline** and the old sectioned-config code paths (greenfield,
    [D2](../index.md)). Update `--help`.
