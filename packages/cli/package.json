@@ -1,0 +1,27 @@
+{
+  "name": "@wastech-mdlint/cli",
+  "version": "0.0.0",
+  "description": "CLI for auditing Markdown context in repositories.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "wastech-mdlint": "./dist/index.js"
+  },
+  "engines": {
+    "node": ">=24.17.0 <25"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@wastech-mdlint/core": "0.0.0",
+    "commander": "^14.0.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

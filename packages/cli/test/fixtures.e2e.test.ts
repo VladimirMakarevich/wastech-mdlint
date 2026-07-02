@@ -2,7 +2,11 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { EXIT_CODE_RUNTIME_ERROR, EXIT_CODE_SUCCESS, EXIT_CODE_USAGE_ERROR } from "../src/cli.js";
+import {
+  EXIT_CODE_RUNTIME_ERROR,
+  EXIT_CODE_SUCCESS,
+  EXIT_CODE_USAGE_ERROR
+} from "../src/commands.js";
 import {
   normalizeFixtureOutput,
   runFixtureCli,
