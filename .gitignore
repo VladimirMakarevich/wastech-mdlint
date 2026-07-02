@@ -5,3 +5,6 @@ node_modules/
 .npm/
 .pnpm-store/
 yarn-error.log
+
+# wastech-orchestrator runtime home (auto-appended by `worc install`)
+.worc/
