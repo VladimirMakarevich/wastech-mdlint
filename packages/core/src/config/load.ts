@@ -98,7 +98,10 @@ function mergeConfig(defaults: AuditConfig, overrides: RawAuditConfig): AuditCon
   };
 }
 
-function formatZodPath(pathParts: Array<string | number>): string {
+// Zod v4's ZodIssue.path is typed as PropertyKey[] (string | number | symbol) instead of v3's
+// (string | number)[); object/array keys never actually surface as symbols at runtime, so this
+// is a type-level widening only, not a behavior change.
+function formatZodPath(pathParts: readonly PropertyKey[]): string {
   if (pathParts.length === 0) {
     return "config";
   }
