@@ -32,7 +32,7 @@ node dist/cli.js --help
 
 After npm publishing is set up, the publishing workflow will be documented in [docs/plan/16-npm-publishing.md](docs/plan/16-npm-publishing.md).
 
-Running `npm install` in a fresh checkout also creates `wastech-mdlint.config.json` from the bundled example if it is missing, and it leaves an existing config file untouched.
+`npm install` no longer writes any files into your checkout. It previously copied a default `wastech-mdlint.config.json` on install; that install-time side effect has been removed because packages should not write to a consumer's working tree during installation. Configuration is optional — when no config file is present the CLI runs on built-in defaults (see [Config](#config)) — so create one only when you want to override them. An explicit initialization command will provide a starter config in a later release.
 
 ## Quick Start
 

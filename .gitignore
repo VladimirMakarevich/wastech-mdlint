@@ -1,4 +1,5 @@
 dist/
+*.tsbuildinfo
 coverage/
 .vitest/
 node_modules/
