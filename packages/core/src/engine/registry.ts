@@ -180,8 +180,10 @@ export class RuleRegistry {
       throw new RuleResolutionError({
         code: "INVALID_OPTIONS",
         ruleName: canonical,
+        // Paths are prefixed with "options" so the loader renders `rules[i].options.<path>`
+        // uniformly for built-in and custom entries.
         issues: parsed.error.issues.map((issue) => ({
-          path: [...issue.path],
+          path: ["options", ...issue.path],
           message: issue.message
         })),
         message: `Invalid options for rule "${canonical}".`

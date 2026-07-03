@@ -98,6 +98,13 @@ export type { ConfigIssue, RuleDefinition, RuleMetadata, RuleResolutionCode } fr
 export { BUILTIN_RULE_DEFINITIONS, ruleRegistry } from "./engine/rules/index.js";
 export { fileScopeShape, matchesFileScope } from "./engine/rules/scope.js";
 export type { FileScope } from "./engine/rules/scope.js";
+export { resolveCustomRule } from "./engine/rules/custom.js";
+export type { CustomRuleEntry } from "./engine/rules/custom.js";
+export {
+  customRuleEntrySchema,
+  ruleEntryUnionSchema
+} from "./config/config-schema.js";
+export type { CustomRuleConfigEntry } from "./config/config-schema.js";
 
 export { generateConfigSchema } from "./engine/schema.js";
 export type { CustomRuleDefinition } from "./engine/schema.js";

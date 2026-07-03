@@ -5,6 +5,7 @@ import { type ParseError, parse as parseJsonc, printParseErrorCode } from "jsonc
 import { z } from "zod";
 
 import { RuleResolutionError, type RuleRegistry } from "../engine/registry.js";
+import { resolveCustomRule, type CustomRuleEntry } from "../engine/rules/custom.js";
 import { ruleRegistry } from "../engine/rules/index.js";
 import type { ResolvedSettings, Rule, SeverityOverride } from "../engine/types.js";
 import { ConfigError } from "./load.js";
@@ -53,9 +54,10 @@ function formatRuleResolutionError(index: number, error: RuleResolutionError): s
     return [`- rules[${index}]: Unknown rule "${error.ruleName}".${suffix}`];
   }
 
+  // Issue paths already carry their full location (e.g. ["options", "maxBytes"] or ["id"]).
   return (error.issues ?? [{ path: [], message: error.message }]).map((issue) => {
-    const suffix = issue.path.length === 0 ? "" : `.${issue.path.join(".")}`;
-    return `- rules[${index}].options${suffix}: ${issue.message}`;
+    const location = issue.path.length === 0 ? `rules[${index}]` : `rules[${index}].${issue.path.join(".")}`;
+    return `- ${location}: ${issue.message}`;
   });
 }
 
@@ -80,7 +82,11 @@ function resolveRules(config: LintConfig, registry: RuleRegistry): ConfiguredRul
 
   entries.forEach((entry, index) => {
     try {
-      resolved.push({ rule: registry.resolveRule(entry.rule, entry.options), severity: entry.severity });
+      const rule =
+        entry.rule === "custom"
+          ? resolveCustomRule(entry as CustomRuleEntry, registry)
+          : registry.resolveRule(entry.rule, (entry as { options?: unknown }).options);
+      resolved.push({ rule, severity: entry.severity });
     } catch (error) {
       if (error instanceof RuleResolutionError) {
         errors.push(...formatRuleResolutionError(index, error));
