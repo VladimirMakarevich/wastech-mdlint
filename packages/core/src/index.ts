@@ -91,6 +91,8 @@ export type { PrimitiveContext, PrimitiveFinding } from "./engine/primitives/typ
 export { defineRule, RuleRegistry, RuleResolutionError } from "./engine/registry.js";
 export type { ConfigIssue, RuleDefinition, RuleMetadata, RuleResolutionCode } from "./engine/registry.js";
 export { BUILTIN_RULE_DEFINITIONS, ruleRegistry } from "./engine/rules/index.js";
+export { fileScopeShape, matchesFileScope } from "./engine/rules/scope.js";
+export type { FileScope } from "./engine/rules/scope.js";
 
 export { generateConfigSchema } from "./engine/schema.js";
 export type { CustomRuleDefinition } from "./engine/schema.js";
