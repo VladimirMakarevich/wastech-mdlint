@@ -1,6 +1,6 @@
 import { Command, CommanderError, Option } from "commander";
 
-import { ConfigError, DiscoveryError } from "@wastech-mdlint/core";
+import { ConfigError } from "@wastech-mdlint/core";
 
 import {
   CliUsageError,
@@ -32,10 +32,9 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
 
   const program = new Command()
     .name("wastech-mdlint")
-    // exitOverride() + configureOutput() must run before .command() creates the scan/graph
-    // subcommands: commander only copies output/exit settings onto a subcommand at the moment
-    // it's created, so subcommands built beforehand would keep writing to the real process
-    // streams and calling process.exit, breaking test isolation and IO injection.
+    // exitOverride() + configureOutput() must run before .command() creates subcommands: commander
+    // only copies output/exit settings onto a subcommand at the moment it's created, so subcommands
+    // built beforehand would keep writing to the real process streams / calling process.exit.
     .exitOverride()
     .configureOutput({
       writeOut: (text) => stdout.write(text),
@@ -44,67 +43,40 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
 
   program.version(await readPackageVersion(), "-v, --version");
 
-  program
-    .command("scan")
-    .description("Analyze Markdown files in a directory.")
-    // Defaulting to the injected cwd here (not process.cwd()) keeps `scan` with no path argument
-    // testable: fixture-driven tests pass a temp directory via io.cwd instead of the real cwd.
-    .argument("[path]", "directory to scan", cwd)
-    .addOption(new Option("--config <file>", "path to a config file"))
-    .addOption(
-      new Option("--format <format>", "output format").choices(OUTPUT_FORMATS).default("text")
-    )
-    .addOption(
-      new Option("--fail-on <level>", "minimum severity that causes a non-zero exit code")
-        .choices(FAIL_ON_LEVELS)
-        .default("error")
-    )
-    .action(
-      async (
-        targetPath: string,
-        options: { config?: string; format: OutputFormat; failOn: FailOn }
-      ) => {
-        executionResult = await executeCommand({
-          kind: "scan",
-          path: targetPath,
-          config: options.config,
-          format: options.format,
-          failOn: options.failOn
-        });
-      }
-    );
+  const lintAction = async (
+    targetPath: string,
+    options: { config?: string; format: OutputFormat; failOn: FailOn; fix?: boolean }
+  ): Promise<void> => {
+    executionResult = await executeCommand({
+      kind: "lint",
+      path: targetPath,
+      config: options.config,
+      format: options.format,
+      failOn: options.failOn,
+      fix: options.fix ?? false
+    });
+  };
 
-  program
-    // The v2 engine command (D4). Named here in P2.07; the P3.09 cutover makes it the default and
-    // turns `scan` into a hidden alias.
-    .command("lint")
-    .description("Lint Markdown files with the v2 rule engine.")
-    .argument("[path]", "directory to lint", cwd)
-    .addOption(new Option("--config <file>", "path to a config file"))
-    .addOption(
-      new Option("--format <format>", "output format").choices(OUTPUT_FORMATS).default("text")
-    )
-    .addOption(
-      new Option("--fail-on <level>", "minimum severity that causes a non-zero exit code")
-        .choices(FAIL_ON_LEVELS)
-        .default("error")
-    )
-    .addOption(new Option("--fix", "apply deterministic fixes in place, then report what remains"))
-    .action(
-      async (
-        targetPath: string,
-        options: { config?: string; format: OutputFormat; failOn: FailOn; fix?: boolean }
-      ) => {
-        executionResult = await executeCommand({
-          kind: "lint",
-          path: targetPath,
-          config: options.config,
-          format: options.format,
-          failOn: options.failOn,
-          fix: options.fix ?? false
-        });
-      }
-    );
+  // Register the shared lint options on a command (used by both `lint` and its hidden `scan` alias).
+  const addLintCommand = (name: string, hidden: boolean, isDefault: boolean): void => {
+    program
+      .command(name, { hidden, isDefault })
+      .description("Lint Markdown files with the rule engine.")
+      .argument("[path]", "directory to lint", cwd)
+      .addOption(new Option("--config <file>", "path to a config file"))
+      .addOption(new Option("--format <format>", "output format").choices(OUTPUT_FORMATS).default("text"))
+      .addOption(
+        new Option("--fail-on <level>", "minimum severity that causes a non-zero exit code")
+          .choices(FAIL_ON_LEVELS)
+          .default("error")
+      )
+      .addOption(new Option("--fix", "apply deterministic fixes in place, then report what remains"))
+      .action(lintAction);
+  };
+
+  // `lint` is the default command (D4); `scan` is a hidden, deprecated alias for one minor version.
+  addLintCommand("lint", false, true);
+  addLintCommand("scan", true, false);
 
   program
     .command("schema")
@@ -116,7 +88,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
 
   program
     .command("graph")
-    .description("Write the Markdown dependency graph to a JSON file.")
+    .description("Write the Markdown context graph to a JSON file.")
     .argument("[path]", "directory to scan", cwd)
     .addOption(new Option("--config <file>", "path to a config file"))
     .requiredOption("--out <file>", "graph output file")
@@ -130,27 +102,16 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
     });
 
   try {
-    if (argv.length === 0) {
-      // Commander silently no-ops on zero subcommand args; the pre-commander CLI treated a
-      // missing command as a usage error, so preserve that instead of exiting 0 with no output.
-      program.outputHelp();
-      return EXIT_CODE_USAGE_ERROR;
-    }
-
     await program.parseAsync(argv, { from: "user" });
   } catch (error) {
     if (error instanceof CommanderError) {
       // Commander reserves exitCode 0 for --help/--version; every other CommanderError (unknown
-      // command/option, invalid choice, missing required option) is a parse/usage failure, which
-      // this CLI has always reported as EXIT_CODE_USAGE_ERROR (2) rather than commander's own 1.
+      // command/option, invalid choice, missing required option) is a parse/usage failure, reported
+      // as EXIT_CODE_USAGE_ERROR (2) rather than commander's own 1.
       return error.exitCode === EXIT_CODE_SUCCESS ? EXIT_CODE_SUCCESS : EXIT_CODE_USAGE_ERROR;
     }
 
-    if (
-      error instanceof CliUsageError ||
-      error instanceof ConfigError ||
-      error instanceof DiscoveryError
-    ) {
+    if (error instanceof CliUsageError || error instanceof ConfigError) {
       stderr.write(`${error.message}\n`);
       return EXIT_CODE_USAGE_ERROR;
     }

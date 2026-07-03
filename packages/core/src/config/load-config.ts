@@ -8,7 +8,7 @@ import { RuleResolutionError, type RuleRegistry } from "../engine/registry.js";
 import { resolveCustomRule, type CustomRuleEntry } from "../engine/rules/custom.js";
 import { ruleRegistry } from "../engine/rules/index.js";
 import type { ResolvedSettings, Rule, SeverityOverride } from "../engine/types.js";
-import { ConfigError } from "./load.js";
+import { ConfigError } from "./config-error.js";
 import { lintConfigSchema, type LintConfig } from "./config-schema.js";
 import { findConfig } from "./find-config.js";
 

@@ -1,1 +1,0 @@
-[Guide](docs/guide.md)

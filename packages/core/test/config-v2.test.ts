@@ -5,7 +5,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { ConfigError } from "../src/config/load.js";
+import { ConfigError } from "../src/config/config-error.js";
 import { findConfig } from "../src/config/find-config.js";
 import { loadConfiguration } from "../src/config/load-config.js";
 import { defineRule, RuleRegistry } from "../src/engine/registry.js";

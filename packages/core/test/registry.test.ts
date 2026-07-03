@@ -57,7 +57,8 @@ describe("RuleRegistry.resolveRule", () => {
     } catch (error) {
       const resolution = error as RuleResolutionError;
       expect(resolution.code).toBe("INVALID_OPTIONS");
-      expect(resolution.issues?.[0]?.path).toEqual(["maxBytes"]);
+      // Paths are prefixed with "options" so the loader renders rules[i].options.<path>.
+      expect(resolution.issues?.[0]?.path).toEqual(["options", "maxBytes"]);
     }
   });
 
