@@ -90,6 +90,8 @@ export { defineRule, RuleRegistry, RuleResolutionError } from "./engine/registry
 export type { ConfigIssue, RuleDefinition, RuleMetadata, RuleResolutionCode } from "./engine/registry.js";
 export { BUILTIN_RULE_DEFINITIONS, ruleRegistry } from "./engine/rules/index.js";
 
+export { generateConfigSchema } from "./engine/schema.js";
+export type { CustomRuleDefinition } from "./engine/schema.js";
 export { lintConfigSchema, ruleEntrySchema, severityOverrideSchema } from "./config/config-schema.js";
 export type { LintConfig, RuleConfigEntry } from "./config/config-schema.js";
 export { CONFIG_FILE_NAME, findConfig } from "./config/find-config.js";

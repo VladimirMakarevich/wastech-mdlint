@@ -29,6 +29,7 @@
   },
   "scripts": {
     "build": "tsc -b",
+    "generate:schema": "node scripts/generate-schema.mjs",
     "test": "vitest run",
     "typecheck": "tsc -b",
     "lint": "eslint .",
