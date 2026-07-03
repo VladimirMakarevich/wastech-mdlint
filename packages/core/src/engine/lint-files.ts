@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import type { ConfiguredRule } from "../config/load-config.js";
+import { buildContextGraph } from "../graph/build-context-graph.js";
 import type { ContextGraph } from "../graph/context-graph-types.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
 import { loadDocuments } from "../markdown/load-documents.js";
@@ -80,12 +81,16 @@ export async function lintFiles(input: LintFilesInput): Promise<LintResult> {
   const documentRules = resolved.filter((entry) => entry.rule.scope === "document");
   const projectRules = resolved.filter((entry) => entry.rule.scope === "project");
 
+  // Build + inject one shared ContextGraph (R5 / audit 2.2). P3 uses the relocated legacy builder;
+  // P4.06 swaps in the semantic builder here. Callers may pass a graph to override (e.g. tests).
+  const graph = input.graph ?? buildContextGraph(documents);
+
   const sharedContext: Omit<RuleContext, "report" | "document" | "filePath"> = {
     documents,
     projectFiles,
     rootDir,
     settings: input.settings,
-    graph: input.graph
+    graph
   };
 
   const rawMessages: LintMessage[] = [];

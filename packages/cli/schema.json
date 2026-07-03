@@ -194,6 +194,181 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
+                "const": "GRP-001"
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "properties": {
+                  "siteRouter": {
+                    "type": "object",
+                    "properties": {
+                      "preset": {
+                        "type": "string"
+                      },
+                      "contentDir": {
+                        "type": "string"
+                      },
+                      "defaultLocale": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
+                "const": "GRP-002"
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "properties": {
+                  "entryPoints": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "siteRouter": {
+                    "type": "object",
+                    "properties": {
+                      "preset": {
+                        "type": "string"
+                      },
+                      "contentDir": {
+                        "type": "string"
+                      },
+                      "defaultLocale": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
+                "const": "GRP-003"
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "properties": {
+                  "chain": {
+                    "minItems": 2,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "stage": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "files": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "idColumn": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "refColumn": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "stage",
+                        "files",
+                        "refColumn"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "idPattern": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "chain"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
                 "const": "REF-001"
               },
               "severity": {
@@ -1154,7 +1329,7 @@
               },
               "id": {
                 "type": "string",
-                "pattern": "^(?!(CTX|REF|SEC|SIZE|STR|TBL)-)[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$"
+                "pattern": "^(?!(CTX|GRP|REF|SEC|SIZE|STR|TBL)-)[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$"
               },
               "description": {
                 "type": "string"

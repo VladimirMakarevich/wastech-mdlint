@@ -52,6 +52,7 @@ export type {
   ContextGraphEdgeType,
   ContextGraphNode
 } from "./graph/context-graph-types.js";
+export { buildContextGraph } from "./graph/build-context-graph.js";
 
 export type {
   LintMessage,
