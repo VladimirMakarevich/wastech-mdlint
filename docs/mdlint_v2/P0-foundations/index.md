@@ -1,9 +1,9 @@
 # Phase P0 — Workspace & Foundations
 
-> Roadmap: [v2 Index](../index.md) · Phase **P0** · Size **M** · Status **Not started**
+> Roadmap: [v2 Index](../index.md) · Phase **P0** · Size **M** · Status **Done**
 >
 > **Goal:** stand up the monorepo and shared tooling so every later phase lands in the
-> right package, then lift-and-shift the current implementatmdlinto `@wastech-mdlint/core` **without
+> right package, then lift-and-shift the current implementation into `@wastech-mdlint/core` **without
 > changing its behavior**. P0 ships no new product features — it is purely structural.
 
 ## Why this phase exists
@@ -45,13 +45,13 @@ P0.05 (cli) and P0.06 (mcp-server) both depend only on P0.04 and can run in para
 
 ## Phase exit criteria
 
-- [ ] `npm run typecheck && npm test && npm run build` are green across the whole workspace.
-- [ ] `packages/{core,cli,mcp-server}` exist with correct names, bins, and `publishConfig`.
-- [ ] Current behavior preserved: `wastmdlintlint scan` and `graph` produce the same output
+- [x] `npm run typecheck && npm test && npm run build` are green across the whole workspace.
+- [x] `packages/{core,cli,mcp-server}` exist with correct names, bins, and `publishConfig`.
+- [x] Current behavior preserved: `wastech-mdlint scan` and `graph` produce the same output
       as before the migration (parity check).
-- [ ] The current `postinstall` auto-config is removed (I1).
-- [ ] CI runs the workspace matrix on Node 24; `npm pack --dry-run` is clean per package.
-- [ ] No new product features were added (P0 is structural only).
+- [x] The current `postinstall` auto-config is removed (I1).
+- [x] CI runs the workspace matrix on Node 24; `npm pack --dry-run` is clean per package.
+- [x] No new product features were added (P0 is structural only).
 
 ## What P0 unblocks
 

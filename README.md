@@ -18,7 +18,31 @@ External HTTP link checks are not included in v1.
 ## Runtime
 
 - Node.js `24.17.0` LTS
-- `package.json` engines: `>=24.17.0 <25`
+- `package.json` engines: `>=24.17.0` (no upper bound, so future Node majors are not locked out; CI validates on the Node 24 LTS line)
+
+## Workspace Layout
+
+`wastech-mdlint` is an npm-workspaces monorepo. `@wastech-mdlint/core` owns the entire analysis
+pipeline; the CLI and MCP server are thin hosts over it.
+
+| Package | Role | Bin |
+| --- | --- | --- |
+| [`@wastech-mdlint/core`](packages/core) | Parsing, config loading, discovery, rules, graph, and reporting — the whole pipeline. Imported by both hosts; publishes no bin. | — |
+| [`@wastech-mdlint/cli`](packages/cli) | commander CLI host: argument parsing, command dispatch, exit codes. | `wastech-mdlint` → `packages/cli/dist/index.js` |
+| [`@wastech-mdlint/mcp-server`](packages/mcp-server) | stdio Model Context Protocol host. A tool-free stub today; the six read-only tools land in P7. | `wastech-mdlint-mcp` → `packages/mcp-server/dist/index.js` |
+
+Build and test the whole workspace from the repo root:
+
+```bash
+npm ci            # lockfile-based install
+npm run typecheck # tsc -b across project references
+npm run build     # tsc -b -> each package's dist/
+npm test          # vitest across all packages
+npm run lint      # eslint across the workspace
+```
+
+`npm run build` compiles in dependency order via TypeScript project references
+(core → cli/mcp-server), and `npm test` runs every package's Vitest project.
 
 ## Install
 

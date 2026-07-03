@@ -1,7 +1,7 @@
 # P0.03 · `@wastech-mdlint/core` package skeleton
 
 > Phase: [P0 — Workspace & Foundations](index.md) · Roadmap: [v2 Index](../index.md) ·
-> Size **S** · Status **Not started**.
+> Size **S** · Status **Done**.
 
 ## Goal
 

@@ -11,6 +11,8 @@ permissions:
 
 jobs:
   verify:
+    # Workspace-wide gate on the pinned Node 24 LTS line (.node-version). tsc -b, vitest, and
+    # eslint all fan out across packages/{core,cli,mcp-server} through the root scripts.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -18,7 +20,33 @@ jobs:
         with:
           node-version-file: ".node-version"
           cache: "npm"
+      # Lockfile-based install (I5): npm ci fails on any package.json <-> lockfile drift, which is
+      # exactly the reproducibility guarantee we want in CI instead of a mutating `npm install`.
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm test
       - run: npm run build
+
+  pack:
+    # Publish-readiness in *shape* only (I5): prove each package's `files` allowlist yields a clean
+    # tarball. Real single-tag publishing of core+cli+mcp (plus tagging skills) is wired in P9 (I4).
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - "@wastech-mdlint/core"
+          - "@wastech-mdlint/cli"
+          - "@wastech-mdlint/mcp-server"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: ".node-version"
+          cache: "npm"
+      - run: npm ci
+      # dist/ must exist before packing because every package's `files` allowlist is ["dist"].
+      - run: npm run build
+      - run: npm pack --dry-run -w ${{ matrix.package }}
