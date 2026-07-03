@@ -75,6 +75,44 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
     );
 
   program
+    // The v2 engine command (D4). Named here in P2.07; the P3.09 cutover makes it the default and
+    // turns `scan` into a hidden alias.
+    .command("lint")
+    .description("Lint Markdown files with the v2 rule engine.")
+    .argument("[path]", "directory to lint", cwd)
+    .addOption(new Option("--config <file>", "path to a config file"))
+    .addOption(
+      new Option("--format <format>", "output format").choices(OUTPUT_FORMATS).default("text")
+    )
+    .addOption(
+      new Option("--fail-on <level>", "minimum severity that causes a non-zero exit code")
+        .choices(FAIL_ON_LEVELS)
+        .default("error")
+    )
+    .action(
+      async (
+        targetPath: string,
+        options: { config?: string; format: OutputFormat; failOn: FailOn }
+      ) => {
+        executionResult = await executeCommand({
+          kind: "lint",
+          path: targetPath,
+          config: options.config,
+          format: options.format,
+          failOn: options.failOn
+        });
+      }
+    );
+
+  program
+    .command("schema")
+    .description("Write the config JSON schema to a local file (no remote URL).")
+    .addOption(new Option("--out <file>", "schema output file").default("schema.json"))
+    .action(async (options: { out: string }) => {
+      executionResult = await executeCommand({ kind: "schema", out: options.out });
+    });
+
+  program
     .command("graph")
     .description("Write the Markdown dependency graph to a JSON file.")
     .argument("[path]", "directory to scan", cwd)

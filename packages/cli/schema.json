@@ -52,11 +52,194 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
+                "const": "REF-001"
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "properties": {
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "siteRouter": {
+                    "type": "object",
+                    "properties": {
+                      "preset": {
+                        "type": "string"
+                      },
+                      "contentDir": {
+                        "type": "string"
+                      },
+                      "defaultLocale": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
+                "const": "SIZE-001"
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "properties": {
+                  "bytes": {
+                    "type": "object",
+                    "properties": {
+                      "warn": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "error": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "lines": {
+                    "type": "object",
+                    "properties": {
+                      "warn": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "error": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "tokens": {
+                    "type": "object",
+                    "properties": {
+                      "warn": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "error": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "overrides": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "pattern": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "bytes": {
+                          "type": "object",
+                          "properties": {
+                            "warn": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "error": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "lines": {
+                          "type": "object",
+                          "properties": {
+                            "warn": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "error": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "tokens": {
+                          "type": "object",
+                          "properties": {
+                            "warn": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "error": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "pattern"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
                 "const": "custom"
               },
               "id": {
                 "type": "string",
-                "pattern": "^[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$"
+                "pattern": "^(?!(REF|SIZE)-)[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$"
               },
               "description": {
                 "type": "string"
