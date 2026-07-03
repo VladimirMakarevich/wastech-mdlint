@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "github-slugger": "^2.0.0",
+    "ignore": "^7.0.5",
     "micromatch": "^4.0.8",
     "remark": "^15.0.1",
     "remark-gfm": "^4.0.1",

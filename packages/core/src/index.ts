@@ -31,6 +31,21 @@ export type {
   SizeOverride
 } from "./types.js";
 
+export type {
+  InlineDirective,
+  InlineDirectiveKind,
+  ParsedCheckItem,
+  ParsedDocument,
+  ParsedHeading,
+  ParsedImage,
+  ParsedImport,
+  ParsedLink,
+  ParsedLinkKind,
+  ParsedTable,
+  ParsedTableRow
+} from "./markdown/document-types.js";
+export type { LoadDocumentsOptions } from "./markdown/load-documents.js";
+
 export { DEFAULT_CONFIG, SUPPORTED_CONFIG_FILE_NAMES } from "./config/defaults.js";
 export { ConfigError, loadConfig } from "./config/load.js";
 export { discoverMarkdownFiles, DiscoveryError } from "./discovery/discover.js";
@@ -43,7 +58,10 @@ export {
 export { buildDependencyGraph } from "./graph/build.js";
 export { buildEntrypointBudgets } from "./llm/budget.js";
 export { analyzeLlmImports } from "./llm/imports.js";
+export { loadDocuments } from "./markdown/load-documents.js";
+export { parseDocument } from "./markdown/parse-document.js";
 export { parseMarkdownFiles } from "./markdown/parse.js";
+export { canonicalizeRuleId } from "./rule-id.js";
 export {
   createAuditResult,
   renderAuditResultJson,
