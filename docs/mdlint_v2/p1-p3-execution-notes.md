@@ -72,6 +72,21 @@
   stabilityColumn); ref-строка несёт referenced ID (idColumn) и стабильность **ссылающегося**
   (stabilityColumn); `stabilityOrder` — от наименее к наиболее стабильному (rank=index). Warning,
   если ранг(referenced) < ранг(referencer).
+- [P3.06] P3-граф — **link-only** (relocated legacy builder, audit 2.2): рёбра только из
+  markdown-ссылок на `.md` (type "link"), dedup по (from,to), циклы через Tarjan SCC (G6). GRP-001
+  читает `graph.cycles`, GRP-002 — `inDegree`. P4.06 подменяет билдер на семантический
+  (anchor/import/id-ref рёбра) без изменения read-shape. GRP-001 files?/exclude?/siteRouter? не
+  ре-скоупят общий корпус-граф в P3 (общий граф уже сконфигурен include/exclude).
+- [P3.09] `graph`-команда мигрирована на v2-конфиг (`loadConfiguration`) + `loadDocuments` +
+  `buildContextGraph` (выводит ContextGraph JSON). Причина: удаление легаси-конфига в рамках
+  cutover форсировало это. Богатый graph/slice/impact CLI — P4.07.
+- [P3.09] README переписан под v2 (удалены описания легаси: `.cjs/.mjs`-конфиг, sectioned config,
+  `links/broken-links`, "Markdown Context Audit"-вывод). Таблица правил генерируется из метаданных
+  (`npm run generate:docs`), синхронность проверяется тестом. Полный маркетинговый polish — P9.
+- [P3.09] Скрипт `generate:schema` → `generate:docs` (генерирует schema.json + README-таблицу).
+  Финальные имена после удаления легаси: `estimateTokens` (без V2-суффикса), `loadConfiguration`
+  оставлено как есть (не переименовано в loadConfig — минимизация churn, имя ясное), `ConfigError`
+  перенесён в `config/config-error.ts`.
 
 ## Coexistence / cutover план (scan → lint), фиксируется для P3.09
 
@@ -98,4 +113,20 @@
 
 ## Отложенные follow-up (P4+ / вне scope)
 
-- (пока нет)
+- [P4.06] Семантические рёбра графа (anchor/import/id-ref по таксономии audit 2.5) — заменить
+  P3 link-only `buildContextGraph`; GRP-001/002 не меняются (read-shape стабилен). Общий
+  `extractDefinedIds` уже готов и экспортирован для id-ref рёбер.
+- [P4.07] Богатый `graph`/`slice`/`impact` CLI (сейчас `graph` выводит ContextGraph JSON как
+  временную замену), `--format mermaid|dot` (G9), query-слой (G2), coverage-сигнал (G5).
+- [P4] GRP-001 files?/exclude?/siteRouter? — ре-скоуп общего графа per-rule (сейчас не влияют).
+- [P3/P8] Fix для SEC-002 (reorder) и SEC-003 (project template scaffold) — сейчас `fixable:false`
+  (небезопасно/не document-scope). --fix движок пока только document-scope.
+- [P5] `describeRules` из метаданных (источник готов — `ruleRegistry.getAllMetadata()`),
+  compile-секция конфига (сейчас `compile` в схеме — `type:object`, не валидируется).
+- [P6] `init` пишет реальный zero-config ruleset (сейчас no-config default = пустые rules);
+  project-local schema через `generateConfigSchema({customRules})` (API готов, audit 4.1).
+- [P7] MCP-инструменты поверх `lintFiles`/`buildContextGraph`; error-taxonomy (audit).
+- [tokens] Замена эвристики `estimateTokens = ceil(len/4)` на реальный токенайзер (изолирована в
+  `engine/tokens.ts`).
+- [REF-004/005/006] Ниши недоспецифицированы; пересмотреть модель, если спецификации уточнятся
+  (см. «Принятые решения» выше).

@@ -1,6 +1,6 @@
 # P3.06 · Graph-integrity rules (GRP-001/002/003)
 
-> Phase: [P3 — Rules](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
+> Phase: [P3 — Rules](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Done**.
 
 ## Goal
 
