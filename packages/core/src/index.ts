@@ -92,9 +92,10 @@ export type { FileScope } from "./engine/rules/scope.js";
 export { resolveCustomRule } from "./engine/rules/custom.js";
 export type { CustomRuleEntry } from "./engine/rules/custom.js";
 
-// Schema generation (P2.06)
+// Schema + docs generation (P2.06 / P3.09)
 export { generateConfigSchema } from "./engine/schema.js";
 export type { CustomRuleDefinition } from "./engine/schema.js";
+export { generateRuleDocs } from "./engine/rule-docs.js";
 
 // Config (P2.04 / P3.08)
 export {

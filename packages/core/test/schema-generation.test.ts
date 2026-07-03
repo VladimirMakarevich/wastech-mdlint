@@ -18,7 +18,7 @@ describe("generateConfigSchema", () => {
   });
 
   it("stays byte-in-sync with the shipped schema.json (R6)", () => {
-    // If this fails, regenerate: `npm run build && npm run generate:schema`.
+    // If this fails, regenerate: `npm run build && npm run generate:docs`.
     const shipped = readFileSync(shippedSchemaPath, "utf8");
     expect(shipped).toBe(generateConfigSchema());
   });
