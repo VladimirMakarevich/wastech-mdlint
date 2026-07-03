@@ -22,7 +22,7 @@ import type { PrimitiveContext, PrimitiveFinding } from "./types.js";
 // Kinds are mutually exclusive on `kind` (a discriminated union). Each option object is `.strict()`
 // so an unknown key becomes a clear C7 config error rather than being silently ignored.
 
-const columnConditionSchema = z
+export const columnConditionSchema = z
   .object({
     column: z.string().min(1),
     equals: z.string().optional(),

@@ -89,17 +89,19 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
         .choices(FAIL_ON_LEVELS)
         .default("error")
     )
+    .addOption(new Option("--fix", "apply deterministic fixes in place, then report what remains"))
     .action(
       async (
         targetPath: string,
-        options: { config?: string; format: OutputFormat; failOn: FailOn }
+        options: { config?: string; format: OutputFormat; failOn: FailOn; fix?: boolean }
       ) => {
         executionResult = await executeCommand({
           kind: "lint",
           path: targetPath,
           config: options.config,
           format: options.format,
-          failOn: options.failOn
+          failOn: options.failOn,
+          fix: options.fix ?? false
         });
       }
     );

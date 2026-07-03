@@ -75,6 +75,8 @@ export { createSuppressionChecker } from "./engine/suppression.js";
 export type { SuppressionChecker } from "./engine/suppression.js";
 export { formatLintResultJson, formatLintResultText } from "./engine/format-lint-result.js";
 export { estimateTokens as estimateTokensV2 } from "./engine/tokens.js";
+export { applyEdits, applyFixes } from "./engine/fix.js";
+export type { ApplyFixesResult } from "./engine/fix.js";
 export { compileRegex, regexFlagsSchema, regexStringSchema } from "./engine/regex.js";
 export { findLineNumber } from "./engine/text-position.js";
 export { extractSectionBody } from "./engine/section-body.js";

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   analyzeLlmImports,
+  applyFixes,
   buildDependencyGraph,
   buildEntrypointBudgets,
   checkFileSizes,
@@ -53,6 +54,7 @@ export type LintCommand = {
   config?: string;
   format: OutputFormat;
   failOn: FailOn;
+  fix: boolean;
 };
 
 export type SchemaCommand = {
@@ -109,6 +111,18 @@ async function handleLint(command: LintCommand): Promise<CommandExecutionResult>
     cwd: command.path,
     explicitConfigPath: command.config
   });
+
+  // ESLint-style --fix (audit 4.2): apply deterministic fixes in place, then re-lint the result and
+  // exit on whatever remains.
+  if (command.fix) {
+    await applyFixes({
+      cwd: command.path,
+      config: loaded.config,
+      rules: loaded.rules,
+      settings: loaded.settings
+    });
+  }
+
   const result = await lintFiles({
     cwd: command.path,
     config: loaded.config,

@@ -82,6 +82,21 @@ describe("lint command", () => {
     expect(parsed.messages).toHaveLength(1);
   });
 
+  it("applies --fix in place then reports what remains", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": ["| ID | Owner |", "| --- | --- |", "| REQ-1 |  |"].join("\n"),
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "TBL-002", options: { columns: ["Owner"] } }]
+      })
+    });
+
+    const result = await run(["lint", cwd, "--fix"], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain("No problems found.");
+    const written = await readFile(path.join(cwd, "a.md"), "utf8");
+    expect(written).toContain("| REQ-1 | TODO |");
+  });
+
   it("maps config errors to exit 2 with a did-you-mean diagnostic", async () => {
     const cwd = await fixtureRepo({
       "a.md": "# A\n",
