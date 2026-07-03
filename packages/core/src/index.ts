@@ -82,6 +82,9 @@ export {
 export type { Assertion, RunAssertionOptions } from "./engine/primitives/assert.js";
 export { DEFAULT_PLACEHOLDERS } from "./engine/primitives/content.js";
 export type { PrimitiveContext, PrimitiveFinding } from "./engine/primitives/types.js";
+export { defineRule, RuleRegistry, RuleResolutionError } from "./engine/registry.js";
+export type { ConfigIssue, RuleDefinition, RuleMetadata, RuleResolutionCode } from "./engine/registry.js";
+export { BUILTIN_RULE_DEFINITIONS, ruleRegistry } from "./engine/rules/index.js";
 
 export { DEFAULT_CONFIG, SUPPORTED_CONFIG_FILE_NAMES } from "./config/defaults.js";
 export { ConfigError, loadConfig } from "./config/load.js";
