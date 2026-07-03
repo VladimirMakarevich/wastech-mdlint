@@ -1,7 +1,7 @@
 # P0.01 · Workspace layout & tooling decisions
 
 > Phase: [P0 — Workspace & Foundations](index.md) · Roadmap: [v2 Index](../index.md) ·
-> Size **S** · Status **Not started** · Design task (no production code).
+> Size **S** · Status **Done** · Design task (no production code).
 
 ## Goal
 

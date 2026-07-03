@@ -1,10 +1,17 @@
 import { cp, mkdtemp, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { afterEach } from "vitest";
 
-import { executeCommand, runCli } from "../../src/cli.js";
+import { executeCommand } from "../../src/commands.js";
+import { runCli } from "../../src/program.js";
+
+// Resolved from this module's own location rather than process.cwd(): the root aggregator
+// (npm test at the repo root) runs vitest with cwd = repo root, not packages/cli, so a
+// cwd-relative "test/fixtures" path would silently miss this package's fixtures.
+const FIXTURES_ROOT = fileURLToPath(new URL("../fixtures", import.meta.url));
 
 const tempDirs: string[] = [];
 
@@ -18,7 +25,7 @@ afterEach(async () => {
 });
 
 export async function copyFixture(fixtureName: string): Promise<string> {
-  const sourceDir = path.resolve("test/fixtures", fixtureName);
+  const sourceDir = path.join(FIXTURES_ROOT, fixtureName);
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-fixture-"));
   tempDirs.push(tempDir);
   await cp(sourceDir, tempDir, { recursive: true });

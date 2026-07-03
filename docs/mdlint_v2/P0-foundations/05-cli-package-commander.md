@@ -1,7 +1,7 @@
 # P0.05 · `@wastech-mdlint/cli` + commander scaffold
 
 > Phase: [P0 — Workspace & Foundations](index.md) · Roadmap: [v2 Index](../index.md) ·
-> Size **M** · Status **Not started**.
+> Size **M** · Status **Done**.
 
 ## Goal
 

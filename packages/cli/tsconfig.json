@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Restated even though tsconfig.base.json sets it: project references require every
+    // referenced project to be composite, so keep it explicit at the package boundary.
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.d.ts"
+  ],
+  "references": [
+    { "path": "../core" }
+  ]
+}

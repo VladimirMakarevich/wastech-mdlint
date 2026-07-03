@@ -1,16 +1,25 @@
-name: Publish Package
+name: Publish
+
+# PLACEHOLDER — no automated publishing yet.
+#
+# Real releases are wired in P9 (roadmap I4): a single `vX.Y.Z` tag publishes
+# @wastech-mdlint/{core,cli,mcp-server} together with npm provenance and tags the skills, via a
+# changesets/release workflow. Until P9 lands, this workflow only proves the tagged commit is
+# publish-shaped (gate + per-package `npm pack --dry-run`); it intentionally does not run
+# `npm publish`.
 
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: read
-  id-token: write
+  id-token: write # reserved for npm provenance once P9 turns on publishing
 
 jobs:
-  publish:
+  publish-readiness:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -18,10 +27,12 @@ jobs:
         with:
           node-version-file: ".node-version"
           registry-url: "https://registry.npmjs.org"
-          package-manager-cache: false
+          cache: "npm"
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - run: npm pack --dry-run
-      - run: npm publish
+      # --workspaces packs every publishable package (core, cli, mcp-server) in dry-run mode.
+      - run: npm pack --dry-run --workspaces
+      - name: Release automation pending
+        run: echo "Publish is not automated yet. Single-tag release (core+cli+mcp + skills) lands in P9 (I4)."

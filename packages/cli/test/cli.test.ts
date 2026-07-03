@@ -5,15 +5,13 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
-  CliUsageError,
   EXIT_CODE_RUNTIME_ERROR,
   EXIT_CODE_SUCCESS,
   EXIT_CODE_USAGE_ERROR,
   executeCommand,
-  parseArgv,
-  resolveScanExitCode,
-  runCli
-} from "../src/cli.js";
+  resolveScanExitCode
+} from "../src/commands.js";
+import { runCli } from "../src/program.js";
 
 function createMemoryWriter() {
   let text = "";
@@ -42,68 +40,80 @@ afterEach(async () => {
   );
 });
 
-describe("parseArgv", () => {
-  it("uses cwd as the default scan path", () => {
-    expect(parseArgv(["scan"], "/repo")).toEqual({
-      kind: "scan",
-      path: "/repo",
-      format: "text",
-      failOn: "error"
+describe("argument parsing", () => {
+  it("scans the injected cwd when no path argument is given", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-cli-"));
+    tempDirs.push(tempDir);
+    await writeFile(path.join(tempDir, "README.md"), "# Root\n", "utf8");
+
+    const stdout = createMemoryWriter();
+    const stderr = createMemoryWriter();
+
+    const exitCode = await runCli(["scan"], {
+      cwd: tempDir,
+      stdout: stdout.stream,
+      stderr: stderr.stream
     });
+
+    expect(exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(stdout.read()).toContain(`Root: ${tempDir}`);
+    expect(stderr.read()).toBe("");
   });
 
-  it("accepts an explicit scan path and options", () => {
-    expect(
-      parseArgv(
-        ["scan", "docs", "--config", "config.json", "--format", "json", "--fail-on", "warning"],
-        "/repo"
-      )
-    ).toEqual({
-      kind: "scan",
-      path: "docs",
-      config: "config.json",
-      format: "json",
-      failOn: "warning"
+  it("writes the graph for the injected cwd when no path argument is given", async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-cli-"));
+    tempDirs.push(tempDir);
+    await writeFile(path.join(tempDir, "README.md"), "# Root\n", "utf8");
+    const outFile = path.join(tempDir, "graph.json");
+
+    const exitCode = await runCli(["graph", "--out", outFile], {
+      cwd: tempDir,
+      stdout: { write: () => true },
+      stderr: { write: () => true }
     });
+
+    expect(exitCode).toBe(EXIT_CODE_SUCCESS);
+    const graphJson = JSON.parse(await readFile(outFile, "utf8")) as { root: string };
+    expect(graphJson.root).toBe(tempDir);
   });
 
-  it("accepts graph options", () => {
-    expect(parseArgv(["graph", "docs", "--config", "config.json", "--out", "graph.json"], "/repo")).toEqual(
-      {
-        kind: "graph",
-        path: "docs",
-        config: "config.json",
-        out: "graph.json"
-      }
-    );
+  it("rejects invalid --format values with a usage error", async () => {
+    const stdout = createMemoryWriter();
+    const stderr = createMemoryWriter();
+
+    const exitCode = await runCli(["scan", "--format", "yaml"], {
+      stdout: stdout.stream,
+      stderr: stderr.stream
+    });
+
+    expect(exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    expect(stdout.read()).toBe("");
   });
 
-  it("rejects invalid --format values", () => {
-    expect(() => parseArgv(["scan", "--format", "yaml"], "/repo")).toThrowError(
-      new CliUsageError("Invalid --format value: yaml. Expected text or json.")
-    );
+  it("rejects invalid --fail-on values with a usage error", async () => {
+    const stdout = createMemoryWriter();
+    const stderr = createMemoryWriter();
+
+    const exitCode = await runCli(["scan", "--fail-on", "fatal"], {
+      stdout: stdout.stream,
+      stderr: stderr.stream
+    });
+
+    expect(exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    expect(stdout.read()).toBe("");
   });
 
-  it("rejects invalid --fail-on values", () => {
-    expect(() => parseArgv(["scan", "--fail-on", "fatal"], "/repo")).toThrowError(
-      new CliUsageError("Invalid --fail-on value: fatal. Expected error, warning, or off.")
-    );
-  });
+  it("requires --out for graph", async () => {
+    const stdout = createMemoryWriter();
+    const stderr = createMemoryWriter();
 
-  it("requires --out for graph", () => {
-    expect(() => parseArgv(["graph"], "/repo")).toThrowError(
-      new CliUsageError("Missing required option --out for graph.")
-    );
-  });
+    const exitCode = await runCli(["graph"], {
+      stdout: stdout.stream,
+      stderr: stderr.stream
+    });
 
-  it("treats lint as an alias for scan with the default path", () => {
-    expect(parseArgv(["lint"], "/repo")).toEqual(parseArgv(["scan"], "/repo"));
-  });
-
-  it("treats lint as an alias for scan with options", () => {
-    const args = ["docs", "--config", "config.json", "--format", "json", "--fail-on", "warning"];
-
-    expect(parseArgv(["lint", ...args], "/repo")).toEqual(parseArgv(["scan", ...args], "/repo"));
+    expect(exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    expect(stdout.read()).toBe("");
   });
 });
 
@@ -118,44 +128,23 @@ describe("CLI smoke", () => {
     });
 
     expect(exitCode).toBe(EXIT_CODE_SUCCESS);
-    expect(stdout.read()).toContain("Usage:");
-    expect(stdout.read()).toContain("wastech-mdlint lint");
-    expect(stdout.read()).toContain("Backward-compatible alias for lint.");
+    expect(stdout.read()).toContain("scan");
+    expect(stdout.read()).toContain("graph");
     expect(stderr.read()).toBe("");
   });
 
-  it("produces byte-identical output for lint and scan", async () => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-cli-"));
-    tempDirs.push(tempDir);
-
-    await writeFile(path.join(tempDir, "README.md"), "[Missing](docs/missing.md)\n", "utf8");
-
-    const lintStdout = createMemoryWriter();
-    const lintStderr = createMemoryWriter();
-    const scanStdout = createMemoryWriter();
-    const scanStderr = createMemoryWriter();
-
-    const lintExitCode = await runCli(["lint", tempDir], {
-      stdout: lintStdout.stream,
-      stderr: lintStderr.stream
-    });
-    const scanExitCode = await runCli(["scan", tempDir], {
-      stdout: scanStdout.stream,
-      stderr: scanStderr.stream
-    });
-
-    expect(lintExitCode).toBe(scanExitCode);
-    expect(lintStdout.read()).toBe(scanStdout.read());
-    expect(lintStderr.read()).toBe(scanStderr.read());
-  });
-
   it("prints version", async () => {
-    const output = await executeCommand({ kind: "version" });
+    const stdout = createMemoryWriter();
+    const stderr = createMemoryWriter();
 
-    expect(output).toEqual({
-      output: "0.0.0\n",
-      exitCode: EXIT_CODE_SUCCESS
+    const exitCode = await runCli(["--version"], {
+      stdout: stdout.stream,
+      stderr: stderr.stream
     });
+
+    expect(exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(stdout.read()).toBe("0.0.0\n");
+    expect(stderr.read()).toBe("");
   });
 
   it("returns a usage error for an invalid config file", async () => {
@@ -188,7 +177,6 @@ describe("CLI smoke", () => {
 
     expect(exitCode).toBe(EXIT_CODE_USAGE_ERROR);
     expect(stdout.read()).toBe("");
-    expect(stderr.read()).toContain("Unknown command: unknown.");
   });
 
   it("writes the graph file", async () => {

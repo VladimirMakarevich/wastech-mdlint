@@ -1,0 +1,29 @@
+{
+  "name": "@wastech-mdlint/mcp-server",
+  "version": "0.0.0",
+  "description": "Model Context Protocol server for wastech-mdlint: a stdio-only, read-only adapter over core.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "wastech-mdlint-mcp": "./dist/index.js"
+  },
+  "engines": {
+    "node": ">=24.17.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@wastech-mdlint/core": "0.0.0",
+    "zod": "^4"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

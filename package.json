@@ -24,33 +24,17 @@
   "workspaces": [
     "packages/*"
   ],
-  "bin": {
-    "wastech-mdlint": "./dist/cli.js"
-  },
   "engines": {
-    "node": ">=24.17.0 <25"
+    "node": ">=24.17.0"
   },
   "scripts": {
     "build": "tsc -b",
     "test": "vitest run",
-    "typecheck": "tsc -b && tsc --noEmit -p tsconfig.src.json",
+    "typecheck": "tsc -b",
     "lint": "eslint .",
     "format": "prettier --check .",
     "prepack": "npm run build",
     "release:check": "npm run typecheck && npm test && npm run build && npm pack --dry-run"
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org/",
-    "access": "public",
-    "provenance": true
-  },
-  "dependencies": {
-    "@wastech-mdlint/core": "0.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

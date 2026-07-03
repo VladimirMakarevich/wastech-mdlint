@@ -18,7 +18,31 @@ External HTTP link checks are not included in v1.
 ## Runtime
 
 - Node.js `24.17.0` LTS
-- `package.json` engines: `>=24.17.0 <25`
+- `package.json` engines: `>=24.17.0` (no upper bound, so future Node majors are not locked out; CI validates on the Node 24 LTS line)
+
+## Workspace Layout
+
+`wastech-mdlint` is an npm-workspaces monorepo. `@wastech-mdlint/core` owns the entire analysis
+pipeline; the CLI and MCP server are thin hosts over it.
+
+| Package | Role | Bin |
+| --- | --- | --- |
+| [`@wastech-mdlint/core`](packages/core) | Parsing, config loading, discovery, rules, graph, and reporting — the whole pipeline. Imported by both hosts; publishes no bin. | — |
+| [`@wastech-mdlint/cli`](packages/cli) | commander CLI host: argument parsing, command dispatch, exit codes. | `wastech-mdlint` → `packages/cli/dist/index.js` |
+| [`@wastech-mdlint/mcp-server`](packages/mcp-server) | stdio Model Context Protocol host. A tool-free stub today; the six read-only tools land in P7. | `wastech-mdlint-mcp` → `packages/mcp-server/dist/index.js` |
+
+Build and test the whole workspace from the repo root:
+
+```bash
+npm ci            # lockfile-based install
+npm run typecheck # tsc -b across project references
+npm run build     # tsc -b -> each package's dist/
+npm test          # vitest across all packages
+npm run lint      # eslint across the workspace
+```
+
+`npm run build` compiles in dependency order via TypeScript project references
+(core → cli/mcp-server), and `npm test` runs every package's Vitest project.
 
 ## Install
 
@@ -27,7 +51,7 @@ The package is not published yet. For now, run it from a local checkout:
 ```bash
 npm install
 npm run build
-node dist/cli.js --help
+node packages/cli/dist/index.js --help
 ```
 
 After npm publishing is set up, the publishing workflow will be documented in [docs/plan/16-npm-publishing.md](docs/plan/16-npm-publishing.md).
@@ -41,29 +65,35 @@ Run a text scan for the current repository:
 ```bash
 npm install
 npm run build
-node dist/cli.js lint .
+node packages/cli/dist/index.js scan .
 ```
 
 Run JSON output instead:
 
 ```bash
-node dist/cli.js lint . --format json
+node packages/cli/dist/index.js scan . --format json
 ```
 
 Write the Markdown dependency graph to a file:
 
 ```bash
-node dist/cli.js graph . --out graph.json
+node packages/cli/dist/index.js graph . --out graph.json
 ```
 
 ## CLI
 
 ```bash
-wastech-mdlint lint [path] [--config <file>] [--format text|json] [--fail-on error|warning|off]
+wastech-mdlint scan [path] [--config <file>] [--format text|json] [--fail-on error|warning|off]
 wastech-mdlint graph [path] [--config <file>] --out graph.json
 ```
 
-`lint` (aliased as `scan` for backward compatibility):
+The CLI lives in `@wastech-mdlint/cli` and is a thin [commander](https://github.com/tj/commander.js)
+host over `@wastech-mdlint/core` — it only parses arguments and resolves exit codes; all analysis
+runs in core. `lint` as the primary command (with `scan` kept as a backward-compatible alias) is a
+planned v2 change, but its semantics depend on the new rule engine and config model, so it ships
+with those in a later phase rather than now; `scan` is the only name available today.
+
+`scan`:
 
 - `path` defaults to the current working directory
 - `--config <file>` loads `wastech-mdlint.config.json`, `.cjs`, or `.mjs`
@@ -90,26 +120,35 @@ export default {
   include: ["**/*.md"],
   exclude: ["node_modules/**", "dist/**", ".git/**"],
   size: {
-    bytes:  { warn: 48 * 1024, error: 64 * 1024 },
-    lines:  { warn: 300, error: 500 },
+    bytes: { warn: 48 * 1024, error: 64 * 1024 },
+    lines: { warn: 300, error: 500 },
     tokens: { warn: 1500, error: 3000 },
     overrides: [
-      { pattern: "CLAUDE.md",          bytes: { warn: 24 * 1024, error: 32 * 1024 } },
-      { pattern: "skills/**/SKILL.md", bytes: { warn: 18 * 1024, error: 24 * 1024 } }
-    ]
+      { pattern: "CLAUDE.md", bytes: { warn: 24 * 1024, error: 32 * 1024 } },
+      {
+        pattern: "skills/**/SKILL.md",
+        bytes: { warn: 18 * 1024, error: 24 * 1024 },
+      },
+    ],
   },
   llm: {
     entrypoints: ["CLAUDE.md", "AGENTS.md", "skills/**/SKILL.md"],
-    maxTokensPerEntrypoint: 5000
+    maxTokensPerEntrypoint: 5000,
   },
   links: {
     checkExternal: false,
-    ignorePatterns: []
+    ignorePatterns: [],
   },
   structure: {
     orphanDocs: "error",
-    orphanExemptions: ["README.md", "index.md", "CLAUDE.md", "AGENTS.md", "skills/**/SKILL.md"]
-  }
+    orphanExemptions: [
+      "README.md",
+      "index.md",
+      "CLAUDE.md",
+      "AGENTS.md",
+      "skills/**/SKILL.md",
+    ],
+  },
 };
 ```
 
@@ -172,7 +211,7 @@ JSON output includes:
 Generate JSON:
 
 ```bash
-node dist/cli.js lint . --format json > report.json
+node packages/cli/dist/index.js scan . --format json > report.json
 ```
 
 ## CI
@@ -180,19 +219,19 @@ node dist/cli.js lint . --format json > report.json
 Fail CI on warnings and errors:
 
 ```bash
-node dist/cli.js lint . --format text --fail-on warning
+node packages/cli/dist/index.js scan . --format text --fail-on warning
 ```
 
 Fail only on error-level findings:
 
 ```bash
-node dist/cli.js lint . --format text --fail-on error
+node packages/cli/dist/index.js scan . --format text --fail-on error
 ```
 
 Always produce a report but never fail the job:
 
 ```bash
-node dist/cli.js lint . --format json --fail-on off
+node packages/cli/dist/index.js scan . --format json --fail-on off
 ```
 
 ## Development Checks
@@ -229,14 +268,14 @@ node --version
 npm run typecheck
 npm test
 npm run build
-node dist/cli.js lint .
+node packages/cli/dist/index.js scan .
 npm pack --dry-run
 ```
 
 Checklist:
 
 - confirm `node --version` reports `v24.17.0`
-- confirm `lint` works on this repository
+- confirm `scan` works on this repository
 - inspect `npm pack --dry-run` contents before publishing
 - follow npm publishing workflow setup in [docs/plan/16-npm-publishing.md](docs/plan/16-npm-publishing.md)
 

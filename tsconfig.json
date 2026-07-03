@@ -1,7 +1,8 @@
 {
   "files": [],
   "references": [
-    { "path": "./tsconfig.src.json" },
-    { "path": "./packages/core" }
+    { "path": "./packages/core" },
+    { "path": "./packages/cli" },
+    { "path": "./packages/mcp-server" }
   ]
 }
