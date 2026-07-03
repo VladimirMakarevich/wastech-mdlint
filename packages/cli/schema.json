@@ -52,6 +52,148 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
+                "const": "CTX-001"
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "properties": {
+                  "section": {
+                    "type": "string"
+                  },
+                  "placeholders": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
+                "const": "CTX-002"
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "properties": {
+                  "section": {
+                    "type": "string"
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
+                "const": "CTX-003"
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "properties": {
+                  "glossary": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "termColumn": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "aliasColumn": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "section": {
+                    "type": "string"
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "glossary",
+                  "termColumn"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
                 "const": "REF-001"
               },
               "severity": {
@@ -1012,7 +1154,7 @@
               },
               "id": {
                 "type": "string",
-                "pattern": "^(?!(REF|SEC|SIZE|STR|TBL)-)[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$"
+                "pattern": "^(?!(CTX|REF|SEC|SIZE|STR|TBL)-)[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$"
               },
               "description": {
                 "type": "string"
