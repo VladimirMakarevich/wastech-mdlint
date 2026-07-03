@@ -1,7 +1,7 @@
 # P2.07 · First rules through the engine + `lint` command
 
 > Phase: [P2 — Rule engine & new config model](index.md) · Roadmap: [v2 Index](../index.md) ·
-> Size **M** · Status **Not started**.
+> Size **M** · Status **Done**.
 
 ## Goal
 

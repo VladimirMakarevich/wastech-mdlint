@@ -1,7 +1,7 @@
 # P2.04 · New config model + JSONC loader + `findConfig`
 
 > Phase: [P2 — Rule engine & new config model](index.md) · Roadmap: [v2 Index](../index.md) ·
-> Size **L** · Status **Not started**.
+> Size **L** · Status **Done**.
 
 ## Goal
 
