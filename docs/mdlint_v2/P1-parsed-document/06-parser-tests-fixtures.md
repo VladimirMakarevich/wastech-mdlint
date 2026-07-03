@@ -1,7 +1,7 @@
 # P1.06 · Parser tests & fixtures
 
 > Phase: [P1 — ParsedDocument & parser upgrade](index.md) · Roadmap: [v2 Index](../index.md) ·
-> Size **M** · Status **Not started**.
+> Size **M** · Status **Done**.
 
 ## Goal
 

@@ -1,6 +1,6 @@
 # Phase P1 — `ParsedDocument` & parser upgrade
 
-> Roadmap: [v2 Index](../index.md) · Phase **P1** · Size **M** · Status **Not started** ·
+> Roadmap: [v2 Index](../index.md) · Phase **P1** · Size **M** · Status **Done** ·
 > Reuse from current implementation: **High**.
 >
 > **Goal:** one parse pass produces *everything* every downstream consumer needs. Extend the
@@ -48,14 +48,14 @@ consumer.
 
 ## Phase exit criteria
 
-- [ ] `ParsedDocument` exposes tables (keyed rows + line + section), headings (+ slug),
+- [x] `ParsedDocument` exposes tables (keyed rows + line + section), headings (+ slug),
       sections, links (+ label text + anchor + kind), images, checkItems, eager imports,
       inline-disable directives, and raw content — each with line positions.
-- [ ] `loadDocuments(patterns, …)` returns a deterministic `Map<absPath, ParsedDocument>`
+- [x] `loadDocuments(patterns, …)` returns a deterministic `Map<absPath, ParsedDocument>`
       (sorted, POSIX-normalized paths).
-- [ ] Parser unit tests cover tables/checklists/sections/links/anchors/imports/directives;
+- [x] Parser unit tests cover tables/checklists/sections/links/anchors/imports/directives;
       CJK fixtures pass; output is byte-stable across runs.
-- [ ] No rule/graph logic added here — this phase only produces parsed data.
+- [x] No rule/graph logic added here — this phase only produces parsed data.
 
 ## What P1 unblocks
 

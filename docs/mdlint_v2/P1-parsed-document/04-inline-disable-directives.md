@@ -1,7 +1,7 @@
 # P1.04 · Inline-disable directive extraction
 
 > Phase: [P1 — ParsedDocument & parser upgrade](index.md) · Roadmap: [v2 Index](../index.md) ·
-> Size **S** · Status **Not started**.
+> Size **S** · Status **Done**.
 
 ## Goal
 
