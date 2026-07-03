@@ -86,6 +86,12 @@ export { defineRule, RuleRegistry, RuleResolutionError } from "./engine/registry
 export type { ConfigIssue, RuleDefinition, RuleMetadata, RuleResolutionCode } from "./engine/registry.js";
 export { BUILTIN_RULE_DEFINITIONS, ruleRegistry } from "./engine/rules/index.js";
 
+export { lintConfigSchema, ruleEntrySchema, severityOverrideSchema } from "./config/config-schema.js";
+export type { LintConfig, RuleConfigEntry } from "./config/config-schema.js";
+export { CONFIG_FILE_NAME, findConfig } from "./config/find-config.js";
+export { loadConfiguration } from "./config/load-config.js";
+export type { ConfiguredRule, LoadedConfiguration } from "./config/load-config.js";
+
 export { DEFAULT_CONFIG, SUPPORTED_CONFIG_FILE_NAMES } from "./config/defaults.js";
 export { ConfigError, loadConfig } from "./config/load.js";
 export { discoverMarkdownFiles, DiscoveryError } from "./discovery/discover.js";
