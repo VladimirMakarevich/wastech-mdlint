@@ -3,25 +3,12 @@ import path from "node:path";
 
 import { matchesConfigGlob, normalizeRelativePath } from "../../discovery/globs.js";
 import type { ParsedDocument, ParsedLink } from "../../markdown/document-types.js";
+import { escapesRoot, filePart, resolveRelativeToSource, sourceLocale } from "../path-resolve.js";
 import { resolveRoutedUrl } from "../site-router.js";
 import type { SiteRouterSettings } from "../types.js";
 import type { PrimitiveContext, PrimitiveFinding } from "./types.js";
 
 type ReferenceContext = Pick<PrimitiveContext, "documents" | "rootDir" | "settings">;
-
-// The file part of a link/image target (drop any `#fragment`).
-function filePart(rawTarget: string): string {
-  return rawTarget.split("#", 1)[0] ?? "";
-}
-
-function resolveRelativeToSource(sourcePath: string, target: string): string {
-  const sourceDir = path.posix.dirname(sourcePath);
-  return normalizeRelativePath(path.posix.normalize(path.posix.join(sourceDir, target)));
-}
-
-function escapesRoot(relPath: string): boolean {
-  return relPath === ".." || relPath.startsWith("../");
-}
 
 // A repo-relative target "resolves" if it is in the Markdown corpus or exists on disk (the latter
 // covers files outside `include`, e.g. images — audit P3 REF gap, avoids false positives).
@@ -34,17 +21,6 @@ function targetResolves(
   }
 
   return context.documents.has(relPath) || existsSync(path.resolve(context.rootDir, relPath));
-}
-
-// The locale segment of a source path under a router content dir (e.g. `.../docs/de/x.md` → "de").
-function sourceLocale(sourcePath: string, router: SiteRouterSettings): string | undefined {
-  const contentDir = router.contentDir ?? "src/content/docs";
-  if (!sourcePath.startsWith(`${contentDir}/`)) {
-    return undefined;
-  }
-  const rest = sourcePath.slice(contentDir.length + 1);
-  const segment = rest.split("/")[0];
-  return segment.length > 0 && segment !== rest ? segment : undefined;
 }
 
 export type LinkResolvesOptions = { exclude?: string[]; siteRouter?: SiteRouterSettings };

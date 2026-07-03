@@ -1,5 +1,5 @@
 import { RuleRegistry, type RuleDefinition } from "../registry.js";
-import { ref001 } from "./ref.js";
+import { REF_RULES } from "./ref.js";
 import { size001 } from "./size.js";
 import { TBL_RULES } from "./tbl.js";
 import { SEC_STR_RULES } from "./sec.js";
@@ -8,10 +8,10 @@ import { SEC_STR_RULES } from "./sec.js";
 // the registry, schema, and README all derive from one list. Kept explicit (not side-effect
 // registration) so build order and tree-shaking never drop a rule silently.
 export const BUILTIN_RULE_DEFINITIONS: readonly RuleDefinition[] = [
-  ref001,
   size001,
   ...TBL_RULES,
-  ...SEC_STR_RULES
+  ...SEC_STR_RULES,
+  ...REF_RULES
 ];
 
 // The process-wide registry over the built-ins. Config loading, schema generation, and the CLI all

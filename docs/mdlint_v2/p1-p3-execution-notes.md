@@ -58,6 +58,20 @@
   (empty→TODO) + SEC-001 (scaffold отсутствующих секций в конце файла). «SEC-* scaffold» реализован
   на SEC-001; SEC-002 (reorder) и SEC-003 (project template) — `fixable:false` (небезопасно/не
   document-scope), их fix — follow-up P4+.
+- [P3.04 REF-004] Underspecified: «cross-zone links declared in zone Dependencies». Принятая модель:
+  zone = первый сегмент под `zonesDir`; ссылка из зоны A в зону B «объявлена», если имя зоны B как
+  слово встречается в теле секции `dependencySection` (default "Dependencies") любого файла зоны A.
+  Обоснование: даёт рабочее детерминированное правило; scope=document, но читает корпус для знания
+  зон/деклараций.
+- [P3.04 REF-005] Column-based (audit 5.5) через общий `extractColumnIds`/`extractDefinedIds`
+  (audit 2.1, экспортирован для id-ref рёбер P4). Модель: `definitions`/`references` — file-globs,
+  `idColumn` — колонка ID (одна и та же в def- и ref-таблицах), `idPattern` валидирует токен;
+  ячейка может содержать несколько ID (split по `[,\s]`). Dangling ref → error, orphan def →
+  warning (per-finding severity). Оба поля обязательны (min 1).
+- [P3.04 REF-006] Underspecified stability-модель: `id→stability` из def-таблиц (idColumn+
+  stabilityColumn); ref-строка несёт referenced ID (idColumn) и стабильность **ссылающегося**
+  (stabilityColumn); `stabilityOrder` — от наименее к наиболее стабильному (rank=index). Warning,
+  если ранг(referenced) < ранг(referencer).
 
 ## Coexistence / cutover план (scan → lint), фиксируется для P3.09
 

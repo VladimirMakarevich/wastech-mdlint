@@ -77,6 +77,8 @@ export { formatLintResultJson, formatLintResultText } from "./engine/format-lint
 export { estimateTokens as estimateTokensV2 } from "./engine/tokens.js";
 export { applyEdits, applyFixes } from "./engine/fix.js";
 export type { ApplyFixesResult } from "./engine/fix.js";
+export { extractColumnIds, extractDefinedIds } from "./engine/defined-ids.js";
+export type { IdOccurrence, IdRef } from "./engine/defined-ids.js";
 export { compileRegex, regexFlagsSchema, regexStringSchema } from "./engine/regex.js";
 export { findLineNumber } from "./engine/text-position.js";
 export { extractSectionBody } from "./engine/section-body.js";
