@@ -1,6 +1,7 @@
 import { RuleRegistry, type RuleDefinition } from "../registry.js";
 import { CTX_RULES } from "./ctx.js";
 import { GRP_RULES } from "./grp.js";
+import { LLM_RULES } from "./llm.js";
 import { REF_RULES } from "./ref.js";
 import { size001 } from "./size.js";
 import { TBL_RULES } from "./tbl.js";
@@ -11,6 +12,7 @@ import { SEC_STR_RULES } from "./sec.js";
 // registration) so build order and tree-shaking never drop a rule silently.
 export const BUILTIN_RULE_DEFINITIONS: readonly RuleDefinition[] = [
   size001,
+  ...LLM_RULES,
   ...TBL_RULES,
   ...SEC_STR_RULES,
   ...REF_RULES,

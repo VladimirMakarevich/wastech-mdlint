@@ -369,6 +369,47 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
+                "const": "LLM-001"
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "properties": {
+                  "entrypoints": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "maxTokensPerEntrypoint": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "entrypoints",
+                  "maxTokensPerEntrypoint"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
                 "const": "REF-001"
               },
               "severity": {
@@ -1329,7 +1370,7 @@
               },
               "id": {
                 "type": "string",
-                "pattern": "^(?!(CTX|GRP|REF|SEC|SIZE|STR|TBL)-)[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$"
+                "pattern": "^(?!(CTX|GRP|LLM|REF|SEC|SIZE|STR|TBL)-)[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$"
               },
               "description": {
                 "type": "string"
