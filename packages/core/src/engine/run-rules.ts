@@ -24,7 +24,7 @@ function compareMessages(left: LintMessage, right: LintMessage): number {
 export function runRules(rules: readonly ResolvedRule[], context: RunRulesContext): LintMessage[] {
   const messages: LintMessage[] = [];
 
-  for (const { rule, severity } of rules) {
+  for (const { rule, severityOverride } of rules) {
     if (rule.scope === "project" && context.documents === undefined) {
       throw new Error(
         `Rule ${rule.id} is project-scoped but no documents were provided (this is a programming error, not a config issue).`
@@ -34,7 +34,8 @@ export function runRules(rules: readonly ResolvedRule[], context: RunRulesContex
     const report = (finding: Parameters<RuleContext["report"]>[0]): void => {
       messages.push({
         ruleId: rule.id,
-        severity,
+        // Config override wins (C2), then the rule's per-finding hint, then its default.
+        severity: severityOverride ?? finding.severity ?? rule.defaultSeverity,
         message: finding.message,
         filePath: finding.filePath ?? context.filePath ?? context.document?.path ?? "",
         line: finding.line,

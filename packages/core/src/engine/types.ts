@@ -52,15 +52,21 @@ export type TextEdit = {
   newText: string;
 };
 
-// What a rule passes to `ctx.report()`. `ruleId`/`severity` are attached by the runner; `filePath`
-// defaults to the current document for document rules and must be set explicitly by project rules
-// (which attribute each message to a specific file).
+// What a rule passes to `ctx.report()`. `ruleId` is attached by the runner; `filePath` defaults to
+// the current document for document rules and must be set explicitly by project rules (which
+// attribute each message to a specific file).
+//
+// `severity` is an optional per-finding hint for rules whose severity varies by finding (SIZE-001:
+// warn vs error threshold). The runner resolves final severity as
+// `configOverride ?? finding.severity ?? rule.defaultSeverity`, so a config `severity` override wins
+// (C2), then the rule's per-finding hint, then the rule default.
 export type ReportInput = {
   message: string;
   line: number;
   column?: number;
   endLine?: number;
   filePath?: string;
+  severity?: Severity;
   fixable?: boolean;
   data?: Record<string, unknown>;
   helpUri?: string;
@@ -120,8 +126,9 @@ export type Rule = {
   fix?(context: RuleContext): TextEdit[];
 };
 
-// A resolved rule paired with its config-resolved severity (`"off"` already filtered out).
+// A resolved rule paired with its config severity *override* (`"off"` already filtered out by the
+// orchestrator). `severityOverride` undefined ⇒ the rule's per-finding hint / default applies.
 export type ResolvedRule = {
   rule: Rule;
-  severity: Severity;
+  severityOverride?: Severity;
 };

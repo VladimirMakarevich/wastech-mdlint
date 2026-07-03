@@ -69,6 +69,10 @@ export type {
 } from "./engine/types.js";
 export { runRules } from "./engine/run-rules.js";
 export type { RunRulesContext } from "./engine/run-rules.js";
+export { lintFiles } from "./engine/lint-files.js";
+export type { LintFilesInput, LintResult } from "./engine/lint-files.js";
+export { createSuppressionChecker } from "./engine/suppression.js";
+export type { SuppressionChecker } from "./engine/suppression.js";
 export { compileRegex, regexFlagsSchema, regexStringSchema } from "./engine/regex.js";
 export { findLineNumber } from "./engine/text-position.js";
 export { extractSectionBody } from "./engine/section-body.js";
