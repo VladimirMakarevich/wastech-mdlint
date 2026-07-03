@@ -46,6 +46,43 @@ export type {
 } from "./markdown/document-types.js";
 export type { LoadDocumentsOptions } from "./markdown/load-documents.js";
 
+export type {
+  ContextGraph,
+  ContextGraphEdge,
+  ContextGraphEdgeType,
+  ContextGraphNode
+} from "./graph/context-graph-types.js";
+
+export type {
+  LintMessage,
+  ReportInput,
+  ResolvedRule,
+  ResolvedSettings,
+  Rule,
+  RuleCategory,
+  RuleContext,
+  RuleScope,
+  Severity,
+  SeverityOverride,
+  SiteRouterSettings,
+  TextEdit
+} from "./engine/types.js";
+export { runRules } from "./engine/run-rules.js";
+export type { RunRulesContext } from "./engine/run-rules.js";
+export { compileRegex, regexFlagsSchema, regexStringSchema } from "./engine/regex.js";
+export { findLineNumber } from "./engine/text-position.js";
+export { extractSectionBody } from "./engine/section-body.js";
+export { resolveRoutedUrl } from "./engine/site-router.js";
+export {
+  assertionSchema,
+  ASSERTION_TARGETS,
+  isProjectAssertion,
+  runAssertion
+} from "./engine/primitives/assert.js";
+export type { Assertion, RunAssertionOptions } from "./engine/primitives/assert.js";
+export { DEFAULT_PLACEHOLDERS } from "./engine/primitives/content.js";
+export type { PrimitiveContext, PrimitiveFinding } from "./engine/primitives/types.js";
+
 export { DEFAULT_CONFIG, SUPPORTED_CONFIG_FILE_NAMES } from "./config/defaults.js";
 export { ConfigError, loadConfig } from "./config/load.js";
 export { discoverMarkdownFiles, DiscoveryError } from "./discovery/discover.js";
