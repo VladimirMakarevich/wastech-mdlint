@@ -42,6 +42,8 @@ export type {
 export { buildContextGraph } from "./graph/build-context-graph.js";
 export { formatContextGraphSummary, getComponents, topologicalSort } from "./graph/graph-algorithms.js";
 export type { TopologicalSortResult } from "./graph/graph-algorithms.js";
+export { impact, query, slice } from "./graph/query.js";
+export type { QueryDirection, QueryOptions, QueryResult, QueryVisit } from "./graph/query.js";
 
 // Engine (P2)
 export type {
