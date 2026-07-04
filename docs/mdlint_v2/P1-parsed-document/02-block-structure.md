@@ -1,7 +1,7 @@
 # P1.02 · Block structure — headings, sections, tables, checklist, content
 
 > Phase: [P1 — ParsedDocument & parser upgrade](index.md) · Roadmap: [v2 Index](../index.md) ·
-> Size **M** · Status **Not started**.
+> Size **M** · Status **Done**.
 
 ## Goal
 

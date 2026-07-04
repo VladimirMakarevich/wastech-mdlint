@@ -1,7 +1,7 @@
 # P2.03 · Rule registry + single metadata source + canonical IDs
 
 > Phase: [P2 — Rule engine & new config model](index.md) · Roadmap: [v2 Index](../index.md) ·
-> Size **M** · Status **Not started**.
+> Size **M** · Status **Done**.
 
 ## Goal
 

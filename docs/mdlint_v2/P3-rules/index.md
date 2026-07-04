@@ -1,6 +1,6 @@
 # Phase P3 — The 22 built-in rules + LLM rules + custom rule
 
-> Roadmap: [v2 Index](../index.md) · Phase **P3** · Size **L** · Status **Not started** ·
+> Roadmap: [v2 Index](../index.md) · Phase **P3** · Size **L** · Status **Done** ·
 > **Milestone M2 — lint parity+.**
 >
 > **Goal:** implement all 22 built-in rules as presets over the [P2 primitives](../P2-rule-engine/02-assertion-primitives.md),
@@ -51,11 +51,11 @@ P3.02–P3.07 are independent once the utils (P3.01) exist and can be done in pa
 
 ## Phase exit criteria
 
-- [ ] All 22 built-in rules implemented as presets, each with options schema + fixtures + tests.
-- [ ] LLM rules (SIZE-001, LLM-001) implemented; the [D3](../index.md) LLM features fully preserved.
-- [ ] `custom` rule works from config over the primitive vocabulary (no rebuild).
-- [ ] README rule table + `schema.json` are generated and in sync ([R6](../requirements/02-rules-engine.md)).
-- [ ] `scan` is now a hidden alias of `lint`; the legacy legacy pipeline is removed ([D4](../index.md)).
+- [x] All 22 built-in rules implemented as presets, each with options schema + fixtures + tests.
+- [x] LLM rules (SIZE-001, LLM-001) implemented; the [D3](../index.md) LLM features fully preserved.
+- [x] `custom` rule works from config over the primitive vocabulary (no rebuild).
+- [x] README rule table + `schema.json` are generated and in sync ([R6](../requirements/02-rules-engine.md)).
+- [x] `scan` is now a hidden alias of `lint`; the legacy legacy pipeline is removed ([D4](../index.md)).
 
 ## What P3 unblocks
 

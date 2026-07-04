@@ -1,7 +1,7 @@
 # P1.01 · Define the `ParsedDocument` contract (types)
 
 > Phase: [P1 — ParsedDocument & parser upgrade](index.md) · Roadmap: [v2 Index](../index.md) ·
-> Size **S** · Status **Not started** · Design/types task.
+> Size **S** · Status **Done** · Design/types task.
 
 ## Goal
 

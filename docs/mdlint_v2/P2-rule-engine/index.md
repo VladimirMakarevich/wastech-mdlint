@@ -1,6 +1,6 @@
 # Phase P2 — Rule engine & new config model
 
-> Roadmap: [v2 Index](../index.md) · Phase **P2** · Size **L** · Status **Not started** ·
+> Roadmap: [v2 Index](../index.md) · Phase **P2** · Size **L** · Status **Done** ·
 > Depends on [D2](../index.md), [D3](../index.md).
 >
 > **Goal:** build the central computational layer (rule engine + assertion primitives +
@@ -47,13 +47,13 @@ P2.06 depends on P2.03 (metadata) + P2.04 (config shape) and can be built alongs
 
 ## Phase exit criteria
 
-- [ ] `Rule`/`RuleContext`/`LintMessage` (with structured fields) + `runRules` implemented.
-- [ ] Closed assertion-primitive vocabulary executes over `ParsedDocument`.
-- [ ] Registry + single metadata source; rule IDs canonical ([C3](../requirements/01-configuration.md)).
-- [ ] New config `{ $schema?, include?, exclude?, respectGitignore?, settings?, rules:[{rule,severity?,options?}], compile? }` parsed (JSONC), validated two-stage, with rich diagnostics.
-- [ ] `lintFiles()` resolves severity (incl. `"off"`), applies inline-disable, fails fast on missing `documents`.
-- [ ] `schema.json` generated from metadata + sync test; `wastech-mdlint schema` writes a local schema; `$schema` is local (no remote URL).
-- [ ] `lint` runs the new engine on a few proof rules; `scan` alias plan recorded for end of P3.
+- [x] `Rule`/`RuleContext`/`LintMessage` (with structured fields) + `runRules` implemented.
+- [x] Closed assertion-primitive vocabulary executes over `ParsedDocument`.
+- [x] Registry + single metadata source; rule IDs canonical ([C3](../requirements/01-configuration.md)).
+- [x] New config `{ $schema?, include?, exclude?, respectGitignore?, settings?, rules:[{rule,severity?,options?}], compile? }` parsed (JSONC), validated two-stage, with rich diagnostics.
+- [x] `lintFiles()` resolves severity (incl. `"off"`), applies inline-disable, fails fast on missing `documents`.
+- [x] `schema.json` generated from metadata + sync test; `wastech-mdlint schema` writes a local schema; `$schema` is local (no remote URL).
+- [x] `lint` runs the new engine on a few proof rules; `scan` alias plan recorded for end of P3.
 
 ## What P2 unblocks
 

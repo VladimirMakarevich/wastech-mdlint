@@ -11,7 +11,8 @@
     "node": ">=24.17.0"
   },
   "files": [
-    "dist"
+    "dist",
+    "schema.json"
   ],
   "scripts": {
     "build": "tsc -b",

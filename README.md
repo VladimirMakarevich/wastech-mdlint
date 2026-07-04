@@ -1,35 +1,39 @@
 # wastech-mdlint
 
-`wastech-mdlint` is a TypeScript CLI for auditing Markdown context in repositories. It targets Node.js `24.17.0` LTS and focuses on deterministic local checks for docs and agent-facing context files such as `README.md`, `CLAUDE.md`, `AGENTS.md`, and `skills/**/SKILL.md`.
+`wastech-mdlint` is a TypeScript CLI and library for linting Markdown context in
+repositories. It targets Node.js `24.17.0` LTS and focuses on **deterministic, local**
+checks for docs and agent-facing context files such as `README.md`, `CLAUDE.md`,
+`AGENTS.md`, and `skills/**/SKILL.md`.
 
-V1 covers:
+It runs a registry-driven **rule engine** over a single Markdown parse pass:
 
-- Markdown discovery under a repository root;
-- local Markdown links and anchor validation;
-- Markdown dependency graph output;
-- orphan doc and dependency cycle detection;
-- `@path/to/file.md` eager imports for LLM entrypoints;
-- per-entrypoint context budget estimates;
-- human-readable text output and machine-readable JSON output;
-- CI-friendly `--fail-on error|warning|off`.
+- 22 built-in rules across `TBL` (tables), `SEC`/`STR` (sections & structure),
+  `REF` (references), `CTX` (content quality), and `GRP` (graph integrity);
+- the preserved LLM context-hygiene rules `SIZE-001` (byte/line/token budgets) and
+  `LLM-001` (eager-import budget);
+- a declarative `custom` rule that composes a closed primitive vocabulary from config —
+  no rebuild, no code execution;
+- inline-disable directives, per-rule severity, `--fix` for deterministic fixes, and
+  text or JSON output with CI-friendly exit codes.
 
-External HTTP link checks are not included in v1.
+External HTTP link checking is intentionally out of scope; all analysis is local and
+deterministic.
 
 ## Runtime
 
 - Node.js `24.17.0` LTS
-- `package.json` engines: `>=24.17.0` (no upper bound, so future Node majors are not locked out; CI validates on the Node 24 LTS line)
+- `package.json` engines: `>=24.17.0` (no upper bound; CI validates on the Node 24 LTS line)
 
-## Workspace Layout
+## Workspace layout
 
-`wastech-mdlint` is an npm-workspaces monorepo. `@wastech-mdlint/core` owns the entire analysis
+`wastech-mdlint` is an npm-workspaces monorepo. `@wastech-mdlint/core` owns the entire
 pipeline; the CLI and MCP server are thin hosts over it.
 
 | Package | Role | Bin |
 | --- | --- | --- |
-| [`@wastech-mdlint/core`](packages/core) | Parsing, config loading, discovery, rules, graph, and reporting — the whole pipeline. Imported by both hosts; publishes no bin. | — |
-| [`@wastech-mdlint/cli`](packages/cli) | commander CLI host: argument parsing, command dispatch, exit codes. | `wastech-mdlint` → `packages/cli/dist/index.js` |
-| [`@wastech-mdlint/mcp-server`](packages/mcp-server) | stdio Model Context Protocol host. A tool-free stub today; the six read-only tools land in P7. | `wastech-mdlint-mcp` → `packages/mcp-server/dist/index.js` |
+| [`@wastech-mdlint/core`](packages/core) | Parsing, config, rule engine, graph, and formatting — the whole pipeline. | — |
+| [`@wastech-mdlint/cli`](packages/cli) | commander CLI host: argument parsing, command dispatch, exit codes. | `wastech-mdlint` |
+| [`@wastech-mdlint/mcp-server`](packages/mcp-server) | stdio MCP host. A stub today; the six read-only tools land in P7. | `wastech-mdlint-mcp` |
 
 Build and test the whole workspace from the repo root:
 
@@ -41,257 +45,140 @@ npm test          # vitest across all packages
 npm run lint      # eslint across the workspace
 ```
 
-`npm run build` compiles in dependency order via TypeScript project references
-(core → cli/mcp-server), and `npm test` runs every package's Vitest project.
-
-## Install
-
-The package is not published yet. For now, run it from a local checkout:
+## Quick start
 
 ```bash
 npm install
 npm run build
-node packages/cli/dist/index.js --help
+node packages/cli/dist/index.js lint .            # text output
+node packages/cli/dist/index.js lint . --format json
+node packages/cli/dist/index.js lint . --fix      # apply deterministic fixes, then re-report
 ```
 
-After npm publishing is set up, the publishing workflow will be documented in [docs/plan/16-npm-publishing.md](docs/plan/16-npm-publishing.md).
-
-`npm install` no longer writes any files into your checkout. It previously copied a default `wastech-mdlint.config.json` on install; that install-time side effect has been removed because packages should not write to a consumer's working tree during installation. Configuration is optional — when no config file is present the CLI runs on built-in defaults (see [Config](#config)) — so create one only when you want to override them. An explicit initialization command will provide a starter config in a later release.
-
-## Quick Start
-
-Run a text scan for the current repository:
-
-```bash
-npm install
-npm run build
-node packages/cli/dist/index.js scan .
-```
-
-Run JSON output instead:
-
-```bash
-node packages/cli/dist/index.js scan . --format json
-```
-
-Write the Markdown dependency graph to a file:
-
-```bash
-node packages/cli/dist/index.js graph . --out graph.json
-```
+`npm install` writes no files into your checkout. Configuration is optional — with no
+config file present the CLI lints every `**/*.md` file with an empty ruleset (a clean
+pass); create a config to enable rules.
 
 ## CLI
 
 ```bash
-wastech-mdlint scan [path] [--config <file>] [--format text|json] [--fail-on error|warning|off]
+wastech-mdlint lint [path] [--config <file>] [--format text|json] [--fail-on error|warning|off] [--fix]
 wastech-mdlint graph [path] [--config <file>] --out graph.json
+wastech-mdlint schema [--out schema.json]
 ```
 
-The CLI lives in `@wastech-mdlint/cli` and is a thin [commander](https://github.com/tj/commander.js)
-host over `@wastech-mdlint/core` — it only parses arguments and resolves exit codes; all analysis
-runs in core. `lint` as the primary command (with `scan` kept as a backward-compatible alias) is a
-planned v2 change, but its semantics depend on the new rule engine and config model, so it ships
-with those in a later phase rather than now; `scan` is the only name available today.
-
-`scan`:
-
-- `path` defaults to the current working directory
-- `--config <file>` loads `wastech-mdlint.config.json`, `.cjs`, or `.mjs`
-- `--format text|json` defaults to `text`
-- `--fail-on error|warning|off` defaults to `error`
-
-`graph`:
-
-- writes deterministic graph JSON to `--out`
-- does not use `--fail-on`
+- `lint` is the default command (running `wastech-mdlint` with no subcommand lints the
+  cwd). `scan` is a hidden, deprecated alias of `lint`.
+- Exit codes: `0` pass · `1` findings at the `--fail-on` threshold · `2` operational error.
+- `graph` writes the deterministic context graph (nodes/edges/cycles) to `--out`.
+- `schema` writes the config JSON schema to a local file (never a remote URL).
 
 ## Config
 
-Supported config files:
+Configuration is JSONC (comments + trailing commas) in `wastech-mdlint.config.json`.
 
-- `wastech-mdlint.config.json`
-- `wastech-mdlint.config.cjs`
-- `wastech-mdlint.config.mjs`
-
-Example `wastech-mdlint.config.mjs`:
-
-```js
-export default {
-  include: ["**/*.md"],
-  exclude: ["node_modules/**", "dist/**", ".git/**"],
-  size: {
-    bytes: { warn: 48 * 1024, error: 64 * 1024 },
-    lines: { warn: 300, error: 500 },
-    tokens: { warn: 1500, error: 3000 },
-    overrides: [
-      { pattern: "CLAUDE.md", bytes: { warn: 24 * 1024, error: 32 * 1024 } },
-      {
-        pattern: "skills/**/SKILL.md",
-        bytes: { warn: 18 * 1024, error: 24 * 1024 },
-      },
-    ],
+```jsonc
+{
+  "$schema": "./node_modules/@wastech-mdlint/cli/schema.json",
+  "include": ["**/*.md"],
+  "exclude": ["node_modules/**", "dist/**", ".git/**"],
+  "respectGitignore": false,
+  "settings": {
+    "siteRouter": { "preset": "starlight", "contentDir": "src/content/docs", "defaultLocale": "en" }
   },
-  llm: {
-    entrypoints: ["CLAUDE.md", "AGENTS.md", "skills/**/SKILL.md"],
-    maxTokensPerEntrypoint: 5000,
-  },
-  links: {
-    checkExternal: false,
-    ignorePatterns: [],
-  },
-  structure: {
-    orphanDocs: "error",
-    orphanExemptions: [
-      "README.md",
-      "index.md",
-      "CLAUDE.md",
-      "AGENTS.md",
-      "skills/**/SKILL.md",
-    ],
-  },
-};
+  "rules": [
+    { "rule": "REF-001", "severity": "warning" },
+    { "rule": "TBL-002", "options": { "columns": ["Owner"] } },
+    {
+      "rule": "custom",
+      "id": "REQ-OWNER",
+      "description": "Each requirement row must have an Owner",
+      "severity": "error",
+      "target": "table",
+      "options": { "files": ["docs/requirements/**/*.md"], "assert": { "kind": "columnNotEmpty", "column": "Owner" } }
+    }
+  ]
+}
 ```
 
-Notes:
-
-- `structure.orphanDocs` supports `"error" | "warning" | "off"`.
-- orphan docs are `error` by default.
-- TypeScript config files are not supported in v1.
-- `.cjs` and `.mjs` configs execute code. Treat executable configs as trusted input only.
+- `exclude` wins over `include`; `respectGitignore` opts into honoring `.gitignore`.
+- Each rule entry may set `severity` to `"error" | "warning" | "off"`; `"off"` documents
+  but disables a rule. Rule IDs are case-insensitive and dash-optional (`ref-001` →
+  `REF-001`).
+- `settings.siteRouter` is inherited by reference rules and may be overridden per rule.
+- The `custom` rule composes the closed assertion vocabulary
+  (`requiredColumns`, `columnNotEmpty`, `columnInSet`, `columnMatches`, `columnUnique`,
+  `crossColumn`, `sectionPresent`, `sectionOrder`, `contentNotMatch`, `noPlaceholders`,
+  `allChecked`, `linkResolves`, `imageResolves`). Its `id` must be namespaced and must not
+  shadow a built-in prefix.
 
 ## Rules
 
-V1 emits these rule ids:
+The following table is generated from the rule metadata (`npm run generate:docs`); do not
+edit it by hand.
 
-- `links/broken-links`: broken local Markdown files or anchors.
-- `size/max-file-size`: file byte, line, or token limit exceeded (`warning` when only the `warn` threshold is crossed; `error` when the `error` threshold is crossed).
-- `structure/orphan-docs`: a Markdown file has no incoming Markdown links and is not exempt.
-- `graph/dependencies`: dependency cycle in the Markdown link graph.
-- `llm/eager-imports`: missing eager import or eager import cycle.
-- `llm/context-budget`: estimated entrypoint context exceeds `llm.maxTokensPerEntrypoint`.
+<!-- BEGIN GENERATED RULES -->
+| Rule | Category | Default severity | Scope | Fixable | Description |
+| --- | --- | --- | --- | --- | --- |
+| `CTX-001` | CTX | warning | document | no | Sections are not empty or placeholder-only. |
+| `CTX-002` | CTX | warning | document | no | All checklist items are checked. |
+| `CTX-003` | CTX | warning | project | no | Content uses canonical glossary terms instead of aliases. |
+| `GRP-001` | GRP | error | project | no | No circular references between documents. |
+| `GRP-002` | GRP | warning | project | no | Documents have at least one incoming reference (except entry points). |
+| `GRP-003` | GRP | warning | project | no | IDs are carried forward across pipeline stages. |
+| `LLM-001` | LLM | warning | project | no | Eager-import context stays within the per-entrypoint token budget. |
+| `REF-001` | REF | error | document | no | Relative links resolve to a file. |
+| `REF-002` | REF | error | document | no | Link anchors match a heading slug. |
+| `REF-003` | REF | error | document | no | Image targets resolve to a file. |
+| `REF-004` | REF | error | document | no | Cross-zone links are declared in the zone's Dependencies section. |
+| `REF-005` | REF | error | project | no | IDs are traceable between definitions and references. |
+| `REF-006` | REF | warning | project | no | References do not depend on less-stable entities. |
+| `SEC-001` | SEC | error | document | yes | Required sections are present. |
+| `SEC-002` | SEC | error | document | no | Sections appear in the required order. |
+| `SEC-003` | SEC | error | project | no | Sections conform to a reference template's heading structure. |
+| `SIZE-001` | SIZE | warning | document | no | File stays within byte / line / token budgets. |
+| `STR-001` | STR | error | project | no | Required files exist in the project. |
+| `TBL-001` | TBL | error | document | no | Tables declare their required columns. |
+| `TBL-002` | TBL | warning | document | yes | Target table cells are not empty. |
+| `TBL-003` | TBL | error | document | no | Cell values fall within an allowed set. |
+| `TBL-004` | TBL | error | document | no | Cell values match a required pattern. |
+| `TBL-005` | TBL | error | document | no | Cross-column conditional holds (when → then). |
+| `TBL-006` | TBL | error | project | no | Column IDs are unique across files. |
+<!-- END GENERATED RULES -->
 
-Severity defaults in v1:
+`custom` (not shown above) is resolved from config, so its id and behavior are
+project-defined.
 
-- `structure/orphan-docs`: `error` by default, configurable to `warning` or `off`
-- everything else above: `warning`
+## Inline suppression
 
-Important behavior:
+```md
+<!-- wastech-mdlint-disable REF-001 -->
+[intentionally broken](does-not-exist.md)
+<!-- wastech-mdlint-enable REF-001 -->
 
-- orphan detection currently uses Markdown link edges, not LLM eager import edges
-- eager imports support `@relative/path.md` and `@/root-relative/path.md`
-- token estimation is heuristic and intentionally approximate
+<!-- wastech-mdlint-disable-next-line TBL-002 -->
+| REQ-1 |  |
+```
+
+A directive with no rule IDs applies to all rules. `disable` runs until a matching
+`enable` or end of file; `disable-next-line` covers only the next line.
 
 ## Output
 
-Text output is intended for humans and groups findings by severity and rule id.
-
-Example:
-
-```text
-Markdown Context Audit
-Root: /repo
-Files: 3
-Findings: 1 error, 2 warning, 0 info
-Graph: 3 nodes, 2 edges, 1 orphan docs (error), 0 cycles
-Budgets: 1 entrypoints, 0 over limit
-
-Errors (1)
-structure/orphan-docs
-- docs/standalone.md docs/standalone.md has no incoming Markdown links. Link it from an index document, remove it, or keep it as standalone when future suppression support exists.
-```
-
-JSON output includes:
-
-- `summary`
-- `findings`
-- `files`
-- `graph`
-- `budgets`
-
-Generate JSON:
+Text output groups findings by file; JSON output (`--format json`) is a structured
+`{ summary, messages, files }` document suitable for machine consumption.
 
 ```bash
-node packages/cli/dist/index.js scan . --format json > report.json
+node packages/cli/dist/index.js lint . --format json > report.json
+node packages/cli/dist/index.js lint . --fail-on warning   # fail CI on warnings too
 ```
-
-## CI
-
-Fail CI on warnings and errors:
-
-```bash
-node packages/cli/dist/index.js scan . --format text --fail-on warning
-```
-
-Fail only on error-level findings:
-
-```bash
-node packages/cli/dist/index.js scan . --format text --fail-on error
-```
-
-Always produce a report but never fail the job:
-
-```bash
-node packages/cli/dist/index.js scan . --format json --fail-on off
-```
-
-## Development Checks
-
-```bash
-npm run typecheck
-npm test
-npm run build
-```
-
-## Project Docs
-
-- Plan review: `docs/plan-review.md`
-- [Task 02: CLI Shell](docs/plan/02-cli-shell.md)
-- [Task 12: Reporting](docs/plan/12-reporting.md)
-- [Task 15: README And Release Checklist](docs/plan/15-readme-release.md)
-
-WSL helper scripts are also available in this repository:
-
-```bash
-./scripts/install-wsl.sh
-./scripts/typecheck-wsl.sh
-./scripts/test-wsl.sh
-./scripts/build-wsl.sh
-./scripts/verify-wsl.sh
-```
-
-## Release Checklist
-
-Before a release:
-
-```bash
-node --version
-npm run typecheck
-npm test
-npm run build
-node packages/cli/dist/index.js scan .
-npm pack --dry-run
-```
-
-Checklist:
-
-- confirm `node --version` reports `v24.17.0`
-- confirm `scan` works on this repository
-- inspect `npm pack --dry-run` contents before publishing
-- follow npm publishing workflow setup in [docs/plan/16-npm-publishing.md](docs/plan/16-npm-publishing.md)
 
 ## Limitations
 
-V1 does not include:
+- No external HTTP link checking or link caching.
+- No runtime `.ts`/`.cjs`/`.mjs` config or user-code plugins (custom rules are data-only).
+- The context graph is rebuilt each run (no incremental cache yet).
 
-- external HTTP link checks
-- external link caching
-- runtime loading of `.ts` config files
-- watch mode
-- visualization UI
-- full `requiredSections` enforcement
+## Planning docs
 
-## Planning Docs
-
-- Product idea: [PLAN.md](PLAN.md)
-- Meta plan: [docs/plan/00-meta-plan.md](docs/plan/00-meta-plan.md)
-- Task breakdown: [docs/plan](docs/plan)
+The v2 roadmap and locked requirements live under [docs/mdlint_v2/](docs/mdlint_v2/index.md).

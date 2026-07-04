@@ -1,6 +1,6 @@
 # P3.03 · Section + structure rules (SEC-001/002/003, STR-001)
 
-> Phase: [P3 — Rules](index.md) · Roadmap: [v2 Index](../index.md) · Size **S→M** · Status **Not started**.
+> Phase: [P3 — Rules](index.md) · Roadmap: [v2 Index](../index.md) · Size **S→M** · Status **Done**.
 
 ## Goal
 

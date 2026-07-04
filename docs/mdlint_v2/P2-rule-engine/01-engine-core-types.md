@@ -1,7 +1,7 @@
 # P2.01 · Engine core types — `Rule` / `RuleContext` / `LintMessage` / `runRules`
 
 > Phase: [P2 — Rule engine & new config model](index.md) · Roadmap: [v2 Index](../index.md) ·
-> Size **M** · Status **Not started** · Design/types task.
+> Size **M** · Status **Done** · Design/types task.
 
 ## Goal
 
