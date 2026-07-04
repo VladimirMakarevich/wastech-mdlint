@@ -50,13 +50,31 @@ export function extractColumnIds(
 export type IdRef = { idPattern: string; definitions: string[]; idColumn: string };
 
 /**
- * Defined IDs of a document: the `idColumn` tokens in tables of files matching `definitions`.
- * Frozen signature for P4's id-ref edges (audit 2.1).
+ * Defined IDs of a document: the `idColumn` tokens in tables of files matching `definitions`,
+ * plus heading tokens matching `idPattern` (spec "+ headings" widening, audit 5.5) — same file-glob
+ * gate as the column side, so a heading only counts as a definition in a file the config declares
+ * as a definitions source. Frozen signature for P4's id-ref edges (audit 2.1).
  */
 export function extractDefinedIds(document: ParsedDocument, idRef: IdRef): IdOccurrence[] {
-  return extractColumnIds(document, {
+  const columnIds = extractColumnIds(document, {
     files: idRef.definitions,
     column: idRef.idColumn,
     idPattern: idRef.idPattern
   });
+
+  if (!matchesConfigGlob(document.path, idRef.definitions)) {
+    return columnIds;
+  }
+
+  const regex = compileRegex(idRef.idPattern);
+  const headingIds: IdOccurrence[] = [];
+  for (const heading of document.headings) {
+    for (const token of tokenize(heading.text)) {
+      if (regex.test(token)) {
+        headingIds.push({ id: token, filePath: document.path, line: heading.line });
+      }
+    }
+  }
+
+  return [...columnIds, ...headingIds];
 }

@@ -1,6 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+import { afterEach, describe, expect, it } from "vitest";
 
 import { buildContextGraph } from "../src/graph/build-context-graph.js";
+import { loadDocuments } from "../src/markdown/load-documents.js";
 import type { ParsedDocument } from "../src/markdown/document-types.js";
 import { parseDocument } from "../src/markdown/parse-document.js";
 
@@ -10,6 +15,25 @@ function docs(entries: Record<string, string>): Map<string, ParsedDocument> {
     map.set(filePath, parseDocument({ path: filePath, content }));
   }
   return map;
+}
+
+const tempDirs: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(tempDirs.splice(0).map((tempDir) => rm(tempDir, { recursive: true, force: true })));
+});
+
+async function createFixtureTree(files: Record<string, string>): Promise<string> {
+  const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-graph-"));
+  tempDirs.push(root);
+
+  for (const [relativePath, content] of Object.entries(files)) {
+    const absolutePath = path.join(root, relativePath);
+    await mkdir(path.dirname(absolutePath), { recursive: true });
+    await writeFile(absolutePath, content, "utf8");
+  }
+
+  return root;
 }
 
 describe("buildContextGraph · link vs anchor typing", () => {
@@ -25,6 +49,19 @@ describe("buildContextGraph · link vs anchor typing", () => {
       { from: "a.md", to: "b.md", type: "anchor", line: 1, text: "see B section", rawTarget: "b.md#sec" },
       { from: "a.md", to: "b.md", type: "link", line: 1, text: "see B", rawTarget: "b.md" }
     ]);
+  });
+});
+
+describe("buildContextGraph · anchor edges validate against the target's heading slugs", () => {
+  it("skips a cross-file fragment link when the target has no matching heading (no downgrade to link)", () => {
+    const graph = buildContextGraph(
+      docs({
+        "a.md": "[see B](b.md#missing)\n",
+        "b.md": "## Sec\n"
+      })
+    );
+
+    expect(graph.edges).toEqual([]);
   });
 });
 
@@ -138,6 +175,19 @@ describe("buildContextGraph · id-ref edges", () => {
 
     expect(buildContextGraph(documents, { idRef }).edges).toEqual([]);
   });
+
+  it("links a plain-text ID mention to a heading-defined source (no table column involved)", () => {
+    const documents = docs({
+      "reqs.md": "# REQ-001 tracking\n",
+      "design.md": "See REQ-001 for details.\n"
+    });
+
+    const graph = buildContextGraph(documents, { idRef });
+
+    expect(graph.edges).toEqual([
+      { from: "design.md", to: "reqs.md", type: "id-ref", line: 1, rawTarget: "REQ-001" }
+    ]);
+  });
 });
 
 describe("buildContextGraph · siteRouter resolution", () => {
@@ -159,5 +209,31 @@ describe("buildContextGraph · siteRouter resolution", () => {
         rawTarget: "/intro"
       }
     ]);
+  });
+});
+
+describe("buildContextGraph · node identity matches loadDocuments() output directly", () => {
+  it("derives nodes from document.path (not the input Map's keys) so every edge endpoint is a real node", async () => {
+    const root = await createFixtureTree({
+      "a.md": "[see B](b.md)\n",
+      "b.md": "# B\n"
+    });
+
+    // loadDocuments() keys its Map by absolute path (see load-documents.test.ts); feed it straight
+    // into buildContextGraph without the repo-relative re-keying every current caller happens to do.
+    const documents = await loadDocuments(["**/*.md"], { cwd: root });
+    const graph = buildContextGraph(documents);
+
+    const nodePaths = new Set(graph.nodes.map((node) => node.path));
+    expect([...nodePaths].sort()).toEqual(["a.md", "b.md"]);
+    for (const nodePath of nodePaths) {
+      expect(nodePath.startsWith("/")).toBe(false);
+      expect(nodePath.includes("\\")).toBe(false);
+    }
+    for (const edge of graph.edges) {
+      expect(nodePaths.has(edge.from)).toBe(true);
+      expect(nodePaths.has(edge.to)).toBe(true);
+    }
+    expect(graph.edges).toEqual([{ from: "a.md", to: "b.md", type: "link", line: 1, text: "see B", rawTarget: "b.md" }]);
   });
 });

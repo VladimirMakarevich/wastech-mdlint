@@ -65,11 +65,9 @@ function hasScheme(target: string): boolean {
 // table cell so a plain-text ID mention (no Markdown link) still yields a graph edge (G1).
 const PROSE_TOKEN_PATTERN = /[^\s,]+/g;
 
-// id-ref edges (G1): definitions are column-based via the frozen `extractDefinedIds` (unchanged —
-// audit 2.1); references are discovered by scanning each document's prose for tokens equal to a
-// defined ID whose definer is a *different* document. The spec's "(+ headings)" widening of
-// `extractDefinedIds` itself is P4.04 slice-index (G4) scope, not this edge pass — left untouched
-// here.
+// id-ref edges (G1): definitions come from `extractDefinedIds` (column + heading discovery, audit
+// 2.1/5.5); references are discovered by scanning each document's prose for tokens equal to a
+// defined ID whose definer is a *different* document.
 function buildIdRefEdges(
   documents: Map<string, ParsedDocument>,
   nodeSet: ReadonlySet<string>,
@@ -122,14 +120,21 @@ export function buildContextGraph(
   documents: Map<string, ParsedDocument>,
   options: BuildContextGraphOptions = {}
 ): ContextGraph {
-  const nodePaths = [...documents.keys()].sort((left, right) => left.localeCompare(right));
+  // Node identity is `document.path` (repo-relative POSIX), never the caller's Map key: loadDocuments()
+  // keys by absolute path and only some callers re-key before reaching here. Re-keying by `document.path`
+  // makes node identity == edge identity regardless of how the input Map was keyed.
+  const documentsByPath = new Map<string, ParsedDocument>();
+  for (const document of documents.values()) {
+    documentsByPath.set(document.path, document);
+  }
+  const nodePaths = [...documentsByPath.keys()].sort((left, right) => left.localeCompare(right));
   const nodeSet = new Set(nodePaths);
   const { siteRouter } = options;
 
   // One edge per source construct — no (from,to) dedup (task constraint; G7 collapses this later).
   const edges: ContextGraphEdge[] = [];
 
-  for (const document of documents.values()) {
+  for (const document of documentsByPath.values()) {
     for (const link of document.links) {
       if (link.kind !== "local-file") {
         continue;
@@ -138,10 +143,19 @@ export function buildContextGraph(
       if (target === undefined || target === document.path) {
         continue;
       }
+      const hasFragment = link.anchor !== undefined && link.anchor.length > 0;
+      if (hasFragment) {
+        // anchor = heading-slug match (AC): a fragment to a target file with no matching heading slug
+        // is skipped entirely, not downgraded to a plain `link` edge.
+        const targetDocument = documentsByPath.get(target)!;
+        if (!targetDocument.headings.some((heading) => heading.slug === link.anchor)) {
+          continue;
+        }
+      }
       edges.push({
         from: document.path,
         to: target,
-        type: link.anchor !== undefined && link.anchor.length > 0 ? "anchor" : "link",
+        type: hasFragment ? "anchor" : "link",
         line: link.line,
         text: link.text,
         rawTarget: link.rawTarget
@@ -177,7 +191,7 @@ export function buildContextGraph(
   }
 
   if (options.idRef !== undefined) {
-    edges.push(...buildIdRefEdges(documents, nodeSet, options.idRef));
+    edges.push(...buildIdRefEdges(documentsByPath, nodeSet, options.idRef));
   }
 
   // Deterministic ordering: from, then to, then type, then line so parallel edges between the same

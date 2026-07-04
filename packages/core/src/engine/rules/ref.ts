@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { matchesConfigGlob, normalizeRelativePath } from "../../discovery/globs.js";
 import type { ParsedDocument } from "../../markdown/document-types.js";
-import { extractColumnIds, type IdOccurrence } from "../defined-ids.js";
+import { extractColumnIds, extractDefinedIds, type IdOccurrence } from "../defined-ids.js";
 import { filePart, resolveRelativeToSource, sourceLocale } from "../path-resolve.js";
 import { imageResolves, linkResolves } from "../primitives/reference.js";
 import { regexStringSchema } from "../regex.js";
@@ -224,8 +224,9 @@ export const ref004: RuleDefinition = defineRule({
 });
 
 // REF-005 — ID traceability: every referenced ID has a definition (dangling ref = error) and every
-// defined ID is referenced (orphan def = warning). Column-based discovery (audit 5.5) via the shared
-// extractColumnIds helper.
+// defined ID is referenced (orphan def = warning). Definitions go through the shared
+// `extractDefinedIds` (column + heading discovery, audit 5.5) so this rule and the graph's id-ref
+// edges agree on what counts as a defined ID; references stay column-only via `extractColumnIds`.
 export const ref005: RuleDefinition = defineRule({
   metadata: {
     id: "REF-005",
@@ -248,10 +249,10 @@ export const ref005: RuleDefinition = defineRule({
     const references: IdOccurrence[] = [];
 
     for (const document of context.documents!.values()) {
-      for (const occurrence of extractColumnIds(document, {
-        files: options.definitions,
-        column: options.idColumn,
-        idPattern: options.idPattern
+      for (const occurrence of extractDefinedIds(document, {
+        idPattern: options.idPattern,
+        definitions: options.definitions,
+        idColumn: options.idColumn
       })) {
         if (!definitions.has(occurrence.id)) {
           definitions.set(occurrence.id, occurrence);

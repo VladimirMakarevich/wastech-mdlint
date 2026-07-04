@@ -57,12 +57,29 @@ precedence rule](../../../AGENTS.md):
   `ContextGraphEdge.{from,to}`. GRP-001/002, the CLI `graph` command, and every existing test read
   those field names, so this task extends them in place rather than renaming — a rename would be a
   purely cosmetic cascading change for zero functional gain.
-- **id-ref reference discovery is a prose token scan, not a second column.** Definitions are
-  column-based via the unchanged `extractDefinedIds` (audit 2.1), but `idRef` has no "references"
-  column to mirror it — id-ref edges instead come from scanning each document's raw text for
-  tokens equal to an ID defined *elsewhere*. This is the literal reading of G1's own example
-  ("`REQ-001` referenced in prose with no Markdown link") and keeps the definer side honest
-  without inventing config that doesn't exist yet.
+- **id-ref reference discovery is a prose token scan, not a second column.** Definitions come from
+  `extractDefinedIds` (column cells + heading tokens matching `idPattern` — audit 5.5's "+
+  headings" widening, applied post-review; see below), but `idRef` has no "references" column to
+  mirror it — id-ref edges instead come from scanning each document's raw text for tokens equal to
+  an ID defined *elsewhere*. This is the literal reading of G1's own example ("`REQ-001`
+  referenced in prose with no Markdown link") and keeps the definer side honest without inventing
+  config that doesn't exist yet.
+
+**Review fixes applied after initial implementation:**
+
+- **Anchor edges validate the target's heading slugs.** A `#fragment` link whose target file
+  resolves but whose fragment matches no heading slug in that target is now skipped entirely
+  (never emitted, never downgraded to a plain `link` edge) — the literal AC reading of "anchor =
+  heading-slug match." Reuses the same `heading.slug` comparison REF-002 already does.
+- **`extractDefinedIds` now includes heading tokens, not just `idColumn` cells.** The spec's
+  "(+ headings)" wording was initially left unimplemented with a deferred-to-P4.04 comment; on
+  review that deferral wasn't backed by a decision doc, and the task AC explicitly listed
+  headings as in-scope, so it was implemented here instead. REF-005's definition lookup and the
+  graph's id-ref edges both now go through the same widened helper.
+- **Node identity is derived from `document.path`, not the input `Map`'s keys.** `buildContextGraph`
+  re-keys its input by `document.path` internally before building nodes, so node identity always
+  matches edge endpoint identity regardless of how the caller keyed its documents map (e.g.
+  `loadDocuments()`'s absolute-path keys, fed in directly with no re-keying).
 
 `exclude`/`entryPoints` are accepted on `BuildContextGraphOptions` for forward compatibility but
 are not yet read by `buildContextGraph` — deriving them from config and using them for
