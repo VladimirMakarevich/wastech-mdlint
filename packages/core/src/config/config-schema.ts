@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { assertionSchema } from "../engine/primitives/assert.js";
+import { regexStringSchema } from "../engine/regex.js";
 
 // Zod root schema for the v2 config (P2.04). Replaces the legacy sectioned config (D2, greenfield).
 // `.strict()` throughout so unknown keys become C7 "unknown key" errors rather than silent no-ops.
@@ -15,7 +16,18 @@ const siteRouterSchema = z
   })
   .strict();
 
-const settingsSchema = z.object({ siteRouter: siteRouterSchema.optional() }).strict();
+// Mirrors REF-005's `idRef` rule-options shape (audit 2.1) so the same ID definition can also feed
+// the shared graph's id-ref edges (P4.06) without the orchestrator reaching into a resolved rule's
+// opaque options.
+const idRefSchema = z
+  .object({
+    idPattern: regexStringSchema,
+    definitions: z.array(z.string()).min(1),
+    idColumn: z.string().min(1)
+  })
+  .strict();
+
+const settingsSchema = z.object({ siteRouter: siteRouterSchema.optional(), idRef: idRefSchema.optional() }).strict();
 
 // A standard rule entry (built-in rules). Options are validated per-rule by resolveRule (two-stage).
 export const ruleEntrySchema = z

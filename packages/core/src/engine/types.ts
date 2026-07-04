@@ -10,6 +10,7 @@
 
 import type { ContextGraph } from "../graph/context-graph-types.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
+import type { IdRef } from "./defined-ids.js";
 
 // Resolved, runnable severities. `"off"` is a config-time value only (see SeverityOverride).
 export type Severity = "error" | "warning";
@@ -39,8 +40,12 @@ export type SiteRouterSettings = {
   defaultLocale?: string;
 };
 
+// idRef feeds the shared ContextGraph's id-ref edges (P4.06), mirroring how REF-005 already accepts
+// the same shape as rule options — a shared setting so the orchestrator (which cannot read a
+// resolved rule's opaque options back out) can wire it into `buildContextGraph` too.
 export type ResolvedSettings = {
   siteRouter?: SiteRouterSettings;
+  idRef?: IdRef;
 };
 
 // Offset-based edit over a document's raw `content` (half-open [start, end)). Offsets are

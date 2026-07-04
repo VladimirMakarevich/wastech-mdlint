@@ -40,6 +40,8 @@ export type {
   ContextGraphNode
 } from "./graph/context-graph-types.js";
 export { buildContextGraph } from "./graph/build-context-graph.js";
+export { computeGraphCoverage } from "./graph/coverage.js";
+export type { ComputeGraphCoverageOptions, GraphCoverage } from "./graph/coverage.js";
 export { formatContextGraphSummary, getComponents, topologicalSort } from "./graph/graph-algorithms.js";
 export type { TopologicalSortResult } from "./graph/graph-algorithms.js";
 export { impact, query, slice } from "./graph/query.js";

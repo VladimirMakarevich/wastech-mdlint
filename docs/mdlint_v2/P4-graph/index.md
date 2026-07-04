@@ -49,7 +49,7 @@ this graph. See the [context-graph requirements](../requirements/03-context-grap
 ## Phase exit criteria
 
 - [x] `ContextGraph` has typed edges (`link|image|anchor|id-ref|import`) with `line`/`text` (P4.01).
-- [ ] One query layer powers `slice` and `impact`; GRP rules use the same graph (R5).
+- [x] One query layer powers `slice` and `impact`; GRP rules use the same graph (R5).
 - [ ] `slice` resolves a real ID/anchor/heading/path index (G4); semantics honest in `--help`.
 - [ ] `impact` reports direct/transitive (+`via`) and lints the affected subgraph.
 - [ ] Explicit cycle list (G6) and coverage signal (G5) surfaced.

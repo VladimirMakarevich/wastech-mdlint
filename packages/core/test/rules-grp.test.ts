@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { ConfiguredRule } from "../src/config/load-config.js";
 import { lintFiles } from "../src/engine/lint-files.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
+import type { ResolvedSettings } from "../src/engine/types.js";
 
 const tempDirs: string[] = [];
 
@@ -27,8 +28,8 @@ function rule(id: string, options?: unknown): ConfiguredRule {
   return { rule: ruleRegistry.resolveRule(id, options) };
 }
 
-async function lint(cwd: string, rules: ConfiguredRule[]) {
-  return lintFiles({ cwd, config: { rules: [] }, rules, settings: {} });
+async function lint(cwd: string, rules: ConfiguredRule[], settings: ResolvedSettings = {}) {
+  return lintFiles({ cwd, config: { rules: [] }, rules, settings });
 }
 
 describe("GRP-001 cycles (reads the injected graph)", () => {
@@ -48,6 +49,34 @@ describe("GRP-001 cycles (reads the injected graph)", () => {
     const cwd = await fixtureRepo({ "a.md": "[b](b.md)\n", "b.md": "# B\n" });
     expect((await lint(cwd, [rule("GRP-001")])).messages).toEqual([]);
   });
+
+  it("detects a cycle formed purely by @import edges (no links)", async () => {
+    const cwd = await fixtureRepo({ "a.md": "@b.md\n", "b.md": "@a.md\n" });
+    const result = await lint(cwd, [rule("GRP-001")]);
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.data).toMatchObject({ cycle: ["a.md", "b.md", "a.md"] });
+  });
+
+  it("detects a cycle formed purely by id-ref edges when settings.idRef is configured", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "| ID |\n| --- |\n| REQ-1 |\n\nSee REQ-2 for context.\n",
+      "b.md": "| ID |\n| --- |\n| REQ-2 |\n\nSee REQ-1 for context.\n"
+    });
+    const settings: ResolvedSettings = {
+      idRef: { idPattern: "^REQ-\\d+$", definitions: ["a.md", "b.md"], idColumn: "ID" }
+    };
+    const result = await lint(cwd, [rule("GRP-001")], settings);
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.data).toMatchObject({ cycle: ["a.md", "b.md", "a.md"] });
+  });
+
+  it("builds no id-ref edges (so reports no cycle) when settings.idRef is absent", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "| ID |\n| --- |\n| REQ-1 |\n\nSee REQ-2 for context.\n",
+      "b.md": "| ID |\n| --- |\n| REQ-2 |\n\nSee REQ-1 for context.\n"
+    });
+    expect((await lint(cwd, [rule("GRP-001")])).messages).toEqual([]);
+  });
 });
 
 describe("GRP-002 orphans", () => {
@@ -59,6 +88,16 @@ describe("GRP-002 orphans", () => {
     });
     const result = await lint(cwd, [rule("GRP-002", { entryPoints: ["index.md"] })]);
     expect(result.messages.map((message) => message.filePath)).toEqual(["orphan.md"]);
+  });
+
+  it("counts an anchor edge as an incoming reference, not just a plain link", async () => {
+    const cwd = await fixtureRepo({
+      "index.md": "[a](a.md)\n",
+      "a.md": "[see detail](detail.md#detail-heading)\n",
+      "detail.md": "## Detail Heading\n"
+    });
+    const result = await lint(cwd, [rule("GRP-002", { entryPoints: ["index.md"] })]);
+    expect(result.messages).toEqual([]);
   });
 });
 

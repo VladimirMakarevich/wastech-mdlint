@@ -106,6 +106,11 @@ Configuration is JSONC (comments + trailing commas) in `wastech-mdlint.config.js
   but disables a rule. Rule IDs are case-insensitive and dash-optional (`ref-001` →
   `REF-001`).
 - `settings.siteRouter` is inherited by reference rules and may be overridden per rule.
+- `settings.idRef` (`{ idPattern, definitions, idColumn }`) feeds the shared context graph's
+  `id-ref` edges, so ID references also count toward `GRP-001` cycles and `GRP-002` incoming
+  references. It mirrors REF-005's own options shape but is configured separately — REF-005
+  cannot expose its resolved options back to the graph builder, so a project that wants both ID
+  traceability (REF-005) and ID-aware graph analysis configures the same shape in both places.
 - The `custom` rule composes the closed assertion vocabulary
   (`requiredColumns`, `columnNotEmpty`, `columnInSet`, `columnMatches`, `columnUnique`,
   `crossColumn`, `sectionPresent`, `sectionOrder`, `contentNotMatch`, `noPlaceholders`,

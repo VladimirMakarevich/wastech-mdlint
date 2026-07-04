@@ -143,6 +143,16 @@ export function generateConfigSchema(opts?: { customRules?: readonly CustomRuleD
               contentDir: { type: "string" },
               defaultLocale: { type: "string" }
             }
+          },
+          idRef: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              idPattern: { type: "string" },
+              definitions: { type: "array", items: { type: "string" }, minItems: 1 },
+              idColumn: { type: "string" }
+            },
+            required: ["idPattern", "definitions", "idColumn"]
           }
         }
       },
