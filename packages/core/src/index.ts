@@ -44,6 +44,8 @@ export { formatContextGraphSummary, getComponents, topologicalSort } from "./gra
 export type { TopologicalSortResult } from "./graph/graph-algorithms.js";
 export { impact, query, slice } from "./graph/query.js";
 export type { QueryDirection, QueryOptions, QueryResult, QueryVisit } from "./graph/query.js";
+export { buildSearchIndex, getContextSlice, resolveQuery, SLICE_RESOLUTION_DESCRIPTION } from "./graph/search-index.js";
+export type { ContextSearchIndex, ContextSliceResult, SliceMatchKind } from "./graph/search-index.js";
 
 // Engine (P2)
 export type {
