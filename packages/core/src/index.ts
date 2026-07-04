@@ -46,6 +46,8 @@ export { impact, query, slice } from "./graph/query.js";
 export type { QueryDirection, QueryOptions, QueryResult, QueryVisit } from "./graph/query.js";
 export { buildSearchIndex, getContextSlice, resolveQuery, SLICE_RESOLUTION_DESCRIPTION } from "./graph/search-index.js";
 export type { ContextSearchIndex, ContextSliceResult, SliceMatchKind } from "./graph/search-index.js";
+export { classifyImpact, getImpactSet, ImpactAnalysisError, relativizeImpact } from "./graph/impact-analysis.js";
+export type { DirectlyAffected, ImpactClassification, TransitivelyAffected } from "./graph/impact-analysis.js";
 
 // Engine (P2)
 export type {
