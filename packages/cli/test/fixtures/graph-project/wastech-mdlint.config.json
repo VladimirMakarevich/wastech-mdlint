@@ -1,0 +1,10 @@
+{
+  "exclude": ["appendix.md"],
+  "settings": {
+    "idRef": { "idPattern": "^REQ-\\d+$", "definitions": ["requirements.md"], "idColumn": "ID" }
+  },
+  "rules": [
+    { "rule": "GRP-001" },
+    { "rule": "GRP-002", "options": { "entryPoints": ["index.md"] } }
+  ]
+}

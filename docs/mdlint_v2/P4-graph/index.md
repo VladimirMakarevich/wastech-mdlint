@@ -1,6 +1,6 @@
 # Phase P4 — ContextGraph + graph / slice / impact
 
-> Roadmap: [v2 Index](../index.md) · Phase **P4** · Size **M** · Status **In progress** ·
+> Roadmap: [v2 Index](../index.md) · Phase **P4** · Size **M** · Status **Done** ·
 > Reuse from current implementation: **High**.
 >
 > **Goal:** make the document graph a first-class primitive with **semantic edges**, a
