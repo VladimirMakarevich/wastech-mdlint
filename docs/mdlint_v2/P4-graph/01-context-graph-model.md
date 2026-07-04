@@ -1,6 +1,6 @@
 # P4.01 · `ContextGraph` model + `buildContextGraph` (semantic edges)
 
-> Phase: [P4 — Graph](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
+> Phase: [P4 — Graph](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Done**.
 
 ## Goal
 
@@ -46,11 +46,37 @@ the current implementation graph builder.
 - [G1](../requirements/03-context-graph.md), [G3](../requirements/03-context-graph.md),
   [R5](../requirements/02-rules-engine.md) routing/exclude inputs.
 
+## Implementation notes
+
+Two spec-vs-code contradictions surfaced during implementation; both were resolved toward the
+existing frozen contract rather than the (predates-P2.01) spec wording, per the [AGENTS.md
+precedence rule](../../../AGENTS.md):
+
+- **Read shape stays frozen.** `GraphNode { filePath }` / `GraphEdge { source, target }` above is
+  the original spec wording; the actual (P2.01-frozen) types are `ContextGraphNode.path` and
+  `ContextGraphEdge.{from,to}`. GRP-001/002, the CLI `graph` command, and every existing test read
+  those field names, so this task extends them in place rather than renaming — a rename would be a
+  purely cosmetic cascading change for zero functional gain.
+- **id-ref reference discovery is a prose token scan, not a second column.** Definitions are
+  column-based via the unchanged `extractDefinedIds` (audit 2.1), but `idRef` has no "references"
+  column to mirror it — id-ref edges instead come from scanning each document's raw text for
+  tokens equal to an ID defined *elsewhere*. This is the literal reading of G1's own example
+  ("`REQ-001` referenced in prose with no Markdown link") and keeps the definer side honest
+  without inventing config that doesn't exist yet.
+
+`exclude`/`entryPoints` are accepted on `BuildContextGraphOptions` for forward compatibility but
+are not yet read by `buildContextGraph` — deriving them from config and using them for
+coverage/orphan reasoning is [P4.06](06-grp-refactor-coverage.md) scope, not this task. Only
+`siteRouter` is wired through today, from `lintFiles` and the CLI `graph` command, so link/anchor/
+image/import edges already resolve root-relative targets identically to REF-001/002 on router
+repos.
+
 ## Exit criteria
 
-- [ ] Edges carry type + line (+ text); anchor/import/id-ref edges materialized.
-- [ ] `buildContextGraph` accepts exclude/entryPoints/siteRouter.
-- [ ] Deterministic node/edge ordering.
+- [x] Edges carry type + line (+ text); anchor/import/id-ref edges materialized.
+- [x] `buildContextGraph` accepts exclude/entryPoints/siteRouter (typed options; exclude/
+      entryPoints are not yet consumed — see Implementation notes).
+- [x] Deterministic node/edge ordering.
 
 ## Hand-off to next
 

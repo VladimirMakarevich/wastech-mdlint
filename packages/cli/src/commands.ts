@@ -114,7 +114,7 @@ async function handleGraph(command: GraphCommand): Promise<CommandExecutionResul
   for (const document of documents.values()) {
     byRelPath.set(document.path, document);
   }
-  const graph = buildContextGraph(byRelPath);
+  const graph = buildContextGraph(byRelPath, { siteRouter: loaded.settings.siteRouter });
 
   const outputPath = path.resolve(command.out);
   const outputStats = await stat(outputPath).catch((error: unknown) => {

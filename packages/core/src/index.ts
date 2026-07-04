@@ -33,6 +33,7 @@ export {
 
 // Graph
 export type {
+  BuildContextGraphOptions,
   ContextGraph,
   ContextGraphEdge,
   ContextGraphEdgeType,
