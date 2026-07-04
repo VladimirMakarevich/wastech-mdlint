@@ -81,9 +81,11 @@ export async function lintFiles(input: LintFilesInput): Promise<LintResult> {
   const documentRules = resolved.filter((entry) => entry.rule.scope === "document");
   const projectRules = resolved.filter((entry) => entry.rule.scope === "project");
 
-  // Build + inject one shared ContextGraph (R5 / audit 2.2). P3 uses the relocated legacy builder;
-  // P4.06 swaps in the semantic builder here. Callers may pass a graph to override (e.g. tests).
-  const graph = input.graph ?? buildContextGraph(documents);
+  // Build + inject one shared ContextGraph (R5 / audit 2.2). P4.01 wires the semantic builder here
+  // with siteRouter so graph edges resolve root-relative links identically to the REF rules; the
+  // remaining options (idRef/exclude/entryPoints) are P4.06 config-derivation scope. Callers may
+  // pass a graph to override (e.g. tests).
+  const graph = input.graph ?? buildContextGraph(documents, { siteRouter: input.settings.siteRouter });
 
   const sharedContext: Omit<RuleContext, "report" | "document" | "filePath"> = {
     documents,
