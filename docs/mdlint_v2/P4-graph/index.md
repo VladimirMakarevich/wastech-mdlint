@@ -50,10 +50,10 @@ this graph. See the [context-graph requirements](../requirements/03-context-grap
 
 - [x] `ContextGraph` has typed edges (`link|image|anchor|id-ref|import`) with `line`/`text` (P4.01).
 - [x] One query layer powers `slice` and `impact`; GRP rules use the same graph (R5).
-- [ ] `slice` resolves a real ID/anchor/heading/path index (G4); semantics honest in `--help`.
-- [ ] `impact` reports direct/transitive (+`via`) and lints the affected subgraph.
-- [ ] Explicit cycle list (G6) and coverage signal (G5) surfaced.
-- [ ] `graph` exports JSON + Mermaid/DOT (G9).
+- [x] `slice` resolves a real ID/anchor/heading/path index (G4); semantics honest in `--help`.
+- [x] `impact` reports direct/transitive (+`via`) and lints the affected subgraph.
+- [x] Explicit cycle list (G6) and coverage signal (G5) surfaced.
+- [x] `graph` exports JSON + Mermaid/DOT (G9).
 
 ## What P4 unblocks
 

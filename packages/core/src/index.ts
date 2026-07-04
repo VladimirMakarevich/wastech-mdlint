@@ -50,6 +50,17 @@ export { buildSearchIndex, getContextSlice, resolveQuery, SLICE_RESOLUTION_DESCR
 export type { ContextSearchIndex, ContextSliceResult, SliceMatchKind } from "./graph/search-index.js";
 export { classifyImpact, getImpactSet, ImpactAnalysisError, relativizeImpact } from "./graph/impact-analysis.js";
 export type { DirectlyAffected, ImpactClassification, TransitivelyAffected } from "./graph/impact-analysis.js";
+export { loadContext } from "./graph/load-context.js";
+export type { GraphContext } from "./graph/load-context.js";
+export {
+  renderContextGraphDot,
+  renderContextGraphMermaid,
+  renderContextGraphText,
+  renderContextSliceSummary,
+  renderImpactSummary,
+  summarizeContextGraph
+} from "./graph/graph-render.js";
+export type { ContextGraphSummary } from "./graph/graph-render.js";
 
 // Engine (P2)
 export type {
