@@ -35,7 +35,7 @@ async function run(argv: string[], cwd: string) {
 }
 
 describe("graph command over the fixture corpus", () => {
-  it("summarizes nodes/edges/components/readingOrder as JSON", async () => {
+  it("summarizes nodes/edges/components/readingOrder + coverage as JSON", async () => {
     const result = await run(["graph", FIXTURE_ROOT, "--format", "json"], FIXTURE_ROOT);
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
 
@@ -44,6 +44,7 @@ describe("graph command over the fixture corpus", () => {
       edges: { from: string; to: string; type: string }[];
       components: string[][];
       readingOrder: string[];
+      coverage: { nodeCount: number; edgeCount: number; filesOutsideCorpus: string[] };
     };
 
     expect(payload.nodes.map((node) => node.path)).toEqual([
@@ -76,6 +77,12 @@ describe("graph command over the fixture corpus", () => {
     expect(payload.readingOrder).not.toContain("cycle-a.md");
     expect(payload.readingOrder).not.toContain("cycle-b.md");
     expect(payload.readingOrder).toHaveLength(payload.nodes.length - 2);
+
+    // audit B: the G5 coverage signal now reaches JSON consumers, not just human output. appendix.md
+    // is linked-to but outside `include`, exactly the "silently incomplete graph" case G5 exists for.
+    expect(payload.coverage.filesOutsideCorpus).toEqual(["appendix.md"]);
+    expect(payload.coverage.nodeCount).toBe(payload.nodes.length);
+    expect(payload.coverage.edgeCount).toBe(payload.edges.length);
   });
 
   it("defaults to human format with hubs, clusters, reading order, and the coverage signal", async () => {
@@ -167,6 +174,18 @@ describe("impact command over the fixture corpus", () => {
     expect(payload.lint.files).toEqual(["design.md", "guide.md", "index.md", "requirements.md"]);
     expect(payload.lint.messages.some((message) => message.filePath === "cycle-a.md")).toBe(false);
     expect(payload.lint.messages.some((message) => message.filePath === "orphan.md")).toBe(false);
+  });
+
+  it("includes cycle-excluded nodes in the JSON payload for parity with human output (audit C)", async () => {
+    // cycle-b.md's affected subgraph is exactly the cycle-a.md ↔ cycle-b.md 2-cycle, so topo-sort
+    // emits nothing and both nodes land in `excluded` — the field a JSON consumer needs to explain
+    // why readingOrder is empty despite affected files existing.
+    const result = await run(["impact", "cycle-b.md", "--format", "json"], FIXTURE_ROOT);
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const payload = JSON.parse(result.stdout) as { readingOrder: string[]; excluded: string[] };
+    expect(payload.readingOrder).toEqual([]);
+    expect(payload.excluded).toEqual(["cycle-a.md", "cycle-b.md"]);
   });
 });
 

@@ -50,6 +50,24 @@ describe("summarizeContextGraph", () => {
       "b.md->a.md@1"
     ]);
   });
+
+  it("includes the G5 coverage signal when one is supplied, and omits it otherwise (audit B)", () => {
+    const graph = graphOf({ "a.md": "# A\n" });
+    // No links/images/imports, so coverage never touches disk — rootDir is required but unused here.
+    const coverage = computeGraphCoverage(
+      new Map([["a.md", parseDocument({ path: "a.md", content: "# A\n" })]]),
+      graph,
+      { rootDir: "/repo" }
+    );
+
+    expect(summarizeContextGraph(graph, coverage).coverage).toEqual({
+      nodeCount: 1,
+      edgeCount: 0,
+      filesOutsideCorpus: []
+    });
+    // Bare-graph callers (e.g. an MCP field with no disk access) still get the old shape.
+    expect(summarizeContextGraph(graph)).not.toHaveProperty("coverage");
+  });
 });
 
 describe("renderContextGraphText", () => {

@@ -77,8 +77,10 @@ so GRP rules run on real anchor/id-ref/import edges + explicit cycle data, and a
 ## Exit criteria
 
 - [x] GRP-001/002 produce identical (or better) results on the semantic graph with no
-      rule-code change; the only graph traversal lives in `ContextGraph` (no parallel adjacency
-      anywhere).
+      rule-code change; the rules and hosts build no parallel adjacency — they read the one shared
+      `ContextGraph`. (Core itself keeps a few internal deduped-adjacency views for topo-sort/SCC/
+      query — `buildAdjacency`, `buildDedupedViews`, `detectCycles`; those are expected per-algorithm
+      structures, not a parallel graph. See [P4.02](02-graph-algorithms.md)/[P4.03](03-query-layer.md).)
 - [x] Coverage signal emitted on incomplete `include`.
 
 ## Hand-off to next

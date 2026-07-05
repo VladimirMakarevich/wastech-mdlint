@@ -39,7 +39,21 @@ function hasScheme(target: string): boolean {
 // Token run used to scan document prose for id-ref occurrences (Decision 2): the same
 // `[\s,]+`-splitting model as `defined-ids.ts`'s column tokenizer, applied to free text instead of a
 // table cell so a plain-text ID mention (no Markdown link) still yields a graph edge (G1).
+//
+// KNOWN LIMITATION (v2, audit finding A): this scans `document.content` — the *raw* file text — not
+// prose-only AST nodes. `ParsedDocument` exposes no per-node text spans, and adding them is a P1
+// parser change outside this phase, so an ID that appears only inside a fenced code block, inline
+// code, or frontmatter still produces a real id-ref edge. Accepted as "honest simple" v2 behavior
+// (a snippet that names REQ-1 arguably does reference it) and pinned by test so the false positive
+// stays intentional rather than drifting silently. Revisit if code-block noise proves costly.
 const PROSE_TOKEN_PATTERN = /[^\s,]+/g;
+
+// A prose mention routinely carries adjacent sentence punctuation a table cell never does:
+// "Blocks REQ-1.", "see REQ-1)", "(REQ-1". Trim leading/trailing non-alphanumerics before matching
+// so those still resolve (audit finding H). Only the boundaries are cleaned — a real ID's internal
+// hyphen and digits survive — which makes this deliberately looser than `defined-ids.ts`'s column
+// tokenizer, justified because free text (not a cell) is where trailing punctuation actually occurs.
+const PROSE_TOKEN_TRIM_PATTERN = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
 
 // id-ref edges (G1): definitions come from `extractDefinedIds` (column + heading discovery, audit
 // 2.1/5.5); references are discovered by scanning each document's prose for tokens equal to a
@@ -69,7 +83,9 @@ function buildIdRefEdges(
 
   for (const document of documents.values()) {
     for (const match of document.content.matchAll(PROSE_TOKEN_PATTERN)) {
-      const token = match[0];
+      // Trim boundary punctuation (finding H) so "REQ-1." / "(REQ-1)" still match. The trimmed value
+      // is also what we store as `rawTarget` — a clean ID reads better downstream than "REQ-1)".
+      const token = match[0].replace(PROSE_TOKEN_TRIM_PATTERN, "");
       if (!idPattern.test(token)) {
         continue;
       }
@@ -147,6 +163,11 @@ export function buildContextGraph(
       if (target === undefined || target === document.path) {
         continue;
       }
+      // Image edges deliberately carry no `text` (audit finding E): G3 scopes the label to
+      // link/anchor edges, and the natural image label (alt text) is not part of the P1
+      // `ParsedImage` contract. Carrying it would be an additive parser-contract change for a
+      // marginal explainability gain that no P4 task requires — revisit if MCP/`--fix` output ever
+      // needs per-image labels.
       edges.push({ from: document.path, to: target, type: "image", line: image.line, rawTarget: image.rawTarget });
     }
 
