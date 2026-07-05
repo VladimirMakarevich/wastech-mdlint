@@ -19,7 +19,10 @@ Verify `init` produces a valid, lint-clean config across repo shapes, interactiv
    monorepo; plus a repo with an existing config.
 2. Test `--yes` non-interactive output (deterministic config); assert canonical IDs +
    local `$schema` + no remote URL.
-3. Assert the generated config **lints cleanly** (`lint` exit 0) on a fresh fixture.
+3. Assert the generated config **loads without a `ConfigError`** (structurally valid, canonical
+   IDs, local `$schema`); and on a **clean** fixture (content with no violations) that `lint`
+   exits 0. Do not assert exit 0 on arbitrary content — a real ruleset can report findings by
+   design.
 4. Test package-manager detection and existing-config handling (overwrite/merge/skip).
 
 ## Decisions applied

@@ -6,6 +6,12 @@
 
 Expose `compileContext` over MCP, returning the generated skill content + a metadata block.
 
+> **Blocked on P5.** `compileContext`, `CompileResult`, and `CompileConfigMissingError` do not
+> exist until P5 lands (today `config.compile` is `z.unknown()`). The symbol names below are the
+> P5 plan of record — confirm them against `packages/core/src/index.ts` before implementing. This
+> is the only one of the six tools that needs P5; if P5 slips, ship [P7.02](02-lint-tools.md) /
+> [P7.03](03-graph-tools.md) first.
+
 ## Sequence
 
 - **Previous:** [P7.01 — Server foundation](01-server-foundation.md) + the compiler

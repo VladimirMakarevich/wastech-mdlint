@@ -11,11 +11,15 @@ config before writing.
 
 - **Previous:** [P6.02 — Rule inference](02-rule-inference.md) (draft rule set + rationale).
 - **Next:** [P6.04 — Config writer](04-config-writer-schema.md).
-- **Depends on:** P6.02 + `@inquirer/prompts` (P0.05) · **Blocks:** P6.04.
+- **Depends on:** P6.02. **This task adds `@inquirer/prompts`** to `@wastech-mdlint/cli` —
+  [P0.05](../P0-foundations/05-cli-package-commander.md) only *reserved* it for P6 and never
+  installed it (the CLI currently depends on `commander` alone), so add the dependency here.
+  · **Blocks:** P6.04.
 
 ## Deliverables / steps
 
-1. Prompts (via `@inquirer/prompts`, [D5](../index.md)): language, include patterns
+1. Prompts (via `@inquirer/prompts` — add it to the `cli` package here, [D5](../index.md)):
+   language, include patterns
    (pre-filled from clusters), rule categories (pre-checked from inference), and confirmation
    of the draft with per-rule rationale.
 2. `--yes` non-interactive mode: accept the inferred draft without prompts (for CI / the

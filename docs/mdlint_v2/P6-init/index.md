@@ -18,6 +18,15 @@ Actions/README on top. `init` also wires the **local schema** ([I3](../requireme
 and replaces the removed `postinstall` ([I1](../requirements/06-installation.md), done in
 [P0.02](../P0-foundations/02-root-scaffolding.md)).
 
+## Package placement (core-hosts-the-pipeline)
+
+The deterministic computation — repo scan (P6.01), rule inference (P6.02), and config-text
+generation (P6.04) — lives in **`@wastech-mdlint/core`** as pure, unit-tested functions the P8
+`-init` skill can also reuse. The CLI `init` command is the thin host boundary: it runs the
+`@inquirer/prompts` flow, dispatches, and performs the actual file write. This keeps `init` off a
+parallel pipeline (the [core-hosts-the-pipeline](../decisions/core-hosts-the-pipeline.md)
+invariant) and lets tests exercise inference without a TTY.
+
 ## Tasks
 
 | # | Task | Size | Depends on |
@@ -50,7 +59,9 @@ and replaces the removed `postinstall` ([I1](../requirements/06-installation.md)
 - [ ] Interactive flow (language, include, categories) + non-interactive `--yes`; Ctrl+C exits 0.
 - [ ] Writes a valid `wastech-mdlint.config.json` (canonical IDs, optional rationale
       comments) with a **local** `$schema`; generates a project schema when custom rules exist.
-- [ ] The produced config lints cleanly on a fresh repo.
+- [ ] The produced config is structurally valid and loads without a `ConfigError` (canonical IDs,
+      local `$schema`). On a **clean** fixture (no violations) `lint` exits 0; a real inferred
+      ruleset may legitimately surface findings on non-clean content — that is not a failure.
 
 ## What P6 unblocks
 

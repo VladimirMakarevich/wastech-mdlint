@@ -16,12 +16,21 @@ metadata source** — not raw config JSON.
 
 ## Deliverables / steps
 
-1. `describeRules(config.rules)` → grouped descriptions by category (Table Structure, Section
-   Order, Project Structure, References, Checklist, Content Quality, Graph Integrity, LLM).
-2. Pull text/category from the metadata source ([R6](../requirements/02-rules-engine.md)) — one
-   source feeds README, schema, and this.
-3. Describe **custom rules** ([R9](../requirements/02-rules-engine.md)) too (target + assertion
-   summary), so compiled skills reflect project-specific rules.
+1. `describeRules(configuredRules, registry)` → descriptions grouped by the real
+   `RuleMetadata.category` codes. There are **8** built-in category codes
+   (`engine/types.ts` — `TBL | SEC | STR | REF | CTX | GRP | SIZE | LLM`), plus `custom`; the
+   grouping key is the category code, and any human-friendly labels must be a **total** map over
+   all 8 (e.g. Table Structure `TBL`, Sections `SEC`, Project Structure `STR`, References `REF`,
+   Content/Context `CTX`, Graph Integrity `GRP`, Size `SIZE`, LLM `LLM`). Note: there is **no
+   `CHK` category** — checklist completeness is `CTX-002`, so "Checklist" and "Content Quality"
+   are the same `CTX` group (3 rules), and `SIZE` (SIZE-001) must not be dropped.
+2. Resolve enabled built-ins from `config.rules`, but pull their text/category from
+   `ruleRegistry.getAllMetadata()` ([R6](../requirements/02-rules-engine.md)) — the **same**
+   source `generateRuleDocs` (the README rule table, `engine/rule-docs.ts`) already consumes.
+   Reuse that metadata read; do not fork a parallel one.
+3. Describe **custom rules** ([R9](../requirements/02-rules-engine.md)) too — derive each from its
+   `custom` config entry (`description` / `target` / `assert` summary), so compiled skills reflect
+   project-specific rules.
 
 ## Decisions applied
 

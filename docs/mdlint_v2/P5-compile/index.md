@@ -22,7 +22,7 @@ requirements](../requirements/04-skills-compile.md).
 | --- | --- | --- | --- |
 | [P5.01](01-graph-analysis.md) | `classifyNodes` + `analyzeGraph` (roles, reading order) | S | P4 done |
 | [P5.02](02-doc-profile.md) | `extractDocProfile` (outline, table schemas, refs in/out) | M | P5.01 |
-| [P5.03](03-describe-rules.md) | `describeRules` from the metadata source (incl. custom) | S | P5.01 |
+| [P5.03](03-describe-rules.md) | `describeRules` from the metadata source (incl. custom) | S | P2.03 (rule metadata) |
 | [P5.04](04-synthesize.md) | `synthesize` → `CompileResult` (host-neutral, deterministic, budget) | M | P5.02, P5.03 |
 | [P5.05](05-compile-config-cli.md) | `compile` config section + CLI `compile` command | M | P5.04 |
 | [P5.06](06-compile-tests.md) | Compile tests & fixtures | M | all above |

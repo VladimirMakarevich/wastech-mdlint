@@ -25,7 +25,7 @@ docs ([M3](../requirements/05-mcp-server.md)), stdio integration tests
 
 | # | Task | Tools | Depends on |
 | --- | --- | --- | --- |
-| [P7.01](01-server-foundation.md) | Server foundation: modular layout, shared helper, conventions | — | P2/P4/P5 done |
+| [P7.01](01-server-foundation.md) | Server foundation: modular layout, shared helper, conventions | — | P2/P4 done (P5 → P7.04 only) |
 | [P7.02](02-lint-tools.md) | `lint`, `lint-files` | 2 | P7.01 |
 | [P7.03](03-graph-tools.md) | `context-graph`, `context-slice`, `impact-analysis` | 3 | P7.01 |
 | [P7.04](04-compile-tool.md) | `compile-context` | 1 | P7.01 |

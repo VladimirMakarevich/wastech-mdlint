@@ -47,8 +47,11 @@ is needed
 - [ ] Each package has correct bins/exports/`files`/`engines`/`publishConfig` + provenance (I5).
 - [ ] One `vX.Y.Z` tag publishes core+cli+mcp and tags the skills together (I4); skill
       `compatibility` matches the CLI version (I7).
-- [ ] A reusable GitHub Action is published; CI runs the full workspace matrix on Node 24 (I6).
-- [ ] README documents the three install paths; rule table + MCP tool list are generated.
+- [ ] A reusable GitHub Action is published on top of the existing `ci.yml`/`publish.yml`
+      baseline; CI runs the full workspace gate on the pinned Node 24 line (single version via
+      `.node-version`; the `pack` job matrixes the three packages) (I6).
+- [ ] README documents the three install paths; the rule table is generated (already) and a new
+      generated MCP tool list is added.
 - [ ] `npm pack --dry-run` clean per package; end-to-end smoke (CLI + MCP + skill) passes.
 - [ ] **Milestone M4 (launch) reached.**
 

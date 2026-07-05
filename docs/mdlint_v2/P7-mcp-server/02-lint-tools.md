@@ -14,11 +14,16 @@ Expose ad-hoc text lint and project file lint as MCP tools over core.
 
 ## Deliverables / steps
 
-1. `lint` — input `{ content, rules }`: `resolveRule` → `parseDocument` → `runRules` →
-   structured findings + text summary. No filesystem/config needed.
-2. `lint-files` — input `{ patterns?, configPath?, cwd? }`: `findConfig`/`loadConfig` →
-   `lintFiles` → structured per-file results + text summary. Empty/absent `patterns` falls
-   back to `config.include ?? ["**/*.md"]`.
+1. `lint` — input `{ content, rules }`: resolve requested rule ids via
+   `ruleRegistry.resolveRule(name, options)` (a `RuleRegistry` method, not a barrel function) →
+   `parseDocument(content)` → `runRules(...)` → structured findings + text summary. No
+   filesystem/config needed.
+2. `lint-files` — input `{ patterns?, configPath?, cwd? }`:
+   `loadConfiguration({ cwd, explicitConfigPath: configPath })` (which walks up to `findConfig`
+   internally — there is no separate `loadConfig` export) → pass its `config`/`rules`/`settings`
+   into `lintFiles` (`LintFilesInput` takes resolved config, not a path) → structured per-file
+   results + text summary. An explicit `patterns` arg overrides `config.include` (the tool sets
+   `config.include = patterns`); absent it, core's `config.include ?? ["**/*.md"]` applies.
 3. Structured output ([M1](../requirements/05-mcp-server.md)) with the `LintMessage` fields
    ([R3](../requirements/02-rules-engine.md)); read-only annotation
    ([M7](../requirements/05-mcp-server.md)).

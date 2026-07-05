@@ -16,15 +16,22 @@ Make every package correctly publishable, building on the [P0.07 baseline](../P0
 
 ## Deliverables / steps
 
-1. Per-package `package.json`: `name`, `bin` (`wastech-mdlint`, `wastech-mdlint-mcp`),
-   `exports` (+ types), `files` allowlist, `engines.node` (`>=24.17.0`, **no upper bound** —
-   audit P9 engines gap; don't lock out future majors, CI validates on the Node 24 LTS line),
-   `publishConfig.access: "public"` + **provenance** ([I5](../requirements/06-installation.md)).
-2. Ensure `core` is a published dependency of `cli`/`mcp-server` (resolve `workspace:*` on
-   publish to the real version).
-3. Ship the generated `schema.json` in the `cli` (and/or `core`) package `files`
+1. **Verify** per-package `package.json` — most of this shipped in P0/P3, so this is an audit, not
+   fresh authoring. Already in place across all three: `engines.node: ">=24.17.0"` (no upper
+   bound), `publishConfig: { access: "public", provenance: true }`, the `bin` names
+   (`wastech-mdlint` on `cli`, `wastech-mdlint-mcp` on `mcp-server`), and `files` allowlists.
+   Library `exports` (+ types) applies to **`core` only** — `cli`/`mcp-server` are bin-only apps
+   and correctly ship no `exports` map. Confirm/add any metadata the P7/P8 surface introduced.
+2. Internal deps are exact literal pins (`"@wastech-mdlint/core": "0.0.0"`, the npm-workspaces
+   convention — there is **no** `workspace:*` protocol here, so nothing "resolves on publish"). The
+   release tool ([P9.02](02-single-tag-release.md)) must bump each package version **and every
+   internal `@wastech-mdlint/*` dependency pin** to the same `vX.Y.Z` in one atomic change, so
+   published `cli`/`mcp-server` depend on the published `core`, not a stale `0.0.0`.
+3. Confirm the generated `schema.json` still ships in `cli`'s `files` (already listed) so editor
+   `$schema` resolution works from the installed package
    ([C9](../requirements/01-configuration.md)).
-4. Confirm no stray dev/test files are packed (`npm pack --dry-run`).
+4. `npm pack --dry-run` per package: confirm `dist` (+ `cli`'s `schema.json`) is present and no
+   dev/test files leak.
 
 ## Decisions applied
 
@@ -33,9 +40,11 @@ Make every package correctly publishable, building on the [P0.07 baseline](../P0
 
 ## Exit criteria
 
-- [ ] All three packages have correct, minimal publish metadata + provenance.
-- [ ] `workspace:*` resolves to real versions on publish.
-- [ ] `npm pack --dry-run` clean per package; schema shipped.
+- [ ] All three packages' publish metadata + provenance verified (`core` has `exports`;
+      `cli`/`mcp-server` are bin-only, no `exports`).
+- [ ] Package version + internal `@wastech-mdlint/*` pins bump in lockstep — no stale `0.0.0`
+      dependency ships.
+- [ ] `npm pack --dry-run` clean per package; `cli` ships `schema.json`.
 
 ## Hand-off to next
 

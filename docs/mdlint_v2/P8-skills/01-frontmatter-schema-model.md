@@ -4,8 +4,9 @@
 
 ## Goal
 
-Define the typed SKILL.md frontmatter schema and the unified skill model that validates both
-static and generated skills.
+Reuse the typed SKILL.md frontmatter schema (defined and exported by core in
+[P5.04](../P5-compile/04-synthesize.md), S1) and build the unified skill model + a validator that
+covers both static and generated skills.
 
 ## Sequence
 
@@ -16,13 +17,16 @@ static and generated skills.
 
 ## Deliverables / steps
 
-1. Zod **frontmatter schema** ([S1](../requirements/04-skills-compile.md)):
-   `name`, `description`, `license`, `compatibility`, `metadata.{homepage, source}`.
+1. **Reuse the core frontmatter Zod schema** ([S1](../requirements/04-skills-compile.md)) exported
+   in [P5.04](../P5-compile/04-synthesize.md) (`name`, `description`, `license`, `compatibility`,
+   `metadata.{homepage, source}`) — do **not** redefine it. P5 is its first consumer; a single
+   schema keeps generated and static skills provably identical (S1). If static skills need extra
+   fields, extend the core schema, don't fork it.
 2. **Unified skill model** ([S5](../requirements/04-skills-compile.md)):
    `{ id, kind: "static" | "generated", path, frontmatter }` — shared by static skills and the
    compiler output (P5).
-3. A validation entry point usable from CI (P8.05) and from the compiler's frontmatter check
-   ([P5.04](../P5-compile/04-synthesize.md)).
+3. A validation entry point usable from CI (P8.05) and by the compiler's frontmatter check
+   ([P5.04](../P5-compile/04-synthesize.md)), both wrapping the one core schema.
 
 ## Decisions applied
 
@@ -30,7 +34,8 @@ static and generated skills.
 
 ## Exit criteria
 
-- [ ] Frontmatter schema + skill model defined and exported.
+- [ ] Skill model + validator defined and exported, both bound to the **core** frontmatter schema
+      (from P5.04) — not a second copy.
 - [ ] One validator covers static + generated skills.
 
 ## Hand-off to next

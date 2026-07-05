@@ -29,7 +29,11 @@ Classify graph nodes into roles and bundle the graph analysis the synthesizer ne
    degree heuristic, **not** a graph-theoretic cut vertex — P4 ships no articulation-point
    algorithm and P5 must not re-implement one. A **fixed, configurable** threshold `H` keeps roles
    deterministic and corpus-independent (a node's role depends only on its own degrees).
-2. `analyzeGraph(graph)` → `{ readingOrder (topo-sort), components, classification }`.
+2. `analyzeGraph(graph)` → `{ readingOrder, excludedFromReadingOrder, components, classification }`.
+   `topologicalSort` returns `{ order, excluded }` (`graph/graph-algorithms.ts`) — capture **both**:
+   `readingOrder = order` and `excludedFromReadingOrder = excluded` (nodes a cycle dropped from the
+   order). Also thread `graph.cycles` through so P5.04 can render cycles honestly (G6) rather than
+   emitting a silently truncated reading order.
 3. Reuse P4 algorithms (no re-implementation).
 
 ## Decisions applied

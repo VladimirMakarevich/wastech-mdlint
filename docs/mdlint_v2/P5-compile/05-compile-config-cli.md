@@ -10,14 +10,19 @@ Expose compilation through config + the CLI, writing the skill to disk with prev
 
 - **Previous:** [P5.04 — Synthesize](04-synthesize.md) produced `CompileResult`.
 - **Next:** [P5.06 — Compile tests](06-compile-tests.md).
-- **Depends on:** P5.04 + config model (P2.04) + commander scaffold (P0.05) · **Blocks:** P5.06.
+- **Depends on:** P5.04 + config model (P2.04, root schema only) + commander scaffold (P0.05) ·
+  **Blocks:** P5.06.
 
 ## Deliverables / steps
 
-1. Config `compile` section (validated in P2.04): `{ outdir?, skill: { name, description },
-   sections?: { architecture?, rules?, dependencies?, workflow? }, commandPreset?,
-   hubMinInDegree? }`. `hubMinInDegree` (default **3**) is the node-role hub threshold used by
-   `classifyNodes` ([P5.01](01-graph-analysis.md), audit 3.3).
+1. Config `compile` section — **defined and Zod-validated in this task.** P2.04 deliberately
+   left it opaque: `config-schema.ts` types `compile` as `z.unknown().optional()` with the
+   comment *"its shape is validated in P5"*, so P5.05 replaces that placeholder with the strict
+   shape `{ outdir?, skill: { name, description }, sections?: { architecture?, rules?,
+   dependencies?, workflow? }, commandPreset?, hubMinInDegree? }`. Keep `.strict()` (matching the
+   root `lintConfigSchema`) so unknown `compile.*` keys become C7 diagnostics.
+   `hubMinInDegree` (default **3**) is the node-role hub threshold used by `classifyNodes`
+   ([P5.01](01-graph-analysis.md), audit 3.3).
 2. CLI `compile`: `--config`, `--outdir`, `--dry-run`, `--cwd`; resolve outdir as
    `--outdir` → `config.compile.outdir` → `.claude/skills/wastech-mdlint/`.
 3. Require `config.compile`; if absent, exit **2** with a clear message. `compileContext`

@@ -1,7 +1,7 @@
 # Phase P8 — Static Agent Skills
 
 > Roadmap: [v2 Index](../index.md) · Phase **P8** · Size **S–M** · Status **Not started** ·
-> Depends on [P6](../index.md), [P7](../index.md).
+> Depends on [P6](../P6-init/index.md), [P7](../P7-mcp-server/index.md).
 >
 > **Goal:** ship the three hand-authored, host-neutral Agent Skills (`-init`, `-fix`,
 > `-impact`) that orchestrate the CLI/MCP surface, validated by a typed frontmatter schema.
@@ -35,6 +35,10 @@ A 4th skill is [S9 backlog](../requirements/04-skills-compile.md).
                   ├─► P8.03 ─┼─► P8.05 ─► (Phase P9)
                   └─► P8.04 ─┘
 ```
+
+> Per-task dependencies are narrower than the phase-level "P6, P7": P8.01 and the `-impact` MCP
+> path need P7; `-init` (P8.02) needs P6; `-fix` (P8.03) needs only the P3 `--fix` engine, so it
+> can be authored ahead of P6/P7 once P8.01's schema exists.
 
 ## Decisions applied
 

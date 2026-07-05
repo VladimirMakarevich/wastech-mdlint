@@ -19,8 +19,9 @@ actionable findings.
 1. `skills/wastech-mdlint-impact/SKILL.md` with valid frontmatter.
 2. Workflow: verify setup (recommend REF-001/GRP-001 enabled) → resolve target (file or ID →
    containing file) → run `impact <file> --format json` **or** prefer the MCP
-   `impact-analysis` tool when available → group direct/transitive, highlight hubs/cycles →
-   recommend follow-ups (often `-fix`).
+   `impact-analysis` tool when available → group `directlyAffected` / `transitivelyAffected` and
+   surface the `readingOrder` plus the cycle-`excluded` nodes (the actual JSON fields; there is no
+   `hubs` field — hub context needs a separate `graph` call) → recommend follow-ups (often `-fix`).
 3. Host-neutral; placeholders replaced ([S7](../requirements/04-skills-compile.md)).
 
 ## Decisions applied

@@ -16,13 +16,18 @@ Prove the whole release works end-to-end across all three channels before taggin
 
 ## Deliverables / steps
 
-1. Full workspace gate green: `typecheck`/`test`/`build`/`lint` on Node 24; schema-sync test;
-   skill-frontmatter validation; `npm pack --dry-run` clean per package.
+1. Full workspace gate green: run the existing root `release:check` script (`npm run typecheck
+   && npm test && npm run build && npm pack --dry-run`); it currently omits `lint` and the
+   schema-sync/skill-frontmatter checks, so either extend the script or also run `npm run lint`
+   and those tests explicitly on the pinned Node 24 line.
 2. **End-to-end smoke** across the three channels:
    - CLI: install the packed `cli`, run `init` → `lint` → `graph`/`slice`/`impact` → `compile`;
    - MCP: boot `wastech-mdlint-mcp`, call each of the 6 tools;
    - Skill: `gh skill install … --pin` resolves and references real commands/tools.
-3. Dry-run the single-tag release ([P9.02](02-single-tag-release.md)) without publishing.
+3. Dry-run the single-tag release ([P9.02](02-single-tag-release.md)) without publishing. The
+   existing `.github/workflows/publish.yml` `publish-readiness` job already runs the gate +
+   `npm pack --dry-run --workspaces` on `v*` tags; P9.02 upgrades it to real publishing, so verify
+   against that job rather than reinventing the dry-run.
 4. Tick the Phase P9 [exit criteria](index.md); confirm **Milestone M4 (launch)**.
 
 ## Decisions applied

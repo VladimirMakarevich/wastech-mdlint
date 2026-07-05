@@ -20,8 +20,10 @@ model and rule model are **fundamentally different** from the target product.
 The target is a substantially larger product (**`wastech-mdlint`**):
 
 - a **`@wastech-mdlint/core`** engine with a **registry of 22 built-in
-  schema-validated rules** across 7 categories (`TBL`, `SEC`, `STR`, `REF`, `CHK`, `CTX`,
-  `GRP`), plus `SIZE-001`, `LLM-001`, and the declarative `custom` rule;
+  schema-validated doc-integrity rules** across 6 categories (`TBL`, `SEC`, `STR`, `REF`, `CTX`,
+  `GRP`), plus `SIZE-001` and `LLM-001` (their own categories) and the declarative `custom` rule —
+  **24 registered built-ins across 8 categories** in total (there is no `CHK` category; checklist
+  completeness is `CTX-002`);
 - a richer **`ParsedDocument`** (tables, sections, checklists, images) and a
   **`ContextGraph`** with `slice` / `impact` / `topological-sort` / `components`;
 - a **`@wastech-mdlint/cli`** with `lint` (default) · `init` · `graph` · `slice`
@@ -69,7 +71,7 @@ Each capability area has a locked requirements doc under [requirements/](require
 | Area | What it defines | New in v2? |
 | --- | --- | --- |
 | [Context graph & search](requirements/03-context-graph.md) | `ContextGraph`, `slice`, `impact`, topo-sort, components | Extends the current graph implementation |
-| [Rules & rule engine](requirements/02-rules-engine.md) | `Rule`/`RuleContext`/`runRules`, registry, 22 built-in rules | **New engine** |
+| [Rules & rule engine](requirements/02-rules-engine.md) | `Rule`/`RuleContext`/`runRules`, registry, 22 built-in rules (+ `SIZE-001`/`LLM-001`, D3) | **New engine** |
 | [Configuration](requirements/01-configuration.md) | `{ include, rules[], compile }`, `findConfig`, JSON schema | **New model** |
 | [MCP server](requirements/05-mcp-server.md) | 6 stdio tools over core | **New package** |
 | [Skills & compile](requirements/04-skills-compile.md) | static skills + generated `SKILL.md` (compile) | **New** |
@@ -112,7 +114,7 @@ pipeline.
 
 ```
 @wastech-mdlint/core        ← parser, ParsedDocument, ContextGraph, rule engine,
-                                 registry (22 built-in rules + LLM/custom), config,
+                                 registry (22 built-in rules + SIZE/LLM + custom), config,
                                  compiler, formatters
         ├── @wastech-mdlint/cli         ← commander: lint|init|graph|slice|impact|compile
         ├── @wastech-mdlint/mcp-server  ← stdio: 6 tools
@@ -215,9 +217,10 @@ right package.
 own `*.test.ts` and a fixture.
 - Utils first: `glob-match` (picomatch `{dot:true}`), `find-line-number`,
   `extract-section-body`, `regex-string` (Zod), `site-router` (Starlight preset).
-- **3a TBL** (001–006) · **3b SEC** (001–002) · **3c STR** (001) ·
-  **3d REF** (001–006, reuses current link logic) · **3e CHK** (001) ·
-  **3f CTX** (001–002) · **3g GRP** (001–003, reuses current cycle/orphan logic).
+- **3a TBL** (001–006) · **3b SEC** (001–003) · **3c STR** (001) ·
+  **3d REF** (001–006, reuses current link logic) · **3e CTX** (001–003, incl. the checklist
+  rule CTX-002) · **3f GRP** (001–003, reuses current cycle/orphan logic). Plus the D3 rules
+  `SIZE-001` and `LLM-001`.
 - **Maps to:** [rules requirements](requirements/02-rules-engine.md); rule inventory in §3.1 above.
 - **Exit:** all 22 built-in rules pass unit + fixture tests; documented in README + schema.
 
@@ -251,7 +254,8 @@ own `*.test.ts` and a fixture.
 - Package-manager detection from lockfiles; local `$schema` wiring (no remote URL).
 - Reconcile/remove the current `postinstall` default-config script (init replaces it).
 - **Maps to:** [installation requirements](requirements/06-installation.md).
-- **Exit:** `init` produces a valid config that lints cleanly on a fresh repo.
+- **Exit:** `init` produces a structurally valid config (loads without a `ConfigError`); it lints
+  with exit 0 on a clean fixture (a real ruleset may report findings on non-clean content).
 
 ### Phase 7 — MCP server package · `M` · depends on: P2, P4, P5 · reuse: n/a
 **Goal:** agent access to the same deterministic operations.

@@ -17,18 +17,24 @@ budget-aware — and return `CompileResult`.
 
 1. `synthesize(...)` → `{ skillContent, metadata: { documentCount, ruleCount, componentCount } }`,
    assembling: frontmatter + sections **Document Architecture** (file tree + roles + document
-   types), **Document Rules**, **Document Dependencies**, **Workflow**, gated by
-   `compile.sections`.
+   types), **Document Rules**, **Document Dependencies** (reading order — and the
+   cycle-`excluded` docs `topologicalSort` reports, rendered explicitly rather than silently
+   dropped, preserving the G6 honesty guarantee), **Workflow**, gated by `compile.sections`.
 2. **Host-neutral commands** ([S2](../requirements/04-skills-compile.md)): the dependencies
    block is templated by `compile.commandPreset` (`claude|generic|none`); default = plain
    instructions + MCP-tool reference (no `!npx … $ARGUMENTS`).
 3. **Determinism + provenance** ([S4](../requirements/04-skills-compile.md)): sorted, no
    timestamps; header "generated from N docs, M rules" + a content hash.
-4. **Context-budget summary** ([S6](../requirements/04-skills-compile.md)): reuse the
-   SIZE/LLM estimator ([P3.07](../P3-rules/07-llm-rules.md)) — corpus token estimate +
-   entrypoints over budget.
-5. **Frontmatter schema** ([S1](../requirements/04-skills-compile.md)): validate the emitted
-   frontmatter against the shared SKILL.md schema.
+4. **Context-budget summary** ([S6](../requirements/04-skills-compile.md)): reuse the shared
+   token estimator `estimateTokens` (`engine/tokens.ts`, isolated per [D3](../index.md) so the
+   `ceil(len/4)` heuristic can be swapped later) — corpus token estimate + entrypoints over
+   budget.
+5. **Frontmatter schema** ([S1](../requirements/04-skills-compile.md)): **define and export the
+   SKILL.md frontmatter Zod schema here** (`name`, `description`, `license`, `compatibility`,
+   `metadata.{homepage, source}`) and validate the emitted frontmatter against it. This schema
+   does **not** exist yet — P5 is its first consumer. Export it from `@wastech-mdlint/core` so
+   [P8.01](../P8-skills/01-frontmatter-schema-model.md) reuses (does not redefine) it for static
+   skills and P9 CI validates against the same schema (single source, S1).
 
 ## Command-block presets (S2) — expected output
 
@@ -84,7 +90,9 @@ export interface CompileResult {
   };
 }
 
-export function compileContext(config: Config, cwd: string): CompileResult;
+export function compileContext(config: LoadedConfiguration, cwd: string): CompileResult;
+// `LoadedConfiguration` (already exported from core) carries the resolved `config`, `rules`, and
+// `settings` the load→graph→analyze pipeline needs — there is no bare `Config` type in core.
 // throws CompileConfigMissingError (typed, carries a stable `code`) when config.compile is absent
 export function synthesize(/* analysis + profiles + rules */): CompileResult;
 ```

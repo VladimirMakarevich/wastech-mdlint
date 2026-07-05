@@ -7,6 +7,11 @@
 Ship a publishable/reusable GitHub Action so consumers run `wastech-mdlint` in CI in one
 step — a major adoption lever ([I6](../requirements/06-installation.md)).
 
+> **Baseline already exists.** `.github/workflows/ci.yml` (verify on the pinned Node 24 line via
+> `.node-version`; a `pack` job matrixed over the three packages) and `.github/workflows/publish.yml`
+> shipped in [P0.07](../P0-foundations/07-ci-packaging-baseline.md). This task adds the *consumer-facing,
+> reusable composite Action* on top — it does not create CI from scratch.
+
 ## Sequence
 
 - **Previous:** [P9.01 — Package metadata](01-package-metadata.md).

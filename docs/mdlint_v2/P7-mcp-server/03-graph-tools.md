@@ -17,17 +17,23 @@ semantics.
 
 ## Deliverables / steps
 
-1. `context-graph` — `{ configPath?, cwd?, format?: "json"|"summary" }`: build graph →
-   structured `{ nodes, edges }` (json) or `formatContextGraphSummary` (summary).
-2. `context-slice` — `{ query, depth?, configPath?, cwd? }`: resolve via the deterministic
-   index ([P4.04](../P4-graph/04-search-index-slice.md)) → `query` forward → structured
-   `{ query, matchType, files[], totalFiles, summary }`. **Description states exact
+1. `context-graph` — `{ configPath?, cwd?, format?: "json"|"summary" }`: build graph → structured
+   `{ nodes, edges, cycles }` (json — `ContextGraph` carries `cycles` for the G3 explicit-cycle
+   signal) or, for the structured summary, `summarizeContextGraph` → `ContextGraphSummary`
+   (`formatContextGraphSummary` supplies the accompanying text block).
+2. `context-slice` — `{ query, depth?, configPath?, cwd? }`: call the composed `getContextSlice`
+   (the deterministic index, [P4.04](../P4-graph/04-search-index-slice.md)) → structured
+   `ContextSliceResult` `{ query, matchKind, starts, files, visited }`, plus a text summary via
+   `renderContextSliceSummary`. (Field is `matchKind`/`SliceMatchKind`, not `matchType`; there is
+   no `totalFiles`/`summary` field on the core type.) **Description states exact
    ID/anchor/heading/path resolution** — no keyword-search promise
-   ([M2](../requirements/05-mcp-server.md)).
+   ([M2](../requirements/05-mcp-server.md); reuse the exported `SLICE_RESOLUTION_DESCRIPTION`).
 3. `impact-analysis` — `{ file, configPath?, cwd? }`: validate file in corpus →
-   `classifyImpact` → `relativizeImpact` → structured `{ changedFile, directlyAffected,
-   transitivelyAffected, summary }`; out-of-corpus → `{ code, message, hint }`
-   ([M6](../requirements/05-mcp-server.md)).
+   `classifyImpact` → `relativizeImpact` (this is `relativizeImpact`'s first consumer — it had none
+   before) → structured `ImpactClassification` `{ file, directlyAffected, transitivelyAffected,
+   readingOrder, excluded }`, plus a text summary via `renderImpactSummary`. (Field is `file`, not
+   `changedFile`; there is no `summary` field on the core type.) Out-of-corpus →
+   `{ code, message, hint }` ([M6](../requirements/05-mcp-server.md)).
 4. Structured output ([M1](../requirements/05-mcp-server.md)); read-only annotations
    ([M7](../requirements/05-mcp-server.md)).
 

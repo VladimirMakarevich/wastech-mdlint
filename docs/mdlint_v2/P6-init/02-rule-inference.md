@@ -18,10 +18,13 @@ categories to concrete canonical rule IDs with rationale.
 
 1. Read 3–5 sample files per cluster; detect patterns (cross-refs, tables, ADR triplets,
    checklists, placeholders, potential cycles).
-2. Category → rule mapping (canonical IDs, [C3](../requirements/01-configuration.md)), e.g.:
-   `ref` → REF-001/002/003, `tbl` → TBL-002, `ctx` → CTX-001/002,
-   `grp` → GRP-001/002. Source the mapping from the rule **metadata** so it stays in sync
-   ([R6](../requirements/02-rules-engine.md)).
+2. Category → rule mapping (canonical IDs, [C3](../requirements/01-configuration.md)). **Do not
+   hardcode IDs** — group `ruleRegistry.getAllMetadata()` on `metadata.category` so the mapping
+   tracks the registry ([R6](../requirements/02-rules-engine.md); the registry comment states this
+   metadata "drives … init categories (P6)"). The full built-in space is **8 categories / 24
+   rules**: REF (REF-001..006), TBL (TBL-001..006), CTX (CTX-001..003), SEC (SEC-001..003), GRP
+   (GRP-001..003), STR (STR-001), SIZE (SIZE-001), LLM (LLM-001) — there is no `CHK` category
+   (checklist is `CTX-002`). Inference maps detected patterns to a subset of these.
 3. Produce a draft rule set + per-rule rationale string for the prompt step.
 
 ## Decisions applied
