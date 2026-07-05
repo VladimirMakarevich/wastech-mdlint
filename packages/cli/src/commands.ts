@@ -138,8 +138,20 @@ async function handleGraph(command: GraphCommand): Promise<CommandExecutionResul
     settings: loaded.settings
   });
 
+  // The G5 coverage signal is shared by the JSON and human formats (audit B): JSON consumers (CI,
+  // MCP, agents) must see `filesOutsideCorpus` too, not just the human reader. Computed lazily via a
+  // closure so both call sites can't drift on rootDir/siteRouter and mermaid/dot skip the work.
+  const coverage = () =>
+    computeGraphCoverage(documents, graph, {
+      rootDir: path.resolve(command.path),
+      siteRouter: loaded.settings.siteRouter
+    });
+
   if (command.format === "json") {
-    return { output: `${JSON.stringify(summarizeContextGraph(graph), null, 2)}\n`, exitCode: EXIT_CODE_SUCCESS };
+    return {
+      output: `${JSON.stringify(summarizeContextGraph(graph, coverage()), null, 2)}\n`,
+      exitCode: EXIT_CODE_SUCCESS
+    };
   }
   if (command.format === "mermaid") {
     return { output: `${renderContextGraphMermaid(graph)}\n`, exitCode: EXIT_CODE_SUCCESS };
@@ -148,11 +160,7 @@ async function handleGraph(command: GraphCommand): Promise<CommandExecutionResul
     return { output: `${renderContextGraphDot(graph)}\n`, exitCode: EXIT_CODE_SUCCESS };
   }
 
-  const coverage = computeGraphCoverage(documents, graph, {
-    rootDir: path.resolve(command.path),
-    siteRouter: loaded.settings.siteRouter
-  });
-  return { output: `${renderContextGraphText(graph, coverage)}\n`, exitCode: EXIT_CODE_SUCCESS };
+  return { output: `${renderContextGraphText(graph, coverage())}\n`, exitCode: EXIT_CODE_SUCCESS };
 }
 
 async function handleSlice(command: SliceCommand): Promise<CommandExecutionResult> {
@@ -226,6 +234,9 @@ async function handleImpact(command: ImpactCommand): Promise<CommandExecutionRes
       directlyAffected: classification.directlyAffected,
       transitivelyAffected: classification.transitivelyAffected,
       readingOrder: classification.readingOrder,
+      // Parity with the human render (audit C): without `excluded`, a JSON consumer sees a
+      // readingOrder shorter than the affected set with no signal that a cycle dropped those nodes.
+      excluded: classification.excluded,
       lint
     };
     return { output: `${JSON.stringify(payload, null, 2)}\n`, exitCode: EXIT_CODE_SUCCESS };

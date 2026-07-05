@@ -81,18 +81,44 @@ precedence rule](../../../AGENTS.md):
   matches edge endpoint identity regardless of how the caller keyed its documents map (e.g.
   `loadDocuments()`'s absolute-path keys, fed in directly with no re-keying).
 
-`exclude`/`entryPoints` are accepted on `BuildContextGraphOptions` for forward compatibility but
-are not yet read by `buildContextGraph` — deriving them from config and using them for
-coverage/orphan reasoning is [P4.06](06-grp-refactor-coverage.md) scope, not this task. Only
-`siteRouter` is wired through today, from `lintFiles` and the CLI `graph` command, so link/anchor/
-image/import edges already resolve root-relative targets identically to REF-001/002 on router
-repos.
+`buildContextGraph` consumes only `siteRouter` and `idRef`, wired through from `lintFiles` and the
+CLI `graph` command, so link/anchor/image/import edges resolve root-relative targets identically to
+REF-001/002 on router repos.
+
+**Update (post-P4.06, audit finding D):** the `exclude`/`entryPoints` fields this task originally
+added to `BuildContextGraphOptions` "for forward compatibility with P4.06" were **removed**. P4.06
+declined to wire them (see [P4.06](06-grp-refactor-coverage.md)), so they stayed dead API for the
+whole phase — contradicting the [coding-style rule](../../../.agents/rules/coding-style.md) against
+extension points for hypothetical needs. Node exclusion, if a later phase needs it, will be added
+under that task; `entryPoints` for GRP-002 already comes from the rule's own options, not the graph
+builder.
+
+## Known limitations
+
+The id-ref reference scan is a raw-text token scan (findings A/H, test-pinned); image edges carry
+no label (finding E):
+
+- **A — code blocks / inline code / frontmatter are not excluded.** The scan runs over
+  `document.content` (raw file text), because `ParsedDocument` exposes no prose-only text spans and
+  adding them is a P1 parser change out of this phase's scope. An ID that appears **only** inside a
+  fenced code block still yields a real `id-ref` edge, which can inflate `impact`/`slice`/`inDegree`
+  (GRP-002). Accepted as honest-simple v2 behavior and pinned by test so it stays intentional.
+- **H — boundary punctuation is trimmed (fixed).** Prose mentions such as `REQ-1.` or `(REQ-1)`
+  now resolve: leading/trailing non-alphanumerics are trimmed before matching `idPattern`.
+  Deliberately looser than `defined-ids.ts`'s column tokenizer, because sentence punctuation occurs
+  in free text but not in table cells.
+- **E — image edges omit `text`.** Link/anchor edges carry the link label as `text`; image edges
+  deliberately do not. G3 scopes the label to link/anchor, and the natural image label (alt text) is
+  not part of the P1 `ParsedImage` contract — carrying it would be an additive parser change for
+  marginal explainability that no P4 task requires. Deferred to a future task that concretely needs
+  per-image labels (e.g. richer MCP/`--fix` output).
 
 ## Exit criteria
 
 - [x] Edges carry type + line (+ text); anchor/import/id-ref edges materialized.
-- [x] `buildContextGraph` accepts exclude/entryPoints/siteRouter (typed options; exclude/
-      entryPoints are not yet consumed — see Implementation notes).
+- [x] `buildContextGraph` accepts `siteRouter` (and `idRef`); the originally-planned
+      `exclude`/`entryPoints` options were removed as never-wired dead API (finding D) — see
+      Implementation notes.
 - [x] Deterministic node/edge ordering.
 
 ## Hand-off to next

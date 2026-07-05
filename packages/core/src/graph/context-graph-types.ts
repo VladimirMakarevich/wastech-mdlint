@@ -11,11 +11,12 @@ import type { SiteRouterSettings } from "../engine/types.js";
 
 export type ContextGraphEdgeType = "link" | "anchor" | "image" | "import" | "id-ref";
 
-// `exclude`/`entryPoints` are accepted for forward compatibility with the P4.06 coverage/orphan
-// wiring; `buildContextGraph` does not yet consume them (task constraint — deferred, not dropped).
+// The only inputs the builder consumes: `siteRouter` mirrors REF-001/002 root-relative resolution
+// so graph edges never disagree with the REF rules; `idRef` turns on id-ref edges. Earlier
+// `exclude`/`entryPoints` fields were removed after P4.06 declined to wire them — they were dead API
+// for the whole phase, and node exclusion belongs to a future task that concretely needs it (per the
+// coding-style rule against extension points for hypothetical needs).
 export type BuildContextGraphOptions = {
-  exclude?: string[];
-  entryPoints?: string[];
   siteRouter?: SiteRouterSettings;
   idRef?: IdRef;
 };

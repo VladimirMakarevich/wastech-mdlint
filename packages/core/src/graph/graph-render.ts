@@ -25,16 +25,24 @@ export type ContextGraphSummary = {
   edges: ContextGraphEdge[];
   components: string[][];
   readingOrder: string[];
+  // G5 coverage (audit B): included only when the host supplies it. The CLI `graph` command always
+  // does now, so JSON consumers (CI, MCP, agents) get `filesOutsideCorpus` too — but a caller that
+  // summarizes a bare graph (e.g. an MCP field without disk access) can still omit it.
+  coverage?: GraphCoverage;
 };
 
-// The AC's `{ nodes, edges, components, readingOrder }` JSON shape (P4.07 step 1). `components` and
-// `readingOrder` reuse P4.02's algorithms verbatim rather than recomputing clusters/order here.
-export function summarizeContextGraph(graph: ContextGraph): ContextGraphSummary {
+// The AC's `{ nodes, edges, components, readingOrder }` JSON shape (P4.07 step 1), plus an additive
+// `coverage` field when the host passes one (audit B — the G5 signal must reach JSON consumers, not
+// only human output). Mirrors `renderContextGraphText`'s optional-coverage parameter so both formats
+// expose the same signal. `components`/`readingOrder` reuse P4.02's algorithms verbatim rather than
+// recomputing clusters/order here.
+export function summarizeContextGraph(graph: ContextGraph, coverage?: GraphCoverage): ContextGraphSummary {
   return {
     nodes: [...graph.nodes].sort((left, right) => byPath(left.path, right.path)),
     edges: [...graph.edges].sort(compareEdges),
     components: getComponents(graph),
-    readingOrder: topologicalSort(graph).order
+    readingOrder: topologicalSort(graph).order,
+    ...(coverage !== undefined ? { coverage } : {})
   };
 }
 

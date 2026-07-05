@@ -188,6 +188,40 @@ describe("buildContextGraph · id-ref edges", () => {
       { from: "design.md", to: "reqs.md", type: "id-ref", line: 1, rawTarget: "REQ-001" }
     ]);
   });
+
+  it("trims adjacent sentence punctuation from a prose ID mention (finding H)", () => {
+    const documents = docs({
+      "reqs.md": "| ID |\n| --- |\n| REQ-001 |\n",
+      "design.md": "Blocks REQ-001. See (REQ-001) here.\n"
+    });
+
+    const graph = buildContextGraph(documents, { idRef });
+
+    // "REQ-001." (trailing period) and "(REQ-001)" (wrapping parens) both trim to REQ-001, so each
+    // still yields an edge (multiplicity retained). The old whitespace/comma-only tokenizer missed
+    // both because the punctuation stayed glued to the token and failed the anchored idPattern.
+    expect(graph.edges).toEqual([
+      { from: "design.md", to: "reqs.md", type: "id-ref", line: 1, rawTarget: "REQ-001" },
+      { from: "design.md", to: "reqs.md", type: "id-ref", line: 1, rawTarget: "REQ-001" }
+    ]);
+  });
+
+  it("still builds an id-ref edge for an ID that appears only inside a fenced code block (known limitation, finding A)", () => {
+    const documents = docs({
+      "reqs.md": "| ID |\n| --- |\n| REQ-001 |\n",
+      "design.md": "# Design\n\n```\n[ERROR] validation failed for REQ-001\n```\n"
+    });
+
+    const graph = buildContextGraph(documents, { idRef });
+
+    // Documented v2 limitation: the id-ref scan runs over raw `content`, so a code-block mention is
+    // not distinguished from prose and still produces an edge (line 4 = the fenced content line).
+    // Pinned so this false positive stays intentional rather than regressing in silently either
+    // direction if the scan ever changes.
+    expect(graph.edges).toEqual([
+      { from: "design.md", to: "reqs.md", type: "id-ref", line: 4, rawTarget: "REQ-001" }
+    ]);
+  });
 });
 
 describe("buildContextGraph · siteRouter resolution", () => {

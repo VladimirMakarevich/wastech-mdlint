@@ -220,15 +220,18 @@ describe("impact command", () => {
       directlyAffected: { path: string; references: number }[];
       transitivelyAffected: unknown[];
       readingOrder: string[];
+      excluded: string[];
       lint: { files: string[]; messages: { filePath: string; ruleId: string }[] };
     };
     expect(Object.keys(payload).sort()).toEqual(
-      ["changedFile", "directlyAffected", "transitivelyAffected", "readingOrder", "lint"].sort()
+      ["changedFile", "directlyAffected", "transitivelyAffected", "readingOrder", "excluded", "lint"].sort()
     );
     expect(payload.changedFile).toBe("a.md");
     expect(payload.directlyAffected).toEqual([{ path: "b.md", references: 1 }]);
     expect(payload.transitivelyAffected).toEqual([]);
     expect(payload.readingOrder).toEqual(["b.md", "a.md"]);
+    // No cycle in this corpus, so nothing is excluded from reading order (audit C parity field).
+    expect(payload.excluded).toEqual([]);
     // The corpus-wide lint also flags c.md's broken link, but c.md is outside the affected subgraph.
     expect(payload.lint.files).toEqual(["a.md", "b.md"]);
     expect(payload.lint.messages.some((message) => message.filePath === "c.md")).toBe(false);

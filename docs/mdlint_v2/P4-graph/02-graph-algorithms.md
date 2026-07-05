@@ -19,9 +19,10 @@ topo order.
 2. `getComponents(graph)` — undirected BFS connected components, sorted **by size descending,
    then by the component's lexicographically-smallest node path (repo-relative POSIX) ascending**
    (audit — P4 component-sort gap) — deterministic across filesystems.
-3. **Explicit cycles** ([G6](../requirements/03-context-graph.md)): SCC/DFS (reuse the existing
-   Tarjan implementation now in `core`) returning the cycle list as data — not just a shorter
-   topo array. Shared with GRP-001 (P4.06). **Edge multiplicity & cycles (audit — P4 edge-dedup
+3. **Explicit cycles** ([G6](../requirements/03-context-graph.md)): the cycle list is returned as
+   data — not just a shorter topo array — from the Tarjan pass P4.01 implements in
+   `buildContextGraph`; this task reuses it by reading `graph.cycles`, not by re-running SCC.
+   Shared with GRP-001 (P4.06). **Edge multiplicity & cycles (audit — P4 edge-dedup
    gap):** duplicate edges do not multiply cycles — SCC is defined over node reachability, so
    several `A→B` edges plus a `B→A` form **one** cycle (the SCC `{A,B}`), reported once (GRP-001
    canonicalizes). Edge multiplicity is retained only for `references`/degree counts; collapsing
@@ -30,17 +31,17 @@ topo order.
 
 ## Decisions applied
 
-- [G6](../requirements/03-context-graph.md) explicit cycles (reuse the existing Tarjan implementation).
+- [G6](../requirements/03-context-graph.md) explicit cycles (reuse P4.01's builder Tarjan via `graph.cycles`).
 
 ## Implementation notes
 
-- **"Reuse the existing Tarjan implementation" means reading `graph.cycles`, not relocating it.**
-  P4.01's `buildContextGraph` already runs Tarjan and stores the canonicalized, deduped cycle list
-  on the graph (G6). `topologicalSort`/`formatContextGraphSummary` consume that field directly
-  instead of re-running SCC or extracting a standalone `getCycles` out of the builder — moving a
-  frozen, already-correct algorithm would be pure churn. Downstream consumers (P4.03, P4.06,
-  GRP-001) should keep reading `graph.cycles` rather than expecting a separate cycle accessor from
-  this module.
+- **Tarjan lives in P4.01's builder; this task reuses it via `graph.cycles`.** There is no separate
+  "existing" Tarjan to relocate — legacy `src/` was removed in P0, so `detectCycles` was written
+  fresh in `buildContextGraph` (P4.01), which stores the canonicalized, deduped cycle list on the
+  graph (G6). `topologicalSort`/`formatContextGraphSummary` consume that field directly instead of
+  re-running SCC or extracting a standalone `getCycles` out of the builder — moving a frozen,
+  already-correct algorithm would be pure churn. Downstream consumers (P4.03, P4.06, GRP-001) should
+  keep reading `graph.cycles` rather than expecting a separate cycle accessor from this module.
 - **In-degree is deduped before Kahn's runs, degree fields are not.** `ContextGraphNode.inDegree`
   intentionally retains edge multiplicity (P4.01 constraint — two `A→B` links are two references).
   Feeding that raw count into Kahn's would strand a node behind a duplicated edge at a permanent
