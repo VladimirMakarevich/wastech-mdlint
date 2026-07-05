@@ -1,6 +1,6 @@
 # Phase P4 — ContextGraph + graph / slice / impact
 
-> Roadmap: [v2 Index](../index.md) · Phase **P4** · Size **M** · Status **In progress** ·
+> Roadmap: [v2 Index](../index.md) · Phase **P4** · Size **M** · Status **Done** ·
 > Reuse from current implementation: **High**.
 >
 > **Goal:** make the document graph a first-class primitive with **semantic edges**, a
@@ -49,11 +49,11 @@ this graph. See the [context-graph requirements](../requirements/03-context-grap
 ## Phase exit criteria
 
 - [x] `ContextGraph` has typed edges (`link|image|anchor|id-ref|import`) with `line`/`text` (P4.01).
-- [ ] One query layer powers `slice` and `impact`; GRP rules use the same graph (R5).
-- [ ] `slice` resolves a real ID/anchor/heading/path index (G4); semantics honest in `--help`.
-- [ ] `impact` reports direct/transitive (+`via`) and lints the affected subgraph.
-- [ ] Explicit cycle list (G6) and coverage signal (G5) surfaced.
-- [ ] `graph` exports JSON + Mermaid/DOT (G9).
+- [x] One query layer powers `slice` and `impact`; GRP rules use the same graph (R5).
+- [x] `slice` resolves a real ID/anchor/heading/path index (G4); semantics honest in `--help`.
+- [x] `impact` reports direct/transitive (+`via`) and lints the affected subgraph.
+- [x] Explicit cycle list (G6) and coverage signal (G5) surfaced.
+- [x] `graph` exports JSON + Mermaid/DOT (G9).
 
 ## What P4 unblocks
 

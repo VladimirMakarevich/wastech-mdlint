@@ -1,10 +1,6 @@
-import path from "node:path";
-
-import { normalizeRelativePath } from "../discovery/globs.js";
 import { extractDefinedIds, type IdRef } from "../engine/defined-ids.js";
-import { filePart, resolveRelativeToSource, sourceLocale } from "../engine/path-resolve.js";
+import { filePart, resolveTargetCandidates } from "../engine/path-resolve.js";
 import { compileRegex } from "../engine/regex.js";
-import { resolveRoutedUrl } from "../engine/site-router.js";
 import { findLineNumber } from "../engine/text-position.js";
 import type { SiteRouterSettings } from "../engine/types.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
@@ -31,27 +27,7 @@ function resolveTarget(
   siteRouter: SiteRouterSettings | undefined,
   nodeSet: ReadonlySet<string>
 ): string | undefined {
-  if (target.length === 0) {
-    return undefined;
-  }
-
-  if (!target.startsWith("/")) {
-    const relTarget = resolveRelativeToSource(sourcePath, target);
-    return nodeSet.has(relTarget) ? relTarget : undefined;
-  }
-
-  if (siteRouter !== undefined) {
-    for (const candidate of resolveRoutedUrl(target, siteRouter, sourceLocale(sourcePath, siteRouter))) {
-      const normalized = normalizeRelativePath(candidate);
-      if (nodeSet.has(normalized)) {
-        return normalized;
-      }
-    }
-    return undefined;
-  }
-
-  const relTarget = normalizeRelativePath(path.posix.normalize(target.replace(/^\/+/, "")));
-  return nodeSet.has(relTarget) ? relTarget : undefined;
+  return resolveTargetCandidates(sourcePath, target, siteRouter).find((candidate) => nodeSet.has(candidate));
 }
 
 // Scheme-qualified targets (http:, https:, data:, …) are never corpus nodes; skip before resolving,

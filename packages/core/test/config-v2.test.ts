@@ -84,6 +84,29 @@ describe("loadConfiguration", () => {
     expect(loaded.settings.siteRouter).toEqual({ preset: "starlight", contentDir: "src/content/docs" });
   });
 
+  it("resolves settings.idRef and exposes it for the graph builder (P4.06)", async () => {
+    const root = await writeConfig(
+      JSON.stringify({
+        settings: { idRef: { idPattern: "^REQ-\\d+$", definitions: ["reqs.md"], idColumn: "ID" } },
+        rules: []
+      })
+    );
+
+    const loaded = await loadConfiguration({ cwd: root, registry });
+    expect(loaded.settings.idRef).toEqual({ idPattern: "^REQ-\\d+$", definitions: ["reqs.md"], idColumn: "ID" });
+  });
+
+  it("rejects a malformed settings.idRef missing idColumn (C7)", async () => {
+    const root = await writeConfig(
+      JSON.stringify({
+        settings: { idRef: { idPattern: "^REQ-\\d+$", definitions: ["reqs.md"] } },
+        rules: []
+      })
+    );
+
+    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(/idColumn/);
+  });
+
   it("rejects unknown top-level keys (C7)", async () => {
     const root = await writeConfig(JSON.stringify({ nonsense: true, rules: [] }));
     await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(/nonsense/);

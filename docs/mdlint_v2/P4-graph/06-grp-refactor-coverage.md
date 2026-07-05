@@ -1,6 +1,6 @@
 # P4.06 · Refactor GRP rules onto the shared graph + coverage signal
 
-> Phase: [P4 — Graph](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
+> Phase: [P4 — Graph](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Done**.
 
 ## Goal
 
@@ -36,12 +36,50 @@ so GRP rules run on real anchor/id-ref/import edges + explicit cycle data, and a
 - [R5](../requirements/02-rules-engine.md) one graph · [G6](../requirements/03-context-graph.md)
   explicit cycles · [G5](../requirements/03-context-graph.md) coverage signal.
 
+## Implementation notes
+
+- **The actual delta was narrower than "swap the injected builder" implies.** `lint-files.ts` had
+  already injected the semantic `buildContextGraph` since P4.01, and anchor/import edges already
+  materialized from the parse with no config — so GRP-001/002 were already reading the richer
+  graph before this task started. The one real gap was `id-ref` edges: `buildContextGraph`
+  supported an `idRef` option, but nothing in the orchestrator could supply it, so id-ref edges
+  never actually reached the injected graph. This task closes exactly that gap; GRP rule code is
+  untouched, confirming the "no rule-code change" claim rather than assuming it.
+- **`settings.idRef` is a new shared setting, not a change to REF-005.** REF-005 already accepts
+  an `{ idPattern, definitions, idColumn }` shape as rule options, but rule options are validated
+  and closed over by the time the orchestrator builds the graph — there is no way to read them
+  back out of a resolved rule. Rather than reach into REF-005's private state, `idRef` was added
+  as its own `ResolvedSettings` field, mirroring how `siteRouter` is already shared between REF
+  rules and the graph builder. Trade-off: a project that wants both REF-005 traceability and
+  id-ref graph edges configures the same ID shape in two places — accepted as explicit and
+  discoverable rather than coupling the graph builder to one specific rule's options.
+- **The coverage signal checks every resolvable candidate, not just the one the graph would pick.**
+  `buildContextGraph`'s edge resolution stops at the first candidate present in the corpus
+  ("first match wins"). `computeGraphCoverage` instead evaluates every root-relative/router
+  candidate a target could resolve to, flagging each on-disk, non-corpus Markdown file it finds.
+  A single link can therefore both produce a normal graph edge (via one candidate) and appear in
+  `filesOutsideCorpus` (via another candidate for the same link) — intentional, since the signal's
+  job is surfacing every plausible on-disk match outside `include`, not just the one the graph
+  happened to resolve to.
+- **Coverage ships core-only in this task — no CLI/lint-output surface yet.**
+  `computeGraphCoverage` (node/edge counts + `filesOutsideCorpus`) lives in `@wastech-mdlint/core`
+  with unit tests only; it is not wired into `LintResult` or any command output. "Done" here means
+  the signal and its contract are correct and stable, not that it is user-reachable yet — that is
+  P4.07's job.
+- **Target-candidate resolution was centralized for the graph/coverage pair only.** The
+  root-relative/router resolution logic duplicated between `build-context-graph.ts` and the new
+  coverage module was extracted into `path-resolve.ts`'s `resolveTargetCandidates`, refactored to
+  be behavior-preserving (guarded by the existing `build-context-graph.test.ts` suite unchanged).
+  REF-001/002's `primitives/reference.ts` still inlines the same logic — left alone here to keep
+  this task's refactor scoped; migrating the primitives onto the same helper is a future cleanup,
+  not required for this task's acceptance criteria.
+
 ## Exit criteria
 
-- [ ] GRP-001/002 produce identical (or better) results on the semantic graph with no
+- [x] GRP-001/002 produce identical (or better) results on the semantic graph with no
       rule-code change; the only graph traversal lives in `ContextGraph` (no parallel adjacency
       anywhere).
-- [ ] Coverage signal emitted on incomplete `include`.
+- [x] Coverage signal emitted on incomplete `include`.
 
 ## Hand-off to next
 

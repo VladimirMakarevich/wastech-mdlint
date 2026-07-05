@@ -63,14 +63,32 @@ pass); create a config to enable rules.
 
 ```bash
 wastech-mdlint lint [path] [--config <file>] [--format text|json] [--fail-on error|warning|off] [--fix]
-wastech-mdlint graph [path] [--config <file>] --out graph.json
+wastech-mdlint graph [path] [--config <file>] [--format human|json|mermaid|dot]
+wastech-mdlint slice <query> [--config <file>] [--depth <n>] [--format text|json]
+wastech-mdlint impact <file> [--config <file>] [--format text|json]
 wastech-mdlint schema [--out schema.json]
 ```
 
 - `lint` is the default command (running `wastech-mdlint` with no subcommand lints the
   cwd). `scan` is a hidden, deprecated alias of `lint`.
 - Exit codes: `0` pass · `1` findings at the `--fail-on` threshold · `2` operational error.
-- `graph` writes the deterministic context graph (nodes/edges/cycles) to `--out`.
+- `graph` prints the context graph to stdout: clusters, hubs, reading order, and the
+  coverage signal as `human` text (default); the deterministic
+  `{ nodes, edges, components, readingOrder }` shape as `json`; or a `mermaid`/`dot`
+  diagram for rendering elsewhere.
+- `slice <query> --depth <n>` (default depth `2`) resolves `query` by **exact match
+  only** — a defined ID, a heading/anchor slug (`#slug`), or a file path, never
+  fuzzy/substring/keyword/LLM matching — then prints the files reachable within that
+  many hops. A query that matches nothing is an honest empty result (`matchKind: null`
+  in `--format json`), not an error.
+- `impact <file>` classifies the blast radius of changing `file` and lints the affected
+  subgraph: linting still runs against the whole corpus (so project-scope rules like
+  `GRP-001` see every document), but the reported `lint` messages/files are narrowed to
+  `file` plus everything directly or transitively affected by it.
+- `slice`/`impact` always scan the current working directory — unlike `graph`, they take
+  no `[path]` argument.
+- `graph`/`slice`/`impact` are read-only reports and exit `0` on success; `impact` exits
+  `2` (with a hint) if `file` is outside the analyzed corpus.
 - `schema` writes the config JSON schema to a local file (never a remote URL).
 
 ## Config
@@ -106,6 +124,11 @@ Configuration is JSONC (comments + trailing commas) in `wastech-mdlint.config.js
   but disables a rule. Rule IDs are case-insensitive and dash-optional (`ref-001` →
   `REF-001`).
 - `settings.siteRouter` is inherited by reference rules and may be overridden per rule.
+- `settings.idRef` (`{ idPattern, definitions, idColumn }`) feeds the shared context graph's
+  `id-ref` edges, so ID references also count toward `GRP-001` cycles and `GRP-002` incoming
+  references. It mirrors REF-005's own options shape but is configured separately — REF-005
+  cannot expose its resolved options back to the graph builder, so a project that wants both ID
+  traceability (REF-005) and ID-aware graph analysis configures the same shape in both places.
 - The `custom` rule composes the closed assertion vocabulary
   (`requiredColumns`, `columnNotEmpty`, `columnInSet`, `columnMatches`, `columnUnique`,
   `crossColumn`, `sectionPresent`, `sectionOrder`, `contentNotMatch`, `noPlaceholders`,

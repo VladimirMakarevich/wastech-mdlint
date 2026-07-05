@@ -1,6 +1,6 @@
-import { Command, CommanderError, Option } from "commander";
+import { Command, CommanderError, InvalidArgumentError, Option } from "commander";
 
-import { ConfigError } from "@wastech-mdlint/core";
+import { ConfigError, SLICE_RESOLUTION_DESCRIPTION } from "@wastech-mdlint/core";
 
 import {
   CliUsageError,
@@ -11,6 +11,7 @@ import {
   readPackageVersion,
   type CommandExecutionResult,
   type FailOn,
+  type GraphFormat,
   type OutputFormat
 } from "./commands.js";
 
@@ -22,6 +23,17 @@ export type CliIo = {
 
 const OUTPUT_FORMATS: OutputFormat[] = ["text", "json"];
 const FAIL_ON_LEVELS: FailOn[] = ["error", "warning", "off"];
+const GRAPH_FORMATS: GraphFormat[] = ["human", "json", "mermaid", "dot"];
+
+// Shared by `slice`'s `--depth`: reject non-integers/negatives at parse time (exit 2) rather than
+// letting a bad value reach `getContextSlice` and produce a confusing traversal result.
+function parseDepth(value: string): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new InvalidArgumentError("--depth must be a non-negative integer.");
+  }
+  return parsed;
+}
 
 export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
   const stdout = io.stdout ?? process.stdout;
@@ -88,16 +100,50 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
 
   program
     .command("graph")
-    .description("Write the Markdown context graph to a JSON file.")
+    .description("Build and summarize the Markdown context graph (clusters, hubs, reading order, coverage).")
     .argument("[path]", "directory to scan", cwd)
     .addOption(new Option("--config <file>", "path to a config file"))
-    .requiredOption("--out <file>", "graph output file")
-    .action(async (targetPath: string, options: { config?: string; out: string }) => {
+    .addOption(new Option("--format <format>", "output format").choices(GRAPH_FORMATS).default("human"))
+    .action(async (targetPath: string, options: { config?: string; format: GraphFormat }) => {
       executionResult = await executeCommand({
         kind: "graph",
         path: targetPath,
         config: options.config,
-        out: options.out
+        format: options.format
+      });
+    });
+
+  program
+    .command("slice")
+    .description(`Print the files reachable from a query within --depth hops. ${SLICE_RESOLUTION_DESCRIPTION}`)
+    .argument("<query>", "an ID, a heading/anchor slug (#slug), or a file path")
+    .addOption(new Option("--config <file>", "path to a config file"))
+    .addOption(new Option("--depth <n>", "traversal depth").default(2).argParser(parseDepth))
+    .addOption(new Option("--format <format>", "output format").choices(OUTPUT_FORMATS).default("text"))
+    .action(async (query: string, options: { config?: string; depth: number; format: OutputFormat }) => {
+      executionResult = await executeCommand({
+        kind: "slice",
+        path: cwd,
+        config: options.config,
+        query,
+        depth: options.depth,
+        format: options.format
+      });
+    });
+
+  program
+    .command("impact")
+    .description("Classify the blast radius of changing <file> and lint the affected subgraph.")
+    .argument("<file>", "repository-relative path of the changed file")
+    .addOption(new Option("--config <file>", "path to a config file"))
+    .addOption(new Option("--format <format>", "output format").choices(OUTPUT_FORMATS).default("text"))
+    .action(async (file: string, options: { config?: string; format: OutputFormat }) => {
+      executionResult = await executeCommand({
+        kind: "impact",
+        path: cwd,
+        config: options.config,
+        file,
+        format: options.format
       });
     });
 
