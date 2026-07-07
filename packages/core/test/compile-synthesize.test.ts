@@ -435,4 +435,19 @@ describe("synthesize", () => {
 
     expect(result.skillContent).toContain("| docs/a\\|b.md | isolated | narrative |");
   });
+
+  it("renders a CJK skill name and description intact in frontmatter and the heading", () => {
+    // Finding: JSON.stringify does not escape non-ASCII BMP characters, so the hand-rolled YAML
+    // frontmatter renderer passes CJK through byte-for-byte — this pins that (S1 has no ASCII
+    // assumption), it doesn't change any rendering code.
+    const result = synthesize(input({ skill: { name: "概要スキル", description: "日本語の説明文です" } }));
+
+    expect(result.skillContent.startsWith('---\nname: "概要スキル"\ndescription: "日本語の説明文です"\n---')).toBe(
+      true
+    );
+    expect(result.skillContent.split("\n")).toContain("# 概要スキル");
+    expect(() =>
+      skillFrontmatterSchema.parse({ name: "概要スキル", description: "日本語の説明文です" })
+    ).not.toThrow();
+  });
 });

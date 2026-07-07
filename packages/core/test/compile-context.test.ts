@@ -189,6 +189,39 @@ describe("compileContext", () => {
     expect(first).toEqual(second);
   });
 
+  it("computes the corpus token estimate against a CJK document's exact character count", async () => {
+    // D3's estimator (Math.ceil(text.length / 4)) counts UTF-16 code units, not UTF-8 bytes.
+    // `expected` is computed from that locked formula directly against the literal fixture
+    // string — not by calling `estimateTokens` itself — so a future regression to a byte-based
+    // measure changes only the code under test, not this assertion's expectation, and the test
+    // still catches the drift instead of moving in lockstep with it.
+    const fileContent = `# 概要\n\n${"日本語のテスト文章です。".repeat(5)}\n`;
+    const root = await fixtureRepo({ "doc.md": fileContent });
+    const config = loadedConfig({
+      include: ["**/*.md"],
+      compile: { skill: { name: "概要スキル", description: "日本語の説明文です" } }
+    });
+
+    const result = await compileContext(config, root);
+    const expected = Math.ceil(fileContent.length / 4);
+
+    expect(expected).toBe(17);
+    expect(result.skillContent).toContain(`Corpus token estimate: ${expected} tokens.`);
+  });
+
+  it("compiles an empty corpus without throwing", async () => {
+    const root = await fixtureRepo({});
+    const config = loadedConfig({
+      include: ["**/*.md"],
+      compile: { skill: { name: "s", description: "d" } }
+    });
+
+    const result = await compileContext(config, root);
+
+    expect(result.metadata.documentCount).toBe(0);
+    expect(result.skillContent).toContain("(no documents found)");
+  });
+
   it("passes compile.sections and compile.commandPreset through to the rendered output", async () => {
     const root = await fixtureRepo({ "a.md": "# A\n" });
     const config = loadedConfig({

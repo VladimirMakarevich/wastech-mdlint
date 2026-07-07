@@ -330,6 +330,17 @@ describe("compile command", () => {
     await expect(readFile(path.join(cwd, ".claude/skills/wastech-mdlint/SKILL.md"), "utf8")).rejects.toThrow();
   });
 
+  it("--dry-run is deterministic: two runs produce byte-identical stdout", async () => {
+    const cwd = await fixtureRepo({ "a.md": "# A\n", "wastech-mdlint.config.json": compileConfig });
+
+    const first = await run(["compile", "--cwd", cwd, "--dry-run"], cwd);
+    const second = await run(["compile", "--cwd", cwd, "--dry-run"], cwd);
+
+    expect(first.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(second.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(second.stdout).toBe(first.stdout);
+  });
+
   it("exits 2 with guidance when config.compile is absent", async () => {
     const cwd = await fixtureRepo({ "a.md": "# A\n" });
 

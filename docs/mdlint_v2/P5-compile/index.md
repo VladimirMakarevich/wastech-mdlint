@@ -1,6 +1,6 @@
 # Phase P5 — Context compiler & `compile`
 
-> Roadmap: [v2 Index](../index.md) · Phase **P5** · Size **M** · Status **Not started** ·
+> Roadmap: [v2 Index](../index.md) · Phase **P5** · Size **M** · Status **Done** ·
 > Depends on [P4](../index.md).
 >
 > **Goal:** generate a deterministic, host-neutral, project-specific `SKILL.md` from the
@@ -42,11 +42,11 @@ requirements](../requirements/04-skills-compile.md).
 
 ## Phase exit criteria
 
-- [ ] `compileContext` runs load→graph→analyze→profile→describe→synthesize deterministically.
-- [ ] Generated `SKILL.md`: frontmatter (schema-validated, S1), host-neutral command block
+- [x] `compileContext` runs load→graph→analyze→profile→describe→synthesize deterministically.
+- [x] Generated `SKILL.md`: frontmatter (schema-validated, S1), host-neutral command block
       (preset `claude|generic|none`, S2), context-budget summary (S6), and a
       "generated from N docs, M rules" header + hash (S4).
-- [ ] CLI `compile` with `--outdir`/`--dry-run`, default `.claude/skills/wastech-mdlint/`;
+- [x] CLI `compile` with `--outdir`/`--dry-run`, default `.claude/skills/wastech-mdlint/`;
       missing `config.compile` exits 2.
 
 ## What P5 unblocks
