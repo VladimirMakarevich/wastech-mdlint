@@ -3,7 +3,6 @@ import os from "node:os";
 import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
-import { ZodError } from "zod";
 
 import type { LintConfig } from "../src/config/config-schema.js";
 import type { LoadedConfiguration } from "../src/config/load-config.js";
@@ -55,72 +54,6 @@ describe("compileContext", () => {
     expect(result.skillContent).toContain('description: "Docs skill"');
   });
 
-  it("keeps a valid compile.skill even when other compile.* fields are malformed", async () => {
-    // Finding: the lenient `config.compile` reader must default each malformed field
-    // independently — a bad `outdir`/`hubMinInDegree`/`commandPreset` must not discard an
-    // otherwise-valid `skill` block and fall through to an empty-frontmatter failure.
-    const root = await fixtureRepo({ "a.md": "# A\n" });
-    const config = loadedConfig({
-      include: ["**/*.md"],
-      compile: {
-        skill: { name: "docs-skill", description: "Docs skill" },
-        outdir: 123,
-        hubMinInDegree: "not-a-number",
-        commandPreset: "bogus-preset"
-      }
-    });
-
-    const result = await compileContext(config, root);
-
-    expect(result.skillContent).toContain('name: "docs-skill"');
-    expect(result.skillContent).toContain('description: "Docs skill"');
-    // Malformed `commandPreset` falls back to the host-neutral default rather than throwing.
-    expect(result.skillContent).toContain("### Working with dependencies");
-    expect(result.skillContent).not.toContain("!npx wastech-mdlint");
-  });
-
-  it("keeps a valid compile.skill.name when compile.skill.description is malformed", async () => {
-    // Finding: parsing `compile.skill` as one nested object fails all-or-nothing, so a bad
-    // `description` must not also drop an otherwise-valid `name`. A malformed `description` still
-    // defaults to `""`, which S1 rejects (empty name/description) and throws — that part is
-    // expected and unrelated to this finding. What matters is *which* field the resulting ZodError
-    // blames: if `name` had also been wrongly reset to `""` by an all-or-nothing nested parse, the
-    // same error would report a second issue for `name` too. Exactly one issue, for `description`
-    // only, proves `name` was preserved.
-    const root = await fixtureRepo({ "a.md": "# A\n" });
-    const config = loadedConfig({
-      include: ["**/*.md"],
-      compile: { skill: { name: "docs-skill", description: 123 } }
-    });
-
-    await expect(compileContext(config, root)).rejects.toBeInstanceOf(ZodError);
-    await expect(compileContext(config, root)).rejects.toMatchObject({
-      issues: [{ path: ["description"] }]
-    });
-  });
-
-  it("keeps valid compile.sections.* flags when a sibling flag is malformed", async () => {
-    // Finding: parsing `compile.sections` as one nested object fails all-or-nothing, so a bad
-    // `rules` flag must not reset every other section flag (`architecture: false` here) back to
-    // its default `true`.
-    const root = await fixtureRepo({ "a.md": "# A\n" });
-    const config = loadedConfig({
-      include: ["**/*.md"],
-      compile: {
-        skill: { name: "s", description: "d" },
-        sections: { architecture: false, rules: "bogus", dependencies: true, workflow: false }
-      }
-    });
-
-    const result = await compileContext(config, root);
-
-    expect(result.skillContent).not.toContain("## Document Architecture");
-    expect(result.skillContent).not.toContain("## Workflow");
-    expect(result.skillContent).toContain("## Document Dependencies");
-    // The malformed `rules` flag defaults to `true` on its own, independent of its siblings.
-    expect(result.skillContent).toContain("## Document Rules");
-  });
-
   it("threads compile.hubMinInDegree through to role classification", async () => {
     // Same fixture shape as P5.01's own hub-threshold test: three files link to `bridge.md`
     // (inDegree 3), which is the default `hubMinInDegree` boundary.
@@ -148,37 +81,6 @@ describe("compileContext", () => {
     expect(defaultResult.skillContent).toContain("| bridge.md | hub | narrative |");
     expect(raisedThreshold.skillContent).toContain("| bridge.md | bridge | narrative |");
   });
-
-  it.each([0, -1, 1.5])(
-    "falls back to the default hubMinInDegree for a malformed value (%s)",
-    async (hubMinInDegree) => {
-      // Finding: `0`/negative/fractional thresholds are malformed for a node-count comparison
-      // (`inDegree >= hubMinInDegree`) — they must default like every other malformed `compile.*`
-      // field, not silently rewrite role classification.
-      const root = await fixtureRepo({
-        "a.md": "[bridge](bridge.md)\n[leaf](leaf.md)\n",
-        "b.md": "[bridge](bridge.md)\n[leaf](leaf.md)\n",
-        "bridge.md": "[sink](sink.md)\n",
-        "c.md": "[bridge](bridge.md)\n[leaf](leaf.md)\n",
-        "leaf.md": "# Leaf\n",
-        "sink.md": "# Sink\n"
-      });
-
-      const defaultResult = await compileContext(
-        loadedConfig({ include: ["**/*.md"], compile: { skill: { name: "s", description: "d" } } }),
-        root
-      );
-      const malformedResult = await compileContext(
-        loadedConfig({
-          include: ["**/*.md"],
-          compile: { skill: { name: "s", description: "d" }, hubMinInDegree }
-        }),
-        root
-      );
-
-      expect(malformedResult.skillContent).toBe(defaultResult.skillContent);
-    }
-  );
 
   it("names an over-budget entrypoint in the Context Budget section", async () => {
     const root = await fixtureRepo({

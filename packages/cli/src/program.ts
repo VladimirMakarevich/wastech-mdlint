@@ -147,6 +147,23 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
       });
     });
 
+  program
+    .command("compile")
+    .description("Generate a deterministic SKILL.md from the document graph, rules, and config.")
+    .addOption(new Option("--config <file>", "path to a config file"))
+    .addOption(new Option("--outdir <dir>", "directory to write SKILL.md into"))
+    .addOption(new Option("--dry-run", "print the generated SKILL.md without writing it"))
+    .addOption(new Option("--cwd <dir>", "working directory to compile from").default(cwd))
+    .action(async (options: { config?: string; outdir?: string; dryRun?: boolean; cwd: string }) => {
+      executionResult = await executeCommand({
+        kind: "compile",
+        cwd: options.cwd,
+        config: options.config,
+        outdir: options.outdir,
+        dryRun: options.dryRun ?? false
+      });
+    });
+
   try {
     await program.parseAsync(argv, { from: "user" });
   } catch (error) {

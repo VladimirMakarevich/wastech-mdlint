@@ -212,6 +212,8 @@ export { generateRuleDocs } from "./engine/rule-docs.js";
 
 // Config (P2.04 / P3.08)
 export {
+  compileCommandPresetSchema,
+  compileConfigSchema,
   customRuleEntrySchema,
   lintConfigSchema,
   ruleEntrySchema,
@@ -219,6 +221,7 @@ export {
   severityOverrideSchema,
 } from "./config/config-schema.js";
 export type {
+  CompileConfig,
   CustomRuleConfigEntry,
   LintConfig,
   RuleConfigEntry,

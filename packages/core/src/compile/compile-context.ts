@@ -1,6 +1,4 @@
-import { z } from "zod";
-
-import type { CustomRuleConfigEntry, RuleConfigEntry } from "../config/config-schema.js";
+import type { CompileConfig, CustomRuleConfigEntry, RuleConfigEntry } from "../config/config-schema.js";
 import type { LoadedConfiguration } from "../config/load-config.js";
 import { ruleRegistry } from "../engine/rules/index.js";
 import { estimateTokens } from "../engine/tokens.js";
@@ -41,27 +39,6 @@ export class CompileConfigMissingError extends Error {
   }
 }
 
-// Deliberately lenient, unexported reader for `config.compile`. The root config schema
-// (`config-schema.ts`) still types `compile` as `z.unknown()` — its strict shape lands in P5.05 —
-// so this local shape mirrors what P5.05 will formalize (`{ outdir?, skill: { name, description },
-// sections?, commandPreset?, hubMinInDegree? }`) but only ever *defaults* missing or malformed
-// pieces. It must never become a second "authoritative" schema; P5.05 supersedes it outright.
-//
-// Every leaf field is parsed independently, all the way down (audit finding): a bad
-// `compile.skill.description` must not also drop a valid `compile.skill.name`, and a bad
-// `compile.sections.rules` must not reset every other `compile.sections.*` flag to its default.
-// Parsing a nested object as one `safeParse` fails all-or-nothing, so each leaf gets its own
-// `safeParse` against a primitive schema instead. `outdir` isn't read here — P5.05's CLI reads it
-// directly — so it isn't validated by this resolver.
-const compileCommandPresetSchema = z.enum(["claude", "generic", "none"]);
-const stringSchema = z.string();
-const booleanSchema = z.boolean();
-// A degree threshold below 1 (or fractional) is malformed, not just "unusual" — `0`/negative would
-// make `classifyNode`'s `inDegree >= hubMinInDegree` check trivially true for almost every node
-// (audit finding), silently rewriting role classification instead of defaulting like every other
-// malformed field here.
-const hubMinInDegreeSchema = z.number().int().min(1);
-
 type ResolvedCompileSettings = {
   skill: { name: string; description: string };
   sections: CompileSections;
@@ -69,41 +46,20 @@ type ResolvedCompileSettings = {
   hubMinInDegree: number;
 };
 
-function asRecord(raw: unknown): Record<string, unknown> {
-  return typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {};
-}
-
-function readString(value: unknown, fallback: string): string {
-  const parsed = stringSchema.safeParse(value);
-  return parsed.success ? parsed.data : fallback;
-}
-
-function readBoolean(value: unknown, fallback: boolean): boolean {
-  const parsed = booleanSchema.safeParse(value);
-  return parsed.success ? parsed.data : fallback;
-}
-
-function resolveCompileSettings(raw: unknown): ResolvedCompileSettings {
-  const record = asRecord(raw);
-  const skillRecord = asRecord(record.skill);
-  const sectionsRecord = asRecord(record.sections);
-
-  const commandPreset = compileCommandPresetSchema.safeParse(record.commandPreset);
-  const hubMinInDegree = hubMinInDegreeSchema.safeParse(record.hubMinInDegree);
-
+// `config-schema.ts`'s strict `compileConfigSchema` already validated presence and shape of every
+// leaf (P5.05), so only *absent* optional leaves need a default here — no more per-leaf `safeParse`
+// defaulting. `outdir` still isn't read here — that stays the CLI's job.
+function resolveCompileSettings(compileConfig: CompileConfig): ResolvedCompileSettings {
   return {
-    skill: {
-      name: readString(skillRecord.name, ""),
-      description: readString(skillRecord.description, "")
-    },
+    skill: compileConfig.skill,
     sections: {
-      architecture: readBoolean(sectionsRecord.architecture, true),
-      rules: readBoolean(sectionsRecord.rules, true),
-      dependencies: readBoolean(sectionsRecord.dependencies, true),
-      workflow: readBoolean(sectionsRecord.workflow, true)
+      architecture: compileConfig.sections?.architecture ?? true,
+      rules: compileConfig.sections?.rules ?? true,
+      dependencies: compileConfig.sections?.dependencies ?? true,
+      workflow: compileConfig.sections?.workflow ?? true
     },
-    commandPreset: commandPreset.success ? commandPreset.data : "generic",
-    hubMinInDegree: hubMinInDegree.success ? hubMinInDegree.data : DEFAULT_HUB_MIN_IN_DEGREE
+    commandPreset: compileConfig.commandPreset ?? "generic",
+    hubMinInDegree: compileConfig.hubMinInDegree ?? DEFAULT_HUB_MIN_IN_DEGREE
   };
 }
 

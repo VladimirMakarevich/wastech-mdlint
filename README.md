@@ -67,6 +67,7 @@ wastech-mdlint graph [path] [--config <file>] [--format human|json|mermaid|dot]
 wastech-mdlint slice <query> [--config <file>] [--depth <n>] [--format text|json]
 wastech-mdlint impact <file> [--config <file>] [--format text|json]
 wastech-mdlint schema [--out schema.json]
+wastech-mdlint compile [--config <file>] [--outdir <dir>] [--dry-run] [--cwd <dir>]
 ```
 
 - `lint` is the default command (running `wastech-mdlint` with no subcommand lints the
@@ -90,6 +91,13 @@ wastech-mdlint schema [--out schema.json]
 - `graph`/`slice`/`impact` are read-only reports and exit `0` on success; `impact` exits
   `2` (with a hint) if `file` is outside the analyzed corpus.
 - `schema` writes the config JSON schema to a local file (never a remote URL).
+- `compile` generates a deterministic `SKILL.md` from the document graph, rule
+  descriptions, and config, then writes it to the resolved outdir (`--outdir` →
+  `config.compile.outdir` → `.claude/skills/wastech-mdlint/`) as `SKILL.md`; `--dry-run`
+  prints the same content to stdout instead of writing it. Requires a `compile` section
+  in config; a missing one exits `2` with guidance instead of a bare stack trace. Unlike
+  every other command, `compile` takes `--cwd` instead of a `[path]` argument, and
+  resolves a relative `--config`/`--outdir` against it (not the process's own cwd).
 
 ## Config
 
@@ -115,7 +123,11 @@ Configuration is JSONC (comments + trailing commas) in `wastech-mdlint.config.js
       "target": "table",
       "options": { "files": ["docs/requirements/**/*.md"], "assert": { "kind": "columnNotEmpty", "column": "Owner" } }
     }
-  ]
+  ],
+  "compile": {
+    "outdir": ".claude/skills/wastech-mdlint",
+    "skill": { "name": "...", "description": "..." }
+  }
 }
 ```
 
@@ -134,6 +146,13 @@ Configuration is JSONC (comments + trailing commas) in `wastech-mdlint.config.js
   `crossColumn`, `sectionPresent`, `sectionOrder`, `contentNotMatch`, `noPlaceholders`,
   `allChecked`, `linkResolves`, `imageResolves`). Its `id` must be namespaced and must not
   shadow a built-in prefix.
+- `compile` configures the `compile` command. `skill.name`/`skill.description` are
+  required (non-empty); `sections.{architecture,rules,dependencies,workflow}` (all
+  default `true`) gate which `SKILL.md` sections render; `commandPreset` (`"claude"` |
+  `"generic"` | `"none"`, default `"generic"`) selects the wording of the generated
+  "Working with dependencies" block; `hubMinInDegree` (default `3`) is the in-degree
+  threshold used to classify a document as a hub. Unknown `compile.*` keys are rejected
+  like any other unknown config key.
 
 ## Rules
 
