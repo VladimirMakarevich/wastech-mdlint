@@ -70,6 +70,12 @@ export type {
   NodeClassification,
   NodeRole
 } from "./compile/graph-analysis.js";
+export { extractDocProfile } from "./compile/doc-profile.js";
+export type {
+  DocumentOutlineItem,
+  DocumentProfile,
+  DocumentTableSchema
+} from "./compile/doc-profile.js";
 
 // Engine (P2)
 export type {
