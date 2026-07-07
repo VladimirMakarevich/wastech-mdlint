@@ -147,6 +147,88 @@ describe("loadConfiguration", () => {
   });
 });
 
+describe("compile config (P5.05)", () => {
+  it("accepts a fully-populated valid compile section", async () => {
+    const root = await writeConfig(
+      JSON.stringify({
+        rules: [],
+        compile: {
+          outdir: ".claude/skills/wastech-mdlint",
+          skill: { name: "docs-skill", description: "Docs skill" },
+          sections: { architecture: true, rules: true, dependencies: false, workflow: true },
+          commandPreset: "claude",
+          hubMinInDegree: 5
+        }
+      })
+    );
+
+    const loaded = await loadConfiguration({ cwd: root, registry });
+    expect(loaded.config.compile).toEqual({
+      outdir: ".claude/skills/wastech-mdlint",
+      skill: { name: "docs-skill", description: "Docs skill" },
+      sections: { architecture: true, rules: true, dependencies: false, workflow: true },
+      commandPreset: "claude",
+      hubMinInDegree: 5
+    });
+  });
+
+  it("rejects compile: {} for missing skill", async () => {
+    const root = await writeConfig(JSON.stringify({ rules: [], compile: {} }));
+    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(/compile\.skill/);
+  });
+
+  it("rejects an empty compile.skill.name", async () => {
+    const root = await writeConfig(
+      JSON.stringify({ rules: [], compile: { skill: { name: "", description: "d" } } })
+    );
+    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(/compile\.skill\.name/);
+  });
+
+  it("rejects an empty compile.skill.description", async () => {
+    const root = await writeConfig(
+      JSON.stringify({ rules: [], compile: { skill: { name: "s", description: "" } } })
+    );
+    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(/compile\.skill\.description/);
+  });
+
+  it.each([0, -1, 1.5])("rejects a hubMinInDegree of %s", async (hubMinInDegree) => {
+    const root = await writeConfig(
+      JSON.stringify({ rules: [], compile: { skill: { name: "s", description: "d" }, hubMinInDegree } })
+    );
+    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(/compile\.hubMinInDegree/);
+  });
+
+  it("rejects an unknown compile.commandPreset value", async () => {
+    const root = await writeConfig(
+      JSON.stringify({
+        rules: [],
+        compile: { skill: { name: "s", description: "d" }, commandPreset: "bogus-preset" }
+      })
+    );
+    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(/compile\.commandPreset/);
+  });
+
+  it("rejects a non-boolean compile.sections.rules", async () => {
+    const root = await writeConfig(
+      JSON.stringify({
+        rules: [],
+        compile: { skill: { name: "s", description: "d" }, sections: { rules: "bogus" } }
+      })
+    );
+    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(/compile\.sections\.rules/);
+  });
+
+  it("rejects an unknown compile.* key (C7)", async () => {
+    const root = await writeConfig(
+      JSON.stringify({
+        rules: [],
+        compile: { skill: { name: "s", description: "d" }, bogus: true }
+      })
+    );
+    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(/config\.compile:.*"bogus"/);
+  });
+});
+
 describe("findConfig", () => {
   it("walks up parent directories to locate the config", async () => {
     const root = await writeConfig(JSON.stringify({ rules: [] }));

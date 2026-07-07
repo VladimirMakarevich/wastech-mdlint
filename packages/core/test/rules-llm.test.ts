@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { ConfiguredRule } from "../src/config/load-config.js";
 import { lintFiles } from "../src/engine/lint-files.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
+import { estimateTokens } from "../src/engine/tokens.js";
+import type { ResolvedSettings } from "../src/engine/types.js";
 
 const tempDirs: string[] = [];
 
@@ -29,8 +31,8 @@ function rule(id: string, options?: unknown): ConfiguredRule {
   return { rule: ruleRegistry.resolveRule(id, options) };
 }
 
-async function lint(cwd: string, rules: ConfiguredRule[]) {
-  return lintFiles({ cwd, config: { rules: [] }, rules, settings: {} });
+async function lint(cwd: string, rules: ConfiguredRule[], settings: ResolvedSettings = {}) {
+  return lintFiles({ cwd, config: { rules: [] }, rules, settings });
 }
 
 describe("SIZE-001 line and token metrics", () => {
@@ -75,5 +77,56 @@ describe("LLM-001 eager-import budget", () => {
       rule("LLM-001", { entrypoints: ["CLAUDE.md"], maxTokensPerEntrypoint: 100000 })
     ]);
     expect(result.messages.some((message) => message.message.includes("Eager import cycle detected"))).toBe(true);
+  });
+
+  it("resolves a routed root-relative eager import through settings.siteRouter", async () => {
+    // Regression pin (audit finding): LLM-001's resolver now reuses `resolveTargetCandidates`
+    // instead of an ad hoc slash-strip, so a root-relative import under a configured `siteRouter`
+    // must resolve to the router's candidate — asserted here directly against the rule, not just
+    // via a compile-vs-lint parity check that could pass if both sides drifted the same wrong way.
+    const entrypointContent = "# Entry\n@/big.md\n";
+    const importedContent = `${"x".repeat(400)}\n`;
+    const cwd = await fixtureRepo({
+      "src/content/docs/entry.md": entrypointContent,
+      // Under the starlight preset, `@/big.md`'s route path is "big.md" (imports always carry a
+      // literal `.md` suffix), whose first router candidate is `<contentDir>/big.md.md`.
+      "src/content/docs/big.md.md": importedContent
+    });
+    const siteRouter = { preset: "starlight", contentDir: "src/content/docs" };
+
+    const result = await lint(
+      cwd,
+      [rule("LLM-001", { entrypoints: ["src/content/docs/entry.md"], maxTokensPerEntrypoint: 50 })],
+      { siteRouter }
+    );
+
+    const overBudget = result.messages.find((message) => message.message.includes("over context budget"));
+    expect(overBudget).toMatchObject({ filePath: "src/content/docs/entry.md" });
+    expect(overBudget?.data).toMatchObject({
+      totalTokens: estimateTokens(entrypointContent) + estimateTokens(importedContent),
+      maxTokens: 50,
+      importedFiles: 1
+    });
+    expect(result.messages.some((message) => message.message.includes("Missing eager import"))).toBe(false);
+  });
+
+  it("reports a missing eager import when a routed root-relative target has no router candidate on disk", async () => {
+    const cwd = await fixtureRepo({ "src/content/docs/entry.md": "@/missing.md\n" });
+    const siteRouter = { preset: "starlight", contentDir: "src/content/docs" };
+
+    const result = await lint(
+      cwd,
+      [rule("LLM-001", { entrypoints: ["src/content/docs/entry.md"], maxTokensPerEntrypoint: 100000 })],
+      { siteRouter }
+    );
+
+    expect(result.messages).toHaveLength(1);
+    // Pin the exact routed fallback path (first starlight candidate), not just the message prefix
+    // — a regression back to the old ad hoc slash-strip resolver would resolve to a different path
+    // ("missing.md") and still match a prefix-only assertion.
+    expect(result.messages[0]?.message).toBe(
+      "Missing eager import @/missing.md; resolved to src/content/docs/missing.md.md."
+    );
+    expect(result.messages[0]?.data).toMatchObject({ targetPath: "src/content/docs/missing.md.md" });
   });
 });

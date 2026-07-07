@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -259,5 +259,93 @@ describe("impact command", () => {
     const result = await run(["impact", "zzz.md"], cwd);
     expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
     expect(result.stderr).toContain("must be repository-relative POSIX");
+  });
+});
+
+describe("compile command", () => {
+  const compileConfig = JSON.stringify({
+    compile: { skill: { name: "docs-skill", description: "Docs skill" } }
+  });
+
+  it("writes SKILL.md to the default .claude/skills/wastech-mdlint/ outdir", async () => {
+    const cwd = await fixtureRepo({ "a.md": "# A\n", "wastech-mdlint.config.json": compileConfig });
+
+    const result = await run(["compile", "--cwd", cwd], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    // Repository-relative POSIX path (invariant), not an absolute host path.
+    expect(result.stdout).toContain(".claude/skills/wastech-mdlint/SKILL.md");
+    expect(result.stdout).not.toContain(cwd);
+
+    const outputPath = path.join(cwd, ".claude/skills/wastech-mdlint/SKILL.md");
+    const written = await readFile(outputPath, "utf8");
+    expect(written).toContain('name: "docs-skill"');
+  });
+
+  it("resolves a relative --config path against --cwd, not the process cwd", async () => {
+    // The process running this test has its own cwd (the repo root), which differs from the
+    // fixture directory — exactly the scenario that broke a naive `path.resolve(command.config)`
+    // inside loadConfiguration, since that resolves against the real process cwd, not `--cwd`.
+    const cwd = await fixtureRepo({ "a.md": "# A\n", "custom.config.json": compileConfig });
+
+    const result = await run(["compile", "--cwd", cwd, "--config", "custom.config.json"], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const written = await readFile(path.join(cwd, ".claude/skills/wastech-mdlint/SKILL.md"), "utf8");
+    expect(written).toContain('name: "docs-skill"');
+  });
+
+  it("writes SKILL.md to a custom --outdir", async () => {
+    const cwd = await fixtureRepo({ "a.md": "# A\n", "wastech-mdlint.config.json": compileConfig });
+
+    const result = await run(["compile", "--cwd", cwd, "--outdir", "generated-skill"], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const written = await readFile(path.join(cwd, "generated-skill/SKILL.md"), "utf8");
+    expect(written).toContain('name: "docs-skill"');
+  });
+
+  it("resolves config.compile.outdir when --outdir is absent", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        compile: { outdir: "configured-outdir", skill: { name: "docs-skill", description: "Docs skill" } }
+      })
+    });
+
+    const result = await run(["compile", "--cwd", cwd], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const written = await readFile(path.join(cwd, "configured-outdir/SKILL.md"), "utf8");
+    expect(written).toContain('name: "docs-skill"');
+  });
+
+  it("--dry-run prints content and does not create the file", async () => {
+    const cwd = await fixtureRepo({ "a.md": "# A\n", "wastech-mdlint.config.json": compileConfig });
+
+    const result = await run(["compile", "--cwd", cwd, "--dry-run"], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain('name: "docs-skill"');
+
+    await expect(readFile(path.join(cwd, ".claude/skills/wastech-mdlint/SKILL.md"), "utf8")).rejects.toThrow();
+  });
+
+  it("--dry-run is deterministic: two runs produce byte-identical stdout", async () => {
+    const cwd = await fixtureRepo({ "a.md": "# A\n", "wastech-mdlint.config.json": compileConfig });
+
+    const first = await run(["compile", "--cwd", cwd, "--dry-run"], cwd);
+    const second = await run(["compile", "--cwd", cwd, "--dry-run"], cwd);
+
+    expect(first.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(second.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(second.stdout).toBe(first.stdout);
+  });
+
+  it("exits 2 with guidance when config.compile is absent", async () => {
+    const cwd = await fixtureRepo({ "a.md": "# A\n" });
+
+    const result = await run(["compile", "--cwd", cwd], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    expect(result.stderr).toContain("config.compile is missing");
   });
 });

@@ -29,6 +29,43 @@ const idRefSchema = z
 
 const settingsSchema = z.object({ siteRouter: siteRouterSchema.optional(), idRef: idRefSchema.optional() }).strict();
 
+// Mirrors `synthesize.ts`'s structurally-equal `CompileCommandPreset` as a standalone enum schema
+// (same pattern as `severityOverrideSchema` vs `engine/types.ts`'s `SeverityOverride`) so config
+// validation doesn't import from `compile/`, which would invert the existing `compile -> config`
+// dependency direction.
+export const compileCommandPresetSchema = z.enum(["claude", "generic", "none"]);
+
+const compileSkillSchema = z
+  .object({
+    name: z.string().min(1),
+    description: z.string().min(1)
+  })
+  .strict();
+
+const compileSectionsSchema = z
+  .object({
+    architecture: z.boolean().optional(),
+    rules: z.boolean().optional(),
+    dependencies: z.boolean().optional(),
+    workflow: z.boolean().optional()
+  })
+  .strict();
+
+// P5.05: the strict shape for `compile`, replacing P2.04's `z.unknown()` placeholder. `skill` is
+// required (locked example: docs/mdlint_v2/requirements/01-configuration.md:47-50); `outdir` is
+// validated here but deliberately never read by `compileContext` — only the CLI reads it.
+export const compileConfigSchema = z
+  .object({
+    outdir: z.string().optional(),
+    skill: compileSkillSchema,
+    sections: compileSectionsSchema.optional(),
+    commandPreset: compileCommandPresetSchema.optional(),
+    hubMinInDegree: z.number().int().min(1).optional()
+  })
+  .strict();
+
+export type CompileConfig = z.infer<typeof compileConfigSchema>;
+
 // A standard rule entry (built-in rules). Options are validated per-rule by resolveRule (two-stage).
 export const ruleEntrySchema = z
   .object({
@@ -70,8 +107,7 @@ export const lintConfigSchema = z
     settings: settingsSchema.optional(),
     // Optional so a minimal config lints nothing rather than erroring; init (P6) writes a real set.
     rules: z.array(ruleEntryUnionSchema).optional(),
-    // `compile` is opaque here; its shape is validated in P5.
-    compile: z.unknown().optional()
+    compile: compileConfigSchema.optional()
   })
   .strict();
 

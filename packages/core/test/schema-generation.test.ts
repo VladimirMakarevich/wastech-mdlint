@@ -37,6 +37,23 @@ describe("generateConfigSchema", () => {
     expect(customBranch).toBeDefined();
   });
 
+  it("requires compile.skill and forbids unknown keys at the compile and compile.skill levels (P5.05)", () => {
+    const schema = JSON.parse(generateConfigSchema()) as {
+      properties: {
+        compile: {
+          required: string[];
+          additionalProperties: boolean;
+          properties: { skill: { required: string[]; additionalProperties: boolean } };
+        };
+      };
+    };
+    const compileSchema = schema.properties.compile;
+    expect(compileSchema.required).toEqual(["skill"]);
+    expect(compileSchema.additionalProperties).toBe(false);
+    expect(compileSchema.properties.skill.required).toEqual(["name", "description"]);
+    expect(compileSchema.properties.skill.additionalProperties).toBe(false);
+  });
+
   it("excludes reserved built-in prefixes and known custom ids from the generic custom id pattern", () => {
     const schema = JSON.parse(
       generateConfigSchema({ customRules: [{ id: "REQ-OWNER" }] })

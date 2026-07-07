@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import {
   applyFixes,
   classifyImpact,
+  compileContext,
+  CompileConfigMissingError,
   computeGraphCoverage,
   formatLintResultJson,
   formatLintResultText,
@@ -14,6 +16,7 @@ import {
   lintFiles,
   loadConfiguration,
   loadContext,
+  normalizeRelativePath,
   renderContextGraphDot,
   renderContextGraphMermaid,
   renderContextGraphText,
@@ -21,7 +24,11 @@ import {
   renderImpactSummary,
   summarizeContextGraph
 } from "@wastech-mdlint/core";
-import type { ImpactClassification, LintMessage, LintResult } from "@wastech-mdlint/core";
+import type { CompileResult, ImpactClassification, LintMessage, LintResult } from "@wastech-mdlint/core";
+
+// Resolution order (P5.05): an explicit `--outdir` wins, then `config.compile.outdir`, then this
+// fallback — matching the locked example path in docs/mdlint_v2/requirements/01-configuration.md.
+const DEFAULT_COMPILE_OUTDIR = ".claude/skills/wastech-mdlint/";
 
 export const EXIT_CODE_SUCCESS = 0;
 export const EXIT_CODE_RUNTIME_ERROR = 1;
@@ -71,7 +78,15 @@ export type SchemaCommand = {
   out: string;
 };
 
-export type CliCommand = LintCommand | GraphCommand | SliceCommand | ImpactCommand | SchemaCommand;
+export type CompileCommand = {
+  kind: "compile";
+  cwd: string;
+  config?: string;
+  outdir?: string;
+  dryRun: boolean;
+};
+
+export type CliCommand = LintCommand | GraphCommand | SliceCommand | ImpactCommand | SchemaCommand | CompileCommand;
 
 export type CommandExecutionResult = {
   output: string;
@@ -265,6 +280,46 @@ async function handleSchema(command: SchemaCommand): Promise<CommandExecutionRes
   return { output: `schema written to ${command.out}\n`, exitCode: EXIT_CODE_SUCCESS };
 }
 
+// `compile` (P5.05): core owns generation (`compileContext`); this handler only resolves `outdir`
+// and does the file I/O, matching the core-hosts-the-pipeline decision.
+async function handleCompile(command: CompileCommand): Promise<CommandExecutionResult> {
+  // `compile` is the one command with a named `--cwd` instead of a `[path]` argument that defaults
+  // to the CLI's own injected cwd, so a relative `--config` must be resolved against `command.cwd`
+  // explicitly — `loadConfiguration` resolves `explicitConfigPath` against `process.cwd()`, which
+  // silently diverges from `command.cwd` when the two differ.
+  const explicitConfigPath =
+    command.config === undefined ? undefined : path.resolve(command.cwd, command.config);
+  const loaded = await loadConfiguration({ cwd: command.cwd, explicitConfigPath });
+
+  let result: CompileResult;
+  try {
+    result = await compileContext(loaded, command.cwd);
+  } catch (error) {
+    // CompileConfigMissingError already carries a guidance hint; re-throw as CliUsageError so
+    // program.ts's existing catch block maps it to exit 2 instead of a bare stack trace.
+    if (error instanceof CompileConfigMissingError) {
+      throw new CliUsageError(error.message);
+    }
+    throw error;
+  }
+
+  if (command.dryRun) {
+    return { output: result.skillContent, exitCode: EXIT_CODE_SUCCESS };
+  }
+
+  const outdirSetting = command.outdir ?? loaded.config.compile?.outdir ?? DEFAULT_COMPILE_OUTDIR;
+  const resolvedOutdir = path.resolve(command.cwd, outdirSetting);
+  const outputPath = path.join(resolvedOutdir, "SKILL.md");
+
+  await mkdir(resolvedOutdir, { recursive: true });
+  await writeFile(outputPath, result.skillContent, "utf8");
+
+  // Repository-relative POSIX path in user-visible output (invariant), not an absolute,
+  // platform-native one — normalize `\` to `/` so this reads identically on Windows.
+  const relativeOutputPath = normalizeRelativePath(path.relative(command.cwd, outputPath));
+  return { output: `SKILL.md written to ${relativeOutputPath}\n`, exitCode: EXIT_CODE_SUCCESS };
+}
+
 export async function executeCommand(command: CliCommand): Promise<CommandExecutionResult> {
   switch (command.kind) {
     case "lint":
@@ -277,6 +332,8 @@ export async function executeCommand(command: CliCommand): Promise<CommandExecut
       return handleImpact(command);
     case "schema":
       return handleSchema(command);
+    case "compile":
+      return handleCompile(command);
     default: {
       const exhaustiveCheck: never = command;
       return exhaustiveCheck;

@@ -16,7 +16,7 @@ export type {
   ParsedLink,
   ParsedLinkKind,
   ParsedTable,
-  ParsedTableRow
+  ParsedTableRow,
 } from "./markdown/document-types.js";
 export { parseDocument } from "./markdown/parse-document.js";
 export { loadDocuments } from "./markdown/load-documents.js";
@@ -28,7 +28,7 @@ export {
   matchesConfigGlob,
   normalizeConfigGlob,
   normalizeConfigGlobs,
-  normalizeRelativePath
+  normalizeRelativePath,
 } from "./discovery/globs.js";
 
 // Graph
@@ -37,19 +37,49 @@ export type {
   ContextGraph,
   ContextGraphEdge,
   ContextGraphEdgeType,
-  ContextGraphNode
+  ContextGraphNode,
 } from "./graph/context-graph-types.js";
 export { buildContextGraph } from "./graph/build-context-graph.js";
 export { computeGraphCoverage } from "./graph/coverage.js";
-export type { ComputeGraphCoverageOptions, GraphCoverage } from "./graph/coverage.js";
-export { formatContextGraphSummary, getComponents, topologicalSort } from "./graph/graph-algorithms.js";
+export type {
+  ComputeGraphCoverageOptions,
+  GraphCoverage,
+} from "./graph/coverage.js";
+export {
+  formatContextGraphSummary,
+  getComponents,
+  topologicalSort,
+} from "./graph/graph-algorithms.js";
 export type { TopologicalSortResult } from "./graph/graph-algorithms.js";
 export { impact, query, slice } from "./graph/query.js";
-export type { QueryDirection, QueryOptions, QueryResult, QueryVisit } from "./graph/query.js";
-export { buildSearchIndex, getContextSlice, resolveQuery, SLICE_RESOLUTION_DESCRIPTION } from "./graph/search-index.js";
-export type { ContextSearchIndex, ContextSliceResult, SliceMatchKind } from "./graph/search-index.js";
-export { classifyImpact, getImpactSet, ImpactAnalysisError, relativizeImpact } from "./graph/impact-analysis.js";
-export type { DirectlyAffected, ImpactClassification, TransitivelyAffected } from "./graph/impact-analysis.js";
+export type {
+  QueryDirection,
+  QueryOptions,
+  QueryResult,
+  QueryVisit,
+} from "./graph/query.js";
+export {
+  buildSearchIndex,
+  getContextSlice,
+  resolveQuery,
+  SLICE_RESOLUTION_DESCRIPTION,
+} from "./graph/search-index.js";
+export type {
+  ContextSearchIndex,
+  ContextSliceResult,
+  SliceMatchKind,
+} from "./graph/search-index.js";
+export {
+  classifyImpact,
+  getImpactSet,
+  ImpactAnalysisError,
+  relativizeImpact,
+} from "./graph/impact-analysis.js";
+export type {
+  DirectlyAffected,
+  ImpactClassification,
+  TransitivelyAffected,
+} from "./graph/impact-analysis.js";
 export { loadContext } from "./graph/load-context.js";
 export type { GraphContext } from "./graph/load-context.js";
 export {
@@ -58,9 +88,45 @@ export {
   renderContextGraphText,
   renderContextSliceSummary,
   renderImpactSummary,
-  summarizeContextGraph
+  summarizeContextGraph,
 } from "./graph/graph-render.js";
 export type { ContextGraphSummary } from "./graph/graph-render.js";
+
+// Compile (P5)
+export {
+  analyzeGraph,
+  classifyNodes,
+  DEFAULT_HUB_MIN_IN_DEGREE,
+} from "./compile/graph-analysis.js";
+export type {
+  GraphAnalysis,
+  GraphAnalysisOptions,
+  NodeClassification,
+  NodeRole,
+} from "./compile/graph-analysis.js";
+export { extractDocProfile } from "./compile/doc-profile.js";
+export type {
+  DocumentOutlineItem,
+  DocumentProfile,
+  DocumentTableSchema,
+} from "./compile/doc-profile.js";
+export { describeRules } from "./compile/describe-rules.js";
+export type {
+  DescribedRule,
+  RuleDescriptionGroup,
+} from "./compile/describe-rules.js";
+export { skillFrontmatterSchema } from "./compile/skill-frontmatter.js";
+export type { SkillFrontmatter } from "./compile/skill-frontmatter.js";
+export { synthesize } from "./compile/synthesize.js";
+export type {
+  CompileBudget,
+  CompileBudgetEntrypoint,
+  CompileCommandPreset,
+  CompileResult,
+  CompileSections,
+  SynthesizeInput,
+} from "./compile/synthesize.js";
+export { compileContext, CompileConfigMissingError } from "./compile/compile-context.js";
 
 // Engine (P2)
 export type {
@@ -75,7 +141,7 @@ export type {
   Severity,
   SeverityOverride,
   SiteRouterSettings,
-  TextEdit
+  TextEdit,
 } from "./engine/types.js";
 export { runRules } from "./engine/run-rules.js";
 export type { RunRulesContext } from "./engine/run-rules.js";
@@ -83,13 +149,20 @@ export { lintFiles } from "./engine/lint-files.js";
 export type { LintFilesInput, LintResult } from "./engine/lint-files.js";
 export { createSuppressionChecker } from "./engine/suppression.js";
 export type { SuppressionChecker } from "./engine/suppression.js";
-export { formatLintResultJson, formatLintResultText } from "./engine/format-lint-result.js";
+export {
+  formatLintResultJson,
+  formatLintResultText,
+} from "./engine/format-lint-result.js";
 export { estimateTokens } from "./engine/tokens.js";
 export { applyEdits, applyFixes } from "./engine/fix.js";
 export type { ApplyFixesResult } from "./engine/fix.js";
 export { extractColumnIds, extractDefinedIds } from "./engine/defined-ids.js";
 export type { IdOccurrence, IdRef } from "./engine/defined-ids.js";
-export { compileRegex, regexFlagsSchema, regexStringSchema } from "./engine/regex.js";
+export {
+  compileRegex,
+  regexFlagsSchema,
+  regexStringSchema,
+} from "./engine/regex.js";
 export { findLineNumber } from "./engine/text-position.js";
 export { extractSectionBody } from "./engine/section-body.js";
 export { resolveRoutedUrl } from "./engine/site-router.js";
@@ -99,16 +172,34 @@ export {
   assertionSchema,
   ASSERTION_TARGETS,
   isProjectAssertion,
-  runAssertion
+  runAssertion,
 } from "./engine/primitives/assert.js";
-export type { Assertion, RunAssertionOptions } from "./engine/primitives/assert.js";
+export type {
+  Assertion,
+  RunAssertionOptions,
+} from "./engine/primitives/assert.js";
 export { DEFAULT_PLACEHOLDERS } from "./engine/primitives/content.js";
-export type { PrimitiveContext, PrimitiveFinding } from "./engine/primitives/types.js";
+export type {
+  PrimitiveContext,
+  PrimitiveFinding,
+} from "./engine/primitives/types.js";
 
 // Registry + rules (P2.03 / P3)
-export { defineRule, RuleRegistry, RuleResolutionError } from "./engine/registry.js";
-export type { ConfigIssue, RuleDefinition, RuleMetadata, RuleResolutionCode } from "./engine/registry.js";
-export { BUILTIN_RULE_DEFINITIONS, ruleRegistry } from "./engine/rules/index.js";
+export {
+  defineRule,
+  RuleRegistry,
+  RuleResolutionError,
+} from "./engine/registry.js";
+export type {
+  ConfigIssue,
+  RuleDefinition,
+  RuleMetadata,
+  RuleResolutionCode,
+} from "./engine/registry.js";
+export {
+  BUILTIN_RULE_DEFINITIONS,
+  ruleRegistry,
+} from "./engine/rules/index.js";
 export { fileScopeShape, matchesFileScope } from "./engine/rules/scope.js";
 export type { FileScope } from "./engine/rules/scope.js";
 export { resolveCustomRule } from "./engine/rules/custom.js";
@@ -121,14 +212,24 @@ export { generateRuleDocs } from "./engine/rule-docs.js";
 
 // Config (P2.04 / P3.08)
 export {
+  compileCommandPresetSchema,
+  compileConfigSchema,
   customRuleEntrySchema,
   lintConfigSchema,
   ruleEntrySchema,
   ruleEntryUnionSchema,
-  severityOverrideSchema
+  severityOverrideSchema,
 } from "./config/config-schema.js";
-export type { CustomRuleConfigEntry, LintConfig, RuleConfigEntry } from "./config/config-schema.js";
+export type {
+  CompileConfig,
+  CustomRuleConfigEntry,
+  LintConfig,
+  RuleConfigEntry,
+} from "./config/config-schema.js";
 export { ConfigError } from "./config/config-error.js";
 export { CONFIG_FILE_NAME, findConfig } from "./config/find-config.js";
 export { loadConfiguration } from "./config/load-config.js";
-export type { ConfiguredRule, LoadedConfiguration } from "./config/load-config.js";
+export type {
+  ConfiguredRule,
+  LoadedConfiguration,
+} from "./config/load-config.js";

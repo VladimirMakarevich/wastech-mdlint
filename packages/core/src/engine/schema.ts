@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { compileConfigSchema } from "../config/config-schema.js";
 import { assertionSchema } from "./primitives/assert.js";
 import { ruleRegistry } from "./rules/index.js";
 
@@ -157,8 +158,7 @@ export function generateConfigSchema(opts?: { customRules?: readonly CustomRuleD
         }
       },
       rules: { type: "array", items: { oneOf: ruleBranches } },
-      // `compile` is validated by the compiler (P5); left permissive here.
-      compile: { type: "object" }
+      compile: optionsToJsonSchema(compileConfigSchema)
     }
   };
 
