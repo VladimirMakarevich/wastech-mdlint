@@ -62,6 +62,15 @@ export {
 } from "./graph/graph-render.js";
 export type { ContextGraphSummary } from "./graph/graph-render.js";
 
+// Compile (P5)
+export { analyzeGraph, classifyNodes, DEFAULT_HUB_MIN_IN_DEGREE } from "./compile/graph-analysis.js";
+export type {
+  GraphAnalysis,
+  GraphAnalysisOptions,
+  NodeClassification,
+  NodeRole
+} from "./compile/graph-analysis.js";
+
 // Engine (P2)
 export type {
   LintMessage,
