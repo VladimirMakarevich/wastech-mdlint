@@ -1,23 +1,32 @@
-import path from "node:path";
-
 import { z } from "zod";
 
 import { matchesConfigGlob, normalizeRelativePath } from "../../discovery/globs.js";
 import type { ParsedDocument } from "../../markdown/document-types.js";
+import { resolveTargetCandidates } from "../path-resolve.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
 import { estimateTokens } from "../tokens.js";
-import type { RuleContext } from "../types.js";
+import type { RuleContext, SiteRouterSettings } from "../types.js";
 
 // LLM-001 — eager-import context budget per entrypoint (D3, P3.07). Single total budget
 // (maxTokensPerEntrypoint) — parity with the legacy llm/budget; per-type limits are out of scope
 // (audit 3.2). Traverses ParsedDocument.imports (one parse pass, P1) — it does not re-parse.
 
-function resolveImportTarget(sourcePath: string, rawTarget: string): string {
+// Resolves an eager `@target` import through the same `resolveTargetCandidates` helper the
+// ContextGraph builder (P4.01/P4.06) and REF-001/002 already use — not an ad hoc resolver. A
+// root-relative import under a configured `siteRouter` must resolve identically here and in the
+// graph's "import" edges; otherwise LLM-001's own traversal and compile's S6 budget (which walks
+// those same edges) can silently disagree on what an entrypoint eagerly imports. Falls back to the
+// first candidate when none resolve, so a genuinely missing import still reports a stable,
+// deterministic `targetPath`.
+function resolveImportTarget(
+  sourcePath: string,
+  rawTarget: string,
+  documents: Map<string, ParsedDocument>,
+  siteRouter: SiteRouterSettings | undefined
+): string {
   const target = rawTarget.replace(/^@/, "");
-  if (target.startsWith("/")) {
-    return normalizeRelativePath(path.posix.normalize(target.slice(1)));
-  }
-  return normalizeRelativePath(path.posix.normalize(path.posix.join(path.posix.dirname(sourcePath), target)));
+  const candidates = resolveTargetCandidates(sourcePath, target, siteRouter);
+  return candidates.find((candidate) => documents.has(candidate)) ?? candidates[0] ?? normalizeRelativePath(target);
 }
 
 type EntrypointTraversal = {
@@ -28,7 +37,11 @@ type EntrypointTraversal = {
 
 // Depth-first traversal of eager imports from one entrypoint, collecting reachable files, missing
 // imports, and cycles (dedup per entrypoint).
-function traverse(entrypoint: string, documents: Map<string, ParsedDocument>): EntrypointTraversal {
+function traverse(
+  entrypoint: string,
+  documents: Map<string, ParsedDocument>,
+  siteRouter: SiteRouterSettings | undefined
+): EntrypointTraversal {
   const importedPaths = new Set<string>();
   const missing: EntrypointTraversal["missing"] = [];
   const cycles: EntrypointTraversal["cycles"] = [];
@@ -38,7 +51,7 @@ function traverse(entrypoint: string, documents: Map<string, ParsedDocument>): E
 
   const visit = (sourcePath: string): void => {
     for (const eagerImport of documents.get(sourcePath)?.imports ?? []) {
-      const targetPath = resolveImportTarget(sourcePath, eagerImport.rawTarget);
+      const targetPath = resolveImportTarget(sourcePath, eagerImport.rawTarget, documents, siteRouter);
       const targetDoc = documents.get(targetPath);
 
       if (targetDoc === undefined) {
@@ -86,7 +99,7 @@ function reportEntrypoint(
   documents: Map<string, ParsedDocument>,
   maxTokens: number
 ): void {
-  const traversal = traverse(entrypoint, documents);
+  const traversal = traverse(entrypoint, documents, context.settings.siteRouter);
 
   let totalTokens = estimateTokens(entrypointDoc.content);
   for (const importedPath of traversal.importedPaths) {

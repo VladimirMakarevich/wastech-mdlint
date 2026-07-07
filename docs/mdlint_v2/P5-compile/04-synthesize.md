@@ -1,6 +1,6 @@
 # P5.04 · `synthesize` → `CompileResult`
 
-> Phase: [P5 — Compile](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
+> Phase: [P5 — Compile](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Done**.
 
 ## Goal
 
@@ -107,11 +107,88 @@ That `code` is one entry in the P7 MCP error taxonomy.
 
 - [S1, S2, S4, S6](../requirements/04-skills-compile.md) · ([S3 skipped — English scaffold](../requirements/04-skills-compile.md)).
 
+## Implementation notes
+
+- `compileContext(config, cwd)` is **async** (`Promise<CompileResult>`), not the sync signature the
+  doc text above illustrates: building a `CompileResult` requires `loadContext`, which is async,
+  and every comparable core entry point (`lintFiles`, `loadConfiguration`) already is. `synthesize`
+  itself stays a synchronous pure renderer — it never touches the filesystem or `cwd`.
+- `config.compile` is still `z.unknown()` in `config-schema.ts` — P5.05 owns the strict schema.
+  `compile-context.ts` reads it through a local, deliberately lenient (non-`.strict()`) reader that
+  only ever *defaults* missing or malformed pieces (`sections.*` → `true`, `commandPreset` →
+  `"generic"`, `hubMinInDegree` → `DEFAULT_HUB_MIN_IN_DEGREE`, `skill.name`/`skill.description` →
+  `""`). It is explicitly commented as superseded by P5.05 and must not become a second
+  authoritative schema.
+- Normalization goes leaf-by-leaf, not just top-level: `commandPreset`/`hubMinInDegree` each get
+  their own `safeParse`, and so does every individual `skill.name`/`skill.description` and
+  `sections.*` flag. A single malformed field (e.g. a non-numeric `hubMinInDegree`, or a
+  non-boolean `sections.rules`) only defaults that field — it must not discard an otherwise-valid
+  sibling (`skill.name`, or the other three `sections.*` flags), which parsing the containing
+  object as one `safeParse` would do by failing all-or-nothing.
+- An empty `skill.name`/`skill.description` (the lenient reader's default when `compile.skill` is
+  missing) fails `skillFrontmatterSchema.parse` inside `synthesize` with a `ZodError` — there is no
+  bespoke error type for that case yet; P5.05 replaces it with a proper load-time diagnostic.
+- S6's budget reuses LLM-001's own `optionsSchema` (via `ruleRegistry.getMetadata("LLM-001")`) to
+  parse active `LLM-001` config entries, and the shared graph traversal
+  (`query(graph, { start, direction: "forward", edgeTypes: ["import"] })`) to sum eager-import
+  tokens — not `llm.ts`'s internal traversal, which stays private. `CompileBudget` carries
+  `llm001Enabled` (any active `LLM-001` entry exists, set as soon as one is found — independent of
+  whether its `entrypoints` glob matched anything) separately from `entrypointsMatched` (beyond the
+  doc's illustrative `entrypointsOverBudget` field), so the budget section can render three distinct
+  states instead of two: "not enabled", "enabled but its glob matched no files" (a misconfigured or
+  empty-match corpus, not silently treated as "not enabled"), and "enabled and everything fits."
+- `computeBudget` evaluates *every* active `LLM-001` entry against every entrypoint it matches, not
+  just the first one to claim it: `rules[]` can configure LLM-001 more than once, and the engine
+  runs every entry independently, so the budget uses the strictest (lowest) matching
+  `maxTokensPerEntrypoint` per file — one rendered row per path, but a violation of any configured
+  entry's threshold.
+- LLM-001's own eager-import resolver (`engine/rules/llm.ts`) now resolves `@target` imports through
+  the shared `resolveTargetCandidates` helper (the same one the `ContextGraph` builder and
+  REF-001/002 use) instead of its own ad hoc slash-stripping logic, so a root-relative import under
+  a configured `siteRouter` resolves identically for LLM-001's lint traversal and for S6's
+  graph-based budget — they walk the same "import" edges by construction now, not two independently
+  maintained resolvers that could silently disagree.
+- "File tree" in Document Architecture is a flat, sorted `Path | Role | Type` table rather than a
+  nested tree — the repo-relative path already conveys structure, and a flat table is trivially
+  deterministic to render and assert on. `Type` (`reference | tabular | narrative`) is a new,
+  derived-only classification with no new parsing: `reference` when the profile has a resolved
+  `idPattern`, else `tabular` when it has any table, else `narrative`.
+- Command-block presets change only the trailing "Working with dependencies" block; the reading
+  order, cycle/excluded listing, and per-file reference lists above it are byte-identical across
+  `claude`/`generic`/`none` (pinned by test).
+- The provenance line's deterministic text (`Generated from N docs, M rules ...`) is part of the S4
+  hash input, not excluded alongside the hash token itself: `contentHash` is computed by first
+  rendering the provenance line with a hash placeholder, hashing that alongside every other
+  section, then substituting the real hash into the line that actually ships. Excluding the whole
+  line let two corpora with different `documentCount`/`ruleCount` share one `contentHash` whenever
+  the section that would otherwise reveal the difference (Architecture/Rules) was gated off.
+- The Reading Order block distinguishes "no documents in the corpus" from "documents exist but all
+  of them are cycle-excluded" (`readingOrder: []` with a non-empty corpus) — the latter renders an
+  explicit "excluded by cycles" sentence instead of reusing the empty-corpus wording, preserving G6
+  honesty for an all-cyclic corpus.
+- Workflow's numbered steps are generated from the *enabled* `sections` flags, not a fixed list: a
+  step naming a gated-off section (e.g. "Start from Document Architecture…" when
+  `sections.architecture` is `false`) would make the generated SKILL.md self-contradictory. The
+  Context Budget step is never gated (S6 always renders), so it is always included.
+- `compile.hubMinInDegree` is validated as a positive integer (`z.number().int().min(1)`), not any
+  number: `0`/negative thresholds make `classifyNode`'s `inDegree >= hubMinInDegree` check trivially
+  true for almost every node, and a fractional threshold is meaningless for an integer degree
+  comparison — both default to `DEFAULT_HUB_MIN_IN_DEGREE` like every other malformed `compile.*`
+  field, rather than silently rewriting role classification.
+- `synthesize.ts` centralizes three Markdown-safety helpers (`toSingleLine`, `codeSpan`,
+  `tableCell`) and applies them everywhere a free-form value — a repo-relative path, a rule id, an
+  author-supplied custom-rule description, the configured skill name — reaches a heading, table
+  cell, or inline code span. Without them, a multiline `skill.name` would truncate the title
+  heading, a path containing a backtick would break its code span, and a path containing `|` would
+  shift a Document Architecture table row. The References block's per-document label switched from
+  bold (`**path**`) to a code span for the same reason — `**` inside a path could otherwise close
+  the emphasis early — and now matches how every other path in the module renders.
+
 ## Exit criteria
 
-- [ ] Output is byte-stable across runs; hash/provenance header present.
-- [ ] Command block respects the preset; default is host-neutral.
-- [ ] Budget section present; frontmatter validates against the schema.
+- [x] Output is byte-stable across runs; hash/provenance header present.
+- [x] Command block respects the preset; default is host-neutral.
+- [x] Budget section present; frontmatter validates against the schema.
 
 ## Hand-off to next
 

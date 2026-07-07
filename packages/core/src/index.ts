@@ -115,6 +115,18 @@ export type {
   DescribedRule,
   RuleDescriptionGroup,
 } from "./compile/describe-rules.js";
+export { skillFrontmatterSchema } from "./compile/skill-frontmatter.js";
+export type { SkillFrontmatter } from "./compile/skill-frontmatter.js";
+export { synthesize } from "./compile/synthesize.js";
+export type {
+  CompileBudget,
+  CompileBudgetEntrypoint,
+  CompileCommandPreset,
+  CompileResult,
+  CompileSections,
+  SynthesizeInput,
+} from "./compile/synthesize.js";
+export { compileContext, CompileConfigMissingError } from "./compile/compile-context.js";
 
 // Engine (P2)
 export type {
