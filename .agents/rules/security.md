@@ -1,7 +1,9 @@
 # Security Rules
 
 The v2 security model is a deterministic, local-first Markdown analysis tool. Keep new work
-inside that boundary unless the roadmap or the user explicitly expands scope.
+inside that boundary unless the roadmap or the user explicitly expands scope. For the terms
+that mark this boundary — local `$schema`, declarative custom rules, Tier-2 code-plugins,
+stdio MCP — see the glossary at `docs/mdlint_v2/glossary.md`.
 
 ## Runtime Boundaries
 

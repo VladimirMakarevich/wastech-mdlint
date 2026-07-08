@@ -26,6 +26,12 @@ The production v2 effort is the current focus. Its authoritative planning lives 
   `docs/mdlint_v2/requirements/index.md`
 - Architectural decisions: `docs/mdlint_v2/decisions/`
 - Phase task plans: `docs/mdlint_v2/P0-foundations/` through `docs/mdlint_v2/P9-release/`
+- Glossary (canonical project vocabulary): `docs/mdlint_v2/glossary.md`
+
+The glossary is a lookup reference for terms — public types, config keys, CLI/MCP surfaces,
+rule IDs, and the planning taxonomy. It is not a precedence tier: when it disagrees with a
+phase task file, requirement, or decision, those win and the glossary entry is the thing to
+fix.
 
 When documents disagree, use this precedence:
 
@@ -119,6 +125,12 @@ verification.
   intentionally diverge.
 - Keep user-facing product documentation in `README.md`.
 - Keep agent-operation guidance in `AGENTS.md`, `CLAUDE.md`, and `.agents/rules/`.
+- Keep the glossary (`docs/mdlint_v2/glossary.md`) current as part of the change that
+  introduces the term — not as a later cleanup pass. Add, rename, or retire an entry
+  whenever you add or rename a load-bearing public type, config key, CLI flag, MCP tool,
+  rule ID, or assertion primitive; change what a term means or its shipped/planned status;
+  or introduce a new domain concept a future reader would otherwise reverse-engineer from
+  code. This is part of "bring the affected docs in line," not optional polish.
 - If a task is documentation-only, do not change product code, public interfaces, package
   metadata, or dependencies unless the user explicitly expands scope.
 

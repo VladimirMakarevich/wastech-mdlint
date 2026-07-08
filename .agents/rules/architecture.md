@@ -6,6 +6,10 @@ The architectural source of truth is `docs/mdlint_v2/`, especially:
 - `docs/mdlint_v2/requirements/`
 - `docs/mdlint_v2/decisions/core-hosts-the-pipeline.md`
 
+For the vocabulary these invariants use — `ParsedDocument`, `ContextGraph`, edge types,
+rule scopes, hosts, and the rest — see the glossary at `docs/mdlint_v2/glossary.md`. Use its
+terms consistently and keep it current when an architectural change adds or renames one.
+
 These invariants should guide implementation work.
 
 ## Current vs Target State

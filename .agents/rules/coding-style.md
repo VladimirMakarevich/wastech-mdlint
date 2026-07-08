@@ -35,6 +35,17 @@ Match the repository's actual tooling and configuration unless a phase task expl
 - If a block is hard to justify with a short why-comment, simplify or restructure it until the
   intent and rationale are clear.
 
+## Glossary And Naming
+
+- The canonical vocabulary lives in `docs/mdlint_v2/glossary.md`. Use the established term
+  for a concept (type name, config key, rule ID, edge type, node role) rather than coining a
+  synonym; consistent naming is a contract, not a style preference.
+- Keep the glossary current as part of the change that introduces the term — the same
+  "document where it is introduced, not in a later cleanup pass" discipline as code comments
+  above. Add, rename, or retire an entry whenever a change adds or renames a load-bearing
+  public type, config key, CLI flag, MCP tool, rule ID, or assertion primitive, or changes
+  what a term means or its shipped/planned status.
+
 ## Types And Contracts
 
 - Keep public and cross-module contracts explicit and strongly typed.

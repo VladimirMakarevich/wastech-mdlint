@@ -1,7 +1,9 @@
 # Testing Rules
 
 The testing source of truth is the v2 roadmap in `docs/mdlint_v2/` plus the repository's
-Vitest-based test suite.
+Vitest-based test suite. For the meaning of the terms used here — fixtures, rule scopes,
+`ParsedDocument`, graph algorithms, exit codes — see the glossary at
+`docs/mdlint_v2/glossary.md`.
 
 ## Test Framework
 

@@ -180,6 +180,9 @@ with an explicit prev/next/depends/blocks chain). Effort is a rough T-shirt size
 [P8 Skills](P8-skills/index.md) ·
 [P9 Release](P9-release/index.md)
 
+**Reference:** [Glossary](glossary.md) — the canonical vocabulary (public types, config
+keys, CLI/MCP surfaces, rule IDs, and this planning taxonomy) used across these docs.
+
 ### Phase 0 — Workspace & foundations · `M` · depends on: D1, D5
 **Goal:** establish the monorepo and shared tooling so subsequent phases land in the
 right package.
