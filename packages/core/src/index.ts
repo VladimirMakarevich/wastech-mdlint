@@ -50,6 +50,15 @@ export type {
   ScanRepositoryOptions,
 } from "./discovery/repo-scan.js";
 
+// Rule inference (P6.02)
+export { inferRuleSet } from "./discovery/rule-inference.js";
+export type {
+  ClusterRuleInference,
+  DetectedPatterns,
+  InferredRule,
+  RuleInferenceResult,
+} from "./discovery/rule-inference.js";
+
 // Graph
 export type {
   BuildContextGraphOptions,

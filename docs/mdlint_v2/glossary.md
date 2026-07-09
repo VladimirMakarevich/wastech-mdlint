@@ -412,7 +412,9 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
 ## Init & repo scan _(planned, P6)_
 
 Core-only groundwork for `init`'s situational awareness. Shipped: the pure `scanRepository`
-scanner and its helpers. Not yet wired to any command — see [P6.01](P6-init/01-repo-scan-detection.md).
+scanner and its helpers, plus `inferRuleSet` which turns a scan into a draft rule proposal. Not
+yet wired to any command — see [P6.01](P6-init/01-repo-scan-detection.md) and
+[P6.02](P6-init/02-rule-inference.md).
 
 - **`scanRepository`** — Scans a repo for Markdown doc clusters and the package manager in
   use, returning a `RepoScanResult`. Runs the cluster heuristic per **scope** (the repo root
@@ -434,6 +436,31 @@ scanner and its helpers. Not yet wired to any command — see [P6.01](P6-init/01
   POSIX `path`; root itself is never a `WorkspacePackage`). Detected from
   `package.json#workspaces` (npm/Yarn forms) or `pnpm-workspace.yaml`, falling back to a
   sibling `packages/*` / `apps/*` heuristic only when neither declares anything explicit.
+- **`inferRuleSet`** — Samples each `DocCluster`'s files, detects reference/table/checklist/
+  placeholder/ADR/cycle patterns, and maps them to a draft, registry-sourced `rules[]` proposal
+  with per-rule rationale, ready for [P6.03](P6-init/03-interactive-prompts.md)'s confirmation
+  prompt. Registry-driven (no hardcoded id table): groups `registry.getAllMetadata()` by
+  `metadata.category` into an id-keyed lookup, so a renamed/removed rule silently drops its
+  proposal instead of crashing. Decision [R6](requirements/02-rules-engine.md).
+- **`DetectedPatterns`** — Per-cluster (and repo-wide, summed) structural/quality tallies:
+  `localLinkCount`, `anchorLinkCount`, `imageCount`, `tableCount`, `checklistItemCount`,
+  `placeholderSectionCount` (via the real `noPlaceholders` primitive), and `adrSections` (the
+  exact-string heading intersection when every sampled doc in a cluster matches an ADR-style
+  triplet).
+- **`InferredRule`** — One draft config `rules[]` entry: canonical `rule` id, `category`,
+  `description` (verbatim from `RuleMetadata`), `defaultSeverity`, `fixable`, a repo-specific
+  `rationale` string, and an optional `options` — populated only for `SEC-001`, the one gated
+  rule whose schema supports `files` scoping and whose `sections` option is derivable per
+  ADR-shaped cluster.
+- **`ClusterRuleInference`** — One cluster's evidence trail: `clusterPath`, `includeGlob`,
+  `sampledFiles` (the samples actually read, after skipping stale paths), its own
+  `DetectedPatterns`, and `contributesTo` (the canonical ids that cluster's own evidence alone
+  would justify — a rule only lands here if the cluster's `includeGlob` actually matches its
+  `sampledFiles`, so a mismatched scope, e.g. the `**/*.md` fallback sampling `.mdx` files, never
+  attributes a dead proposal).
+- **`RuleInferenceResult`** — `inferRuleSet`'s return shape: `clusters`
+  (`ClusterRuleInference[]`, the per-cluster evidence trail) and `rules` (the deduped, id-sorted
+  `InferredRule[]` proposal).
 
 ## CLI
 
