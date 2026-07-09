@@ -1,6 +1,6 @@
 # P6.01 · Repo scan — doc clusters + package-manager detection
 
-> Phase: [P6 — init](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
+> Phase: [P6 — init](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Done**.
 
 ## Goal
 
@@ -55,10 +55,49 @@ at the repo root; tag each returned cluster with its owning package (if any).
 
 - [I2](../requirements/06-installation.md) smart scanning (no hardcoded layout).
 
+## Implementation notes
+
+- A workspace package's scope excludes any file already claimed by a deeper nested workspace
+  package (e.g. a detected `packages/foo/examples/bar`), so each Markdown file is owned by
+  exactly one — the deepest matching — scope. Without this a nested package's files would be
+  scanned twice: once under the ancestor's cluster and again under its own.
+- Workspace glob declarations (`package.json#workspaces`, `pnpm-workspace.yaml`) must be matched
+  as a whole list (`micromatch(list, patterns)`), not per-directory `isMatch()` — the latter
+  checks each candidate independently against the pattern array, so an ordered exclusion like
+  `["packages/*", "!packages/private"]` can never actually exclude anything. This required
+  extending the repo's local `micromatch.d.ts` type shim with the list-form call signature,
+  since no `@types/micromatch` package exists to declare it.
+- The pnpm-workspace.yaml line parser accepts both indented and unindented `- glob` list items,
+  quoted or bare, each optionally followed by a trailing `# comment` — real-world files commonly
+  write entries this way, and a parser that rejects them would silently under-detect the
+  monorepo. It is still deliberately narrow, not a general YAML parser: flow sequences
+  (`packages: [a, b]`) and anchors remain unsupported (see the trade-off already called out
+  above the parser in code).
+- `detectWorkspacePackages(cwd)` keeps the single-argument signature this task's contract calls
+  for and is the only barrel-exported surface from `@wastech-mdlint/core`. `scanRepository` needs
+  a caller-overridden `noiseDirNames` to prune workspace-package discovery the same way it prunes
+  the Markdown walk, but threading that knob onto the standalone function would leak a
+  scanner-internal tuning parameter into the public API — so it lives on a second,
+  non-barrel-exported `detectWorkspacePackagesWithNoise(cwd, noiseDirNames)` instead.
+- Generated `includeGlob` values escape glob metacharacters in the literal directory path
+  (`docs[x]`, `apps(web)`) using single-character bracket classes (`[x]`), not a backslash —
+  `normalizeConfigGlob` (the shared glob-normalization helper) converts every `\` to `/` when
+  normalizing Windows-style separators, so a backslash-escaped pattern would be silently
+  unescaped before it ever reached the matcher.
+- The `"fallback"` entry's `includeGlob` stays the literal `**/*.md`, deliberately not
+  `.mdx`-aware like the rest of the scanner: it mirrors the tool's actual zero-config default
+  (`lintFiles`/`fix`/`loadContext` all default `include` to `["**/*.md"]`), not the scan's own
+  broader `.md`+`.mdx` discovery criteria. In a repo whose only Markdown is `.mdx`, this means the
+  fallback's `sampleFiles` can include paths its own proposed glob won't match — an accepted,
+  documented trade-off of proposing the tool's real default rather than a scan-specific one.
+- `detectPackageManager`'s lockfile check uses `stat().isFile()`, not `access()` — `access()`
+  only proves a path is reachable, so a directory (or a symlink to one) named `bun.lock` etc.
+  would otherwise be misreported as that package manager.
+
 ## Exit criteria
 
-- [ ] Clusters detected across common + custom layouts; monorepo-aware.
-- [ ] Package manager detected from lockfiles.
+- [x] Clusters detected across common + custom layouts; monorepo-aware.
+- [x] Package manager detected from lockfiles.
 
 ## Hand-off to next
 

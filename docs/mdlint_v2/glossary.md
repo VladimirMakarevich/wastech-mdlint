@@ -409,6 +409,32 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
   (corpus token estimate + entrypoints over budget). Reuses the token estimator. Decision
   [S6](requirements/04-skills-compile.md).
 
+## Init & repo scan _(planned, P6)_
+
+Core-only groundwork for `init`'s situational awareness. Shipped: the pure `scanRepository`
+scanner and its helpers. Not yet wired to any command — see [P6.01](P6-init/01-repo-scan-detection.md).
+
+- **`scanRepository`** — Scans a repo for Markdown doc clusters and the package manager in
+  use, returning a `RepoScanResult`. Runs the cluster heuristic per **scope** (the repo root
+  minus workspace-package files, plus one scope per detected workspace package) so a
+  package's own `docs/` groups with that package rather than the root. Decision
+  [I2](requirements/06-installation.md).
+- **`DocCluster` / `DocClusterKind`** — A proposed `include` candidate: `path`, `score`,
+  `subtreeCount`, `includeGlob`, sorted `sampleFiles`, and an optional `workspacePackage` tag.
+  Three kinds, ranked in this order regardless of score: `cluster` (a directory that qualifies
+  via the scoring heuristic — `subtreeCount >= minClusterSize`, or any count when its basename
+  is a known doc-directory name), `root` (scattered root-level files, always low-priority), and
+  `fallback` (the global `**/*.md` safety net, used only when nothing else qualified anywhere
+  but Markdown exists).
+- **`DetectedPackageManager`** — `bun | pnpm | yarn | npm | undefined`, detected from a
+  lockfile at the repo root (priority bun > pnpm > yarn > npm). `undefined` means no lockfile
+  was found; core does not default-guess `"npm"` — that UX call belongs to the interactive
+  `init` layer (P6.03).
+- **`WorkspacePackage`** — `{ path, name? }` for a detected workspace package (repo-relative
+  POSIX `path`; root itself is never a `WorkspacePackage`). Detected from
+  `package.json#workspaces` (npm/Yarn forms) or `pnpm-workspace.yaml`, falling back to a
+  sibling `packages/*` / `apps/*` heuristic only when neither declares anything explicit.
+
 ## CLI
 
 - **commander / `@inquirer/prompts`** — The CLI framework (`commander`) and the interactive
@@ -432,8 +458,8 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
   against it. Requires a `compile` config section (missing → exit 2 with guidance).
 - **`init`** — Interactive zero-to-config bootstrap: detects clusters, samples files,
   suggests rule categories, detects the package manager, wires the local `$schema`, and
-  writes `wastech-mdlint.config.json`. `--yes` for CI. _(planned, P6)_. Decisions
-  [I1–I3](requirements/06-installation.md).
+  writes `wastech-mdlint.config.json`. `--yes` for CI. _(planned, P6)_. See **Init & repo
+  scan** for the underlying scanner. Decisions [I1–I3](requirements/06-installation.md).
 - **Exit codes** — `0` pass · `1` findings at the `--fail-on` threshold · `2` operational
   error. A cross-cutting contract (roadmap §8).
 
