@@ -411,10 +411,13 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
 
 ## Init & repo scan _(planned, P6)_
 
-Core-only groundwork for `init`'s situational awareness. Shipped: the pure `scanRepository`
-scanner and its helpers, plus `inferRuleSet` which turns a scan into a draft rule proposal. Not
-yet wired to any command — see [P6.01](P6-init/01-repo-scan-detection.md) and
-[P6.02](P6-init/02-rule-inference.md).
+Core-only groundwork for `init`'s situational awareness, plus the CLI `init` command that wires
+it up. Shipped: the pure `scanRepository` scanner and its helpers, `inferRuleSet` which turns a
+scan into a draft rule proposal, and (as of [P6.03](P6-init/03-interactive-prompts.md)) a real
+`init` command that runs both and prints a confirmable preview. `init` does not write a config
+file yet — that lands in [P6.04](P6-init/04-config-writer-schema.md). See
+[P6.01](P6-init/01-repo-scan-detection.md) and [P6.02](P6-init/02-rule-inference.md) for the
+underlying scan/inference.
 
 - **`scanRepository`** — Scans a repo for Markdown doc clusters and the package manager in
   use, returning a `RepoScanResult`. Runs the cluster heuristic per **scope** (the repo root
@@ -483,10 +486,18 @@ yet wired to any command — see [P6.01](P6-init/01-repo-scan-detection.md) and
   (`--outdir` → `config.compile.outdir` → `.claude/skills/wastech-mdlint/`); `--dry-run`
   prints instead. Takes `--cwd` (not `[path]`) and resolves relative `--config`/`--outdir`
   against it. Requires a `compile` config section (missing → exit 2 with guidance).
-- **`init`** — Interactive zero-to-config bootstrap: detects clusters, samples files,
-  suggests rule categories, detects the package manager, wires the local `$schema`, and
-  writes `wastech-mdlint.config.json`. `--yes` for CI. _(planned, P6)_. See **Init & repo
-  scan** for the underlying scanner. Decisions [I1–I3](requirements/06-installation.md).
+- **`init`** — Zero-to-config bootstrap: scans for doc clusters, re-infers rules against the
+  confirmed cluster subset, and prints a confirmable draft preview (include globs, rules grouped
+  by category with rationale, existing-config disposition, package manager). `[path]` defaults to
+  the cwd, but re-roots to an ancestor directory's config when `[path]` is below one (see
+  [P6.03](P6-init/03-interactive-prompts.md)'s implementation notes for why). `-y`/`--yes` skips
+  every prompt (for CI / the `-init` skill) and defaults `--on-existing` to `skip` when omitted —
+  interactive mode always prompts for it, and every prompt's own unchosen-Enter default matches
+  the same `--yes` defaults. With no existing config, both flags are ignored. Ctrl+C during any
+  prompt exits `0`. Does **not** write a file or wire `$schema` yet — that is
+  [P6.04](P6-init/04-config-writer-schema.md)'s job. See **Init & repo scan** for the underlying
+  scanner/inference. Decisions [I1–I3](requirements/06-installation.md),
+  [D5](index.md) inquirer.
 - **Exit codes** — `0` pass · `1` findings at the `--fail-on` threshold · `2` operational
   error. A cross-cutting contract (roadmap §8).
 

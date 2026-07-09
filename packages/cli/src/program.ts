@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { Command, CommanderError, InvalidArgumentError, Option } from "commander";
 
 import { ConfigError, SLICE_RESOLUTION_DESCRIPTION } from "@wastech-mdlint/core";
@@ -14,16 +16,29 @@ import {
   type GraphFormat,
   type OutputFormat
 } from "./commands.js";
+import type { ExistingConfigAction, InitPrompter } from "./init-command.js";
+import { createInquirerPrompter } from "./init-prompter.js";
 
 export type CliIo = {
   cwd?: string;
   stdout?: Pick<NodeJS.WriteStream, "write">;
   stderr?: Pick<NodeJS.WriteStream, "write">;
+  // Test-injection seams for `init` (mirrors the stdout/stderr/cwd seam above): a fake prompter
+  // avoids driving real `@inquirer/prompts` TTY rendering in tests. `isTty` overrides the whole
+  // interactive-terminal gate below at once (both stdin and stdout); `stdinIsTty`/`stdoutIsTty`
+  // override just one side of it, so a test can simulate a stdin TTY paired with piped/redirected
+  // stdout (or vice versa) without faking the real global `process.stdin`/`process.stdout`. Only
+  // consulted when `isTty` itself is not set.
+  initPrompter?: InitPrompter;
+  isTty?: boolean;
+  stdinIsTty?: boolean;
+  stdoutIsTty?: boolean;
 };
 
 const OUTPUT_FORMATS: OutputFormat[] = ["text", "json"];
 const FAIL_ON_LEVELS: FailOn[] = ["error", "warning", "off"];
 const GRAPH_FORMATS: GraphFormat[] = ["human", "json", "mermaid", "dot"];
+const EXISTING_CONFIG_ACTIONS: ExistingConfigAction[] = ["overwrite", "merge", "skip"];
 
 // Shared by `slice`'s `--depth`: reject non-integers/negatives at parse time (exit 2) rather than
 // letting a bad value reach `getContextSlice` and produce a confusing traversal result.
@@ -164,9 +179,55 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
       });
     });
 
+  program
+    .command("init")
+    .description("Scan the repo, infer a rule set, and preview a wastech-mdlint.config.json draft.")
+    .argument("[path]", "directory to scan", cwd)
+    .addOption(new Option("-y, --yes", "accept the inferred draft without prompts"))
+    .addOption(
+      new Option("--on-existing <mode>", "how to handle an existing config under --yes").choices(
+        EXISTING_CONFIG_ACTIONS
+      )
+    )
+    .action(async (targetPath: string, options: { yes?: boolean; onExisting?: ExistingConfigAction }) => {
+      const yes = options.yes ?? false;
+      // Both streams must be real terminals: `@inquirer/prompts` reads from stdin and renders to
+      // stdout, so a piped/redirected stdout with a TTY stdin (or vice versa) is just as
+      // unusable interactively as neither being one.
+      const isTty =
+        io.isTty ??
+        ((io.stdinIsTty ?? process.stdin.isTTY === true) && (io.stdoutIsTty ?? process.stdout.isTTY === true));
+
+      // Cheap, important: without this, a piped/CI invocation that forgot --yes would otherwise
+      // hang forever on the first inquirer prompt instead of failing fast.
+      if (!yes && !isTty) {
+        throw new CliUsageError("init requires an interactive terminal; pass --yes for non-interactive/CI use.");
+      }
+
+      // `targetPath` may be a relative argument like "." or "docs"; resolve it against this run's
+      // own `cwd` (the injected `io.cwd`, when set) rather than letting `findConfig`/
+      // `scanRepository` fall back to the real `process.cwd()` inside core.
+      const resolvedCwd = path.resolve(cwd, targetPath);
+
+      // Construct the real prompter here (not inside commands.ts) so its `confirmDraft` writes
+      // through this run's own `stdout` seam instead of the real `process.stdout` — the same
+      // stream every other command already writes its output through.
+      executionResult = await executeCommand(
+        { kind: "init", cwd: resolvedCwd, yes, onExisting: options.onExisting, isTty },
+        { prompter: io.initPrompter ?? createInquirerPrompter(stdout) }
+      );
+    });
+
   try {
     await program.parseAsync(argv, { from: "user" });
   } catch (error) {
+    // Ctrl+C during any inquirer prompt (matched on `.name`, not `instanceof` a specific imported
+    // class — @inquirer/prompts' own docs recommend this as the version-stable detection) exits
+    // gracefully rather than surfacing as an unexpected-error stack trace.
+    if (error instanceof Error && error.name === "ExitPromptError") {
+      return EXIT_CODE_SUCCESS;
+    }
+
     if (error instanceof CommanderError) {
       // Commander reserves exitCode 0 for --help/--version; every other CommanderError (unknown
       // command/option, invalid choice, missing required option) is a parse/usage failure, reported
