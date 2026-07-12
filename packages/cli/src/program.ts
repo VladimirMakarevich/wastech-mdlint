@@ -181,7 +181,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
 
   program
     .command("init")
-    .description("Scan the repo, infer a rule set, and preview a wastech-mdlint.config.json draft.")
+    .description("Scan the repo, infer a rule set, and write a wastech-mdlint.config.json.")
     .argument("[path]", "directory to scan", cwd)
     .addOption(new Option("-y, --yes", "accept the inferred draft without prompts"))
     .addOption(
@@ -189,7 +189,14 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
         EXISTING_CONFIG_ACTIONS
       )
     )
-    .action(async (targetPath: string, options: { yes?: boolean; onExisting?: ExistingConfigAction }) => {
+    .addOption(
+      new Option("--with-ci-workflow", "write .github/workflows/wastech-mdlint.yml under --yes without prompting")
+    )
+    .action(
+      async (
+        targetPath: string,
+        options: { yes?: boolean; onExisting?: ExistingConfigAction; withCiWorkflow?: boolean }
+      ) => {
       const yes = options.yes ?? false;
       // Both streams must be real terminals: `@inquirer/prompts` reads from stdin and renders to
       // stdout, so a piped/redirected stdout with a TTY stdin (or vice versa) is just as
@@ -213,10 +220,11 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
       // through this run's own `stdout` seam instead of the real `process.stdout` — the same
       // stream every other command already writes its output through.
       executionResult = await executeCommand(
-        { kind: "init", cwd: resolvedCwd, yes, onExisting: options.onExisting, isTty },
+        { kind: "init", cwd: resolvedCwd, yes, onExisting: options.onExisting, isTty, withCiWorkflow: options.withCiWorkflow },
         { prompter: io.initPrompter ?? createInquirerPrompter(stdout) }
       );
-    });
+      }
+    );
 
   try {
     await program.parseAsync(argv, { from: "user" });

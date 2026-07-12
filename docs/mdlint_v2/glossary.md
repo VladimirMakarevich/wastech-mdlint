@@ -294,7 +294,9 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
 - **`compile`** — The config section for the `compile` command (`outdir`, `skill`,
   `sections`, `commandPreset`, `hubMinInDegree`). See **Compile**.
 - **`$schema`** — A **local, version-matched** relative path
-  (`./node_modules/@wastech-mdlint/cli/schema.json`) — never a remote URL. Decision
+  (`./node_modules/@wastech-mdlint/cli/schema.json`) — never a remote URL. When custom rules are
+  present, `init` instead generates a project-local `schema.json` via
+  `generateConfigSchema({ customRules })` and repoints `$schema` at `./schema.json`. Decision
   [C9](requirements/01-configuration.md).
 - **`findConfig` / `loadConfiguration` / `ConfigError`** — The walk-up config search, the
   JSONC loader + two-stage validation (root, then per-rule), and the structured error type.
@@ -413,9 +415,9 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
 
 Core-only groundwork for `init`'s situational awareness, plus the CLI `init` command that wires
 it up. Shipped: the pure `scanRepository` scanner and its helpers, `inferRuleSet` which turns a
-scan into a draft rule proposal, and (as of [P6.03](P6-init/03-interactive-prompts.md)) a real
-`init` command that runs both and prints a confirmable preview. `init` does not write a config
-file yet — that lands in [P6.04](P6-init/04-config-writer-schema.md). See
+scan into a draft rule proposal, a real `init` command that runs both and prints a confirmable
+preview, and (as of [P6.04](P6-init/04-config-writer-schema.md)) the `generateInitConfig` writer
+that turns a confirmed draft into the written config and wires its local `$schema`. See
 [P6.01](P6-init/01-repo-scan-detection.md) and [P6.02](P6-init/02-rule-inference.md) for the
 underlying scan/inference.
 
@@ -464,6 +466,40 @@ underlying scan/inference.
 - **`RuleInferenceResult`** — `inferRuleSet`'s return shape: `clusters`
   (`ClusterRuleInference[]`, the per-cluster evidence trail) and `rules` (the deduped, id-sorted
   `InferredRule[]` proposal).
+- **`generateInitConfig` / `config-writer.ts`** — The pure, fs-free P6.04 writer that turns a
+  confirmed draft into the `wastech-mdlint.config.json` bytes (a hand-rolled JSONC serializer, so
+  each newly-inferred rule can carry its rationale as a trailing `//` comment) and wires the local
+  `$schema` — the CLI passes a `packageSchemaRef` computed relative to the config's *own* directory
+  and anchored on the actual installed schema (walked up on disk), falling back to the repository
+  root, so a subdirectory config points up at the hoisted node_modules (`../node_modules/...`) rather
+  than a fixed root literal. `"fresh"` writes `$schema` + `include` (omitted when empty) + `exclude`
+  (the scanner's pruned noise dirs as globs, so a written config never re-scans `node_modules`/`.git`/…
+  — C1) + inferred `rules`; `"merge"` is additive/existing-wins — it round-trips every existing
+  top-level key verbatim, keeps every existing `rules[]` entry (canonicalizing its id per C3), and
+  only appends rules whose canonical id is absent. `identifyExistingRule` keys a built-in by its
+  canonical `rule` and a custom rule by its canonical `id` (never the literal `"custom"`); a `merge`
+  whose existing config is unreadable/unparsable, whose `rules[]` has an entry that can't be
+  canonically identified (a bare string, a non-string `rule`, or a `custom` entry with a
+  missing/non-string/non-schemaable `id`), or that `loadConfiguration` would reject (unknown
+  top-level key, unknown rule id, invalid preserved options — validated through the real loader
+  before writing) aborts the write entirely rather than write a config that is invalid or drops/
+  duplicates an entry. Rationale comments are sanitized to a single line so a newline-bearing path
+  can't corrupt the JSONC, and a project schema is generated only for custom ids the loader would
+  actually accept. Also exports `buildCiWorkflowYaml(configPath?)` / `CI_WORKFLOW_YAML`, the opt-in CI
+  workflow template `init` offers to drop — a self-contained install-and-run-the-CLI workflow
+  (`npm install` + `npx wastech-mdlint lint --fail-on error`), **not** a `uses:` reference to P9.03's
+  composite Action, which is not built yet (P9.03 can later swap the template to the `uses:` form). It
+  is anchored at the repository root — the `.git` root when one exists (a nested workspace package
+  still anchors at the real repo root, not `packages/foo`), else the nearest `package.json`/
+  `node_modules` — where GitHub loads workflows. For a subdirectory config it scopes lint to the
+  config's directory (`lint <dir>`, so `include`/`exclude` resolve there) plus a shell-quoted
+  `--config`; a path with a line terminator is declined rather than emitted broken. The offer belongs
+  only to the confirmed config-write branch — `--on-existing skip` is a strict no-write outcome and
+  never drops a workflow — and a Ctrl+C at its post-write prompt is treated as "no workflow" so the
+  config/schema write summary still prints. The CLI host does the actual `writeFile` and reports
+  repository-relative POSIX paths. Decisions
+  [C3/C4/C9](requirements/01-configuration.md),
+  [I3/I6](requirements/06-installation.md).
 
 ## CLI
 
@@ -494,9 +530,13 @@ underlying scan/inference.
   every prompt (for CI / the `-init` skill) and defaults `--on-existing` to `skip` when omitted —
   interactive mode always prompts for it, and every prompt's own unchosen-Enter default matches
   the same `--yes` defaults. With no existing config, both flags are ignored. Ctrl+C during any
-  prompt exits `0`. Does **not** write a file or wire `$schema` yet — that is
-  [P6.04](P6-init/04-config-writer-schema.md)'s job. See **Init & repo scan** for the underlying
-  scanner/inference. Decisions [I1–I3](requirements/06-installation.md),
+  prompt exits `0`. On confirmation it **writes** `wastech-mdlint.config.json` and wires its local
+  `$schema` (a project-local `schema.json` when custom rules are present); a `merge` whose existing
+  config is unreadable or would not load (unknown key/rule/options) aborts the write rather than
+  produce an invalid or lossy result. `--with-ci-workflow` (under `--yes` only) drops the opt-in
+  `.github/workflows/wastech-mdlint.yml`; interactive runs prompt for it (default no). See **Init &
+  repo scan** and `generateInitConfig` for the underlying scanner/inference/writer. Decisions
+  [I1–I3, I6](requirements/06-installation.md), [C3/C4/C9](requirements/01-configuration.md),
   [D5](index.md) inquirer.
 - **Exit codes** — `0` pass · `1` findings at the `--fail-on` threshold · `2` operational
   error. A cross-cutting contract (roadmap §8).

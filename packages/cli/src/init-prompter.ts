@@ -57,6 +57,17 @@ export function buildPackageManagerPromptConfig(): {
   };
 }
 
+/**
+ * `default: false` — "ask first, don't write silently" (I6) means a bare Enter must not opt into
+ * dropping a CI workflow file; `@inquirer/confirm` otherwise defaults to yes.
+ */
+export function buildCiWorkflowPromptConfig(): { message: string; default: boolean } {
+  return {
+    message: "Also add a GitHub Actions workflow (.github/workflows/wastech-mdlint.yml)?",
+    default: false
+  };
+}
+
 // `@inquirer/prompts`' context argument wants a full `NodeJS.WritableStream` (it renders through
 // `.write()` but also expects the standard `Writable` shape); our injected seam is deliberately
 // narrowed to just `write` (mirrors `CliIo.stdout`), so wrap it in a real `Writable` that forwards
@@ -121,6 +132,10 @@ export function createInquirerPrompter(stdout: Pick<NodeJS.WriteStream, "write">
       // itself after a confirmed interactive run (see the `InitPrompter.confirmDraft` contract).
       stdout.write(summary);
       return confirm({ message: "Confirm this draft configuration?", default: true }, context);
+    },
+
+    async confirmCiWorkflow(): Promise<boolean> {
+      return confirm(buildCiWorkflowPromptConfig(), context);
     }
   };
 }

@@ -68,7 +68,7 @@ wastech-mdlint slice <query> [--config <file>] [--depth <n>] [--format text|json
 wastech-mdlint impact <file> [--config <file>] [--format text|json]
 wastech-mdlint schema [--out schema.json]
 wastech-mdlint compile [--config <file>] [--outdir <dir>] [--dry-run] [--cwd <dir>]
-wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip]
+wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-ci-workflow]
 ```
 
 - `lint` is the default command (running `wastech-mdlint` with no subcommand lints the
@@ -99,14 +99,21 @@ wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip]
   in config; a missing one exits `2` with guidance instead of a bare stack trace. Unlike
   every other command, `compile` takes `--cwd` instead of a `[path]` argument, and
   resolves a relative `--config`/`--outdir` against it (not the process's own cwd).
-- `init` scans the repo for doc clusters, infers a rule set with rationale, and prints a
-  confirmable draft preview — it does not write a config file yet. `--yes` skips every
-  prompt (for CI) and defaults `--on-existing` to `skip` when omitted; interactive mode
-  always prompts, and pressing Enter without choosing lands on that same safe default
-  rather than the first listed option. If `[path]` is below a repo's existing config,
-  `init` scans from the config's own directory instead, so the preview always matches the
-  config it would change. Without `--yes`, `init` requires an interactive terminal.
-  Ctrl+C during any prompt exits `0`.
+- `init` scans the repo for doc clusters, infers a rule set with rationale, and — on
+  confirmation — writes `wastech-mdlint.config.json` with a **local** `$schema` (canonical
+  rule IDs, optional per-rule rationale comments, and an `exclude` list of the build/vendor
+  directories the scan skips so lint never re-scans them). When custom rules are present it also
+  generates a project-local `schema.json` and points `$schema` at it; no remote URL is ever
+  emitted. `--on-existing merge` is additive/existing-wins — it keeps every existing rule and
+  appends only new ones; a merge whose existing config is unreadable or would not load (unknown
+  key, unknown rule, invalid options) aborts the write rather than risk an invalid or lossy
+  result. `--yes` skips every prompt (for CI) and defaults `--on-existing`
+  to `skip` when omitted; interactive mode always prompts, and pressing Enter without choosing
+  lands on that same safe default rather than the first listed option. `--with-ci-workflow`
+  (under `--yes` only) also drops a `.github/workflows/wastech-mdlint.yml`; interactive runs
+  offer it with a default of no. If `[path]` is below a repo's existing config, `init` works
+  from the config's own directory instead. Without `--yes`, `init` requires an interactive
+  terminal. Ctrl+C during any prompt exits `0`.
 
 ## Config
 

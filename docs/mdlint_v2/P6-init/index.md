@@ -59,7 +59,7 @@ invariant) and lets tests exercise inference without a TTY.
 - [x] Interactive flow (include, categories — the "language" prompt named here is confirmed
       dead text, see [P6.03](03-interactive-prompts.md)) + non-interactive `--yes`; Ctrl+C
       exits 0.
-- [ ] Writes a valid `wastech-mdlint.config.json` (canonical IDs, optional rationale
+- [x] Writes a valid `wastech-mdlint.config.json` (canonical IDs, optional rationale
       comments) with a **local** `$schema`; generates a project schema when custom rules exist.
 - [ ] The produced config is structurally valid and loads without a `ConfigError` (canonical IDs,
       local `$schema`). On a **clean** fixture (no violations) `lint` exits 0; a real inferred

@@ -59,6 +59,21 @@ export type {
   RuleInferenceResult,
 } from "./discovery/rule-inference.js";
 
+// Config writer (P6.04)
+export {
+  buildCiWorkflowYaml,
+  CI_WORKFLOW_YAML,
+  generateInitConfig,
+  identifyExistingRule,
+} from "./discovery/config-writer.js";
+export type {
+  ExistingConfigDocument,
+  ExistingRuleIdentity,
+  GeneratedInitConfig,
+  GenerateInitConfigParams,
+  InitConfigAction,
+} from "./discovery/config-writer.js";
+
 // Graph
 export type {
   BuildContextGraphOptions,

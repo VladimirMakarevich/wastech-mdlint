@@ -95,6 +95,7 @@ export type InitCommand = {
   yes: boolean;
   onExisting?: ExistingConfigAction;
   isTty: boolean;
+  withCiWorkflow?: boolean;
 };
 
 export type CliCommand =
@@ -338,11 +339,17 @@ async function handleCompile(command: CompileCommand): Promise<CommandExecutionR
   return { output: `SKILL.md written to ${relativeOutputPath}\n`, exitCode: EXIT_CODE_SUCCESS };
 }
 
-// `init` (P6.03): never writes a file (P6.04's job) — the result is always a preview string, so
-// unlike every other handler this always exits 0 regardless of `wasConfirmed`.
+// `init` (P6.04): core generates the config bytes; `runInitCommand` performs the writes. The result
+// output is always informational (draft/write/abort summary), so this handler always exits 0.
 async function handleInit(command: InitCommand, prompter: InitPrompter): Promise<CommandExecutionResult> {
   const { output } = await runInitCommand(
-    { cwd: command.cwd, yes: command.yes, onExisting: command.onExisting, isTty: command.isTty },
+    {
+      cwd: command.cwd,
+      yes: command.yes,
+      onExisting: command.onExisting,
+      isTty: command.isTty,
+      withCiWorkflow: command.withCiWorkflow
+    },
     prompter
   );
   return { output, exitCode: EXIT_CODE_SUCCESS };

@@ -4,7 +4,17 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { lintConfigSchema, ruleEntrySchema, type DocCluster, type InferredRule, type RuleCategory } from "@wastech-mdlint/core";
+import { parse as parseJsonc } from "jsonc-parser";
+
+import {
+  generateConfigSchema,
+  lintConfigSchema,
+  loadConfiguration,
+  ruleEntrySchema,
+  type DocCluster,
+  type InferredRule,
+  type RuleCategory
+} from "@wastech-mdlint/core";
 
 import { EXIT_CODE_SUCCESS, EXIT_CODE_USAGE_ERROR } from "../src/commands.js";
 import {
@@ -17,7 +27,11 @@ import {
   type ConfirmedInitSelections,
   type InitPrompter
 } from "../src/init-command.js";
-import { buildExistingConfigActionPromptConfig, buildPackageManagerPromptConfig } from "../src/init-prompter.js";
+import {
+  buildCiWorkflowPromptConfig,
+  buildExistingConfigActionPromptConfig,
+  buildPackageManagerPromptConfig
+} from "../src/init-prompter.js";
 import { runCli, type CliIo } from "../src/program.js";
 
 function createMemoryWriter() {
@@ -69,8 +83,15 @@ function createDefaultFakePrompter(overrides: Partial<InitPrompter> = {}): InitP
     choosePackageManager: overrides.choosePackageManager ?? (async () => undefined),
     selectClusters: overrides.selectClusters ?? (async (clusters) => clusters),
     selectCategories: overrides.selectCategories ?? (async (categories) => categories),
-    confirmDraft: overrides.confirmDraft ?? (async () => true)
+    confirmDraft: overrides.confirmDraft ?? (async () => true),
+    confirmCiWorkflow: overrides.confirmCiWorkflow ?? (async () => false)
   };
+}
+
+const CONFIG_FILE = "wastech-mdlint.config.json";
+
+function readConfig(text: string): Record<string, unknown> {
+  return parseJsonc(text) as Record<string, unknown>;
 }
 
 // Cross-linked docs/ cluster: two local links (one anchored) + a real anchor match (REF-001/002),
@@ -131,12 +152,17 @@ describe("init command · scan + inference draft", () => {
     const interactiveResult = await run(["init", interactiveCwd], interactiveCwd, { isTty: true, initPrompter: prompter });
 
     expect(interactiveResult.exitCode).toBe(EXIT_CODE_SUCCESS);
-    expect(confirmDraftCalls).toEqual([yesResult.stdout]);
-    // Nothing left for runCli itself to print — the prompter already showed it once.
-    expect(interactiveResult.stdout).toBe("");
+    // The draft the prompter was shown is a prefix of --yes's output (which appends a write summary
+    // the interactive run reserves for its own second stage).
+    expect(confirmDraftCalls).toHaveLength(1);
+    expect(yesResult.stdout.startsWith(confirmDraftCalls[0]!)).toBe(true);
+    // Interactive run: the prompter already showed the draft, so runCli only prints the write
+    // summary — non-empty now that P6.04 actually writes.
+    expect(interactiveResult.stdout).not.toBe("");
+    expect(interactiveResult.stdout).toContain(`Wrote ${CONFIG_FILE}`);
   });
 
-  it("never writes any file to disk", async () => {
+  it("leaves the sampled Markdown fixture files untouched", async () => {
     const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
     await run(["init", cwd, "--yes"], cwd);
 
@@ -150,10 +176,13 @@ describe("init command · scan + inference draft", () => {
     // `cwd` here is a temp fixture dir, deliberately different from the real process.cwd() (the
     // repo root this test runs from). If "." were resolved against the wrong base, this scan
     // would cover the repo root instead of the tiny fixture and diverge from the absolute-path run.
-    const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+    // Separate fixtures per run: init now writes a config, so a second run against the same cwd
+    // would find that written config and default to skip instead of re-inferring.
+    const absoluteCwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+    const relativeCwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
 
-    const absoluteResult = await run(["init", cwd, "--yes"], cwd);
-    const relativeResult = await run(["init", ".", "--yes"], cwd);
+    const absoluteResult = await run(["init", absoluteCwd, "--yes"], absoluteCwd);
+    const relativeResult = await run(["init", ".", "--yes"], relativeCwd);
 
     expect(relativeResult.exitCode).toBe(EXIT_CODE_SUCCESS);
     expect(relativeResult.stdout).toBe(absoluteResult.stdout);
@@ -173,22 +202,25 @@ describe("init command · existing config handling", () => {
     await expect(readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8")).resolves.toBe(existingConfigText);
   });
 
-  it("--on-existing overwrite previews the full inferred draft without writing", async () => {
+  it("--on-existing overwrite writes the full inferred config, replacing the existing one", async () => {
     const cwd = await fixtureRepo({ ...CROSS_LINKED_DOCS_FIXTURE, "wastech-mdlint.config.json": existingConfigText });
 
     const result = await run(["init", cwd, "--yes", "--on-existing", "overwrite"], cwd);
 
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
     expect(result.stdout).toContain("will be overwritten with the confirmed draft");
-    expect(result.stdout).toContain("- REF-001:");
-    expect(result.stdout).toContain("- GRP-001:");
-    // Unlike merge, overwrite replaces the whole config, so the Include section still applies.
-    expect(result.stdout).toContain("Include (");
-    expect(result.stdout).toContain("docs/**/*.{md,mdx}");
-    await expect(readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8")).resolves.toBe(existingConfigText);
+    expect(result.stdout).toContain(`Wrote ${CONFIG_FILE}`);
+
+    const written = readConfig(await readFile(path.join(cwd, CONFIG_FILE), "utf8"));
+    const ruleIds = (written.rules as { rule: string }[]).map((entry) => entry.rule);
+    // Overwrite replaces the whole config: the freshly inferred canonical ids, the package $schema.
+    expect(ruleIds).toContain("REF-001");
+    expect(ruleIds).toContain("GRP-001");
+    expect(written.include).toContain("docs/**/*.{md,mdx}");
+    expect(written.$schema).toBe("./node_modules/@wastech-mdlint/cli/schema.json");
   });
 
-  it("--on-existing merge previews only the new-by-canonical-id rules and leaves existing ones unmentioned", async () => {
+  it("--on-existing merge appends only new-by-canonical-id rules and keeps existing ones verbatim", async () => {
     const cwd = await fixtureRepo({ ...CROSS_LINKED_DOCS_FIXTURE, "wastech-mdlint.config.json": existingConfigText });
 
     const result = await run(["init", cwd, "--yes", "--on-existing", "merge"], cwd);
@@ -196,16 +228,16 @@ describe("init command · existing config handling", () => {
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
     expect(result.stdout).toContain("existing rules[] entries are left untouched");
     expect(result.stdout).not.toContain("WARNING");
-    expect(result.stdout).not.toContain("- REF-001:");
-    expect(result.stdout).toContain("- REF-002:");
-    expect(result.stdout).toContain("- TBL-002:");
-    expect(result.stdout).toContain("- CTX-002:");
-    expect(result.stdout).toContain("- GRP-001:");
-    // Merge is additive/existing-wins: include/exclude/settings must never appear as changing.
-    expect(result.stdout).not.toContain("Include (");
-    expect(result.stdout).not.toContain("docs/**/*.{md,mdx}");
-    expect(result.stdout).toContain("Include / exclude / settings: left unchanged");
-    await expect(readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8")).resolves.toBe(existingConfigText);
+    expect(result.stdout).toContain(`Merged ${CONFIG_FILE}`);
+
+    const written = readConfig(await readFile(path.join(cwd, CONFIG_FILE), "utf8"));
+    const ruleIds = (written.rules as { rule: string }[]).map((entry) => entry.rule);
+    // Existing REF-001 preserved (still first), new rules appended, package $schema (no custom rule).
+    expect(ruleIds[0]).toBe("REF-001");
+    expect(ruleIds).toContain("REF-002");
+    expect(ruleIds).toContain("TBL-002");
+    expect(ruleIds).toContain("GRP-001");
+    expect(written.$schema).toBe("./node_modules/@wastech-mdlint/cli/schema.json");
   });
 
   it("--on-existing skip previews the skip message and leaves the file untouched", async () => {
@@ -215,6 +247,23 @@ describe("init command · existing config handling", () => {
 
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
     expect(result.stdout).toContain("skipped — existing config left untouched.");
+    await expect(readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8")).resolves.toBe(existingConfigText);
+  });
+
+  it("--on-existing skip never touches the filesystem, even with --with-ci-workflow", async () => {
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      ".git/HEAD": "ref: refs/heads/main\n",
+      "wastech-mdlint.config.json": existingConfigText
+    });
+
+    const result = await run(["init", cwd, "--yes", "--on-existing", "skip", "--with-ci-workflow"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain("skipped — existing config left untouched.");
+    // skip is a strict no-write outcome (plan invariant): no CI workflow, no config change.
+    expect(result.stdout).not.toContain("Wrote CI workflow");
+    await expect(readFile(path.join(cwd, ".github", "workflows", "wastech-mdlint.yml"), "utf8")).rejects.toThrow();
     await expect(readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8")).resolves.toBe(existingConfigText);
   });
 
@@ -242,8 +291,10 @@ describe("init command · existing config handling", () => {
     const result = await run(["init", cwd, "--yes", "--on-existing", "merge"], cwd);
 
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
-    expect(result.stdout).toContain("WARNING: the existing config could not be read or parsed");
+    expect(result.stdout).toContain("WARNING: the existing config could not be read, parsed, or validated");
     expect(result.stdout).toContain("- REF-001:");
+    // Unreadable + merge aborts the write: the file is untouched and the output says so explicitly.
+    expect(result.stdout).toContain("Not written:");
     await expect(readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8")).resolves.toBe("{ not json");
   });
 
@@ -254,9 +305,56 @@ describe("init command · existing config handling", () => {
     const result = await run(["init", cwd, "--yes", "--on-existing", "merge"], cwd);
 
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
-    expect(result.stdout).toContain("WARNING: the existing config could not be read or parsed");
+    expect(result.stdout).toContain("WARNING: the existing config could not be read, parsed, or validated");
     expect(result.stdout).toContain("- REF-001:");
+    expect(result.stdout).toContain("Not written:");
     await expect(readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8")).resolves.toBe(malformedConfigText);
+  });
+
+  it("--on-existing merge aborts when rules[] is an array with an unidentifiable entry", async () => {
+    // `["REF-001"]` is array-shaped but the bare-string entry can't be canonically diffed, so
+    // merging would append an inferred REF-001 as a duplicate — the additive existing-wins contract
+    // forbids that, so the write aborts and the file is left untouched.
+    const malformedConfigText = JSON.stringify({ rules: ["REF-001"] });
+    const cwd = await fixtureRepo({ ...CROSS_LINKED_DOCS_FIXTURE, "wastech-mdlint.config.json": malformedConfigText });
+
+    const result = await run(["init", cwd, "--yes", "--on-existing", "merge"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain("WARNING: the existing config could not be read, parsed, or validated");
+    expect(result.stdout).toContain("Not written:");
+    await expect(readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8")).resolves.toBe(malformedConfigText);
+  });
+
+  it("--on-existing merge aborts when a custom entry can't be canonically identified", async () => {
+    // A `rule: "custom"` entry with no usable `id` (missing here) can't be diffed or schema-wired, so
+    // the merge aborts rather than rewrite a config it can't reason about (additive-merge safety).
+    const malformedConfigText = JSON.stringify({
+      rules: [{ rule: "custom", options: { assert: { kind: "sectionPresent", section: "X" } } }]
+    });
+    const cwd = await fixtureRepo({ ...CROSS_LINKED_DOCS_FIXTURE, "wastech-mdlint.config.json": malformedConfigText });
+
+    const result = await run(["init", cwd, "--yes", "--on-existing", "merge"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain("WARNING: the existing config could not be read, parsed, or validated");
+    expect(result.stdout).toContain("Not written:");
+    await expect(readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8")).resolves.toBe(malformedConfigText);
+  });
+
+  it("--on-existing merge aborts when the existing config parses but loadConfiguration rejects it", async () => {
+    // Parses fine and every rule id is identifiable, but an unknown top-level key fails the strict
+    // root schema. Preserving it verbatim would write a config `loadConfiguration` rejects, so the
+    // merge aborts instead of reporting a successful (but invalid) write.
+    const invalidConfigText = JSON.stringify({ notARealKey: true, rules: [{ rule: "REF-001" }] });
+    const cwd = await fixtureRepo({ ...CROSS_LINKED_DOCS_FIXTURE, "wastech-mdlint.config.json": invalidConfigText });
+
+    const result = await run(["init", cwd, "--yes", "--on-existing", "merge"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain("WARNING: the existing config could not be read, parsed, or validated");
+    expect(result.stdout).toContain("Not written:");
+    await expect(readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8")).resolves.toBe(invalidConfigText);
   });
 
   // `findConfig` walks up from `[path]` to find the root config; the whole flow must then re-root
@@ -271,10 +369,13 @@ describe("init command · existing config handling", () => {
     }
 
     it("--on-existing overwrite: re-rooted subdirectory run matches the root-invoked run byte for byte", async () => {
-      const cwd = await fixtureWithRootConfigAndLockfile();
+      // Separate fixtures per run: init now writes, so reusing one cwd would let the first run's
+      // write change what the second run observes.
+      const rootCwd = await fixtureWithRootConfigAndLockfile();
+      const subdirCwd = await fixtureWithRootConfigAndLockfile();
 
-      const fromRoot = await run(["init", cwd, "--yes", "--on-existing", "overwrite"], cwd);
-      const fromSubdirectory = await run(["init", "docs", "--yes", "--on-existing", "overwrite"], cwd);
+      const fromRoot = await run(["init", rootCwd, "--yes", "--on-existing", "overwrite"], rootCwd);
+      const fromSubdirectory = await run(["init", "docs", "--yes", "--on-existing", "overwrite"], subdirCwd);
 
       expect(fromSubdirectory.exitCode).toBe(EXIT_CODE_SUCCESS);
       expect(fromSubdirectory.stdout).toBe(fromRoot.stdout);
@@ -287,10 +388,11 @@ describe("init command · existing config handling", () => {
     });
 
     it("--on-existing merge: re-rooted subdirectory run matches the root-invoked run byte for byte", async () => {
-      const cwd = await fixtureWithRootConfigAndLockfile();
+      const rootCwd = await fixtureWithRootConfigAndLockfile();
+      const subdirCwd = await fixtureWithRootConfigAndLockfile();
 
-      const fromRoot = await run(["init", cwd, "--yes", "--on-existing", "merge"], cwd);
-      const fromSubdirectory = await run(["init", "docs", "--yes", "--on-existing", "merge"], cwd);
+      const fromRoot = await run(["init", rootCwd, "--yes", "--on-existing", "merge"], rootCwd);
+      const fromSubdirectory = await run(["init", "docs", "--yes", "--on-existing", "merge"], subdirCwd);
 
       expect(fromSubdirectory.exitCode).toBe(EXIT_CODE_SUCCESS);
       expect(fromSubdirectory.stdout).toBe(fromRoot.stdout);
@@ -298,6 +400,182 @@ describe("init command · existing config handling", () => {
       expect(fromSubdirectory.stdout).not.toContain("..");
       expect(fromSubdirectory.stdout).toContain("Package manager: npm.");
     });
+  });
+});
+
+describe("init command · writing the config (P6.04)", () => {
+  it("--yes with no existing config writes a config loadConfiguration accepts", async () => {
+    const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+
+    const result = await run(["init", cwd, "--yes"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain(`Wrote ${CONFIG_FILE}`);
+    const written = readConfig(await readFile(path.join(cwd, CONFIG_FILE), "utf8"));
+    expect(written.$schema).toBe("./node_modules/@wastech-mdlint/cli/schema.json");
+    // Deliverable 1 / C1: the fresh write prunes the noise trees, so init never broadens the
+    // scanned corpus back to node_modules/.git/dist after writing.
+    expect(written.exclude).toContain("node_modules/**");
+    expect(written.exclude).toContain(".git/**");
+    // Forward-compat smoke check: the written config must load without a ConfigError.
+    await expect(loadConfiguration({ cwd })).resolves.toBeDefined();
+  });
+
+  it("merge preserving a custom rule writes a project-local schema and points $schema at it", async () => {
+    const customConfig = JSON.stringify({
+      rules: [
+        {
+          rule: "custom",
+          id: "REQ-100",
+          description: "Requires an Owner section.",
+          options: { assert: { kind: "sectionPresent", sections: ["Owner"] } }
+        }
+      ]
+    });
+    const cwd = await fixtureRepo({ ...CROSS_LINKED_DOCS_FIXTURE, [CONFIG_FILE]: customConfig });
+
+    const result = await run(["init", cwd, "--yes", "--on-existing", "merge"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    const written = readConfig(await readFile(path.join(cwd, CONFIG_FILE), "utf8"));
+    expect(written.$schema).toBe("./schema.json");
+    const schemaText = await readFile(path.join(cwd, "schema.json"), "utf8");
+    expect(schemaText).toBe(
+      generateConfigSchema({ customRules: [{ id: "REQ-100", description: "Requires an Owner section." }] })
+    );
+  });
+
+  it("--yes --with-ci-workflow writes the workflow file; plain --yes does not", async () => {
+    const workflowPath = path.join(".github", "workflows", "wastech-mdlint.yml");
+
+    const withCwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+    const withResult = await run(["init", withCwd, "--yes", "--with-ci-workflow"], withCwd);
+    expect(withResult.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(withResult.stdout).toContain("Wrote CI workflow");
+    const workflow = await readFile(path.join(withCwd, workflowPath), "utf8");
+    // Self-contained: installs the published CLI and runs it directly (P9.03's composite Action is
+    // not built yet, so no `uses:` reference to a not-yet-published Action).
+    expect(workflow).toContain("npm install --no-save @wastech-mdlint/cli");
+    expect(workflow).toContain("npx wastech-mdlint lint --fail-on error");
+
+    const withoutCwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+    await run(["init", withoutCwd, "--yes"], withoutCwd);
+    await expect(readFile(path.join(withoutCwd, workflowPath), "utf8")).rejects.toThrow();
+  });
+
+  it("anchors the CI workflow at the git root (not the target subdirectory) and passes the config path", async () => {
+    const workflowPath = path.join(".github", "workflows", "wastech-mdlint.yml");
+    // A git repo whose Markdown lives under docs/, with no existing config anywhere.
+    const cwd = await fixtureRepo({ ...CROSS_LINKED_DOCS_FIXTURE, ".git/HEAD": "ref: refs/heads/main\n" });
+
+    const result = await run(["init", "docs", "--yes", "--with-ci-workflow"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    // The summary reports the repo-relative path, so a subdirectory run says where the config landed.
+    expect(result.stdout).toContain("Wrote docs/wastech-mdlint.config.json");
+    // Config is written into the targeted subdirectory, and its local `$schema` points up at the
+    // repo-root node_modules — not a path nested under docs/ that would resolve to nothing.
+    const written = readConfig(await readFile(path.join(cwd, "docs", CONFIG_FILE), "utf8"));
+    expect(written.$schema).toBe("../node_modules/@wastech-mdlint/cli/schema.json");
+    // ...but the workflow is anchored at the repo root, where GitHub will actually load it, and it
+    // scopes lint to the config's directory (so include/exclude resolve there) plus an explicit
+    // --config — both single-quoted, POSIX, relative to the repo root.
+    const workflow = await readFile(path.join(cwd, workflowPath), "utf8");
+    expect(workflow).toContain("npx wastech-mdlint lint 'docs' --fail-on error --config 'docs/wastech-mdlint.config.json'");
+    // The dead-workflow location under docs/ is never created.
+    await expect(readFile(path.join(cwd, "docs", workflowPath), "utf8")).rejects.toThrow();
+  });
+
+  it("writes a nested config whose workflow lint command actually lints that subtree", async () => {
+    // docs/ has a broken local link (REF-001 evidence + a real violation). The workflow scopes lint
+    // to the config directory, so running that same command must load the nested config and scan the
+    // nested tree — not lint the repo root against docs-relative globs and find nothing.
+    const cwd = await fixtureRepo({
+      ".git/HEAD": "ref: refs/heads/main\n",
+      "docs/a.md": "# A\n\nSee [missing](nope.md).\n",
+      "docs/b.md": "# B\n\nSee [A](a.md).\n"
+    });
+
+    const initResult = await run(["init", "docs", "--yes"], cwd);
+    expect(initResult.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    // Mirror the workflow's `lint <configDir> --config <configPath>` (absolute here so the lint cwd
+    // is unambiguous, exactly as the repo-root-run workflow resolves `docs`).
+    const lintResult = await run(
+      ["lint", path.join(cwd, "docs"), "--config", path.join(cwd, "docs", CONFIG_FILE)],
+      cwd
+    );
+
+    // Not a usage/config error (2): the nested config loaded. REF-001 fired on the broken link,
+    // proving lint scanned the docs subtree rather than an empty/wrong root.
+    expect(lintResult.exitCode).not.toBe(EXIT_CODE_USAGE_ERROR);
+    expect(lintResult.stdout).toContain("REF-001");
+  });
+
+  it("anchors schema and workflow at the project root even without .git (package.json marks it)", async () => {
+    const workflowPath = path.join(".github", "workflows", "wastech-mdlint.yml");
+    // A valid non-git project: no `.git`, but `package.json` at the root marks the install root.
+    const cwd = await fixtureRepo({
+      "package.json": JSON.stringify({ name: "proj" }),
+      "docs/a.md": "# A\n\nSee [B](b.md).\n",
+      "docs/b.md": "# B\n\nSee [A](a.md).\n"
+    });
+
+    const result = await run(["init", "docs", "--yes", "--with-ci-workflow"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    // `$schema` resolves up to the project-root node_modules, not `./node_modules` inside docs/.
+    const written = readConfig(await readFile(path.join(cwd, "docs", CONFIG_FILE), "utf8"));
+    expect(written.$schema).toBe("../node_modules/@wastech-mdlint/cli/schema.json");
+    // Workflow is anchored at the project root, not under docs/.
+    await expect(readFile(path.join(cwd, workflowPath), "utf8")).resolves.toContain(
+      "--config 'docs/wastech-mdlint.config.json'"
+    );
+    await expect(readFile(path.join(cwd, "docs", workflowPath), "utf8")).rejects.toThrow();
+  });
+
+  it("anchors at the git repo root for a nested workspace package (not the package dir)", async () => {
+    const workflowPath = path.join(".github", "workflows", "wastech-mdlint.yml");
+    // A monorepo: `.git` + workspace `package.json` at the root, and a nested package with its own
+    // `package.json`. Running init inside the nested package must still anchor at the repo root.
+    const cwd = await fixtureRepo({
+      ".git/HEAD": "ref: refs/heads/main\n",
+      "package.json": JSON.stringify({ name: "monorepo", workspaces: ["packages/*"] }),
+      "packages/foo/package.json": JSON.stringify({ name: "foo" }),
+      "packages/foo/a.md": "# A\n\nSee [B](b.md).\n",
+      "packages/foo/b.md": "# B\n\nSee [A](a.md).\n"
+    });
+
+    const result = await run(["init", "packages/foo", "--yes", "--with-ci-workflow"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    // `$schema` climbs to the repo-root node_modules (two levels up), not the package's own.
+    const written = readConfig(await readFile(path.join(cwd, "packages", "foo", CONFIG_FILE), "utf8"));
+    expect(written.$schema).toBe("../../node_modules/@wastech-mdlint/cli/schema.json");
+    // Workflow lives at the repo root (where GitHub loads it), pointed at the nested config...
+    const workflow = await readFile(path.join(cwd, workflowPath), "utf8");
+    expect(workflow).toContain("--config 'packages/foo/wastech-mdlint.config.json'");
+    // ...and never at the dead `packages/foo/.github/...` location.
+    await expect(readFile(path.join(cwd, "packages", "foo", workflowPath), "utf8")).rejects.toThrow();
+  });
+
+  it("shell-quotes a config path with spaces so the lint command stays a single argument", async () => {
+    const workflowPath = path.join(".github", "workflows", "wastech-mdlint.yml");
+    // A legal target directory containing a space: the config path must not split into two tokens.
+    const cwd = await fixtureRepo({
+      ".git/HEAD": "ref: refs/heads/main\n",
+      "doc site/a.md": "# A\n\nSee [B](b.md).\n",
+      "doc site/b.md": "# B\n\nSee [A](a.md).\n"
+    });
+
+    const result = await run(["init", "doc site", "--yes", "--with-ci-workflow"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    await expect(readFile(path.join(cwd, "doc site", CONFIG_FILE), "utf8")).resolves.toBeDefined();
+    const workflow = await readFile(path.join(cwd, workflowPath), "utf8");
+    // Single-quoted as one shell argument — never the bare, space-split `--config doc site/...`.
+    expect(workflow).toContain("--config 'doc site/wastech-mdlint.config.json'");
+    expect(workflow).not.toContain("--config doc site/");
   });
 });
 
@@ -326,6 +604,26 @@ describe("init command · Ctrl+C and TTY guard", () => {
     const result = await run(["init", cwd], cwd, { isTty: true, initPrompter: prompter });
 
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+  });
+
+  it("Ctrl+C at the post-write CI-workflow prompt keeps the already-written config + summary", async () => {
+    // This prompt runs after the config is on disk; cancelling it must not discard the write summary
+    // and make the mutated repo look untouched. Cancellation is treated as "no workflow".
+    const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+    const prompter = createDefaultFakePrompter({
+      confirmDraft: async () => true,
+      confirmCiWorkflow: async () => {
+        throw Object.assign(new Error("cancelled"), { name: "ExitPromptError" });
+      }
+    });
+
+    const result = await run(["init", cwd], cwd, { isTty: true, initPrompter: prompter });
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    // The config was written and its summary printed — cancellation only skipped the workflow.
+    expect(result.stdout).toContain(`Wrote ${CONFIG_FILE}`);
+    expect(result.stdout).not.toContain("Wrote CI workflow");
+    await expect(readFile(path.join(cwd, CONFIG_FILE), "utf8")).resolves.toBeDefined();
   });
 
   it("rejects a non-interactive invocation without --yes as a usage error", async () => {
@@ -538,7 +836,7 @@ describe("formatDraftSummary", () => {
       "wastech-mdlint.config.json"
     );
 
-    expect(summary).toContain("WARNING: the existing config could not be read or parsed");
+    expect(summary).toContain("WARNING: the existing config could not be read, parsed, or validated");
   });
 });
 
@@ -571,6 +869,38 @@ describe("readExistingRuleIds", () => {
     const cwd = await fixtureRepo({ "wastech-mdlint.config.json": JSON.stringify({ rules: "REF-001" }) });
     const result = await readExistingRuleIds(cwd, path.join(cwd, "wastech-mdlint.config.json"));
     expect(result).toEqual({ ruleIds: [], parsed: false });
+  });
+
+  it("returns parsed: false when a rules[] entry is a bare string (not identifiable for the diff)", async () => {
+    // `["REF-001"]` looks array-shaped but the element carries no `{ rule }` to canonically diff, so
+    // a merge could not prove it a duplicate — the whole config is non-mergeable, not silently kept.
+    const cwd = await fixtureRepo({ "wastech-mdlint.config.json": JSON.stringify({ rules: ["REF-001"] }) });
+    const result = await readExistingRuleIds(cwd, path.join(cwd, "wastech-mdlint.config.json"));
+    expect(result).toEqual({ ruleIds: [], parsed: false });
+  });
+
+  it("returns parsed: false when a rules[] entry has a non-string rule value", async () => {
+    const cwd = await fixtureRepo({ "wastech-mdlint.config.json": JSON.stringify({ rules: [{ rule: 1 }] }) });
+    const result = await readExistingRuleIds(cwd, path.join(cwd, "wastech-mdlint.config.json"));
+    expect(result).toEqual({ ruleIds: [], parsed: false });
+  });
+
+  it("returns parsed: false for a custom entry with a missing or non-string id", async () => {
+    for (const rules of [[{ rule: "custom" }], [{ rule: "custom", id: 1 }]]) {
+      const cwd = await fixtureRepo({ "wastech-mdlint.config.json": JSON.stringify({ rules }) });
+      const result = await readExistingRuleIds(cwd, path.join(cwd, "wastech-mdlint.config.json"));
+      expect(result).toEqual({ ruleIds: [], parsed: false });
+    }
+  });
+
+  it("identifies a custom entry by its canonical id, not the literal \"custom\"", async () => {
+    const cwd = await fixtureRepo({
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "custom", id: "req-100", options: { assert: { kind: "sectionPresent", section: "X" } } }]
+      })
+    });
+    const result = await readExistingRuleIds(cwd, path.join(cwd, "wastech-mdlint.config.json"));
+    expect(result).toEqual({ ruleIds: ["REQ-100"], parsed: true });
   });
 
   it("parses JSONC (comments + trailing commas), canonicalizing every rule id", async () => {
@@ -609,5 +939,9 @@ describe("interactive prompt defaults match --yes", () => {
     expect(config.default).toBeUndefined();
     // "none of these" (value: undefined) must be an offered choice, not just an unreachable default.
     expect(config.choices.map((choice) => choice.value)).toContain(undefined);
+  });
+
+  it("confirmCiWorkflow's prompt defaults to false — \"ask first, don't write silently\"", () => {
+    expect(buildCiWorkflowPromptConfig().default).toBe(false);
   });
 });

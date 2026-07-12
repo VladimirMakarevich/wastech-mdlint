@@ -23,7 +23,10 @@ step — a major adoption lever ([I6](../requirements/06-installation.md)).
 1. A reusable composite Action (`wastech-mdlint`) that installs and runs `lint` with
    configurable `--fail-on`/`--config`/`--format`, surfacing findings in CI.
 2. A documented workflow snippet (`.github/workflows/wastech-mdlint.yml`) that the
-   [`init` P6.04](../P6-init/04-config-writer-schema.md) optionally drops into a repo.
+   [`init` P6.04](../P6-init/04-config-writer-schema.md) optionally drops into a repo. **Until this
+   task lands, P6.04 ships a self-contained `npm install` + `npx wastech-mdlint lint` workflow**
+   (the Action does not exist before P9); part of this task is swapping that template
+   (`buildCiWorkflowYaml` in `config-writer.ts`) to reference the composite Action via `uses:`.
 3. (Optional) SARIF output mapping from structured findings
    ([R3](../requirements/02-rules-engine.md)) so results appear in GitHub code scanning.
 

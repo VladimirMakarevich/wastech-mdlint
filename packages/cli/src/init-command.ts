@@ -1,26 +1,34 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { type ParseError, parse as parseJsonc } from "jsonc-parser";
 
 import {
+  buildCiWorkflowYaml,
   canonicalizeRuleId,
+  CONFIG_FILE_NAME,
   findConfig,
+  generateInitConfig,
+  identifyExistingRule,
   inferRuleSet,
+  loadConfiguration,
   normalizeRelativePath,
   ruleRegistry,
   scanRepository,
   type DetectedPackageManager,
   type DocCluster,
+  type ExistingConfigDocument,
+  type GeneratedInitConfig,
   type InferredRule,
+  type InitConfigAction,
   type RuleCategory,
   type RuleConfigEntry
 } from "@wastech-mdlint/core";
 
-// `init` (P6.03): the thin host boundary over P6.01/02's core scan + inference. This module owns
-// orchestration and pure preview-building; it never touches process.stdin/stdout (that split lives
-// in init-prompter.ts) and never writes a config file (that is P6.04's job — see the phase hand-off
-// note in docs/mdlint_v2/P6-init/03-interactive-prompts.md).
+// `init` (P6.03/P6.04): the thin host boundary over P6.01/02's core scan + inference. This module
+// owns orchestration and pure preview-building; it never touches process.stdin/stdout (that split
+// lives in init-prompter.ts). P6.04 makes it write the confirmed config: core generates the bytes
+// (generateInitConfig), this host performs the actual filesystem writes.
 
 export type ExistingConfigAction = "overwrite" | "merge" | "skip";
 
@@ -43,6 +51,9 @@ export type InitPrompter = {
   // draft is shown on an interactive run. `runInitCommand` trusts that display already happened
   // and does not re-emit `summary` itself once this resolves, so a caller must not skip it.
   confirmDraft(summary: string): Promise<boolean>;
+  // The opt-in CI-workflow offer (I6): "ask first, don't write silently", so its prompt defaults to
+  // no. Only consulted on an interactive run when no workflow file already exists.
+  confirmCiWorkflow(): Promise<boolean>;
 };
 
 export type InitCommandOptions = {
@@ -50,6 +61,9 @@ export type InitCommandOptions = {
   yes: boolean;
   onExisting?: ExistingConfigAction;
   isTty: boolean;
+  // Pre-answers the CI-workflow prompt under `--yes` only (mirrors `--on-existing`): interactive
+  // runs always prompt regardless of this flag.
+  withCiWorkflow?: boolean;
 };
 
 // The confirmed draft handed to formatDraftSummary. `"none"` distinguishes "no config existed" from
@@ -121,13 +135,21 @@ export type ExistingRuleIdsResult = {
   parsed: boolean;
 };
 
+export type ParsedExistingConfig = {
+  // The parsed JSONC root object, or undefined when the file could not be read or did not parse to
+  // an object. `parsed` mirrors that: false ⇒ `raw` is undefined.
+  raw: Record<string, unknown> | undefined;
+  parsed: boolean;
+};
+
 /**
- * Raw JSONC read of an existing config's `rules[].rule` ids, canonicalized. Deliberately not a full
- * `lintConfigSchema` validation (that belongs to `loadConfiguration`) — a committed config that
- * doesn't fully validate must still be diffable for the merge preview, and a malformed file must
- * degrade to an empty id set (with `parsed: false`, so the caller can warn) rather than crash `init`.
+ * Shared JSONC read of an existing config's root object. Deliberately not a full `lintConfigSchema`
+ * validation (that belongs to `loadConfiguration`) — a committed config that doesn't fully validate
+ * must still be diffable for the merge preview, and a malformed file must degrade to `parsed: false`
+ * (so callers can warn/abort) rather than crash `init`. Both `readExistingRuleIds` (diff preview)
+ * and `readExistingConfigDocument` (write path) are thin wrappers over this one read.
  */
-export async function readExistingRuleIds(cwd: string, configPath: string): Promise<ExistingRuleIdsResult> {
+async function parseExistingConfigFile(cwd: string, configPath: string): Promise<ParsedExistingConfig> {
   const absoluteConfigPath = path.isAbsolute(configPath) ? configPath : path.resolve(cwd, configPath);
 
   try {
@@ -136,32 +158,73 @@ export async function readExistingRuleIds(cwd: string, configPath: string): Prom
     const raw = parseJsonc(text, errors, { allowTrailingComma: true, disallowComments: false });
 
     if (errors.length > 0 || raw === null || typeof raw !== "object") {
-      return { ruleIds: [], parsed: false };
+      return { raw: undefined, parsed: false };
     }
-
-    const rulesField = (raw as { rules?: unknown }).rules;
-    if (rulesField === undefined) {
-      // Successfully parsed, and the key is genuinely absent — zero existing ids is a known
-      // fact here, not a degraded guess.
-      return { ruleIds: [], parsed: true };
-    }
-    if (!Array.isArray(rulesField)) {
-      // `rules` is present but structurally invalid (e.g. `{}` or a string) — this config cannot
-      // be merged additively, so it degrades the same way an unparsable file does.
-      return { ruleIds: [], parsed: false };
-    }
-
-    const ids: string[] = [];
-    for (const entry of rulesField) {
-      const ruleId = entry !== null && typeof entry === "object" ? (entry as { rule?: unknown }).rule : undefined;
-      if (typeof ruleId === "string") {
-        ids.push(canonicalizeRuleId(ruleId));
-      }
-    }
-    return { ruleIds: ids, parsed: true };
+    return { raw: raw as Record<string, unknown>, parsed: true };
   } catch {
+    return { raw: undefined, parsed: false };
+  }
+}
+
+/**
+ * Derives the canonicalized `rules[].rule` ids from an already-parsed config root, and whether the
+ * config can be merged additively (`mergeable`). A present-but-non-array `rules` key cannot be
+ * merged, so it degrades the same way an unparsable file does. Pure over one parsed snapshot, so the
+ * diff preview and the write path can share a single read without re-parsing.
+ */
+function extractExistingRuleIds(raw: Record<string, unknown> | undefined): { ruleIds: string[]; mergeable: boolean } {
+  if (raw === undefined) {
+    return { ruleIds: [], mergeable: false };
+  }
+
+  const rulesField = raw.rules;
+  if (rulesField === undefined) {
+    // Successfully parsed, and the key is genuinely absent — zero existing ids is a known fact
+    // here, not a degraded guess.
+    return { ruleIds: [], mergeable: true };
+  }
+  if (!Array.isArray(rulesField)) {
+    return { ruleIds: [], mergeable: false };
+  }
+
+  const ids: string[] = [];
+  for (const entry of rulesField) {
+    // `identifyExistingRule` (core) keys a built-in by its canonical `rule` and a custom rule by its
+    // canonical `id` — never the literal `"custom"`. Any entry it can't identify (a bare string, a
+    // non-string `rule`, or a `rule: "custom"` with a missing/non-string/non-schemaable `id`) makes
+    // the whole config non-mergeable: appending inferred rules over an unidentifiable existing entry
+    // could silently duplicate or shadow it, so the caller routes this to the not-written abort.
+    const identity = identifyExistingRule(entry);
+    if (identity.kind === "invalid") {
+      return { ruleIds: [], mergeable: false };
+    }
+    ids.push(identity.kind === "custom" ? identity.rule.id : identity.canonicalId);
+  }
+  return { ruleIds: ids, mergeable: true };
+}
+
+/**
+ * The existing config's canonicalized `rules[].rule` ids for the merge diff preview. `parsed` is
+ * false when the file is unreadable/unparsable *or* has a present-but-non-array `rules` key — either
+ * case cannot be merged additively, so the caller must not present the diff as authoritative.
+ */
+export async function readExistingRuleIds(cwd: string, configPath: string): Promise<ExistingRuleIdsResult> {
+  const { raw, parsed } = await parseExistingConfigFile(cwd, configPath);
+  if (!parsed) {
     return { ruleIds: [], parsed: false };
   }
+  const { ruleIds, mergeable } = extractExistingRuleIds(raw);
+  return { ruleIds, parsed: mergeable };
+}
+
+/**
+ * The existing config's parsed root object for the merge *write* path (feeds `generateInitConfig`'s
+ * `ExistingConfigDocument`). Only consulted once the diff has already confirmed the file is readable
+ * and additively mergeable, so an undefined `raw` here is a guarded, unreachable case rather than a
+ * silent fallback.
+ */
+export async function readExistingConfigDocument(cwd: string, configPath: string): Promise<ParsedExistingConfig> {
+  return parseExistingConfigFile(cwd, configPath);
 }
 
 /**
@@ -196,8 +259,8 @@ function formatExistingConfigLine(selections: ConfirmedInitSelections, configPat
         `Existing config found at ${configPath}: existing rules[] entries are left untouched ` +
         `(severity/options preserved); ${selections.newRuleIds.length} new rule(s) would be appended.`;
       return selections.existingConfigUnreadable
-        ? `${base} WARNING: the existing config could not be read or parsed, so this is the full ` +
-            "inferred set, not a verified diff — check for duplicates before merging."
+        ? `${base} WARNING: the existing config could not be read, parsed, or validated, so this is ` +
+            "the full inferred set, not a verified diff — check for duplicates before merging."
         : base;
     }
     case "skip":
@@ -261,12 +324,213 @@ export function formatDraftSummary(selections: ConfirmedInitSelections, configPa
   return `${lines.join("\n")}\n`;
 }
 
+// The workflow file location, as path segments joined via path.join for a Windows-correct write. Its
+// user-visible form is derived as a project-relative POSIX path at the write site (toRepoRelative).
+const CI_WORKFLOW_PATH_SEGMENTS = [".github", "workflows", "wastech-mdlint.yml"] as const;
+
+// The CLI package (`@wastech-mdlint/cli`) ships `schema.json`. Segments joined via path.join.
+const PACKAGE_SCHEMA_SEGMENTS = ["node_modules", "@wastech-mdlint", "cli", "schema.json"] as const;
+
+// Fallback project-root markers, used only when there is no `.git` above the write dir. A valid
+// non-git project still has `package.json`/`node_modules` at its root.
+const PROJECT_ROOT_MARKERS = ["package.json", "node_modules"] as const;
+
+// Walk up from `startDir` to the first ancestor for which `matches` holds; undefined at the FS root.
+async function findAncestor(
+  startDir: string,
+  matches: (directory: string) => Promise<boolean>
+): Promise<string | undefined> {
+  let directory = path.resolve(startDir);
+
+  for (;;) {
+    if (await matches(directory)) {
+      return directory;
+    }
+    const parent = path.dirname(directory);
+    if (parent === directory) {
+      return undefined;
+    }
+    directory = parent;
+  }
+}
+
+/**
+ * Resolve the root that anchors the CI workflow and user-visible relative paths. The repository root
+ * (`.git`) wins whenever one exists — GitHub loads workflows only from the *repo* root, so a nested
+ * workspace-package run (`packages/foo`) must anchor at the repo root, never at `packages/foo`. Only
+ * when there is no git root above the write dir does it fall back to the nearest `package.json`/
+ * `node_modules` (a valid non-git project). Undefined outside any recognizable project.
+ */
+async function findRepositoryRoot(startDir: string): Promise<string | undefined> {
+  const gitRoot = await findAncestor(startDir, (directory) => fileExists(path.join(directory, ".git")));
+  if (gitRoot !== undefined) {
+    return gitRoot;
+  }
+  return findAncestor(startDir, async (directory) => {
+    for (const marker of PROJECT_ROOT_MARKERS) {
+      if (await fileExists(path.join(directory, marker))) {
+        return true;
+      }
+    }
+    return false;
+  });
+}
+
+/**
+ * Walk up from `startDir` for the directory whose `node_modules/@wastech-mdlint/cli/schema.json`
+ * actually exists on disk — the real installed schema, wherever the package manager hoisted it.
+ * Returns that directory, or undefined when the package is not installed (a common case in tests /
+ * before `npm install`), so the caller can fall back to the project root.
+ */
+async function findInstalledSchemaDir(startDir: string): Promise<string | undefined> {
+  let directory = path.resolve(startDir);
+
+  for (;;) {
+    if (await fileExists(path.join(directory, ...PACKAGE_SCHEMA_SEGMENTS))) {
+      return directory;
+    }
+    const parent = path.dirname(directory);
+    if (parent === directory) {
+      return undefined;
+    }
+    directory = parent;
+  }
+}
+
+/**
+ * The default `$schema` value: the relative POSIX path from the config's own directory to the
+ * installed package schema (C9 — local, never a remote URL). `schemaAnchor` is the directory holding
+ * `node_modules/@wastech-mdlint/cli/schema.json` (resolved on disk, or the project root as a
+ * fallback), so a subdirectory config gets `../node_modules/...` and a root config `./node_modules/...`.
+ */
+function resolvePackageSchemaRef(configDir: string, schemaAnchor: string): string {
+  const relative = normalizeRelativePath(path.relative(configDir, path.join(schemaAnchor, ...PACKAGE_SCHEMA_SEGMENTS)));
+  // A same-dir/descendant path needs an explicit `./` prefix; a `../` path already reads as relative.
+  return relative.startsWith("../") ? relative : `./${relative}`;
+}
+
+/**
+ * Offer — and, if accepted, write — the opt-in CI workflow (I6, deliverable 3). Shared by the
+ * confirmed-write path and the `skip` path so `--with-ci-workflow` is honored even when the config
+ * itself is left untouched. Never overwrites an existing workflow. Anchors at the project root
+ * (where GitHub loads workflows) and points the workflow at `configAbsPath` relative to that root.
+ * Returns the project-relative POSIX path written, or undefined when nothing was written.
+ */
+async function offerCiWorkflow(params: {
+  repoRoot: string;
+  configAbsPath: string;
+  yes: boolean;
+  withCiWorkflow: boolean | undefined;
+  prompter: InitPrompter;
+}): Promise<string | undefined> {
+  const { repoRoot, configAbsPath, yes, withCiWorkflow, prompter } = params;
+
+  // Under `--yes` the flag fully decides (mirroring `--on-existing`), so do no filesystem work when
+  // it is off; an interactive run always prompts.
+  if (yes && withCiWorkflow !== true) {
+    return undefined;
+  }
+
+  // Omit the `--config` argument when the config sits at the project root — the CLI's walk-up finds
+  // it there; otherwise pass its project-root-relative POSIX path.
+  const configFromRoot = normalizeRelativePath(path.relative(repoRoot, configAbsPath));
+  // A line terminator in the path can't be represented safely in the workflow's shell command, and
+  // stripping it would mis-target the config — so decline this opt-in feature rather than emit a
+  // broken/mis-pointing workflow (an extreme but legal path edge; the config itself is still written).
+  if (/[\r\n]/.test(configFromRoot)) {
+    return undefined;
+  }
+
+  const ciWorkflowPath = path.join(repoRoot, ...CI_WORKFLOW_PATH_SEGMENTS);
+  if (await fileExists(ciWorkflowPath)) {
+    return undefined;
+  }
+
+  // This prompt runs AFTER the config/schema are already on disk. A Ctrl+C here must not unwind the
+  // whole command (that would exit without the write summary and make an already-mutated repo look
+  // untouched) — treat cancellation as "no workflow" and let the write summary print. Matched on
+  // `.name` (not `instanceof`), the version-stable @inquirer convention used in program.ts.
+  let wantsCi: boolean;
+  if (yes) {
+    wantsCi = true;
+  } else {
+    try {
+      wantsCi = await prompter.confirmCiWorkflow();
+    } catch (error) {
+      if (error instanceof Error && error.name === "ExitPromptError") {
+        return undefined;
+      }
+      throw error;
+    }
+  }
+  if (!wantsCi) {
+    return undefined;
+  }
+
+  const configArg = configFromRoot === CONFIG_FILE_NAME ? undefined : configFromRoot;
+  await mkdir(path.dirname(ciWorkflowPath), { recursive: true });
+  await writeFile(ciWorkflowPath, buildCiWorkflowYaml(configArg), "utf8");
+  return normalizeRelativePath(path.relative(repoRoot, ciWorkflowPath));
+}
+
+/**
+ * Deterministic write-outcome summary: how the config was written (fresh/merge), rule counts, which
+ * `$schema` it points at, and where the config / project schema / CI workflow landed. Every path is
+ * a repository-relative POSIX path (so a subdirectory run reports `docs/wastech-mdlint.config.json`,
+ * not a bare filename). Pure and exported so it can be asserted directly, mirroring `formatDraftSummary`.
+ */
+export function formatWriteSummary(params: {
+  action: InitConfigAction;
+  result: GeneratedInitConfig;
+  configPath: string;
+  schemaPath?: string;
+  ciWorkflowPath?: string;
+}): string {
+  const { action, result, configPath, schemaPath, ciWorkflowPath } = params;
+  const lines: string[] = [];
+
+  if (action === "merge") {
+    lines.push(
+      `Merged ${configPath}: ${result.addedRuleCount} new rule(s) appended (${result.totalRuleCount} total).`
+    );
+  } else {
+    lines.push(`Wrote ${configPath} with ${result.totalRuleCount} rule(s).`);
+  }
+
+  lines.push(`Schema: ${result.schemaRef}`);
+  if (schemaPath !== undefined) {
+    lines.push(`Wrote project-local schema ${schemaPath} (custom rules present).`);
+  }
+  if (ciWorkflowPath !== undefined) {
+    lines.push(`Wrote CI workflow ${ciWorkflowPath}.`);
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
+/**
+ * The "nothing written" outcome for the one abort case: a `merge` whose existing config could not be
+ * read/parsed/validated. The deliverable requires never modifying or dropping an existing entry and
+ * writing only a valid config — both unprovable when the existing config can't be parsed or would be
+ * rejected by the loader — so the safe answer is to write nothing.
+ * `configPath` is a repository-relative POSIX path.
+ */
+export function formatNotWrittenSummary(configPath: string | undefined): string {
+  const location = configPath ?? CONFIG_FILE_NAME;
+  return (
+    `Not written: the existing config at ${location} could not be read, parsed, or validated, so a ` +
+    "merge cannot guarantee a valid config with its existing entries preserved. Fix or remove it, " +
+    "then re-run init.\n"
+  );
+}
+
 /**
  * Orchestrates the init flow end to end: resolve existing-config disposition, scan, confirm
  * clusters/package-manager, re-run inference against the confirmed cluster subset (so global gates
  * and the cycle heuristic reflect what the user actually kept), confirm categories, diff against an
- * existing config when merging, and confirm the draft. Never writes a file — the return value is
- * only ever a preview string (P6.04's hand-off owns serialization + write).
+ * existing config when merging, and confirm the draft. On confirmation, writes the config (and an
+ * optional project-local schema + CI workflow); a `merge` whose existing config is unreadable aborts
+ * the write entirely rather than risk dropping an entry it cannot even parse.
  */
 export async function runInitCommand(
   options: InitCommandOptions,
@@ -292,6 +556,8 @@ export async function runInitCommand(
       : await prompter.resolveExistingConfigAction(relativeConfigPath);
 
     if (existingConfigAction === "skip") {
+      // `skip` must never touch the filesystem (plan invariant): no config, schema, or CI workflow
+      // write — the CI-workflow offer belongs only to the confirmed config-write branch below.
       return {
         output: `${DRAFT_SUMMARY_HEADER}\n\nskipped — existing config left untouched.\n`,
         wasConfirmed: false
@@ -337,11 +603,22 @@ export async function runInitCommand(
   const selectedCategorySet = new Set(selectedCategories);
   let selectedRules = inference.rules.filter((rule) => selectedCategorySet.has(rule.category));
   let existingConfigUnreadable = false;
+  // The single parsed snapshot of the existing config, read once and reused by both the diff below
+  // and the merge write later — re-reading after confirmation could race with a concurrent edit and
+  // (on a second-read failure) silently drop the very entries a merge must preserve.
+  let existingDocument: ParsedExistingConfig | undefined;
 
   if (existingConfigPath !== undefined && existingConfigAction === "merge") {
-    const existingRuleIds = await readExistingRuleIds(cwd, existingConfigPath);
-    existingConfigUnreadable = !existingRuleIds.parsed;
-    selectedRules = diffAgainstExistingRuleIds(existingRuleIds.ruleIds, selectedRules).newRules;
+    existingDocument = await readExistingConfigDocument(cwd, existingConfigPath);
+    const { ruleIds, mergeable } = extractExistingRuleIds(existingDocument.raw);
+    // Additive merge preserves the existing content verbatim, so the written config is only valid if
+    // the existing one already loads (append-only adds registry-valid inferred rules). Validate it
+    // through the real loader — an unknown top-level key, unknown rule id, or invalid preserved
+    // options must abort the merge, never be reported as a successful write of a config that
+    // `loadConfiguration` would then reject.
+    existingConfigUnreadable =
+      !existingDocument.parsed || !mergeable || !(await existingConfigLoads(cwd, existingConfigPath));
+    selectedRules = diffAgainstExistingRuleIds(ruleIds, selectedRules).newRules;
   }
 
   const selections: ConfirmedInitSelections = {
@@ -355,17 +632,109 @@ export async function runInitCommand(
 
   const summary = formatDraftSummary(selections, relativeConfigPath);
 
-  // `--yes` never prompts, so `summary` has not been shown to anyone yet — it must be the
-  // returned output. Interactively, `confirmDraft` owns displaying `summary` (see its contract
-  // above) before asking, so echoing it again here would print the draft twice.
-  if (options.yes) {
-    return { output: summary, wasConfirmed: true };
-  }
-
-  const confirmed = await prompter.confirmDraft(summary);
+  // `--yes` never prompts, so `summary` has not been shown to anyone yet and must be prepended to
+  // whatever the write step produces. Interactively, `confirmDraft` owns displaying `summary` (see
+  // its contract above), so the write step's output is returned on its own to avoid a double print.
+  const confirmed = options.yes ? true : await prompter.confirmDraft(summary);
   if (!confirmed) {
     return { output: "Aborted: configuration not confirmed.\n", wasConfirmed: false };
   }
 
-  return { output: "", wasConfirmed: true };
+  const composeOutput = (suffix: string): string => (options.yes ? `${summary}\n${suffix}` : suffix);
+
+  // The repository root anchors every user-visible path so a subdirectory run reports where files
+  // actually landed (e.g. `docs/wastech-mdlint.config.json`). findRepositoryRoot prefers the `.git`
+  // root (a nested workspace package must still anchor at the real repo root, not `packages/foo`)
+  // and only falls back to a nearer `package.json`/`node_modules` outside a git repo. It walks *up*
+  // from the write dir, so the root is always an ancestor and reported paths never contain a "..".
+  // Falls back to `cwd` outside any recognizable project (best effort — no parent anchor to report).
+  const repoRoot = (await findRepositoryRoot(cwd)) ?? cwd;
+  const toRepoRelative = (absolutePath: string): string => normalizeRelativePath(path.relative(repoRoot, absolutePath));
+
+  // A merge that cannot read/parse the existing config aborts: the deliverable's "never modify or
+  // drop an existing entry" is unprovable when the entries can't be parsed, so writing nothing is
+  // the only safe outcome (no config, no schema, no CI workflow touch the disk here).
+  if (existingConfigAction === "merge" && existingConfigUnreadable) {
+    const notWrittenPath =
+      existingConfigPath === undefined ? relativeConfigPath : toRepoRelative(existingConfigPath);
+    return {
+      output: composeOutput(formatNotWrittenSummary(notWrittenPath)),
+      wasConfirmed: false
+    };
+  }
+
+  const action: InitConfigAction = existingConfigAction === "merge" ? "merge" : "fresh";
+
+  // Reuse the snapshot read above. The unreadable-merge abort has already returned, so on a merge
+  // that reaches here `existingDocument.raw` is guaranteed defined (parsed + additively mergeable) —
+  // no second read, no window for a fresh-overwrite that drops the existing keys.
+  const existing: ExistingConfigDocument | undefined =
+    action === "merge" && existingDocument?.raw !== undefined ? { raw: existingDocument.raw } : undefined;
+
+  const configPath = path.join(cwd, CONFIG_FILE_NAME);
+
+  // `include` is only meaningful for a fresh write; generateInitConfig ignores it under "merge". The
+  // package `$schema` ref is computed relative to the config's own directory (not a fixed literal),
+  // anchored on the *actual* installed schema when present (or the project root otherwise), so a
+  // subdirectory config wires `../node_modules/...` instead of a dead path nested under it.
+  const schemaAnchor = (await findInstalledSchemaDir(cwd)) ?? repoRoot;
+  const preview = buildConfigPreview(confirmedClusters, selectedRules);
+  const result = generateInitConfig({
+    action,
+    existing,
+    include: preview.include,
+    newRules: selectedRules,
+    packageSchemaRef: resolvePackageSchemaRef(cwd, schemaAnchor)
+  });
+
+  await writeFile(configPath, result.configText, "utf8");
+  let schemaRelativePath: string | undefined;
+  if (result.projectSchema !== undefined) {
+    const schemaPath = path.join(cwd, result.projectSchema.fileName);
+    await writeFile(schemaPath, result.projectSchema.text, "utf8");
+    schemaRelativePath = toRepoRelative(schemaPath);
+  }
+
+  const ciWorkflowRelativePath = await offerCiWorkflow({
+    repoRoot,
+    configAbsPath: configPath,
+    yes: options.yes,
+    withCiWorkflow: options.withCiWorkflow,
+    prompter
+  });
+
+  return {
+    output: composeOutput(
+      formatWriteSummary({
+        action,
+        result,
+        configPath: toRepoRelative(configPath),
+        schemaPath: schemaRelativePath,
+        ciWorkflowPath: ciWorkflowRelativePath
+      })
+    ),
+    wasConfirmed: true
+  };
+}
+
+async function fileExists(absolutePath: string): Promise<boolean> {
+  try {
+    await stat(absolutePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// True when the existing config fully loads (root schema + rule resolution) — the same validation
+// `loadConfiguration` runs at lint time. A `merge` gates on this so it never rewrites a config that
+// preserves an already-invalid key/rule/options and then reports success (acceptance: init writes a
+// valid config). Any thrown ConfigError (or other read failure) counts as "does not load".
+async function existingConfigLoads(cwd: string, configPath: string): Promise<boolean> {
+  try {
+    await loadConfiguration({ cwd, explicitConfigPath: configPath });
+    return true;
+  } catch {
+    return false;
+  }
 }
