@@ -65,6 +65,8 @@ export {
   CI_WORKFLOW_YAML,
   generateInitConfig,
   identifyExistingRule,
+  PACKAGE_SCHEMA_SEGMENTS,
+  resolvePackageSchemaRef,
 } from "./discovery/config-writer.js";
 export type {
   ExistingConfigDocument,

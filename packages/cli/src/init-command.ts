@@ -1,4 +1,5 @@
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 import { type ParseError, parse as parseJsonc } from "jsonc-parser";
@@ -13,6 +14,8 @@ import {
   inferRuleSet,
   loadConfiguration,
   normalizeRelativePath,
+  PACKAGE_SCHEMA_SEGMENTS,
+  resolvePackageSchemaRef,
   ruleRegistry,
   scanRepository,
   type DetectedPackageManager,
@@ -87,6 +90,9 @@ export type ConfigPreview = {
 
 export type RunInitCommandResult = {
   output: string;
+  // Whether the user actually confirmed the draft (via `--yes` or `confirmDraft`) — distinct from
+  // whether anything was *written*: the unreadable-merge abort still sets this `true` because the
+  // draft was confirmed, even though the write itself was then withheld for an unrelated safety reason.
   wasConfirmed: boolean;
 };
 
@@ -328,21 +334,25 @@ export function formatDraftSummary(selections: ConfirmedInitSelections, configPa
 // user-visible form is derived as a project-relative POSIX path at the write site (toRepoRelative).
 const CI_WORKFLOW_PATH_SEGMENTS = [".github", "workflows", "wastech-mdlint.yml"] as const;
 
-// The CLI package (`@wastech-mdlint/cli`) ships `schema.json`. Segments joined via path.join.
-const PACKAGE_SCHEMA_SEGMENTS = ["node_modules", "@wastech-mdlint", "cli", "schema.json"] as const;
-
 // Fallback project-root markers, used only when there is no `.git` above the write dir. A valid
 // non-git project still has `package.json`/`node_modules` at its root.
 const PROJECT_ROOT_MARKERS = ["package.json", "node_modules"] as const;
 
-// Walk up from `startDir` to the first ancestor for which `matches` holds; undefined at the FS root.
+// Walk up from `startDir` to the first ancestor for which `matches` holds; undefined at the FS root
+// or once the walk reaches `boundary` (checked, but never crossed — see findRepositoryRoot/
+// findInstalledSchemaDir for why the caller always passes the user's home directory here).
 async function findAncestor(
   startDir: string,
-  matches: (directory: string) => Promise<boolean>
+  matches: (directory: string) => Promise<boolean>,
+  boundary: string
 ): Promise<string | undefined> {
   let directory = path.resolve(startDir);
+  const resolvedBoundary = path.resolve(boundary);
 
   for (;;) {
+    if (directory === resolvedBoundary) {
+      return undefined;
+    }
     if (await matches(directory)) {
       return directory;
     }
@@ -360,61 +370,56 @@ async function findAncestor(
  * workspace-package run (`packages/foo`) must anchor at the repo root, never at `packages/foo`. Only
  * when there is no git root above the write dir does it fall back to the nearest `package.json`/
  * `node_modules` (a valid non-git project). Undefined outside any recognizable project.
+ *
+ * The walk stops at (and never accepts) the user's home directory: `init` bootstraps a *new* project,
+ * so its target commonly has no `.git`/`package.json` of its own yet, and a great many developer
+ * machines have an unrelated `.git` at `$HOME` (a dotfiles repo). Without this bound, running `init`
+ * anywhere under such a home directory would silently anchor the CI-workflow write — a real file on
+ * disk — at `$HOME` instead of the target project. Capping at `$HOME` trades away the rare legitimate
+ * case of a project rooted exactly at `$HOME` for never writing outside the user's intended target.
  */
 async function findRepositoryRoot(startDir: string): Promise<string | undefined> {
-  const gitRoot = await findAncestor(startDir, (directory) => fileExists(path.join(directory, ".git")));
+  const homeDir = os.homedir();
+  const gitRoot = await findAncestor(startDir, (directory) => fileExists(path.join(directory, ".git")), homeDir);
   if (gitRoot !== undefined) {
     return gitRoot;
   }
-  return findAncestor(startDir, async (directory) => {
-    for (const marker of PROJECT_ROOT_MARKERS) {
-      if (await fileExists(path.join(directory, marker))) {
-        return true;
+  return findAncestor(
+    startDir,
+    async (directory) => {
+      for (const marker of PROJECT_ROOT_MARKERS) {
+        if (await fileExists(path.join(directory, marker))) {
+          return true;
+        }
       }
-    }
-    return false;
-  });
+      return false;
+    },
+    homeDir
+  );
 }
 
 /**
  * Walk up from `startDir` for the directory whose `node_modules/@wastech-mdlint/cli/schema.json`
  * actually exists on disk — the real installed schema, wherever the package manager hoisted it.
  * Returns that directory, or undefined when the package is not installed (a common case in tests /
- * before `npm install`), so the caller can fall back to the project root.
+ * before `npm install`) or the walk reaches the user's home directory (same unrelated-ancestor
+ * concern as `findRepositoryRoot`), so the caller can fall back to the project root.
  */
 async function findInstalledSchemaDir(startDir: string): Promise<string | undefined> {
-  let directory = path.resolve(startDir);
-
-  for (;;) {
-    if (await fileExists(path.join(directory, ...PACKAGE_SCHEMA_SEGMENTS))) {
-      return directory;
-    }
-    const parent = path.dirname(directory);
-    if (parent === directory) {
-      return undefined;
-    }
-    directory = parent;
-  }
+  return findAncestor(
+    startDir,
+    (directory) => fileExists(path.join(directory, ...PACKAGE_SCHEMA_SEGMENTS)),
+    os.homedir()
+  );
 }
 
 /**
- * The default `$schema` value: the relative POSIX path from the config's own directory to the
- * installed package schema (C9 — local, never a remote URL). `schemaAnchor` is the directory holding
- * `node_modules/@wastech-mdlint/cli/schema.json` (resolved on disk, or the project root as a
- * fallback), so a subdirectory config gets `../node_modules/...` and a root config `./node_modules/...`.
- */
-function resolvePackageSchemaRef(configDir: string, schemaAnchor: string): string {
-  const relative = normalizeRelativePath(path.relative(configDir, path.join(schemaAnchor, ...PACKAGE_SCHEMA_SEGMENTS)));
-  // A same-dir/descendant path needs an explicit `./` prefix; a `../` path already reads as relative.
-  return relative.startsWith("../") ? relative : `./${relative}`;
-}
-
-/**
- * Offer — and, if accepted, write — the opt-in CI workflow (I6, deliverable 3). Shared by the
- * confirmed-write path and the `skip` path so `--with-ci-workflow` is honored even when the config
- * itself is left untouched. Never overwrites an existing workflow. Anchors at the project root
- * (where GitHub loads workflows) and points the workflow at `configAbsPath` relative to that root.
- * Returns the project-relative POSIX path written, or undefined when nothing was written.
+ * Offer — and, if accepted, write — the opt-in CI workflow (I6, deliverable 3). Only called from the
+ * confirmed config-write branch of `runInitCommand` — `skip` returns earlier and never reaches this,
+ * so `--with-ci-workflow` has no effect when the existing config is left untouched (skip is a strict
+ * no-write outcome). Never overwrites an existing workflow. Anchors at the project root (where GitHub
+ * loads workflows) and points the workflow at `configAbsPath` relative to that root. Returns the
+ * project-relative POSIX path written, or undefined when nothing was written.
  */
 async function offerCiWorkflow(params: {
   repoRoot: string;
@@ -659,7 +664,9 @@ export async function runInitCommand(
       existingConfigPath === undefined ? relativeConfigPath : toRepoRelative(existingConfigPath);
     return {
       output: composeOutput(formatNotWrittenSummary(notWrittenPath)),
-      wasConfirmed: false
+      // The user did confirm the draft above (`confirmed === true`) — only the write itself was
+      // withheld, for a reason unrelated to their choice. See the type's own comment.
+      wasConfirmed: true
     };
   }
 

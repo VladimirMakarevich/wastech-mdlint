@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { parse as parseJsonc } from "jsonc-parser";
 
@@ -22,6 +22,8 @@ import {
   DEFAULT_EXISTING_CONFIG_ACTION,
   diffAgainstExistingRuleIds,
   formatDraftSummary,
+  formatNotWrittenSummary,
+  formatWriteSummary,
   groupInferredRulesByCategory,
   readExistingRuleIds,
   type ConfirmedInitSelections,
@@ -559,6 +561,40 @@ describe("init command · writing the config (P6.04)", () => {
     await expect(readFile(path.join(cwd, "packages", "foo", workflowPath), "utf8")).rejects.toThrow();
   });
 
+  it("never anchors the CI workflow or $schema above the user's home directory", async () => {
+    // A realistic hazard: the home directory is itself a git repo (a common dotfiles setup), and the
+    // actual project being bootstrapped sits underneath it with no `.git`/`package.json` of its own
+    // yet (the ordinary "init before git init" case). The repo-root/schema-anchor walk must stop
+    // before reaching the home directory rather than mistake the unrelated dotfiles repo for the
+    // project root and write files there.
+    const fakeHome = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-fakehome-"));
+    tempDirs.push(fakeHome);
+    await mkdir(path.join(fakeHome, ".git"), { recursive: true });
+    const projectDir = path.join(fakeHome, "projects", "my-docs");
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(path.join(projectDir, "a.md"), "# A\n\nSee [B](b.md).\n", "utf8");
+    await writeFile(path.join(projectDir, "b.md"), "# B\n\nSee [A](a.md).\n", "utf8");
+
+    const homedirSpy = vi.spyOn(os, "homedir").mockReturnValue(fakeHome);
+    try {
+      const result = await run(["init", projectDir, "--yes", "--with-ci-workflow"], projectDir);
+
+      expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+      // Must never land at the unrelated dotfiles-repo root...
+      await expect(
+        readFile(path.join(fakeHome, ".github", "workflows", "wastech-mdlint.yml"), "utf8")
+      ).rejects.toThrow();
+      // ...it stays anchored at the actual target directory instead (no ancestor qualifies).
+      await expect(
+        readFile(path.join(projectDir, ".github", "workflows", "wastech-mdlint.yml"), "utf8")
+      ).resolves.toBeDefined();
+      const written = readConfig(await readFile(path.join(projectDir, CONFIG_FILE), "utf8"));
+      expect(written.$schema).toBe("./node_modules/@wastech-mdlint/cli/schema.json");
+    } finally {
+      homedirSpy.mockRestore();
+    }
+  });
+
   it("shell-quotes a config path with spaces so the lint command stays a single argument", async () => {
     const workflowPath = path.join(".github", "workflows", "wastech-mdlint.yml");
     // A legal target directory containing a space: the config path must not split into two tokens.
@@ -576,6 +612,45 @@ describe("init command · writing the config (P6.04)", () => {
     // Single-quoted as one shell argument — never the bare, space-split `--config doc site/...`.
     expect(workflow).toContain("--config 'doc site/wastech-mdlint.config.json'");
     expect(workflow).not.toContain("--config doc site/");
+  });
+
+  it("never overwrites an existing CI workflow file", async () => {
+    const workflowPath = path.join(".github", "workflows", "wastech-mdlint.yml");
+    const existingWorkflowText = "name: hand-written\non: push\n";
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      [workflowPath]: existingWorkflowText
+    });
+
+    const result = await run(["init", cwd, "--yes", "--with-ci-workflow"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    // Never clobber a file the user already owns — no "Wrote CI workflow" line, and the file is
+    // byte-for-byte untouched (the offer is skipped before ever reaching the prompt/write step).
+    expect(result.stdout).not.toContain("Wrote CI workflow");
+    await expect(readFile(path.join(cwd, workflowPath), "utf8")).resolves.toBe(existingWorkflowText);
+  });
+
+  it("interactive mode always prompts for the CI workflow, even with --with-ci-workflow set", async () => {
+    // `--with-ci-workflow` only pre-answers the prompt under `--yes` (mirrors `--on-existing`);
+    // interactively the flag must not silently bypass confirmCiWorkflow.
+    let confirmCiWorkflowCalls = 0;
+    const prompter = createDefaultFakePrompter({
+      confirmCiWorkflow: async () => {
+        confirmCiWorkflowCalls += 1;
+        return false;
+      }
+    });
+    const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+
+    const result = await run(["init", cwd, "--with-ci-workflow"], cwd, { isTty: true, initPrompter: prompter });
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(confirmCiWorkflowCalls).toBe(1);
+    expect(result.stdout).not.toContain("Wrote CI workflow");
+    await expect(
+      readFile(path.join(cwd, ".github", "workflows", "wastech-mdlint.yml"), "utf8")
+    ).rejects.toThrow();
   });
 });
 
@@ -837,6 +912,75 @@ describe("formatDraftSummary", () => {
     );
 
     expect(summary).toContain("WARNING: the existing config could not be read, parsed, or validated");
+  });
+});
+
+describe("formatWriteSummary", () => {
+  function buildResult(
+    overrides: Partial<{
+      configText: string;
+      schemaRef: string;
+      projectSchema?: { fileName: string; text: string };
+      addedRuleCount: number;
+      totalRuleCount: number;
+    }> = {}
+  ) {
+    return {
+      configText: "{}\n",
+      schemaRef: "./node_modules/@wastech-mdlint/cli/schema.json",
+      addedRuleCount: 2,
+      totalRuleCount: 2,
+      ...overrides
+    };
+  }
+
+  it("reports a fresh write with its rule count and schema ref, and no schema/workflow lines by default", () => {
+    const summary = formatWriteSummary({
+      action: "fresh",
+      result: buildResult(),
+      configPath: CONFIG_FILE
+    });
+
+    expect(summary).toContain(`Wrote ${CONFIG_FILE} with 2 rule(s).`);
+    expect(summary).toContain("Schema: ./node_modules/@wastech-mdlint/cli/schema.json");
+    expect(summary).not.toContain("Wrote project-local schema");
+    expect(summary).not.toContain("Wrote CI workflow");
+  });
+
+  it("reports a merge's added-vs-total rule counts with distinct wording from a fresh write", () => {
+    const summary = formatWriteSummary({
+      action: "merge",
+      result: buildResult({ addedRuleCount: 1, totalRuleCount: 3 }),
+      configPath: CONFIG_FILE
+    });
+
+    expect(summary).toContain(`Merged ${CONFIG_FILE}: 1 new rule(s) appended (3 total).`);
+  });
+
+  it("mentions the project-local schema and CI workflow only when their paths are actually passed", () => {
+    const summary = formatWriteSummary({
+      action: "fresh",
+      result: buildResult({ schemaRef: "./schema.json" }),
+      configPath: CONFIG_FILE,
+      schemaPath: "schema.json",
+      ciWorkflowPath: ".github/workflows/wastech-mdlint.yml"
+    });
+
+    expect(summary).toContain("Wrote project-local schema schema.json (custom rules present).");
+    expect(summary).toContain("Wrote CI workflow .github/workflows/wastech-mdlint.yml.");
+  });
+});
+
+describe("formatNotWrittenSummary", () => {
+  it("names the unreadable existing config's path and tells the user how to recover", () => {
+    const summary = formatNotWrittenSummary("docs/wastech-mdlint.config.json");
+    expect(summary).toContain("Not written: the existing config at docs/wastech-mdlint.config.json");
+    expect(summary).toContain("Fix or remove it, then re-run init.");
+  });
+
+  it("falls back to the canonical filename when no config path is known", () => {
+    const summary = formatNotWrittenSummary(undefined);
+    expect(summary).toContain(`Not written: the existing config at ${CONFIG_FILE}`);
   });
 });
 

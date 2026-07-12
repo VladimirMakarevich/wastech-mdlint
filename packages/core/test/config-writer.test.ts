@@ -5,6 +5,7 @@ import {
   buildCiWorkflowYaml,
   generateInitConfig,
   identifyExistingRule,
+  resolvePackageSchemaRef,
   type GenerateInitConfigParams
 } from "../src/discovery/config-writer.js";
 import { generateConfigSchema } from "../src/engine/schema.js";
@@ -261,6 +262,22 @@ describe("buildCiWorkflowYaml", () => {
     // opt-in workflow before reaching this).
     expect(() => buildCiWorkflowYaml("bad\nname/wastech-mdlint.config.json")).toThrow(/line terminator/);
     expect(() => buildCiWorkflowYaml("bad\rname/wastech-mdlint.config.json")).toThrow(/line terminator/);
+  });
+});
+
+describe("resolvePackageSchemaRef", () => {
+  it("wires a root config to the package schema directly under node_modules", () => {
+    expect(resolvePackageSchemaRef("/repo", "/repo")).toBe("./node_modules/@wastech-mdlint/cli/schema.json");
+  });
+
+  it("climbs one level for a config one directory below the schema anchor", () => {
+    expect(resolvePackageSchemaRef("/repo/docs", "/repo")).toBe("../node_modules/@wastech-mdlint/cli/schema.json");
+  });
+
+  it("climbs multiple levels for a config nested under a workspace package", () => {
+    expect(resolvePackageSchemaRef("/repo/packages/foo", "/repo")).toBe(
+      "../../node_modules/@wastech-mdlint/cli/schema.json"
+    );
   });
 });
 

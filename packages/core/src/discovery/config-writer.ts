@@ -1,7 +1,11 @@
+import path from "node:path";
+
 import { canonicalizeRuleId } from "../rule-id.js";
 import { generateConfigSchema, type CustomRuleDefinition } from "../engine/schema.js";
 import { ruleRegistry } from "../engine/rules/index.js";
+import { CUSTOM_ID_GRAMMAR } from "../engine/rules/custom.js";
 import { DEFAULT_NOISE_DIR_NAMES } from "./repo-scan-constants.js";
+import { normalizeRelativePath } from "./globs.js";
 import type { InferredRule } from "./rule-inference.js";
 
 // Config writer (P6.04): the deterministic "config-text generation" half of `init`'s write step.
@@ -47,6 +51,27 @@ export type GeneratedInitConfig = {
 
 const PROJECT_SCHEMA_FILE_NAME = "schema.json";
 const PROJECT_SCHEMA_REF = `./${PROJECT_SCHEMA_FILE_NAME}`;
+
+// The CLI package (`@wastech-mdlint/cli`) ships `schema.json` at this path once installed. Exported
+// so the CLI's (fs-bound) ancestor walk for the actual installed location checks the same segments
+// this module's own (fs-free) relative-path math resolves `resolvePackageSchemaRef` against.
+export const PACKAGE_SCHEMA_SEGMENTS = ["node_modules", "@wastech-mdlint", "cli", "schema.json"] as const;
+
+/**
+ * The default `$schema` value (C9): the relative POSIX path from the config's own directory to the
+ * installed package schema. `schemaAnchorDir` is the directory holding
+ * `node_modules/@wastech-mdlint/cli/schema.json` (resolved on disk by the CLI, or the project root
+ * as a fallback — locating it requires fs, so that walk stays in the host), so a subdirectory config
+ * gets `../node_modules/...` and a root config `./node_modules/...`. Pure path math — lives here
+ * (not in the CLI host) so the config-text-generation logic this module owns stays in one place.
+ */
+export function resolvePackageSchemaRef(configDir: string, schemaAnchorDir: string): string {
+  const relative = normalizeRelativePath(
+    path.relative(configDir, path.join(schemaAnchorDir, ...PACKAGE_SCHEMA_SEGMENTS))
+  );
+  // A same-dir/descendant path needs an explicit `./` prefix; a `../` path already reads as relative.
+  return relative.startsWith("../") ? relative : `./${relative}`;
+}
 
 // The fresh-write `exclude` (C1 / deliverable 1): the scanner's own pruned noise directories as
 // globs, so a written config never re-scans the `node_modules`/`.git`/`dist`/… trees that `init`
@@ -185,13 +210,12 @@ function renderRulesValue(items: RuleItem[]): string {
   return `[\n${lines.join("\n")}\n  ]`;
 }
 
-// Mirrors resolveCustomRule's authoritative id checks (custom.ts): the namespaced grammar plus the
-// reserved-prefix / built-in-collision guard. A preserved custom entry whose id fails these is
-// rejected by loadConfiguration at runtime, so it must not seed a project schema that claims it is
-// valid — feeding such an id to generateConfigSchema would make the written `$schema` disagree with
-// the loader. The id is already canonicalized (matching resolveCustomRule's own normalization).
-const CUSTOM_ID_GRAMMAR = /^[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$/;
-
+// Mirrors resolveCustomRule's authoritative id checks (custom.ts): the namespaced grammar (imported
+// from custom.ts, not re-declared, so the two can never silently drift) plus the reserved-prefix /
+// built-in-collision guard. A preserved custom entry whose id fails these is rejected by
+// loadConfiguration at runtime, so it must not seed a project schema that claims it is valid —
+// feeding such an id to generateConfigSchema would make the written `$schema` disagree with the
+// loader. The id is already canonicalized (matching resolveCustomRule's own normalization).
 function isResolvableCustomId(canonicalId: string): boolean {
   if (!CUSTOM_ID_GRAMMAR.test(canonicalId)) {
     return false;
