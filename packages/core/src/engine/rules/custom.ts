@@ -14,8 +14,10 @@ import type { Rule } from "../types.js";
 // — no code execution — so it is safe inside the MCP server (M8). Its id is user-chosen and cannot
 // shadow built-ins.
 
-// Namespaced id grammar (audit 3.5): uppercase dash-separated, at least one dash.
-const CUSTOM_ID_GRAMMAR = /^[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$/;
+// Namespaced id grammar (audit 3.5): uppercase dash-separated, at least one dash. Exported so
+// config-writer.ts (P6.04) can mirror this exact authoritative grammar for a preserved-on-merge
+// custom rule instead of keeping a second hand-copied regex that could silently drift from this one.
+export const CUSTOM_ID_GRAMMAR = /^[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$/;
 
 export type CustomRuleEntry = {
   rule: "custom";

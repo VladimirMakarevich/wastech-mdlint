@@ -31,6 +31,51 @@ export {
   normalizeRelativePath,
 } from "./discovery/globs.js";
 
+// Repo scan (P6.01)
+export {
+  DEFAULT_KNOWN_CLUSTER_NAMES,
+  DEFAULT_MIN_CLUSTER_SIZE,
+  DEFAULT_NOISE_DIR_NAMES,
+  DEFAULT_SAMPLE_SIZE,
+} from "./discovery/repo-scan-constants.js";
+export { detectPackageManager } from "./discovery/package-manager.js";
+export type { DetectedPackageManager } from "./discovery/package-manager.js";
+export { detectWorkspacePackages } from "./discovery/workspace-packages.js";
+export type { WorkspacePackage } from "./discovery/workspace-packages.js";
+export { scanRepository } from "./discovery/repo-scan.js";
+export type {
+  DocCluster,
+  DocClusterKind,
+  RepoScanResult,
+  ScanRepositoryOptions,
+} from "./discovery/repo-scan.js";
+
+// Rule inference (P6.02)
+export { inferRuleSet } from "./discovery/rule-inference.js";
+export type {
+  ClusterRuleInference,
+  DetectedPatterns,
+  InferredRule,
+  RuleInferenceResult,
+} from "./discovery/rule-inference.js";
+
+// Config writer (P6.04)
+export {
+  buildCiWorkflowYaml,
+  CI_WORKFLOW_YAML,
+  generateInitConfig,
+  identifyExistingRule,
+  PACKAGE_SCHEMA_SEGMENTS,
+  resolvePackageSchemaRef,
+} from "./discovery/config-writer.js";
+export type {
+  ExistingConfigDocument,
+  ExistingRuleIdentity,
+  GeneratedInitConfig,
+  GenerateInitConfigParams,
+  InitConfigAction,
+} from "./discovery/config-writer.js";
+
 // Graph
 export type {
   BuildContextGraphOptions,

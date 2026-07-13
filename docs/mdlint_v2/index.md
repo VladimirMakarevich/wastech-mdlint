@@ -252,8 +252,8 @@ own `*.test.ts` and a fixture.
 
 ### Phase 6 — `init` command · `M` · depends on: D5 · reuse: Low
 **Goal:** zero-to-config bootstrap.
-- Interactive (`@inquirer/prompts`): language, include patterns, rule categories →
-  writes `wastech-mdlint.config.json` with a sensible zero-config rule set.
+- Interactive (`@inquirer/prompts`): include patterns, rule categories → confirmable draft,
+  then writes `wastech-mdlint.config.json` with a sensible zero-config rule set.
 - Package-manager detection from lockfiles; local `$schema` wiring (no remote URL).
 - Reconcile/remove the current `postinstall` default-config script (init replaces it).
 - **Maps to:** [installation requirements](requirements/06-installation.md).

@@ -26,6 +26,9 @@ import {
 } from "@wastech-mdlint/core";
 import type { CompileResult, ImpactClassification, LintMessage, LintResult } from "@wastech-mdlint/core";
 
+import { createInquirerPrompter } from "./init-prompter.js";
+import { runInitCommand, type ExistingConfigAction, type InitPrompter } from "./init-command.js";
+
 // Resolution order (P5.05): an explicit `--outdir` wins, then `config.compile.outdir`, then this
 // fallback — matching the locked example path in docs/mdlint_v2/requirements/01-configuration.md.
 const DEFAULT_COMPILE_OUTDIR = ".claude/skills/wastech-mdlint/";
@@ -86,7 +89,23 @@ export type CompileCommand = {
   dryRun: boolean;
 };
 
-export type CliCommand = LintCommand | GraphCommand | SliceCommand | ImpactCommand | SchemaCommand | CompileCommand;
+export type InitCommand = {
+  kind: "init";
+  cwd: string;
+  yes: boolean;
+  onExisting?: ExistingConfigAction;
+  isTty: boolean;
+  withCiWorkflow?: boolean;
+};
+
+export type CliCommand =
+  | LintCommand
+  | GraphCommand
+  | SliceCommand
+  | ImpactCommand
+  | SchemaCommand
+  | CompileCommand
+  | InitCommand;
 
 export type CommandExecutionResult = {
   output: string;
@@ -320,7 +339,26 @@ async function handleCompile(command: CompileCommand): Promise<CommandExecutionR
   return { output: `SKILL.md written to ${relativeOutputPath}\n`, exitCode: EXIT_CODE_SUCCESS };
 }
 
-export async function executeCommand(command: CliCommand): Promise<CommandExecutionResult> {
+// `init` (P6.04): core generates the config bytes; `runInitCommand` performs the writes. The result
+// output is always informational (draft/write/abort summary), so this handler always exits 0.
+async function handleInit(command: InitCommand, prompter: InitPrompter): Promise<CommandExecutionResult> {
+  const { output } = await runInitCommand(
+    {
+      cwd: command.cwd,
+      yes: command.yes,
+      onExisting: command.onExisting,
+      isTty: command.isTty,
+      withCiWorkflow: command.withCiWorkflow
+    },
+    prompter
+  );
+  return { output, exitCode: EXIT_CODE_SUCCESS };
+}
+
+export async function executeCommand(
+  command: CliCommand,
+  deps?: { prompter?: InitPrompter }
+): Promise<CommandExecutionResult> {
   switch (command.kind) {
     case "lint":
       return handleLint(command);
@@ -334,6 +372,8 @@ export async function executeCommand(command: CliCommand): Promise<CommandExecut
       return handleSchema(command);
     case "compile":
       return handleCompile(command);
+    case "init":
+      return handleInit(command, deps?.prompter ?? createInquirerPrompter());
     default: {
       const exhaustiveCheck: never = command;
       return exhaustiveCheck;
