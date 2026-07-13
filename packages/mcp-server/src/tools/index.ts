@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
+import { registerCompileContextTool } from "./compile-context.js";
 import { registerContextGraphTool } from "./context-graph.js";
 import { registerContextSliceTool } from "./context-slice.js";
 import { registerImpactAnalysisTool } from "./impact-analysis.js";
@@ -20,6 +21,7 @@ const TOOL_REGISTRARS: Array<(server: McpServer) => void> = [
   registerContextGraphTool,
   registerContextSliceTool,
   registerImpactAnalysisTool,
+  registerCompileContextTool,
 ];
 
 export function registerTools(server: McpServer): void {

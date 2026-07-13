@@ -546,14 +546,18 @@ underlying scan/inference.
 - **MCP / stdio** — Model Context Protocol; the server exposes core operations to agents over
   **stdio only** (no HTTP/SSE in v2). It is read-only and never loads code-plugins. Decision
   [M8](requirements/05-mcp-server.md). `lint`/`lint-files` ship in P7.02; `context-graph`,
-  `context-slice`, and `impact-analysis` ship in P7.03, leaving `compile-context` for P7.04.
+  `context-slice`, and `impact-analysis` ship in P7.03; `compile-context` ships in P7.04,
+  completing the six-tool surface.
 - **The six tools** — `lint`, `lint-files`, `context-graph`, `context-slice`,
   `impact-analysis`, `compile-context`. Each is a thin wrapper over core with a Zod input
   schema. The tool inventory is generated from registration so docs cannot drift ("5 vs 6").
   Decision [M3](requirements/05-mcp-server.md).
 - **`structuredContent` / `outputSchema`** — Typed tool output (derived from core types)
   alongside a short human-readable text summary, so hosts need not re-parse text. Decision
-  [M1](requirements/05-mcp-server.md).
+  [M1](requirements/05-mcp-server.md). M1 scopes this to the five tools it names (`lint`,
+  `lint-files`, `context-graph`, `context-slice`, `impact-analysis`); `compile-context` is the
+  exception — it returns two plain-text content blocks (the skill content plus a
+  `Documents/Rules/Components` metadata line) and no `outputSchema`.
 - **`readOnlyHint`** — The safety annotation on all six tools; a future `fix` tool would be
   `destructiveHint`. Decision [M7](requirements/05-mcp-server.md).
 - **Error contract** — `{ code, message, hint }` with `isError`, machine-recoverable. `code` is

@@ -29,10 +29,11 @@ describe("mcp-server", () => {
       name: "wastech-mdlint-mcp",
     });
 
-    // P7.02 landed `lint`/`lint-files`; P7.03 adds the three graph tools below. P7.04 lands the last
-    // tool (`compile-context`), which will extend this list again.
+    // P7.02 landed `lint`/`lint-files`; P7.03 added the three graph tools; P7.04 lands the last tool
+    // (`compile-context`), completing the six-tool surface.
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual([
+      "compile-context",
       "context-graph",
       "context-slice",
       "impact-analysis",

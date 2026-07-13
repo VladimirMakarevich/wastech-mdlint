@@ -46,7 +46,9 @@ docs ([M3](../requirements/05-mcp-server.md)), stdio integration tests
 
 ## Phase exit criteria
 
-- [ ] 6 tools registered, each a thin wrapper over core with **structured output** + a text summary.
+- [ ] 6 tools registered, each a thin wrapper over core. Five carry **structured output** + a text
+      summary; `compile-context` is the M1-scoped exception, returning two plain-text content blocks
+      (skill content + a `Documents/Rules/Components` line). See [P7.04](04-compile-tool.md).
 - [ ] `context-slice` description matches the real deterministic index (G4/[M2](../requirements/05-mcp-server.md)).
 - [ ] Shared config/context helper; tool inventory **generated** (no 5-vs-6 drift, M3).
 - [ ] Error contract `{ code, message, hint }` (M6); read-only safety annotations (M7).
