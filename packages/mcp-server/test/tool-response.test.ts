@@ -1,10 +1,12 @@
 import { ConfigError } from "@wastech-mdlint/core";
+import { z } from "zod";
 import { describe, expect, it } from "vitest";
 
 import {
   errorResult,
   READ_ONLY_ANNOTATIONS,
-  successResult
+  successResult,
+  withErrorOutput
 } from "../src/shared/tool-response.js";
 
 describe("successResult", () => {
@@ -17,7 +19,7 @@ describe("successResult", () => {
 });
 
 describe("errorResult", () => {
-  it("passes a structured error's code/message/hint through verbatim", () => {
+  it("passes a structured error's code/message/hint through verbatim in structuredContent", () => {
     const result = errorResult(new ConfigError("CONFIG_INVALID", "bad config", "fix line 3"));
     expect(result.isError).toBe(true);
     expect(result.structuredContent).toEqual({
@@ -50,6 +52,40 @@ describe("errorResult", () => {
       message: "An unexpected internal error occurred."
     });
     expect(JSON.stringify(result)).not.toContain("/etc/passwd");
+  });
+});
+
+describe("withErrorOutput", () => {
+  it("keeps success fields required while allowing schema-compatible error payloads", () => {
+    const schema = z.object(
+      withErrorOutput({
+        files: z.array(z.string()),
+        errorCount: z.number().int()
+      })
+    );
+
+    expect(() =>
+      schema.parse({
+        code: "CONFIG_INVALID",
+        message: "bad config",
+        hint: "fix line 3"
+      })
+    ).toThrow();
+
+    const result = errorResult(new ConfigError("CONFIG_INVALID", "bad config", "fix line 3"), {
+      files: [],
+      errorCount: 0
+    });
+
+    expect(
+      schema.parse(result.structuredContent as Record<string, unknown>)
+    ).toEqual({
+      files: [],
+      errorCount: 0,
+      code: "CONFIG_INVALID",
+      message: "bad config",
+      hint: "fix line 3"
+    });
   });
 });
 

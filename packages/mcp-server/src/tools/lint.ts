@@ -18,7 +18,12 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 import { lintMessageSchema } from "../shared/lint-message-schema.js";
-import { errorResult, READ_ONLY_ANNOTATIONS, successResult } from "../shared/tool-response.js";
+import {
+  errorResult,
+  READ_ONLY_ANNOTATIONS,
+  successResult,
+  withErrorOutput
+} from "../shared/tool-response.js";
 
 // `lint` — lint ad-hoc Markdown text against an explicit set of rules. This tool never touches the
 // filesystem or a config file (that is `lint-files`' job): the whole contract is "content + rules
@@ -43,6 +48,14 @@ const lintOutputShape = {
   messages: z.array(lintMessageSchema),
   errorCount: z.number().int(),
   warningCount: z.number().int()
+} as const;
+
+// Wire clients validate `structuredContent` against `outputSchema` even on errors, so the error
+// path needs schema-compatible zero values for lint's required success fields.
+const EMPTY_LINT_OUTPUT = {
+  messages: [],
+  errorCount: 0,
+  warningCount: 0
 } as const;
 
 type LintToolInput = { content: string; rules: RuleConfigEntry[] };
@@ -151,7 +164,7 @@ export function handleLint(input: LintToolInput): CallToolResult {
 
     return successResult({ summary, structured: { messages, errorCount, warningCount } });
   } catch (error) {
-    return errorResult(error);
+    return errorResult(error, EMPTY_LINT_OUTPUT);
   }
 }
 
@@ -163,7 +176,7 @@ export function registerLintTool(server: McpServer): void {
       description:
         "Lint ad-hoc Markdown content against an explicit set of rules. Reads no filesystem or config.",
       inputSchema: lintInputShape,
-      outputSchema: lintOutputShape,
+      outputSchema: withErrorOutput(lintOutputShape),
       annotations: READ_ONLY_ANNOTATIONS
     },
     (input) => handleLint(input)

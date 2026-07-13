@@ -15,6 +15,7 @@ import {
   errorResult,
   READ_ONLY_ANNOTATIONS,
   successResult,
+  withErrorOutput,
 } from "../shared/tool-response.js";
 
 // `context-slice` — the files reachable within `depth` hops of a resolved query, following graph
@@ -72,7 +73,15 @@ export async function handleContextSlice(
       structured: result,
     });
   } catch (error) {
-    return errorResult(error);
+    // Preserve the caller's query on the error path so the payload still satisfies the required
+    // success schema fields without inventing a misleading alternate lookup target.
+    return errorResult(error, {
+      query: input.query,
+      matchKind: null,
+      starts: [],
+      files: [],
+      visited: [],
+    });
   }
 }
 
@@ -87,7 +96,7 @@ export function registerContextSliceTool(server: McpServer): void {
         "Files reachable within `depth` hops of a resolved query, following graph edges forward. " +
         `${SLICE_RESOLUTION_DESCRIPTION} Read-only.`,
       inputSchema: contextSliceInputShape,
-      outputSchema: contextSliceOutputShape,
+      outputSchema: withErrorOutput(contextSliceOutputShape),
       annotations: READ_ONLY_ANNOTATIONS,
     },
     (input) => handleContextSlice(input),

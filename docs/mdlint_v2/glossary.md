@@ -541,7 +541,7 @@ underlying scan/inference.
 - **Exit codes** — `0` pass · `1` findings at the `--fail-on` threshold · `2` operational
   error. A cross-cutting contract (roadmap §8).
 
-## MCP server _(planned, P7)_
+## MCP server
 
 - **MCP / stdio** — Model Context Protocol; the server exposes core operations to agents over
   **stdio only** (no HTTP/SSE in v2). It is read-only and never loads code-plugins. Decision
@@ -557,16 +557,23 @@ underlying scan/inference.
   [M1](requirements/05-mcp-server.md). M1 scopes this to the five tools it names (`lint`,
   `lint-files`, `context-graph`, `context-slice`, `impact-analysis`); `compile-context` is the
   exception — it returns two plain-text content blocks (the skill content plus a
-  `Documents/Rules/Components` metadata line) and no `outputSchema`.
+  `Documents/Rules/Components` metadata line) and no `outputSchema`. For the five schema-carrying
+  tools, the advertised `outputSchema` extends the success shape with the optional
+  `{ code, message, hint }` error fields (helper `withErrorOutput`) so the error payload also
+  validates on the wire; the pinned SDK only advertises object schemas, so this "success schema
+  plus optional error metadata" superset is used instead of a union / `oneOf`.
 - **`readOnlyHint`** — The safety annotation on all six tools; a future `fix` tool would be
   `destructiveHint`. Decision [M7](requirements/05-mcp-server.md).
 - **Error contract** — `{ code, message, hint }` with `isError`, machine-recoverable. `code` is
   a closed set (`ToolErrorCode`) defined once in core (`packages/core/src/errors.ts`) and shared
   by CLI + MCP: `CONFIG_NOT_FOUND`, `CONFIG_INVALID`, `FILE_NOT_IN_CORPUS`, `TARGET_NOT_FOUND`,
   `COMPILE_CONFIG_MISSING`, `INVALID_INPUT`, `INTERNAL_ERROR` (the catch-all wrap for any
-  unexpected throwable; its message is sanitized and never leaks a stack trace). The type ships in
-  P7.01; tool call-sites that map errors to codes land in P7.02–04. Decision
-  [M6](requirements/05-mcp-server.md).
+  unexpected throwable; its message is sanitized and never leaks a stack trace). On the wire the
+  payload is carried in `structuredContent` (P7.05), because a spec-compliant client validates any
+  present `structuredContent` against the tool's advertised `outputSchema` — including on `isError`
+  results — so an error that did not conform to the schema would be rejected before the caller saw
+  the code. The type ships in P7.01; tool call-sites that map errors to codes land in P7.02–04.
+  Decision [M6](requirements/05-mcp-server.md).
 
 ## Agent Skills & distribution
 
@@ -720,7 +727,8 @@ Not needed:
   `npm run typecheck`, `npm test`, `npm run build`; `npm run lint` / `npm run format` when the
   scope needs style checks.
 - **`generate:docs`** — `npm run generate:docs` regenerates the README rules table from rule
-  metadata; the block between the `BEGIN/END GENERATED RULES` markers is never hand-edited.
+  metadata (the `BEGIN/END GENERATED RULES` block) and the README MCP tool inventory from the live
+  tool registration (the `BEGIN/END GENERATED MCP TOOLS` block); neither block is hand-edited.
 - **micromatch / picomatch** — The glob engines used for `include`/`exclude` matching
   (`{ dot: true }`).
 - **RTK (Rust Token Killer)** — A local token-optimizing CLI proxy used during development;

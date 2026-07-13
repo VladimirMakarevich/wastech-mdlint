@@ -5,7 +5,12 @@ import { z } from "zod";
 
 import { lintMessageSchema } from "../shared/lint-message-schema.js";
 import { resolveToolConfiguration, type ToolFileInput } from "../shared/tool-context.js";
-import { errorResult, READ_ONLY_ANNOTATIONS, successResult } from "../shared/tool-response.js";
+import {
+  errorResult,
+  READ_ONLY_ANNOTATIONS,
+  successResult,
+  withErrorOutput
+} from "../shared/tool-response.js";
 
 // `lint-files` — lint the project's Markdown files. Configuration (and its resolved rules/settings)
 // comes from `resolveToolConfiguration`, the shared P7.01 helper over core's `loadConfiguration`;
@@ -31,6 +36,15 @@ const lintFilesOutputShape = {
   warningCount: z.number().int()
 } as const;
 
+// Match the required `LintResult` fields on the error path so schema-validating MCP clients accept
+// the structured error payload instead of rejecting the response before the caller sees the code.
+const EMPTY_LINT_FILES_OUTPUT = {
+  messages: [],
+  files: [],
+  errorCount: 0,
+  warningCount: 0
+} as const;
+
 export async function handleLintFiles(input: LintFilesToolInput): Promise<CallToolResult> {
   try {
     // `resolveToolConfiguration` computes this same default internally but doesn't return it, so
@@ -53,7 +67,7 @@ export async function handleLintFiles(input: LintFilesToolInput): Promise<CallTo
 
     return successResult({ summary: formatLintResultText(result), structured: result });
   } catch (error) {
-    return errorResult(error);
+    return errorResult(error, EMPTY_LINT_FILES_OUTPUT);
   }
 }
 
@@ -65,7 +79,7 @@ export function registerLintFilesTool(server: McpServer): void {
       description:
         "Lint the project's Markdown files using the resolved config (or the zero-config `**/*.md` default). Read-only.",
       inputSchema: lintFilesInputShape,
-      outputSchema: lintFilesOutputShape,
+      outputSchema: withErrorOutput(lintFilesOutputShape),
       annotations: READ_ONLY_ANNOTATIONS
     },
     (input) => handleLintFiles(input)

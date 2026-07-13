@@ -14,6 +14,7 @@ import {
   errorResult,
   READ_ONLY_ANNOTATIONS,
   successResult,
+  withErrorOutput,
 } from "../shared/tool-response.js";
 
 // `context-graph` — build the project's `ContextGraph` and return it either raw (`format: "json"`)
@@ -59,6 +60,14 @@ const contextGraphOutputShape = {
   readingOrder: z.array(z.string()).optional(),
 } as const;
 
+// `context-graph`'s success schema is already a deliberate superset of two success payloads
+// (`json` raw graph vs `summary` projection). Reusing that same superset on errors keeps the wire
+// validator satisfied without weakening the required shared fields (`nodes`, `edges`).
+const EMPTY_CONTEXT_GRAPH_OUTPUT = {
+  nodes: [],
+  edges: [],
+} as const;
+
 export async function handleContextGraph(
   input: ContextGraphToolInput,
 ): Promise<CallToolResult> {
@@ -80,7 +89,7 @@ export async function handleContextGraph(
       structured,
     });
   } catch (error) {
-    return errorResult(error);
+    return errorResult(error, EMPTY_CONTEXT_GRAPH_OUTPUT);
   }
 }
 
@@ -94,7 +103,7 @@ export function registerContextGraphTool(server: McpServer): void {
         '(nodes, edges, cycles); `format: "summary"` returns nodes, edges, connected components, ' +
         "and topological reading order. Read-only.",
       inputSchema: contextGraphInputShape,
-      outputSchema: contextGraphOutputShape,
+      outputSchema: withErrorOutput(contextGraphOutputShape),
       annotations: READ_ONLY_ANNOTATIONS,
     },
     (input) => handleContextGraph(input),

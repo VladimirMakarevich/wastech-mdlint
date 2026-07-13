@@ -17,14 +17,15 @@ repo's sources of truth at v2.
 
 1. **Extend `README.md` — it is already v2** (the P3.09 cutover removed legacy `.cjs/.mjs`,
    sectioned config, `links/broken-links`, and "Markdown Context Audit", and rewrote the head).
-   The real gap is the missing install channels: today only the CLI (`npm i -D
-   @wastech-mdlint/cli`) is documented — add **MCP** (`npx @wastech-mdlint/mcp-server` + host
-   snippet) and **skills** (`gh skill install VladimirMakarevich/wastech-mdlint <skill> --pin
+   The **MCP** install channel already landed in [P7.05](../P7-mcp-server/05-integration-tests-docs.md)
+   (`## MCP server` section: `npx @wastech-mdlint/mcp-server` + host-config snippet). The remaining
+   gap is the **skills** channel (`gh skill install VladimirMakarevich/wastech-mdlint <skill> --pin
    vX.Y.Z`, [I7](../requirements/06-installation.md)); refresh quick-start / commands / config.
 2. The rule table is **already generated** by `generateRuleDocs` (`generate:docs` script) and
-   sync-checked by `packages/core/test/docs-sync.test.ts` — keep that. The **MCP tool list is not
-   generated yet**: add a tool-inventory generator to `scripts/generate-docs.mjs` (built on the
-   P7 tool registry, M3) and a matching sync check, then embed it so docs can't drift.
+   sync-checked by `packages/core/test/docs-sync.test.ts` — keep that. The **MCP tool inventory is
+   also already generated** (P7.05: `generateToolInventory` in `packages/mcp-server/src/tool-docs.ts`,
+   wired into `scripts/generate-docs.mjs`, sync-checked by `packages/mcp-server/test/docs-sync.test.ts`)
+   — keep that too; nothing new to add here.
 3. CHANGELOG; **no migration guide** ([I8 — greenfield](../requirements/06-installation.md)).
 4. **Verify** [AGENTS.md](../../../AGENTS.md) "Sources Of Truth" still resolves to `docs/mdlint_v2/`
    (it was already pointed there — roadmap + requirements + decisions + phase folders); only fix
@@ -38,10 +39,9 @@ repo's sources of truth at v2.
 
 ## Exit criteria
 
-- [ ] README covers CLI + MCP + skill install paths with correct names/bins (MCP + skill sections
-      added; CLI section already present).
-- [ ] Rule table stays generated + sync-checked; a new generated MCP tool list is added and
-      sync-checked.
+- [ ] README covers CLI + MCP + skill install paths with correct names/bins (CLI + MCP sections
+      already present; add the skill section).
+- [ ] Rule table and MCP tool list both stay generated + sync-checked (both landed in P7.05).
 - [ ] AGENTS.md "Sources Of Truth" confirmed pointing at v2 (already done in an earlier phase).
 
 ## Hand-off to next

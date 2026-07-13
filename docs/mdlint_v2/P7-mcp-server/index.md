@@ -1,6 +1,6 @@
 # Phase P7 — MCP server
 
-> Roadmap: [v2 Index](../index.md) · Phase **P7** · Size **M** · Status **Not started** ·
+> Roadmap: [v2 Index](../index.md) · Phase **P7** · Size **M** · Status **Done** ·
 > Depends on [P2](../index.md), [P4](../index.md), [P5](../index.md).
 >
 > **Goal:** fill the [P0.06 stub](../P0-foundations/06-mcp-server-skeleton.md) with the 6
@@ -46,14 +46,18 @@ docs ([M3](../requirements/05-mcp-server.md)), stdio integration tests
 
 ## Phase exit criteria
 
-- [ ] 6 tools registered, each a thin wrapper over core. Five carry **structured output** + a text
+- [x] 6 tools registered, each a thin wrapper over core. Five carry **structured output** + a text
       summary; `compile-context` is the M1-scoped exception, returning two plain-text content blocks
       (skill content + a `Documents/Rules/Components` line). See [P7.04](04-compile-tool.md).
-- [ ] `context-slice` description matches the real deterministic index (G4/[M2](../requirements/05-mcp-server.md)).
-- [ ] Shared config/context helper; tool inventory **generated** (no 5-vs-6 drift, M3).
-- [ ] Error contract `{ code, message, hint }` (M6); read-only safety annotations (M7).
-- [ ] stdio-only; declarative custom rules run, code-plugins never load (M8).
-- [ ] stdio integration tests green (M4).
+- [x] `context-slice` description matches the real deterministic index (G4/[M2](../requirements/05-mcp-server.md)).
+- [x] Shared config/context helper; tool inventory **generated** (no 5-vs-6 drift, M3).
+- [x] Error contract `{ code, message, hint }` (M6, carried in `structuredContent`; each
+      schema-carrying tool keeps its success fields required in `outputSchema` and satisfies the
+      wire validator on errors by attaching schema-compatible empty/default success fields plus the
+      optional error metadata — see [P7.05](05-integration-tests-docs.md)); read-only safety
+      annotations (M7).
+- [x] stdio-only; declarative custom rules run, code-plugins never load (M8).
+- [x] stdio integration tests green (M4).
 
 ## What P7 unblocks
 

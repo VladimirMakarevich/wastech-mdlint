@@ -15,6 +15,7 @@ import {
   errorResult,
   READ_ONLY_ANNOTATIONS,
   successResult,
+  withErrorOutput,
 } from "../shared/tool-response.js";
 
 // `impact-analysis` — the blast radius of changing `file`: which files reference it directly, which
@@ -72,7 +73,15 @@ export async function handleImpactAnalysis(
       structured: relativized,
     });
   } catch (error) {
-    return errorResult(error);
+    // Preserve the requested `file` while zeroing the graph-derived lists so the error remains
+    // machine-parseable under the same required schema a successful impact result uses.
+    return errorResult(error, {
+      file: input.file,
+      directlyAffected: [],
+      transitivelyAffected: [],
+      readingOrder: [],
+      excluded: [],
+    });
   }
 }
 
@@ -86,7 +95,7 @@ export function registerImpactAnalysisTool(server: McpServer): void {
         "files affected transitively, and the reading order over the affected subgraph. A file not " +
         "in the corpus returns an actionable error. Read-only.",
       inputSchema: impactAnalysisInputShape,
-      outputSchema: impactAnalysisOutputShape,
+      outputSchema: withErrorOutput(impactAnalysisOutputShape),
       annotations: READ_ONLY_ANNOTATIONS,
     },
     (input) => handleImpactAnalysis(input),
