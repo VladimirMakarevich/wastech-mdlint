@@ -5,12 +5,12 @@ import { describe, expect, it } from "vitest";
 
 import { createServer } from "../src/index.js";
 
-// P0.06 smoke check: prove the stub builds, speaks MCP over a real transport, and — crucially —
-// registers no tools. A linked in-memory transport pair is used instead of stdio so the check is
-// deterministic and never seizes the test runner's stdin/stdout; the wire-level StdioServerTransport
-// integration tests belong to P7 when the six tools land.
-describe("mcp-server stub", () => {
-  it("completes the MCP handshake and exposes no tools yet", async () => {
+// Smoke check: prove the server builds, speaks MCP over a real transport, and advertises exactly
+// the tools registered so far. A linked in-memory transport pair is used instead of stdio so the
+// check is deterministic and never seizes the test runner's stdin/stdout; the wire-level
+// StdioServerTransport integration tests belong to P7.05 when the full six-tool surface lands.
+describe("mcp-server", () => {
+  it("completes the MCP handshake and advertises the registered tools", async () => {
     const server = await createServer();
     expect(server).toBeInstanceOf(McpServer);
 
@@ -24,10 +24,10 @@ describe("mcp-server stub", () => {
       name: "wastech-mdlint-mcp"
     });
 
-    // No tools capability is advertised because the stub registers none, so tools/list is an
-    // unknown method (JSON-RPC -32601). This is the guard that keeps P0 from smuggling in the
-    // P7 tool surface.
-    await expect(client.listTools()).rejects.toThrow(/Method not found/);
+    // P7.02 lands the first two tools; tools/list now succeeds and must report exactly them
+    // (sorted). P7.03/04 extend this list as they add the remaining four tools.
+    const { tools } = await client.listTools();
+    expect(tools.map((tool) => tool.name).sort()).toEqual(["lint", "lint-files"]);
 
     await client.close();
     await server.close();
