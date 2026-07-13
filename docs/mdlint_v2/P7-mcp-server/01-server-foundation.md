@@ -1,6 +1,6 @@
 # P7.01 · Server foundation — modular layout, shared helper, conventions
 
-> Phase: [P7 — MCP server](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
+> Phase: [P7 — MCP server](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Done**.
 
 ## Goal
 
@@ -56,9 +56,50 @@ config/context helper, and the output/error/annotation conventions every tool fo
 
 ## Exit criteria
 
-- [ ] Per-tool modules + shared helper in place.
-- [ ] Output/error/annotation conventions implemented as reusable wrappers.
-- [ ] stdio transport boots cleanly.
+- [x] Per-tool modules + shared helper in place.
+- [x] Output/error/annotation conventions implemented as reusable wrappers.
+- [x] stdio transport boots cleanly.
+
+## Implementation notes
+
+- **The taxonomy is one union + a runtime guard, not a shared base class.** Core's existing errors
+  (`ConfigError`, `ImpactAnalysisError`, `CompileConfigMissingError`) already `extends Error`
+  independently and are matched by `instanceof` at their call sites. Reparenting them onto a common
+  `StructuredError` base to carry `code`/`hint` would perturb those prototype chains for no gain, so
+  instead `packages/core/src/errors.ts` exports the `TOOL_ERROR_CODES` closed set, the derived
+  `ToolErrorCode` type, and an `isStructuredError()` guard that each error class satisfies
+  structurally by adding a `code` field. Same "defined once, shared by CLI + MCP" guarantee (M6),
+  smaller blast radius.
+- **`isStructuredError` is an allowlist, not duck-typing.** It checks membership in
+  `TOOL_ERROR_CODES`, not merely "has a string `.code`" — Node `fs` errors (`ENOENT`, …) also carry
+  a `.code`, and letting those through would leak an unrelated system code to an MCP client instead
+  of falling through to the sanitized `INTERNAL_ERROR`. The type is derived from the runtime array
+  so the two cannot drift.
+- **`ImpactAnalysisError` maps to `TARGET_NOT_FOUND`, and `FILE_NOT_IN_CORPUS` ships defined but
+  unused.** The two codes overlap in wording; `TARGET_NOT_FOUND`'s bullet explicitly names an
+  "impact … file argument," the closer match. `FILE_NOT_IN_CORPUS` is reserved for a future
+  call-site (revisit when P7.03 wires the graph tools' error paths) rather than removed, keeping the
+  taxonomy stable for the tool tasks that follow.
+- **The shared helper resolves a relative `configPath` against the tool `cwd`, not the process
+  cwd.** `loadConfiguration` resolves `explicitConfigPath` against `process.cwd()`; an MCP tool's
+  `cwd` can differ from the server process cwd, so `resolveToolConfiguration` resolves a non-absolute
+  `configPath` against the effective tool `cwd` first — mirroring the guard the CLI's `compile`
+  handler already applies. Without it a relative `configPath` would silently load the wrong config or
+  raise a spurious `CONFIG_NOT_FOUND`.
+- **`INTERNAL_ERROR` returns a fixed, source-independent message.** The catch-all deliberately does
+  not forward `error.message`/`String(error)`, which can carry absolute paths or stack fragments;
+  M6/security requires the unexpected-error path be sanitized, so only coded errors keep their own
+  vetted messages.
+- **The registrar list is function-only and empty until the tool tasks land.** `tools/index.ts`
+  holds `Array<(server: McpServer) => void>` with no parallel name list — a second hand-maintained
+  inventory is exactly the "5 vs 6 tools" drift M3 exists to prevent, so P7.05's doc generation
+  should introspect the live server instead. `registerTools()` is wired into `createServer()` now
+  but is a no-op, which is what keeps `smoke.test.ts` green (still zero tools advertised) as the
+  regression guard for the preserved stub invariants.
+
+> `ConfigError`'s constructor changed from `(message)` to `(code, message, hint?)` — a public-API
+> shape change in core. It is contained to the four throw sites in `load-config.ts`; every consumer
+> only does `instanceof` / reads `.message`, so the added fields are purely additive.
 
 ## Hand-off to next
 

@@ -555,8 +555,13 @@ underlying scan/inference.
   [M1](requirements/05-mcp-server.md).
 - **`readOnlyHint`** — The safety annotation on all six tools; a future `fix` tool would be
   `destructiveHint`. Decision [M7](requirements/05-mcp-server.md).
-- **Error contract** — `{ code, message, hint }` with `isError`, machine-recoverable.
-  Decision [M6](requirements/05-mcp-server.md).
+- **Error contract** — `{ code, message, hint }` with `isError`, machine-recoverable. `code` is
+  a closed set (`ToolErrorCode`) defined once in core (`packages/core/src/errors.ts`) and shared
+  by CLI + MCP: `CONFIG_NOT_FOUND`, `CONFIG_INVALID`, `FILE_NOT_IN_CORPUS`, `TARGET_NOT_FOUND`,
+  `COMPILE_CONFIG_MISSING`, `INVALID_INPUT`, `INTERNAL_ERROR` (the catch-all wrap for any
+  unexpected throwable; its message is sanitized and never leaks a stack trace). The type ships in
+  P7.01; tool call-sites that map errors to codes land in P7.02–04. Decision
+  [M6](requirements/05-mcp-server.md).
 
 ## Agent Skills & distribution
 

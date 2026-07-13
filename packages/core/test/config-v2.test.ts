@@ -128,7 +128,12 @@ describe("loadConfiguration", () => {
 
   it("throws on invalid JSONC", async () => {
     const root = await writeConfig("{ not valid ");
-    await expect(loadConfiguration({ cwd: root, registry })).rejects.toBeInstanceOf(ConfigError);
+    // The structured code/hint (M6) accompany the message so an MCP host can render the error
+    // contract without re-classifying it.
+    const error = await loadConfiguration({ cwd: root, registry }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ConfigError);
+    expect((error as ConfigError).code).toBe("CONFIG_INVALID");
+    expect((error as ConfigError).hint).toBeTruthy();
   });
 
   it("returns a zero-config default when no config is found", async () => {
@@ -141,9 +146,15 @@ describe("loadConfiguration", () => {
   });
 
   it("errors when an explicit --config path does not exist", async () => {
-    await expect(
-      loadConfiguration({ cwd: process.cwd(), explicitConfigPath: "/nope/x.json", registry })
-    ).rejects.toThrow(/Config file not found/);
+    const error = await loadConfiguration({
+      cwd: process.cwd(),
+      explicitConfigPath: "/nope/x.json",
+      registry
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ConfigError);
+    expect((error as ConfigError).message).toMatch(/Config file not found/);
+    expect((error as ConfigError).code).toBe("CONFIG_NOT_FOUND");
+    expect((error as ConfigError).hint).toBeTruthy();
   });
 });
 

@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { normalizeRelativePath } from "../discovery/globs.js";
+import type { ToolErrorCode } from "../errors.js";
 import type { ContextGraph } from "./context-graph-types.js";
 import { topologicalSort } from "./graph-algorithms.js";
 import { impact, type QueryVisit } from "./query.js";
@@ -17,6 +18,9 @@ const byPath = (left: string, right: string): number => left.localeCompare(right
 // "did you mean" suggestion: that would make the error's shape depend on corpus contents, which
 // cuts against deterministic, reproducible diagnostics.
 export class ImpactAnalysisError extends Error {
+  // TARGET_NOT_FOUND, not FILE_NOT_IN_CORPUS: the taxonomy bullet for TARGET_NOT_FOUND explicitly
+  // names an "impact... file argument" that resolved to nothing — the more direct textual match.
+  readonly code: ToolErrorCode = "TARGET_NOT_FOUND";
   readonly hint: string;
 
   constructor(file: string) {

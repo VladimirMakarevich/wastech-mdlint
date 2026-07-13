@@ -7,10 +7,13 @@ import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
-// P0 ships only the package shell. The six read-only tools land in P7 on top of
-// @wastech-mdlint/core; keeping the stub tool-free here avoids committing to a tool contract
-// (names, input/output schemas) before the phase that designs the structured-output surface.
-// The invariant this stub does lock in: transport is stdio-only and the server never loads
+import { registerTools } from "./tools/index.js";
+
+// The server shell (P7.01). Tools are registered through the modular seam in tools/index.ts — one
+// module per tool (M3) — so this file stays the transport/lifecycle owner, not a tool mega-file.
+// The six read-only tools land in P7.02–04 by appending to that seam; until then registerTools is a
+// no-op and no tools are advertised.
+// The invariants this shell locks in: transport is stdio-only and the server never loads
 // code-plugins (M8).
 
 // Resolves relative to the compiled module (dist/index.js), one level under dist/, so the read
@@ -26,10 +29,14 @@ async function readPackageVersion(): Promise<string> {
 }
 
 export async function createServer(): Promise<McpServer> {
-  return new McpServer({
+  const server = new McpServer({
     name: "wastech-mdlint-mcp",
     version: await readPackageVersion()
   });
+
+  registerTools(server);
+
+  return server;
 }
 
 export async function startServer(): Promise<void> {

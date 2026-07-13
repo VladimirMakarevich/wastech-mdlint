@@ -136,6 +136,8 @@ describe("classifyImpact · out-of-corpus input", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(ImpactAnalysisError);
       expect((error as ImpactAnalysisError).hint.length).toBeGreaterThan(0);
+      // Structured code (M6) lets an MCP host map this to the shared error contract.
+      expect((error as ImpactAnalysisError).code).toBe("TARGET_NOT_FOUND");
       expect((error as Error).message).toContain("missing.md");
     }
   });

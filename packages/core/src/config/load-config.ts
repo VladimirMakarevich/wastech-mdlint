@@ -69,7 +69,11 @@ function parseJsoncConfig(text: string, configPath: string): unknown {
     const details = errors
       .map((error) => `${printParseErrorCode(error.error)} at offset ${error.offset}`)
       .join("; ");
-    throw new ConfigError(`Failed to parse JSONC config at ${configPath}: ${details}`);
+    throw new ConfigError(
+      "CONFIG_INVALID",
+      `Failed to parse JSONC config at ${configPath}: ${details}`,
+      details
+    );
   }
 
   return value;
@@ -97,7 +101,8 @@ function resolveRules(config: LintConfig, registry: RuleRegistry): ConfiguredRul
   });
 
   if (errors.length > 0) {
-    throw new ConfigError(`Invalid config:\n${errors.join("\n")}`);
+    // hint = the first formatted issue (matches the task's "hint = failing path").
+    throw new ConfigError("CONFIG_INVALID", `Invalid config:\n${errors.join("\n")}`, errors[0]);
   }
 
   return resolved;
@@ -122,7 +127,11 @@ export async function loadConfiguration(params: {
     : undefined;
 
   if (explicitConfigPath !== undefined && !(await fileExists(explicitConfigPath))) {
-    throw new ConfigError(`Config file not found: ${explicitConfigPath}`);
+    throw new ConfigError(
+      "CONFIG_NOT_FOUND",
+      `Config file not found: ${explicitConfigPath}`,
+      "Check that configPath/cwd points to an existing wastech-mdlint.config.json, or omit it to use the zero-config default."
+    );
   }
 
   const configPath = explicitConfigPath ?? (await findConfig(params.cwd));
@@ -137,7 +146,11 @@ export async function loadConfiguration(params: {
   const parsed = lintConfigSchema.safeParse(raw);
   if (!parsed.success) {
     const lines = parsed.error.issues.map(formatRootIssue);
-    throw new ConfigError(`Invalid config at ${configPath}:\n${lines.join("\n")}`);
+    throw new ConfigError(
+      "CONFIG_INVALID",
+      `Invalid config at ${configPath}:\n${lines.join("\n")}`,
+      lines[0]
+    );
   }
 
   const config = parsed.data;

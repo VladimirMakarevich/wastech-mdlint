@@ -1,4 +1,5 @@
 import type { CompileConfig, CustomRuleConfigEntry, RuleConfigEntry } from "../config/config-schema.js";
+import type { ToolErrorCode } from "../errors.js";
 import type { LoadedConfiguration } from "../config/load-config.js";
 import { ruleRegistry } from "../engine/rules/index.js";
 import { estimateTokens } from "../engine/tokens.js";
@@ -28,7 +29,7 @@ import {
 // a host can catch this type specifically: the CLI (P5.05) maps it to exit 2, the MCP tool (P7.04)
 // maps it to `{ code, message, hint }`.
 export class CompileConfigMissingError extends Error {
-  readonly code = "COMPILE_CONFIG_MISSING";
+  readonly code: ToolErrorCode = "COMPILE_CONFIG_MISSING";
   readonly hint: string;
 
   constructor() {
