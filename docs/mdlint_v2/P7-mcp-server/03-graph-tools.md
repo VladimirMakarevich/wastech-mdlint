@@ -1,6 +1,6 @@
 # P7.03 · `context-graph`, `context-slice`, `impact-analysis` tools
 
-> Phase: [P7 — MCP server](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
+> Phase: [P7 — MCP server](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Done**.
 
 ## Goal
 
@@ -44,8 +44,41 @@ semantics.
 
 ## Exit criteria
 
-- [ ] All three tools return structured output matching the CLI contracts.
-- [ ] `context-slice` description is honest; out-of-corpus `impact` returns an actionable error.
+- [x] All three tools return structured output matching the CLI contracts.
+- [x] `context-slice` description is honest; out-of-corpus `impact` returns an actionable error.
+
+## Implementation notes
+
+- **`context-graph` uses one superset output schema for both `format` branches, not a discriminated
+  union.** `registerTool` takes exactly one `outputSchema`, but `format: "json"` returns raw
+  `ContextGraph` (`{ nodes, edges, cycles }`) and `format: "summary"` returns `ContextGraphSummary`
+  (`{ nodes, edges, components, readingOrder }`). The schema keeps `nodes`/`edges` required and marks
+  the format-specific fields (`cycles`, `components`, `readingOrder`) individually optional. A
+  discriminated union was rejected: it would require echoing a `format` field that neither core type
+  carries, widening the payload beyond the deliverable's shape. Adding that discriminant later is a
+  one-line, low-risk follow-up if a reviewer wants it.
+- **`format` defaults to `"json"`.** The raw graph is the more fundamental shape; `"summary"` is a
+  derived convenience view. Not spec-mandated — a reversible one-line choice, flagged rather than
+  left implicit.
+- **`context-graph` deliberately omits G5 coverage.** The deliverable's return shape never mentions
+  `computeGraphCoverage`, and computing it would require threading `rootDir`/`siteRouter` and a live
+  disk re-scan beyond the loaded corpus — work a minimal read-only tool has no mandate to do by
+  default. Left out entirely rather than pre-declaring an always-optional, unused `coverage` field.
+- **`impact-analysis` calls `relativizeImpact(classification, "")` — an intentional identity
+  transform.** This tool's `cwd` is both the corpus root the graph is built from *and* the base the
+  classification's paths are already relative to, so "repo-relative cwd" is `""`. The call is still
+  made (this tool is `relativizeImpact`'s first real consumer, per the deliverable), it just changes
+  no path here — unlike CLI `compile`, which has a genuine `--cwd`/`--outdir` split.
+- **`context-slice` rejects a negative `depth` at input validation.** The schema bounds `depth` to
+  a non-negative integer (`z.number().int().min(0)`), mirroring the CLI's `--depth` parse guard. A
+  negative hop bound is not a meaningful traversal request — left unbounded it would pass validation
+  and silently degrade to a start-only slice — so it is refused at the wire (surfacing as an
+  `INVALID_INPUT`-class error) rather than accepted and quietly misinterpreted.
+- **`impact-analysis` needs no `RuleResolutionError`-style error translation.**
+  `ImpactAnalysisError.code` is already `TARGET_NOT_FOUND`, a member of `TOOL_ERROR_CODES`, so
+  `isStructuredError` recognizes it and `errorResult` passes it through verbatim. The `lint` tool's
+  `ToolInputError` wrapper exists only because `RuleResolutionError`'s codes are a different enum;
+  that translation is not needed (and not copied) here.
 
 ## Hand-off to next
 

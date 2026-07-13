@@ -1,6 +1,6 @@
 # P7.04 · `compile-context` tool
 
-> Phase: [P7 — MCP server](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Not started**.
+> Phase: [P7 — MCP server](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Done**.
 
 ## Goal
 
@@ -37,8 +37,25 @@ Expose `compileContext` over MCP, returning the generated skill content + a meta
 
 ## Exit criteria
 
-- [ ] Returns skill content + metadata; missing `compile` errors with guidance.
-- [ ] Output matches CLI `compile` byte-for-byte (determinism).
+- [x] Returns skill content + metadata; missing `compile` errors with guidance.
+- [x] Output matches CLI `compile` byte-for-byte (determinism).
+
+## Implementation notes
+
+- **No `structuredContent`/`outputSchema` — the one structured-output exception among the six
+  tools.** Three sources disagreed on the surface: this task file (most specific) specifies "two
+  content blocks"; [M1](../requirements/05-mcp-server.md) (locked requirement) names the exact five
+  tools that get structured output and omits `compile-context`; the [phase index](index.md)
+  roadmap-summary bullet reads as if all six are structured. Per `AGENTS.md` precedence (task file
+  > requirement > roadmap summary), the task file and M1 win: `registerTool` omits `outputSchema`
+  and the handler returns exactly `content: [skillContent block, metadata block]`. The SDK treats
+  a tool without an `outputSchema` as returning `content` (not `structuredContent`), so this is
+  mechanically valid. `successResult` (which always attaches `structuredContent`) is deliberately
+  not reused for this tool.
+- **No error-translation wrapper.** `CompileConfigMissingError.code` (`COMPILE_CONFIG_MISSING`) is
+  already in `TOOL_ERROR_CODES` and it carries `.hint`, so `errorResult` passes it through verbatim
+  — like `impact-analysis`'s `ImpactAnalysisError`, and unlike `lint`'s `RuleResolutionError` whose
+  codes aren't in the taxonomy.
 
 ## Hand-off to next
 

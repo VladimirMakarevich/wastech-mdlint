@@ -272,6 +272,10 @@ export type {
   RuleConfigEntry,
 } from "./config/config-schema.js";
 export { ConfigError } from "./config/config-error.js";
+
+// Structured error taxonomy (M6) — defined once here, shared by cli + mcp-server.
+export { TOOL_ERROR_CODES, isStructuredError } from "./errors.js";
+export type { StructuredErrorInfo, ToolErrorCode } from "./errors.js";
 export { CONFIG_FILE_NAME, findConfig } from "./config/find-config.js";
 export { loadConfiguration } from "./config/load-config.js";
 export type {

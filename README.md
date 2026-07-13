@@ -33,7 +33,7 @@ pipeline; the CLI and MCP server are thin hosts over it.
 | --- | --- | --- |
 | [`@wastech-mdlint/core`](packages/core) | Parsing, config, rule engine, graph, and formatting — the whole pipeline. | — |
 | [`@wastech-mdlint/cli`](packages/cli) | commander CLI host: argument parsing, command dispatch, exit codes. | `wastech-mdlint` |
-| [`@wastech-mdlint/mcp-server`](packages/mcp-server) | stdio MCP host. A stub today; the six read-only tools land in P7. | `wastech-mdlint-mcp` |
+| [`@wastech-mdlint/mcp-server`](packages/mcp-server) | stdio MCP host; `lint`/`lint-files` ship in P7.02, `context-graph`/`context-slice`/`impact-analysis` in P7.03, `compile-context` in P7.04. | `wastech-mdlint-mcp` |
 
 Build and test the whole workspace from the repo root:
 
@@ -114,6 +114,44 @@ wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-
   offer it with a default of no. If `[path]` is below a repo's existing config, `init` works
   from the config's own directory instead. Without `--yes`, `init` requires an interactive
   terminal. Ctrl+C during any prompt exits `0`.
+
+## MCP server
+
+`@wastech-mdlint/mcp-server` is a stdio-only Model Context Protocol host over the same core
+pipeline the CLI uses: 6 read-only tools, no HTTP/SSE, no code-plugin execution. A `fix`/`schema`
+pair is planned for a later release — v2 ships exactly these 6.
+
+```bash
+npx @wastech-mdlint/mcp-server        # run directly, no install
+npm i -D @wastech-mdlint/mcp-server   # or install the wastech-mdlint-mcp bin
+```
+
+Add it to any stdio-based MCP host (Claude Code's `.mcp.json`, Claude Desktop's
+`claude_desktop_config.json`, etc.):
+
+```jsonc
+{
+  "mcpServers": {
+    "wastech-mdlint": { "command": "npx", "args": ["-y", "@wastech-mdlint/mcp-server"] }
+  }
+}
+```
+
+<!-- BEGIN GENERATED MCP TOOLS -->
+| Tool | Description | Read-only | Structured output |
+| --- | --- | --- | --- |
+| `lint` | Lint ad-hoc Markdown content against an explicit set of rules. Reads no filesystem or config. | yes | yes |
+| `lint-files` | Lint the project's Markdown files using the resolved config (or the zero-config `**/*.md` default). Read-only. | yes | yes |
+| `context-graph` | Build the project's context graph. `format: "json"` (default) returns the raw graph (nodes, edges, cycles); `format: "summary"` returns nodes, edges, connected components, and topological reading order. Read-only. | yes | yes |
+| `context-slice` | Files reachable within `depth` hops of a resolved query, following graph edges forward. Resolves the query by exact match against defined IDs, heading/anchor slugs, and file paths — no fuzzy, substring, keyword, or LLM matching. Read-only. | yes | yes |
+| `impact-analysis` | Compute the blast radius of changing a Markdown file: files that reference it directly, files affected transitively, and the reading order over the affected subgraph. A file not in the corpus returns an actionable error. Read-only. | yes | yes |
+| `compile-context` | Compile the project skill (SKILL.md) from `config.compile`, producing the same deterministic output as the CLI `compile` command: the skill content plus a Documents/Rules/Components metadata line. Requires `config.compile`; its absence returns an actionable error. Read-only. | yes | no |
+<!-- END GENERATED MCP TOOLS -->
+
+All 6 tools carry a `readOnlyHint` annotation; five return `structuredContent` + `outputSchema`
+(`compile-context` returns two plain-text content blocks instead). MCP errors use the structured
+`{ code, message, hint }` contract; the CLI maps the same core error taxonomy to stderr + exit
+codes.
 
 ## Config
 
