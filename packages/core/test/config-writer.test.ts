@@ -143,7 +143,7 @@ describe("generateInitConfig · merge", () => {
       rule: "custom",
       id: "REQ-100",
       description: "Requires an owner.",
-      options: { assert: { kind: "sectionPresent", section: "Owner" } }
+      options: { assert: { kind: "sectionPresent", sections: ["Owner"] } }
     };
     const existing = { raw: { rules: [customEntry] } };
     const result = generateInitConfig({
@@ -169,7 +169,7 @@ describe("generateInitConfig · merge", () => {
       raw: {
         rules: [
           { rule: "ref001", severity: "warning", options: { exclude: ["legacy/**"] } },
-          { rule: "custom", id: "req-owner", options: { assert: { kind: "sectionPresent", section: "Owner" } } }
+          { rule: "custom", id: "req-owner", options: { assert: { kind: "sectionPresent", sections: ["Owner"] } } }
         ]
       }
     };
@@ -188,7 +188,7 @@ describe("generateInitConfig · merge", () => {
     expect(rules[1]).toEqual({
       rule: "custom",
       id: "REQ-OWNER",
-      options: { assert: { kind: "sectionPresent", section: "Owner" } }
+      options: { assert: { kind: "sectionPresent", sections: ["Owner"] } }
     });
     // The custom id in the config agrees with the id the generated project schema is built from.
     expect(config.$schema).toBe("./schema.json");
@@ -202,7 +202,7 @@ describe("generateInitConfig · merge", () => {
     for (const invalidId of ["foo", "ref-owner"]) {
       const existing = {
         raw: {
-          rules: [{ rule: "custom", id: invalidId, options: { assert: { kind: "sectionPresent", section: "X" } } }]
+          rules: [{ rule: "custom", id: invalidId, options: { assert: { kind: "sectionPresent", sections: ["X"] } } }]
         }
       };
       const result = generateInitConfig({

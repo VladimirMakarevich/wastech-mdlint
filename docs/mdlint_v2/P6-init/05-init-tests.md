@@ -1,6 +1,6 @@
 # P6.05 · `init` tests & fixtures
 
-> Phase: [P6 — init](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
+> Phase: [P6 — init](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Done**.
 
 ## Goal
 
@@ -32,9 +32,35 @@ Verify `init` produces a valid, lint-clean config across repo shapes, interactiv
 
 ## Exit criteria
 
-- [ ] `--yes` config is deterministic, canonical, locally-schema'd, and lints clean.
-- [ ] Layout/monorepo/existing-config cases covered.
-- [ ] Phase P6 [exit criteria](index.md) satisfied.
+- [x] `--yes` config is deterministic, canonical, locally-schema'd, and lints clean.
+- [x] Layout/monorepo/existing-config cases covered.
+- [x] Phase P6 [exit criteria](index.md) satisfied.
+
+## Implementation notes
+
+Decisions that are load-bearing but not obvious from the code:
+
+- **Fixtures are in-memory objects written to a `mkdtemp` dir, not checked-in static
+  `fixtures/<scenario>/` directories.** `init` mutates its target tree (it writes the config,
+  schema, and optionally a workflow), so a static fixture dir would be written into by the test
+  run. Every `init` e2e test uses the `fixtureRepo(files)` helper for this reason; the new
+  layout/monorepo/clean cases follow the same convention rather than introducing a second one.
+- **"Lints clean" is asserted as the exact zero-messages string, not just exit 0.** `TBL-002`
+  and `CTX-002` default to `warning`, so a fixture with lingering warnings would still exit 0
+  under the default `--fail-on error` — satisfying the letter of "lint exits 0" while violating
+  "content with no violations". The clean-fixture tests assert `formatLintResultText`'s exact
+  `"No problems found.\n"` output in addition to `EXIT_CODE_SUCCESS`.
+- **Which fixture proves which clean rule path.** `CLEAN_DOCS_FIXTURE` (a surgical clean
+  derivation of the cross-linked `docs/` fixture) proves `REF-001/REF-002/TBL-002/CTX-002/GRP-001`
+  lint clean; `CUSTOM_LAYOUT_FIXTURE` (`specs/` + `adr/`) additionally proves `SEC-001`'s clean
+  path, which the plain-docs fixture never infers.
+- **The monorepo fixture is scoped to shape/determinism, not clean-lint.** It proves per-package
+  cluster detection, a deterministic sorted root `include` spanning both workspace packages, npm
+  detection, and that `loadConfiguration` accepts the result — cleanliness is already covered by
+  the docs/ and custom fixtures, so re-proving it per layout would be duplicate coverage.
+- **Existing-config handling (overwrite/merge/skip) is not re-tested per new layout.** That path
+  is layout-agnostic (it only inspects the existing config file, never the scan result) and is
+  already covered against the cross-linked fixture.
 
 ## Hand-off to next
 

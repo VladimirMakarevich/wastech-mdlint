@@ -117,6 +117,104 @@ const CROSS_LINKED_DOCS_FIXTURE: Record<string, string> = {
   "docs/b.md": ["# B", "", "See [A](a.md).", "", "## Overview", "", "Additional detail about B.", ""].join("\n")
 };
 
+// A deliberately clean derivation of CROSS_LINKED_DOCS_FIXTURE (P6.05 deliverable 3 + the P6 exit
+// criterion "on a clean fixture, lint exits 0"). Two surgical edits keep the *same* inferred rule
+// set the byte-identical draft test already proves — REF-001/REF-002/TBL-002/CTX-002/GRP-001 — so
+// the new test only has to prove the new property (zero findings): the checklist item is checked
+// (CTX-002 clean) and docs/b.md's back-link to a.md is dropped so a↔b is a DAG, not a cycle
+// (GRP-001 clean). The resolvable link + real anchor + filled table stay, so REF-001/REF-002/TBL-002
+// still infer and still pass.
+const CLEAN_DOCS_FIXTURE: Record<string, string> = {
+  "docs/a.md": [
+    "# A",
+    "",
+    "See [B](b.md) and [more detail](b.md#overview).",
+    "",
+    "## Tasks",
+    "",
+    "- [x] write more docs",
+    "",
+    "| Name | Status |",
+    "| --- | --- |",
+    "| Widget | Done |",
+    ""
+  ].join("\n"),
+  "docs/b.md": ["# B", "", "## Overview", "", "Additional detail about B.", ""].join("\n")
+};
+
+// A clean custom layout (specs/ + adr/), both non-`docs/` known cluster names. It does triple duty:
+// deliverable 1's "custom layout" fixture, deliverable 3's "clean fixture lints clean", and the only
+// fixture that exercises SEC-001's clean path (plain docs/ never infers SEC-001). specs/ is a
+// one-directional resolvable link + a checked checklist + a filled table (REF-001/CTX-002/TBL-002/
+// GRP-001 clean, no cycle, no anchor so no REF-002). adr/ carries two files with Status/Context/
+// Decision headings, modeled on rule-inference.test.ts's proven ADR shape, so SEC-001 is inferred
+// scoped to adr/**/*.{md,mdx} and passes (every adr file has all three sections).
+const CUSTOM_LAYOUT_FIXTURE: Record<string, string> = {
+  "specs/overview.md": [
+    "# Overview",
+    "",
+    "See the [details](details.md).",
+    "",
+    "## Tasks",
+    "",
+    "- [x] draft the spec",
+    "",
+    "| Field | Value |",
+    "| --- | --- |",
+    "| Owner | Team A |",
+    ""
+  ].join("\n"),
+  "specs/details.md": ["# Details", "", "Concrete detail about the spec.", ""].join("\n"),
+  "adr/0001-use-typescript.md": [
+    "# ADR 0001: Use TypeScript",
+    "",
+    "## Status",
+    "",
+    "Accepted",
+    "",
+    "## Context",
+    "",
+    "We need a language.",
+    "",
+    "## Decision",
+    "",
+    "Use TypeScript.",
+    ""
+  ].join("\n"),
+  "adr/0002-use-vitest.md": [
+    "# ADR 0002: Use Vitest",
+    "",
+    "## Status",
+    "",
+    "Accepted",
+    "",
+    "## Context",
+    "",
+    "We need a test runner.",
+    "",
+    "## Decision",
+    "",
+    "Use Vitest.",
+    ""
+  ].join("\n")
+};
+
+// A small npm monorepo: a workspace root (package.json `workspaces` + package-lock.json → npm) with
+// two nested packages, each carrying its own docs/ cluster. Scoped to shape/determinism only (not
+// clean-lint): each package's docs/ reuses the cross-linked cycle shape — cleanliness is proven by
+// the docs/ and custom fixtures, so this one only proves per-package cluster detection, a
+// deterministic sorted root `include` spanning both packages, and that loadConfiguration accepts it.
+const MONOREPO_FIXTURE: Record<string, string> = {
+  "package.json": JSON.stringify({ name: "monorepo", private: true, workspaces: ["packages/*"] }),
+  "package-lock.json": "{}",
+  "packages/alpha/package.json": JSON.stringify({ name: "alpha" }),
+  "packages/alpha/docs/a.md": ["# A", "", "See [B](b.md).", ""].join("\n"),
+  "packages/alpha/docs/b.md": ["# B", "", "See [A](a.md).", ""].join("\n"),
+  "packages/beta/package.json": JSON.stringify({ name: "beta" }),
+  "packages/beta/docs/a.md": ["# A", "", "See [B](b.md).", ""].join("\n"),
+  "packages/beta/docs/b.md": ["# B", "", "See [A](a.md).", ""].join("\n")
+};
+
 describe("init command · scan + inference draft", () => {
   it("--yes produces a deterministic draft that is byte-identical across runs", async () => {
     const cwdOne = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
@@ -332,7 +430,7 @@ describe("init command · existing config handling", () => {
     // A `rule: "custom"` entry with no usable `id` (missing here) can't be diffed or schema-wired, so
     // the merge aborts rather than rewrite a config it can't reason about (additive-merge safety).
     const malformedConfigText = JSON.stringify({
-      rules: [{ rule: "custom", options: { assert: { kind: "sectionPresent", section: "X" } } }]
+      rules: [{ rule: "custom", options: { assert: { kind: "sectionPresent", sections: ["X"] } } }]
     });
     const cwd = await fixtureRepo({ ...CROSS_LINKED_DOCS_FIXTURE, "wastech-mdlint.config.json": malformedConfigText });
 
@@ -1040,7 +1138,7 @@ describe("readExistingRuleIds", () => {
   it("identifies a custom entry by its canonical id, not the literal \"custom\"", async () => {
     const cwd = await fixtureRepo({
       "wastech-mdlint.config.json": JSON.stringify({
-        rules: [{ rule: "custom", id: "req-100", options: { assert: { kind: "sectionPresent", section: "X" } } }]
+        rules: [{ rule: "custom", id: "req-100", options: { assert: { kind: "sectionPresent", sections: ["X"] } } }]
       })
     });
     const result = await readExistingRuleIds(cwd, path.join(cwd, "wastech-mdlint.config.json"));
@@ -1087,5 +1185,114 @@ describe("interactive prompt defaults match --yes", () => {
 
   it("confirmCiWorkflow's prompt defaults to false — \"ask first, don't write silently\"", () => {
     expect(buildCiWorkflowPromptConfig().default).toBe(false);
+  });
+});
+
+describe("init command · clean fixture lints clean (P6.05)", () => {
+  // The P6 exit criterion is "on a clean fixture (no violations), lint exits 0". Severity is not a
+  // safe proxy: TBL-002/CTX-002 default to `warning`, so a fixture with lingering warnings would
+  // still exit 0 under the default `--fail-on error` while violating "content with no violations".
+  // Assert the stronger, direct property instead — the exact zero-messages string plus exit 0.
+  it("plain docs/ clean fixture: init --yes then lint reports no problems and exits 0", async () => {
+    const cwd = await fixtureRepo(CLEAN_DOCS_FIXTURE);
+
+    const initResult = await run(["init", cwd, "--yes"], cwd);
+    expect(initResult.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const lintResult = await run(["lint", cwd], cwd);
+    expect(lintResult.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(lintResult.stdout).toBe("No problems found.\n");
+    await expect(loadConfiguration({ cwd })).resolves.toBeDefined();
+  });
+
+  it("custom layout (specs/ + adr/) clean fixture lints clean, exercising SEC-001's clean path", async () => {
+    const cwd = await fixtureRepo(CUSTOM_LAYOUT_FIXTURE);
+
+    const initResult = await run(["init", cwd, "--yes"], cwd);
+    expect(initResult.exitCode).toBe(EXIT_CODE_SUCCESS);
+    // SEC-001 is inferred here (ADR sections) but not in the plain-docs fixture, so this case is the
+    // one that proves its clean-lint path — every adr/ file has Status/Context/Decision.
+    expect(initResult.stdout).toContain("- SEC-001:");
+
+    const lintResult = await run(["lint", cwd], cwd);
+    expect(lintResult.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(lintResult.stdout).toBe("No problems found.\n");
+    await expect(loadConfiguration({ cwd })).resolves.toBeDefined();
+  });
+});
+
+describe("init command · custom layout (specs/, adr/) (P6.05)", () => {
+  it("--yes produces a deterministic draft covering both clusters with a local $schema and no remote URL", async () => {
+    const cwdOne = await fixtureRepo(CUSTOM_LAYOUT_FIXTURE);
+    const cwdTwo = await fixtureRepo(CUSTOM_LAYOUT_FIXTURE);
+
+    const first = await run(["init", cwdOne, "--yes"], cwdOne);
+    const second = await run(["init", cwdTwo, "--yes"], cwdTwo);
+
+    expect(first.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(first.stdout).toBe(second.stdout);
+
+    const written = readConfig(await readFile(path.join(cwdOne, CONFIG_FILE), "utf8"));
+    expect(written.include).toContain("specs/**/*.{md,mdx}");
+    expect(written.include).toContain("adr/**/*.{md,mdx}");
+    const ruleIds = (written.rules as { rule: string }[]).map((entry) => entry.rule).sort();
+    expect(ruleIds).toEqual(["CTX-002", "GRP-001", "REF-001", "SEC-001", "TBL-002"]);
+    // Local, version-matched schema ref — never a remote URL (architecture invariant / C9).
+    expect(written.$schema).toBe("./node_modules/@wastech-mdlint/cli/schema.json");
+    expect(JSON.stringify(written.$schema)).not.toContain("http");
+    await expect(loadConfiguration({ cwd: cwdOne })).resolves.toBeDefined();
+  });
+});
+
+describe("init command · small monorepo layout (P6.05)", () => {
+  it("--yes detects each workspace package's docs/ cluster into one deterministic root config", async () => {
+    const cwdOne = await fixtureRepo(MONOREPO_FIXTURE);
+    const cwdTwo = await fixtureRepo(MONOREPO_FIXTURE);
+
+    const first = await run(["init", cwdOne, "--yes"], cwdOne);
+    const second = await run(["init", cwdTwo, "--yes"], cwdTwo);
+
+    expect(first.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(first.stdout).toBe(second.stdout);
+    expect(first.stdout).toContain("Package manager: npm.");
+
+    const written = readConfig(await readFile(path.join(cwdOne, CONFIG_FILE), "utf8"));
+    const include = written.include as string[];
+    expect(include).toContain("packages/alpha/docs/**/*.{md,mdx}");
+    expect(include).toContain("packages/beta/docs/**/*.{md,mdx}");
+    // include is user-visible output, so it must be sorted deterministically, not filesystem-ordered.
+    expect(include).toEqual([...include].sort());
+    await expect(loadConfiguration({ cwd: cwdOne })).resolves.toBeDefined();
+  });
+});
+
+describe("init command · package-manager detection e2e (P6.05)", () => {
+  // Core unit-tests every lockfile→manager mapping; this proves the full CLI run surfaces the same
+  // detection in the --yes draft. One case per lockfile plus the no-lockfile fallback.
+  const lockfileCases: { lockfile: string; expected: string }[] = [
+    { lockfile: "bun.lock", expected: "bun" },
+    { lockfile: "pnpm-lock.yaml", expected: "pnpm" },
+    { lockfile: "yarn.lock", expected: "yarn" },
+    { lockfile: "package-lock.json", expected: "npm" }
+  ];
+
+  for (const { lockfile, expected } of lockfileCases) {
+    it(`reports "${expected}" from a ${lockfile} lockfile`, async () => {
+      const cwd = await fixtureRepo({ ...CROSS_LINKED_DOCS_FIXTURE, [lockfile]: "" });
+
+      const result = await run(["init", cwd, "--yes"], cwd);
+
+      expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+      expect(result.stdout).toContain(`Package manager: ${expected}.`);
+    });
+  }
+
+  it("reports \"not detected\" when no lockfile is present", async () => {
+    const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+
+    const result = await run(["init", cwd, "--yes"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain("Package manager: not detected.");
   });
 });

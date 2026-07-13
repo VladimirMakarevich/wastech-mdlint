@@ -1,6 +1,6 @@
 # Phase P6 — `init` command
 
-> Roadmap: [v2 Index](../index.md) · Phase **P6** · Size **M** · Status **Not started** ·
+> Roadmap: [v2 Index](../index.md) · Phase **P6** · Size **M** · Status **Done** ·
 > Depends on [D5](../index.md).
 >
 > **Goal:** a **smart, self-sufficient** `init` that scans the repo, infers a sensible rule
@@ -61,7 +61,7 @@ invariant) and lets tests exercise inference without a TTY.
       exits 0.
 - [x] Writes a valid `wastech-mdlint.config.json` (canonical IDs, optional rationale
       comments) with a **local** `$schema`; generates a project schema when custom rules exist.
-- [ ] The produced config is structurally valid and loads without a `ConfigError` (canonical IDs,
+- [x] The produced config is structurally valid and loads without a `ConfigError` (canonical IDs,
       local `$schema`). On a **clean** fixture (no violations) `lint` exits 0; a real inferred
       ruleset may legitimately surface findings on non-clean content — that is not a failure.
 
