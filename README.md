@@ -33,7 +33,7 @@ pipeline; the CLI and MCP server are thin hosts over it.
 | --- | --- | --- |
 | [`@wastech-mdlint/core`](packages/core) | Parsing, config, rule engine, graph, and formatting — the whole pipeline. | — |
 | [`@wastech-mdlint/cli`](packages/cli) | commander CLI host: argument parsing, command dispatch, exit codes. | `wastech-mdlint` |
-| [`@wastech-mdlint/mcp-server`](packages/mcp-server) | stdio MCP host; `lint`/`lint-files` ship in P7.02, four more land in P7.03–04. | `wastech-mdlint-mcp` |
+| [`@wastech-mdlint/mcp-server`](packages/mcp-server) | stdio MCP host; `lint`/`lint-files` ship in P7.02, `context-graph`/`context-slice`/`impact-analysis` in P7.03, `compile-context` in P7.04. | `wastech-mdlint-mcp` |
 
 Build and test the whole workspace from the repo root:
 

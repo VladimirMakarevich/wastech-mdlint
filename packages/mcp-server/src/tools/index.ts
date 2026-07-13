@@ -1,5 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
+import { registerContextGraphTool } from "./context-graph.js";
+import { registerContextSliceTool } from "./context-slice.js";
+import { registerImpactAnalysisTool } from "./impact-analysis.js";
 import { registerLintFilesTool } from "./lint-files.js";
 import { registerLintTool } from "./lint.js";
 
@@ -13,7 +16,10 @@ import { registerLintTool } from "./lint.js";
 // McpServer instance instead of reading a name array here.
 const TOOL_REGISTRARS: Array<(server: McpServer) => void> = [
   registerLintTool,
-  registerLintFilesTool
+  registerLintFilesTool,
+  registerContextGraphTool,
+  registerContextSliceTool,
+  registerImpactAnalysisTool,
 ];
 
 export function registerTools(server: McpServer): void {

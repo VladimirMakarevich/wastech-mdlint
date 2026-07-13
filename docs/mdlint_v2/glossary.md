@@ -545,8 +545,8 @@ underlying scan/inference.
 
 - **MCP / stdio** — Model Context Protocol; the server exposes core operations to agents over
   **stdio only** (no HTTP/SSE in v2). It is read-only and never loads code-plugins. Decision
-  [M8](requirements/05-mcp-server.md). `lint`/`lint-files` ship in P7.02; the remaining four
-  tools land in P7.03–04.
+  [M8](requirements/05-mcp-server.md). `lint`/`lint-files` ship in P7.02; `context-graph`,
+  `context-slice`, and `impact-analysis` ship in P7.03, leaving `compile-context` for P7.04.
 - **The six tools** — `lint`, `lint-files`, `context-graph`, `context-slice`,
   `impact-analysis`, `compile-context`. Each is a thin wrapper over core with a Zod input
   schema. The tool inventory is generated from registration so docs cannot drift ("5 vs 6").
