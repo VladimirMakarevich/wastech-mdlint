@@ -16,6 +16,7 @@ Your findings are consumed by a downstream LLM agent that will do the rework, no
 
 - Confirm the change actually satisfies the task's business requirements and the plan's acceptance criteria — not just that it compiles.
 - Check the edges the task implies: empty input, missing/duplicate/circular data, unusual paths, and error handling.
+- When the diff is an authoring/documentation deliverable (a `SKILL.md`, README, or doc asserting facts about this product), enumerate every product-surface reference it makes — each command, flag, option value, output field, MCP tool — and verify each against current source in this one pass, so the whole set of skill-vs-product drift surfaces now rather than one instance per later round.
 - Confirm behavior matches the phase task file and the locked decisions under `docs/mdlint_v2/`; flag any silent divergence.
 - The diff may be cumulative: on a shared branch it can include files committed by earlier tasks. Judge only the changes that belong to **this task's plan** — do not flag prior-task code as scope drift.
 

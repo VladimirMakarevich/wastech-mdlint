@@ -14,6 +14,7 @@ Ground the plan in the code as it exists today, not an idealized version of it:
 - Read the files named in the task and the enriched spec first, then follow them into the modules they touch.
 - Find the conventions and patterns this change must follow, and name a similar existing feature to model the work on rather than inventing a new shape.
 - Trace the relevant code paths end to end — real call sites, types, and package boundaries — so the plan never assumes an interface that isn't there. Verify every path you cite against the current tree.
+- When you enumerate a product surface a downstream author will reference (CLI commands, flags, option values, output fields, MCP tools), bind each item to the specific command or type that owns it and cite the source line. A flat list of names lets the implementer attach a flag to the wrong command.
 - If the plan departs from an existing pattern, say so and justify the departure instead of quietly diverging.
 
 ## Clarification And Approval

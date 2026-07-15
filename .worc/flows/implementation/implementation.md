@@ -39,6 +39,15 @@ npm run build
 
 Use `npm run lint` and `npm run format` when the touched scope requires style verification.
 
+## Authoring And Documentation Deliverables
+
+Some tasks ship prose, not code — a `SKILL.md`, a README section, a doc page — and its correctness is whether every claim it makes about THIS product is true. The checks above (`typecheck`/`test`/`build`) do not read prose: they pass while the text is wrong, so they are not verification for this class of work.
+
+- Treat every command, flag, option value, output field, and path the document asserts as a claim to verify against the authoritative source before you write it — the CLI command wiring (`packages/cli/src/program.ts` and the command modules), the core contracts (types, schemas, result shapes), and the MCP tool/`inputSchema` definitions. Quote the source; do not recall it.
+- Bind each flag or option to the command that owns it — a flag on one command is not evidence another accepts it (`lint --config` does not make `init --config` exist).
+- Describe behavior at its real edges (no-detection / no-write / rerun / nested-target / non-LF / duplicate-input), not the happy path alone; keep it host-neutral and portable exactly as the task requires.
+- Verify the deliverable the way its consumer will: parse frontmatter through the real validator, resolve every referenced surface against the current tree. If a claim cannot be verified against source, do not make it.
+
 ## Comments And Rationale
 
 - Treat comments as part of the deliverable: all new code must be documented where it is introduced, not left for a later cleanup pass.
