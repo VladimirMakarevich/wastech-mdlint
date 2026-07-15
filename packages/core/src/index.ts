@@ -173,6 +173,19 @@ export type {
 } from "./compile/synthesize.js";
 export { compileContext, CompileConfigMissingError } from "./compile/compile-context.js";
 
+// Skills (P8)
+export {
+  skillModelSchema,
+  validateSkill,
+  parseSkillFrontmatter,
+} from "./skills/skill-model.js";
+export type {
+  Skill,
+  SkillKind,
+  SkillValidationIssue,
+  SkillValidationResult,
+} from "./skills/skill-model.js";
+
 // Engine (P2)
 export type {
   LintMessage,

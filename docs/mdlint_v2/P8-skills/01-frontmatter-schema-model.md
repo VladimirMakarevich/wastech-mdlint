@@ -1,6 +1,6 @@
 # P8.01 · Frontmatter schema + unified skill model
 
-> Phase: [P8 — Static skills](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Not started**.
+> Phase: [P8 — Static skills](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Done**.
 
 ## Goal
 
@@ -34,9 +34,28 @@ covers both static and generated skills.
 
 ## Exit criteria
 
-- [ ] Skill model + validator defined and exported, both bound to the **core** frontmatter schema
+- [x] Skill model + validator defined and exported, both bound to the **core** frontmatter schema
       (from P5.04) — not a second copy.
-- [ ] One validator covers static + generated skills.
+- [x] One validator covers static + generated skills.
+
+## Implementation notes
+
+- **Two entry points, one schema.** The model + validator live in the new
+  `packages/core/src/skills/skill-model.ts` and *import* `skillFrontmatterSchema` from
+  `compile/skill-frontmatter.js`; the frontmatter schema was **not** moved out of `compile/`
+  (that module is done and byte-stable, and P5's imports point at it). Two wrappers exist because
+  the two callers need opposite ergonomics: `validateSkill` (non-throwing `safeParse`, sorted
+  issues) serves P8.05 CI, which must report every bad skill in one pass; `parseSkillFrontmatter`
+  (throwing) serves `synthesize`, whose existing ZodError-on-invalid contract is pinned by a test.
+  `synthesize` now routes through `parseSkillFrontmatter`, so the compiler is a genuine consumer of
+  the shared validator rather than merely importing the same schema.
+- **`path` is validated, not trusted.** `Skill.path` is public core data, so `skillModelSchema`
+  enforces the repo-relative POSIX invariant in core instead of leaving normalization to callers:
+  it rejects backslash separators, drive/absolute roots, and any empty/`.`/`..` segment (which also
+  rules out `//`, trailing slashes, `./` prefixes, and root-escaping). Rejection surfaces as a
+  validation issue rather than silent normalization, so CI can point at the offending skill.
+- **Determinism.** `validateSkill` sorts its issue array (by path, then message) so a multi-skill
+  report is stable regardless of Zod's internal issue order.
 
 ## Hand-off to next
 
