@@ -4,7 +4,7 @@ import type { ContextGraphEdge } from "../graph/context-graph-types.js";
 import type { DocumentProfile } from "./doc-profile.js";
 import type { RuleDescriptionGroup } from "./describe-rules.js";
 import type { GraphAnalysis } from "./graph-analysis.js";
-import { skillFrontmatterSchema } from "./skill-frontmatter.js";
+import { parseSkillFrontmatter } from "../skills/skill-model.js";
 
 // P5.04 pure renderer (S1/S2/S4/S6): assembles the final SKILL.md text from already-computed P5.01
 // (`GraphAnalysis`), P5.02 (`DocumentProfile`), and P5.03 (`RuleDescriptionGroup`) data. `synthesize`
@@ -321,7 +321,7 @@ export function synthesize(input: SynthesizeInput): CompileResult {
   // here rather than silently emitting invalid frontmatter. `compile-context.ts`'s lenient reader
   // defaults missing fields to `""`, so this is the one place that actually enforces S1 today —
   // P5.05 replaces it with a proper load-time diagnostic.
-  skillFrontmatterSchema.parse({ name: input.skill.name, description: input.skill.description });
+  parseSkillFrontmatter({ name: input.skill.name, description: input.skill.description });
 
   const frontmatter = renderFrontmatter(input.skill);
   // Single-lined (unlike the frontmatter, which safely embeds a raw multiline name inside a YAML

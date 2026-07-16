@@ -1,6 +1,6 @@
 # Phase P8 — Static Agent Skills
 
-> Roadmap: [v2 Index](../index.md) · Phase **P8** · Size **S–M** · Status **Not started** ·
+> Roadmap: [v2 Index](../index.md) · Phase **P8** · Size **S–M** · Status **Done** ·
 > Depends on [P6](../P6-init/index.md), [P7](../P7-mcp-server/index.md).
 >
 > **Goal:** ship the three hand-authored, host-neutral Agent Skills (`-init`, `-fix`,
@@ -47,12 +47,12 @@ A 4th skill is [S9 backlog](../requirements/04-skills-compile.md).
 
 ## Phase exit criteria
 
-- [ ] `skills/wastech-mdlint-{init,fix,impact}/SKILL.md` exist with valid frontmatter
+- [x] `skills/wastech-mdlint-{init,fix,impact}/SKILL.md` exist with valid frontmatter
       (schema-checked, S1) and the unified skill model (S5).
-- [ ] Content is host-neutral (no Claude-specific syntax, the vendor-neutral skill distribution decision); placeholders replaced
+- [x] Content is host-neutral (no Claude-specific syntax, the vendor-neutral skill distribution decision); placeholders replaced
       with `VladimirMakarevich/wastech-mdlint` (S7).
-- [ ] `-fix` delegates mechanical fixes to core `--fix`; reserves judgement for the AI (S8).
-- [ ] Skills install via `gh skill install` and reference the real CLI/MCP surface.
+- [x] `-fix` delegates mechanical fixes to core `--fix`; reserves judgement for the AI (S8).
+- [x] Skills install via `gh skill install` and reference the real CLI/MCP surface.
 
 ## What P8 unblocks
 

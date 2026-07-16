@@ -406,7 +406,13 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
 - **Skill frontmatter** — The Zod-validated YAML header on a `SKILL.md`
   (`name`, `description`, `license`, `compatibility`, `metadata.{homepage,source}`).
   `skillFrontmatterSchema` validates both generated and static skills. Decision
-  [S1/S5](requirements/04-skills-compile.md).
+  [S1](requirements/04-skills-compile.md).
+- **`Skill` / `SkillKind` / `validateSkill`** — The unified skill model
+  `{ id, kind: "static" | "generated", path, frontmatter }` (`skillModelSchema`), the one shape
+  shared by static skills (P8) and the compiler's generated output (P5). `validateSkill` is the
+  non-throwing validator (deterministic, sorted issues) over `skillFrontmatterSchema`;
+  `parseSkillFrontmatter` is the throwing frontmatter helper `synthesize` routes through. Decision
+  [S5](requirements/04-skills-compile.md).
 - **Compile budget** — The LLM context-budget summary embedded in the generated skill
   (corpus token estimate + entrypoints over budget). Reuses the token estimator. Decision
   [S6](requirements/04-skills-compile.md).
