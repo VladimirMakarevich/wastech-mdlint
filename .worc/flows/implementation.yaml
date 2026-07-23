@@ -60,11 +60,12 @@ flow:
     - id: implementation
       kind: agent
       role_file: implementation/implementation.md
-      session_scope: editing_lineage
+      session_scope: fresh_disposable
       permission_profile: workspace-write
-      provider: claude
-      model: claude-opus-4-8
-      reasoning: high
+      # Codex-node run: implementation on Codex gpt-5.5 at xhigh reasoning.
+      provider: codex
+      model: gpt-5.5
+      reasoning: xhigh
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []
@@ -78,23 +79,22 @@ flow:
       role_file: implementation/review.md
       session_scope: fresh_disposable
       permission_profile: read-only
-      # Cross-provider review on Codex gpt-5.4 at high reasoning.
-      provider: codex
-      model: gpt-5.4
-      reasoning: xhigh
+      # Cross-provider review on Claude Opus 4.8 at high reasoning.
+      provider: claude
+      model: claude-opus-4-8
+      reasoning: high
       # network_access: false
       # blocking: true
       # max_rework_per_stage: 1
     - id: fixing
       kind: agent
       role_file: implementation/fixing.md
-      session_scope: editing_lineage
-      lineage_affinity: implementation
+      session_scope: fresh_disposable
       permission_profile: workspace-write
-      # Claude-node run: fixing on Claude Sonnet 5 at extra-high reasoning.
-      provider: claude
-      model: claude-opus-4-8
-      reasoning: medium
+      # Codex-node run: fixing on Codex gpt-5.5 at xhigh reasoning.
+      provider: codex
+      model: gpt-5.5
+      reasoning: xhigh
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []
@@ -105,13 +105,11 @@ flow:
     - id: documentation
       kind: agent
       role_file: implementation/documentation.md
-      session_scope: editing_lineage
-      lineage_affinity: implementation
+      session_scope: fresh_disposable
       permission_profile: workspace-write
-      # Claude-node run: documentation on Claude Sonnet 5 at extra-high reasoning.
-      reasoning: low
       provider: claude
       model: claude-opus-4-8
+      reasoning: low
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []

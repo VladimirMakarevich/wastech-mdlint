@@ -178,16 +178,52 @@ describe("parseDocument · eager imports", () => {
     ]);
   });
 
-  it("reports the source column for imports inside indented containers (audit M-1)", () => {
-    // remark strips the `-`/`>` markers and indentation from Text.value, so column must be resolved
-    // against the raw source line — otherwise these continuation-line imports report column 1.
-    const doc = parse(
-      ["- intro", "  @a.md", "", "> quote", "> @b.md", ""].join("\n")
-    );
+  it("anchors column to the matched import, not an earlier @-substring on the line (audit M-1)", () => {
+    // `foo@early.md` is not an import (the `@` is not at a word boundary), so only the second token
+    // matches — the column must point at that match, not the earlier `@early.md` text on the line.
+    const doc = parse("foo@early.md see @late.md here\n");
+
+    expect(doc.imports).toEqual([{ rawTarget: "@late.md", line: 1, column: 18 }]);
+  });
+
+  it("gives repeated identical imports on one line their own columns", () => {
+    const doc = parse("@a.md @a.md\n");
 
     expect(doc.imports).toEqual([
-      { rawTarget: "@a.md", line: 2, column: 3 },
-      { rawTarget: "@b.md", line: 5, column: 3 }
+      { rawTarget: "@a.md", line: 1, column: 1 },
+      { rawTarget: "@a.md", line: 1, column: 7 }
+    ]);
+  });
+
+  it("gives each import in separate paragraphs its own line (audit M-1)", () => {
+    // Two paragraphs are two `text` nodes; each import's line must come from its own node, not from
+    // an unrelated `@` elsewhere in the document.
+    const doc = parse("@a.md\n\n@b.md\n");
+
+    expect(doc.imports).toEqual([
+      { rawTarget: "@a.md", line: 1, column: 1 },
+      { rawTarget: "@b.md", line: 3, column: 1 }
+    ]);
+  });
+
+  it("reports a continuation-line column past the start of that line (audit M-1)", () => {
+    // Guards the continuation-line column arithmetic: every other multi-line case here lands the
+    // import at column 1, which would still pass even if the offset math were degenerate. Here the
+    // second line has leading text, so the `@` sits at column 6 of its own physical line.
+    const doc = parse("intro\ntext @a.md\n");
+
+    expect(doc.imports).toEqual([
+      { rawTarget: "@a.md", line: 2, column: 6 }
+    ]);
+  });
+
+  it("reports the source column when the text node starts mid-line", () => {
+    // `**x**` is a separate strong node, so the import's text node starts at column 6, not 1. The
+    // first-line column must add the node's own start column, not assume the node begins the line.
+    const doc = parse("**x** @a.md\n");
+
+    expect(doc.imports).toEqual([
+      { rawTarget: "@a.md", line: 1, column: 7 }
     ]);
   });
 });
