@@ -25,7 +25,7 @@ The production v2 effort is the current focus. Its authoritative planning lives 
 - Locked requirements: `docs/mdlint_v2/requirements/` with index at
   `docs/mdlint_v2/requirements/index.md`
 - Architectural decisions: `docs/mdlint_v2/decisions/`
-- Phase task plans: `docs/mdlint_v2/P0-foundations/` through `docs/mdlint_v2/P9-release/`
+- Phase task plans: `docs/mdlint_v2/P0-foundations/` through `docs/mdlint_v2/P-release/`
 - Glossary (canonical project vocabulary): `docs/mdlint_v2/glossary.md`
 
 The glossary is a lookup reference for terms — public types, config keys, CLI/MCP surfaces,
@@ -50,7 +50,11 @@ when it conflicts with `docs/mdlint_v2/`.
 Unless the user explicitly asks for a different slice, follow the v2 phase order and task
 dependency chains:
 
-`P0 Foundations -> P1 ParsedDocument -> P2 Rule engine -> P3 Rules -> P4 Graph -> P5 Compile -> P6 Init -> P7 MCP server -> P8 Skills -> P9 Release`
+`P0 Foundations -> P1 ParsedDocument -> P2 Rule engine -> P3 Rules -> P4 Graph -> P5 Compile -> P6 Init -> P7 MCP server -> P8 Skills -> P9 Remediation -> P10 Consistency -> P-release Release`
+
+(P9 and P10 are the post-audit remediation/consistency phases from the
+[P0–P8 audit](docs/mdlint_v2/audit-2026-07-23-p0-p8.md); the release phase is the terminal
+`P-release`.)
 
 For implementation sequencing, respect each task file's `Previous`, `Next`, `Depends on`, and
 `Blocks` links.

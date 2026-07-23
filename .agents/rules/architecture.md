@@ -61,7 +61,9 @@ This is enforced by the accepted decision in
 
 ## Phase Discipline
 
-- Follow the roadmap order `P0` through `P9` unless the user asks for a different slice.
+- Follow the roadmap order `P0` → … → `P8`, then the post-audit phases `P9` (code
+  remediation) and `P10` (docs/tests consistency), then the terminal `P-release`, unless the
+  user asks for a different slice.
 - Within a phase, respect each task file's `Previous`, `Next`, `Depends on`, and `Blocks`
   chain.
 - If the roadmap and a task file disagree on a load-bearing detail, use the more specific task

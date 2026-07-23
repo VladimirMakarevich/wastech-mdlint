@@ -19,6 +19,21 @@ It runs a registry-driven **rule engine** over a single Markdown parse pass:
 External HTTP link checking is intentionally out of scope; all analysis is local and
 deterministic.
 
+## Documentation
+
+The full user guide — capabilities grouped by area, a page per rule with examples, a
+configuration guide, and an annotated config with every option — lives in
+[docs/guide/](docs/guide/README.md):
+
+- [Getting started](docs/guide/getting-started.md) · [Use cases](docs/guide/use-cases/README.md) ·
+  [CLI reference](docs/guide/cli.md) · [Configuration](docs/guide/configuration.md) ·
+  [Annotated config reference](docs/guide/config-reference.md)
+- [Rules index](docs/guide/rules/README.md) (one page per rule) ·
+  [Context graph](docs/guide/context-graph.md) · [Compile](docs/guide/compile.md) ·
+  [MCP server](docs/guide/mcp-server.md) · [Skills](docs/guide/skills.md) ·
+  [Suppression](docs/guide/suppression.md) · [Output](docs/guide/output.md) ·
+  [Concepts](docs/guide/concepts.md)
+
 ## Runtime
 
 - Node.js `24.17.0` LTS
