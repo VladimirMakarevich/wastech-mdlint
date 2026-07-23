@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import type { ConfiguredRule } from "../config/load-config.js";
+import { compareStrings } from "../deterministic-sort.js";
 import { buildContextGraph } from "../graph/build-context-graph.js";
 import type { ContextGraph } from "../graph/context-graph-types.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
@@ -44,11 +45,11 @@ function activeRules(rules: readonly ConfiguredRule[]): ResolvedRule[] {
 
 function compareMessages(left: LintMessage, right: LintMessage): number {
   return (
-    left.filePath.localeCompare(right.filePath) ||
+    compareStrings(left.filePath, right.filePath) ||
     left.line - right.line ||
     (left.column ?? 0) - (right.column ?? 0) ||
-    left.ruleId.localeCompare(right.ruleId) ||
-    left.message.localeCompare(right.message)
+    compareStrings(left.ruleId, right.ruleId) ||
+    compareStrings(left.message, right.message)
   );
 }
 
@@ -75,7 +76,7 @@ export async function lintFiles(input: LintFilesInput): Promise<LintResult> {
   for (const document of loaded.values()) {
     documents.set(document.path, document);
   }
-  const projectFiles = [...documents.keys()].sort((left, right) => left.localeCompare(right));
+  const projectFiles = [...documents.keys()].sort(compareStrings);
 
   const resolved = activeRules(input.rules);
   const documentRules = resolved.filter((entry) => entry.rule.scope === "document");

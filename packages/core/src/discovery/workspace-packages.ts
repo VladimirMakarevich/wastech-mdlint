@@ -3,6 +3,7 @@ import path from "node:path";
 
 import micromatch from "micromatch";
 
+import { compareStrings } from "../deterministic-sort.js";
 import { normalizeRelativePath } from "./globs.js";
 import { DEFAULT_NOISE_DIR_NAMES } from "./repo-scan-constants.js";
 
@@ -217,6 +218,6 @@ export async function detectWorkspacePackagesWithNoise(
     packages.push({ path: normalizeRelativePath(dir), name: extractPackageName(parsed) });
   }
 
-  packages.sort((left, right) => left.path.localeCompare(right.path));
+  packages.sort((left, right) => compareStrings(left.path, right.path));
   return packages;
 }

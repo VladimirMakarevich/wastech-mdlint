@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { compareStrings } from "../deterministic-sort.js";
 import { normalizeRelativePath } from "../discovery/globs.js";
 import type { ToolErrorCode } from "../errors.js";
 import type { ContextGraph } from "./context-graph-types.js";
@@ -10,7 +11,7 @@ import { impact, type QueryVisit } from "./query.js";
 // P4.03 reverse traversal (`impact`) and the P4.02 topo-sort. No new traversal is written here —
 // the architecture invariant is "one traversal, one topo-sort", not per-feature reimplementations.
 
-const byPath = (left: string, right: string): number => left.localeCompare(right);
+const byPath = compareStrings;
 
 // Thrown when the requested file is not a node in the graph (typo, or excluded by config globs).
 // Mirrors the ConfigError/RuleResolutionError dedicated-error pattern so a host (P4.07 CLI, P7 MCP

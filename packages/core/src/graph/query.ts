@@ -1,3 +1,4 @@
+import { compareStrings } from "../deterministic-sort.js";
 import type { ContextGraph, ContextGraphEdgeType } from "./context-graph-types.js";
 
 // P4.03 unified traversal (G2): the one BFS that `slice`/`impact`/MCP/compile call instead of each
@@ -5,7 +6,7 @@ import type { ContextGraph, ContextGraphEdgeType } from "./context-graph-types.j
 // and is never re-expanded — so cyclic graphs terminate without any cycle-removal step; GRP-001
 // (`graph.cycles`) stays the sole owner of *reporting* cycles.
 
-const byPath = (left: string, right: string): number => left.localeCompare(right);
+const byPath = compareStrings;
 
 export type QueryDirection = "forward" | "reverse";
 

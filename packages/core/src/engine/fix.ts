@@ -1,6 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { compareStrings } from "../deterministic-sort.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
 import { loadDocuments } from "../markdown/load-documents.js";
 import type { LintFilesInput } from "./lint-files.js";
@@ -47,7 +48,7 @@ export async function applyFixes(input: LintFilesInput): Promise<ApplyFixesResul
   for (const document of loaded.values()) {
     documents.set(document.path, document);
   }
-  const projectFiles = [...documents.keys()].sort((left, right) => left.localeCompare(right));
+  const projectFiles = [...documents.keys()].sort(compareStrings);
 
   const fixRules = input.rules
     .filter((configured) => configured.severity !== "off")
@@ -83,5 +84,5 @@ export async function applyFixes(input: LintFilesInput): Promise<ApplyFixesResul
     }
   }
 
-  return { fixedFiles: fixedFiles.sort((left, right) => left.localeCompare(right)) };
+  return { fixedFiles: fixedFiles.sort(compareStrings) };
 }

@@ -1,3 +1,4 @@
+import { compareStrings } from "../deterministic-sort.js";
 import { validateSkill, type SkillValidationIssue, type SkillValidationResult } from "./skill-model.js";
 
 // Read and validate a committed `skills/<id>/SKILL.md` for CI (P8.05). The repo deliberately ships
@@ -127,7 +128,7 @@ export function parseStaticSkill(content: string, repoRelativePath: string): Ski
   if (issues.length > 0) {
     // Sort so a multi-issue report is deterministic regardless of source line order, matching the
     // ordering `validateSkill` already applies to schema issues.
-    issues.sort((a, b) => a.path.localeCompare(b.path) || a.message.localeCompare(b.message));
+    issues.sort((a, b) => compareStrings(a.path, b.path) || compareStrings(a.message, b.message));
     return { ok: false, issues };
   }
 

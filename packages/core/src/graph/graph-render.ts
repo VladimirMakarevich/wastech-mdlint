@@ -1,3 +1,4 @@
+import { compareStrings } from "../deterministic-sort.js";
 import type { GraphCoverage } from "./coverage.js";
 import type { ContextGraph, ContextGraphEdge, ContextGraphNode } from "./context-graph-types.js";
 import { formatContextGraphSummary, getComponents, topologicalSort } from "./graph-algorithms.js";
@@ -9,13 +10,13 @@ import type { ContextSliceResult } from "./search-index.js";
 // only projects their outputs into JSON-shaped structs or byte-stable text, so hosts never duplicate
 // graph logic (core-hosts-the-pipeline decision).
 
-const byPath = (left: string, right: string): number => left.localeCompare(right);
+const byPath = compareStrings;
 
 function compareEdges(left: ContextGraphEdge, right: ContextGraphEdge): number {
   return (
     byPath(left.from, right.from) ||
     byPath(left.to, right.to) ||
-    left.type.localeCompare(right.type) ||
+    compareStrings(left.type, right.type) ||
     (left.line ?? 0) - (right.line ?? 0)
   );
 }

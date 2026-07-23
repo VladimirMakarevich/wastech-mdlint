@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { compareStrings } from "../deterministic-sort.js";
 import { matchesConfigGlob } from "./globs.js";
 import { filePart, resolveTargetCandidates } from "../engine/path-resolve.js";
 import { noPlaceholders } from "../engine/primitives/content.js";
@@ -271,7 +272,7 @@ function findSampleCycle(sampleDocs: Map<string, ParsedDocument>): SampleCycle |
     return undefined;
   }
 
-  for (const sourcePath of [...sampleDocs.keys()].sort((left, right) => left.localeCompare(right))) {
+  for (const sourcePath of [...sampleDocs.keys()].sort(compareStrings)) {
     if (!visited.has(sourcePath)) {
       const found = visit(sourcePath);
       if (found !== undefined) {
@@ -427,7 +428,7 @@ export async function inferRuleSet(params: {
     const docs = perClusterDocs[index];
     const adrSections = detectAdrSections(docs);
     const patterns: DetectedPatterns = { ...tallyPatterns(docs), adrSections };
-    const sampledFiles = docs.map((doc) => doc.path).sort((left, right) => left.localeCompare(right));
+    const sampledFiles = docs.map((doc) => doc.path).sort(compareStrings);
 
     const contributesTo = Object.entries(PATTERN_GATES)
       .filter(([id, definition]) => idIndex.has(id) && definition.gate(patterns))
@@ -439,7 +440,7 @@ export async function inferRuleSet(params: {
     ) {
       contributesTo.push("SEC-001");
     }
-    contributesTo.sort((left, right) => left.localeCompare(right));
+    contributesTo.sort(compareStrings);
 
     return {
       clusterPath: cluster.path,
@@ -479,8 +480,8 @@ export async function inferRuleSet(params: {
   }
 
   rules.sort((left, right) => {
-    const idDiff = left.rule.localeCompare(right.rule);
-    return idDiff !== 0 ? idDiff : fileScopeSortKey(left).localeCompare(fileScopeSortKey(right));
+    const idDiff = compareStrings(left.rule, right.rule);
+    return idDiff !== 0 ? idDiff : compareStrings(fileScopeSortKey(left), fileScopeSortKey(right));
   });
 
   return { clusters: clusterInferences, rules };

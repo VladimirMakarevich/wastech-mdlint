@@ -1,3 +1,4 @@
+import { compareStrings } from "../deterministic-sort.js";
 import { extractDefinedIds, type IdRef } from "../engine/defined-ids.js";
 import { filePart, resolveTargetCandidates } from "../engine/path-resolve.js";
 import { compileRegex } from "../engine/regex.js";
@@ -75,7 +76,7 @@ function buildIdRefEdges(
     }
   }
   for (const definingPaths of definers.values()) {
-    definingPaths.sort((left, right) => left.localeCompare(right));
+    definingPaths.sort(compareStrings);
   }
 
   const idPattern = compileRegex(idRef.idPattern);
@@ -119,7 +120,7 @@ export function buildContextGraph(
   for (const document of documents.values()) {
     documentsByPath.set(document.path, document);
   }
-  const nodePaths = [...documentsByPath.keys()].sort((left, right) => left.localeCompare(right));
+  const nodePaths = [...documentsByPath.keys()].sort(compareStrings);
   const nodeSet = new Set(nodePaths);
   const { siteRouter } = options;
 
@@ -195,9 +196,9 @@ export function buildContextGraph(
   // pair (multiplicity retained) still sort stably regardless of construct-scan order.
   edges.sort(
     (left, right) =>
-      left.from.localeCompare(right.from) ||
-      left.to.localeCompare(right.to) ||
-      left.type.localeCompare(right.type) ||
+      compareStrings(left.from, right.from) ||
+      compareStrings(left.to, right.to) ||
+      compareStrings(left.type, right.type) ||
       (left.line ?? 0) - (right.line ?? 0)
   );
 
@@ -230,7 +231,7 @@ function detectCycles(nodePaths: string[], edges: readonly ContextGraphEdge[]): 
     }
   }
   for (const neighbors of adjacency.values()) {
-    neighbors.sort((left, right) => left.localeCompare(right));
+    neighbors.sort(compareStrings);
   }
 
   let index = 0;
@@ -281,14 +282,14 @@ function detectCycles(nodePaths: string[], edges: readonly ContextGraphEdge[]): 
 
   return components
     .map((component) => cyclePath(component, adjacency))
-    .sort((left, right) => left.join(" ").localeCompare(right.join(" ")));
+    .sort((left, right) => compareStrings(left.join(" "), right.join(" ")));
 }
 
 // Find a concrete cycle through an SCC starting at its smallest node, returned as a closed path
 // (start repeated at the end).
 function cyclePath(component: string[], adjacency: Map<string, string[]>): string[] {
   const inComponent = new Set(component);
-  const start = [...component].sort((left, right) => left.localeCompare(right))[0]!;
+  const start = [...component].sort(compareStrings)[0]!;
   const visited = new Set<string>([start]);
   const path = [start];
 

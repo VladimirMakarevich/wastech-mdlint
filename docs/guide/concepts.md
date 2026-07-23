@@ -42,6 +42,13 @@ normalized to repository-relative **POSIX** form, and there are no timestamps or
 filesystem-order-dependent results. The same inputs produce byte-identical output across runs and
 across Windows/macOS/Linux.
 
+Ordering uses a plain code-point string comparison, not locale-aware collation — locale
+collation depends on the host's ICU data and default locale, so it cannot guarantee the same
+order on two machines. The trade-off is that sorting is not human-locale-aware: ASCII uppercase
+sorts before lowercase (`Beta.md` before `alpha.md`) and non-ASCII names sort by code point.
+Stable-everywhere ordering is worth more than locale-friendly ordering for output meant to be
+diffed and cached.
+
 ## Token estimation
 
 The context-budget rules ([SIZE-001](rules/SIZE-001.md), [LLM-001](rules/LLM-001.md)) estimate

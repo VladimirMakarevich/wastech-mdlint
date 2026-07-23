@@ -142,6 +142,24 @@ describe("lintFiles orchestration", () => {
     });
     expect({ errors: result.errorCount, warnings: result.warningCount }).toEqual({ errors: 1, warnings: 1 });
   });
+
+  it("returns files in host-independent string order for mixed-case and non-ASCII paths", async () => {
+    const cwd = await fixtureRepo({
+      "alpha.md": "# Lower\n",
+      "Zulu.md": "# Upper z\n",
+      "Beta.md": "# Upper b\n",
+      "文.md": "# CJK\n"
+    });
+
+    const result = await lintFiles({
+      cwd,
+      config: { include: ["**/*.md"], rules: [] },
+      rules: [],
+      settings: {}
+    });
+
+    expect(result.files).toEqual(["Beta.md", "Zulu.md", "alpha.md", "文.md"]);
+  });
 });
 
 describe("runRules fail-fast", () => {

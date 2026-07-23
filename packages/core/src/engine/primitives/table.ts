@@ -1,3 +1,4 @@
+import { compareStrings } from "../../deterministic-sort.js";
 import type { ParsedDocument, ParsedTable } from "../../markdown/document-types.js";
 import { compileRegex } from "../regex.js";
 import type { PrimitiveContext, PrimitiveFinding } from "./types.js";
@@ -243,7 +244,7 @@ export function columnUnique(
 
   // Deterministic corpus order: sort documents by repo-relative path before scanning.
   const documents = [...context.documents.values()].sort((left, right) =>
-    left.path.localeCompare(right.path)
+    compareStrings(left.path, right.path)
   );
 
   for (const document of documents) {

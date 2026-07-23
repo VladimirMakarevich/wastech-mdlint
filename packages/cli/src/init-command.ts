@@ -7,6 +7,7 @@ import { type ParseError, parse as parseJsonc } from "jsonc-parser";
 import {
   buildCiWorkflowYaml,
   canonicalizeRuleId,
+  compareStrings,
   CONFIG_FILE_NAME,
   findConfig,
   generateInitConfig,
@@ -240,9 +241,7 @@ export async function readExistingConfigDocument(cwd: string, configPath: string
  * dependency on the schema).
  */
 export function buildConfigPreview(clusters: DocCluster[], rules: InferredRule[]): ConfigPreview {
-  const include = [...new Set(clusters.map((cluster) => cluster.includeGlob))].sort((left, right) =>
-    left.localeCompare(right)
-  );
+  const include = [...new Set(clusters.map((cluster) => cluster.includeGlob))].sort(compareStrings);
 
   const ruleEntries: RuleConfigEntry[] = rules.map((rule) => ({
     rule: rule.rule,
@@ -313,7 +312,7 @@ export function formatDraftSummary(selections: ConfirmedInitSelections, configPa
   lines.push("");
 
   const grouped = groupInferredRulesByCategory(selections.rules);
-  const categories = (Object.keys(grouped) as RuleCategory[]).sort((left, right) => left.localeCompare(right));
+  const categories = (Object.keys(grouped) as RuleCategory[]).sort(compareStrings);
 
   lines.push(`Rules (${selections.rules.length}):`);
   if (categories.length === 0) {
@@ -595,9 +594,7 @@ export async function runInitCommand(
   // Only categories with >=1 inferred rule are offered — the other built-ins have a required
   // option with no safe way to derive it from sampled files (see rule-inference.ts's own note on
   // the 7 gated ids), so a category with nothing to add would be a dead, confusing checkbox entry.
-  const categoriesWithRules = (Object.keys(groupedByCategory) as RuleCategory[]).sort((left, right) =>
-    left.localeCompare(right)
-  );
+  const categoriesWithRules = (Object.keys(groupedByCategory) as RuleCategory[]).sort(compareStrings);
 
   const selectedCategories = options.yes
     ? categoriesWithRules

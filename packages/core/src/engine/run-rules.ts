@@ -1,3 +1,4 @@
+import { compareStrings } from "../deterministic-sort.js";
 import type { LintMessage, ResolvedRule, RuleContext } from "./types.js";
 
 // Context fields the caller supplies; `report` is added by the runner.
@@ -5,11 +6,11 @@ export type RunRulesContext = Omit<RuleContext, "report">;
 
 function compareMessages(left: LintMessage, right: LintMessage): number {
   return (
-    left.filePath.localeCompare(right.filePath) ||
+    compareStrings(left.filePath, right.filePath) ||
     left.line - right.line ||
     (left.column ?? 0) - (right.column ?? 0) ||
-    left.ruleId.localeCompare(right.ruleId) ||
-    left.message.localeCompare(right.message)
+    compareStrings(left.ruleId, right.ruleId) ||
+    compareStrings(left.message, right.message)
   );
 }
 

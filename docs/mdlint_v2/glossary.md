@@ -616,6 +616,13 @@ underlying scan/inference.
 - **Repo-relative POSIX path** — The canonical path form in all public data and reports:
   relative to the repo root, `\` normalized to `/`. Node identity, finding attribution, and
   `documents` keys all use it.
+- **`compareStrings`** — The shared, host-independent string comparator (exported from
+  `core`) used for every user-visible ordering path (loader keys, `projectFiles`, findings,
+  graph nodes/edges, rule metadata, config-writer keys). Plain relational comparison
+  (`<`/`>`), i.e. UTF-16 code-unit order, rather than `String.prototype.localeCompare`, whose
+  result depends on the host ICU data and default locale. Consequence: ordering is stable
+  across locales/OSes but not locale-aware — ASCII uppercase sorts before lowercase, and
+  non-ASCII sorts by code point.
 - **Fixture** — A small, scenario-focused test input under a package's test tree. Preferred
   over linting the repo's real docs so a failure points to one behavior. See
   [testing rules](../../.agents/rules/testing.md).

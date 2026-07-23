@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { compareStrings } from "../deterministic-sort.js";
 import type { ContextGraphEdge } from "../graph/context-graph-types.js";
 import type { DocumentProfile } from "./doc-profile.js";
 import type { RuleDescriptionGroup } from "./describe-rules.js";
@@ -215,7 +216,7 @@ function formatEdgeList(edges: readonly ContextGraphEdge[], endpoint: "to" | "fr
   }
 
   const sorted = [...edges].sort(
-    (left, right) => left[endpoint].localeCompare(right[endpoint]) || left.type.localeCompare(right.type)
+    (left, right) => compareStrings(left[endpoint], right[endpoint]) || compareStrings(left.type, right.type)
   );
   return sorted.map((edge) => `${codeSpan(edge[endpoint])} (${edge.type})`).join(", ");
 }

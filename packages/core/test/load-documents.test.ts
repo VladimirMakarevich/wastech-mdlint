@@ -106,4 +106,22 @@ describe("loadDocuments", () => {
 
     expect(first).toEqual(second);
   });
+
+  it("sorts mixed-case and non-ASCII paths by host-independent string order", async () => {
+    const root = await createFixtureTree({
+      "alpha.md": "# Lower\n",
+      "Zulu.md": "# Upper z\n",
+      "Beta.md": "# Upper b\n",
+      "文.md": "# CJK\n"
+    });
+
+    const documents = await loadDocuments(["**/*.md"], { cwd: root });
+
+    expect([...documents.values()].map((doc) => doc.path)).toEqual([
+      "Beta.md",
+      "Zulu.md",
+      "alpha.md",
+      "文.md"
+    ]);
+  });
 });

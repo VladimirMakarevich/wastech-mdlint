@@ -1,6 +1,7 @@
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 
+import { compareStrings } from "../deterministic-sort.js";
 import { detectPackageManager, type DetectedPackageManager } from "./package-manager.js";
 import {
   DEFAULT_KNOWN_CLUSTER_NAMES,
@@ -192,7 +193,7 @@ function computeScopeClusters(params: ScopeClustersParams): DocCluster[] {
   // drops deeper qualifying descendants it already covers (e.g. docs/ before docs/api/).
   qualifying.sort((left, right) => {
     const depthDiff = left.dir.split("/").length - right.dir.split("/").length;
-    return depthDiff !== 0 ? depthDiff : left.dir.localeCompare(right.dir);
+    return depthDiff !== 0 ? depthDiff : compareStrings(left.dir, right.dir);
   });
 
   const kept: Candidate[] = [];
@@ -266,7 +267,7 @@ export async function scanRepository(options: ScanRepositoryOptions): Promise<Re
     collectMarkdownFiles(cwd, noiseDirNames)
   ]);
 
-  const allFiles = unsortedFiles.sort((left, right) => left.localeCompare(right));
+  const allFiles = unsortedFiles.sort(compareStrings);
 
   const scopes: { scopeRoot: string; workspacePackage?: string }[] = [
     { scopeRoot: "" },
@@ -327,7 +328,7 @@ export async function scanRepository(options: ScanRepositoryOptions): Promise<Re
       return rankDiff;
     }
     const scoreDiff = right.score - left.score;
-    return scoreDiff !== 0 ? scoreDiff : left.path.localeCompare(right.path);
+    return scoreDiff !== 0 ? scoreDiff : compareStrings(left.path, right.path);
   });
 
   return { clusters, packageManager, workspacePackages };

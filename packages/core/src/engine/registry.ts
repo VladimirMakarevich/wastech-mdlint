@@ -1,5 +1,6 @@
 import type { z } from "zod";
 
+import { compareStrings } from "../deterministic-sort.js";
 import { canonicalizeRuleId } from "../rule-id.js";
 import type { Rule, RuleCategory, RuleContext, RuleScope, Severity, TextEdit } from "./types.js";
 
@@ -131,7 +132,7 @@ export class RuleRegistry {
   getAllMetadata(): RuleMetadata[] {
     return [...this.byId.values()]
       .map((definition) => definition.metadata)
-      .sort((left, right) => left.id.localeCompare(right.id));
+      .sort((left, right) => compareStrings(left.id, right.id));
   }
 
   // Reserved built-in prefixes (audit 3.5): the first segment of every built-in id. Derived from the

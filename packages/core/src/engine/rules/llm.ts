@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { compareStrings } from "../../deterministic-sort.js";
 import { matchesConfigGlob, normalizeRelativePath } from "../../discovery/globs.js";
 import type { ParsedDocument } from "../../markdown/document-types.js";
 import { resolveTargetCandidates } from "../path-resolve.js";
@@ -158,7 +159,7 @@ export const llm001: RuleDefinition = defineRule({
     const documents = context.documents!;
     const entrypoints = [...documents.keys()]
       .filter((filePath) => matchesConfigGlob(filePath, options.entrypoints))
-      .sort((left, right) => left.localeCompare(right));
+      .sort(compareStrings);
 
     for (const entrypoint of entrypoints) {
       reportEntrypoint(context, entrypoint, documents.get(entrypoint)!, documents, options.maxTokensPerEntrypoint);

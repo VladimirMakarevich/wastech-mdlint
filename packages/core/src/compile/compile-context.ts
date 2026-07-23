@@ -1,3 +1,4 @@
+import { compareStrings } from "../deterministic-sort.js";
 import type { CompileConfig, CustomRuleConfigEntry, RuleConfigEntry } from "../config/config-schema.js";
 import type { ToolErrorCode } from "../errors.js";
 import type { LoadedConfiguration } from "../config/load-config.js";
@@ -107,7 +108,7 @@ function computeBudget(
     activeEntries.push(parsedOptions.data as ActiveLlm001Entry);
   }
 
-  const sortedDocumentPaths = [...documents.keys()].sort((left, right) => left.localeCompare(right));
+  const sortedDocumentPaths = [...documents.keys()].sort(compareStrings);
   const overBudget: CompileBudgetEntrypoint[] = [];
   let entrypointsMatched = 0;
 
@@ -142,7 +143,7 @@ function computeBudget(
     }
   }
 
-  overBudget.sort((left, right) => left.path.localeCompare(right.path));
+  overBudget.sort((left, right) => compareStrings(left.path, right.path));
 
   return { corpusTokenEstimate, llm001Enabled, entrypointsMatched, entrypointsOverBudget: overBudget };
 }
@@ -164,7 +165,7 @@ export async function compileContext(config: LoadedConfiguration, cwd: string): 
   });
   const analysis = analyzeGraph(graph, { hubMinInDegree });
 
-  const documentPaths = [...documents.keys()].sort((left, right) => left.localeCompare(right));
+  const documentPaths = [...documents.keys()].sort(compareStrings);
   const profiles = new Map(
     documentPaths.map((documentPath) => [
       documentPath,

@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 
+import { compareStrings } from "../deterministic-sort.js";
 import { escapesRoot, filePart, resolveTargetCandidates } from "../engine/path-resolve.js";
 import type { SiteRouterSettings } from "../engine/types.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
@@ -92,6 +93,6 @@ export function computeGraphCoverage(
   return {
     nodeCount: graph.nodes.length,
     edgeCount: graph.edges.length,
-    filesOutsideCorpus: [...outsideCorpus].sort((left, right) => left.localeCompare(right))
+    filesOutsideCorpus: [...outsideCorpus].sort(compareStrings)
   };
 }

@@ -3,6 +3,7 @@ import path from "node:path";
 
 import ignore, { type Ignore } from "ignore";
 
+import { compareStrings } from "../deterministic-sort.js";
 import { matchesConfigGlob, normalizeRelativePath } from "../discovery/globs.js";
 import type { ParsedDocument } from "./document-types.js";
 import { parseDocument } from "./parse-document.js";
@@ -168,7 +169,7 @@ export async function loadDocuments(
   });
 
   // Sort before reading so map insertion order (and every array derived from it) is deterministic.
-  results.sort((left, right) => left.localeCompare(right));
+  results.sort(compareStrings);
 
   const documents = new Map<string, ParsedDocument>();
 

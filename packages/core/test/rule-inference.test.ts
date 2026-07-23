@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { DocCluster } from "../src/discovery/repo-scan.js";
 import { scanRepository } from "../src/discovery/repo-scan.js";
 import { inferRuleSet } from "../src/discovery/rule-inference.js";
+import { compareStrings } from "../src/deterministic-sort.js";
 import { defineRule, RuleRegistry } from "../src/engine/registry.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
 
@@ -143,9 +144,7 @@ describe("inferRuleSet · end to end", () => {
 
     const docsCluster = result.clusters.find((cluster) => cluster.clusterPath === "docs");
     expect(docsCluster?.contributesTo).toEqual(
-      ["CTX-001", "CTX-002", "GRP-001", "REF-001", "REF-002", "TBL-002"].sort((left, right) =>
-        left.localeCompare(right)
-      )
+      ["CTX-001", "CTX-002", "GRP-001", "REF-001", "REF-002", "TBL-002"].sort(compareStrings)
     );
   });
 });
@@ -459,7 +458,7 @@ describe("inferRuleSet · determinism", () => {
 
     expect(first).toEqual(second);
     const ids = first.rules.map((rule) => rule.rule);
-    expect(ids).toEqual([...ids].sort((left, right) => left.localeCompare(right)));
+    expect(ids).toEqual([...ids].sort(compareStrings));
   });
 });
 

@@ -8,12 +8,14 @@ import {
   resolvePackageSchemaRef,
   type GenerateInitConfigParams
 } from "../src/discovery/config-writer.js";
+import { compareStrings } from "../src/deterministic-sort.js";
 import { generateConfigSchema } from "../src/engine/schema.js";
 import { DEFAULT_NOISE_DIR_NAMES } from "../src/discovery/repo-scan-constants.js";
 import type { InferredRule } from "../src/discovery/rule-inference.js";
 
-// The fresh-write `exclude` mirrors the scanner's pruned noise directories as globs, sorted.
-const EXPECTED_EXCLUDE = [...DEFAULT_NOISE_DIR_NAMES].map((name) => `${name}/**`).sort((a, b) => a.localeCompare(b));
+// The fresh-write `exclude` mirrors the scanner's pruned noise directories as globs, sorted by the
+// same host-independent comparator as production.
+const EXPECTED_EXCLUDE = [...DEFAULT_NOISE_DIR_NAMES].map((name) => `${name}/**`).sort(compareStrings);
 
 function buildRule(overrides: Partial<InferredRule> & { rule: string }): InferredRule {
   return {

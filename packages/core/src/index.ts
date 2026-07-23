@@ -30,6 +30,7 @@ export {
   normalizeConfigGlobs,
   normalizeRelativePath,
 } from "./discovery/globs.js";
+export { compareStrings } from "./deterministic-sort.js";
 
 // Repo scan (P6.01)
 export {

@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { compareStrings } from "../deterministic-sort.js";
 import { canonicalizeRuleId } from "../rule-id.js";
 import { generateConfigSchema, type CustomRuleDefinition } from "../engine/schema.js";
 import { ruleRegistry } from "../engine/rules/index.js";
@@ -80,7 +81,7 @@ export function resolvePackageSchemaRef(configDir: string, schemaAnchorDir: stri
 // `exclude`; this is only for the fresh/overwrite path.
 const DEFAULT_EXCLUDE_GLOBS = [...DEFAULT_NOISE_DIR_NAMES]
   .map((name) => `${name}/**`)
-  .sort((left, right) => left.localeCompare(right));
+  .sort(compareStrings);
 
 // Canonical top-level key order, applied on every write rather than preserving an existing file's
 // original order — simpler and fully deterministic, at only the cosmetic cost of reordering a merged
@@ -335,7 +336,7 @@ export function generateInitConfig(params: GenerateInitConfigParams): GeneratedI
     ...TOP_LEVEL_KEY_ORDER.filter((key) => values.has(key)),
     ...[...values.keys()]
       .filter((key) => !TOP_LEVEL_KEY_ORDER.includes(key as (typeof TOP_LEVEL_KEY_ORDER)[number]))
-      .sort((left, right) => left.localeCompare(right))
+      .sort(compareStrings)
   ];
 
   const body = orderedKeys.map((key) => `  ${JSON.stringify(key)}: ${values.get(key)!}`).join(",\n");

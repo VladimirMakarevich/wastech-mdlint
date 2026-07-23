@@ -1,3 +1,4 @@
+import { compareStrings } from "../deterministic-sort.js";
 import { normalizeRelativePath } from "../discovery/globs.js";
 import { extractDefinedIds, type IdRef } from "../engine/defined-ids.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
@@ -10,7 +11,7 @@ import { query as runQuery, type QueryVisit } from "./query.js";
 // index lookups. Exact match only, never fuzzy/substring/keyword/LLM, so `slice` results stay
 // deterministic and the CLI/MCP surfaces (P4.07/P7) can advertise honest semantics.
 
-const byPath = (left: string, right: string): number => left.localeCompare(right);
+const byPath = compareStrings;
 
 export type SliceMatchKind = "id" | "anchor" | "heading" | "path";
 
@@ -137,7 +138,7 @@ export function resolveQuery(index: ContextSearchIndex, query: string): { kind: 
 // and a depth tie can only happen between two non-start nodes (each start uniquely owns depth 0 for
 // its own path), so comparing `via` as a plain string at that point is always meaningful.
 function compareVisit(left: QueryVisit, right: QueryVisit): number {
-  return left.depth - right.depth || (left.via ?? "").localeCompare(right.via ?? "");
+  return left.depth - right.depth || compareStrings(left.via ?? "", right.via ?? "");
 }
 
 function mergeVisited(perStart: QueryVisit[][]): QueryVisit[] {

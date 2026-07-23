@@ -2,6 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
+import { compareStrings } from "@wastech-mdlint/core";
 
 import { EXIT_CODE_SUCCESS } from "../src/commands.js";
 import { runCli } from "../src/program.js";
@@ -119,12 +120,12 @@ describe("graph command over the fixture corpus", () => {
       edges: { from: string; to: string; type: string; line?: number }[];
     };
     expect(payload.nodes.map((node) => node.path)).toEqual(
-      [...payload.nodes.map((node) => node.path)].sort((left, right) => left.localeCompare(right))
+      [...payload.nodes.map((node) => node.path)].sort(compareStrings)
     );
     const edgeSortKey = (edge: { from: string; to: string; type: string; line?: number }): string =>
       `${edge.from} ${edge.to} ${edge.type} ${edge.line ?? 0}`;
     expect(payload.edges.map(edgeSortKey)).toEqual(
-      [...payload.edges.map(edgeSortKey)].sort((left, right) => left.localeCompare(right))
+      [...payload.edges.map(edgeSortKey)].sort(compareStrings)
     );
   });
 });
