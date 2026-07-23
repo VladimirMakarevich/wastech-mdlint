@@ -38,6 +38,12 @@ describe("loadDocuments", () => {
     const documents = await loadDocuments(["**/*.md"], { cwd: root });
     const keys = [...documents.keys()];
 
+    // On the Windows CI leg this makes the normalization assertion non-vacuous: the fixture root
+    // must contain native separators before loadDocuments returns POSIX map keys.
+    if (path.sep === "\\") {
+      expect(root).toContain("\\");
+    }
+
     expect(keys).toEqual([
       `${root}/b.md`.replaceAll("\\", "/"),
       `${root}/docs/a.md`.replaceAll("\\", "/")

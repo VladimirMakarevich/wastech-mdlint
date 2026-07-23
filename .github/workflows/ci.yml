@@ -13,7 +13,16 @@ jobs:
   verify:
     # Workspace-wide gate on the pinned Node 24 LTS line (.node-version). tsc -b, vitest, and
     # eslint all fan out across packages/{core,cli,mcp-server} through the root scripts.
-    runs-on: ubuntu-latest
+    # Keep the OS matrix scoped here so path/newline/glob behavior is covered on every runtime
+    # host without multiplying the package-shaped tarball checks below.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
