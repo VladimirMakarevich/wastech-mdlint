@@ -18,6 +18,7 @@ import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import { visit } from "unist-util-visit";
 
+import { findLineNumber } from "../engine/text-position.js";
 import { canonicalizeRuleId } from "../rule-id.js";
 import type {
   InlineDirective,
@@ -206,8 +207,13 @@ function parseDirective(node: Html): InlineDirective | undefined {
   };
 }
 
-function extractImports(node: Text): ParsedImport[] {
+function extractImports(node: Text, sourceLines: string[]): ParsedImport[] {
   const imports: ParsedImport[] = [];
+  const nodeStartLine = node.position?.start.line ?? 0;
+
+  // Track how far along each source line we have already matched so repeated identical `@imports`
+  // on one line get distinct, in-order columns instead of all collapsing onto the first occurrence.
+  const nextSearchFrom = new Map<number, number>();
 
   for (const match of node.value.matchAll(IMPORT_PATTERN)) {
     const rawTarget = match.groups?.target;
@@ -216,15 +222,33 @@ function extractImports(node: Text): ParsedImport[] {
       continue;
     }
 
-    // The match may start with a boundary char (space/paren); locate the `@` to report its column.
+    // The match may start with a boundary char (space/paren); locate the `@`'s absolute offset
+    // within node.value so the line delta counts newlines up to the `@` itself, not the boundary.
     const matchIndex = match.index ?? 0;
     const atOffset = match[0].lastIndexOf(`@${rawTarget}`);
-    const startColumn = (node.position?.start.column ?? 1) + matchIndex + atOffset;
+    const atCharIndex = matchIndex + atOffset;
+
+    // remark packs consecutive non-blank lines into one `text` node, so a match past the node's
+    // first physical line must not inherit the node's start line (audit M-1). Newlines survive
+    // container prefix stripping, so counting them in node.value gives the correct line delta.
+    const line = nodeStartLine + (findLineNumber(node.value, atCharIndex) - 1);
+
+    // Column must come from the original source line, not node.value: remark strips list/blockquote
+    // markers and indentation from the value, so for `- intro\n  @a.md` or `> q\n> @b.md` the `@`'s
+    // offset within node.value is short by the prefix width. Locate it in the raw source line.
+    const importToken = `@${rawTarget}`;
+    const sourceLine = sourceLines[line - 1];
+    const searchFrom = nextSearchFrom.get(line) ?? 0;
+    const columnIndex = sourceLine === undefined ? -1 : sourceLine.indexOf(importToken, searchFrom);
+
+    if (columnIndex !== -1) {
+      nextSearchFrom.set(line, columnIndex + importToken.length);
+    }
 
     imports.push({
-      rawTarget: `@${rawTarget}`,
-      line: node.position?.start.line ?? 0,
-      column: startColumn
+      rawTarget: importToken,
+      line,
+      column: columnIndex === -1 ? undefined : columnIndex + 1
     });
   }
 
@@ -242,6 +266,10 @@ export function parseDocument(params: { path: string; content: string }): Parsed
   const tree = markdownProcessor.parse(params.content) as Root;
   const definitions = getReferenceDefinitions(tree);
   const slugger = new GithubSlugger();
+
+  // Raw source lines back the import column lookup: node.value has container prefixes stripped, so
+  // only the original text preserves the true column of each `@import` (audit M-1).
+  const sourceLines = params.content.split("\n");
 
   const headings: ParsedHeading[] = [];
   const sections: string[] = [];
@@ -320,7 +348,7 @@ export function parseDocument(params: { path: string; content: string }): Parsed
         return;
       }
       case "text": {
-        imports.push(...extractImports(node as Text));
+        imports.push(...extractImports(node as Text, sourceLines));
         return;
       }
       default:

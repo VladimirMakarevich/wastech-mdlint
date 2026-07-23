@@ -156,6 +156,40 @@ describe("parseDocument · eager imports", () => {
 
     expect(doc.imports).toEqual([]);
   });
+
+  it("gives each import in a multi-line block its own line and column (audit M-1)", () => {
+    // remark merges these three consecutive lines into one `text` node; the block starts at line 3
+    // (not 1) so a fix that only works by coincidence at the top of a file still fails.
+    const doc = parse(
+      [
+        "Intro line.",
+        "",
+        "@AGENTS.md",
+        "@.agents/rules/architecture.md",
+        "@.agents/rules/coding-style.md",
+        ""
+      ].join("\n")
+    );
+
+    expect(doc.imports).toEqual([
+      { rawTarget: "@AGENTS.md", line: 3, column: 1 },
+      { rawTarget: "@.agents/rules/architecture.md", line: 4, column: 1 },
+      { rawTarget: "@.agents/rules/coding-style.md", line: 5, column: 1 }
+    ]);
+  });
+
+  it("reports the source column for imports inside indented containers (audit M-1)", () => {
+    // remark strips the `-`/`>` markers and indentation from Text.value, so column must be resolved
+    // against the raw source line — otherwise these continuation-line imports report column 1.
+    const doc = parse(
+      ["- intro", "  @a.md", "", "> quote", "> @b.md", ""].join("\n")
+    );
+
+    expect(doc.imports).toEqual([
+      { rawTarget: "@a.md", line: 2, column: 3 },
+      { rawTarget: "@b.md", line: 5, column: 3 }
+    ]);
+  });
 });
 
 describe("parseDocument · inline-disable directives", () => {

@@ -1,7 +1,7 @@
 # P9.01 · Fix line/column for multi-line `@import` blocks
 
 > Phase: [P9 — Post-audit remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** ·
-> Status **Not started**. Audit finding **M-1** ([report](../audit-2026-07-23-p0-p8.md)).
+> Status **Done**. Audit finding **M-1** ([report](../audit-2026-07-23-p0-p8.md)).
 
 ## Goal
 
@@ -37,6 +37,6 @@ point at the wrong location.
 
 ## Exit criteria
 
-- [ ] Each import in a multi-line block reports its own correct `line`/`column`.
-- [ ] New multi-line-block test fails on the old code and passes on the fix.
-- [ ] `npm run typecheck && npm test` green.
+- [x] Each import in a multi-line block reports its own correct `line`/`column`.
+- [x] New multi-line-block test fails on the old code and passes on the fix.
+- [x] `npm run typecheck && npm test` green.
