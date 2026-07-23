@@ -12,6 +12,8 @@ yarn-error.log
 # Git won't descend into a fully-excluded dir, so `.worc/` would make any !.worc/flows a no-op.
 .worc/*
 !.worc/flows/
+# sibling exchange root (agent read-isolation I/O, WRI-001) — must also never be committed
+.worc-io/
 
 # orchestrator task files: authored/moved locally, committed by worc on the task branch
 # (not tracked on main — avoids pending->done lifecycle churn on the base branch)
