@@ -29,7 +29,7 @@ Write the final config and wire it to the **local** schema, optionally dropping 
    `.github/workflows/wastech-mdlint.yml` — ask first, don't write silently. **Shipped as a
    self-contained workflow** (`npm install --no-save @wastech-mdlint/cli` +
    `npx wastech-mdlint lint …`) rather than a `uses:` reference to the first-class composite Action:
-   that Action is [P9.03](../P9-release/03-github-action.md) (Not started), so a `uses:` template
+   that Action is [PR.03](../P-release/03-github-action.md) (Not started), so a `uses:` template
    would be a dead workflow when P6 lands. P9.03 owns swapping this template to the published `uses:`
    form once the Action exists. The workflow is anchored at the repository root (where GitHub loads
    workflows) and, for a subdirectory config, scopes lint to the config's directory and passes

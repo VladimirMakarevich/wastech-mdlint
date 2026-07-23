@@ -1,6 +1,6 @@
-# P9.05 · Release dry-run & launch verification
+# PR.05 · Release dry-run & launch verification
 
-> Phase: [P9 — Release](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
+> Phase: [P-release — Release](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
 
 ## Goal
 
@@ -8,11 +8,11 @@ Prove the whole release works end-to-end across all three channels before taggin
 
 ## Sequence
 
-- **Previous:** [P9.02 — Single-tag release](02-single-tag-release.md),
-  [P9.03 — GitHub Action](03-github-action.md), [P9.04 — Docs](04-docs-readme.md).
+- **Previous:** [PR.02 — Single-tag release](02-single-tag-release.md),
+  [PR.03 — GitHub Action](03-github-action.md), [PR.04 — Docs](04-docs-readme.md).
 - **Next:** **v2 launch** (backlog becomes the next iteration — see
   [requirements backlog](../requirements/index.md)).
-- **Depends on:** P9.02–P9.04 · **Blocks:** the release tag.
+- **Depends on:** PR.02–PR.04 · **Blocks:** the release tag.
 
 ## Deliverables / steps
 
@@ -24,11 +24,11 @@ Prove the whole release works end-to-end across all three channels before taggin
    - CLI: install the packed `cli`, run `init` → `lint` → `graph`/`slice`/`impact` → `compile`;
    - MCP: boot `wastech-mdlint-mcp`, call each of the 6 tools;
    - Skill: `gh skill install … --pin` resolves and references real commands/tools.
-3. Dry-run the single-tag release ([P9.02](02-single-tag-release.md)) without publishing. The
+3. Dry-run the single-tag release ([PR.02](02-single-tag-release.md)) without publishing. The
    existing `.github/workflows/publish.yml` `publish-readiness` job already runs the gate +
-   `npm pack --dry-run --workspaces` on `v*` tags; P9.02 upgrades it to real publishing, so verify
+   `npm pack --dry-run --workspaces` on `v*` tags; PR.02 upgrades it to real publishing, so verify
    against that job rather than reinventing the dry-run.
-4. Tick the Phase P9 [exit criteria](index.md); confirm **Milestone M4 (launch)**.
+4. Tick the Phase P-release [exit criteria](index.md); confirm **Milestone M4 (launch)**.
 
 ## Decisions applied
 

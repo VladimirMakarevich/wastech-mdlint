@@ -178,7 +178,9 @@ with an explicit prev/next/depends/blocks chain). Effort is a rough T-shirt size
 [P6 init](P6-init/index.md) ·
 [P7 MCP server](P7-mcp-server/index.md) ·
 [P8 Skills](P8-skills/index.md) ·
-[P9 Release](P9-release/index.md)
+[P9 Remediation](P9-remediation/index.md) ·
+[P10 Consistency](P10-consistency/index.md) ·
+[P-release Release](P-release/index.md)
 
 **Reference:** [Glossary](glossary.md) — the canonical vocabulary (public types, config
 keys, CLI/MCP surfaces, rule IDs, and this planning taxonomy) used across these docs.
@@ -278,7 +280,27 @@ own `*.test.ts` and a fixture.
 - **Maps to:** [skills & compile](requirements/04-skills-compile.md) + [installation](requirements/06-installation.md) requirements.
 - **Exit:** skills install via `gh skill install` and reference real command/MCP surface.
 
-### Phase 9 — Distribution, CI & release · `M` · depends on: all · reuse: Medium
+### Phase 9 — Post-audit remediation (code) · `M` · depends on: P8 · reuse: n/a
+**Goal:** fix the code-level correctness, cross-platform, and tooling gaps from the
+[P0–P8 audit](audit-2026-07-23-p0-p8.md) before release. See [P9 tasks](P9-remediation/index.md).
+- Multi-line `@import` positions (M-1); deterministic loader sort, no `localeCompare` (M-4).
+- Windows/macOS CI matrix (M-5); honest MCP `lint` tool description (M-3).
+- Resolve `custom` `target: "heading"` mismatch (M-2); fix + enforce the Prettier gate (M-6).
+- `init` CI workflow respects the detected package manager (L-7); (stretch) id-ref prose scan (L-6).
+- **Maps to:** [audit report](audit-2026-07-23-p0-p8.md) MEDIUM findings + code-level LOWs.
+- **Exit:** all MEDIUM code/verification findings closed; gates green and enforced.
+
+### Phase 10 — Post-audit consistency (docs/contracts/tests) · `S–M` · depends on: P9 · reuse: n/a
+**Goal:** reconcile governance docs, glossary, requirements, and test guards with the shipped
+product. See [P10 tasks](P10-consistency/index.md).
+- Governance docs drop the removed root `src/`/`test/` (M-7); glossary marks P6–P8 shipped (M-8).
+- Clean stale `CHK`/"P2 wires" comments (L-1/L-2); registry inventory guard test (L-12).
+- Deepen parser + per-rule tests (L-13/L-14); reconcile R7 / M1-table / P5.04 text (L-8/L-9/L-10).
+- Decouple frontmatter-schema import direction (L-5); document accepted behaviors (L-15/L-11).
+- **Maps to:** [audit report](audit-2026-07-23-p0-p8.md) documentation/contract/test-depth findings.
+- **Exit:** docs/tests describe the current product; no stale-state or phantom-category references.
+
+### Phase P-release — Distribution, CI & release · `M` · depends on: all (incl. P9, P10) · reuse: Medium
 **Goal:** production packaging.
 - Per-package `package.json` (bins, exports, `files`, `engines`, `publishConfig`).
 - Single-tag release that publishes npm packages + tags skills together.
@@ -295,18 +317,20 @@ own `*.test.ts` and a fixture.
 P0 ─► P1 ─► P2 ─► P3
             │     
             └► P4 ─► P5 ─┐
-            └► P6        ├─► P7 ─► P8 ─► P9
+            └► P6        ├─► P7 ─► P8 ─► P9 ─► P10 ─► P-release
                          
 Critical path: P0 → P1 → P2 → P3 (rules) and P0 → P1 → P4 → P5 (graph/compile)
 run largely in parallel after P2. P7 (MCP) needs P2+P4+P5. P8 (skills) needs the
-CLI/MCP surface stable. P9 closes out.
+CLI/MCP surface stable. P9 (code remediation) and P10 (docs/tests consistency) close out
+the post-audit gaps; P-release ships it.
 ```
 
 Recommended milestones:
 - **M1 "Engine":** P0–P2 — workspace + new config + rule engine + first rules runnable.
 - **M2 "Lint parity+":** P3 — all 22 built-in rules + current LLM rules; this is a usable linter.
 - **M3 "Graph & agents":** P4–P5 + P7 — slice/impact/compile + MCP.
-- **M4 "Launch":** P6, P8, P9 — init, skills, packaging, release.
+- **M4 "Launch":** P6, P8, then P9/P10 (post-audit remediation) and P-release — init, skills,
+  audit fixes, packaging, release.
 
 ---
 
@@ -360,5 +384,7 @@ Recommended milestones:
 | Skills (generated) | P5 (compile) |
 | MCP server | P7 |
 | Skills (static) + skill installation | P8 |
-| MCP server installation | P7, P9 |
-| Linter installation | P6, P9 |
+| MCP server installation | P7, P-release |
+| Linter installation | P6, P-release |
+| Post-audit remediation (code) | P9 ([audit](audit-2026-07-23-p0-p8.md)) |
+| Post-audit consistency (docs/tests) | P10 ([audit](audit-2026-07-23-p0-p8.md)) |

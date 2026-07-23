@@ -56,4 +56,6 @@ A 4th skill is [S9 backlog](../requirements/04-skills-compile.md).
 
 ## What P8 unblocks
 
-- **P9** — skills are tagged together with the npm packages under one version (I4/I7).
+- **P9/P10** — the next phases are the post-audit remediation (code) and consistency
+  (docs/tests) passes from the [P0–P8 audit](../audit-2026-07-23-p0-p8.md).
+- **P-release** — skills are tagged together with the npm packages under one version (I4/I7).

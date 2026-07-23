@@ -1,6 +1,6 @@
-# P9.03 · First-class GitHub Action / reusable CI workflow
+# PR.03 · First-class GitHub Action / reusable CI workflow
 
-> Phase: [P9 — Release](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
+> Phase: [P-release — Release](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
 
 ## Goal
 
@@ -14,9 +14,9 @@ step — a major adoption lever ([I6](../requirements/06-installation.md)).
 
 ## Sequence
 
-- **Previous:** [P9.01 — Package metadata](01-package-metadata.md).
-- **Next:** [P9.05 — Release verification](05-release-verification.md).
-- **Depends on:** P9.01 · **Parallel with:** P9.02, P9.04 · **Blocks:** P9.05.
+- **Previous:** [PR.01 — Package metadata](01-package-metadata.md).
+- **Next:** [PR.05 — Release verification](05-release-verification.md).
+- **Depends on:** PR.01 · **Parallel with:** PR.02, PR.04 · **Blocks:** PR.05.
 
 ## Deliverables / steps
 
@@ -25,7 +25,7 @@ step — a major adoption lever ([I6](../requirements/06-installation.md)).
 2. A documented workflow snippet (`.github/workflows/wastech-mdlint.yml`) that the
    [`init` P6.04](../P6-init/04-config-writer-schema.md) optionally drops into a repo. **Until this
    task lands, P6.04 ships a self-contained `npm install` + `npx wastech-mdlint lint` workflow**
-   (the Action does not exist before P9); part of this task is swapping that template
+   (the Action does not exist before P-release); part of this task is swapping that template
    (`buildCiWorkflowYaml` in `config-writer.ts`) to reference the composite Action via `uses:`.
 3. (Optional) SARIF output mapping from structured findings
    ([R3](../requirements/02-rules-engine.md)) so results appear in GitHub code scanning.
@@ -42,4 +42,4 @@ step — a major adoption lever ([I6](../requirements/06-installation.md)).
 
 ## Hand-off to next
 
-P9.05 includes the Action in the end-to-end launch smoke test.
+PR.05 includes the Action in the end-to-end launch smoke test.

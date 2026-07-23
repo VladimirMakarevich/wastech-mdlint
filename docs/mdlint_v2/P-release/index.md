@@ -1,6 +1,6 @@
-# Phase P9 — Distribution, CI & release
+# Phase P-release — Distribution, CI & release
 
-> Roadmap: [v2 Index](../index.md) · Phase **P9** · Size **M** · Status **Not started** ·
+> Roadmap: [v2 Index](../index.md) · Phase **P-release** · Size **M** · Status **Not started** ·
 > Depends on **all** prior phases.
 >
 > **Goal:** make the workspace production-publishable — per-package metadata, single-tag
@@ -9,7 +9,7 @@
 
 ## Why this phase exists
 
-P9 turns three working packages + three skills into a shippable release. It applies the
+P-release turns three working packages + three skills into a shippable release. It applies the
 [installation requirements](../requirements/06-installation.md): supply chain
 ([I5](../requirements/06-installation.md)), single-tag release
 ([I4](../requirements/06-installation.md)), a first-class GitHub Action
@@ -23,18 +23,18 @@ is needed
 
 | # | Task | Size | Depends on |
 | --- | --- | --- | --- |
-| [P9.01](01-package-metadata.md) | Finalize per-package publish metadata + supply chain | M | P7, P8 |
-| [P9.02](02-single-tag-release.md) | Single-tag release automation (npm + skills) | M | P9.01 |
-| [P9.03](03-github-action.md) | First-class GitHub Action / reusable CI workflow | M | P9.01 |
-| [P9.04](04-docs-readme.md) | README rewrite (3 install paths) + generated docs + AGENTS.md | M | P9.01 |
-| [P9.05](05-release-verification.md) | Release dry-run & launch verification | M | P9.02–P9.04 |
+| [PR.01](01-package-metadata.md) | Finalize per-package publish metadata + supply chain | M | P7, P8 |
+| [PR.02](02-single-tag-release.md) | Single-tag release automation (npm + skills) | M | PR.01 |
+| [PR.03](03-github-action.md) | First-class GitHub Action / reusable CI workflow | M | PR.01 |
+| [PR.04](04-docs-readme.md) | README rewrite (3 install paths) + generated docs + AGENTS.md | M | PR.01 |
+| [PR.05](05-release-verification.md) | Release dry-run & launch verification | M | PR.02–PR.04 |
 
 ## Sequence
 
 ```
-(P7/P8) ─► P9.01 ─┬─► P9.02 ─┐
-                  ├─► P9.03 ─┼─► P9.05 ─► (v2 launch)
-                  └─► P9.04 ─┘
+(P10) ─► PR.01 ─┬─► PR.02 ─┐
+                  ├─► PR.03 ─┼─► PR.05 ─► (v2 launch)
+                  └─► PR.04 ─┘
 ```
 
 ## Decisions applied
@@ -55,7 +55,7 @@ is needed
 - [ ] `npm pack --dry-run` clean per package; end-to-end smoke (CLI + MCP + skill) passes.
 - [ ] **Milestone M4 (launch) reached.**
 
-## What P9 unblocks
+## What P-release unblocks
 
 - v2 is released. Backlog items (C6, G7/G8, R9-Tier2 plugins, S9, M5, HTTP transport, LSP,
   docs site) become the next iteration — see the [requirements backlog](../requirements/index.md).

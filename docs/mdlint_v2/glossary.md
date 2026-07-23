@@ -656,7 +656,7 @@ underlying scan/inference.
 
 ## Distribution & release _(planned, P9)_
 
-Production packaging. The mechanics land in [P9](P9-release/index.md); the decisions are in
+Production packaging. The mechanics land in [P-release](P-release/index.md); the decisions are in
 [requirements/06-installation.md](requirements/06-installation.md).
 
 - **Single-tag release** — One `vX.Y.Z` git tag publishes `@wastech-mdlint/{core,cli,mcp-server}`

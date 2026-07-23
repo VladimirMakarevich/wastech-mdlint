@@ -1,6 +1,6 @@
-# P9.01 · Finalize per-package publish metadata + supply chain
+# PR.01 · Finalize per-package publish metadata + supply chain
 
-> Phase: [P9 — Release](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
+> Phase: [P-release — Release](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
 
 ## Goal
 
@@ -8,11 +8,12 @@ Make every package correctly publishable, building on the [P0.07 baseline](../P0
 
 ## Sequence
 
-- **Previous:** [P7](../P7-mcp-server/index.md) (mcp-server filled) and [P8](../P8-skills/index.md)
+- **Previous:** [P10 — Post-audit consistency](../P10-consistency/index.md) (all remediation
+  landed); the product surface itself comes from [P7](../P7-mcp-server/index.md) (mcp-server filled) and [P8](../P8-skills/index.md)
   (skills) — the full surface now exists.
-- **Next:** [P9.02 — Single-tag release](02-single-tag-release.md), [P9.03](03-github-action.md),
-  [P9.04](04-docs-readme.md).
-- **Depends on:** P7, P8 · **Blocks:** P9.02–P9.04.
+- **Next:** [PR.02 — Single-tag release](02-single-tag-release.md), [PR.03](03-github-action.md),
+  [PR.04](04-docs-readme.md).
+- **Depends on:** P7, P8 · **Blocks:** PR.02–PR.04.
 
 ## Deliverables / steps
 
@@ -24,7 +25,7 @@ Make every package correctly publishable, building on the [P0.07 baseline](../P0
    and correctly ship no `exports` map. Confirm/add any metadata the P7/P8 surface introduced.
 2. Internal deps are exact literal pins (`"@wastech-mdlint/core": "0.0.0"`, the npm-workspaces
    convention — there is **no** `workspace:*` protocol here, so nothing "resolves on publish"). The
-   release tool ([P9.02](02-single-tag-release.md)) must bump each package version **and every
+   release tool ([PR.02](02-single-tag-release.md)) must bump each package version **and every
    internal `@wastech-mdlint/*` dependency pin** to the same `vX.Y.Z` in one atomic change, so
    published `cli`/`mcp-server` depend on the published `core`, not a stale `0.0.0`.
 3. Confirm the generated `schema.json` still ships in `cli`'s `files` (already listed) so editor
@@ -48,4 +49,4 @@ Make every package correctly publishable, building on the [P0.07 baseline](../P0
 
 ## Hand-off to next
 
-P9.02 wires the release workflow that publishes these packages under one tag.
+PR.02 wires the release workflow that publishes these packages under one tag.

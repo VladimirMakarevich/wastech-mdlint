@@ -1,6 +1,6 @@
-# P9.04 · README polish (add MCP/skill channels) + generated docs
+# PR.04 · README polish (add MCP/skill channels) + generated docs
 
-> Phase: [P9 — Release](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
+> Phase: [P-release — Release](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
 
 ## Goal
 
@@ -9,9 +9,9 @@ repo's sources of truth at v2.
 
 ## Sequence
 
-- **Previous:** [P9.01 — Package metadata](01-package-metadata.md).
-- **Next:** [P9.05 — Release verification](05-release-verification.md).
-- **Depends on:** P9.01 · **Parallel with:** P9.02, P9.03 · **Blocks:** P9.05.
+- **Previous:** [PR.01 — Package metadata](01-package-metadata.md).
+- **Next:** [PR.05 — Release verification](05-release-verification.md).
+- **Depends on:** PR.01 · **Parallel with:** PR.02, PR.03 · **Blocks:** PR.05.
 
 ## Deliverables / steps
 
@@ -46,4 +46,4 @@ repo's sources of truth at v2.
 
 ## Hand-off to next
 
-P9.05 verifies the documented flows actually work end-to-end before release.
+PR.05 verifies the documented flows actually work end-to-end before release.

@@ -11,8 +11,9 @@ references.
 
 - **Previous:** the three skills ([P8.02](02-skill-init.md), [P8.03](03-skill-fix.md),
   [P8.04](04-skill-impact.md)).
-- **Next:** **Phase P9 — Distribution & release** (see [roadmap](../index.md)).
-- **Depends on:** P8.02–P8.04 · **Blocks:** single-tag release (P9).
+- **Next:** **Phase P9 — Post-audit remediation** (see [roadmap](../index.md)); the single-tag
+  release itself is the terminal **P-release**.
+- **Depends on:** P8.02–P8.04 · **Blocks:** single-tag release (P-release).
 
 ## Deliverables / steps
 
@@ -74,4 +75,4 @@ drift would this miss?", and the answer shaped every choice below.
 
 ## Hand-off to next
 
-P9 tags the validated skills together with the npm packages under one version (I4/I7).
+P-release tags the validated skills together with the npm packages under one version (I4/I7).

@@ -1,6 +1,6 @@
-# P9.02 · Single-tag release automation (npm + skills)
+# PR.02 · Single-tag release automation (npm + skills)
 
-> Phase: [P9 — Release](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
+> Phase: [P-release — Release](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
 
 ## Goal
 
@@ -9,9 +9,9 @@ One `vX.Y.Z` tag publishes all npm packages and tags the skills together — no 
 
 ## Sequence
 
-- **Previous:** [P9.01 — Package metadata](01-package-metadata.md) (publishable packages).
-- **Next:** [P9.05 — Release verification](05-release-verification.md).
-- **Depends on:** P9.01 · **Parallel with:** P9.03, P9.04 · **Blocks:** P9.05.
+- **Previous:** [PR.01 — Package metadata](01-package-metadata.md) (publishable packages).
+- **Next:** [PR.05 — Release verification](05-release-verification.md).
+- **Depends on:** PR.01 · **Parallel with:** PR.03, PR.04 · **Blocks:** PR.05.
 
 ## Deliverables / steps
 
@@ -36,4 +36,4 @@ One `vX.Y.Z` tag publishes all npm packages and tags the skills together — no 
 
 ## Hand-off to next
 
-P9.05 dry-runs and verifies the release end-to-end.
+PR.05 dry-runs and verifies the release end-to-end.

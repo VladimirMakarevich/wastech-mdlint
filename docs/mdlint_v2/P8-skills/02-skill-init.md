@@ -55,11 +55,11 @@ Non-obvious decisions the prose encodes, and why:
   …) and only step 4 installs the CLI. This resolves a chicken-and-egg the task's linear step
   order glosses over.
 - **Version-coupling is enforced in the commands, not just claimed.** Because the skill and CLI
-  ship from one P9 tag ([I4/I7](../requirements/06-installation.md)), a bare `@wastech-mdlint/cli`
+  ship from one P-release tag ([I4/I7](../requirements/06-installation.md)), a bare `@wastech-mdlint/cli`
   (resolves to latest) could pull an incompatible CLI even from a pinned skill install. Every
   run/install command pins `@wastech-mdlint/cli@<skill-version>`, and the README example uses the
   pinned `gh skill install … --pin vX.Y.Z` form. The `compatibility` value is same-tag wording,
-  not a version floor; its concrete tag is owned by the P9 single-tag release.
+  not a version floor; its concrete tag is owned by the P-release single-tag release.
 - **Everything runs from the effective init root.** `init` re-roots detection to the found
   config's directory (or the target when none exists), which is also the correct
   package-manager root for a nested `packages/foo/`. The skill `cd`s there once and runs `init`,
