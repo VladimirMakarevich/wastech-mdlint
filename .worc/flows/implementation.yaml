@@ -53,7 +53,7 @@ flow:
       # Claude-node run: planning on Claude Sonnet 5 at  max reasoning.
       provider: claude
       model: claude-sonnet-5
-      reasoning: max
+      reasoning: high
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []
