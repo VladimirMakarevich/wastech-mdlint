@@ -53,7 +53,7 @@
   заглушки); P3.04/P3.07 добавляют остальные REF/LLM-правила и оставляют эти как есть.
 - [P3.02/P3.03] `--fix` реализован только для **document-scope** правил (TextEdit адресует контент
   одного документа; project-правила не дают fix). Locked fixable subset (audit 4.2) = TBL-002
-  (empty→TODO) + SEC-001 (scaffold отсутствующих секций в конце файла). «SEC-* scaffold» реализован
+  (empty→TODO) + SEC-001 (scaffold отсутствующих секций в конце файла). «SEC-\* scaffold» реализован
   на SEC-001; SEC-002 (reorder) и SEC-003 (project template) — `fixable:false` (небезопасно/не
   document-scope), их fix — follow-up P4+.
 - [P3.04 REF-004] Underspecified: «cross-zone links declared in zone Dependencies». Принятая модель:

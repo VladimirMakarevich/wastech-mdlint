@@ -172,7 +172,10 @@ export type {
   CompileSections,
   SynthesizeInput,
 } from "./compile/synthesize.js";
-export { compileContext, CompileConfigMissingError } from "./compile/compile-context.js";
+export {
+  compileContext,
+  CompileConfigMissingError,
+} from "./compile/compile-context.js";
 
 // Skills (P8)
 export {

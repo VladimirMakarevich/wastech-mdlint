@@ -1,7 +1,12 @@
 import { stat } from "node:fs/promises";
 import path from "node:path";
 
-export type DetectedPackageManager = "bun" | "pnpm" | "yarn" | "npm" | undefined;
+export type DetectedPackageManager =
+  | "bun"
+  | "pnpm"
+  | "yarn"
+  | "npm"
+  | undefined;
 
 async function fileExists(candidatePath: string): Promise<boolean> {
   try {
@@ -20,7 +25,9 @@ async function fileExists(candidatePath: string): Promise<boolean> {
  * `undefined` when no lockfile exists rather than defaulting to `"npm"` — guessing a manager
  * with no evidence is a UX call for the interactive `init` layer (P6.03), not core's job.
  */
-export async function detectPackageManager(cwd: string): Promise<DetectedPackageManager> {
+export async function detectPackageManager(
+  cwd: string,
+): Promise<DetectedPackageManager> {
   // bun.lock (current text lockfile) and bun.lockb (legacy binary) both count as "bun".
   if (
     (await fileExists(path.join(cwd, "bun.lock"))) ||

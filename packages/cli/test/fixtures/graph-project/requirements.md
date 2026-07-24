@@ -1,5 +1,5 @@
 # Requirements
 
-| ID | Description |
-| --- | --- |
+| ID    | Description     |
+| ----- | --------------- |
 | REQ-1 | Requirement one |

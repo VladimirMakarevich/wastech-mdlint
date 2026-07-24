@@ -16,12 +16,18 @@ const tempDirs: string[] = [];
 
 afterEach(async () => {
   await Promise.all(
-    tempDirs.splice(0).map((tempDir) => rm(tempDir, { recursive: true, force: true }))
+    tempDirs
+      .splice(0)
+      .map((tempDir) => rm(tempDir, { recursive: true, force: true })),
   );
 });
 
-async function createFixtureTree(files: Record<string, string>): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-inference-"));
+async function createFixtureTree(
+  files: Record<string, string>,
+): Promise<string> {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "wastech-mdlint-inference-"),
+  );
   tempDirs.push(root);
 
   for (const [relativePath, content] of Object.entries(files)) {
@@ -34,13 +40,15 @@ async function createFixtureTree(files: Record<string, string>): Promise<string>
 }
 
 // Hand-built DocCluster for tests that pin exact gate behavior independent of scanRepository.
-function buildCluster(overrides: Partial<DocCluster> & { path: string; sampleFiles: string[] }): DocCluster {
+function buildCluster(
+  overrides: Partial<DocCluster> & { path: string; sampleFiles: string[] },
+): DocCluster {
   return {
     kind: "cluster",
     score: 1,
     subtreeCount: overrides.sampleFiles.length,
     includeGlob: `${overrides.path}/**/*.{md,mdx}`,
-    ...overrides
+    ...overrides,
   };
 }
 
@@ -64,7 +72,7 @@ describe("inferRuleSet · end to end", () => {
         "",
         "- [ ] write tests",
         "- [x] write code",
-        ""
+        "",
       ].join("\n"),
       "docs/b.md": [
         "# B",
@@ -78,7 +86,7 @@ describe("inferRuleSet · end to end", () => {
         "## Notes",
         "",
         "TBD",
-        ""
+        "",
       ].join("\n"),
       "adr/0001-use-typescript.md": [
         "# ADR 0001: Use TypeScript",
@@ -94,7 +102,7 @@ describe("inferRuleSet · end to end", () => {
         "## Decision",
         "",
         "Use TypeScript.",
-        ""
+        "",
       ].join("\n"),
       "adr/0002-use-vitest.md": [
         "# ADR 0002: Use Vitest",
@@ -110,21 +118,27 @@ describe("inferRuleSet · end to end", () => {
         "## Decision",
         "",
         "Use Vitest.",
-        ""
-      ].join("\n")
+        "",
+      ].join("\n"),
     });
 
     const scan = await scanRepository({ cwd: root });
-    const result = await inferRuleSet({ cwd: root, clusters: scan.clusters, registry: ruleRegistry });
+    const result = await inferRuleSet({
+      cwd: root,
+      clusters: scan.clusters,
+      registry: ruleRegistry,
+    });
 
-    const globalRules = result.rules.filter((rule) => rule.options === undefined);
+    const globalRules = result.rules.filter(
+      (rule) => rule.options === undefined,
+    );
     expect(globalRules.map((rule) => rule.rule)).toEqual([
       "CTX-001",
       "CTX-002",
       "GRP-001",
       "REF-001",
       "REF-002",
-      "TBL-002"
+      "TBL-002",
     ]);
     for (const rule of globalRules) {
       expect(rule.rationale.length).toBeGreaterThan(0);
@@ -135,16 +149,29 @@ describe("inferRuleSet · end to end", () => {
     expect(sec001).toMatchObject({
       // Reading order from the sampled ADRs ("## Status" then "## Context" then "## Decision"),
       // not alphabetical — SEC-001's fix scaffolds missing sections in this order.
-      options: { files: ["adr/**/*.{md,mdx}"], sections: ["Status", "Context", "Decision"] }
+      options: {
+        files: ["adr/**/*.{md,mdx}"],
+        sections: ["Status", "Context", "Decision"],
+      },
     });
 
-    const adrCluster = result.clusters.find((cluster) => cluster.clusterPath === "adr");
-    expect(adrCluster?.patterns.adrSections).toEqual(["Status", "Context", "Decision"]);
+    const adrCluster = result.clusters.find(
+      (cluster) => cluster.clusterPath === "adr",
+    );
+    expect(adrCluster?.patterns.adrSections).toEqual([
+      "Status",
+      "Context",
+      "Decision",
+    ]);
     expect(adrCluster?.contributesTo).toContain("SEC-001");
 
-    const docsCluster = result.clusters.find((cluster) => cluster.clusterPath === "docs");
+    const docsCluster = result.clusters.find(
+      (cluster) => cluster.clusterPath === "docs",
+    );
     expect(docsCluster?.contributesTo).toEqual(
-      ["CTX-001", "CTX-002", "GRP-001", "REF-001", "REF-002", "TBL-002"].sort(compareStrings)
+      ["CTX-001", "CTX-002", "GRP-001", "REF-001", "REF-002", "TBL-002"].sort(
+        compareStrings,
+      ),
     );
   });
 });
@@ -160,12 +187,19 @@ describe("inferRuleSet · per-pattern isolation", () => {
         "| Name | Value |",
         "| --- | --- |",
         "| a | b |",
-        ""
-      ].join("\n")
+        "",
+      ].join("\n"),
     });
 
-    const cluster = buildCluster({ path: "docs", sampleFiles: ["docs/only-tables.md"] });
-    const result = await inferRuleSet({ cwd: root, clusters: [cluster], registry: ruleRegistry });
+    const cluster = buildCluster({
+      path: "docs",
+      sampleFiles: ["docs/only-tables.md"],
+    });
+    const result = await inferRuleSet({
+      cwd: root,
+      clusters: [cluster],
+      registry: ruleRegistry,
+    });
 
     expect(result.rules.map((rule) => rule.rule)).toEqual(["TBL-002"]);
   });
@@ -179,12 +213,19 @@ describe("inferRuleSet · per-pattern isolation", () => {
         "",
         "- [ ] one",
         "- [x] two",
-        ""
-      ].join("\n")
+        "",
+      ].join("\n"),
     });
 
-    const cluster = buildCluster({ path: "docs", sampleFiles: ["docs/only-checklist.md"] });
-    const result = await inferRuleSet({ cwd: root, clusters: [cluster], registry: ruleRegistry });
+    const cluster = buildCluster({
+      path: "docs",
+      sampleFiles: ["docs/only-checklist.md"],
+    });
+    const result = await inferRuleSet({
+      cwd: root,
+      clusters: [cluster],
+      registry: ruleRegistry,
+    });
 
     expect(result.rules.map((rule) => rule.rule)).toEqual(["CTX-002"]);
   });
@@ -199,25 +240,44 @@ describe("inferRuleSet · per-pattern isolation", () => {
         "Real content with a picture.",
         "",
         "![diagram](diagram.png)",
-        ""
-      ].join("\n")
+        "",
+      ].join("\n"),
     });
 
-    const cluster = buildCluster({ path: "docs", sampleFiles: ["docs/only-images.md"] });
-    const result = await inferRuleSet({ cwd: root, clusters: [cluster], registry: ruleRegistry });
+    const cluster = buildCluster({
+      path: "docs",
+      sampleFiles: ["docs/only-images.md"],
+    });
+    const result = await inferRuleSet({
+      cwd: root,
+      clusters: [cluster],
+      registry: ruleRegistry,
+    });
 
     expect(result.rules.map((rule) => rule.rule)).toEqual(["REF-003"]);
   });
 
   it("produces no rules when a sample has none of the detectable patterns", async () => {
     const root = await createFixtureTree({
-      "docs/plain.md": ["# Plain", "", "## Overview", "", "Just prose, nothing notable.", ""].join(
-        "\n"
-      )
+      "docs/plain.md": [
+        "# Plain",
+        "",
+        "## Overview",
+        "",
+        "Just prose, nothing notable.",
+        "",
+      ].join("\n"),
     });
 
-    const cluster = buildCluster({ path: "docs", sampleFiles: ["docs/plain.md"] });
-    const result = await inferRuleSet({ cwd: root, clusters: [cluster], registry: ruleRegistry });
+    const cluster = buildCluster({
+      path: "docs",
+      sampleFiles: ["docs/plain.md"],
+    });
+    const result = await inferRuleSet({
+      cwd: root,
+      clusters: [cluster],
+      registry: ruleRegistry,
+    });
 
     expect(result.rules).toEqual([]);
     expect(result.clusters[0]?.contributesTo).toEqual([]);
@@ -227,16 +287,41 @@ describe("inferRuleSet · per-pattern isolation", () => {
 describe("inferRuleSet · ADR detection", () => {
   it("does not propose SEC-001 for generic headings that are not an ADR triplet", async () => {
     const root = await createFixtureTree({
-      "notes/a.md": ["# A", "", "## Overview", "", "Some content.", "", "## Summary", "", "Wrap up.", ""].join(
-        "\n"
-      ),
-      "notes/b.md": ["# B", "", "## Overview", "", "Other content.", "", "## Summary", "", "Wrap up.", ""].join(
-        "\n"
-      )
+      "notes/a.md": [
+        "# A",
+        "",
+        "## Overview",
+        "",
+        "Some content.",
+        "",
+        "## Summary",
+        "",
+        "Wrap up.",
+        "",
+      ].join("\n"),
+      "notes/b.md": [
+        "# B",
+        "",
+        "## Overview",
+        "",
+        "Other content.",
+        "",
+        "## Summary",
+        "",
+        "Wrap up.",
+        "",
+      ].join("\n"),
     });
 
-    const cluster = buildCluster({ path: "notes", sampleFiles: ["notes/a.md", "notes/b.md"] });
-    const result = await inferRuleSet({ cwd: root, clusters: [cluster], registry: ruleRegistry });
+    const cluster = buildCluster({
+      path: "notes",
+      sampleFiles: ["notes/a.md", "notes/b.md"],
+    });
+    const result = await inferRuleSet({
+      cwd: root,
+      clusters: [cluster],
+      registry: ruleRegistry,
+    });
 
     expect(result.clusters[0]?.patterns.adrSections).toEqual([]);
     expect(result.rules.some((rule) => rule.rule === "SEC-001")).toBe(false);
@@ -258,7 +343,7 @@ describe("inferRuleSet · ADR detection", () => {
         "## Decision",
         "",
         "Some decision.",
-        ""
+        "",
       ].join("\n"),
       "adr/0002.md": [
         "# ADR 2",
@@ -274,12 +359,19 @@ describe("inferRuleSet · ADR detection", () => {
         "## Decision",
         "",
         "Other decision.",
-        ""
-      ].join("\n")
+        "",
+      ].join("\n"),
     });
 
-    const cluster = buildCluster({ path: "adr", sampleFiles: ["adr/0001.md", "adr/0002.md"] });
-    const result = await inferRuleSet({ cwd: root, clusters: [cluster], registry: ruleRegistry });
+    const cluster = buildCluster({
+      path: "adr",
+      sampleFiles: ["adr/0001.md", "adr/0002.md"],
+    });
+    const result = await inferRuleSet({
+      cwd: root,
+      clusters: [cluster],
+      registry: ruleRegistry,
+    });
 
     const adrSections = result.clusters[0]?.patterns.adrSections ?? [];
     expect(adrSections).not.toContain("Status");
@@ -287,7 +379,10 @@ describe("inferRuleSet · ADR detection", () => {
     expect(adrSections).toEqual(["Context", "Decision"]);
 
     const sec001 = result.rules.find((rule) => rule.rule === "SEC-001");
-    expect(sec001?.options).toEqual({ files: [cluster.includeGlob], sections: ["Context", "Decision"] });
+    expect(sec001?.options).toEqual({
+      files: [cluster.includeGlob],
+      sections: ["Context", "Decision"],
+    });
   });
 
   it("does not propose SEC-001 when the cluster's includeGlob does not match its own .mdx samples", async () => {
@@ -310,7 +405,7 @@ describe("inferRuleSet · ADR detection", () => {
         "## Decision",
         "",
         "Some decision.",
-        ""
+        "",
       ].join("\n"),
       "adr/0002.mdx": [
         "# ADR 2",
@@ -326,21 +421,29 @@ describe("inferRuleSet · ADR detection", () => {
         "## Decision",
         "",
         "Other decision.",
-        ""
-      ].join("\n")
+        "",
+      ].join("\n"),
     });
 
     const cluster = buildCluster({
       path: "",
       kind: "fallback",
       includeGlob: "**/*.md",
-      sampleFiles: ["adr/0001.mdx", "adr/0002.mdx"]
+      sampleFiles: ["adr/0001.mdx", "adr/0002.mdx"],
     });
 
-    const result = await inferRuleSet({ cwd: root, clusters: [cluster], registry: ruleRegistry });
+    const result = await inferRuleSet({
+      cwd: root,
+      clusters: [cluster],
+      registry: ruleRegistry,
+    });
 
     // The ADR evidence is still detected from the sampled content...
-    expect(result.clusters[0]?.patterns.adrSections).toEqual(["Status", "Context", "Decision"]);
+    expect(result.clusters[0]?.patterns.adrSections).toEqual([
+      "Status",
+      "Context",
+      "Decision",
+    ]);
     // ...but SEC-001 must not be proposed: "**/*.md" does not match either sampled .mdx file.
     expect(result.rules.some((rule) => rule.rule === "SEC-001")).toBe(false);
     expect(result.clusters[0]?.contributesTo).not.toContain("SEC-001");
@@ -368,32 +471,37 @@ describe("inferRuleSet · registry drift safety", () => {
         "## Tasks",
         "",
         "- [ ] follow up",
-        ""
-      ].join("\n")
+        "",
+      ].join("\n"),
     });
 
     // Trimmed registry (registry.test.ts style): a real rule can be renamed or removed without
     // inferRuleSet crashing or emitting a dangling id — every gate id is a lookup key, not a
     // standalone hardcoded metadata object.
     const trimmedRegistry = new RuleRegistry(
-      ["REF-001", "REF-002", "REF-003", "TBL-002", "CTX-001", "GRP-001"].map((id) =>
-        defineRule({
-          metadata: {
-            id,
-            category: id.split("-")[0] as "REF" | "TBL" | "CTX" | "GRP",
-            description: `${id} description`,
-            defaultSeverity: "warning",
-            scope: "document",
-            fixable: false
-          },
-          optionsSchema: z.object({}).strict(),
-          check: () => () => {}
-        })
-      )
+      ["REF-001", "REF-002", "REF-003", "TBL-002", "CTX-001", "GRP-001"].map(
+        (id) =>
+          defineRule({
+            metadata: {
+              id,
+              category: id.split("-")[0] as "REF" | "TBL" | "CTX" | "GRP",
+              description: `${id} description`,
+              defaultSeverity: "warning",
+              scope: "document",
+              fixable: false,
+            },
+            optionsSchema: z.object({}).strict(),
+            check: () => () => {},
+          }),
+      ),
     );
 
     const cluster = buildCluster({ path: "adr", sampleFiles: ["adr/0001.md"] });
-    const result = await inferRuleSet({ cwd: root, clusters: [cluster], registry: trimmedRegistry });
+    const result = await inferRuleSet({
+      cwd: root,
+      clusters: [cluster],
+      registry: trimmedRegistry,
+    });
 
     const ruleIds = result.rules.map((rule) => rule.rule);
     expect(ruleIds).not.toContain("CTX-002");
@@ -414,16 +522,20 @@ describe("inferRuleSet · unreadable sample file", () => {
         "| Name | Value |",
         "| --- | --- |",
         "| a | b |",
-        ""
-      ].join("\n")
+        "",
+      ].join("\n"),
     });
 
     const cluster = buildCluster({
       path: "docs",
-      sampleFiles: ["docs/exists.md", "docs/missing.md"]
+      sampleFiles: ["docs/exists.md", "docs/missing.md"],
     });
 
-    const result = await inferRuleSet({ cwd: root, clusters: [cluster], registry: ruleRegistry });
+    const result = await inferRuleSet({
+      cwd: root,
+      clusters: [cluster],
+      registry: ruleRegistry,
+    });
 
     expect(result.clusters[0]?.sampledFiles).toEqual(["docs/exists.md"]);
     expect(result.rules.map((rule) => rule.rule)).toEqual(["TBL-002"]);
@@ -447,14 +559,22 @@ describe("inferRuleSet · determinism", () => {
         "| a | b |",
         "",
         "- [ ] task",
-        ""
+        "",
       ].join("\n"),
-      "docs/b.md": "# B\n\nSee [A](a.md).\n"
+      "docs/b.md": "# B\n\nSee [A](a.md).\n",
     });
 
     const scan = await scanRepository({ cwd: root });
-    const first = await inferRuleSet({ cwd: root, clusters: scan.clusters, registry: ruleRegistry });
-    const second = await inferRuleSet({ cwd: root, clusters: scan.clusters, registry: ruleRegistry });
+    const first = await inferRuleSet({
+      cwd: root,
+      clusters: scan.clusters,
+      registry: ruleRegistry,
+    });
+    const second = await inferRuleSet({
+      cwd: root,
+      clusters: scan.clusters,
+      registry: ruleRegistry,
+    });
 
     expect(first).toEqual(second);
     const ids = first.rules.map((rule) => rule.rule);
@@ -466,16 +586,22 @@ describe("inferRuleSet · cross-cluster cycle heuristic", () => {
   it("surfaces a concrete file pair in the GRP-001 rationale when two clusters reference each other", async () => {
     const root = await createFixtureTree({
       "docs/a.md": "# A\n\nSee [B](../other/b.md).\n",
-      "other/b.md": "# B\n\nSee [A](../docs/a.md).\n"
+      "other/b.md": "# B\n\nSee [A](../docs/a.md).\n",
     });
 
-    const docsCluster = buildCluster({ path: "docs", sampleFiles: ["docs/a.md"] });
-    const otherCluster = buildCluster({ path: "other", sampleFiles: ["other/b.md"] });
+    const docsCluster = buildCluster({
+      path: "docs",
+      sampleFiles: ["docs/a.md"],
+    });
+    const otherCluster = buildCluster({
+      path: "other",
+      sampleFiles: ["other/b.md"],
+    });
 
     const result = await inferRuleSet({
       cwd: root,
       clusters: [docsCluster, otherCluster],
-      registry: ruleRegistry
+      registry: ruleRegistry,
     });
 
     const grp001 = result.rules.find((rule) => rule.rule === "GRP-001");
@@ -490,16 +616,22 @@ describe("inferRuleSet · cross-cluster cycle heuristic", () => {
     // "docs/other/b.md", missing the real sample at "other/b.md" entirely.
     const root = await createFixtureTree({
       "docs/a.md": "# A\n\nSee [B](/other/b.md).\n",
-      "other/b.md": "# B\n\nSee [A](/docs/a.md).\n"
+      "other/b.md": "# B\n\nSee [A](/docs/a.md).\n",
     });
 
-    const docsCluster = buildCluster({ path: "docs", sampleFiles: ["docs/a.md"] });
-    const otherCluster = buildCluster({ path: "other", sampleFiles: ["other/b.md"] });
+    const docsCluster = buildCluster({
+      path: "docs",
+      sampleFiles: ["docs/a.md"],
+    });
+    const otherCluster = buildCluster({
+      path: "other",
+      sampleFiles: ["other/b.md"],
+    });
 
     const result = await inferRuleSet({
       cwd: root,
       clusters: [docsCluster, otherCluster],
-      registry: ruleRegistry
+      registry: ruleRegistry,
     });
 
     const grp001 = result.rules.find((rule) => rule.rule === "GRP-001");
@@ -513,11 +645,18 @@ describe("inferRuleSet · cross-cluster cycle heuristic", () => {
     // real edge back to a.md, so no sampled cycle should be found at all.
     const root = await createFixtureTree({
       "docs/a.md": "# A\n\nSee [B](b.md#missing-heading).\n",
-      "docs/b.md": "# B\n\nSee [A](a.md).\n"
+      "docs/b.md": "# B\n\nSee [A](a.md).\n",
     });
 
-    const cluster = buildCluster({ path: "docs", sampleFiles: ["docs/a.md", "docs/b.md"] });
-    const result = await inferRuleSet({ cwd: root, clusters: [cluster], registry: ruleRegistry });
+    const cluster = buildCluster({
+      path: "docs",
+      sampleFiles: ["docs/a.md", "docs/b.md"],
+    });
+    const result = await inferRuleSet({
+      cwd: root,
+      clusters: [cluster],
+      registry: ruleRegistry,
+    });
 
     const grp001 = result.rules.find((rule) => rule.rule === "GRP-001");
     expect(grp001).toBeDefined();
@@ -531,14 +670,18 @@ describe("inferRuleSet · cross-cluster cycle heuristic", () => {
     const root = await createFixtureTree({
       "docs/a.md": "# A\n\nSee [B](b.md).\n",
       "docs/b.md": "# B\n\nSee [C](c.md).\n",
-      "docs/c.md": "# C\n\nSee [A](a.md).\n"
+      "docs/c.md": "# C\n\nSee [A](a.md).\n",
     });
 
     const cluster = buildCluster({
       path: "docs",
-      sampleFiles: ["docs/a.md", "docs/b.md", "docs/c.md"]
+      sampleFiles: ["docs/a.md", "docs/b.md", "docs/c.md"],
     });
-    const result = await inferRuleSet({ cwd: root, clusters: [cluster], registry: ruleRegistry });
+    const result = await inferRuleSet({
+      cwd: root,
+      clusters: [cluster],
+      registry: ruleRegistry,
+    });
 
     const grp001 = result.rules.find((rule) => rule.rule === "GRP-001");
     expect(grp001).toBeDefined();
@@ -561,12 +704,19 @@ describe("inferRuleSet · gate evidence matches what the rule evaluates", () => 
         "",
         "![remote](https://example.com/pic.png)",
         "![inline](data:image/png;base64,AAAA)",
-        ""
-      ].join("\n")
+        "",
+      ].join("\n"),
     });
 
-    const cluster = buildCluster({ path: "docs", sampleFiles: ["docs/external-images.md"] });
-    const result = await inferRuleSet({ cwd: root, clusters: [cluster], registry: ruleRegistry });
+    const cluster = buildCluster({
+      path: "docs",
+      sampleFiles: ["docs/external-images.md"],
+    });
+    const result = await inferRuleSet({
+      cwd: root,
+      clusters: [cluster],
+      registry: ruleRegistry,
+    });
 
     expect(result.clusters[0]?.patterns.imageCount).toBe(0);
     expect(result.rules).toEqual([]);
@@ -580,12 +730,19 @@ describe("inferRuleSet · gate evidence matches what the rule evaluates", () => 
         "## Overview",
         "",
         "Real content mentioning [an empty link]().",
-        ""
-      ].join("\n")
+        "",
+      ].join("\n"),
     });
 
-    const cluster = buildCluster({ path: "docs", sampleFiles: ["docs/empty-link.md"] });
-    const result = await inferRuleSet({ cwd: root, clusters: [cluster], registry: ruleRegistry });
+    const cluster = buildCluster({
+      path: "docs",
+      sampleFiles: ["docs/empty-link.md"],
+    });
+    const result = await inferRuleSet({
+      cwd: root,
+      clusters: [cluster],
+      registry: ruleRegistry,
+    });
 
     expect(result.clusters[0]?.patterns.localLinkCount).toBe(0);
     expect(result.rules).toEqual([]);

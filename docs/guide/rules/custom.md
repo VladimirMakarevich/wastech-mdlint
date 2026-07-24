@@ -27,17 +27,17 @@ ID, with your own description and severity, scoped to a specific document family
 A `custom` entry is a config `rules[]` object. Unlike built-in rules (which are keyed by their ID
 in the `rule` field), a `custom` entry sets `rule: "custom"` and supplies its identity separately.
 
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `rule` | `"custom"` | **yes** | Marks this entry as a declarative custom rule. |
-| `id` | `string` | **yes** | Your namespaced rule ID (see the pattern below). Case-insensitive and dash-optional on input, canonicalized to uppercase. |
-| `options` | `object` | **yes** | Carries `assert` plus optional `files`/`exclude`. |
-| `options.assert` | `object` | **yes** | The single assertion this rule runs. Exactly one `kind` from the vocabulary below. |
-| `description` | `string` | no | Human-readable summary shown in reports; defaults to the `id` if omitted. |
-| `severity` | `"error" \| "warning" \| "off"` | no | Overrides the default `error`. `"off"` documents but disables the rule. |
-| `target` | `"checklist" \| "content" \| "link" \| "section" \| "table"` | no | Optional redundant declaration of what the assertion operates on; if set it must agree with the `kind` (see [Notes](#notes)). |
-| `options.files` | `string[]` | no | Glob(s) narrowing which files this instance applies to. |
-| `options.exclude` | `string[]` | no | Glob(s) removing files from this instance. |
+| Field             | Type                                                         | Required | Description                                                                                                                   |
+| ----------------- | ------------------------------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `rule`            | `"custom"`                                                   | **yes**  | Marks this entry as a declarative custom rule.                                                                                |
+| `id`              | `string`                                                     | **yes**  | Your namespaced rule ID (see the pattern below). Case-insensitive and dash-optional on input, canonicalized to uppercase.     |
+| `options`         | `object`                                                     | **yes**  | Carries `assert` plus optional `files`/`exclude`.                                                                             |
+| `options.assert`  | `object`                                                     | **yes**  | The single assertion this rule runs. Exactly one `kind` from the vocabulary below.                                            |
+| `description`     | `string`                                                     | no       | Human-readable summary shown in reports; defaults to the `id` if omitted.                                                     |
+| `severity`        | `"error" \| "warning" \| "off"`                              | no       | Overrides the default `error`. `"off"` documents but disables the rule.                                                       |
+| `target`          | `"checklist" \| "content" \| "link" \| "section" \| "table"` | no       | Optional redundant declaration of what the assertion operates on; if set it must agree with the `kind` (see [Notes](#notes)). |
+| `options.files`   | `string[]`                                                   | no       | Glob(s) narrowing which files this instance applies to.                                                                       |
+| `options.exclude` | `string[]`                                                   | no       | Glob(s) removing files from this instance.                                                                                    |
 
 ### The `id` namespacing rule
 
@@ -60,21 +60,21 @@ runtime, so this list stays in sync with the actual built-ins.)
 built-in rule's behavior, calling the same underlying primitive. Fields marked **req** are
 required; the rest are optional.
 
-| Kind | Target | Fields | Mirrors |
-| --- | --- | --- | --- |
-| `requiredColumns` | table | `columns: string[]` (**req**, ≥1) · `section?` | [TBL-001](TBL-001.md) |
-| `columnNotEmpty` | table | `column: string` (**req**) · `section?` | [TBL-002](TBL-002.md) |
-| `columnInSet` | table | `column: string` (**req**) · `values: string[]` (**req**, ≥1) · `caseSensitive?: boolean` · `section?` | [TBL-003](TBL-003.md) |
-| `columnMatches` | table | `column: string` (**req**) · `pattern: string` (**req**) · `flags?: string` · `section?` | [TBL-004](TBL-004.md) |
-| `columnUnique` | table | `column: string` (**req**) · `idPattern?: string` · `section?` | [TBL-006](TBL-006.md) |
-| `crossColumn` | table | `when` (**req**) · `then` (**req**) · `section?` | [TBL-005](TBL-005.md) |
-| `sectionPresent` | section | `sections: string[]` (**req**, ≥1) | [SEC-001](SEC-001.md) |
-| `sectionOrder` | section | `order: string[]` (**req**, ≥1) · `level?: number` · `section?` | [SEC-002](SEC-002.md) |
-| `contentNotMatch` | content | `pattern: string` (**req**) · `flags?: string` | — (generic content guard, no dedicated built-in) |
-| `noPlaceholders` | content | `section?` · `placeholders?: string[]` | [CTX-001](CTX-001.md) |
-| `allChecked` | checklist | `section?` | [CTX-002](CTX-002.md) |
-| `linkResolves` | link | `exclude?: string[]` | [REF-001](REF-001.md) |
-| `imageResolves` | link | `exclude?: string[]` | [REF-003](REF-003.md) |
+| Kind              | Target    | Fields                                                                                                 | Mirrors                                          |
+| ----------------- | --------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| `requiredColumns` | table     | `columns: string[]` (**req**, ≥1) · `section?`                                                         | [TBL-001](TBL-001.md)                            |
+| `columnNotEmpty`  | table     | `column: string` (**req**) · `section?`                                                                | [TBL-002](TBL-002.md)                            |
+| `columnInSet`     | table     | `column: string` (**req**) · `values: string[]` (**req**, ≥1) · `caseSensitive?: boolean` · `section?` | [TBL-003](TBL-003.md)                            |
+| `columnMatches`   | table     | `column: string` (**req**) · `pattern: string` (**req**) · `flags?: string` · `section?`               | [TBL-004](TBL-004.md)                            |
+| `columnUnique`    | table     | `column: string` (**req**) · `idPattern?: string` · `section?`                                         | [TBL-006](TBL-006.md)                            |
+| `crossColumn`     | table     | `when` (**req**) · `then` (**req**) · `section?`                                                       | [TBL-005](TBL-005.md)                            |
+| `sectionPresent`  | section   | `sections: string[]` (**req**, ≥1)                                                                     | [SEC-001](SEC-001.md)                            |
+| `sectionOrder`    | section   | `order: string[]` (**req**, ≥1) · `level?: number` · `section?`                                        | [SEC-002](SEC-002.md)                            |
+| `contentNotMatch` | content   | `pattern: string` (**req**) · `flags?: string`                                                         | — (generic content guard, no dedicated built-in) |
+| `noPlaceholders`  | content   | `section?` · `placeholders?: string[]`                                                                 | [CTX-001](CTX-001.md)                            |
+| `allChecked`      | checklist | `section?`                                                                                             | [CTX-002](CTX-002.md)                            |
+| `linkResolves`    | link      | `exclude?: string[]`                                                                                   | [REF-001](REF-001.md)                            |
+| `imageResolves`   | link      | `exclude?: string[]`                                                                                   | [REF-003](REF-003.md)                            |
 
 Notes on individual fields:
 
@@ -106,8 +106,8 @@ Notes on individual fields:
   "target": "table",
   "options": {
     "files": ["docs/requirements/**/*.md"],
-    "assert": { "kind": "columnNotEmpty", "column": "Owner" }
-  }
+    "assert": { "kind": "columnNotEmpty", "column": "Owner" },
+  },
 }
 ```
 
@@ -124,8 +124,11 @@ Notes on individual fields:
   "target": "section",
   "options": {
     "files": ["docs/architecture/**/*.md"],
-    "assert": { "kind": "sectionPresent", "sections": ["Overview", "Dependencies"] }
-  }
+    "assert": {
+      "kind": "sectionPresent",
+      "sections": ["Overview", "Dependencies"],
+    },
+  },
 }
 ```
 
@@ -143,8 +146,8 @@ Notes on individual fields:
   "target": "content",
   "options": {
     "files": ["docs/guide/**/*.md"],
-    "assert": { "kind": "noPlaceholders", "placeholders": ["DRAFT", "???"] }
-  }
+    "assert": { "kind": "noPlaceholders", "placeholders": ["DRAFT", "???"] },
+  },
 }
 ```
 

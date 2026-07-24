@@ -20,8 +20,11 @@ Add it to any stdio-based MCP host (Claude Code's `.mcp.json`, Claude Desktop's
 ```jsonc
 {
   "mcpServers": {
-    "wastech-mdlint": { "command": "npx", "args": ["-y", "@wastech-mdlint/mcp-server"] }
-  }
+    "wastech-mdlint": {
+      "command": "npx",
+      "args": ["-y", "@wastech-mdlint/mcp-server"],
+    },
+  },
 }
 ```
 
@@ -29,14 +32,14 @@ Readiness is announced on stderr; stdout carries only the protocol.
 
 ## The 6 tools
 
-| Tool | What it does | Structured output |
-| --- | --- | --- |
-| `lint` | Lint ad-hoc Markdown content against an explicit set of rules; it does not load project config. | yes |
-| `lint-files` | Lint the project's Markdown files using the resolved config (or the zero-config `**/*.md` default). | yes |
-| `context-graph` | Build the project's context graph; `format: "json"` (default) returns raw nodes/edges/cycles, `format: "summary"` returns nodes/edges/components/reading order. | yes |
-| `context-slice` | Files reachable within `depth` hops of a resolved query (exact match against IDs, heading/anchor slugs, file paths — no fuzzy/keyword/LLM matching). | yes |
-| `impact-analysis` | Blast radius of changing a file: direct + transitive dependents and the reading order over the affected subgraph. A file not in the corpus returns an actionable error. | yes |
-| `compile-context` | Compile the project skill (`SKILL.md`) from `config.compile`; same deterministic output as the CLI `compile`. Requires `config.compile`. | no (two text blocks) |
+| Tool              | What it does                                                                                                                                                            | Structured output    |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `lint`            | Lint ad-hoc Markdown content against an explicit set of rules; it does not load project config.                                                                         | yes                  |
+| `lint-files`      | Lint the project's Markdown files using the resolved config (or the zero-config `**/*.md` default).                                                                     | yes                  |
+| `context-graph`   | Build the project's context graph; `format: "json"` (default) returns raw nodes/edges/cycles, `format: "summary"` returns nodes/edges/components/reading order.         | yes                  |
+| `context-slice`   | Files reachable within `depth` hops of a resolved query (exact match against IDs, heading/anchor slugs, file paths — no fuzzy/keyword/LLM matching).                    | yes                  |
+| `impact-analysis` | Blast radius of changing a file: direct + transitive dependents and the reading order over the affected subgraph. A file not in the corpus returns an actionable error. | yes                  |
+| `compile-context` | Compile the project skill (`SKILL.md`) from `config.compile`; same deterministic output as the CLI `compile`. Requires `config.compile`.                                | no (two text blocks) |
 
 All 6 carry a `readOnlyHint` annotation. Five return `structuredContent` + an `outputSchema`;
 `compile-context` returns two plain-text content blocks instead.

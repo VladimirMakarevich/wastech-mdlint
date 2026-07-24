@@ -1,4 +1,7 @@
-import type { ParsedDocument, ParsedHeading } from "../../markdown/document-types.js";
+import type {
+  ParsedDocument,
+  ParsedHeading,
+} from "../../markdown/document-types.js";
 import type { PrimitiveFinding } from "./types.js";
 
 export type SectionPresentOptions = { sections: string[] };
@@ -7,7 +10,7 @@ export type SectionPresentOptions = { sections: string[] };
 // have no line, so they report at line 0 (the P3.03 "section absent" convention).
 export function sectionPresent(
   document: ParsedDocument,
-  options: SectionPresentOptions
+  options: SectionPresentOptions,
 ): PrimitiveFinding[] {
   const present = new Set(document.sections);
 
@@ -16,7 +19,7 @@ export function sectionPresent(
     .map((section) => ({
       message: `Required section "${section}" is missing.`,
       line: 0,
-      data: { section }
+      data: { section },
     }));
 }
 
@@ -30,7 +33,10 @@ export type SectionOrderOptions = {
 
 // Restrict headings to the contiguous run that belongs to `section`: everything after the section
 // heading, up to the next heading of same-or-higher level (flat ownership, audit 5.3).
-function headingsInSection(headings: ParsedHeading[], section: string): ParsedHeading[] {
+function headingsInSection(
+  headings: ParsedHeading[],
+  section: string,
+): ParsedHeading[] {
   const startIndex = headings.findIndex((heading) => heading.text === section);
 
   if (startIndex === -1) {
@@ -54,7 +60,7 @@ function headingsInSection(headings: ParsedHeading[], section: string): ParsedHe
 // present sections are ordered (presence is SEC-001's job); the first inversion is reported.
 export function sectionOrder(
   document: ParsedDocument,
-  options: SectionOrderOptions
+  options: SectionOrderOptions,
 ): PrimitiveFinding[] {
   let headings = options.section
     ? headingsInSection(document.headings, options.section)
@@ -69,7 +75,9 @@ export function sectionOrder(
   let lastMatchedSection: string | undefined;
 
   for (const wanted of options.order) {
-    const headingIndex = headings.findIndex((heading) => heading.text === wanted);
+    const headingIndex = headings.findIndex(
+      (heading) => heading.text === wanted,
+    );
 
     if (headingIndex === -1) {
       continue;
@@ -79,7 +87,7 @@ export function sectionOrder(
       findings.push({
         message: `Section "${wanted}" appears before "${lastMatchedSection}" but should come after it.`,
         line: headings[headingIndex]!.line,
-        data: { section: wanted, expectedAfter: lastMatchedSection }
+        data: { section: wanted, expectedAfter: lastMatchedSection },
       });
       continue;
     }

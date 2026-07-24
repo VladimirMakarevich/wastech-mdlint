@@ -12,7 +12,7 @@ describe("parseDocument · headings & sections", () => {
 
     expect(doc.headings).toEqual([
       { text: "Title", depth: 1, slug: "title", line: 1 },
-      { text: "Details", depth: 2, slug: "details", line: 3 }
+      { text: "Details", depth: 2, slug: "details", line: 3 },
     ]);
     expect(doc.sections).toEqual(["Title", "Details"]);
   });
@@ -23,16 +23,21 @@ describe("parseDocument · headings & sections", () => {
     expect(doc.headings.map((heading) => heading.slug)).toEqual([
       "heading",
       "heading-1",
-      "heading-2"
+      "heading-2",
     ]);
   });
 
   it("preserves CJK / Unicode heading text and slugs verbatim", () => {
     const doc = parse("# 概要 テスト\n## Привет мир\n");
 
-    expect(doc.headings.map((heading) => ({ text: heading.text, slug: heading.slug }))).toEqual([
+    expect(
+      doc.headings.map((heading) => ({
+        text: heading.text,
+        slug: heading.slug,
+      })),
+    ).toEqual([
       { text: "概要 テスト", slug: "概要-テスト" },
-      { text: "Привет мир", slug: "привет-мир" }
+      { text: "Привет мир", slug: "привет-мир" },
     ]);
   });
 });
@@ -40,7 +45,14 @@ describe("parseDocument · headings & sections", () => {
 describe("parseDocument · tables", () => {
   it("keys cells by header and records section + line", () => {
     const doc = parse(
-      ["## Requirements", "", "| ID | Owner |", "| --- | --- |", "| REQ-1 | Ann |", ""].join("\n")
+      [
+        "## Requirements",
+        "",
+        "| ID | Owner |",
+        "| --- | --- |",
+        "| REQ-1 | Ann |",
+        "",
+      ].join("\n"),
     );
 
     expect(doc.tables).toHaveLength(1);
@@ -48,11 +60,15 @@ describe("parseDocument · tables", () => {
     expect(table?.headers).toEqual(["ID", "Owner"]);
     expect(table?.section).toBe("Requirements");
     expect(table?.line).toBe(3);
-    expect(table?.rows).toEqual([{ line: 5, cells: { ID: "REQ-1", Owner: "Ann" } }]);
+    expect(table?.rows).toEqual([
+      { line: 5, cells: { ID: "REQ-1", Owner: "Ann" } },
+    ]);
   });
 
   it("defaults missing trailing cells to empty strings", () => {
-    const doc = parse(["| A | B |", "| --- | --- |", "| only |", ""].join("\n"));
+    const doc = parse(
+      ["| A | B |", "| --- | --- |", "| only |", ""].join("\n"),
+    );
 
     expect(doc.tables[0]?.rows[0]?.cells).toEqual({ A: "only", B: "" });
   });
@@ -65,7 +81,9 @@ describe("parseDocument · tables", () => {
 
   it("assigns the most-recent heading of any level as the section (audit 5.3)", () => {
     const doc = parse(
-      ["## Outer", "", "### Inner", "", "| A |", "| --- |", "| v |", ""].join("\n")
+      ["## Outer", "", "### Inner", "", "| A |", "| --- |", "| v |", ""].join(
+        "\n",
+      ),
     );
 
     expect(doc.tables[0]?.section).toBe("Inner");
@@ -74,11 +92,13 @@ describe("parseDocument · tables", () => {
 
 describe("parseDocument · checklist", () => {
   it("reports checked state, text, section, and line", () => {
-    const doc = parse(["## Todos", "", "- [x] done", "- [ ] pending", ""].join("\n"));
+    const doc = parse(
+      ["## Todos", "", "- [x] done", "- [ ] pending", ""].join("\n"),
+    );
 
     expect(doc.checkItems).toEqual([
       { text: "done", checked: true, section: "Todos", line: 3 },
-      { text: "pending", checked: false, section: "Todos", line: 4 }
+      { text: "pending", checked: false, section: "Todos", line: 4 },
     ]);
   });
 
@@ -99,20 +119,27 @@ describe("parseDocument · links & images", () => {
       anchor: "intro",
       kind: "local-file",
       line: 1,
-      column: 1
+      column: 1,
     });
   });
 
   it("classifies same-file anchors, external, mailto, and other schemes", () => {
     const doc = parse(
-      ["[a](#sec)", "[b](https://example.com)", "[c](mailto:x@y.z)", "[d](vscode://f)"].join("\n")
+      [
+        "[a](#sec)",
+        "[b](https://example.com)",
+        "[c](mailto:x@y.z)",
+        "[d](vscode://f)",
+      ].join("\n"),
     );
 
-    expect(doc.links.map((link) => ({ kind: link.kind, anchor: link.anchor }))).toEqual([
+    expect(
+      doc.links.map((link) => ({ kind: link.kind, anchor: link.anchor })),
+    ).toEqual([
       { kind: "same-file-anchor", anchor: "sec" },
       { kind: "external", anchor: undefined },
       { kind: "mailto", anchor: undefined },
-      { kind: "other", anchor: undefined }
+      { kind: "other", anchor: undefined },
     ]);
   });
 
@@ -122,7 +149,7 @@ describe("parseDocument · links & images", () => {
     expect(doc.links[0]).toMatchObject({
       rawTarget: "docs/guide.md",
       text: "Guide",
-      kind: "local-file"
+      kind: "local-file",
     });
   });
 
@@ -137,7 +164,7 @@ describe("parseDocument · links & images", () => {
 
     expect(doc.images).toEqual([
       { rawTarget: "d.md", line: 1 },
-      { rawTarget: "a.png", line: 2 }
+      { rawTarget: "a.png", line: 2 },
     ]);
   });
 });
@@ -147,7 +174,7 @@ describe("parseDocument · eager imports", () => {
     const doc = parse("See @docs/glossary.md for terms.\n");
 
     expect(doc.imports).toEqual([
-      { rawTarget: "@docs/glossary.md", line: 1, column: 5 }
+      { rawTarget: "@docs/glossary.md", line: 1, column: 5 },
     ]);
   });
 
@@ -167,14 +194,14 @@ describe("parseDocument · eager imports", () => {
         "@AGENTS.md",
         "@.agents/rules/architecture.md",
         "@.agents/rules/coding-style.md",
-        ""
-      ].join("\n")
+        "",
+      ].join("\n"),
     );
 
     expect(doc.imports).toEqual([
       { rawTarget: "@AGENTS.md", line: 3, column: 1 },
       { rawTarget: "@.agents/rules/architecture.md", line: 4, column: 1 },
-      { rawTarget: "@.agents/rules/coding-style.md", line: 5, column: 1 }
+      { rawTarget: "@.agents/rules/coding-style.md", line: 5, column: 1 },
     ]);
   });
 
@@ -183,7 +210,9 @@ describe("parseDocument · eager imports", () => {
     // matches — the column must point at that match, not the earlier `@early.md` text on the line.
     const doc = parse("foo@early.md see @late.md here\n");
 
-    expect(doc.imports).toEqual([{ rawTarget: "@late.md", line: 1, column: 18 }]);
+    expect(doc.imports).toEqual([
+      { rawTarget: "@late.md", line: 1, column: 18 },
+    ]);
   });
 
   it("gives repeated identical imports on one line their own columns", () => {
@@ -191,7 +220,7 @@ describe("parseDocument · eager imports", () => {
 
     expect(doc.imports).toEqual([
       { rawTarget: "@a.md", line: 1, column: 1 },
-      { rawTarget: "@a.md", line: 1, column: 7 }
+      { rawTarget: "@a.md", line: 1, column: 7 },
     ]);
   });
 
@@ -202,7 +231,7 @@ describe("parseDocument · eager imports", () => {
 
     expect(doc.imports).toEqual([
       { rawTarget: "@a.md", line: 1, column: 1 },
-      { rawTarget: "@b.md", line: 3, column: 1 }
+      { rawTarget: "@b.md", line: 3, column: 1 },
     ]);
   });
 
@@ -212,9 +241,7 @@ describe("parseDocument · eager imports", () => {
     // second line has leading text, so the `@` sits at column 6 of its own physical line.
     const doc = parse("intro\ntext @a.md\n");
 
-    expect(doc.imports).toEqual([
-      { rawTarget: "@a.md", line: 2, column: 6 }
-    ]);
+    expect(doc.imports).toEqual([{ rawTarget: "@a.md", line: 2, column: 6 }]);
   });
 
   it("reports the source column when the text node starts mid-line", () => {
@@ -222,9 +249,7 @@ describe("parseDocument · eager imports", () => {
     // first-line column must add the node's own start column, not assume the node begins the line.
     const doc = parse("**x** @a.md\n");
 
-    expect(doc.imports).toEqual([
-      { rawTarget: "@a.md", line: 1, column: 7 }
-    ]);
+    expect(doc.imports).toEqual([{ rawTarget: "@a.md", line: 1, column: 7 }]);
   });
 });
 
@@ -235,14 +260,14 @@ describe("parseDocument · inline-disable directives", () => {
         "<!-- wastech-mdlint-disable REF-001 -->",
         "text",
         "<!-- wastech-mdlint-enable REF-001 -->",
-        "<!-- wastech-mdlint-disable-next-line TBL-002 -->"
-      ].join("\n")
+        "<!-- wastech-mdlint-disable-next-line TBL-002 -->",
+      ].join("\n"),
     );
 
     expect(doc.directives).toEqual([
       { kind: "disable", ruleIds: ["REF-001"], line: 1 },
       { kind: "enable", ruleIds: ["REF-001"], line: 3 },
-      { kind: "disable-next-line", ruleIds: ["TBL-002"], line: 4 }
+      { kind: "disable-next-line", ruleIds: ["TBL-002"], line: 4 },
     ]);
   });
 
@@ -260,7 +285,10 @@ describe("parseDocument · inline-disable directives", () => {
 
   it("tolerates malformed or unknown directives (ignored, not fatal)", () => {
     const doc = parse(
-      ["<!-- wastech-mdlint-frobnicate REF-001 -->", "<!-- just a comment -->"].join("\n")
+      [
+        "<!-- wastech-mdlint-frobnicate REF-001 -->",
+        "<!-- just a comment -->",
+      ].join("\n"),
     );
 
     expect(doc.directives).toEqual([]);
@@ -280,7 +308,7 @@ describe("parseDocument · determinism", () => {
       "",
       "[Guide](docs/guide.md#intro)",
       "@docs/glossary.md",
-      "<!-- wastech-mdlint-disable REF-001 -->"
+      "<!-- wastech-mdlint-disable REF-001 -->",
     ].join("\n");
 
     const first = parse(content);

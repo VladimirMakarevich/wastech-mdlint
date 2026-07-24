@@ -21,7 +21,7 @@ function tokenize(cell: string): string[] {
  */
 export function extractColumnIds(
   document: ParsedDocument,
-  options: { files: string[]; column: string; idPattern: string }
+  options: { files: string[]; column: string; idPattern: string },
 ): IdOccurrence[] {
   if (!matchesConfigGlob(document.path, options.files)) {
     return [];
@@ -37,7 +37,11 @@ export function extractColumnIds(
     for (const row of table.rows) {
       for (const token of tokenize(row.cells[options.column] ?? "")) {
         if (regex.test(token)) {
-          occurrences.push({ id: token, filePath: document.path, line: row.line });
+          occurrences.push({
+            id: token,
+            filePath: document.path,
+            line: row.line,
+          });
         }
       }
     }
@@ -47,7 +51,11 @@ export function extractColumnIds(
 }
 
 // The `idRef` shape from audit 2.1: `extractDefinedIds(doc, { idPattern, definitions, idColumn })`.
-export type IdRef = { idPattern: string; definitions: string[]; idColumn: string };
+export type IdRef = {
+  idPattern: string;
+  definitions: string[];
+  idColumn: string;
+};
 
 /**
  * Defined IDs of a document: the `idColumn` tokens in tables of files matching `definitions`,
@@ -55,11 +63,14 @@ export type IdRef = { idPattern: string; definitions: string[]; idColumn: string
  * gate as the column side, so a heading only counts as a definition in a file the config declares
  * as a definitions source. Frozen signature for P4's id-ref edges (audit 2.1).
  */
-export function extractDefinedIds(document: ParsedDocument, idRef: IdRef): IdOccurrence[] {
+export function extractDefinedIds(
+  document: ParsedDocument,
+  idRef: IdRef,
+): IdOccurrence[] {
   const columnIds = extractColumnIds(document, {
     files: idRef.definitions,
     column: idRef.idColumn,
-    idPattern: idRef.idPattern
+    idPattern: idRef.idPattern,
   });
 
   if (!matchesConfigGlob(document.path, idRef.definitions)) {
@@ -71,7 +82,11 @@ export function extractDefinedIds(document: ParsedDocument, idRef: IdRef): IdOcc
   for (const heading of document.headings) {
     for (const token of tokenize(heading.text)) {
       if (regex.test(token)) {
-        headingIds.push({ id: token, filePath: document.path, line: heading.line });
+        headingIds.push({
+          id: token,
+          filePath: document.path,
+          line: heading.line,
+        });
       }
     }
   }

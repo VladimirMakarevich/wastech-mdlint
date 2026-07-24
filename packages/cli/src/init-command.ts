@@ -26,7 +26,7 @@ import {
   type InferredRule,
   type InitConfigAction,
   type RuleCategory,
-  type RuleConfigEntry
+  type RuleConfigEntry,
 } from "@wastech-mdlint/core";
 
 // `init` (P6.03/P6.04): the thin host boundary over P6.01/02's core scan + inference. This module
@@ -47,7 +47,9 @@ export const DEFAULT_EXISTING_CONFIG_ACTION: ExistingConfigAction = "skip";
 export type InitPrompter = {
   // `configPath` is already a repository-relative POSIX path (normalized by the caller) — public
   // output never surfaces an absolute, platform-native filesystem path.
-  resolveExistingConfigAction(configPath: string): Promise<ExistingConfigAction>;
+  resolveExistingConfigAction(
+    configPath: string,
+  ): Promise<ExistingConfigAction>;
   choosePackageManager(): Promise<DetectedPackageManager>;
   selectClusters(clusters: DocCluster[]): Promise<DocCluster[]>;
   selectCategories(categories: RuleCategory[]): Promise<RuleCategory[]>;
@@ -104,7 +106,7 @@ const DRAFT_SUMMARY_HEADER = "wastech-mdlint init — draft configuration";
  * each group (a computed sequence, not an incidental one — re-sorting here would just be redundant).
  */
 export function groupInferredRulesByCategory(
-  rules: InferredRule[]
+  rules: InferredRule[],
 ): Partial<Record<RuleCategory, InferredRule[]>> {
   const grouped: Partial<Record<RuleCategory, InferredRule[]>> = {};
 
@@ -126,10 +128,14 @@ export function groupInferredRulesByCategory(
  */
 export function diffAgainstExistingRuleIds(
   existingIds: string[],
-  rules: InferredRule[]
+  rules: InferredRule[],
 ): { newRules: InferredRule[] } {
-  const canonicalExisting = new Set(existingIds.map((id) => canonicalizeRuleId(id)));
-  const newRules = rules.filter((rule) => !canonicalExisting.has(canonicalizeRuleId(rule.rule)));
+  const canonicalExisting = new Set(
+    existingIds.map((id) => canonicalizeRuleId(id)),
+  );
+  const newRules = rules.filter(
+    (rule) => !canonicalExisting.has(canonicalizeRuleId(rule.rule)),
+  );
   return { newRules };
 }
 
@@ -156,13 +162,21 @@ export type ParsedExistingConfig = {
  * (so callers can warn/abort) rather than crash `init`. Both `readExistingRuleIds` (diff preview)
  * and `readExistingConfigDocument` (write path) are thin wrappers over this one read.
  */
-async function parseExistingConfigFile(cwd: string, configPath: string): Promise<ParsedExistingConfig> {
-  const absoluteConfigPath = path.isAbsolute(configPath) ? configPath : path.resolve(cwd, configPath);
+async function parseExistingConfigFile(
+  cwd: string,
+  configPath: string,
+): Promise<ParsedExistingConfig> {
+  const absoluteConfigPath = path.isAbsolute(configPath)
+    ? configPath
+    : path.resolve(cwd, configPath);
 
   try {
     const text = await readFile(absoluteConfigPath, "utf8");
     const errors: ParseError[] = [];
-    const raw = parseJsonc(text, errors, { allowTrailingComma: true, disallowComments: false });
+    const raw = parseJsonc(text, errors, {
+      allowTrailingComma: true,
+      disallowComments: false,
+    });
 
     if (errors.length > 0 || raw === null || typeof raw !== "object") {
       return { raw: undefined, parsed: false };
@@ -179,7 +193,10 @@ async function parseExistingConfigFile(cwd: string, configPath: string): Promise
  * merged, so it degrades the same way an unparsable file does. Pure over one parsed snapshot, so the
  * diff preview and the write path can share a single read without re-parsing.
  */
-function extractExistingRuleIds(raw: Record<string, unknown> | undefined): { ruleIds: string[]; mergeable: boolean } {
+function extractExistingRuleIds(raw: Record<string, unknown> | undefined): {
+  ruleIds: string[];
+  mergeable: boolean;
+} {
   if (raw === undefined) {
     return { ruleIds: [], mergeable: false };
   }
@@ -205,7 +222,9 @@ function extractExistingRuleIds(raw: Record<string, unknown> | undefined): { rul
     if (identity.kind === "invalid") {
       return { ruleIds: [], mergeable: false };
     }
-    ids.push(identity.kind === "custom" ? identity.rule.id : identity.canonicalId);
+    ids.push(
+      identity.kind === "custom" ? identity.rule.id : identity.canonicalId,
+    );
   }
   return { ruleIds: ids, mergeable: true };
 }
@@ -215,7 +234,10 @@ function extractExistingRuleIds(raw: Record<string, unknown> | undefined): { rul
  * false when the file is unreadable/unparsable *or* has a present-but-non-array `rules` key — either
  * case cannot be merged additively, so the caller must not present the diff as authoritative.
  */
-export async function readExistingRuleIds(cwd: string, configPath: string): Promise<ExistingRuleIdsResult> {
+export async function readExistingRuleIds(
+  cwd: string,
+  configPath: string,
+): Promise<ExistingRuleIdsResult> {
   const { raw, parsed } = await parseExistingConfigFile(cwd, configPath);
   if (!parsed) {
     return { ruleIds: [], parsed: false };
@@ -230,7 +252,10 @@ export async function readExistingRuleIds(cwd: string, configPath: string): Prom
  * and additively mergeable, so an undefined `raw` here is a guarded, unreachable case rather than a
  * silent fallback.
  */
-export async function readExistingConfigDocument(cwd: string, configPath: string): Promise<ParsedExistingConfig> {
+export async function readExistingConfigDocument(
+  cwd: string,
+  configPath: string,
+): Promise<ParsedExistingConfig> {
   return parseExistingConfigFile(cwd, configPath);
 }
 
@@ -240,18 +265,26 @@ export async function readExistingConfigDocument(cwd: string, configPath: string
  * validated against `lintConfigSchema` only in tests (a forward-compat smoke check, not a runtime
  * dependency on the schema).
  */
-export function buildConfigPreview(clusters: DocCluster[], rules: InferredRule[]): ConfigPreview {
-  const include = [...new Set(clusters.map((cluster) => cluster.includeGlob))].sort(compareStrings);
+export function buildConfigPreview(
+  clusters: DocCluster[],
+  rules: InferredRule[],
+): ConfigPreview {
+  const include = [
+    ...new Set(clusters.map((cluster) => cluster.includeGlob)),
+  ].sort(compareStrings);
 
   const ruleEntries: RuleConfigEntry[] = rules.map((rule) => ({
     rule: rule.rule,
-    ...(rule.options === undefined ? {} : { options: rule.options })
+    ...(rule.options === undefined ? {} : { options: rule.options }),
   }));
 
   return { include, rules: ruleEntries };
 }
 
-function formatExistingConfigLine(selections: ConfirmedInitSelections, configPath: string | undefined): string {
+function formatExistingConfigLine(
+  selections: ConfirmedInitSelections,
+  configPath: string | undefined,
+): string {
   if (selections.existingConfigAction === "none" || configPath === undefined) {
     return "Existing config: none found.";
   }
@@ -289,15 +322,22 @@ function formatExistingConfigLine(selections: ConfirmedInitSelections, configPat
  * `Include (...)` section entirely — showing clusters there would imply `include` is changing,
  * which the merge path is not allowed to write.
  */
-export function formatDraftSummary(selections: ConfirmedInitSelections, configPath: string | undefined): string {
+export function formatDraftSummary(
+  selections: ConfirmedInitSelections,
+  configPath: string | undefined,
+): string {
   const lines: string[] = [DRAFT_SUMMARY_HEADER, ""];
 
   lines.push(formatExistingConfigLine(selections, configPath));
-  lines.push(`Package manager: ${selections.packageManager ?? "not detected"}.`);
+  lines.push(
+    `Package manager: ${selections.packageManager ?? "not detected"}.`,
+  );
   lines.push("");
 
   if (selections.existingConfigAction === "merge") {
-    lines.push("Include / exclude / settings: left unchanged (merge only appends new rules[] entries).");
+    lines.push(
+      "Include / exclude / settings: left unchanged (merge only appends new rules[] entries).",
+    );
   } else {
     const preview = buildConfigPreview(selections.clusters, selections.rules);
     lines.push(`Include (${preview.include.length}):`);
@@ -312,7 +352,9 @@ export function formatDraftSummary(selections: ConfirmedInitSelections, configPa
   lines.push("");
 
   const grouped = groupInferredRulesByCategory(selections.rules);
-  const categories = (Object.keys(grouped) as RuleCategory[]).sort(compareStrings);
+  const categories = (Object.keys(grouped) as RuleCategory[]).sort(
+    compareStrings,
+  );
 
   lines.push(`Rules (${selections.rules.length}):`);
   if (categories.length === 0) {
@@ -331,7 +373,11 @@ export function formatDraftSummary(selections: ConfirmedInitSelections, configPa
 
 // The workflow file location, as path segments joined via path.join for a Windows-correct write. Its
 // user-visible form is derived as a project-relative POSIX path at the write site (toRepoRelative).
-const CI_WORKFLOW_PATH_SEGMENTS = [".github", "workflows", "wastech-mdlint.yml"] as const;
+const CI_WORKFLOW_PATH_SEGMENTS = [
+  ".github",
+  "workflows",
+  "wastech-mdlint.yml",
+] as const;
 
 // Fallback project-root markers, used only when there is no `.git` above the write dir. A valid
 // non-git project still has `package.json`/`node_modules` at its root.
@@ -343,7 +389,7 @@ const PROJECT_ROOT_MARKERS = ["package.json", "node_modules"] as const;
 async function findAncestor(
   startDir: string,
   matches: (directory: string) => Promise<boolean>,
-  boundary: string
+  boundary: string,
 ): Promise<string | undefined> {
   let directory = path.resolve(startDir);
   const resolvedBoundary = path.resolve(boundary);
@@ -377,9 +423,15 @@ async function findAncestor(
  * disk — at `$HOME` instead of the target project. Capping at `$HOME` trades away the rare legitimate
  * case of a project rooted exactly at `$HOME` for never writing outside the user's intended target.
  */
-async function findRepositoryRoot(startDir: string): Promise<string | undefined> {
+async function findRepositoryRoot(
+  startDir: string,
+): Promise<string | undefined> {
   const homeDir = os.homedir();
-  const gitRoot = await findAncestor(startDir, (directory) => fileExists(path.join(directory, ".git")), homeDir);
+  const gitRoot = await findAncestor(
+    startDir,
+    (directory) => fileExists(path.join(directory, ".git")),
+    homeDir,
+  );
   if (gitRoot !== undefined) {
     return gitRoot;
   }
@@ -393,7 +445,7 @@ async function findRepositoryRoot(startDir: string): Promise<string | undefined>
       }
       return false;
     },
-    homeDir
+    homeDir,
   );
 }
 
@@ -404,11 +456,13 @@ async function findRepositoryRoot(startDir: string): Promise<string | undefined>
  * before `npm install`) or the walk reaches the user's home directory (same unrelated-ancestor
  * concern as `findRepositoryRoot`), so the caller can fall back to the project root.
  */
-async function findInstalledSchemaDir(startDir: string): Promise<string | undefined> {
+async function findInstalledSchemaDir(
+  startDir: string,
+): Promise<string | undefined> {
   return findAncestor(
     startDir,
     (directory) => fileExists(path.join(directory, ...PACKAGE_SCHEMA_SEGMENTS)),
-    os.homedir()
+    os.homedir(),
   );
 }
 
@@ -437,7 +491,9 @@ async function offerCiWorkflow(params: {
 
   // Omit the `--config` argument when the config sits at the project root — the CLI's walk-up finds
   // it there; otherwise pass its project-root-relative POSIX path.
-  const configFromRoot = normalizeRelativePath(path.relative(repoRoot, configAbsPath));
+  const configFromRoot = normalizeRelativePath(
+    path.relative(repoRoot, configAbsPath),
+  );
   // A line terminator in the path can't be represented safely in the workflow's shell command, and
   // stripping it would mis-target the config — so decline this opt-in feature rather than emit a
   // broken/mis-pointing workflow (an extreme but legal path edge; the config itself is still written).
@@ -471,7 +527,8 @@ async function offerCiWorkflow(params: {
     return undefined;
   }
 
-  const configArg = configFromRoot === CONFIG_FILE_NAME ? undefined : configFromRoot;
+  const configArg =
+    configFromRoot === CONFIG_FILE_NAME ? undefined : configFromRoot;
   await mkdir(path.dirname(ciWorkflowPath), { recursive: true });
   await writeFile(ciWorkflowPath, buildCiWorkflowYaml(configArg), "utf8");
   return normalizeRelativePath(path.relative(repoRoot, ciWorkflowPath));
@@ -495,7 +552,7 @@ export function formatWriteSummary(params: {
 
   if (action === "merge") {
     lines.push(
-      `Merged ${configPath}: ${result.addedRuleCount} new rule(s) appended (${result.totalRuleCount} total).`
+      `Merged ${configPath}: ${result.addedRuleCount} new rule(s) appended (${result.totalRuleCount} total).`,
     );
   } else {
     lines.push(`Wrote ${configPath} with ${result.totalRuleCount} rule(s).`);
@@ -503,7 +560,9 @@ export function formatWriteSummary(params: {
 
   lines.push(`Schema: ${result.schemaRef}`);
   if (schemaPath !== undefined) {
-    lines.push(`Wrote project-local schema ${schemaPath} (custom rules present).`);
+    lines.push(
+      `Wrote project-local schema ${schemaPath} (custom rules present).`,
+    );
   }
   if (ciWorkflowPath !== undefined) {
     lines.push(`Wrote CI workflow ${ciWorkflowPath}.`);
@@ -519,7 +578,9 @@ export function formatWriteSummary(params: {
  * rejected by the loader — so the safe answer is to write nothing.
  * `configPath` is a repository-relative POSIX path.
  */
-export function formatNotWrittenSummary(configPath: string | undefined): string {
+export function formatNotWrittenSummary(
+  configPath: string | undefined,
+): string {
   const location = configPath ?? CONFIG_FILE_NAME;
   return (
     `Not written: the existing config at ${location} could not be read, parsed, or validated, so a ` +
@@ -538,7 +599,7 @@ export function formatNotWrittenSummary(configPath: string | undefined): string 
  */
 export async function runInitCommand(
   options: InitCommandOptions,
-  prompter: InitPrompter
+  prompter: InitPrompter,
 ): Promise<RunInitCommandResult> {
   const existingConfigPath = await findConfig(options.cwd);
   // `findConfig` walks up to an ancestor directory when `options.cwd` is a subdirectory of a repo
@@ -546,17 +607,22 @@ export async function runInitCommand(
   // directory, so the whole flow re-roots there too. Scanning/inferring against `options.cwd`
   // instead would produce include globs/rule scopes relative to the wrong root and could miss a
   // lockfile that only lives at the real root. A no-op when the config is already at `options.cwd`.
-  const cwd = existingConfigPath === undefined ? options.cwd : path.dirname(existingConfigPath);
+  const cwd =
+    existingConfigPath === undefined
+      ? options.cwd
+      : path.dirname(existingConfigPath);
   // Repository-relative POSIX path (public-output invariant) — computed up front so both the
   // existing-config prompt and the printed summary use it instead of the raw absolute path.
   const relativeConfigPath =
-    existingConfigPath === undefined ? undefined : normalizeRelativePath(path.relative(cwd, existingConfigPath));
+    existingConfigPath === undefined
+      ? undefined
+      : normalizeRelativePath(path.relative(cwd, existingConfigPath));
 
   let existingConfigAction: ExistingConfigAction | "none" = "none";
 
   if (existingConfigPath !== undefined && relativeConfigPath !== undefined) {
     existingConfigAction = options.yes
-      ? options.onExisting ?? DEFAULT_EXISTING_CONFIG_ACTION
+      ? (options.onExisting ?? DEFAULT_EXISTING_CONFIG_ACTION)
       : await prompter.resolveExistingConfigAction(relativeConfigPath);
 
     if (existingConfigAction === "skip") {
@@ -564,7 +630,7 @@ export async function runInitCommand(
       // write — the CI-workflow offer belongs only to the confirmed config-write branch below.
       return {
         output: `${DRAFT_SUMMARY_HEADER}\n\nskipped — existing config left untouched.\n`,
-        wasConfirmed: false
+        wasConfirmed: false,
       };
     }
   }
@@ -588,13 +654,19 @@ export async function runInitCommand(
   // Re-run inference against the confirmed cluster subset, not a post-hoc filter of one
   // full-corpus run, so global gate sums / the cross-cluster cycle heuristic / SEC-001's `files`
   // scoping stay correct for exactly what the user kept.
-  const inference = await inferRuleSet({ cwd, clusters: confirmedClusters, registry: ruleRegistry });
+  const inference = await inferRuleSet({
+    cwd,
+    clusters: confirmedClusters,
+    registry: ruleRegistry,
+  });
 
   const groupedByCategory = groupInferredRulesByCategory(inference.rules);
   // Only categories with >=1 inferred rule are offered — the other built-ins have a required
   // option with no safe way to derive it from sampled files (see rule-inference.ts's own note on
   // the 7 gated ids), so a category with nothing to add would be a dead, confusing checkbox entry.
-  const categoriesWithRules = (Object.keys(groupedByCategory) as RuleCategory[]).sort(compareStrings);
+  const categoriesWithRules = (
+    Object.keys(groupedByCategory) as RuleCategory[]
+  ).sort(compareStrings);
 
   const selectedCategories = options.yes
     ? categoriesWithRules
@@ -603,7 +675,9 @@ export async function runInitCommand(
       : [];
 
   const selectedCategorySet = new Set(selectedCategories);
-  let selectedRules = inference.rules.filter((rule) => selectedCategorySet.has(rule.category));
+  let selectedRules = inference.rules.filter((rule) =>
+    selectedCategorySet.has(rule.category),
+  );
   let existingConfigUnreadable = false;
   // The single parsed snapshot of the existing config, read once and reused by both the diff below
   // and the merge write later — re-reading after confirmation could race with a concurrent edit and
@@ -611,7 +685,10 @@ export async function runInitCommand(
   let existingDocument: ParsedExistingConfig | undefined;
 
   if (existingConfigPath !== undefined && existingConfigAction === "merge") {
-    existingDocument = await readExistingConfigDocument(cwd, existingConfigPath);
+    existingDocument = await readExistingConfigDocument(
+      cwd,
+      existingConfigPath,
+    );
     const { ruleIds, mergeable } = extractExistingRuleIds(existingDocument.raw);
     // Additive merge preserves the existing content verbatim, so the written config is only valid if
     // the existing one already loads (append-only adds registry-valid inferred rules). Validate it
@@ -619,7 +696,9 @@ export async function runInitCommand(
     // options must abort the merge, never be reported as a successful write of a config that
     // `loadConfiguration` would then reject.
     existingConfigUnreadable =
-      !existingDocument.parsed || !mergeable || !(await existingConfigLoads(cwd, existingConfigPath));
+      !existingDocument.parsed ||
+      !mergeable ||
+      !(await existingConfigLoads(cwd, existingConfigPath));
     selectedRules = diffAgainstExistingRuleIds(ruleIds, selectedRules).newRules;
   }
 
@@ -629,7 +708,7 @@ export async function runInitCommand(
     clusters: confirmedClusters,
     rules: selectedRules,
     newRuleIds: selectedRules.map((rule) => rule.rule),
-    existingConfigUnreadable
+    existingConfigUnreadable,
   };
 
   const summary = formatDraftSummary(selections, relativeConfigPath);
@@ -639,10 +718,14 @@ export async function runInitCommand(
   // its contract above), so the write step's output is returned on its own to avoid a double print.
   const confirmed = options.yes ? true : await prompter.confirmDraft(summary);
   if (!confirmed) {
-    return { output: "Aborted: configuration not confirmed.\n", wasConfirmed: false };
+    return {
+      output: "Aborted: configuration not confirmed.\n",
+      wasConfirmed: false,
+    };
   }
 
-  const composeOutput = (suffix: string): string => (options.yes ? `${summary}\n${suffix}` : suffix);
+  const composeOutput = (suffix: string): string =>
+    options.yes ? `${summary}\n${suffix}` : suffix;
 
   // The repository root anchors every user-visible path so a subdirectory run reports where files
   // actually landed (e.g. `docs/wastech-mdlint.config.json`). findRepositoryRoot prefers the `.git`
@@ -651,29 +734,35 @@ export async function runInitCommand(
   // from the write dir, so the root is always an ancestor and reported paths never contain a "..".
   // Falls back to `cwd` outside any recognizable project (best effort — no parent anchor to report).
   const repoRoot = (await findRepositoryRoot(cwd)) ?? cwd;
-  const toRepoRelative = (absolutePath: string): string => normalizeRelativePath(path.relative(repoRoot, absolutePath));
+  const toRepoRelative = (absolutePath: string): string =>
+    normalizeRelativePath(path.relative(repoRoot, absolutePath));
 
   // A merge that cannot read/parse the existing config aborts: the deliverable's "never modify or
   // drop an existing entry" is unprovable when the entries can't be parsed, so writing nothing is
   // the only safe outcome (no config, no schema, no CI workflow touch the disk here).
   if (existingConfigAction === "merge" && existingConfigUnreadable) {
     const notWrittenPath =
-      existingConfigPath === undefined ? relativeConfigPath : toRepoRelative(existingConfigPath);
+      existingConfigPath === undefined
+        ? relativeConfigPath
+        : toRepoRelative(existingConfigPath);
     return {
       output: composeOutput(formatNotWrittenSummary(notWrittenPath)),
       // The user did confirm the draft above (`confirmed === true`) — only the write itself was
       // withheld, for a reason unrelated to their choice. See the type's own comment.
-      wasConfirmed: true
+      wasConfirmed: true,
     };
   }
 
-  const action: InitConfigAction = existingConfigAction === "merge" ? "merge" : "fresh";
+  const action: InitConfigAction =
+    existingConfigAction === "merge" ? "merge" : "fresh";
 
   // Reuse the snapshot read above. The unreadable-merge abort has already returned, so on a merge
   // that reaches here `existingDocument.raw` is guaranteed defined (parsed + additively mergeable) —
   // no second read, no window for a fresh-overwrite that drops the existing keys.
   const existing: ExistingConfigDocument | undefined =
-    action === "merge" && existingDocument?.raw !== undefined ? { raw: existingDocument.raw } : undefined;
+    action === "merge" && existingDocument?.raw !== undefined
+      ? { raw: existingDocument.raw }
+      : undefined;
 
   const configPath = path.join(cwd, CONFIG_FILE_NAME);
 
@@ -688,7 +777,7 @@ export async function runInitCommand(
     existing,
     include: preview.include,
     newRules: selectedRules,
-    packageSchemaRef: resolvePackageSchemaRef(cwd, schemaAnchor)
+    packageSchemaRef: resolvePackageSchemaRef(cwd, schemaAnchor),
   });
 
   await writeFile(configPath, result.configText, "utf8");
@@ -704,7 +793,7 @@ export async function runInitCommand(
     configAbsPath: configPath,
     yes: options.yes,
     withCiWorkflow: options.withCiWorkflow,
-    prompter
+    prompter,
   });
 
   return {
@@ -714,10 +803,10 @@ export async function runInitCommand(
         result,
         configPath: toRepoRelative(configPath),
         schemaPath: schemaRelativePath,
-        ciWorkflowPath: ciWorkflowRelativePath
-      })
+        ciWorkflowPath: ciWorkflowRelativePath,
+      }),
     ),
-    wasConfirmed: true
+    wasConfirmed: true,
   };
 }
 
@@ -734,7 +823,10 @@ async function fileExists(absolutePath: string): Promise<boolean> {
 // `loadConfiguration` runs at lint time. A `merge` gates on this so it never rewrites a config that
 // preserves an already-invalid key/rule/options and then reports success (acceptance: init writes a
 // valid config). Any thrown ConfigError (or other read failure) counts as "does not load".
-async function existingConfigLoads(cwd: string, configPath: string): Promise<boolean> {
+async function existingConfigLoads(
+  cwd: string,
+  configPath: string,
+): Promise<boolean> {
   try {
     await loadConfiguration({ cwd, explicitConfigPath: configPath });
     return true;

@@ -16,16 +16,16 @@ this layout already exists.
 
 ## Tasks
 
-| # | Task | Size | Depends on |
-| --- | --- | --- | --- |
-| [P0.01](01-workspace-decisions.md) | Workspace layout & tooling decisions (design) | S | — |
-| [P0.02](02-root-scaffolding.md) | Root workspace + shared config baseline | M | P0.01 |
-| [P0.03](03-core-package-skeleton.md) | `@wastech-mdlint/core` package skeleton | S | P0.02 |
-| [P0.04](04-relocate-current-source-into-core.md) | Relocate current source into core (behavior-preserving) | M | P0.03 |
-| [P0.05](05-cli-package-commander.md) | `@wastech-mdlint/cli` + commander scaffold (port scan/graph) | M | P0.04 |
-| [P0.06](06-mcp-server-skeleton.md) | `@wastech-mdlint/mcp-server` package skeleton (stub) | S | P0.04 |
-| [P0.07](07-ci-packaging-baseline.md) | CI matrix & packaging/publish baseline | M | P0.05, P0.06 |
-| [P0.08](08-exit-verification.md) | Phase exit verification & layout docs | S | all above |
+| #                                                | Task                                                         | Size | Depends on   |
+| ------------------------------------------------ | ------------------------------------------------------------ | ---- | ------------ |
+| [P0.01](01-workspace-decisions.md)               | Workspace layout & tooling decisions (design)                | S    | —            |
+| [P0.02](02-root-scaffolding.md)                  | Root workspace + shared config baseline                      | M    | P0.01        |
+| [P0.03](03-core-package-skeleton.md)             | `@wastech-mdlint/core` package skeleton                      | S    | P0.02        |
+| [P0.04](04-relocate-current-source-into-core.md) | Relocate current source into core (behavior-preserving)      | M    | P0.03        |
+| [P0.05](05-cli-package-commander.md)             | `@wastech-mdlint/cli` + commander scaffold (port scan/graph) | M    | P0.04        |
+| [P0.06](06-mcp-server-skeleton.md)               | `@wastech-mdlint/mcp-server` package skeleton (stub)         | S    | P0.04        |
+| [P0.07](07-ci-packaging-baseline.md)             | CI matrix & packaging/publish baseline                       | M    | P0.05, P0.06 |
+| [P0.08](08-exit-verification.md)                 | Phase exit verification & layout docs                        | S    | all above    |
 
 ## Sequence
 

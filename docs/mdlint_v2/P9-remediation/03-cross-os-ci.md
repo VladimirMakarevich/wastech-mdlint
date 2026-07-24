@@ -22,7 +22,7 @@ ship undetected.
 1. Add an OS matrix to the `verify` job: at minimum `windows-latest`; ideally `macos-latest` too,
    on the pinned Node 24 line (`.node-version`).
 2. Confirm the suite is green on Windows; fix any real path/newline/glob assumptions the run
-   uncovers (the normalization code looks correct — this is about *verification*).
+   uncovers (the normalization code looks correct — this is about _verification_).
 3. Keep the `pack` per-package matrix as-is (it stays Linux-only; publish shape is OS-independent).
 4. Note cost/time: a 3-OS × per-package fan-out can get large — scope the OS matrix to the
    `verify` job, not `pack`.

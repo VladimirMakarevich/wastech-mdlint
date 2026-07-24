@@ -90,7 +90,10 @@ export interface CompileResult {
   };
 }
 
-export function compileContext(config: LoadedConfiguration, cwd: string): CompileResult;
+export function compileContext(
+  config: LoadedConfiguration,
+  cwd: string,
+): CompileResult;
 // `LoadedConfiguration` (already exported from core) carries the resolved `config`, `rules`, and
 // `settings` the load→graph→analyze pipeline needs — there is no bare `Config` type in core.
 // throws CompileConfigMissingError (typed, carries a stable `code`) when config.compile is absent
@@ -115,7 +118,7 @@ That `code` is one entry in the P7 MCP error taxonomy.
   itself stays a synchronous pure renderer — it never touches the filesystem or `cwd`.
 - `config.compile` is still `z.unknown()` in `config-schema.ts` — P5.05 owns the strict schema.
   `compile-context.ts` reads it through a local, deliberately lenient (non-`.strict()`) reader that
-  only ever *defaults* missing or malformed pieces (`sections.*` → `true`, `commandPreset` →
+  only ever _defaults_ missing or malformed pieces (`sections.*` → `true`, `commandPreset` →
   `"generic"`, `hubMinInDegree` → `DEFAULT_HUB_MIN_IN_DEGREE`, `skill.name`/`skill.description` →
   `""`). It is explicitly commented as superseded by P5.05 and must not become a second
   authoritative schema.
@@ -137,7 +140,7 @@ That `code` is one entry in the P7 MCP error taxonomy.
   doc's illustrative `entrypointsOverBudget` field), so the budget section can render three distinct
   states instead of two: "not enabled", "enabled but its glob matched no files" (a misconfigured or
   empty-match corpus, not silently treated as "not enabled"), and "enabled and everything fits."
-- `computeBudget` evaluates *every* active `LLM-001` entry against every entrypoint it matches, not
+- `computeBudget` evaluates _every_ active `LLM-001` entry against every entrypoint it matches, not
   just the first one to claim it: `rules[]` can configure LLM-001 more than once, and the engine
   runs every entry independently, so the budget uses the strictest (lowest) matching
   `maxTokensPerEntrypoint` per file — one rendered row per path, but a violation of any configured
@@ -166,7 +169,7 @@ That `code` is one entry in the P7 MCP error taxonomy.
   of them are cycle-excluded" (`readingOrder: []` with a non-empty corpus) — the latter renders an
   explicit "excluded by cycles" sentence instead of reusing the empty-corpus wording, preserving G6
   honesty for an all-cyclic corpus.
-- Workflow's numbered steps are generated from the *enabled* `sections` flags, not a fixed list: a
+- Workflow's numbered steps are generated from the _enabled_ `sections` flags, not a fixed list: a
   step naming a gated-off section (e.g. "Start from Document Architecture…" when
   `sections.architecture` is `false`) would make the generated SKILL.md self-contradictory. The
   Context Budget step is never gated (S6 always renders), so it is always included.

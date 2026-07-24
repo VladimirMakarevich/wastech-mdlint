@@ -11,7 +11,9 @@ import { ruleRegistry } from "../src/engine/rules/index.js";
 const tempDirs: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
+  );
 });
 
 async function fixtureRepo(files: Record<string, string>): Promise<string> {
@@ -34,16 +36,29 @@ async function lint(cwd: string, rules: ConfiguredRule[]) {
 describe("CTX-001 placeholder / empty sections", () => {
   it("flags empty and placeholder-only sections but not prose mentions", async () => {
     const cwd = await fixtureRepo({
-      "a.md": ["## Empty", "", "## Todo", "TODO", "## Fine", "Mentions TODO but has real prose."].join("\n")
+      "a.md": [
+        "## Empty",
+        "",
+        "## Todo",
+        "TODO",
+        "## Fine",
+        "Mentions TODO but has real prose.",
+      ].join("\n"),
     });
     const result = await lint(cwd, [rule("CTX-001")]);
-    expect(result.messages.map((message) => message.data?.section)).toEqual(["Empty", "Todo"]);
+    expect(result.messages.map((message) => message.data?.section)).toEqual([
+      "Empty",
+      "Todo",
+    ]);
   });
 
   it("unions custom placeholders with the locked defaults", async () => {
     const cwd = await fixtureRepo({ "a.md": "## S\nLATER\n" });
     expect((await lint(cwd, [rule("CTX-001")])).messages).toEqual([]);
-    expect((await lint(cwd, [rule("CTX-001", { placeholders: ["LATER"] })])).messages).toHaveLength(1);
+    expect(
+      (await lint(cwd, [rule("CTX-001", { placeholders: ["LATER"] })]))
+        .messages,
+    ).toHaveLength(1);
   });
 });
 
@@ -59,13 +74,23 @@ describe("CTX-002 checklist completeness", () => {
 describe("CTX-003 glossary aliases", () => {
   it("suggests the canonical term for alias usage and skips the glossary itself", async () => {
     const cwd = await fixtureRepo({
-      "glossary.md": "| Term | Aliases |\n| --- | --- |\n| GraphQL | graphql, gql |\n",
-      "doc.md": "We use gql and graphql everywhere.\n"
+      "glossary.md":
+        "| Term | Aliases |\n| --- | --- |\n| GraphQL | graphql, gql |\n",
+      "doc.md": "We use gql and graphql everywhere.\n",
     });
     const result = await lint(cwd, [
-      rule("CTX-003", { glossary: "glossary.md", termColumn: "Term", aliasColumn: "Aliases", files: ["doc.md"] })
+      rule("CTX-003", {
+        glossary: "glossary.md",
+        termColumn: "Term",
+        aliasColumn: "Aliases",
+        files: ["doc.md"],
+      }),
     ]);
-    expect(result.messages.map((message) => message.data?.alias).sort()).toEqual(["gql", "graphql"]);
-    expect(result.messages.every((message) => message.data?.canonical === "GraphQL")).toBe(true);
+    expect(
+      result.messages.map((message) => message.data?.alias).sort(),
+    ).toEqual(["gql", "graphql"]);
+    expect(
+      result.messages.every((message) => message.data?.canonical === "GraphQL"),
+    ).toBe(true);
   });
 });

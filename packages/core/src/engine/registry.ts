@@ -2,7 +2,14 @@ import type { z } from "zod";
 
 import { compareStrings } from "../deterministic-sort.js";
 import { canonicalizeRuleId } from "../rule-id.js";
-import type { Rule, RuleCategory, RuleContext, RuleScope, Severity, TextEdit } from "./types.js";
+import type {
+  Rule,
+  RuleCategory,
+  RuleContext,
+  RuleScope,
+  Severity,
+  TextEdit,
+} from "./types.js";
 
 // The single metadata source per rule (R6). One object drives the registry, `schema.json`
 // generation (P2.06), the README table (P3.09), `describeRules` (P5), and `init` categories (P6) —
@@ -45,7 +52,10 @@ export function defineRule<TSchema extends z.ZodType>(def: {
   return {
     metadata: { ...def.metadata, optionsSchema: def.optionsSchema },
     createCheck: (options) => def.check(options as z.infer<TSchema>),
-    createFix: fix === undefined ? undefined : (options) => fix(options as z.infer<TSchema>)
+    createFix:
+      fix === undefined
+        ? undefined
+        : (options) => fix(options as z.infer<TSchema>),
   };
 }
 
@@ -84,7 +94,9 @@ export class RuleResolutionError extends Error {
 function editDistance(left: string, right: string): number {
   const rows = left.length + 1;
   const cols = right.length + 1;
-  const distances = Array.from({ length: rows }, () => new Array<number>(cols).fill(0));
+  const distances = Array.from({ length: rows }, () =>
+    new Array<number>(cols).fill(0),
+  );
 
   for (let row = 0; row < rows; row += 1) {
     distances[row]![0] = row;
@@ -99,7 +111,7 @@ function editDistance(left: string, right: string): number {
       distances[row]![col] = Math.min(
         distances[row - 1]![col]! + 1,
         distances[row]![col - 1]! + 1,
-        distances[row - 1]![col - 1]! + cost
+        distances[row - 1]![col - 1]! + cost,
       );
     }
   }
@@ -152,7 +164,8 @@ export class RuleRegistry {
     }
 
     // Only suggest when the typo is plausibly close (≤ ~40% of the id length).
-    return best !== undefined && best.distance <= Math.ceil(best.id.length * 0.4)
+    return best !== undefined &&
+      best.distance <= Math.ceil(best.id.length * 0.4)
       ? best.id
       : undefined;
   }
@@ -171,11 +184,13 @@ export class RuleRegistry {
         code: "UNKNOWN_RULE",
         ruleName: name,
         suggestion: this.suggest(canonical),
-        message: `Unknown rule "${name}".`
+        message: `Unknown rule "${name}".`,
       });
     }
 
-    const parsed = definition.metadata.optionsSchema.safeParse(rawOptions ?? {});
+    const parsed = definition.metadata.optionsSchema.safeParse(
+      rawOptions ?? {},
+    );
 
     if (!parsed.success) {
       throw new RuleResolutionError({
@@ -185,9 +200,9 @@ export class RuleRegistry {
         // uniformly for built-in and custom entries.
         issues: parsed.error.issues.map((issue) => ({
           path: ["options", ...issue.path],
-          message: issue.message
+          message: issue.message,
         })),
-        message: `Invalid options for rule "${canonical}".`
+        message: `Invalid options for rule "${canonical}".`,
       });
     }
 
@@ -200,7 +215,7 @@ export class RuleRegistry {
       fixable: definition.metadata.fixable,
       docsUrl: definition.metadata.docsUrl,
       check: definition.createCheck(parsed.data),
-      fix: definition.createFix?.(parsed.data)
+      fix: definition.createFix?.(parsed.data),
     };
   }
 }

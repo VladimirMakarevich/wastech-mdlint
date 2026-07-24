@@ -44,10 +44,10 @@ configuration guide, and an annotated config with every option — lives in
 `wastech-mdlint` is an npm-workspaces monorepo. `@wastech-mdlint/core` owns the entire
 pipeline; the CLI and MCP server are thin hosts over it.
 
-| Package | Role | Bin |
-| --- | --- | --- |
-| [`@wastech-mdlint/core`](packages/core) | Parsing, config, rule engine, graph, and formatting — the whole pipeline. | — |
-| [`@wastech-mdlint/cli`](packages/cli) | commander CLI host: argument parsing, command dispatch, exit codes. | `wastech-mdlint` |
+| Package                                             | Role                                                                                                                                       | Bin                  |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------- |
+| [`@wastech-mdlint/core`](packages/core)             | Parsing, config, rule engine, graph, and formatting — the whole pipeline.                                                                  | —                    |
+| [`@wastech-mdlint/cli`](packages/cli)               | commander CLI host: argument parsing, command dispatch, exit codes.                                                                        | `wastech-mdlint`     |
 | [`@wastech-mdlint/mcp-server`](packages/mcp-server) | stdio MCP host; `lint`/`lint-files` ship in P7.02, `context-graph`/`context-slice`/`impact-analysis` in P7.03, `compile-context` in P7.04. | `wastech-mdlint-mcp` |
 
 Build and test the whole workspace from the repo root:
@@ -58,6 +58,7 @@ npm run typecheck # tsc -b across project references
 npm run build     # tsc -b -> each package's dist/
 npm test          # vitest across all packages
 npm run lint      # eslint across the workspace
+npm run format    # prettier --check . (CI-enforced; run before pushing)
 ```
 
 ## Quick start
@@ -147,12 +148,16 @@ Add it to any stdio-based MCP host (Claude Code's `.mcp.json`, Claude Desktop's
 ```jsonc
 {
   "mcpServers": {
-    "wastech-mdlint": { "command": "npx", "args": ["-y", "@wastech-mdlint/mcp-server"] }
-  }
+    "wastech-mdlint": {
+      "command": "npx",
+      "args": ["-y", "@wastech-mdlint/mcp-server"],
+    },
+  },
 }
 ```
 
 <!-- BEGIN GENERATED MCP TOOLS -->
+<!-- prettier-ignore -->
 | Tool | Description | Read-only | Structured output |
 | --- | --- | --- | --- |
 | `lint` | Lint ad-hoc Markdown content against an explicit set of rules. Does not load project config; file-resolving rules such as REF-001/REF-003 and SEC-003 may probe or read paths relative to the server's working directory. | yes | yes |
@@ -161,6 +166,7 @@ Add it to any stdio-based MCP host (Claude Code's `.mcp.json`, Claude Desktop's
 | `context-slice` | Files reachable within `depth` hops of a resolved query, following graph edges forward. Resolves the query by exact match against defined IDs, heading/anchor slugs, and file paths — no fuzzy, substring, keyword, or LLM matching. Read-only. | yes | yes |
 | `impact-analysis` | Compute the blast radius of changing a Markdown file: files that reference it directly, files affected transitively, and the reading order over the affected subgraph. A file not in the corpus returns an actionable error. Read-only. | yes | yes |
 | `compile-context` | Compile the project skill (SKILL.md) from `config.compile`, producing the same deterministic output as the CLI `compile` command: the skill content plus a Documents/Rules/Components metadata line. Requires `config.compile`; its absence returns an actionable error. Read-only. | yes | no |
+
 <!-- END GENERATED MCP TOOLS -->
 
 All 6 tools carry a `readOnlyHint` annotation; five return `structuredContent` + `outputSchema`
@@ -179,7 +185,11 @@ Configuration is JSONC (comments + trailing commas) in `wastech-mdlint.config.js
   "exclude": ["node_modules/**", "dist/**", ".git/**"],
   "respectGitignore": false,
   "settings": {
-    "siteRouter": { "preset": "starlight", "contentDir": "src/content/docs", "defaultLocale": "en" }
+    "siteRouter": {
+      "preset": "starlight",
+      "contentDir": "src/content/docs",
+      "defaultLocale": "en",
+    },
   },
   "rules": [
     { "rule": "REF-001", "severity": "warning" },
@@ -190,13 +200,16 @@ Configuration is JSONC (comments + trailing commas) in `wastech-mdlint.config.js
       "description": "Each requirement row must have an Owner",
       "severity": "error",
       "target": "table",
-      "options": { "files": ["docs/requirements/**/*.md"], "assert": { "kind": "columnNotEmpty", "column": "Owner" } }
-    }
+      "options": {
+        "files": ["docs/requirements/**/*.md"],
+        "assert": { "kind": "columnNotEmpty", "column": "Owner" },
+      },
+    },
   ],
   "compile": {
     "outdir": ".claude/skills/wastech-mdlint",
-    "skill": { "name": "...", "description": "..." }
-  }
+    "skill": { "name": "...", "description": "..." },
+  },
 }
 ```
 
@@ -229,6 +242,7 @@ The following table is generated from the rule metadata (`npm run generate:docs`
 edit it by hand.
 
 <!-- BEGIN GENERATED RULES -->
+<!-- prettier-ignore -->
 | Rule | Category | Default severity | Scope | Fixable | Description |
 | --- | --- | --- | --- | --- | --- |
 | `CTX-001` | CTX | warning | document | no | Sections are not empty or placeholder-only. |
@@ -255,6 +269,7 @@ edit it by hand.
 | `TBL-004` | TBL | error | document | no | Cell values match a required pattern. |
 | `TBL-005` | TBL | error | document | no | Cross-column conditional holds (when → then). |
 | `TBL-006` | TBL | error | project | no | Column IDs are unique across files. |
+
 <!-- END GENERATED RULES -->
 
 `custom` (not shown above) is resolved from config, so its id and behavior are
@@ -264,11 +279,14 @@ project-defined.
 
 ```md
 <!-- wastech-mdlint-disable REF-001 -->
+
 [intentionally broken](does-not-exist.md)
+
 <!-- wastech-mdlint-enable REF-001 -->
 
 <!-- wastech-mdlint-disable-next-line TBL-002 -->
-| REQ-1 |  |
+
+| REQ-1 | |
 ```
 
 A directive with no rule IDs applies to all rules. `disable` runs until a matching

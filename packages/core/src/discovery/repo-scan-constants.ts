@@ -14,7 +14,7 @@ export const DEFAULT_NOISE_DIR_NAMES: readonly string[] = [
   "vendor",
   ".next",
   ".cache",
-  "target"
+  "target",
 ];
 
 // Directory basenames that qualify as a doc cluster with as little as one Markdown file (the
@@ -30,7 +30,7 @@ export const DEFAULT_KNOWN_CLUSTER_NAMES: readonly string[] = [
   "rfcs",
   "references",
   "reference",
-  "guides"
+  "guides",
 ];
 
 // N_MIN: how many Markdown files a non-known-named directory needs to qualify as a cluster,

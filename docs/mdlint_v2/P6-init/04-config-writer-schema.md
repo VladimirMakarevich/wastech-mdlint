@@ -18,7 +18,7 @@ Write the final config and wire it to the **local** schema, optionally dropping 
 1. Write `wastech-mdlint.config.json` in `cwd`: `$schema` (local path), `include`/`exclude`,
    and `rules` using **canonical IDs** ([C3](../requirements/01-configuration.md)); optionally
    add rationale **comments** (JSONC, [C4](../requirements/01-configuration.md)). On **merge**
-   ([P6.03](03-interactive-prompts.md), audit — P6 merge gap) apply *additive, existing-wins*:
+   ([P6.03](03-interactive-prompts.md), audit — P6 merge gap) apply _additive, existing-wins_:
    preserve every existing `rules[]` entry (severity/options) and only append inferred rules
    whose canonical ID is absent; do not touch existing `include`/`exclude`/`settings`.
 2. **Schema wiring** ([I3](../requirements/06-installation.md)/[C9](../requirements/01-configuration.md)):
@@ -62,7 +62,7 @@ Decisions that are load-bearing but not obvious from the code:
 - **Merge is validated through the real loader before writing.** Additive merge preserves the
   existing content verbatim, so the result is only valid if the existing config already loads. The
   merge path runs `loadConfiguration` on the existing file and aborts (writes nothing) on an unknown
-  top-level key, unknown rule id, or invalid preserved options — the acceptance bar is a *valid*
+  top-level key, unknown rule id, or invalid preserved options — the acceptance bar is a _valid_
   config, and reporting success while writing one the loader rejects would violate it.
 - **Merge safety keys entries by identity, not the literal `rule` field.** A built-in is identified
   by its canonical `rule`; a `custom` entry by its canonical `id` (never the string `"custom"`).
@@ -75,7 +75,7 @@ Decisions that are load-bearing but not obvious from the code:
   The workflow anchors at the `.git` root when one exists (a nested workspace package still anchors
   at the real repo root, not `packages/foo`), falling back to the nearest `package.json`/`node_modules`
   outside git.
-- **`skip` is a strict no-write outcome**, and a Ctrl+C at the *post-write* CI-workflow prompt is
+- **`skip` is a strict no-write outcome**, and a Ctrl+C at the _post-write_ CI-workflow prompt is
   treated as "no workflow" (the config/schema are already on disk, so the write summary must still
   print rather than the whole command unwinding to look like a no-op).
 - **CI template is self-contained, not `uses:`** — see deliverable 3; `buildCiWorkflowYaml` is the

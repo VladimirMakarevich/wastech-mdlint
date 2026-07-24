@@ -7,7 +7,7 @@ export type AllCheckedOptions = { section?: string };
 // section are considered.
 export function allChecked(
   document: ParsedDocument,
-  options: AllCheckedOptions
+  options: AllCheckedOptions,
 ): PrimitiveFinding[] {
   const items =
     options.section === undefined
@@ -19,6 +19,6 @@ export function allChecked(
     .map((item) => ({
       message: `Checklist item is not checked: "${item.text}".`,
       line: item.line,
-      data: { text: item.text, section: item.section }
+      data: { text: item.text, section: item.section },
     }));
 }

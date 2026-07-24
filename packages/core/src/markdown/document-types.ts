@@ -21,7 +21,12 @@
 // config-light (`idPattern` is config, not a parse input) and avoiding duplicated table data.
 
 // Link classification mirrors the legacy parser so behavior is preserved across the cutover.
-export type ParsedLinkKind = "local-file" | "same-file-anchor" | "external" | "mailto" | "other";
+export type ParsedLinkKind =
+  | "local-file"
+  | "same-file-anchor"
+  | "external"
+  | "mailto"
+  | "other";
 
 export type ParsedHeading = {
   text: string;

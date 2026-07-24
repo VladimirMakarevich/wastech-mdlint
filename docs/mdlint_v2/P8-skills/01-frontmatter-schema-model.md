@@ -41,7 +41,7 @@ covers both static and generated skills.
 ## Implementation notes
 
 - **Two entry points, one schema.** The model + validator live in the new
-  `packages/core/src/skills/skill-model.ts` and *import* `skillFrontmatterSchema` from
+  `packages/core/src/skills/skill-model.ts` and _import_ `skillFrontmatterSchema` from
   `compile/skill-frontmatter.js`; the frontmatter schema was **not** moved out of `compile/`
   (that module is done and byte-stable, and P5's imports point at it). Two wrappers exist because
   the two callers need opposite ergonomics: `validateSkill` (non-throwing `safeParse`, sorted

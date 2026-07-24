@@ -2,16 +2,19 @@ import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 
 import { compareStrings } from "../deterministic-sort.js";
-import { detectPackageManager, type DetectedPackageManager } from "./package-manager.js";
+import {
+  detectPackageManager,
+  type DetectedPackageManager,
+} from "./package-manager.js";
 import {
   DEFAULT_KNOWN_CLUSTER_NAMES,
   DEFAULT_MIN_CLUSTER_SIZE,
   DEFAULT_NOISE_DIR_NAMES,
-  DEFAULT_SAMPLE_SIZE
+  DEFAULT_SAMPLE_SIZE,
 } from "./repo-scan-constants.js";
 import {
   detectWorkspacePackagesWithNoise,
-  type WorkspacePackage
+  type WorkspacePackage,
 } from "./workspace-packages.js";
 
 export type DocClusterKind = "cluster" | "root" | "fallback";
@@ -70,7 +73,9 @@ function dirnameOf(filePath: string): string {
 const GLOB_SPECIAL_CHARS = /[\\*?[\]{}()!+@|]/g;
 
 function escapeGlobPath(value: string): string {
-  return value.replace(GLOB_SPECIAL_CHARS, (char) => (char === "]" ? "[]]" : `[${char}]`));
+  return value.replace(GLOB_SPECIAL_CHARS, (char) =>
+    char === "]" ? "[]]" : `[${char}]`,
+  );
 }
 
 // A workspace package's scope owns only the Markdown files not also claimed by a deeper nested
@@ -80,7 +85,7 @@ function escapeGlobPath(value: string): string {
 function isOwnedByPackageScope(
   file: string,
   workspacePackage: string,
-  workspacePackages: WorkspacePackage[]
+  workspacePackages: WorkspacePackage[],
 ): boolean {
   if (!file.startsWith(`${workspacePackage}/`)) {
     return false;
@@ -90,7 +95,7 @@ function isOwnedByPackageScope(
     (pkg) =>
       pkg.path !== workspacePackage &&
       pkg.path.startsWith(`${workspacePackage}/`) &&
-      file.startsWith(`${pkg.path}/`)
+      file.startsWith(`${pkg.path}/`),
   );
 }
 
@@ -101,15 +106,21 @@ function isOwnedByPackageScope(
 // "skip anything that isn't a plain dir/file" behavior) is an acceptable simplification.
 async function collectMarkdownFiles(
   cwd: string,
-  noiseDirNames: readonly string[]
+  noiseDirNames: readonly string[],
 ): Promise<string[]> {
   const results: string[] = [];
 
-  async function walk(directoryPath: string, relDirectory: string): Promise<void> {
-    const entries = await readdir(directoryPath, { withFileTypes: true }).catch(() => []);
+  async function walk(
+    directoryPath: string,
+    relDirectory: string,
+  ): Promise<void> {
+    const entries = await readdir(directoryPath, { withFileTypes: true }).catch(
+      () => [],
+    );
 
     for (const entry of entries) {
-      const relPath = relDirectory === "" ? entry.name : `${relDirectory}/${entry.name}`;
+      const relPath =
+        relDirectory === "" ? entry.name : `${relDirectory}/${entry.name}`;
 
       if (entry.isDirectory()) {
         if (noiseDirNames.includes(entry.name)) {
@@ -147,8 +158,14 @@ type ScopeClustersParams = {
 // cluster, defeating the heuristic. Root's own direct files instead become a low-priority
 // "root"-kind candidate.
 function computeScopeClusters(params: ScopeClustersParams): DocCluster[] {
-  const { scopeRoot, workspacePackage, files, minClusterSize, knownClusterNames, sampleSize } =
-    params;
+  const {
+    scopeRoot,
+    workspacePackage,
+    files,
+    minClusterSize,
+    knownClusterNames,
+    sampleSize,
+  } = params;
 
   const dirCounts = new Map<string, number>();
 
@@ -179,12 +196,14 @@ function computeScopeClusters(params: ScopeClustersParams): DocCluster[] {
       continue;
     }
 
-    const isKnown = knownClusterNames.has(path.posix.basename(dir).toLowerCase());
+    const isKnown = knownClusterNames.has(
+      path.posix.basename(dir).toLowerCase(),
+    );
     if (subtreeCount >= minClusterSize || (isKnown && subtreeCount >= 1)) {
       qualifying.push({
         dir,
         subtreeCount,
-        score: subtreeCount + (isKnown ? minClusterSize : 0)
+        score: subtreeCount + (isKnown ? minClusterSize : 0),
       });
     }
   }
@@ -199,7 +218,9 @@ function computeScopeClusters(params: ScopeClustersParams): DocCluster[] {
   const kept: Candidate[] = [];
   for (const candidate of qualifying) {
     const coveredByKept = kept.some(
-      (entry) => candidate.dir === entry.dir || candidate.dir.startsWith(`${entry.dir}/`)
+      (entry) =>
+        candidate.dir === entry.dir ||
+        candidate.dir.startsWith(`${entry.dir}/`),
     );
     if (!coveredByKept) {
       kept.push(candidate);
@@ -208,7 +229,8 @@ function computeScopeClusters(params: ScopeClustersParams): DocCluster[] {
 
   // Spread the tag in only when defined — the public contract has repo-root-scoped entries
   // omit `workspacePackage` entirely, not carry it as an explicit `undefined` value.
-  const workspacePackageTag = workspacePackage === undefined ? {} : { workspacePackage };
+  const workspacePackageTag =
+    workspacePackage === undefined ? {} : { workspacePackage };
 
   const clusters: DocCluster[] = kept.map(({ dir, subtreeCount, score }) => ({
     path: dir,
@@ -216,8 +238,10 @@ function computeScopeClusters(params: ScopeClustersParams): DocCluster[] {
     score,
     subtreeCount,
     includeGlob: `${escapeGlobPath(dir)}/**/*.{md,mdx}`,
-    sampleFiles: files.filter((file) => file.startsWith(`${dir}/`)).slice(0, sampleSize),
-    ...workspacePackageTag
+    sampleFiles: files
+      .filter((file) => file.startsWith(`${dir}/`))
+      .slice(0, sampleSize),
+    ...workspacePackageTag,
   }));
 
   const directFiles = files.filter((file) => dirnameOf(file) === scopeRoot);
@@ -231,28 +255,38 @@ function computeScopeClusters(params: ScopeClustersParams): DocCluster[] {
       // rewrites any slash-free pattern to `**/${pattern}`, which would silently turn a
       // root-only proposal into a repo-wide one once `init` writes it into config.
       includeGlob:
-        scopeRoot === "" ? "./*.{md,mdx}" : `${escapeGlobPath(scopeRoot)}/*.{md,mdx}`,
+        scopeRoot === ""
+          ? "./*.{md,mdx}"
+          : `${escapeGlobPath(scopeRoot)}/*.{md,mdx}`,
       sampleFiles: directFiles.slice(0, sampleSize),
-      ...workspacePackageTag
+      ...workspacePackageTag,
     });
   }
 
   return clusters;
 }
 
-const CLUSTER_KIND_RANK: Record<DocClusterKind, number> = { cluster: 0, root: 1, fallback: 2 };
+const CLUSTER_KIND_RANK: Record<DocClusterKind, number> = {
+  cluster: 0,
+  root: 1,
+  fallback: 2,
+};
 
 /**
  * Scans a repository for Markdown doc clusters and the package manager in use (P6.01), so
  * `init` (P6.03/04) can propose defaults instead of hardcoding `docs/`. Pure and read-only;
  * does not write anything.
  */
-export async function scanRepository(options: ScanRepositoryOptions): Promise<RepoScanResult> {
+export async function scanRepository(
+  options: ScanRepositoryOptions,
+): Promise<RepoScanResult> {
   const { cwd } = options;
   const sampleSize = options.sampleSize ?? DEFAULT_SAMPLE_SIZE;
   const minClusterSize = options.minClusterSize ?? DEFAULT_MIN_CLUSTER_SIZE;
   const knownClusterNames = new Set(
-    (options.knownClusterNames ?? DEFAULT_KNOWN_CLUSTER_NAMES).map((name) => name.toLowerCase())
+    (options.knownClusterNames ?? DEFAULT_KNOWN_CLUSTER_NAMES).map((name) =>
+      name.toLowerCase(),
+    ),
   );
   const noiseDirNames = options.noiseDirNames ?? DEFAULT_NOISE_DIR_NAMES;
 
@@ -264,14 +298,17 @@ export async function scanRepository(options: ScanRepositoryOptions): Promise<Re
   const [packageManager, workspacePackages, unsortedFiles] = await Promise.all([
     detectPackageManager(cwd),
     detectWorkspacePackagesWithNoise(cwd, noiseDirNames),
-    collectMarkdownFiles(cwd, noiseDirNames)
+    collectMarkdownFiles(cwd, noiseDirNames),
   ]);
 
   const allFiles = unsortedFiles.sort(compareStrings);
 
   const scopes: { scopeRoot: string; workspacePackage?: string }[] = [
     { scopeRoot: "" },
-    ...workspacePackages.map((pkg) => ({ scopeRoot: pkg.path, workspacePackage: pkg.path }))
+    ...workspacePackages.map((pkg) => ({
+      scopeRoot: pkg.path,
+      workspacePackage: pkg.path,
+    })),
   ];
 
   const clusters: DocCluster[] = [];
@@ -286,10 +323,11 @@ export async function scanRepository(options: ScanRepositoryOptions): Promise<Re
     const scopeFiles =
       workspacePackage === undefined
         ? allFiles.filter(
-            (file) => !workspacePackages.some((pkg) => file.startsWith(`${pkg.path}/`))
+            (file) =>
+              !workspacePackages.some((pkg) => file.startsWith(`${pkg.path}/`)),
           )
         : allFiles.filter((file) =>
-            isOwnedByPackageScope(file, workspacePackage, workspacePackages)
+            isOwnedByPackageScope(file, workspacePackage, workspacePackages),
           );
 
     clusters.push(
@@ -299,8 +337,8 @@ export async function scanRepository(options: ScanRepositoryOptions): Promise<Re
         files: scopeFiles,
         minClusterSize,
         knownClusterNames,
-        sampleSize
-      })
+        sampleSize,
+      }),
     );
   }
 
@@ -318,12 +356,13 @@ export async function scanRepository(options: ScanRepositoryOptions): Promise<Re
       score: allFiles.length,
       subtreeCount: allFiles.length,
       includeGlob: "**/*.md",
-      sampleFiles: allFiles.slice(0, sampleSize)
+      sampleFiles: allFiles.slice(0, sampleSize),
     });
   }
 
   clusters.sort((left, right) => {
-    const rankDiff = CLUSTER_KIND_RANK[left.kind] - CLUSTER_KIND_RANK[right.kind];
+    const rankDiff =
+      CLUSTER_KIND_RANK[left.kind] - CLUSTER_KIND_RANK[right.kind];
     if (rankDiff !== 0) {
       return rankDiff;
     }

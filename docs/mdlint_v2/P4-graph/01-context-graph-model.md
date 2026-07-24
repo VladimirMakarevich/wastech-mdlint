@@ -28,7 +28,7 @@ the current implementation graph builder.
    **anchor** edges (heading-slug match), **import** edges (`@path.md`), and **id-ref** edges.
    **id-ref discovery is column-based (decided 2026-07-02, audit 5.5):** defined IDs come from
    the declared `definitions`/`idColumn` columns (+ headings), the **same model as REF-005** —
-   `idPattern` validates the token *within* those cells, it does not scan arbitrary cells. The
+   `idPattern` validates the token _within_ those cells, it does not scan arbitrary cells. The
    graph therefore receives `idRef: { idPattern, definitions, idColumn }` (from REF-005-style
    config); with no such config, no id-ref edges are built. Resolve defined IDs via the shared
    `extractDefinedIds(doc, idRef)` helper over the parsed `tables`/`headings` (audit 2.1) — no
@@ -61,7 +61,7 @@ precedence rule](../../../AGENTS.md):
   `extractDefinedIds` (column cells + heading tokens matching `idPattern` — audit 5.5's "+
   headings" widening, applied post-review; see below), but `idRef` has no "references" column to
   mirror it — id-ref edges instead come from scanning each document's raw text for tokens equal to
-  an ID defined *elsewhere*. This is the literal reading of G1's own example ("`REQ-001`
+  an ID defined _elsewhere_. This is the literal reading of G1's own example ("`REQ-001`
   referenced in prose with no Markdown link") and keeps the definer side honest without inventing
   config that doesn't exist yet.
 

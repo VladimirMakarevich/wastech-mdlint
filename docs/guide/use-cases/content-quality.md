@@ -8,10 +8,17 @@ uses canonical glossary terms.
 ```jsonc
 {
   "rules": [
-    { "rule": "CTX-001" },                                              // no empty / TBD-TODO-only sections
+    { "rule": "CTX-001" }, // no empty / TBD-TODO-only sections
     { "rule": "CTX-002", "options": { "section": "Acceptance criteria" } }, // all - [ ] checked
-    { "rule": "CTX-003", "options": { "glossary": "docs/glossary.md", "termColumn": "Term", "aliasColumn": "Aliases" } }
-  ]
+    {
+      "rule": "CTX-003",
+      "options": {
+        "glossary": "docs/glossary.md",
+        "termColumn": "Term",
+        "aliasColumn": "Aliases",
+      },
+    },
+  ],
 }
 ```
 

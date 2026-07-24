@@ -1,7 +1,15 @@
 import { compareStrings } from "../deterministic-sort.js";
 import type { GraphCoverage } from "./coverage.js";
-import type { ContextGraph, ContextGraphEdge, ContextGraphNode } from "./context-graph-types.js";
-import { formatContextGraphSummary, getComponents, topologicalSort } from "./graph-algorithms.js";
+import type {
+  ContextGraph,
+  ContextGraphEdge,
+  ContextGraphNode,
+} from "./context-graph-types.js";
+import {
+  formatContextGraphSummary,
+  getComponents,
+  topologicalSort,
+} from "./graph-algorithms.js";
 import type { ImpactClassification } from "./impact-analysis.js";
 import type { ContextSliceResult } from "./search-index.js";
 
@@ -37,13 +45,18 @@ export type ContextGraphSummary = {
 // only human output). Mirrors `renderContextGraphText`'s optional-coverage parameter so both formats
 // expose the same signal. `components`/`readingOrder` reuse P4.02's algorithms verbatim rather than
 // recomputing clusters/order here.
-export function summarizeContextGraph(graph: ContextGraph, coverage?: GraphCoverage): ContextGraphSummary {
+export function summarizeContextGraph(
+  graph: ContextGraph,
+  coverage?: GraphCoverage,
+): ContextGraphSummary {
   return {
-    nodes: [...graph.nodes].sort((left, right) => byPath(left.path, right.path)),
+    nodes: [...graph.nodes].sort((left, right) =>
+      byPath(left.path, right.path),
+    ),
     edges: [...graph.edges].sort(compareEdges),
     components: getComponents(graph),
     readingOrder: topologicalSort(graph).order,
-    ...(coverage !== undefined ? { coverage } : {})
+    ...(coverage !== undefined ? { coverage } : {}),
   };
 }
 
@@ -51,7 +64,10 @@ export function summarizeContextGraph(graph: ContextGraph, coverage?: GraphCover
 // points/hubs) rather than re-deriving those fields, then appends the three signals the AC asks for
 // that the P4.02 summary does not already cover: clusters, reading order, and (optionally) the P4.06
 // coverage signal.
-export function renderContextGraphText(graph: ContextGraph, coverage?: GraphCoverage): string {
+export function renderContextGraphText(
+  graph: ContextGraph,
+  coverage?: GraphCoverage,
+): string {
   const lines = [formatContextGraphSummary(graph)];
 
   const components = getComponents(graph);
@@ -63,7 +79,9 @@ export function renderContextGraphText(graph: ContextGraph, coverage?: GraphCove
   const { order, excluded } = topologicalSort(graph);
   lines.push(`reading order (${order.length}): ${order.join(", ")}`);
   if (excluded.length > 0) {
-    lines.push(`excluded from reading order (${excluded.length}): ${excluded.join(", ")}`);
+    lines.push(
+      `excluded from reading order (${excluded.length}): ${excluded.join(", ")}`,
+    );
   }
 
   if (coverage !== undefined) {
@@ -71,7 +89,7 @@ export function renderContextGraphText(graph: ContextGraph, coverage?: GraphCove
     lines.push(`  nodes: ${coverage.nodeCount}`);
     lines.push(`  edges: ${coverage.edgeCount}`);
     lines.push(
-      `  files outside corpus (${coverage.filesOutsideCorpus.length}): ${coverage.filesOutsideCorpus.join(", ")}`
+      `  files outside corpus (${coverage.filesOutsideCorpus.length}): ${coverage.filesOutsideCorpus.join(", ")}`,
     );
   }
 
@@ -93,10 +111,15 @@ function buildNodeIdMap(graph: ContextGraph): Map<string, string> {
 // invariant, see coverage.ts), so every edge endpoint is guaranteed to be in `idByPath`. Looking this
 // up as a checked throw (rather than a non-null assertion) keeps that invariant enforced loudly if a
 // future caller ever hands the renderer a hand-built, inconsistent graph.
-function requireNodeId(idByPath: Map<string, string>, nodePath: string): string {
+function requireNodeId(
+  idByPath: Map<string, string>,
+  nodePath: string,
+): string {
   const id = idByPath.get(nodePath);
   if (id === undefined) {
-    throw new Error(`Context graph edge references a node missing from graph.nodes: "${nodePath}"`);
+    throw new Error(
+      `Context graph edge references a node missing from graph.nodes: "${nodePath}"`,
+    );
   }
   return id;
 }
@@ -109,7 +132,9 @@ export function renderContextGraphMermaid(graph: ContextGraph): string {
   const idByPath = buildNodeIdMap(graph);
   const lines = ["flowchart TD"];
 
-  for (const [nodePath, id] of [...idByPath.entries()].sort((left, right) => byPath(left[0], right[0]))) {
+  for (const [nodePath, id] of [...idByPath.entries()].sort((left, right) =>
+    byPath(left[0], right[0]),
+  )) {
     lines.push(`  ${id}["${escapeMermaidLabel(nodePath)}"]`);
   }
 
@@ -130,14 +155,18 @@ export function renderContextGraphDot(graph: ContextGraph): string {
   const idByPath = buildNodeIdMap(graph);
   const lines = ["digraph ContextGraph {"];
 
-  for (const [nodePath, id] of [...idByPath.entries()].sort((left, right) => byPath(left[0], right[0]))) {
+  for (const [nodePath, id] of [...idByPath.entries()].sort((left, right) =>
+    byPath(left[0], right[0]),
+  )) {
     lines.push(`  ${id} [label="${escapeDotLabel(nodePath)}"];`);
   }
 
   for (const edge of [...graph.edges].sort(compareEdges)) {
     const fromId = requireNodeId(idByPath, edge.from);
     const toId = requireNodeId(idByPath, edge.to);
-    lines.push(`  ${fromId} -> ${toId} [label="${escapeDotLabel(edge.type)}"];`);
+    lines.push(
+      `  ${fromId} -> ${toId} [label="${escapeDotLabel(edge.type)}"];`,
+    );
   }
 
   lines.push("}");
@@ -152,7 +181,7 @@ export function renderContextSliceSummary(result: ContextSliceResult): string {
   const lines = [
     `query: ${result.query}`,
     `matched: ${result.matchKind} (${result.starts.join(", ")})`,
-    `files (${result.files.length}):`
+    `files (${result.files.length}):`,
   ];
   for (const file of result.files) {
     lines.push(`  ${file}`);
@@ -162,9 +191,14 @@ export function renderContextSliceSummary(result: ContextSliceResult): string {
 }
 
 export function renderImpactSummary(result: ImpactClassification): string {
-  const lines = [`changed file: ${result.file}`, `directly affected (${result.directlyAffected.length}):`];
+  const lines = [
+    `changed file: ${result.file}`,
+    `directly affected (${result.directlyAffected.length}):`,
+  ];
   for (const entry of result.directlyAffected) {
-    lines.push(`  ${entry.path} (${entry.references} reference${entry.references === 1 ? "" : "s"})`);
+    lines.push(
+      `  ${entry.path} (${entry.references} reference${entry.references === 1 ? "" : "s"})`,
+    );
   }
 
   lines.push(`transitively affected (${result.transitivelyAffected.length}):`);
@@ -172,9 +206,13 @@ export function renderImpactSummary(result: ImpactClassification): string {
     lines.push(`  ${entry.path} (depth ${entry.depth}, via ${entry.via})`);
   }
 
-  lines.push(`reading order (${result.readingOrder.length}): ${result.readingOrder.join(", ")}`);
+  lines.push(
+    `reading order (${result.readingOrder.length}): ${result.readingOrder.join(", ")}`,
+  );
   if (result.excluded.length > 0) {
-    lines.push(`excluded from reading order (${result.excluded.length}): ${result.excluded.join(", ")}`);
+    lines.push(
+      `excluded from reading order (${result.excluded.length}): ${result.excluded.join(", ")}`,
+    );
   }
 
   return lines.join("\n");

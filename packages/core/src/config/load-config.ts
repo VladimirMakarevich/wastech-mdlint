@@ -1,13 +1,24 @@
 import { readFile, access } from "node:fs/promises";
 import path from "node:path";
 
-import { type ParseError, parse as parseJsonc, printParseErrorCode } from "jsonc-parser";
+import {
+  type ParseError,
+  parse as parseJsonc,
+  printParseErrorCode,
+} from "jsonc-parser";
 import { z } from "zod";
 
 import { RuleResolutionError, type RuleRegistry } from "../engine/registry.js";
-import { resolveCustomRule, type CustomRuleEntry } from "../engine/rules/custom.js";
+import {
+  resolveCustomRule,
+  type CustomRuleEntry,
+} from "../engine/rules/custom.js";
 import { ruleRegistry } from "../engine/rules/index.js";
-import type { ResolvedSettings, Rule, SeverityOverride } from "../engine/types.js";
+import type {
+  ResolvedSettings,
+  Rule,
+  SeverityOverride,
+} from "../engine/types.js";
 import { ConfigError } from "./config-error.js";
 import { lintConfigSchema, type LintConfig } from "./config-schema.js";
 import { findConfig } from "./find-config.js";
@@ -30,7 +41,7 @@ function defaultConfiguration(): LoadedConfiguration {
   return {
     config: { include: ["**/*.md"], rules: [] },
     rules: [],
-    settings: {}
+    settings: {},
   };
 }
 
@@ -44,42 +55,63 @@ async function fileExists(filePath: string): Promise<boolean> {
 }
 
 function formatRootIssue(issue: z.core.$ZodIssue): string {
-  const location = issue.path.length === 0 ? "config" : `config.${issue.path.join(".")}`;
+  const location =
+    issue.path.length === 0 ? "config" : `config.${issue.path.join(".")}`;
   return `- ${location}: ${issue.message}`;
 }
 
-function formatRuleResolutionError(index: number, error: RuleResolutionError): string[] {
+function formatRuleResolutionError(
+  index: number,
+  error: RuleResolutionError,
+): string[] {
   if (error.code === "UNKNOWN_RULE") {
-    const suffix = error.suggestion === undefined ? "" : ` Did you mean "${error.suggestion}"?`;
+    const suffix =
+      error.suggestion === undefined
+        ? ""
+        : ` Did you mean "${error.suggestion}"?`;
     return [`- rules[${index}]: Unknown rule "${error.ruleName}".${suffix}`];
   }
 
   // Issue paths already carry their full location (e.g. ["options", "maxBytes"] or ["id"]).
-  return (error.issues ?? [{ path: [], message: error.message }]).map((issue) => {
-    const location = issue.path.length === 0 ? `rules[${index}]` : `rules[${index}].${issue.path.join(".")}`;
-    return `- ${location}: ${issue.message}`;
-  });
+  return (error.issues ?? [{ path: [], message: error.message }]).map(
+    (issue) => {
+      const location =
+        issue.path.length === 0
+          ? `rules[${index}]`
+          : `rules[${index}].${issue.path.join(".")}`;
+      return `- ${location}: ${issue.message}`;
+    },
+  );
 }
 
 function parseJsoncConfig(text: string, configPath: string): unknown {
   const errors: ParseError[] = [];
-  const value = parseJsonc(text, errors, { allowTrailingComma: true, disallowComments: false });
+  const value = parseJsonc(text, errors, {
+    allowTrailingComma: true,
+    disallowComments: false,
+  });
 
   if (errors.length > 0) {
     const details = errors
-      .map((error) => `${printParseErrorCode(error.error)} at offset ${error.offset}`)
+      .map(
+        (error) =>
+          `${printParseErrorCode(error.error)} at offset ${error.offset}`,
+      )
       .join("; ");
     throw new ConfigError(
       "CONFIG_INVALID",
       `Failed to parse JSONC config at ${configPath}: ${details}`,
-      details
+      details,
     );
   }
 
   return value;
 }
 
-function resolveRules(config: LintConfig, registry: RuleRegistry): ConfiguredRule[] {
+function resolveRules(
+  config: LintConfig,
+  registry: RuleRegistry,
+): ConfiguredRule[] {
   const entries = config.rules ?? [];
   const resolved: ConfiguredRule[] = [];
   const errors: string[] = [];
@@ -89,7 +121,10 @@ function resolveRules(config: LintConfig, registry: RuleRegistry): ConfiguredRul
       const rule =
         entry.rule === "custom"
           ? resolveCustomRule(entry as CustomRuleEntry, registry)
-          : registry.resolveRule(entry.rule, (entry as { options?: unknown }).options);
+          : registry.resolveRule(
+              entry.rule,
+              (entry as { options?: unknown }).options,
+            );
       resolved.push({ rule, severity: entry.severity });
     } catch (error) {
       if (error instanceof RuleResolutionError) {
@@ -102,7 +137,11 @@ function resolveRules(config: LintConfig, registry: RuleRegistry): ConfiguredRul
 
   if (errors.length > 0) {
     // hint = the first formatted issue (matches the task's "hint = failing path").
-    throw new ConfigError("CONFIG_INVALID", `Invalid config:\n${errors.join("\n")}`, errors[0]);
+    throw new ConfigError(
+      "CONFIG_INVALID",
+      `Invalid config:\n${errors.join("\n")}`,
+      errors[0],
+    );
   }
 
   return resolved;
@@ -126,11 +165,14 @@ export async function loadConfiguration(params: {
     ? path.resolve(params.explicitConfigPath)
     : undefined;
 
-  if (explicitConfigPath !== undefined && !(await fileExists(explicitConfigPath))) {
+  if (
+    explicitConfigPath !== undefined &&
+    !(await fileExists(explicitConfigPath))
+  ) {
     throw new ConfigError(
       "CONFIG_NOT_FOUND",
       `Config file not found: ${explicitConfigPath}`,
-      "Check that configPath/cwd points to an existing wastech-mdlint.config.json, or omit it to use the zero-config default."
+      "Check that configPath/cwd points to an existing wastech-mdlint.config.json, or omit it to use the zero-config default.",
     );
   }
 
@@ -149,7 +191,7 @@ export async function loadConfiguration(params: {
     throw new ConfigError(
       "CONFIG_INVALID",
       `Invalid config at ${configPath}:\n${lines.join("\n")}`,
-      lines[0]
+      lines[0],
     );
   }
 
@@ -159,6 +201,6 @@ export async function loadConfiguration(params: {
     config,
     configPath,
     rules: resolveRules(config, registry),
-    settings: (config.settings ?? {}) as ResolvedSettings
+    settings: (config.settings ?? {}) as ResolvedSettings,
   };
 }

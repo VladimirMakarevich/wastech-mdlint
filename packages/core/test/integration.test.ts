@@ -14,7 +14,9 @@ import { lintFiles } from "../src/engine/lint-files.js";
 const tempDirs: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
+  );
 });
 
 async function fixtureRepo(files: Record<string, string>): Promise<string> {
@@ -34,15 +36,25 @@ const CONFIG = JSON.stringify({
   rules: [
     { rule: "REF-001" },
     { rule: "TBL-002", options: { columns: ["Owner"] } },
-    { rule: "SEC-001", options: { sections: ["Overview"], files: ["docs/**/*.md"] } },
+    {
+      rule: "SEC-001",
+      options: { sections: ["Overview"], files: ["docs/**/*.md"] },
+    },
     { rule: "GRP-001" },
     { rule: "SIZE-001", options: { lines: { warn: 1 } } },
     {
       rule: "custom",
       id: "REQ-STATUS",
-      options: { files: ["docs/**/*.md"], assert: { kind: "columnInSet", column: "Status", values: ["open", "done"] } }
-    }
-  ]
+      options: {
+        files: ["docs/**/*.md"],
+        assert: {
+          kind: "columnInSet",
+          column: "Status",
+          values: ["open", "done"],
+        },
+      },
+    },
+  ],
 });
 
 const REPO = {
@@ -56,15 +68,20 @@ const REPO = {
     "| --- | --- | --- |",
     "| REQ-1 |  | bogus |",
     "",
-    "[dangling](nope.md)"
+    "[dangling](nope.md)",
   ].join("\n"),
   "docs/missing-overview.md": "## Detail\n\nno overview section here\n",
-  "ignored/junk.md": "[broken](also-missing.md)\n"
+  "ignored/junk.md": "[broken](also-missing.md)\n",
 };
 
 async function runLint(cwd: string) {
   const loaded = await loadConfiguration({ cwd });
-  return lintFiles({ cwd, config: loaded.config, rules: loaded.rules, settings: loaded.settings });
+  return lintFiles({
+    cwd,
+    config: loaded.config,
+    rules: loaded.rules,
+    settings: loaded.settings,
+  });
 }
 
 describe("core pipeline integration", () => {
@@ -81,7 +98,9 @@ describe("core pipeline integration", () => {
 
     // Excluded files never enter the corpus.
     expect(result.files).not.toContain("ignored/junk.md");
-    expect(result.messages.some((message) => message.filePath === "ignored/junk.md")).toBe(false);
+    expect(
+      result.messages.some((message) => message.filePath === "ignored/junk.md"),
+    ).toBe(false);
   });
 
   it("produces byte-identical JSON output across repeated runs (determinism)", async () => {

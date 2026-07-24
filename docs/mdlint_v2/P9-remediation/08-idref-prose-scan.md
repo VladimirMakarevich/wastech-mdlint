@@ -12,7 +12,7 @@ inline code, or frontmatter — which inflates `impact`/`slice` blast radius and
 ## Problem (from the audit)
 
 `buildIdRefEdges` (`packages/core/src/graph/build-context-graph.ts:49,85`) scans the raw
-`document.content`, so an ID token inside a ```code fence``` still creates a real `id-ref` edge.
+`document.content`, so an ID token inside a `code fence` still creates a real `id-ref` edge.
 This is a **documented, accepted** v2 limitation (finding A, pinned by an existing test), not a
 plan violation — it is captured here so the trade-off is tracked, not lost.
 

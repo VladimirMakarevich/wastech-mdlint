@@ -10,10 +10,10 @@ and the requirement text no longer disagree. Documentation-only.
 
 ## Problem (from the audit)
 
-- **L-8** `requirements/02-rules-engine.md` R7 ("uniform `files`/`exclude` base for *every* rule")
+- **L-8** `requirements/02-rules-engine.md` R7 ("uniform `files`/`exclude` base for _every_ rule")
   is literally contradicted: `fileScopeShape` (`rules/scope.ts:10`) is omitted by REF-001/003/004/
   005, LLM-001, SIZE-001 (SIZE uses `overrides[].pattern`). The P3 task tables (higher precedence)
-  don't promise `files?` on those, so the code matches the *specific* plan — R7's general text
+  don't promise `files?` on those, so the code matches the _specific_ plan — R7's general text
   needs a one-line reconciliation.
 - **L-9** `requirements/05-mcp-server.md:13` (M1 table) shorthand says "graph/slice/impact/lint",
   omitting `lint-files`; the detail paragraph (24-28) is correct. Doc shorthand only.

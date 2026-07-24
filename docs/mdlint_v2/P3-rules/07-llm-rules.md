@@ -17,10 +17,10 @@ the new engine, so the original PLAN.md mission rides on top of the doc-integrit
 
 ## Rules
 
-| ID | Scope | Severity | Checks | Key options |
-| --- | --- | --- | --- | --- |
-| SIZE-001 | document | configurable | file over byte / line / token budget | `bytes?:{warn?,error?}`, `lines?:{warn?,error?}`, `tokens?:{warn?,error?}`, `overrides[{pattern,bytes?,lines?,tokens?}]` |
-| LLM-001 | project | configurable | eager-import budget per entrypoint over limit | `entrypoints`, `maxTokensPerEntrypoint` |
+| ID       | Scope    | Severity     | Checks                                        | Key options                                                                                                              |
+| -------- | -------- | ------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| SIZE-001 | document | configurable | file over byte / line / token budget          | `bytes?:{warn?,error?}`, `lines?:{warn?,error?}`, `tokens?:{warn?,error?}`, `overrides[{pattern,bytes?,lines?,tokens?}]` |
+| LLM-001  | project  | configurable | eager-import budget per entrypoint over limit | `entrypoints`, `maxTokensPerEntrypoint`                                                                                  |
 
 ## SIZE-001 — Configuration schema
 
@@ -30,14 +30,17 @@ Each metric is optional; omitting it disables that check entirely.
 {
   "rule": "SIZE-001",
   "options": {
-    "bytes":  { "warn": 49152, "error": 65536 },  // 48 KB warn, 64 KB error
-    "lines":  { "warn": 300,   "error": 500 },
-    "tokens": { "warn": 1500,  "error": 3000 },
+    "bytes": { "warn": 49152, "error": 65536 }, // 48 KB warn, 64 KB error
+    "lines": { "warn": 300, "error": 500 },
+    "tokens": { "warn": 1500, "error": 3000 },
     "overrides": [
-      { "pattern": "CLAUDE.md",          "bytes": { "warn": 24576, "error": 32768 } },
-      { "pattern": "skills/**/SKILL.md", "bytes": { "warn": 18432, "error": 24576 } }
-    ]
-  }
+      { "pattern": "CLAUDE.md", "bytes": { "warn": 24576, "error": 32768 } },
+      {
+        "pattern": "skills/**/SKILL.md",
+        "bytes": { "warn": 18432, "error": 24576 },
+      },
+    ],
+  },
 }
 ```
 
@@ -61,9 +64,9 @@ Threshold semantics:
 {
   "rule": "LLM-001",
   "options": {
-    "entrypoints": ["CLAUDE.md", "AGENTS.md"],   // globs; which docs to budget
-    "maxTokensPerEntrypoint": 8000               // own + all eager-imported tokens, summed
-  }
+    "entrypoints": ["CLAUDE.md", "AGENTS.md"], // globs; which docs to budget
+    "maxTokensPerEntrypoint": 8000, // own + all eager-imported tokens, summed
+  },
 }
 ```
 

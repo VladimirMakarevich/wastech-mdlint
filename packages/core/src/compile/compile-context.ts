@@ -1,5 +1,9 @@
 import { compareStrings } from "../deterministic-sort.js";
-import type { CompileConfig, CustomRuleConfigEntry, RuleConfigEntry } from "../config/config-schema.js";
+import type {
+  CompileConfig,
+  CustomRuleConfigEntry,
+  RuleConfigEntry,
+} from "../config/config-schema.js";
 import type { ToolErrorCode } from "../errors.js";
 import type { LoadedConfiguration } from "../config/load-config.js";
 import { ruleRegistry } from "../engine/rules/index.js";
@@ -19,7 +23,7 @@ import {
   type CompileBudgetEntrypoint,
   type CompileCommandPreset,
   type CompileResult,
-  type CompileSections
+  type CompileSections,
 } from "./synthesize.js";
 
 // P5.04 orchestration: the entry point both the CLI (P5.05) and MCP (P7.04) call. Reuses
@@ -34,7 +38,8 @@ export class CompileConfigMissingError extends Error {
   readonly hint: string;
 
   constructor() {
-    const hint = 'Add a "compile" section to the config with at least "compile.skill.name" and "compile.skill.description".';
+    const hint =
+      'Add a "compile" section to the config with at least "compile.skill.name" and "compile.skill.description".';
     super(`Cannot compile a SKILL.md: config.compile is missing. ${hint}`);
     this.name = "CompileConfigMissingError";
     this.hint = hint;
@@ -51,25 +56,32 @@ type ResolvedCompileSettings = {
 // `config-schema.ts`'s strict `compileConfigSchema` already validated presence and shape of every
 // leaf (P5.05), so only *absent* optional leaves need a default here — no more per-leaf `safeParse`
 // defaulting. `outdir` still isn't read here — that stays the CLI's job.
-function resolveCompileSettings(compileConfig: CompileConfig): ResolvedCompileSettings {
+function resolveCompileSettings(
+  compileConfig: CompileConfig,
+): ResolvedCompileSettings {
   return {
     skill: compileConfig.skill,
     sections: {
       architecture: compileConfig.sections?.architecture ?? true,
       rules: compileConfig.sections?.rules ?? true,
       dependencies: compileConfig.sections?.dependencies ?? true,
-      workflow: compileConfig.sections?.workflow ?? true
+      workflow: compileConfig.sections?.workflow ?? true,
     },
     commandPreset: compileConfig.commandPreset ?? "generic",
-    hubMinInDegree: compileConfig.hubMinInDegree ?? DEFAULT_HUB_MIN_IN_DEGREE
+    hubMinInDegree: compileConfig.hubMinInDegree ?? DEFAULT_HUB_MIN_IN_DEGREE,
   };
 }
 
-function isCustomRuleEntry(entry: RuleConfigEntry | CustomRuleConfigEntry): entry is CustomRuleConfigEntry {
+function isCustomRuleEntry(
+  entry: RuleConfigEntry | CustomRuleConfigEntry,
+): entry is CustomRuleConfigEntry {
   return entry.rule === "custom";
 }
 
-type ActiveLlm001Entry = { entrypoints: string[]; maxTokensPerEntrypoint: number };
+type ActiveLlm001Entry = {
+  entrypoints: string[];
+  maxTokensPerEntrypoint: number;
+};
 
 // S6: reuses LLM-001's own options schema (so budget options are validated exactly the way
 // `resolveRule` validates them) and the shared graph traversal (`query`, edgeTypes: ["import"])
@@ -77,7 +89,7 @@ type ActiveLlm001Entry = { entrypoints: string[]; maxTokensPerEntrypoint: number
 function computeBudget(
   rules: readonly (RuleConfigEntry | CustomRuleConfigEntry)[],
   documents: Map<string, ParsedDocument>,
-  graph: ContextGraph
+  graph: ContextGraph,
 ): CompileBudget {
   let corpusTokenEstimate = 0;
   for (const document of documents.values()) {
@@ -86,7 +98,9 @@ function computeBudget(
 
   const llm001Metadata = ruleRegistry.getMetadata("LLM-001");
   if (llm001Metadata === undefined) {
-    throw new Error('Cannot compute the context budget: "LLM-001" metadata is missing from the registry.');
+    throw new Error(
+      'Cannot compute the context budget: "LLM-001" metadata is missing from the registry.',
+    );
   }
 
   // Collect every active entry first (not a first-match dedupe): `rules[]` may configure LLM-001
@@ -96,12 +110,18 @@ function computeBudget(
   let llm001Enabled = false;
 
   for (const entry of rules) {
-    if (isCustomRuleEntry(entry) || canonicalizeRuleId(entry.rule) !== "LLM-001" || entry.severity === "off") {
+    if (
+      isCustomRuleEntry(entry) ||
+      canonicalizeRuleId(entry.rule) !== "LLM-001" ||
+      entry.severity === "off"
+    ) {
       continue;
     }
     llm001Enabled = true;
 
-    const parsedOptions = llm001Metadata.optionsSchema.safeParse(entry.options ?? {});
+    const parsedOptions = llm001Metadata.optionsSchema.safeParse(
+      entry.options ?? {},
+    );
     if (!parsedOptions.success) {
       continue;
     }
@@ -120,7 +140,10 @@ function computeBudget(
       if (!matchesConfigGlob(entrypoint, activeEntry.entrypoints)) {
         continue;
       }
-      if (strictestMaxTokens === undefined || activeEntry.maxTokensPerEntrypoint < strictestMaxTokens) {
+      if (
+        strictestMaxTokens === undefined ||
+        activeEntry.maxTokensPerEntrypoint < strictestMaxTokens
+      ) {
         strictestMaxTokens = activeEntry.maxTokensPerEntrypoint;
       }
     }
@@ -130,7 +153,11 @@ function computeBudget(
     entrypointsMatched += 1;
 
     let totalTokens = estimateTokens(documents.get(entrypoint)!.content);
-    const reached = query(graph, { start: entrypoint, direction: "forward", edgeTypes: ["import"] });
+    const reached = query(graph, {
+      start: entrypoint,
+      direction: "forward",
+      edgeTypes: ["import"],
+    });
     for (const visit of reached.visited) {
       if (visit.depth === 0) {
         continue;
@@ -139,29 +166,42 @@ function computeBudget(
     }
 
     if (totalTokens > strictestMaxTokens) {
-      overBudget.push({ path: entrypoint, totalTokens, maxTokens: strictestMaxTokens });
+      overBudget.push({
+        path: entrypoint,
+        totalTokens,
+        maxTokens: strictestMaxTokens,
+      });
     }
   }
 
   overBudget.sort((left, right) => compareStrings(left.path, right.path));
 
-  return { corpusTokenEstimate, llm001Enabled, entrypointsMatched, entrypointsOverBudget: overBudget };
+  return {
+    corpusTokenEstimate,
+    llm001Enabled,
+    entrypointsMatched,
+    entrypointsOverBudget: overBudget,
+  };
 }
 
 // The doc's illustrative signature (`compileContext(config, cwd): CompileResult`) is shorthand, not
 // literal: building a `CompileResult` requires `loadContext`, which is async, and every comparable
 // core entry point (`lintFiles`, `loadConfiguration`) is already async — so this one is too.
-export async function compileContext(config: LoadedConfiguration, cwd: string): Promise<CompileResult> {
+export async function compileContext(
+  config: LoadedConfiguration,
+  cwd: string,
+): Promise<CompileResult> {
   if (config.config.compile === undefined) {
     throw new CompileConfigMissingError();
   }
 
-  const { skill, sections, commandPreset, hubMinInDegree } = resolveCompileSettings(config.config.compile);
+  const { skill, sections, commandPreset, hubMinInDegree } =
+    resolveCompileSettings(config.config.compile);
 
   const { documents, graph } = await loadContext({
     cwd,
     config: config.config,
-    settings: config.settings
+    settings: config.settings,
   });
   const analysis = analyzeGraph(graph, { hubMinInDegree });
 
@@ -169,13 +209,24 @@ export async function compileContext(config: LoadedConfiguration, cwd: string): 
   const profiles = new Map(
     documentPaths.map((documentPath) => [
       documentPath,
-      extractDocProfile(documents.get(documentPath)!, graph, { hubMinInDegree })
-    ])
+      extractDocProfile(documents.get(documentPath)!, graph, {
+        hubMinInDegree,
+      }),
+    ]),
   );
 
   const configuredRules = config.config.rules ?? [];
   const ruleGroups = describeRules(configuredRules, ruleRegistry);
   const budget = computeBudget(configuredRules, documents, graph);
 
-  return synthesize({ skill, sections, commandPreset, documentPaths, profiles, analysis, ruleGroups, budget });
+  return synthesize({
+    skill,
+    sections,
+    commandPreset,
+    documentPaths,
+    profiles,
+    analysis,
+    ruleGroups,
+    budget,
+  });
 }

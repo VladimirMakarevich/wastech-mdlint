@@ -8,15 +8,26 @@ budget, so agents don't blow their context window.
 ```jsonc
 {
   "rules": [
-    { "rule": "SIZE-001", "options": {
-      "tokens": { "warn": 8000, "error": 16000 },
-      "overrides": [ { "pattern": "docs/reference/**", "tokens": { "warn": 20000, "error": 40000 } } ]
-    } },
-    { "rule": "LLM-001", "options": {
-      "entrypoints": ["CLAUDE.md", "AGENTS.md"],
-      "maxTokensPerEntrypoint": 20000
-    } }
-  ]
+    {
+      "rule": "SIZE-001",
+      "options": {
+        "tokens": { "warn": 8000, "error": 16000 },
+        "overrides": [
+          {
+            "pattern": "docs/reference/**",
+            "tokens": { "warn": 20000, "error": 40000 },
+          },
+        ],
+      },
+    },
+    {
+      "rule": "LLM-001",
+      "options": {
+        "entrypoints": ["CLAUDE.md", "AGENTS.md"],
+        "maxTokensPerEntrypoint": 20000,
+      },
+    },
+  ],
 }
 ```
 

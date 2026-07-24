@@ -125,7 +125,9 @@ export function getComponents(graph: ContextGraph): string[][] {
 
   // Seed BFS in sorted node path order so which node represents a component (and the discovery order)
   // is deterministic. Every node participates, so isolated files surface as singleton components.
-  for (const node of [...graph.nodes].sort((left, right) => byPath(left.path, right.path))) {
+  for (const node of [...graph.nodes].sort((left, right) =>
+    byPath(left.path, right.path),
+  )) {
     if (visited.has(node.path)) {
       continue;
     }
@@ -148,7 +150,9 @@ export function getComponents(graph: ContextGraph): string[][] {
 
   // Size descending, then by the component's smallest node path ascending — after the per-component
   // sort above that smallest path is `component[0]` (audit — P4 component-sort gap).
-  components.sort((left, right) => right.length - left.length || byPath(left[0]!, right[0]!));
+  components.sort(
+    (left, right) => right.length - left.length || byPath(left[0]!, right[0]!),
+  );
   return components;
 }
 
@@ -167,7 +171,8 @@ export function formatContextGraphSummary(graph: ContextGraph): string {
   const hubs = [...graph.nodes]
     .sort(
       (left, right) =>
-        right.inDegree + right.outDegree - (left.inDegree + left.outDegree) || byPath(left.path, right.path)
+        right.inDegree + right.outDegree - (left.inDegree + left.outDegree) ||
+        byPath(left.path, right.path),
     )
     .slice(0, TOP_HUB_LIMIT);
 
@@ -176,7 +181,7 @@ export function formatContextGraphSummary(graph: ContextGraph): string {
     `edges: ${graph.edges.length}`,
     `cycles: ${graph.cycles.length}`,
     `entry points (${entryPoints.length}): ${entryPoints.join(", ")}`,
-    "top hubs:"
+    "top hubs:",
   ];
   for (const hub of hubs) {
     lines.push(`  ${hub.path} (${hub.inDegree + hub.outDegree})`);

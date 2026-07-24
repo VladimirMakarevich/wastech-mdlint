@@ -22,13 +22,16 @@ function compareMessages(left: LintMessage, right: LintMessage): number {
  * runner throws instead of silently producing nothing. `"off"` rules are expected to be filtered by
  * the orchestrator before reaching here.
  */
-export function runRules(rules: readonly ResolvedRule[], context: RunRulesContext): LintMessage[] {
+export function runRules(
+  rules: readonly ResolvedRule[],
+  context: RunRulesContext,
+): LintMessage[] {
   const messages: LintMessage[] = [];
 
   for (const { rule, severityOverride } of rules) {
     if (rule.scope === "project" && context.documents === undefined) {
       throw new Error(
-        `Rule ${rule.id} is project-scoped but no documents were provided (this is a programming error, not a config issue).`
+        `Rule ${rule.id} is project-scoped but no documents were provided (this is a programming error, not a config issue).`,
       );
     }
 
@@ -38,13 +41,14 @@ export function runRules(rules: readonly ResolvedRule[], context: RunRulesContex
         // Config override wins (C2), then the rule's per-finding hint, then its default.
         severity: severityOverride ?? finding.severity ?? rule.defaultSeverity,
         message: finding.message,
-        filePath: finding.filePath ?? context.filePath ?? context.document?.path ?? "",
+        filePath:
+          finding.filePath ?? context.filePath ?? context.document?.path ?? "",
         line: finding.line,
         column: finding.column,
         endLine: finding.endLine,
         fixable: finding.fixable,
         data: finding.data,
-        helpUri: finding.helpUri
+        helpUri: finding.helpUri,
       });
     };
 

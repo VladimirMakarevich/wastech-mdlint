@@ -1,7 +1,10 @@
 import { z } from "zod";
 
 import { compareStrings } from "../../deterministic-sort.js";
-import { matchesConfigGlob, normalizeRelativePath } from "../../discovery/globs.js";
+import {
+  matchesConfigGlob,
+  normalizeRelativePath,
+} from "../../discovery/globs.js";
 import type { ParsedDocument } from "../../markdown/document-types.js";
 import { resolveTargetCandidates } from "../path-resolve.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
@@ -23,16 +26,26 @@ function resolveImportTarget(
   sourcePath: string,
   rawTarget: string,
   documents: Map<string, ParsedDocument>,
-  siteRouter: SiteRouterSettings | undefined
+  siteRouter: SiteRouterSettings | undefined,
 ): string {
   const target = rawTarget.replace(/^@/, "");
   const candidates = resolveTargetCandidates(sourcePath, target, siteRouter);
-  return candidates.find((candidate) => documents.has(candidate)) ?? candidates[0] ?? normalizeRelativePath(target);
+  return (
+    candidates.find((candidate) => documents.has(candidate)) ??
+    candidates[0] ??
+    normalizeRelativePath(target)
+  );
 }
 
 type EntrypointTraversal = {
   importedPaths: Set<string>;
-  missing: { sourcePath: string; rawTarget: string; targetPath: string; line: number; column?: number }[];
+  missing: {
+    sourcePath: string;
+    rawTarget: string;
+    targetPath: string;
+    line: number;
+    column?: number;
+  }[];
   cycles: { paths: string[]; sourcePath: string; line: number }[];
 };
 
@@ -41,7 +54,7 @@ type EntrypointTraversal = {
 function traverse(
   entrypoint: string,
   documents: Map<string, ParsedDocument>,
-  siteRouter: SiteRouterSettings | undefined
+  siteRouter: SiteRouterSettings | undefined,
 ): EntrypointTraversal {
   const importedPaths = new Set<string>();
   const missing: EntrypointTraversal["missing"] = [];
@@ -52,7 +65,12 @@ function traverse(
 
   const visit = (sourcePath: string): void => {
     for (const eagerImport of documents.get(sourcePath)?.imports ?? []) {
-      const targetPath = resolveImportTarget(sourcePath, eagerImport.rawTarget, documents, siteRouter);
+      const targetPath = resolveImportTarget(
+        sourcePath,
+        eagerImport.rawTarget,
+        documents,
+        siteRouter,
+      );
       const targetDoc = documents.get(targetPath);
 
       if (targetDoc === undefined) {
@@ -61,17 +79,24 @@ function traverse(
           rawTarget: eagerImport.rawTarget,
           targetPath,
           line: eagerImport.line,
-          column: eagerImport.column
+          column: eagerImport.column,
         });
         continue;
       }
 
       if (stack.includes(targetPath)) {
-        const cyclePaths = [...stack.slice(stack.indexOf(targetPath)), targetPath];
+        const cyclePaths = [
+          ...stack.slice(stack.indexOf(targetPath)),
+          targetPath,
+        ];
         const key = cyclePaths.join(" ");
         if (!cycleKeys.has(key)) {
           cycleKeys.add(key);
-          cycles.push({ paths: cyclePaths, sourcePath, line: eagerImport.line });
+          cycles.push({
+            paths: cyclePaths,
+            sourcePath,
+            line: eagerImport.line,
+          });
         }
         continue;
       }
@@ -98,9 +123,13 @@ function reportEntrypoint(
   entrypoint: string,
   entrypointDoc: ParsedDocument,
   documents: Map<string, ParsedDocument>,
-  maxTokens: number
+  maxTokens: number,
 ): void {
-  const traversal = traverse(entrypoint, documents, context.settings.siteRouter);
+  const traversal = traverse(
+    entrypoint,
+    documents,
+    context.settings.siteRouter,
+  );
 
   let totalTokens = estimateTokens(entrypointDoc.content);
   for (const importedPath of traversal.importedPaths) {
@@ -108,13 +137,19 @@ function reportEntrypoint(
   }
 
   if (totalTokens > maxTokens) {
-    const percentOver = (((totalTokens - maxTokens) / maxTokens) * 100).toFixed(1);
+    const percentOver = (((totalTokens - maxTokens) / maxTokens) * 100).toFixed(
+      1,
+    );
     context.report({
       message: `Entrypoint ${entrypoint} is over context budget: ${totalTokens} estimated tokens exceeds ${maxTokens} (${percentOver}% over).`,
       line: 0,
       filePath: entrypoint,
-      data: { totalTokens, maxTokens, importedFiles: traversal.importedPaths.size },
-      helpUri: "LLM-001"
+      data: {
+        totalTokens,
+        maxTokens,
+        importedFiles: traversal.importedPaths.size,
+      },
+      helpUri: "LLM-001",
     });
   }
 
@@ -125,7 +160,7 @@ function reportEntrypoint(
       column: missing.column,
       filePath: missing.sourcePath,
       data: { rawTarget: missing.rawTarget, targetPath: missing.targetPath },
-      helpUri: "LLM-001"
+      helpUri: "LLM-001",
     });
   }
 
@@ -135,7 +170,7 @@ function reportEntrypoint(
       line: cycle.line,
       filePath: cycle.sourcePath,
       data: { cycle: cycle.paths },
-      helpUri: "LLM-001"
+      helpUri: "LLM-001",
     });
   }
 }
@@ -144,15 +179,16 @@ export const llm001: RuleDefinition = defineRule({
   metadata: {
     id: "LLM-001",
     category: "LLM",
-    description: "Eager-import context stays within the per-entrypoint token budget.",
+    description:
+      "Eager-import context stays within the per-entrypoint token budget.",
     defaultSeverity: "warning",
     scope: "project",
-    fixable: false
+    fixable: false,
   },
   optionsSchema: z
     .object({
       entrypoints: z.array(z.string()).min(1),
-      maxTokensPerEntrypoint: z.number().int().positive()
+      maxTokensPerEntrypoint: z.number().int().positive(),
     })
     .strict(),
   check: (options) => (context) => {
@@ -162,9 +198,15 @@ export const llm001: RuleDefinition = defineRule({
       .sort(compareStrings);
 
     for (const entrypoint of entrypoints) {
-      reportEntrypoint(context, entrypoint, documents.get(entrypoint)!, documents, options.maxTokensPerEntrypoint);
+      reportEntrypoint(
+        context,
+        entrypoint,
+        documents.get(entrypoint)!,
+        documents,
+        options.maxTokensPerEntrypoint,
+      );
     }
-  }
+  },
 });
 
 export const LLM_RULES: readonly RuleDefinition[] = [llm001];

@@ -2,7 +2,11 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 
 import { compareStrings } from "../deterministic-sort.js";
-import { escapesRoot, filePart, resolveTargetCandidates } from "../engine/path-resolve.js";
+import {
+  escapesRoot,
+  filePart,
+  resolveTargetCandidates,
+} from "../engine/path-resolve.js";
 import type { SiteRouterSettings } from "../engine/types.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
 import type { ContextGraph } from "./context-graph-types.js";
@@ -28,7 +32,9 @@ export type ComputeGraphCoverageOptions = {
 const MARKDOWN_EXTENSIONS = [".md", ".markdown"];
 
 function isMarkdownFile(relPath: string): boolean {
-  return MARKDOWN_EXTENSIONS.some((extension) => relPath.toLowerCase().endsWith(extension));
+  return MARKDOWN_EXTENSIONS.some((extension) =>
+    relPath.toLowerCase().endsWith(extension),
+  );
 }
 
 // Scheme-qualified targets (http:, https:, data:, …) are never a local file; mirrors REF-003's
@@ -70,14 +76,18 @@ function collectRawTargets(document: ParsedDocument): string[] {
 export function computeGraphCoverage(
   documents: Map<string, ParsedDocument>,
   graph: ContextGraph,
-  options: ComputeGraphCoverageOptions
+  options: ComputeGraphCoverageOptions,
 ): GraphCoverage {
   const nodeSet = new Set(graph.nodes.map((node) => node.path));
   const outsideCorpus = new Set<string>();
 
   for (const document of documents.values()) {
     for (const rawTarget of collectRawTargets(document)) {
-      for (const candidate of resolveTargetCandidates(document.path, rawTarget, options.siteRouter)) {
+      for (const candidate of resolveTargetCandidates(
+        document.path,
+        rawTarget,
+        options.siteRouter,
+      )) {
         if (
           isMarkdownFile(candidate) &&
           !escapesRoot(candidate) &&
@@ -93,6 +103,6 @@ export function computeGraphCoverage(
   return {
     nodeCount: graph.nodes.length,
     edgeCount: graph.edges.length,
-    filesOutsideCorpus: [...outsideCorpus].sort(compareStrings)
+    filesOutsideCorpus: [...outsideCorpus].sort(compareStrings),
   };
 }

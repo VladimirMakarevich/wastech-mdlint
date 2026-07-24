@@ -29,11 +29,11 @@ operating systems (no timestamps, no host-dependent ordering).
 
 ## Exit codes
 
-| Code | Meaning |
-| --- | --- |
-| `0` | Clean — no findings at or above the `--fail-on` threshold. |
-| `1` | Findings at or above `--fail-on` (default `error`). |
-| `2` | Operational/usage error (bad flag, missing config section, target outside the corpus, unreadable config). |
+| Code | Meaning                                                                                                   |
+| ---- | --------------------------------------------------------------------------------------------------------- |
+| `0`  | Clean — no findings at or above the `--fail-on` threshold.                                                |
+| `1`  | Findings at or above `--fail-on` (default `error`).                                                       |
+| `2`  | Operational/usage error (bad flag, missing config section, target outside the corpus, unreadable config). |
 
 Control what fails CI with `--fail-on`:
 
@@ -47,7 +47,7 @@ wastech-mdlint lint . --fail-on off        # never fail; report only
 
 `lint --fix` applies deterministic fixes in place, then re-reports what remains. Only rules with a
 fix hook change files — currently [SEC-001](rules/SEC-001.md) (scaffold missing sections) and
-[TBL-002](rules/TBL-002.md) (empty target cell → ` TODO `). Everything else is reported, never
+[TBL-002](rules/TBL-002.md) (empty target cell → `TODO`). Everything else is reported, never
 rewritten.
 
 ## Other commands

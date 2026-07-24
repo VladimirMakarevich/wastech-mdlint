@@ -8,8 +8,16 @@ declare module "micromatch" {
   // excludes matches — unlike per-item `isMatch()`, which evaluates each candidate against the
   // pattern array in isolation and can't express "matches A but not B" across a set.
   interface Micromatch {
-    (list: string[], patterns: string | string[], options?: MicromatchOptions): string[];
-    isMatch(input: string, patterns: string | string[], options?: MicromatchOptions): boolean;
+    (
+      list: string[],
+      patterns: string | string[],
+      options?: MicromatchOptions,
+    ): string[];
+    isMatch(
+      input: string,
+      patterns: string | string[],
+      options?: MicromatchOptions,
+    ): boolean;
   }
 
   const micromatch: Micromatch;

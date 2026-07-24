@@ -6,48 +6,58 @@
 
 ## Decisions
 
-| # | Improvement | Status | Notes |
-| --- | --- | --- | --- |
-| **C1** | Top-level `exclude` | ✅ Accepted | `exclude` wins over `include`. |
-| **C2** | Per-rule `severity` override (`error`/`warning`/`off`) | ✅ Accepted | Severity resolved at orchestration, not baked into the rule (see [Phase 2 / rule engine](02-rules-engine.md)). |
-| **C3** | Single canonical rule ID (`REF-001`) in config and output | ✅ Accepted | Accept case-insensitive, dash-optional input; emit canonical. |
-| **C4** | JSONC (comments + trailing commas), file stays `.json` | ✅ Accepted | Tolerant parser (e.g. `jsonc-parser`). No code execution → still honors D2 (JSON-only). |
-| **C5** | Top-level `settings.siteRouter` inherited by rules | ✅ Accepted | Per-rule override allowed. DRY for SSG routing. |
-| **C6** | Presets / `extends` | ⛔ Deferred | Revisit if `init` + manual config benefit from a shared preset source. |
-| **C7** | Rich config diagnostics (did-you-mean, option path) | ✅ Accepted | Cheap DX win. |
-| **C8** | `respectGitignore` flag | ✅ Accepted | Default `false`; opt-in to skip vendored/generated docs. |
-| **C9** | Local, version-matched `$schema` — **no remote URL** | ✅ Accepted | Ship `schema.json` in the package; `$schema` is a relative path. Generated project-local schema covers custom rules. See [02-rules-engine.md](02-rules-engine.md). |
+| #      | Improvement                                               | Status      | Notes                                                                                                                                                              |
+| ------ | --------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **C1** | Top-level `exclude`                                       | ✅ Accepted | `exclude` wins over `include`.                                                                                                                                     |
+| **C2** | Per-rule `severity` override (`error`/`warning`/`off`)    | ✅ Accepted | Severity resolved at orchestration, not baked into the rule (see [Phase 2 / rule engine](02-rules-engine.md)).                                                     |
+| **C3** | Single canonical rule ID (`REF-001`) in config and output | ✅ Accepted | Accept case-insensitive, dash-optional input; emit canonical.                                                                                                      |
+| **C4** | JSONC (comments + trailing commas), file stays `.json`    | ✅ Accepted | Tolerant parser (e.g. `jsonc-parser`). No code execution → still honors D2 (JSON-only).                                                                            |
+| **C5** | Top-level `settings.siteRouter` inherited by rules        | ✅ Accepted | Per-rule override allowed. DRY for SSG routing.                                                                                                                    |
+| **C6** | Presets / `extends`                                       | ⛔ Deferred | Revisit if `init` + manual config benefit from a shared preset source.                                                                                             |
+| **C7** | Rich config diagnostics (did-you-mean, option path)       | ✅ Accepted | Cheap DX win.                                                                                                                                                      |
+| **C8** | `respectGitignore` flag                                   | ✅ Accepted | Default `false`; opt-in to skip vendored/generated docs.                                                                                                           |
+| **C9** | Local, version-matched `$schema` — **no remote URL**      | ✅ Accepted | Ship `schema.json` in the package; `$schema` is a relative path. Generated project-local schema covers custom rules. See [02-rules-engine.md](02-rules-engine.md). |
 
 ## Resulting config shape (annotated)
 
 ```jsonc
 {
-  "$schema": "./node_modules/@wastech-mdlint/cli/schema.json",   // C9 — local, version-matched, offline; NO remote URL
+  "$schema": "./node_modules/@wastech-mdlint/cli/schema.json", // C9 — local, version-matched, offline; NO remote URL
 
   "include": ["**/*.md"],
-  "exclude": ["node_modules/**", "dist/**", ".git/**"],   // C1 — exclude wins over include
-  "respectGitignore": false,                              // C8 — opt-in
+  "exclude": ["node_modules/**", "dist/**", ".git/**"], // C1 — exclude wins over include
+  "respectGitignore": false, // C8 — opt-in
 
-  "settings": {                                           // C5 — shared, rule-inheritable settings
+  "settings": {
+    // C5 — shared, rule-inheritable settings
     "siteRouter": {
       "preset": "starlight",
       "contentDir": "src/content/docs",
-      "defaultLocale": "en"
-    }
+      "defaultLocale": "en",
+    },
   },
 
   "rules": [
     // C3 — canonical ID; C2 — per-rule severity override
-    { "rule": "REF-001", "severity": "warning", "options": { "exclude": ["legacy/**"] } },
-    { "rule": "GRP-001" },                                // default severity from the rule
-    { "rule": "GRP-002", "severity": "off" },             // documented but disabled
-    { "rule": "REF-001", "options": { /* may override settings.siteRouter locally */ } }
+    {
+      "rule": "REF-001",
+      "severity": "warning",
+      "options": { "exclude": ["legacy/**"] },
+    },
+    { "rule": "GRP-001" }, // default severity from the rule
+    { "rule": "GRP-002", "severity": "off" }, // documented but disabled
+    {
+      "rule": "REF-001",
+      "options": {
+        /* may override settings.siteRouter locally */
+      },
+    },
   ],
 
   "compile": {
     "outdir": ".claude/skills/wastech-mdlint",
-    "skill": { "name": "...", "description": "..." }
-  }
+    "skill": { "name": "...", "description": "..." },
+  },
 }
 ```
 
@@ -103,7 +113,7 @@
 ## Downstream impact (for later phases)
 
 - **Rule engine (P2):** severity must be resolved by the orchestrator (R1); a rule's
-  declared severity becomes a *default*. `RuleContext` gains resolved `settings`.
+  declared severity becomes a _default_. `RuleContext` gains resolved `settings`.
 - **schema.json sync test:** must handle canonical-ID normalization (C3) and the new
   top-level keys (`exclude`, `respectGitignore`, `settings`).
 - **`init` (P6):** writes the new shape; emits canonical rule IDs; may add commented

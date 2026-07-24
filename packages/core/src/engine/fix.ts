@@ -12,8 +12,13 @@ import type { RuleContext, TextEdit } from "./types.js";
  * down so earlier offsets stay valid; overlapping edits are skipped (last-writer-wins by position)
  * so a malformed rule can never corrupt the file.
  */
-export function applyEdits(content: string, edits: readonly TextEdit[]): string {
-  const sorted = [...edits].sort((left, right) => right.start - left.start || right.end - left.end);
+export function applyEdits(
+  content: string,
+  edits: readonly TextEdit[],
+): string {
+  const sorted = [...edits].sort(
+    (left, right) => right.start - left.start || right.end - left.end,
+  );
   let result = content;
   let lastStart = Number.POSITIVE_INFINITY;
 
@@ -21,7 +26,8 @@ export function applyEdits(content: string, edits: readonly TextEdit[]): string 
     if (edit.end > lastStart) {
       continue;
     }
-    result = result.slice(0, edit.start) + edit.newText + result.slice(edit.end);
+    result =
+      result.slice(0, edit.start) + edit.newText + result.slice(edit.end);
     lastStart = edit.start;
   }
 
@@ -36,12 +42,14 @@ export type ApplyFixesResult = { fixedFiles: string[] };
  * document's content — so project-scope rules never contribute fixes. Returns the fixed file list;
  * the caller re-lints to report what remains.
  */
-export async function applyFixes(input: LintFilesInput): Promise<ApplyFixesResult> {
+export async function applyFixes(
+  input: LintFilesInput,
+): Promise<ApplyFixesResult> {
   const rootDir = path.resolve(input.cwd);
   const loaded = await loadDocuments(input.config.include ?? ["**/*.md"], {
     cwd: rootDir,
     exclude: input.config.exclude,
-    respectGitignore: input.config.respectGitignore
+    respectGitignore: input.config.respectGitignore,
   });
 
   const documents = new Map<string, ParsedDocument>();
@@ -66,7 +74,7 @@ export async function applyFixes(input: LintFilesInput): Promise<ApplyFixesResul
       rootDir,
       settings: input.settings,
       graph: input.graph,
-      report: () => {}
+      report: () => {},
     };
 
     const edits: TextEdit[] = [];

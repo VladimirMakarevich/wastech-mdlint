@@ -17,7 +17,7 @@ export const BUILTIN_RULE_DEFINITIONS: readonly RuleDefinition[] = [
   ...SEC_STR_RULES,
   ...REF_RULES,
   ...CTX_RULES,
-  ...GRP_RULES
+  ...GRP_RULES,
 ];
 
 // The process-wide registry over the built-ins. Config loading, schema generation, and the CLI all

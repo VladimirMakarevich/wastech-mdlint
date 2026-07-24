@@ -7,16 +7,16 @@
 
 ## Decisions
 
-| # | Improvement | Status | Notes |
-| --- | --- | --- | --- |
-| **I1** | Drop `postinstall` auto-config → explicit `init` only | ✅ Accepted | Remove `scripts/install-default-config.mjs`; no file writes on install. |
-| **I2** | Make CLI `init` smart by default (merge the two flows) | ✅ Accepted | Cluster detection, file sampling, rule-category suggestion, package-manager detection; `--yes` for CI. Skill orchestrates on top. |
-| **I3** | `init` wires the local `$schema` + generates project schema | ✅ Accepted | Ties to [C9](01-configuration.md). |
-| **I4** | One version tag publishes core+cli+mcp and tags skills | ✅ Accepted | the vendor-neutral skill distribution decision version coupling; changesets / release workflow. |
-| **I5** | Per-package supply chain | ✅ Accepted | npm provenance on all packages, `engines.node`, `files` allowlist, lockfile CI. |
-| **I6** | First-class GitHub Action / reusable CI workflow | ✅ Accepted | Publishable Action; `init` can drop `.github/workflows/wastech-mdlint.yml`. |
-| **I7** | Documented `gh skill install … --pin` + compatibility frontmatter | ✅ Accepted | Reproducible, version-coupled skill install. |
-| **I8** | legacy-to-v2 config migration (guide / `migrate` command) | ⛔ Not needed | **Greenfield** — no prior users; reinforces [D2](../index.md) clean replace. |
+| #      | Improvement                                                       | Status        | Notes                                                                                                                             |
+| ------ | ----------------------------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| **I1** | Drop `postinstall` auto-config → explicit `init` only             | ✅ Accepted   | Remove `scripts/install-default-config.mjs`; no file writes on install.                                                           |
+| **I2** | Make CLI `init` smart by default (merge the two flows)            | ✅ Accepted   | Cluster detection, file sampling, rule-category suggestion, package-manager detection; `--yes` for CI. Skill orchestrates on top. |
+| **I3** | `init` wires the local `$schema` + generates project schema       | ✅ Accepted   | Ties to [C9](01-configuration.md).                                                                                                |
+| **I4** | One version tag publishes core+cli+mcp and tags skills            | ✅ Accepted   | the vendor-neutral skill distribution decision version coupling; changesets / release workflow.                                   |
+| **I5** | Per-package supply chain                                          | ✅ Accepted   | npm provenance on all packages, `engines.node`, `files` allowlist, lockfile CI.                                                   |
+| **I6** | First-class GitHub Action / reusable CI workflow                  | ✅ Accepted   | Publishable Action; `init` can drop `.github/workflows/wastech-mdlint.yml`.                                                       |
+| **I7** | Documented `gh skill install … --pin` + compatibility frontmatter | ✅ Accepted   | Reproducible, version-coupled skill install.                                                                                      |
+| **I8** | legacy-to-v2 config migration (guide / `migrate` command)         | ⛔ Not needed | **Greenfield** — no prior users; reinforces [D2](../index.md) clean replace.                                                      |
 
 ## Detail & rationale
 
@@ -25,8 +25,8 @@
   runs on transitive/CI installs and can clobber. v2 removes it; configuration is created
   only by the explicit `init` command.
 
-- **I2 — smart CLI `init`.** The reference splits a *dumb* manual `init` (no scanning,
-  hardcoded zero-config rules) from a *smart* skill-driven init (scans, infers). That makes
+- **I2 — smart CLI `init`.** The reference splits a _dumb_ manual `init` (no scanning,
+  hardcoded zero-config rules) from a _smart_ skill-driven init (scans, infers). That makes
   the CLI alone produce a weak config and pushes the good experience onto the AI host. v2
   moves the smart inference into the CLI `init` itself — detect doc clusters, sample files,
   suggest rule categories, detect the package manager — with a non-interactive `--yes` mode

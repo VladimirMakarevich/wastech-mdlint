@@ -11,7 +11,9 @@ import { ruleRegistry } from "../src/engine/rules/index.js";
 const tempDirs: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
+  );
 });
 
 async function fixtureRepo(files: Record<string, string>): Promise<string> {
@@ -31,14 +33,14 @@ describe("REF-001 (proof rule) through the engine", () => {
   it("reports unresolved relative links and passes resolved ones", async () => {
     const cwd = await fixtureRepo({
       "a.md": "[ok](b.md)\n[bad](missing.md)\n",
-      "b.md": "# B\n"
+      "b.md": "# B\n",
     });
 
     const result = await lintFiles({
       cwd,
       config: { rules: [] },
       rules: [rule("REF-001")],
-      settings: {}
+      settings: {},
     });
 
     expect(result.messages).toHaveLength(1);
@@ -47,7 +49,7 @@ describe("REF-001 (proof rule) through the engine", () => {
       severity: "error",
       filePath: "a.md",
       line: 2,
-      data: { target: "missing.md" }
+      data: { target: "missing.md" },
     });
   });
 });
@@ -60,16 +62,24 @@ describe("SIZE-001 (proof rule) through the engine", () => {
       cwd,
       config: { rules: [] },
       rules: [rule("SIZE-001", { bytes: { warn: 10, error: 50 } })],
-      settings: {}
+      settings: {},
     });
 
     // 101 bytes crosses both warn (10) and error (50): both findings appear (P3.07).
-    expect(result.messages.map((message) => message.severity).sort()).toEqual(["error", "warning"]);
-    expect(result.messages.every((message) => message.data?.metric === "bytes")).toBe(true);
+    expect(result.messages.map((message) => message.severity).sort()).toEqual([
+      "error",
+      "warning",
+    ]);
+    expect(
+      result.messages.every((message) => message.data?.metric === "bytes"),
+    ).toBe(true);
   });
 
   it("applies glob overrides with per-metric fallback to top-level thresholds", async () => {
-    const cwd = await fixtureRepo({ "CLAUDE.md": `${"x".repeat(100)}\n`, "other.md": `${"x".repeat(100)}\n` });
+    const cwd = await fixtureRepo({
+      "CLAUDE.md": `${"x".repeat(100)}\n`,
+      "other.md": `${"x".repeat(100)}\n`,
+    });
 
     const result = await lintFiles({
       cwd,
@@ -77,10 +87,10 @@ describe("SIZE-001 (proof rule) through the engine", () => {
       rules: [
         rule("SIZE-001", {
           bytes: { error: 1000 },
-          overrides: [{ pattern: "CLAUDE.md", bytes: { error: 10 } }]
-        })
+          overrides: [{ pattern: "CLAUDE.md", bytes: { error: 10 } }],
+        }),
       ],
-      settings: {}
+      settings: {},
     });
 
     // Only CLAUDE.md (override error 10) exceeds; other.md (top-level error 1000) does not.
@@ -94,8 +104,13 @@ describe("SIZE-001 (proof rule) through the engine", () => {
     const result = await lintFiles({
       cwd,
       config: { rules: [] },
-      rules: [{ rule: ruleRegistry.resolveRule("SIZE-001", { bytes: { error: 10 } }), severity: "warning" }],
-      settings: {}
+      rules: [
+        {
+          rule: ruleRegistry.resolveRule("SIZE-001", { bytes: { error: 10 } }),
+          severity: "warning",
+        },
+      ],
+      settings: {},
     });
 
     expect(result.messages).toHaveLength(1);

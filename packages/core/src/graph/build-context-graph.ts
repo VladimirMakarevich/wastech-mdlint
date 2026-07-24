@@ -9,7 +9,7 @@ import type {
   BuildContextGraphOptions,
   ContextGraph,
   ContextGraphEdge,
-  ContextGraphNode
+  ContextGraphNode,
 } from "./context-graph-types.js";
 
 // P4.01 semantic ContextGraph builder (G1/G3). Extends the P3.06 "relocated legacy builder" (link
@@ -26,9 +26,11 @@ function resolveTarget(
   sourcePath: string,
   target: string,
   siteRouter: SiteRouterSettings | undefined,
-  nodeSet: ReadonlySet<string>
+  nodeSet: ReadonlySet<string>,
 ): string | undefined {
-  return resolveTargetCandidates(sourcePath, target, siteRouter).find((candidate) => nodeSet.has(candidate));
+  return resolveTargetCandidates(sourcePath, target, siteRouter).find(
+    (candidate) => nodeSet.has(candidate),
+  );
 }
 
 // Scheme-qualified targets (http:, https:, data:, …) are never corpus nodes; skip before resolving,
@@ -62,7 +64,7 @@ const PROSE_TOKEN_TRIM_PATTERN = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
 function buildIdRefEdges(
   documents: Map<string, ParsedDocument>,
   nodeSet: ReadonlySet<string>,
-  idRef: IdRef
+  idRef: IdRef,
 ): ContextGraphEdge[] {
   const definers = new Map<string, string[]>();
   for (const document of documents.values()) {
@@ -99,7 +101,13 @@ function buildIdRefEdges(
         if (definingPath === document.path || !nodeSet.has(definingPath)) {
           continue;
         }
-        edges.push({ from: document.path, to: definingPath, type: "id-ref", line, rawTarget: token });
+        edges.push({
+          from: document.path,
+          to: definingPath,
+          type: "id-ref",
+          line,
+          rawTarget: token,
+        });
       }
     }
   }
@@ -111,7 +119,7 @@ function buildIdRefEdges(
 // per the taxonomy, and the explicit cycle list (G6).
 export function buildContextGraph(
   documents: Map<string, ParsedDocument>,
-  options: BuildContextGraphOptions = {}
+  options: BuildContextGraphOptions = {},
 ): ContextGraph {
   // Node identity is `document.path` (repo-relative POSIX), never the caller's Map key: loadDocuments()
   // keys by absolute path and only some callers re-key before reaching here. Re-keying by `document.path`
@@ -132,7 +140,12 @@ export function buildContextGraph(
       if (link.kind !== "local-file") {
         continue;
       }
-      const target = resolveTarget(document.path, filePart(link.rawTarget), siteRouter, nodeSet);
+      const target = resolveTarget(
+        document.path,
+        filePart(link.rawTarget),
+        siteRouter,
+        nodeSet,
+      );
       if (target === undefined || target === document.path) {
         continue;
       }
@@ -141,7 +154,11 @@ export function buildContextGraph(
         // anchor = heading-slug match (AC): a fragment to a target file with no matching heading slug
         // is skipped entirely, not downgraded to a plain `link` edge.
         const targetDocument = documentsByPath.get(target)!;
-        if (!targetDocument.headings.some((heading) => heading.slug === link.anchor)) {
+        if (
+          !targetDocument.headings.some(
+            (heading) => heading.slug === link.anchor,
+          )
+        ) {
           continue;
         }
       }
@@ -151,7 +168,7 @@ export function buildContextGraph(
         type: hasFragment ? "anchor" : "link",
         line: link.line,
         text: link.text,
-        rawTarget: link.rawTarget
+        rawTarget: link.rawTarget,
       });
     }
 
@@ -160,7 +177,12 @@ export function buildContextGraph(
       if (imageTarget.length === 0 || hasScheme(imageTarget)) {
         continue;
       }
-      const target = resolveTarget(document.path, imageTarget, siteRouter, nodeSet);
+      const target = resolveTarget(
+        document.path,
+        imageTarget,
+        siteRouter,
+        nodeSet,
+      );
       if (target === undefined || target === document.path) {
         continue;
       }
@@ -169,12 +191,23 @@ export function buildContextGraph(
       // `ParsedImage` contract. Carrying it would be an additive parser-contract change for a
       // marginal explainability gain that no P4 task requires — revisit if MCP/`--fix` output ever
       // needs per-image labels.
-      edges.push({ from: document.path, to: target, type: "image", line: image.line, rawTarget: image.rawTarget });
+      edges.push({
+        from: document.path,
+        to: target,
+        type: "image",
+        line: image.line,
+        rawTarget: image.rawTarget,
+      });
     }
 
     for (const importRecord of document.imports) {
       // `rawTarget` is `@path.md` / `@/path.md` (D3); drop the leading `@` and resolve like a link.
-      const target = resolveTarget(document.path, importRecord.rawTarget.slice(1), siteRouter, nodeSet);
+      const target = resolveTarget(
+        document.path,
+        importRecord.rawTarget.slice(1),
+        siteRouter,
+        nodeSet,
+      );
       if (target === undefined || target === document.path) {
         continue;
       }
@@ -183,7 +216,7 @@ export function buildContextGraph(
         to: target,
         type: "import",
         line: importRecord.line,
-        rawTarget: importRecord.rawTarget
+        rawTarget: importRecord.rawTarget,
       });
     }
   }
@@ -199,7 +232,7 @@ export function buildContextGraph(
       compareStrings(left.from, right.from) ||
       compareStrings(left.to, right.to) ||
       compareStrings(left.type, right.type) ||
-      (left.line ?? 0) - (right.line ?? 0)
+      (left.line ?? 0) - (right.line ?? 0),
   );
 
   const inDegree = new Map(nodePaths.map((nodePath) => [nodePath, 0]));
@@ -212,7 +245,7 @@ export function buildContextGraph(
   const nodes: ContextGraphNode[] = nodePaths.map((nodePath) => ({
     path: nodePath,
     inDegree: inDegree.get(nodePath) ?? 0,
-    outDegree: outDegree.get(nodePath) ?? 0
+    outDegree: outDegree.get(nodePath) ?? 0,
   }));
 
   return { nodes, edges, cycles: detectCycles(nodePaths, edges) };
@@ -222,8 +255,13 @@ export function buildContextGraph(
 // component and canonicalized (rotated to its lexicographically smallest start) for stable, deduped
 // output. Multiplicity-insensitive: parallel edges between the same pair collapse to one adjacency
 // entry below, so retaining edge multiplicity (P4.01) does not change cycle detection.
-function detectCycles(nodePaths: string[], edges: readonly ContextGraphEdge[]): string[][] {
-  const adjacency = new Map<string, string[]>(nodePaths.map((nodePath) => [nodePath, []]));
+function detectCycles(
+  nodePaths: string[],
+  edges: readonly ContextGraphEdge[],
+): string[][] {
+  const adjacency = new Map<string, string[]>(
+    nodePaths.map((nodePath) => [nodePath, []]),
+  );
   for (const edge of edges) {
     const neighbors = adjacency.get(edge.from);
     if (neighbors !== undefined && !neighbors.includes(edge.to)) {
@@ -251,9 +289,15 @@ function detectCycles(nodePaths: string[], edges: readonly ContextGraphEdge[]): 
     for (const neighbor of adjacency.get(node) ?? []) {
       if (!indices.has(neighbor)) {
         strongConnect(neighbor);
-        lowLinks.set(node, Math.min(lowLinks.get(node)!, lowLinks.get(neighbor)!));
+        lowLinks.set(
+          node,
+          Math.min(lowLinks.get(node)!, lowLinks.get(neighbor)!),
+        );
       } else if (onStack.has(neighbor)) {
-        lowLinks.set(node, Math.min(lowLinks.get(node)!, indices.get(neighbor)!));
+        lowLinks.set(
+          node,
+          Math.min(lowLinks.get(node)!, indices.get(neighbor)!),
+        );
       }
     }
 
@@ -287,14 +331,19 @@ function detectCycles(nodePaths: string[], edges: readonly ContextGraphEdge[]): 
 
 // Find a concrete cycle through an SCC starting at its smallest node, returned as a closed path
 // (start repeated at the end).
-function cyclePath(component: string[], adjacency: Map<string, string[]>): string[] {
+function cyclePath(
+  component: string[],
+  adjacency: Map<string, string[]>,
+): string[] {
   const inComponent = new Set(component);
   const start = [...component].sort(compareStrings)[0]!;
   const visited = new Set<string>([start]);
   const path = [start];
 
   const walk = (node: string): string[] | undefined => {
-    for (const neighbor of (adjacency.get(node) ?? []).filter((candidate) => inComponent.has(candidate))) {
+    for (const neighbor of (adjacency.get(node) ?? []).filter((candidate) =>
+      inComponent.has(candidate),
+    )) {
       if (neighbor === start && path.length > 1) {
         return [...path, start];
       }

@@ -9,7 +9,12 @@ import { loadDocuments } from "../markdown/load-documents.js";
 import { runRules } from "./run-rules.js";
 import { createSuppressionChecker } from "./suppression.js";
 import type { LintConfig } from "../config/config-schema.js";
-import type { LintMessage, ResolvedRule, ResolvedSettings, RuleContext } from "./types.js";
+import type {
+  LintMessage,
+  ResolvedRule,
+  ResolvedSettings,
+  RuleContext,
+} from "./types.js";
 
 export type LintResult = {
   messages: LintMessage[];
@@ -37,7 +42,10 @@ function activeRules(rules: readonly ConfiguredRule[]): ResolvedRule[] {
     if (configured.severity === "off") {
       continue;
     }
-    active.push({ rule: configured.rule, severityOverride: configured.severity });
+    active.push({
+      rule: configured.rule,
+      severityOverride: configured.severity,
+    });
   }
 
   return active;
@@ -67,7 +75,7 @@ export async function lintFiles(input: LintFilesInput): Promise<LintResult> {
   const loaded = await loadDocuments(input.config.include ?? ["**/*.md"], {
     cwd: rootDir,
     exclude: input.config.exclude,
-    respectGitignore: input.config.respectGitignore
+    respectGitignore: input.config.respectGitignore,
   });
 
   // Re-key the loader's absolute-path map to repo-relative POSIX paths — the identity rules resolve
@@ -79,8 +87,12 @@ export async function lintFiles(input: LintFilesInput): Promise<LintResult> {
   const projectFiles = [...documents.keys()].sort(compareStrings);
 
   const resolved = activeRules(input.rules);
-  const documentRules = resolved.filter((entry) => entry.rule.scope === "document");
-  const projectRules = resolved.filter((entry) => entry.rule.scope === "project");
+  const documentRules = resolved.filter(
+    (entry) => entry.rule.scope === "document",
+  );
+  const projectRules = resolved.filter(
+    (entry) => entry.rule.scope === "project",
+  );
 
   // Build + inject one shared ContextGraph (R5 / audit 2.2). P4.01 wires siteRouter so graph edges
   // resolve root-relative links identically to the REF rules; P4.06 adds idRef so id-ref edges
@@ -88,14 +100,18 @@ export async function lintFiles(input: LintFilesInput): Promise<LintResult> {
   // they don't re-scope the corpus-wide graph, per GRP-001/002's forward-compat comments). Callers
   // may pass a graph to override (e.g. tests).
   const graph =
-    input.graph ?? buildContextGraph(documents, { siteRouter: input.settings.siteRouter, idRef: input.settings.idRef });
+    input.graph ??
+    buildContextGraph(documents, {
+      siteRouter: input.settings.siteRouter,
+      idRef: input.settings.idRef,
+    });
 
   const sharedContext: Omit<RuleContext, "report" | "document" | "filePath"> = {
     documents,
     projectFiles,
     rootDir,
     settings: input.settings,
-    graph
+    graph,
   };
 
   const rawMessages: LintMessage[] = [];
@@ -104,7 +120,7 @@ export async function lintFiles(input: LintFilesInput): Promise<LintResult> {
   for (const filePath of projectFiles) {
     const document = documents.get(filePath)!;
     rawMessages.push(
-      ...runRules(documentRules, { ...sharedContext, document, filePath })
+      ...runRules(documentRules, { ...sharedContext, document, filePath }),
     );
   }
 
@@ -114,7 +130,10 @@ export async function lintFiles(input: LintFilesInput): Promise<LintResult> {
   }
 
   // Inline-disable suppression: drop each message whose (ruleId, line) is disabled in its file.
-  const suppressionByFile = new Map<string, ReturnType<typeof createSuppressionChecker>>();
+  const suppressionByFile = new Map<
+    string,
+    ReturnType<typeof createSuppressionChecker>
+  >();
   const messages = rawMessages.filter((message) => {
     const document = documents.get(message.filePath);
     if (document === undefined) {
@@ -133,7 +152,9 @@ export async function lintFiles(input: LintFilesInput): Promise<LintResult> {
   return {
     messages,
     files: projectFiles,
-    errorCount: messages.filter((message) => message.severity === "error").length,
-    warningCount: messages.filter((message) => message.severity === "warning").length
+    errorCount: messages.filter((message) => message.severity === "error")
+      .length,
+    warningCount: messages.filter((message) => message.severity === "warning")
+      .length,
   };
 }

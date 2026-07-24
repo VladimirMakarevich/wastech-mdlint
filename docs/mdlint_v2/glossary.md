@@ -477,7 +477,7 @@ underlying scan/inference.
 - **`generateInitConfig` / `config-writer.ts`** — The pure, fs-free P6.04 writer that turns a
   confirmed draft into the `wastech-mdlint.config.json` bytes (a hand-rolled JSONC serializer, so
   each newly-inferred rule can carry its rationale as a trailing `//` comment) and wires the local
-  `$schema` — the CLI passes a `packageSchemaRef` computed relative to the config's *own* directory
+  `$schema` — the CLI passes a `packageSchemaRef` computed relative to the config's _own_ directory
   and anchored on the actual installed schema (walked up on disk), falling back to the repository
   root, so a subdirectory config points up at the hoisted node_modules (`../node_modules/...`) rather
   than a fixed root literal. `"fresh"` writes `$schema` + `include` (omitted when empty) + `exclude`
@@ -738,9 +738,11 @@ Not needed:
 
 - **Node 24.17.0 LTS** — The runtime target. `engines.node` is `>=24.17.0` with no upper
   bound; CI validates on the Node 24 LTS line.
-- **Vitest / ESLint / Prettier** — Test runner, linter, formatter. Verification gates:
-  `npm run typecheck`, `npm test`, `npm run build`; `npm run lint` / `npm run format` when the
-  scope needs style checks.
+- **Vitest / ESLint / Prettier** — Test runner, linter, formatter. The CI `verify` job runs
+  `npm run typecheck`, `npm run lint`, `npm run format`, `npm test`, and `npm run build` on every
+  push (`npm run format` is `prettier --check .`, enforced since [P9.06](P9-remediation/06-format-gate.md)),
+  so style drift fails fast alongside type/lint/test/build failures. Locally, `npm run lint` /
+  `npm run format` are still the discretionary steps to run when a change's scope touches style.
 - **`generate:docs`** — `npm run generate:docs` regenerates the README rules table from rule
   metadata (the `BEGIN/END GENERATED RULES` block) and the README MCP tool inventory from the live
   tool registration (the `BEGIN/END GENERATED MCP TOOLS` block); neither block is hand-edited.

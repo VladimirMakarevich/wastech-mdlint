@@ -9,7 +9,9 @@ function formatLocation(message: LintMessage): string {
     // File-level finding (SIZE whole-file, absent section, missing file): no specific line.
     return "-";
   }
-  return message.column === undefined ? `${message.line}` : `${message.line}:${message.column}`;
+  return message.column === undefined
+    ? `${message.line}`
+    : `${message.line}:${message.column}`;
 }
 
 export function formatLintResultText(result: LintResult): string {
@@ -25,7 +27,9 @@ export function formatLintResultText(result: LintResult): string {
       currentFile = message.filePath;
       lines.push(currentFile);
     }
-    lines.push(`  ${formatLocation(message)}  ${message.severity}  ${message.message}  ${message.ruleId}`);
+    lines.push(
+      `  ${formatLocation(message)}  ${message.severity}  ${message.message}  ${message.ruleId}`,
+    );
   }
 
   const total = result.errorCount + result.warningCount;
@@ -33,7 +37,7 @@ export function formatLintResultText(result: LintResult): string {
   lines.push(
     `✖ ${total} problem${total === 1 ? "" : "s"} (${result.errorCount} error${
       result.errorCount === 1 ? "" : "s"
-    }, ${result.warningCount} warning${result.warningCount === 1 ? "" : "s"})`
+    }, ${result.warningCount} warning${result.warningCount === 1 ? "" : "s"})`,
   );
 
   return `${lines.join("\n")}\n`;
@@ -44,10 +48,10 @@ export function formatLintResultJson(result: LintResult): string {
     summary: {
       files: result.files.length,
       errors: result.errorCount,
-      warnings: result.warningCount
+      warnings: result.warningCount,
     },
     messages: result.messages,
-    files: result.files
+    files: result.files,
   };
 
   return `${JSON.stringify(payload, null, 2)}\n`;

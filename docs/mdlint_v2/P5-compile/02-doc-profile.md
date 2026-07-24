@@ -16,7 +16,7 @@ reference relationships from the graph.
 ## Deliverables / steps
 
 1. `extractDocProfile(doc, graph, options?)` → `{ role, outline, tableSchemas, idPattern?,
-   referencesTo, referencedBy }`.
+referencesTo, referencedBy }`.
 2. `outline` from headings; `tableSchemas` from table headers; `idPattern` detected from
    column values (e.g. `REQ-001` → `REQ-NNN`).
 3. `referencesTo`/`referencedBy` from the semantic graph edges

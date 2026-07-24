@@ -1,5 +1,12 @@
-import { isStructuredError, TOOL_ERROR_CODES, type ToolErrorCode } from "@wastech-mdlint/core";
-import type { CallToolResult, ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
+import {
+  isStructuredError,
+  TOOL_ERROR_CODES,
+  type ToolErrorCode,
+} from "@wastech-mdlint/core";
+import type {
+  CallToolResult,
+  ToolAnnotations,
+} from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 // Output/error/annotation conventions (P7.01, task step 3) as reusable wrappers so every tool
@@ -18,7 +25,7 @@ export function successResult(params: {
 }): CallToolResult {
   return {
     content: [{ type: "text", text: params.summary }],
-    structuredContent: params.structured
+    structuredContent: params.structured,
   };
 }
 
@@ -41,16 +48,20 @@ const INTERNAL_ERROR_MESSAGE = "An unexpected internal error occurred.";
 // even on `isError` results. `compile-context` has no `outputSchema`, so it passes no placeholders.
 export function errorResult(
   error: unknown,
-  successFields?: Readonly<Record<string, unknown>>
+  successFields?: Readonly<Record<string, unknown>>,
 ): CallToolResult {
-  const structured: { code: ToolErrorCode; message: string; hint?: string } = isStructuredError(error)
-    ? { code: error.code, message: error.message, hint: error.hint }
-    : { code: "INTERNAL_ERROR", message: INTERNAL_ERROR_MESSAGE };
+  const structured: { code: ToolErrorCode; message: string; hint?: string } =
+    isStructuredError(error)
+      ? { code: error.code, message: error.message, hint: error.hint }
+      : { code: "INTERNAL_ERROR", message: INTERNAL_ERROR_MESSAGE };
 
   return {
     isError: true,
     content: [{ type: "text", text: structured.message }],
-    structuredContent: successFields === undefined ? structured : { ...successFields, ...structured }
+    structuredContent:
+      successFields === undefined
+        ? structured
+        : { ...successFields, ...structured },
   };
 }
 
@@ -62,7 +73,7 @@ export function errorResult(
 const ERROR_OUTPUT_SHAPE = {
   code: z.enum(TOOL_ERROR_CODES).optional(),
   message: z.string().optional(),
-  hint: z.string().optional()
+  hint: z.string().optional(),
 } as const;
 
 // Extend a success output shape with the optional M6 error fields WITHOUT weakening the success
@@ -72,7 +83,7 @@ const ERROR_OUTPUT_SHAPE = {
 // metadata", and each tool's error path supplies schema-compatible placeholder success fields via
 // `errorResult(..., successFields)`.
 export function withErrorOutput(
-  success: Readonly<Record<string, z.ZodTypeAny>>
+  success: Readonly<Record<string, z.ZodTypeAny>>,
 ): Record<string, z.ZodTypeAny> {
   return { ...success, ...ERROR_OUTPUT_SHAPE };
 }

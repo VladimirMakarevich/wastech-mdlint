@@ -22,8 +22,15 @@ export function normalizeRelativePath(filePath: string): string {
   return normalizePathValue(filePath).replace(/^\.\/+/, "");
 }
 
-export function matchesConfigGlob(filePath: string, patterns: string[]): boolean {
-  return micromatch.isMatch(normalizeRelativePath(filePath), normalizeConfigGlobs(patterns), {
-    dot: true
-  });
+export function matchesConfigGlob(
+  filePath: string,
+  patterns: string[],
+): boolean {
+  return micromatch.isMatch(
+    normalizeRelativePath(filePath),
+    normalizeConfigGlobs(patterns),
+    {
+      dot: true,
+    },
+  );
 }

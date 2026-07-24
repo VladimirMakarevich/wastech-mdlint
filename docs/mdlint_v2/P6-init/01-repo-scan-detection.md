@@ -16,14 +16,14 @@ package manager the repo uses.
 
 ## Deliverables / steps
 
-1. Scan for doc clusters using the scoring heuristic below; boost known layouts (as a *bonus*,
+1. Scan for doc clusters using the scoring heuristic below; boost known layouts (as a _bonus_,
    not a filter), handle monorepos — **don't** hardcode `docs/` ([I2](../requirements/06-installation.md)).
 2. Detect the package manager from lockfiles (bun > pnpm > yarn > npm).
 3. Return a structured scan result (clusters + sample file candidates + detected manager).
 
 ## Cluster scoring heuristic (decided 2026-07-02, audit 5.4)
 
-Deterministic; constants are defaults (tunable). `init` is interactive, so this only *proposes*
+Deterministic; constants are defaults (tunable). `init` is interactive, so this only _proposes_
 `include` globs — the user confirms in [P6.03](03-interactive-prompts.md).
 
 ```

@@ -9,7 +9,12 @@
 import type { IdRef } from "../engine/defined-ids.js";
 import type { SiteRouterSettings } from "../engine/types.js";
 
-export type ContextGraphEdgeType = "link" | "anchor" | "image" | "import" | "id-ref";
+export type ContextGraphEdgeType =
+  | "link"
+  | "anchor"
+  | "image"
+  | "import"
+  | "id-ref";
 
 // The only inputs the builder consumes: `siteRouter` mirrors REF-001/002 root-relative resolution
 // so graph edges never disagree with the REF rules; `idRef` turns on id-ref edges. Earlier

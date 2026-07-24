@@ -10,7 +10,9 @@ import { handleCompileContext } from "../src/tools/compile-context.js";
 const tempDirs: string[] = [];
 
 afterAll(async () => {
-  await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirs.map((dir) => rm(dir, { recursive: true, force: true })),
+  );
 });
 
 async function makeTempDir(prefix: string): Promise<string> {
@@ -31,9 +33,9 @@ describe("handleCompileContext", () => {
       JSON.stringify({
         include: ["**/*.md"],
         rules: [{ rule: "REF-001" }],
-        compile: { skill: { name: "docs-skill", description: "Docs skill" } }
+        compile: { skill: { name: "docs-skill", description: "Docs skill" } },
       }),
-      "utf8"
+      "utf8",
     );
     await writeFile(path.join(dir, "a.md"), "# A\n\n[b](b.md)\n", "utf8");
     await writeFile(path.join(dir, "b.md"), "# B\n", "utf8");
@@ -51,7 +53,7 @@ describe("handleCompileContext", () => {
     expect(textOf(result.content![0])).toBe(expected.skillContent);
     expect(textOf(result.content![1])).toBe(
       `Documents: ${expected.metadata.documentCount}, Rules: ${expected.metadata.ruleCount}, ` +
-        `Components: ${expected.metadata.componentCount}`
+        `Components: ${expected.metadata.componentCount}`,
     );
   });
 
@@ -63,7 +65,9 @@ describe("handleCompileContext", () => {
     const result = await handleCompileContext({ cwd: dir });
 
     expect(result.isError).toBe(true);
-    expect((result.structuredContent as { code: string }).code).toBe("COMPILE_CONFIG_MISSING");
+    expect((result.structuredContent as { code: string }).code).toBe(
+      "COMPILE_CONFIG_MISSING",
+    );
     expect((result.structuredContent as { hint?: string }).hint).toBeTruthy();
     expect(textOf(result.content![0])).toContain("config.compile is missing");
   });

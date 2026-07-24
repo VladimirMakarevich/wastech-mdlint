@@ -11,8 +11,9 @@ regression, matching the coverage the phase plans called for.
 ## Problem (from the audit)
 
 **Parser (L-13, vs P1.06 deliverables):**
+
 - Reference-style **image** definitions are handled (`parse-document.ts:305-314`) but untested —
-  only reference-style *links* are tested (`parse-document.test.ts:119`).
+  only reference-style _links_ are tested (`parse-document.test.ts:119`).
 - CJK is only partly covered: headings/slugs tested (`:30`) and non-ASCII anchor decoding via
   Cyrillic (`:129`), but no CJK-content-scanning or CJK-anchor-in-link case.
 - The loader determinism test compares only key **ordering** (`load-documents.test.ts:97`), not

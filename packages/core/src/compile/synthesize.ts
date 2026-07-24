@@ -86,9 +86,15 @@ function toSingleLine(text: string): string {
 // CommonMark code-span requirements, not cosmetic choices.
 function codeSpan(text: string): string {
   const singleLine = toSingleLine(text);
-  const longestBacktickRun = Math.max(0, ...(singleLine.match(/`+/g) ?? []).map((run) => run.length));
+  const longestBacktickRun = Math.max(
+    0,
+    ...(singleLine.match(/`+/g) ?? []).map((run) => run.length),
+  );
   const fence = "`".repeat(longestBacktickRun + 1);
-  const needsPadding = singleLine.length === 0 || singleLine.startsWith("`") || singleLine.endsWith("`");
+  const needsPadding =
+    singleLine.length === 0 ||
+    singleLine.startsWith("`") ||
+    singleLine.endsWith("`");
   return `${fence}${needsPadding ? ` ${singleLine} ` : singleLine}${fence}`;
 }
 
@@ -99,28 +105,41 @@ function tableCell(text: string): string {
   return toSingleLine(text).replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
 }
 
-function renderFrontmatter(skill: { name: string; description: string }): string {
+function renderFrontmatter(skill: {
+  name: string;
+  description: string;
+}): string {
   // Hand-rendered YAML (no YAML dependency): `JSON.stringify` produces a valid YAML double-quoted
   // scalar for any string, including one containing quotes or newlines.
   return `---\nname: ${JSON.stringify(skill.name)}\ndescription: ${JSON.stringify(skill.description)}\n---`;
 }
 
 function renderBudget(budget: CompileBudget): string {
-  const lines = ["## Context Budget", "", `Corpus token estimate: ${budget.corpusTokenEstimate} tokens.`];
+  const lines = [
+    "## Context Budget",
+    "",
+    `Corpus token estimate: ${budget.corpusTokenEstimate} tokens.`,
+  ];
 
   if (!budget.llm001Enabled) {
     lines.push("No entrypoints configured (LLM-001 not enabled).");
   } else if (budget.entrypointsMatched === 0) {
-    lines.push("LLM-001 is enabled, but its configured entrypoints matched no files in this corpus.");
+    lines.push(
+      "LLM-001 is enabled, but its configured entrypoints matched no files in this corpus.",
+    );
   } else if (budget.entrypointsOverBudget.length === 0) {
     lines.push("All configured entrypoints are within budget.");
   } else {
     // Phrasing mirrors LLM-001's own report (engine/rules/llm.ts) so the same budget breach reads
     // identically whether seen as a lint finding or in the compiled skill.
     for (const entrypoint of budget.entrypointsOverBudget) {
-      const percentOver = (((entrypoint.totalTokens - entrypoint.maxTokens) / entrypoint.maxTokens) * 100).toFixed(1);
+      const percentOver = (
+        ((entrypoint.totalTokens - entrypoint.maxTokens) /
+          entrypoint.maxTokens) *
+        100
+      ).toFixed(1);
       lines.push(
-        `- ${codeSpan(entrypoint.path)}: ${entrypoint.totalTokens} estimated tokens exceeds ${entrypoint.maxTokens} (${percentOver}% over).`
+        `- ${codeSpan(entrypoint.path)}: ${entrypoint.totalTokens} estimated tokens exceeds ${entrypoint.maxTokens} (${percentOver}% over).`,
       );
     }
   }
@@ -130,7 +149,9 @@ function renderBudget(budget: CompileBudget): string {
 
 // Derived-only classification (no new parsing): a document with a resolved id-table pattern is a
 // reference doc; otherwise any table makes it tabular; otherwise it's narrative prose.
-function classifyDocumentType(profile: DocumentProfile): "reference" | "tabular" | "narrative" {
+function classifyDocumentType(
+  profile: DocumentProfile,
+): "reference" | "tabular" | "narrative" {
   if (profile.idPattern !== undefined) {
     return "reference";
   }
@@ -140,7 +161,10 @@ function classifyDocumentType(profile: DocumentProfile): "reference" | "tabular"
   return "narrative";
 }
 
-function renderArchitecture(documentPaths: string[], profiles: Map<string, DocumentProfile>): string {
+function renderArchitecture(
+  documentPaths: string[],
+  profiles: Map<string, DocumentProfile>,
+): string {
   if (documentPaths.length === 0) {
     return ["## Document Architecture", "", "(no documents found)"].join("\n");
   }
@@ -151,11 +175,18 @@ function renderArchitecture(documentPaths: string[], profiles: Map<string, Docum
   const rows = documentPaths.map((documentPath) => {
     const profile = profiles.get(documentPath);
     const role = profile?.role ?? "isolated";
-    const type = profile === undefined ? "narrative" : classifyDocumentType(profile);
+    const type =
+      profile === undefined ? "narrative" : classifyDocumentType(profile);
     return `| ${tableCell(documentPath)} | ${role} | ${type} |`;
   });
 
-  return ["## Document Architecture", "", "| Path | Role | Type |", "| --- | --- | --- |", ...rows].join("\n");
+  return [
+    "## Document Architecture",
+    "",
+    "| Path | Role | Type |",
+    "| --- | --- | --- |",
+    ...rows,
+  ].join("\n");
 }
 
 function renderRules(ruleGroups: RuleDescriptionGroup[]): string {
@@ -164,14 +195,21 @@ function renderRules(ruleGroups: RuleDescriptionGroup[]): string {
   }
 
   const groupBlocks = ruleGroups.map((group) => {
-    const bulletLines = group.rules.map((rule) => `- ${codeSpan(rule.id)}: ${toSingleLine(rule.description)}`);
-    return [`### ${group.label} (${group.category})`, "", ...bulletLines].join("\n");
+    const bulletLines = group.rules.map(
+      (rule) => `- ${codeSpan(rule.id)}: ${toSingleLine(rule.description)}`,
+    );
+    return [`### ${group.label} (${group.category})`, "", ...bulletLines].join(
+      "\n",
+    );
   });
 
   return ["## Document Rules", groupBlocks.join("\n\n")].join("\n\n");
 }
 
-function renderReadingOrderBlock(documentPaths: string[], analysis: GraphAnalysis): string {
+function renderReadingOrderBlock(
+  documentPaths: string[],
+  analysis: GraphAnalysis,
+): string {
   const lines = ["### Reading Order", ""];
 
   if (documentPaths.length === 0) {
@@ -181,7 +219,7 @@ function renderReadingOrderBlock(documentPaths: string[], analysis: GraphAnalysi
     // excluded, not that the corpus itself is empty — those are different facts and must not share
     // the same "(no documents found)" message. The Cycles block right below names them.
     lines.push(
-      `(no reading order — all ${documentPaths.length} document(s) are excluded by cycles; see Cycles below)`
+      `(no reading order — all ${documentPaths.length} document(s) are excluded by cycles; see Cycles below)`,
     );
   } else {
     analysis.readingOrder.forEach((documentPath, index) => {
@@ -204,24 +242,36 @@ function renderCyclesBlock(analysis: GraphAnalysis): string {
   const excludedText =
     analysis.excludedFromReadingOrder.length === 0
       ? "(none)"
-      : analysis.excludedFromReadingOrder.map((documentPath) => codeSpan(documentPath)).join(", ");
+      : analysis.excludedFromReadingOrder
+          .map((documentPath) => codeSpan(documentPath))
+          .join(", ");
   lines.push("", `Excluded from reading order: ${excludedText}`);
 
   return lines.join("\n");
 }
 
-function formatEdgeList(edges: readonly ContextGraphEdge[], endpoint: "to" | "from"): string {
+function formatEdgeList(
+  edges: readonly ContextGraphEdge[],
+  endpoint: "to" | "from",
+): string {
   if (edges.length === 0) {
     return "(none)";
   }
 
   const sorted = [...edges].sort(
-    (left, right) => compareStrings(left[endpoint], right[endpoint]) || compareStrings(left.type, right.type)
+    (left, right) =>
+      compareStrings(left[endpoint], right[endpoint]) ||
+      compareStrings(left.type, right.type),
   );
-  return sorted.map((edge) => `${codeSpan(edge[endpoint])} (${edge.type})`).join(", ");
+  return sorted
+    .map((edge) => `${codeSpan(edge[endpoint])} (${edge.type})`)
+    .join(", ");
 }
 
-function renderReferencesBlock(documentPaths: string[], profiles: Map<string, DocumentProfile>): string {
+function renderReferencesBlock(
+  documentPaths: string[],
+  profiles: Map<string, DocumentProfile>,
+): string {
   if (documentPaths.length === 0) {
     return ["### References", "", "(no documents found)"].join("\n");
   }
@@ -233,7 +283,7 @@ function renderReferencesBlock(documentPaths: string[], profiles: Map<string, Do
       // sequence inside a path would otherwise prematurely close a bold span (audit finding).
       codeSpan(documentPath),
       `- to: ${formatEdgeList(profile?.referencesTo ?? [], "to")}`,
-      `- from: ${formatEdgeList(profile?.referencedBy ?? [], "from")}`
+      `- from: ${formatEdgeList(profile?.referencedBy ?? [], "from")}`,
     ].join("\n");
   });
 
@@ -242,7 +292,9 @@ function renderReferencesBlock(documentPaths: string[], profiles: Map<string, Do
 
 // Locked verbatim (audit 3.4) — copy exactly; presets change only this block, never the computed
 // data above it (S2/S4).
-function renderCommandBlock(commandPreset: CompileCommandPreset): string | undefined {
+function renderCommandBlock(
+  commandPreset: CompileCommandPreset,
+): string | undefined {
   if (commandPreset === "none") {
     return undefined;
   }
@@ -257,7 +309,7 @@ function renderCommandBlock(commandPreset: CompileCommandPreset): string | undef
       "",
       "- Pull the context slice for a topic:",
       "",
-      "  !npx wastech-mdlint slice $ARGUMENTS"
+      "  !npx wastech-mdlint slice $ARGUMENTS",
     ].join("\n");
   }
 
@@ -267,7 +319,7 @@ function renderCommandBlock(commandPreset: CompileCommandPreset): string | undef
     "- Trace what a change affects: run `wastech-mdlint impact <file>`, or call the",
     '  `impact-analysis` MCP tool with `{ "file": "<file>" }`.',
     "- Pull the context slice for a topic: run `wastech-mdlint slice <query>`, or call the",
-    '  `context-slice` MCP tool with `{ "query": "<query>" }`.'
+    '  `context-slice` MCP tool with `{ "query": "<query>" }`.',
   ].join("\n");
 }
 
@@ -275,7 +327,7 @@ function renderDependencies(
   documentPaths: string[],
   profiles: Map<string, DocumentProfile>,
   analysis: GraphAnalysis,
-  commandPreset: CompileCommandPreset
+  commandPreset: CompileCommandPreset,
 ): string {
   const blocks = [renderReadingOrderBlock(documentPaths, analysis)];
 
@@ -301,20 +353,30 @@ function renderWorkflow(sections: CompileSections): string {
   const steps: string[] = [];
 
   if (sections.architecture) {
-    steps.push("Start from Document Architecture to find the right entry point for your change.");
+    steps.push(
+      "Start from Document Architecture to find the right entry point for your change.",
+    );
   }
   if (sections.rules) {
-    steps.push("Check Document Rules for the constraints that apply to the files you plan to touch.");
+    steps.push(
+      "Check Document Rules for the constraints that apply to the files you plan to touch.",
+    );
   }
   if (sections.dependencies) {
     steps.push(
-      "Read Document Dependencies to trace what a change affects, and follow the reading order before editing."
+      "Read Document Dependencies to trace what a change affects, and follow the reading order before editing.",
     );
   }
   // Context Budget is never gated by `sections` (S6), so this step is always valid to reference.
-  steps.push("Mind the Context Budget so your edits do not push an eager-imported entrypoint over its token limit.");
+  steps.push(
+    "Mind the Context Budget so your edits do not push an eager-imported entrypoint over its token limit.",
+  );
 
-  return ["## Workflow", "", ...steps.map((step, index) => `${index + 1}. ${step}`)].join("\n");
+  return [
+    "## Workflow",
+    "",
+    ...steps.map((step, index) => `${index + 1}. ${step}`),
+  ].join("\n");
 }
 
 export function synthesize(input: SynthesizeInput): CompileResult {
@@ -322,7 +384,10 @@ export function synthesize(input: SynthesizeInput): CompileResult {
   // here rather than silently emitting invalid frontmatter. `compile-context.ts`'s lenient reader
   // defaults missing fields to `""`, so this is the one place that actually enforces S1 today —
   // P5.05 replaces it with a proper load-time diagnostic.
-  parseSkillFrontmatter({ name: input.skill.name, description: input.skill.description });
+  parseSkillFrontmatter({
+    name: input.skill.name,
+    description: input.skill.description,
+  });
 
   const frontmatter = renderFrontmatter(input.skill);
   // Single-lined (unlike the frontmatter, which safely embeds a raw multiline name inside a YAML
@@ -333,14 +398,26 @@ export function synthesize(input: SynthesizeInput): CompileResult {
   const architectureSection = input.sections.architecture
     ? renderArchitecture(input.documentPaths, input.profiles)
     : undefined;
-  const rulesSection = input.sections.rules ? renderRules(input.ruleGroups) : undefined;
-  const dependenciesSection = input.sections.dependencies
-    ? renderDependencies(input.documentPaths, input.profiles, input.analysis, input.commandPreset)
+  const rulesSection = input.sections.rules
+    ? renderRules(input.ruleGroups)
     : undefined;
-  const workflowSection = input.sections.workflow ? renderWorkflow(input.sections) : undefined;
+  const dependenciesSection = input.sections.dependencies
+    ? renderDependencies(
+        input.documentPaths,
+        input.profiles,
+        input.analysis,
+        input.commandPreset,
+      )
+    : undefined;
+  const workflowSection = input.sections.workflow
+    ? renderWorkflow(input.sections)
+    : undefined;
 
   const documentCount = input.documentPaths.length;
-  const ruleCount = input.ruleGroups.reduce((total, group) => total + group.rules.length, 0);
+  const ruleCount = input.ruleGroups.reduce(
+    (total, group) => total + group.rules.length,
+    0,
+  );
   const componentCount = input.analysis.components.length;
 
   // Hash the provenance line's deterministic text too, not just the gated sections — a gated-off
@@ -359,9 +436,12 @@ export function synthesize(input: SynthesizeInput): CompileResult {
     architectureSection,
     rulesSection,
     dependenciesSection,
-    workflowSection
+    workflowSection,
   ].filter(isDefined);
-  const contentHash = createHash("sha256").update(hashedParts.join("\n\n")).digest("hex").slice(0, 16);
+  const contentHash = createHash("sha256")
+    .update(hashedParts.join("\n\n"))
+    .digest("hex")
+    .slice(0, 16);
 
   const provenance = renderProvenance(contentHash);
 
@@ -373,11 +453,11 @@ export function synthesize(input: SynthesizeInput): CompileResult {
     architectureSection,
     rulesSection,
     dependenciesSection,
-    workflowSection
+    workflowSection,
   ].filter(isDefined);
 
   return {
     skillContent: `${parts.join("\n\n")}\n`,
-    metadata: { documentCount, ruleCount, componentCount, contentHash }
+    metadata: { documentCount, ruleCount, componentCount, contentHash },
   };
 }

@@ -6,11 +6,11 @@
 surface. They are workflow instructions an AI host executes — a contract over the product surface,
 not code. They live under [`skills/`](../../skills):
 
-| Skill | Purpose |
-| --- | --- |
-| [`wastech-mdlint-init`](../../skills/wastech-mdlint-init/SKILL.md) | Bootstrap: scan the repo and produce a sensible `wastech-mdlint.config.json` via `init`. |
-| [`wastech-mdlint-fix`](../../skills/wastech-mdlint-fix/SKILL.md) | Fix findings by rule prefix — delegating mechanical fixes to the deterministic `--fix`, reserving judgement for the AI. |
-| [`wastech-mdlint-impact`](../../skills/wastech-mdlint-impact/SKILL.md) | Explain the blast radius of a change using `impact` / the graph. |
+| Skill                                                                  | Purpose                                                                                                                 |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| [`wastech-mdlint-init`](../../skills/wastech-mdlint-init/SKILL.md)     | Bootstrap: scan the repo and produce a sensible `wastech-mdlint.config.json` via `init`.                                |
+| [`wastech-mdlint-fix`](../../skills/wastech-mdlint-fix/SKILL.md)       | Fix findings by rule prefix — delegating mechanical fixes to the deterministic `--fix`, reserving judgement for the AI. |
+| [`wastech-mdlint-impact`](../../skills/wastech-mdlint-impact/SKILL.md) | Explain the blast radius of a change using `impact` / the graph.                                                        |
 
 ## Host-neutral by design
 

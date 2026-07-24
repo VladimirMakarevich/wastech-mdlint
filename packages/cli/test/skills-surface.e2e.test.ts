@@ -12,7 +12,10 @@ import { runCli } from "../src/program.js";
 // Drift guard (deliverable 3, CLI half): every CLI command and flag the shipped skills instruct users
 // to run must still exist in the real program. A renamed/removed command makes `--help` exit 2 here;
 // a renamed flag makes the flag assertion fail — either way CI catches skill-vs-product drift.
-const skillsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../skills");
+const skillsDir = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../../skills",
+);
 
 function readSkill(id: string): string {
   return readFileSync(path.join(skillsDir, id, "SKILL.md"), "utf8");
@@ -49,15 +52,20 @@ function parseCliInvocations(): Map<string, Set<string>> {
   return invocations;
 }
 
-async function help(command: string): Promise<{ exitCode: number; text: string }> {
+async function help(
+  command: string,
+): Promise<{ exitCode: number; text: string }> {
   let text = "";
   const sink = {
     write(chunk: string) {
       text += chunk;
       return true;
-    }
+    },
   };
-  const exitCode = await runCli([command, "--help"], { stdout: sink, stderr: sink });
+  const exitCode = await runCli([command, "--help"], {
+    stdout: sink,
+    stderr: sink,
+  });
   return { exitCode, text };
 }
 
@@ -72,7 +80,12 @@ interface Choice {
   value: string;
   evidence: RegExp;
 }
-const COMMANDS: { command: string; usage: string; flags: string[]; choices: Choice[] }[] = [
+const COMMANDS: {
+  command: string;
+  usage: string;
+  flags: string[];
+  choices: Choice[];
+}[] = [
   {
     command: "init",
     usage: "wastech-mdlint init",
@@ -81,8 +94,8 @@ const COMMANDS: { command: string; usage: string; flags: string[]; choices: Choi
     choices: [
       { value: "overwrite", evidence: /--on-existing <[^>]*\boverwrite\b/ },
       { value: "merge", evidence: /--on-existing <[^>]*\bmerge\b/ },
-      { value: "skip", evidence: /--on-existing <[^>]*\bskip\b/ }
-    ]
+      { value: "skip", evidence: /--on-existing <[^>]*\bskip\b/ },
+    ],
   },
   {
     command: "lint",
@@ -92,20 +105,24 @@ const COMMANDS: { command: string; usage: string; flags: string[]; choices: Choi
     choices: [
       { value: "json", evidence: /wastech-mdlint lint[^\n`]*--format json/ },
       { value: "off", evidence: /--fail-on off/ },
-      { value: "error", evidence: /--fail-on error/ }
-    ]
+      { value: "error", evidence: /--fail-on error/ },
+    ],
   },
   {
     command: "impact",
     usage: "wastech-mdlint impact",
     flags: ["--format"],
-    choices: [{ value: "json", evidence: /wastech-mdlint impact[^\n`]*--format json/ }]
+    choices: [
+      { value: "json", evidence: /wastech-mdlint impact[^\n`]*--format json/ },
+    ],
   },
   {
     command: "slice",
     usage: "wastech-mdlint slice",
     flags: ["--format"],
-    choices: [{ value: "json", evidence: /wastech-mdlint slice[^\n`]*--format json/ }]
+    choices: [
+      { value: "json", evidence: /wastech-mdlint slice[^\n`]*--format json/ },
+    ],
   },
   {
     command: "graph",
@@ -114,11 +131,14 @@ const COMMANDS: { command: string; usage: string; flags: string[]; choices: Choi
     // The impact skill lists `graph`'s non-default renders in one clause: `--format json|mermaid|dot`.
     // `json` is tied to `graph` by proximity; `mermaid`/`dot` appear only in that clause.
     choices: [
-      { value: "json", evidence: /wastech-mdlint graph[\s\S]{0,160}--format json/ },
+      {
+        value: "json",
+        evidence: /wastech-mdlint graph[\s\S]{0,160}--format json/,
+      },
       { value: "mermaid", evidence: /--format mermaid/ },
-      { value: "dot", evidence: /--format dot/ }
-    ]
-  }
+      { value: "dot", evidence: /--format dot/ },
+    ],
+  },
 ];
 
 describe("skills reference a live CLI surface", () => {
@@ -128,14 +148,21 @@ describe("skills reference a live CLI surface", () => {
   it("COMMANDS matches the CLI invocations documented in the skills", () => {
     const parsed = parseCliInvocations();
 
-    expect([...parsed.keys()].sort()).toEqual(COMMANDS.map((c) => c.command).sort());
+    expect([...parsed.keys()].sort()).toEqual(
+      COMMANDS.map((c) => c.command).sort(),
+    );
 
     for (const { command, flags } of COMMANDS) {
-      const documentedFlags = [...(parsed.get(command) ?? new Set<string>())].sort();
+      const documentedFlags = [
+        ...(parsed.get(command) ?? new Set<string>()),
+      ].sort();
       // Every flag the skills attach to this command's invocations must be declared for it in the
       // matrix (the matrix may list extra flags documented only in prose, e.g. `--config`).
       for (const flag of documentedFlags) {
-        expect(flags, `${command} invocation uses ${flag}, absent from its matrix flags`).toContain(flag);
+        expect(
+          flags,
+          `${command} invocation uses ${flag}, absent from its matrix flags`,
+        ).toContain(flag);
       }
     }
   });
@@ -152,16 +179,24 @@ describe("skills reference a live CLI surface", () => {
     //  - `--pin` belongs to the `gh skill install` example, not this CLI.
     const nonCommandFlags = new Set(["--version", "--pin"]);
 
-    const referencedFlags = new Set([...allSkillText.matchAll(/--[a-z][a-z-]+/g)].map((m) => m[0]));
+    const referencedFlags = new Set(
+      [...allSkillText.matchAll(/--[a-z][a-z-]+/g)].map((m) => m[0]),
+    );
     for (const flag of referencedFlags) {
       if (nonCommandFlags.has(flag)) {
         continue;
       }
       const owners = COMMANDS.filter((c) => c.flags.includes(flag));
-      expect(owners.length, `skill references ${flag} but no command matrix owns it`).toBeGreaterThan(0);
+      expect(
+        owners.length,
+        `skill references ${flag} but no command matrix owns it`,
+      ).toBeGreaterThan(0);
       for (const owner of owners) {
         const { text } = await help(owner.command);
-        expect(text, `${owner.command} --help is missing referenced flag ${flag}`).toContain(flag);
+        expect(
+          text,
+          `${owner.command} --help is missing referenced flag ${flag}`,
+        ).toContain(flag);
       }
     }
   });
@@ -183,10 +218,13 @@ describe("skills reference a live CLI surface", () => {
       for (const { value, evidence } of choices) {
         // Command-scoped: the value must be documented for THIS command (not merely appear somewhere),
         // and commander must still advertise it as a quoted choice in this command's help.
-        expect(evidence.test(allSkillText), `${command} choice ${value} not documented for it`).toBe(true);
+        expect(
+          evidence.test(allSkillText),
+          `${command} choice ${value} not documented for it`,
+        ).toBe(true);
         expect(text).toContain(`"${value}"`);
       }
-    }
+    },
   );
 
   it("supports the root --version flag the fix skill documents", async () => {
@@ -196,11 +234,14 @@ describe("skills reference a live CLI surface", () => {
       write(chunk: string) {
         text += chunk;
         return true;
-      }
+      },
     };
     // `--version` resolves inside commander with exit 0 (never the usage-error path) and prints a
     // version string; a removed root version flag would surface as usage error 2.
-    const exitCode = await runCli(["--version"], { stdout: sink, stderr: sink });
+    const exitCode = await runCli(["--version"], {
+      stdout: sink,
+      stderr: sink,
+    });
     expect(exitCode).toBe(EXIT_CODE_SUCCESS);
     expect(text.trim()).not.toBe("");
   });
@@ -214,54 +255,87 @@ describe("skills reference the real CLI JSON contract", () => {
   const tempDirs: string[] = [];
 
   afterEach(async () => {
-    await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+    await Promise.all(
+      tempDirs
+        .splice(0)
+        .map((dir) => rm(dir, { recursive: true, force: true })),
+    );
   });
 
   // `a.md` references `b.md` (a graph edge, so impact/slice resolve a non-empty neighborhood) and also
   // carries a broken link so `lint` emits at least one REF-001 message to exercise message fields.
   async function fixtureRepo(): Promise<string> {
-    const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-skills-"));
+    const root = await mkdtemp(
+      path.join(os.tmpdir(), "wastech-mdlint-skills-"),
+    );
     tempDirs.push(root);
-    await writeFile(path.join(root, "a.md"), "# A\n\n[to b](b.md)\n[broken](missing.md)\n", "utf8");
+    await writeFile(
+      path.join(root, "a.md"),
+      "# A\n\n[to b](b.md)\n[broken](missing.md)\n",
+      "utf8",
+    );
     await writeFile(path.join(root, "b.md"), "# B\n", "utf8");
     await writeFile(
       path.join(root, "wastech-mdlint.config.json"),
       JSON.stringify({ rules: [{ rule: "REF-001" }] }),
-      "utf8"
+      "utf8",
     );
     return root;
   }
 
-  async function runJson(argv: string[], cwd: string): Promise<Record<string, unknown>> {
+  async function runJson(
+    argv: string[],
+    cwd: string,
+  ): Promise<Record<string, unknown>> {
     let text = "";
     const sink = {
       write(chunk: string) {
         text += chunk;
         return true;
-      }
+      },
     };
     const exitCode = await runCli(argv, { cwd, stdout: sink, stderr: sink });
-    expect(exitCode, `${argv.join(" ")} failed: ${text}`).toBe(EXIT_CODE_SUCCESS);
+    expect(exitCode, `${argv.join(" ")} failed: ${text}`).toBe(
+      EXIT_CODE_SUCCESS,
+    );
     return JSON.parse(text) as Record<string, unknown>;
   }
 
   // Assert a skill documents each field (by name) and the live payload actually carries it.
-  function expectContract(skill: string, payload: Record<string, unknown>, fields: string[]): void {
+  function expectContract(
+    skill: string,
+    payload: Record<string, unknown>,
+    fields: string[],
+  ): void {
     for (const field of fields) {
-      expect(skill, `skill no longer documents field '${field}'`).toContain(field);
-      expect(payload, `CLI payload missing field '${field}'`).toHaveProperty(field);
+      expect(skill, `skill no longer documents field '${field}'`).toContain(
+        field,
+      );
+      expect(payload, `CLI payload missing field '${field}'`).toHaveProperty(
+        field,
+      );
     }
   }
 
   it("lint --format json emits the summary/messages/files shape the fix skill reads", async () => {
     const cwd = await fixtureRepo();
-    const payload = await runJson(["lint", cwd, "--format", "json", "--fail-on", "off"], cwd);
+    const payload = await runJson(
+      ["lint", cwd, "--format", "json", "--fail-on", "off"],
+      cwd,
+    );
 
     expectContract(fixSkill, payload, ["summary", "messages", "files"]);
-    expectContract(fixSkill, payload.summary as Record<string, unknown>, ["files", "errors", "warnings"]);
+    expectContract(fixSkill, payload.summary as Record<string, unknown>, [
+      "files",
+      "errors",
+      "warnings",
+    ]);
 
     const messages = payload.messages as Record<string, unknown>[];
-    expect(messages.length, "fixture should surface at least one REF-001 message").toBeGreaterThan(0);
+    expect(
+      messages.length,
+      "fixture should surface at least one REF-001 message",
+    ).toBeGreaterThan(0);
     // The fix skill groups by `ruleId` and reports `severity`/`filePath` per message.
     expectContract(fixSkill, messages[0]!, ["ruleId", "severity", "filePath"]);
   });
@@ -270,7 +344,13 @@ describe("skills reference the real CLI JSON contract", () => {
     const cwd = await fixtureRepo();
     const payload = await runJson(["slice", "b.md", "--format", "json"], cwd);
 
-    expectContract(impactSkill, payload, ["query", "matchKind", "starts", "files", "visited"]);
+    expectContract(impactSkill, payload, [
+      "query",
+      "matchKind",
+      "starts",
+      "files",
+      "visited",
+    ]);
     // The skill instructs reading the resolved target from `starts` (not `files`).
     expect(payload.starts).toContain("b.md");
   });
@@ -285,7 +365,7 @@ describe("skills reference the real CLI JSON contract", () => {
       "transitivelyAffected",
       "readingOrder",
       "excluded",
-      "lint"
+      "lint",
     ]);
     expect(payload.changedFile).toBe("b.md");
 

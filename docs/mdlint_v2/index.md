@@ -46,17 +46,17 @@ so each phase ships something runnable.
 
 Single package `wastech-mdlint`, Node 24.17 LTS, ESM, TypeScript NodeNext.
 
-| Module | Status | Reuse in v2 |
-| --- | --- | --- |
-| `src/markdown/parse.ts` (remark + gfm + slugger) | Solid | **High** — extend into `ParsedDocument` (add tables, checkItems, sections) |
-| `src/graph/build.ts` (dependency graph) | Solid | **High** — extend into `ContextGraph` (in/out degree, edge type+line) |
-| `src/discovery/` (micromatch globbing) | Solid | **High** — becomes `loadDocuments()` |
-| `src/llm/budget.ts` (`estimateTokens = ceil(len/4)`) | Solid | **High** — keep isolated as the token estimator |
-| `src/rules/{local-links,size,structure}.ts` | Works | **Medium** — logic reusable, but re-expressed as registry rules |
-| `src/config/` (Zod v3, sectioned config) | Works | **Low** — config model is replaced (see §4) |
-| `src/cli.ts` (hand-rolled arg parser) | Works | **Low** — replaced by `commander` |
-| `src/reporting/render.ts` | Works | **Medium** — superseded by `format.ts` |
-| Test fixtures (`test/fixtures/*`) | Good pattern | **High** — keep the fixture-per-scenario approach |
+| Module                                               | Status       | Reuse in v2                                                                |
+| ---------------------------------------------------- | ------------ | -------------------------------------------------------------------------- |
+| `src/markdown/parse.ts` (remark + gfm + slugger)     | Solid        | **High** — extend into `ParsedDocument` (add tables, checkItems, sections) |
+| `src/graph/build.ts` (dependency graph)              | Solid        | **High** — extend into `ContextGraph` (in/out degree, edge type+line)      |
+| `src/discovery/` (micromatch globbing)               | Solid        | **High** — becomes `loadDocuments()`                                       |
+| `src/llm/budget.ts` (`estimateTokens = ceil(len/4)`) | Solid        | **High** — keep isolated as the token estimator                            |
+| `src/rules/{local-links,size,structure}.ts`          | Works        | **Medium** — logic reusable, but re-expressed as registry rules            |
+| `src/config/` (Zod v3, sectioned config)             | Works        | **Low** — config model is replaced (see §4)                                |
+| `src/cli.ts` (hand-rolled arg parser)                | Works        | **Low** — replaced by `commander`                                          |
+| `src/reporting/render.ts`                            | Works        | **Medium** — superseded by `format.ts`                                     |
+| Test fixtures (`test/fixtures/*`)                    | Good pattern | **High** — keep the fixture-per-scenario approach                          |
 
 Key takeaway from the audit: **every analysis primitive is cleanly separated and
 reusable; the coupling is only in CLI orchestration and the config shape.** That
@@ -68,14 +68,14 @@ is exactly the part the target architecture also wants centralized in `core`.
 
 Each capability area has a locked requirements doc under [requirements/](requirements/index.md):
 
-| Area | What it defines | New in v2? |
-| --- | --- | --- |
-| [Context graph & search](requirements/03-context-graph.md) | `ContextGraph`, `slice`, `impact`, topo-sort, components | Extends the current graph implementation |
-| [Rules & rule engine](requirements/02-rules-engine.md) | `Rule`/`RuleContext`/`runRules`, registry, 22 built-in rules (+ `SIZE-001`/`LLM-001`, D3) | **New engine** |
-| [Configuration](requirements/01-configuration.md) | `{ include, rules[], compile }`, `findConfig`, JSON schema | **New model** |
-| [MCP server](requirements/05-mcp-server.md) | 6 stdio tools over core | **New package** |
-| [Skills & compile](requirements/04-skills-compile.md) | static skills + generated `SKILL.md` (compile) | **New** |
-| [Installation](requirements/06-installation.md) | `gh skill install`, `npx` MCP, npm + `init` flows | **New** |
+| Area                                                       | What it defines                                                                           | New in v2?                               |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------- |
+| [Context graph & search](requirements/03-context-graph.md) | `ContextGraph`, `slice`, `impact`, topo-sort, components                                  | Extends the current graph implementation |
+| [Rules & rule engine](requirements/02-rules-engine.md)     | `Rule`/`RuleContext`/`runRules`, registry, 22 built-in rules (+ `SIZE-001`/`LLM-001`, D3) | **New engine**                           |
+| [Configuration](requirements/01-configuration.md)          | `{ include, rules[], compile }`, `findConfig`, JSON schema                                | **New model**                            |
+| [MCP server](requirements/05-mcp-server.md)                | 6 stdio tools over core                                                                   | **New package**                          |
+| [Skills & compile](requirements/04-skills-compile.md)      | static skills + generated `SKILL.md` (compile)                                            | **New**                                  |
+| [Installation](requirements/06-installation.md)            | `gh skill install`, `npx` MCP, npm + `init` flows                                         | **New**                                  |
 
 ### 3.1 Rule inventory (the bulk of the work)
 
@@ -84,17 +84,17 @@ Each capability area has a locked requirements doc under [requirements/](require
 
 - **TBL (tables, 6)** — `TBL-001` required columns · `TBL-002` non-empty
   cells · `TBL-003` allowed values · `TBL-004` cell regex · `TBL-005`
-  cross-column conditional · `TBL-006` unique IDs across files *(project)*.
-- **SEC (sections, 3)** — `SEC-001` required sections · `SEC-002` section order · `SEC-003` template conformance *(project)*.
-- **STR (structure, 1)** — `STR-001` required files exist *(project)*.
+  cross-column conditional · `TBL-006` unique IDs across files _(project)_.
+- **SEC (sections, 3)** — `SEC-001` required sections · `SEC-002` section order · `SEC-003` template conformance _(project)_.
+- **STR (structure, 1)** — `STR-001` required files exist _(project)_.
 - **REF (references, 6)** — `REF-001` relative links resolve · `REF-002`
   anchor/heading slugs · `REF-003` images resolve · `REF-004` cross-zone link
-  declaration · `REF-005` ID traceability *(project)* · `REF-006` stability
-  consistency *(project)*.
+  declaration · `REF-005` ID traceability _(project)_ · `REF-006` stability
+  consistency _(project)_.
 - **CTX (content quality, 3)** — `CTX-001` no placeholder/empty sections ·
-  `CTX-002` all checklist items checked · `CTX-003` glossary alias usage *(project)*.
-- **GRP (graph integrity, 3)** — `GRP-001` no cycles *(project)* ·
-  `GRP-002` no orphan docs *(project)* · `GRP-003` ID chain across stages *(project)*.
+  `CTX-002` all checklist items checked · `CTX-003` glossary alias usage _(project)_.
+- **GRP (graph integrity, 3)** — `GRP-001` no cycles _(project)_ ·
+  `GRP-002` no orphan docs _(project)_ · `GRP-003` ID chain across stages _(project)_.
 
 Note: the current `links/broken-links` behavior maps roughly to
 `REF-001` + `REF-002` + `REF-003`; current `graph/dependencies` cycle checks map to
@@ -138,16 +138,16 @@ confirmed by the owner on 2026-06-21** (all on the recommended option).
 **D4–D7 were confirmed by the owner on 2026-07-02** (all on the recommended
 option).
 
-| # | Decision | Resolution |
-| --- | --- | --- |
-| **D1** ✅ | **Monorepo vs single package.** | **Monorepo (npm workspaces)** — `packages/core` + `cli` + `mcp-server`. Required to ship MCP + CLI separately and to honor the core-hosts-the-pipeline decision. |
-| **D2** ✅ | **Config model migration.** | **Clean replace**, no compatibility layer (still `v0.0.0`, no real users). New `{ include, rules[], compile }`; **JSON-only** (drop `.cjs/.mjs`). One-time migration note in the README. |
-| **D3** ✅ | **Fate of current LLM features** (size, eager `@import` budget, per-entrypoint token budget) — absent from the 22 built-in rule set. | **Preserve as first-class rules** in the new engine (`SIZE-001` checks bytes/lines/tokens each with independent per-metric `warn`/`error` thresholds; `LLM-001` eager-import budget). Keeps the original PLAN.md mission (LLM context hygiene) on top of doc-integrity. |
-| **Order** ✅ | **What ships first after the foundation.** | **Lint parity first** — P3 (all 22 built-in rules + the LLM rules) before graph/agents. M1→M2 is the priority path. |
-| **D4** ✅ | **`scan` command.** The current CLI uses `scan`; target uses `lint` (default). | **Default to `lint`, keep `scan` as a hidden alias** for one minor version, then deprecate. |
-| **D5** ✅ | **CLI framework.** | **Adopt `commander` + `@inquirer/prompts`** (matches reference, needed for `init`'s interactive flow). |
-| **D6** ✅ | **LSP server** (`lsp-server/config-loader.ts` in the spec). | **Out of v2 scope** (stretch). Keep `core` LSP-friendly (sync, no `process.exit` in library code). |
-| **D7** ✅ | **Docs site** (reference ships Astro/Starlight). | **Out of v2 core scope**; README + schema + skills suffice for launch. |
+| #            | Decision                                                                                                                             | Resolution                                                                                                                                                                                                                                                              |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **D1** ✅    | **Monorepo vs single package.**                                                                                                      | **Monorepo (npm workspaces)** — `packages/core` + `cli` + `mcp-server`. Required to ship MCP + CLI separately and to honor the core-hosts-the-pipeline decision.                                                                                                        |
+| **D2** ✅    | **Config model migration.**                                                                                                          | **Clean replace**, no compatibility layer (still `v0.0.0`, no real users). New `{ include, rules[], compile }`; **JSON-only** (drop `.cjs/.mjs`). One-time migration note in the README.                                                                                |
+| **D3** ✅    | **Fate of current LLM features** (size, eager `@import` budget, per-entrypoint token budget) — absent from the 22 built-in rule set. | **Preserve as first-class rules** in the new engine (`SIZE-001` checks bytes/lines/tokens each with independent per-metric `warn`/`error` thresholds; `LLM-001` eager-import budget). Keeps the original PLAN.md mission (LLM context hygiene) on top of doc-integrity. |
+| **Order** ✅ | **What ships first after the foundation.**                                                                                           | **Lint parity first** — P3 (all 22 built-in rules + the LLM rules) before graph/agents. M1→M2 is the priority path.                                                                                                                                                     |
+| **D4** ✅    | **`scan` command.** The current CLI uses `scan`; target uses `lint` (default).                                                       | **Default to `lint`, keep `scan` as a hidden alias** for one minor version, then deprecate.                                                                                                                                                                             |
+| **D5** ✅    | **CLI framework.**                                                                                                                   | **Adopt `commander` + `@inquirer/prompts`** (matches reference, needed for `init`'s interactive flow).                                                                                                                                                                  |
+| **D6** ✅    | **LSP server** (`lsp-server/config-loader.ts` in the spec).                                                                          | **Out of v2 scope** (stretch). Keep `core` LSP-friendly (sync, no `process.exit` in library code).                                                                                                                                                                      |
+| **D7** ✅    | **Docs site** (reference ships Astro/Starlight).                                                                                     | **Out of v2 core scope**; README + schema + skills suffice for launch.                                                                                                                                                                                                  |
 
 ---
 
@@ -186,8 +186,10 @@ with an explicit prev/next/depends/blocks chain). Effort is a rough T-shirt size
 keys, CLI/MCP surfaces, rule IDs, and this planning taxonomy) used across these docs.
 
 ### Phase 0 — Workspace & foundations · `M` · depends on: D1, D5
+
 **Goal:** establish the monorepo and shared tooling so subsequent phases land in the
 right package.
+
 - Convert to npm workspaces: `packages/core`, `packages/cli`, `packages/mcp-server`.
 - Move the current `src/*` tree into `packages/core/src` (parser, graph, discovery, token est.).
 - Shared `tsconfig` base, ESLint/Prettier, Vitest, CI matrix (Node 24).
@@ -196,7 +198,9 @@ right package.
 - **Exit:** `npm run typecheck && npm test && npm run build` green across the workspace; CLI still runs current behavior.
 
 ### Phase 1 — `ParsedDocument` & parser upgrade · `M` · reuse: High
+
 **Goal:** one parse pass produces everything every rule needs.
+
 - Extend the remark parser to emit `ParsedDocument`: `tables` (header + keyed
   rows + line), `headings`, `sections`, `links`, `images`, `checkItems`, `content`.
 - Keep GitHub-style slug generation (already present via `github-slugger`).
@@ -205,7 +209,9 @@ right package.
 - **Exit:** parser unit tests cover tables/checklists/sections; CJK fixtures pass.
 
 ### Phase 2 — Rule engine & new config model · `L` · depends on: D2, D3 · reuse: Medium
+
 **Goal:** the central computational layer + the config that drives it.
+
 - `Rule` / `RuleContext` / `runRules` / `LintMessage` (callback-report model).
 - `registry.ts` with `defineRule(schema, factory)` + `resolveRule(name, options)`.
 - New config: `{ $schema?, include?, rules: [{rule, options?}], compile? }`, Zod
@@ -218,8 +224,10 @@ right package.
 - **Exit:** engine runs an empty + a small ruleset end-to-end; config errors are clear.
 
 ### Phase 3 — Implement the 22 built-in rules + shared utils · `L` · reuse: Medium
+
 **Goal:** full rule coverage. Sub-sequence by category; each rule ships with its
 own `*.test.ts` and a fixture.
+
 - Utils first: `glob-match` (picomatch `{dot:true}`), `find-line-number`,
   `extract-section-body`, `regex-string` (Zod), `site-router` (Starlight preset).
 - **3a TBL** (001–006) · **3b SEC** (001–003) · **3c STR** (001) ·
@@ -230,7 +238,9 @@ own `*.test.ts` and a fixture.
 - **Exit:** all 22 built-in rules pass unit + fixture tests; documented in README + schema.
 
 ### Phase 4 — `ContextGraph` + `graph`/`slice`/`impact` · `M` · reuse: High
+
 **Goal:** the graph as a first-class primitive and its three CLI surfaces.
+
 - `ContextGraph` (`GraphNode{inDegree,outDegree}`, `GraphEdge{type,line}`),
   `buildContextGraph`, `topologicalSort` (Kahn), `getComponents`,
   `getContextSlice` (BFS + table-ID start), `getImpactSet`/`classifyImpact`
@@ -243,7 +253,9 @@ own `*.test.ts` and a fixture.
 - **Exit:** graph/slice/impact match reference contracts on a fixture repo.
 
 ### Phase 5 — Context compiler & `compile` · `M` · depends on: P4 · reuse: Low
+
 **Goal:** generate a project-specific `SKILL.md`.
+
 - `classifyNodes` (entry/hub/leaf/isolated/bridge), `analyzeGraph`,
   `extractDocProfile` (outline, table schemas, ID-pattern detection, refs in/out),
   `describeRules`, `synthesize` → `CompileResult{ skillContent, metadata }`.
@@ -253,7 +265,9 @@ own `*.test.ts` and a fixture.
 - **Exit:** compile produces deterministic `SKILL.md`; `--dry-run` + custom outdir tested.
 
 ### Phase 6 — `init` command · `M` · depends on: D5 · reuse: Low
+
 **Goal:** zero-to-config bootstrap.
+
 - Interactive (`@inquirer/prompts`): include patterns, rule categories → confirmable draft,
   then writes `wastech-mdlint.config.json` with a sensible zero-config rule set.
 - Package-manager detection from lockfiles; local `$schema` wiring (no remote URL).
@@ -263,7 +277,9 @@ own `*.test.ts` and a fixture.
   with exit 0 on a clean fixture (a real ruleset may report findings on non-clean content).
 
 ### Phase 7 — MCP server package · `M` · depends on: P2, P4, P5 · reuse: n/a
+
 **Goal:** agent access to the same deterministic operations.
+
 - `@wastech-mdlint/mcp-server`: stdio transport, 6 tools — `lint`, `lint-files`,
   `context-graph`, `context-slice`, `impact-analysis`, `compile-context` — each a
   thin wrapper over core; Zod input schemas; text/JSON-in-text responses; `isError`.
@@ -272,7 +288,9 @@ own `*.test.ts` and a fixture.
 - **Exit:** tool-layer tests over core green; manual stdio smoke test in one host.
 
 ### Phase 8 — Static skills · `S–M` · depends on: P6, P7 · reuse: n/a
+
 **Goal:** ship the 3 hand-authored Agent Skills.
+
 - `skills/wastech-mdlint-{init,fix,impact}/SKILL.md` with frontmatter
   (`name`, `description`, `license`, `compatibility`, `metadata.{homepage,source}`).
 - Encode the workflows (init bootstrap; fix-by-rule-prefix policy; impact blast-radius).
@@ -281,8 +299,10 @@ own `*.test.ts` and a fixture.
 - **Exit:** skills install via `gh skill install` and reference real command/MCP surface.
 
 ### Phase 9 — Post-audit remediation (code) · `M` · depends on: P8 · reuse: n/a
+
 **Goal:** fix the code-level correctness, cross-platform, and tooling gaps from the
 [P0–P8 audit](audit-2026-07-23-p0-p8.md) before release. See [P9 tasks](P9-remediation/index.md).
+
 - Multi-line `@import` positions (M-1); deterministic loader sort, no `localeCompare` (M-4).
 - Windows/macOS CI matrix (M-5); honest MCP `lint` tool description (M-3).
 - Resolve `custom` `target: "heading"` mismatch (M-2); fix + enforce the Prettier gate (M-6).
@@ -291,8 +311,10 @@ own `*.test.ts` and a fixture.
 - **Exit:** all MEDIUM code/verification findings closed; gates green and enforced.
 
 ### Phase 10 — Post-audit consistency (docs/contracts/tests) · `S–M` · depends on: P9 · reuse: n/a
+
 **Goal:** reconcile governance docs, glossary, requirements, and test guards with the shipped
 product. See [P10 tasks](P10-consistency/index.md).
+
 - Governance docs drop the removed root `src/`/`test/` (M-7); glossary marks P6–P8 shipped (M-8).
 - Clean stale `CHK`/"P2 wires" comments (L-1/L-2); registry inventory guard test (L-12).
 - Deepen parser + per-rule tests (L-13/L-14); reconcile R7 / M1-table / P5.04 text (L-8/L-9/L-10).
@@ -301,7 +323,9 @@ product. See [P10 tasks](P10-consistency/index.md).
 - **Exit:** docs/tests describe the current product; no stale-state or phantom-category references.
 
 ### Phase P-release — Distribution, CI & release · `M` · depends on: all (incl. P9, P10) · reuse: Medium
+
 **Goal:** production packaging.
+
 - Per-package `package.json` (bins, exports, `files`, `engines`, `publishConfig`).
 - Single-tag release that publishes npm packages + tags skills together.
 - CI: typecheck/test/build/lint across workspace; pack dry-run; schema-sync test.
@@ -315,10 +339,10 @@ product. See [P10 tasks](P10-consistency/index.md).
 
 ```
 P0 ─► P1 ─► P2 ─► P3
-            │     
+            │
             └► P4 ─► P5 ─┐
             └► P6        ├─► P7 ─► P8 ─► P9 ─► P10 ─► P-release
-                         
+
 Critical path: P0 → P1 → P2 → P3 (rules) and P0 → P1 → P4 → P5 (graph/compile)
 run largely in parallel after P2. P7 (MCP) needs P2+P4+P5. P8 (skills) needs the
 CLI/MCP surface stable. P9 (code remediation) and P10 (docs/tests consistency) close out
@@ -326,6 +350,7 @@ the post-audit gaps; P-release ships it.
 ```
 
 Recommended milestones:
+
 - **M1 "Engine":** P0–P2 — workspace + new config + rule engine + first rules runnable.
 - **M2 "Lint parity+":** P3 — all 22 built-in rules + current LLM rules; this is a usable linter.
 - **M3 "Graph & agents":** P4–P5 + P7 — slice/impact/compile + MCP.
@@ -369,22 +394,22 @@ Recommended milestones:
    - **P0** — workspace/monorepo bootstrap (gates everything);
    - **P2** — rule engine + new config model (the engine core);
    - **P3** — the 22 built-in rules + the two preserved LLM rules (the lint-parity milestone, M2).
-   P1/P4 can be detailed in parallel once P0 is drafted.
+     P1/P4 can be detailed in parallel once P0 is drafted.
 3. Update [AGENTS.md](../../AGENTS.md) "Sources Of Truth" to point at this roadmap.
 
 ---
 
 ### Appendix A — Requirement area → phase traceability
 
-| Requirement area | Primary phase(s) |
-| --- | --- |
-| Configuration | P2 (model), P6 (init writes it) |
-| Rules & rule engine | P2 (engine), P3 (22 built-in rules) |
-| Context graph & search | P1 (parse), P4 (graph/slice/impact) |
-| Skills (generated) | P5 (compile) |
-| MCP server | P7 |
-| Skills (static) + skill installation | P8 |
-| MCP server installation | P7, P-release |
-| Linter installation | P6, P-release |
-| Post-audit remediation (code) | P9 ([audit](audit-2026-07-23-p0-p8.md)) |
-| Post-audit consistency (docs/tests) | P10 ([audit](audit-2026-07-23-p0-p8.md)) |
+| Requirement area                     | Primary phase(s)                         |
+| ------------------------------------ | ---------------------------------------- |
+| Configuration                        | P2 (model), P6 (init writes it)          |
+| Rules & rule engine                  | P2 (engine), P3 (22 built-in rules)      |
+| Context graph & search               | P1 (parse), P4 (graph/slice/impact)      |
+| Skills (generated)                   | P5 (compile)                             |
+| MCP server                           | P7                                       |
+| Skills (static) + skill installation | P8                                       |
+| MCP server installation              | P7, P-release                            |
+| Linter installation                  | P6, P-release                            |
+| Post-audit remediation (code)        | P9 ([audit](audit-2026-07-23-p0-p8.md))  |
+| Post-audit consistency (docs/tests)  | P10 ([audit](audit-2026-07-23-p0-p8.md)) |

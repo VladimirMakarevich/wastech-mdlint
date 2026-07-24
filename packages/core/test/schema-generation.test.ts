@@ -9,7 +9,7 @@ import { generateConfigSchema } from "../src/engine/schema.js";
 // The shipped schema lives in the CLI package (its path is the config's default local `$schema`).
 const shippedSchemaPath = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  "../../cli/schema.json"
+  "../../cli/schema.json",
 );
 
 describe("generateConfigSchema", () => {
@@ -30,10 +30,18 @@ describe("generateConfigSchema", () => {
 
   it("includes the generic declarative custom-rule shape (R9)", () => {
     const schema = JSON.parse(generateConfigSchema()) as {
-      properties: { rules: { items: { oneOf: Array<{ properties?: { rule?: { const?: string } } }> } } };
+      properties: {
+        rules: {
+          items: {
+            oneOf: Array<{ properties?: { rule?: { const?: string } } }>;
+          };
+        };
+      };
     };
     const branches = schema.properties.rules.items.oneOf;
-    const customBranch = branches.find((branch) => branch.properties?.rule?.const === "custom");
+    const customBranch = branches.find(
+      (branch) => branch.properties?.rule?.const === "custom",
+    );
     expect(customBranch).toBeDefined();
   });
 
@@ -43,29 +51,41 @@ describe("generateConfigSchema", () => {
         compile: {
           required: string[];
           additionalProperties: boolean;
-          properties: { skill: { required: string[]; additionalProperties: boolean } };
+          properties: {
+            skill: { required: string[]; additionalProperties: boolean };
+          };
         };
       };
     };
     const compileSchema = schema.properties.compile;
     expect(compileSchema.required).toEqual(["skill"]);
     expect(compileSchema.additionalProperties).toBe(false);
-    expect(compileSchema.properties.skill.required).toEqual(["name", "description"]);
+    expect(compileSchema.properties.skill.required).toEqual([
+      "name",
+      "description",
+    ]);
     expect(compileSchema.properties.skill.additionalProperties).toBe(false);
   });
 
   it("excludes reserved built-in prefixes and known custom ids from the generic custom id pattern", () => {
     const schema = JSON.parse(
-      generateConfigSchema({ customRules: [{ id: "REQ-OWNER" }] })
+      generateConfigSchema({ customRules: [{ id: "REQ-OWNER" }] }),
     ) as {
-      properties: { rules: { items: { oneOf: Array<Record<string, unknown>> } } };
+      properties: {
+        rules: { items: { oneOf: Array<Record<string, unknown>> } };
+      };
     };
     const branches = schema.properties.rules.items.oneOf;
     const genericCustom = branches.find(
       (branch) =>
-        (branch.properties as { rule?: { const?: string }; id?: { pattern?: string } })?.rule
-          ?.const === "custom" &&
-        (branch.properties as { id?: { pattern?: string } })?.id?.pattern !== undefined
+        (
+          branch.properties as {
+            rule?: { const?: string };
+            id?: { pattern?: string };
+          }
+        )?.rule?.const === "custom" &&
+        (branch.properties as { id?: { pattern?: string } })?.id?.pattern !==
+          undefined,
     ) as { properties: { id: { pattern: string } } } | undefined;
 
     expect(genericCustom).toBeDefined();

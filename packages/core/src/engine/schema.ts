@@ -40,9 +40,9 @@ function builtinRuleBranch(id: string, optionsSchema: z.ZodType): JsonSchema {
     properties: {
       rule: { const: id },
       severity: severityProperty(),
-      options: optionsToJsonSchema(optionsSchema)
+      options: optionsToJsonSchema(optionsSchema),
     },
-    required: ["rule"]
+    required: ["rule"],
   };
 }
 
@@ -53,16 +53,19 @@ function customOptionsSchema(): JsonSchema {
     properties: {
       files: { type: "array", items: { type: "string" } },
       exclude: { type: "array", items: { type: "string" } },
-      assert: optionsToJsonSchema(assertionSchema)
+      assert: optionsToJsonSchema(assertionSchema),
     },
-    required: ["assert"]
+    required: ["assert"],
   };
 }
 
 // Namespaced custom-id pattern (audit 3.5): uppercase dash-separated segments, at least one dash,
 // with a negative lookahead excluding built-in prefixes (and any project-local custom ids, which get
 // their own dedicated branch) so the generic branch never overlaps a specific one under `oneOf`.
-function customIdPattern(reservedPrefixes: string[], knownCustomIds: string[]): string {
+function customIdPattern(
+  reservedPrefixes: string[],
+  knownCustomIds: string[],
+): string {
   const lookaheads: string[] = [];
   if (reservedPrefixes.length > 0) {
     lookaheads.push(`(?!(${reservedPrefixes.join("|")})-)`);
@@ -83,9 +86,9 @@ function genericCustomBranch(idPattern: string): JsonSchema {
       description: { type: "string" },
       severity: severityProperty(),
       target: { enum: ["checklist", "content", "link", "section", "table"] },
-      options: customOptionsSchema()
+      options: customOptionsSchema(),
     },
-    required: ["rule", "id", "options"]
+    required: ["rule", "id", "options"],
   };
 }
 
@@ -99,9 +102,9 @@ function knownCustomBranch(id: string): JsonSchema {
       description: { type: "string" },
       severity: severityProperty(),
       target: { enum: ["checklist", "content", "link", "section", "table"] },
-      options: customOptionsSchema()
+      options: customOptionsSchema(),
     },
-    required: ["rule", "id", "options"]
+    required: ["rule", "id", "options"],
   };
 }
 
@@ -110,7 +113,9 @@ function knownCustomBranch(id: string): JsonSchema {
  * schema.json). No `opts` ⇒ the package schema (built-in rules only); `opts.customRules` ⇒ a
  * project-local schema that also validates those custom rules' ids (P6.04). Frozen API (audit 4.1).
  */
-export function generateConfigSchema(opts?: { customRules?: readonly CustomRuleDefinition[] }): string {
+export function generateConfigSchema(opts?: {
+  customRules?: readonly CustomRuleDefinition[];
+}): string {
   const metadata = ruleRegistry.getAllMetadata();
   const reservedPrefixes = [...ruleRegistry.getReservedPrefixes()].sort();
   const customRules = opts?.customRules ?? [];
@@ -119,7 +124,7 @@ export function generateConfigSchema(opts?: { customRules?: readonly CustomRuleD
   const ruleBranches: JsonSchema[] = [
     ...metadata.map((rule) => builtinRuleBranch(rule.id, rule.optionsSchema)),
     ...knownCustomIds.map((id) => knownCustomBranch(id)),
-    genericCustomBranch(customIdPattern(reservedPrefixes, knownCustomIds))
+    genericCustomBranch(customIdPattern(reservedPrefixes, knownCustomIds)),
   ];
 
   const schema: JsonSchema = {
@@ -142,24 +147,28 @@ export function generateConfigSchema(opts?: { customRules?: readonly CustomRuleD
             properties: {
               preset: { type: "string" },
               contentDir: { type: "string" },
-              defaultLocale: { type: "string" }
-            }
+              defaultLocale: { type: "string" },
+            },
           },
           idRef: {
             type: "object",
             additionalProperties: false,
             properties: {
               idPattern: { type: "string" },
-              definitions: { type: "array", items: { type: "string" }, minItems: 1 },
-              idColumn: { type: "string" }
+              definitions: {
+                type: "array",
+                items: { type: "string" },
+                minItems: 1,
+              },
+              idColumn: { type: "string" },
             },
-            required: ["idPattern", "definitions", "idColumn"]
-          }
-        }
+            required: ["idPattern", "definitions", "idColumn"],
+          },
+        },
       },
       rules: { type: "array", items: { oneOf: ruleBranches } },
-      compile: optionsToJsonSchema(compileConfigSchema)
-    }
+      compile: optionsToJsonSchema(compileConfigSchema),
+    },
   };
 
   return `${JSON.stringify(schema, null, 2)}\n`;
