@@ -50,7 +50,6 @@ flow:
       permission_profile: read-only
       output_artifact: plan
       hitl: { allow_question: true, allow_approval: true }
-      # Claude-node run: planning on Claude Sonnet 5 at  max reasoning.
       provider: claude
       model: claude-sonnet-5
       reasoning: max
@@ -62,10 +61,9 @@ flow:
       role_file: implementation/implementation.md
       session_scope: fresh_disposable
       permission_profile: workspace-write
-      # Codex-node run: implementation on Codex gpt-5.5 at xhigh reasoning.
-      provider: codex
-      model: gpt-5.5
-      reasoning: xhigh
+      provider: claude
+      model: claude-sonnet-5
+      reasoning: max
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []
@@ -79,7 +77,6 @@ flow:
       role_file: implementation/review.md
       session_scope: fresh_disposable
       permission_profile: read-only
-      # Cross-provider review on Claude Opus 4.8 at high reasoning.
       provider: claude
       model: claude-opus-4-8
       reasoning: xhigh
@@ -91,10 +88,9 @@ flow:
       role_file: implementation/fixing.md
       session_scope: fresh_disposable
       permission_profile: workspace-write
-      # Codex-node run: fixing on Codex gpt-5.5 at xhigh reasoning.
-      provider: codex
-      model: gpt-5.5
-      reasoning: xhigh
+      provider: claude
+      model: claude-sonnet-5
+      reasoning: max
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []
