@@ -744,8 +744,6 @@ Not needed:
   tool registration (the `BEGIN/END GENERATED MCP TOOLS` block); neither block is hand-edited.
 - **micromatch / picomatch** — The glob engines used for `include`/`exclude` matching
   (`{ dot: true }`).
-- **RTK (Rust Token Killer)** — A local token-optimizing CLI proxy used during development;
-  prefix shell commands with `rtk`. See [RTK.md](../../RTK.md).
 - **wastech-orchestrator (`.worc/`)** — The task orchestrator that drives multi-step
   implementation via flows. The documentation step lives at
   [`.worc/flows/implementation/documentation.md`](../../.worc/flows/implementation/documentation.md).
