@@ -82,7 +82,7 @@ flow:
       # Cross-provider review on Claude Opus 4.8 at high reasoning.
       provider: claude
       model: claude-opus-4-8
-      reasoning: high
+      reasoning: xhigh
       # network_access: false
       # blocking: true
       # max_rework_per_stage: 1
@@ -98,10 +98,6 @@ flow:
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []
-    # Whole-task docs update after the code is accepted: an ordinary workspace-write agent that
-    # mirrors `fixing` (resumes the implementation editing lineage, no output_artifact, no hitl/when)
-    # so the agent has the full context of what shipped. It is deliberately kept OUT of
-    # decomposition.sub_flow so it runs once per task (after the last subtask), not once per subtask.
     - id: documentation
       kind: agent
       role_file: implementation/documentation.md
@@ -109,7 +105,7 @@ flow:
       permission_profile: workspace-write
       provider: claude
       model: claude-opus-4-8
-      reasoning: low
+      reasoning: medium
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []
