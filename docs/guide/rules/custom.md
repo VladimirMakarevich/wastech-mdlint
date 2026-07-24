@@ -158,10 +158,8 @@ placeholders plus `DRAFT`/`???` (same check as `CTX-001`, as a warning).
   You do not set scope directly; it follows from the assertion `kind`.
 - **`target` is optional and validated.** The shipped `target` enum is exactly
   `checklist | content | link | section | table`. If you set it, it must match the target the
-  chosen `kind` operates on (per the table above), or config resolution fails. There is **no
-  `heading` target** in the shipped schema — section-oriented kinds use `section`. Some planning
-  docs still mention a `heading` target; that is a known doc/schema mismatch tracked for cleanup in
-  **P9.05**, not a missing feature.
+  chosen `kind` operates on (per the table above), or config resolution fails. There is no
+  `heading` target — heading-scoped checks (`sectionPresent`, `sectionOrder`) use `section`.
 - **`files` / `exclude`** let you register the same underlying assertion multiple times under
   different IDs for different document families — e.g. one column schema for
   `docs/requirements/**` and another elsewhere — without touching product code.

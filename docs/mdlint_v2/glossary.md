@@ -259,10 +259,12 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
 - **`custom` rule** — The declarative rule that composes the primitive vocabulary from
   config — no code, no rebuild, pure JSONC, safe to run inside the MCP server. Requires a
   namespaced `id` that must not shadow a built-in prefix, a `target`
-  (`table | section | content | checklist | link | heading`), and an `assert`. Decision
+  (`table | section | content | checklist | link`), and an `assert`. Decision
   [R9](requirements/02-rules-engine.md); see [`engine/rules/custom.ts`](../../packages/core/src/engine/rules/custom.ts).
 - **Target** — Which parsed construct a custom assertion runs against
-  (`table | section | content | checklist | link | heading`).
+  (`table | section | content | checklist | link`). No `heading` target exists — the
+  `sectionPresent`/`sectionOrder` primitives cover heading-scoped checks under `section`
+  (decision P9.05, [audit M-2](audit-2026-07-23-p0-p8.md)).
 - **Code-plugins (Tier 2)** — User-authored rule code (`plugins: [...]`). **Deferred from
   v2** (would execute arbitrary code — a security risk inside the MCP server). No `plugins`
   config key ships in v2. Decision [R9](requirements/02-rules-engine.md).

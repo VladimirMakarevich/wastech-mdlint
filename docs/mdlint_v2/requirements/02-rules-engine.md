@@ -42,7 +42,7 @@ arbitrary user code would be dangerous).
   "id": "REQ-OWNER",                 // user ID, namespaced; must not collide with built-ins
   "description": "Each requirement row must have an Owner",
   "severity": "error",
-  "target": "table",                 // table | section | content | checklist | link | heading
+  "target": "table",                 // table | section | content | checklist | link
   "options": {
     "files": ["docs/requirements/**/*.md"],
     "assert": { "kind": "columnNotEmpty", "column": "Owner" }

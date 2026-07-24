@@ -98,4 +98,24 @@ describe("declarative custom rule", () => {
 
     await expect(loadConfiguration({ cwd })).rejects.toThrow(/valid regular expression/);
   });
+
+  it("rejects a target that does not match the assert kind, including the retired 'heading' target (P9.05)", async () => {
+    const cwd = await repo({
+      "a.md": "# A\n## B\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [
+          {
+            rule: "custom",
+            id: "ARCH-DEPS",
+            target: "heading",
+            options: { assert: { kind: "sectionPresent", sections: ["B"] } }
+          }
+        ]
+      })
+    });
+
+    await expect(loadConfiguration({ cwd })).rejects.toThrow(
+      /target "heading" does not match assert kind "sectionPresent" \(expected "section"\)/
+    );
+  });
 });
