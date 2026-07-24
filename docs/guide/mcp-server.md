@@ -31,7 +31,7 @@ Readiness is announced on stderr; stdout carries only the protocol.
 
 | Tool | What it does | Structured output |
 | --- | --- | --- |
-| `lint` | Lint ad-hoc Markdown content against an explicit set of rules. | yes |
+| `lint` | Lint ad-hoc Markdown content against an explicit set of rules; it does not load project config. | yes |
 | `lint-files` | Lint the project's Markdown files using the resolved config (or the zero-config `**/*.md` default). | yes |
 | `context-graph` | Build the project's context graph; `format: "json"` (default) returns raw nodes/edges/cycles, `format: "summary"` returns nodes/edges/components/reading order. | yes |
 | `context-slice` | Files reachable within `depth` hops of a resolved query (exact match against IDs, heading/anchor slugs, file paths — no fuzzy/keyword/LLM matching). | yes |
@@ -50,7 +50,6 @@ consistently — they are thin adapters over one pipeline, not separate implemen
 ## Boundaries
 
 - **stdio only**, **read-only**, **local** — no network, no external HTTP link checking.
-- Reference rules ([REF-001](rules/REF-001.md)/[REF-003](rules/REF-003.md)) resolve relative
-  targets against the server's working directory, so those tools may probe whether target files
-  exist. (The `lint` tool's shipped description understates this; it is tracked for correction in
-  the roadmap's post-audit remediation.)
+- The ad-hoc `lint` tool does not load project config. File-resolving rules such as
+  [REF-001](rules/REF-001.md)/[REF-003](rules/REF-003.md) and [SEC-003](rules/SEC-003.md) may probe
+  or read paths relative to the server's working directory.

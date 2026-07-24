@@ -155,7 +155,7 @@ Add it to any stdio-based MCP host (Claude Code's `.mcp.json`, Claude Desktop's
 <!-- BEGIN GENERATED MCP TOOLS -->
 | Tool | Description | Read-only | Structured output |
 | --- | --- | --- | --- |
-| `lint` | Lint ad-hoc Markdown content against an explicit set of rules. Reads no filesystem or config. | yes | yes |
+| `lint` | Lint ad-hoc Markdown content against an explicit set of rules. Does not load project config; file-resolving rules such as REF-001/REF-003 and SEC-003 may probe or read paths relative to the server's working directory. | yes | yes |
 | `lint-files` | Lint the project's Markdown files using the resolved config (or the zero-config `**/*.md` default). Read-only. | yes | yes |
 | `context-graph` | Build the project's context graph. `format: "json"` (default) returns the raw graph (nodes, edges, cycles); `format: "summary"` returns nodes, edges, connected components, and topological reading order. Read-only. | yes | yes |
 | `context-slice` | Files reachable within `depth` hops of a resolved query, following graph edges forward. Resolves the query by exact match against defined IDs, heading/anchor slugs, and file paths — no fuzzy, substring, keyword, or LLM matching. Read-only. | yes | yes |

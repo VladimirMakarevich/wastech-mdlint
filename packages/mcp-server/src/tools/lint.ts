@@ -25,10 +25,10 @@ import {
   withErrorOutput
 } from "../shared/tool-response.js";
 
-// `lint` — lint ad-hoc Markdown text against an explicit set of rules. This tool never touches the
-// filesystem or a config file (that is `lint-files`' job): the whole contract is "content + rules
-// in, findings out", so the input carries the rules to run rather than resolving them from a
-// project config.
+// `lint` — lint ad-hoc Markdown text against an explicit set of rules. This tool never loads a
+// project config (that is `lint-files`' job): the whole contract is "content + rules in, findings
+// out", so the input carries the rules to run rather than resolving them from a config. Core still
+// owns rule semantics, so file-resolving rules may inspect paths under the server cwd.
 
 // A synthetic in-memory path for the single document. Ends in `.md` because some built-in rules
 // accept `files`/`exclude` glob options (fileScopeShape) and match them against the document path;
@@ -174,7 +174,9 @@ export function registerLintTool(server: McpServer): void {
     {
       title: "Lint Markdown content",
       description:
-        "Lint ad-hoc Markdown content against an explicit set of rules. Reads no filesystem or config.",
+        "Lint ad-hoc Markdown content against an explicit set of rules. Does not load project config; " +
+        "file-resolving rules such as REF-001/REF-003 and SEC-003 may probe or read paths relative " +
+        "to the server's working directory.",
       inputSchema: lintInputShape,
       outputSchema: withErrorOutput(lintOutputShape),
       annotations: READ_ONLY_ANNOTATIONS
