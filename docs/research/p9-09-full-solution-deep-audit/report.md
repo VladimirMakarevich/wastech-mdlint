@@ -29,7 +29,7 @@ one finding that rests on an external contract (TP-1) is validated against MDN/E
 
 ### Category 1 — Business/logic defects
 
-#### BL-1 · `STR-001` only sees the Markdown corpus, and its guide overstates it — *Medium, confirmed*
+#### BL-1 · `STR-001` only sees the Markdown corpus, and its guide overstates it — _Medium, confirmed_
 
 **What is wrong.** `STR-001` ("Required files exist in the project") decides whether each entry in
 its `files` option is satisfied by scanning `context.projectFiles`
@@ -39,16 +39,16 @@ its `files` option is satisfied by scanning `context.projectFiles`
 `loadDocuments(input.config.include ?? ["**/*.md"], …)` (`packages/core/src/engine/lint-files.ts:75`).
 So the satisfaction set is the `include`-matched Markdown corpus (default `**/*.md`) — **never the
 filesystem.** A required entry that is not a Markdown file within `include` — the guide's own
-`LICENSE` example, or a `package.json` — is reported *missing even when it exists on disk*.
+`LICENSE` example, or a `package.json` — is reported _missing even when it exists on disk_.
 
 The membership test compounds it: `matchesConfigGlob` normalizes a bare required entry like
 `README.md` to `**/README.md` (`packages/core/src/discovery/globs.ts:7`, the `**/${…}` rewrite),
-so a required *root* file is satisfied by any `docs/**/README.md` anywhere in the tree — `STR-001`
+so a required _root_ file is satisfied by any `docs/**/README.md` anywhere in the tree — `STR-001`
 cannot pin a required file to a location.
 
 **Standard it falls short of.** The guide claims `STR-001` "scans the analyzed file corpus"
-(`docs/guide/rules/STR-001.md:8`) yet motivates it with *"every project must ship a `README.md`, a
-`CONTRIBUTING.md`, a `LICENSE`"* (`docs/guide/rules/STR-001.md:11`) and asserts "literal paths must
+(`docs/guide/rules/STR-001.md:8`) yet motivates it with _"every project must ship a `README.md`, a
+`CONTRIBUTING.md`, a `LICENSE`"_ (`docs/guide/rules/STR-001.md:11`) and asserts "literal paths must
 match exactly" (`docs/guide/rules/STR-001.md:66`). The `LICENSE` example and the "match exactly"
 claim are both falsified by the code above. This is a documentation-vs-implementation mismatch of
 the kind the audit's acceptance criteria require recording as a finding.
@@ -61,7 +61,7 @@ requires `LICENSE.md` (a `.md` file) and only asserts genuinely-absent names
 file is untested.
 
 **Recommended direction.** Resolve each required path against the filesystem (a bounded
-`existsSync`-style probe from the analyzed root) rather than only the corpus, *or* narrow the guide
+`existsSync`-style probe from the analyzed root) rather than only the corpus, _or_ narrow the guide
 and the corresponding requirement wording to "required Markdown files within `include`" and drop
 the `LICENSE` example and the "literal paths must match exactly" claim. Either way, add a
 regression fixture with a present non-`.md` required file. If the location-pinning behavior is
@@ -71,7 +71,7 @@ intended, document that bare names are corpus-wide globs.
 
 ### Category 2 — Technical problems
 
-#### TP-1 · `columnMatches` reuses a stateful `g`/`y` `RegExp` across rows → false findings — *Low–Medium, confirmed (incl. external)*
+#### TP-1 · `columnMatches` reuses a stateful `g`/`y` `RegExp` across rows → false findings — _Low–Medium, confirmed (incl. external)_
 
 **What is wrong.** The `columnMatches` primitive compiles its pattern once
 (`const regex = compileRegex(options.pattern, options.flags)`,
@@ -79,7 +79,7 @@ intended, document that bare names are corpus-wide globs.
 per-row loop (`packages/core/src/engine/primitives/table.ts:147`). When the configured `flags`
 include `g` or `sticky` (`y`), a `RegExp` is stateful: `test()` advances and consults `lastIndex`
 across calls, so consecutive tests over different cells start matching from a stale offset. The
-flag validator only checks that flags are *legal* — `regexFlagsSchema` at
+flag validator only checks that flags are _legal_ — `regexFlagsSchema` at
 `packages/core/src/engine/regex.ts:25` refines on `isValidRegex(".", value)` — so `g`/`y` pass
 untouched. On an anchored pattern like `^REQ-\d+$` with `"flags": "g"`, valid cells after the first
 match are wrongly flagged, and the result is order-dependent.
@@ -92,10 +92,10 @@ into `columnMatches` (`packages/core/src/engine/rules/tbl.ts:207` declares
 **Standard it violates.** `RegExp.prototype.test()` statefulness with `g`/`y` is authoritative
 JavaScript semantics — MDN, reflecting ECMA-262 §22.2.6.16, states that `g`/`y` regexes store a
 `lastIndex` and `test()` does not reset it even across different strings (see `sources.json`,
-external). It breaks the architecture invariant that findings are *deterministic*. The correct
+external). It breaks the architecture invariant that findings are _deterministic_. The correct
 pattern sits right next door: `contentNotMatch` force-adds `g` and consumes state per-call via
 `matchAll` (`packages/core/src/engine/primitives/content.ts:14` comment, `:22` the `matchAll`
-call), which — per MDN — *requires* `g` and is not vulnerable to cross-call `lastIndex` bleed. The
+call), which — per MDN — _requires_ `g` and is not vulnerable to cross-call `lastIndex` bleed. The
 `TBL-004` guide even lists `flags` as "e.g. `i`, `m`" without warning that `g`/`y` are unsafe
 (`docs/guide/rules/TBL-004.md:25`).
 
@@ -114,7 +114,7 @@ regression fixture with `"flags": "g"` over a multi-row column, and note the con
 
 ### Category 3 — Omissions / gaps
 
-#### OG-1 · The MCP `lint` tool cannot run declarative custom rules — *Low, needs confirmation*
+#### OG-1 · The MCP `lint` tool cannot run declarative custom rules — _Low, needs confirmation_
 
 **What is wrong.** The ad-hoc `lint` MCP tool validates its `rules` input as
 `z.array(ruleEntrySchema)` (`packages/mcp-server/src/tools/lint.ts:44`) — the built-in-only entry.
@@ -130,7 +130,7 @@ from what the requirement says the server supports.
 **Why it matters.** An agent that composes a one-off `custom` assertion and calls `lint` gets a
 schema-validation error with no explanation, and nothing tells it to route custom rules through
 `lint-files`. Likely an intentional narrowing (ad-hoc lint takes an explicit built-in rule set),
-but it is undocumented, which is why this is recorded as *needs confirmation* rather than asserted
+but it is undocumented, which is why this is recorded as _needs confirmation_ rather than asserted
 as a defect.
 
 **Recommended direction.** Either accept the custom-rule union in the `lint` input schema, or state
@@ -141,7 +141,7 @@ rules run through `lint-files`. Whichever is chosen, make the requirement and th
 
 ### Category 4 — Shortcomings
 
-#### SC-1 · `GRP-001`/`GRP-002` accept options that are silently ignored — *Low, confirmed*
+#### SC-1 · `GRP-001`/`GRP-002` accept options that are silently ignored — _Low, confirmed_
 
 **What is wrong.** `GRP-001`'s options schema declares `siteRouter` plus the shared file-scope
 shape (`files`/`exclude`) (`packages/core/src/engine/rules/grp.ts:34` and the `...fileScopeShape`
@@ -149,7 +149,7 @@ at `:35`), but its `check` takes no options at all — `check: () => (context) =
 (`packages/core/src/engine/rules/grp.ts:38`) — and reads only the shared corpus-wide
 `ContextGraph`. So `files`/`exclude`/`siteRouter` validate but do nothing. `GRP-002` similarly
 declares `siteRouter` (`packages/core/src/engine/rules/grp.ts:74`) which is never consulted (its
-`files`/`exclude` *are* honored via `matchesFileScope`, and `entryPoints` is honored).
+`files`/`exclude` _are_ honored via `matchesFileScope`, and `entryPoints` is honored).
 
 **Standard it falls short of.** This is acknowledged in the code as forward-compat — the comment at
 `packages/core/src/engine/rules/grp.ts:21` says the options "are accepted for forward-compat but do
@@ -163,7 +163,7 @@ supported.
 **Recommended direction.** Either wire the options (re-scope the graph query per rule instance) or
 remove them from the schema until they are honored, so validation stops advertising a no-op.
 
-#### SC-2 · `SIZE-001` can emit duplicate same-severity findings under a `severity` override — *Low, confirmed*
+#### SC-2 · `SIZE-001` can emit duplicate same-severity findings under a `severity` override — _Low, confirmed_
 
 **What is wrong.** `SIZE-001` fires the warn-budget and error-budget findings independently for one
 metric (`packages/core/src/engine/rules/size.ts:94` comment, then the two `context.report` blocks).
@@ -183,7 +183,7 @@ condition, which can mislead a user reading the report or wiring exit-code thres
 **Recommended direction.** Suppress the redundant lower-threshold finding when an override collapses
 the two severities to the same value, or document the interaction in the `SIZE-001` guide.
 
-#### SC-3 · Unbounded recursive DFS in cycle detection / import traversal — *Low, needs confirmation*
+#### SC-3 · Unbounded recursive DFS in cycle detection / import traversal — _Low, needs confirmation_
 
 **What is wrong.** Four graph/import traversals recurse with no explicit depth guard:
 `strongConnect` (`packages/core/src/graph/build-context-graph.ts:282`) and `walk`
@@ -194,7 +194,7 @@ cycle sampler `visit` (`packages/core/src/discovery/rule-inference.ts:284`).
 **Standard it falls short of.** No documented corpus-size bound exists, and v2 rebuilds the graph
 non-incrementally. A pathologically deep link/import chain (many thousands of documents in one
 component) could exceed the Node call stack. This is the generic recursion caveat, not a specific
-upstream contract — hence *needs confirmation*; it is almost certainly fine for realistic repos.
+upstream contract — hence _needs confirmation_; it is almost certainly fine for realistic repos.
 
 **Why it matters.** If very large corpora are ever in scope, an uncaught `RangeError: Maximum call
 stack size exceeded` would surface as an opaque crash rather than a structured diagnostic.
@@ -207,7 +207,7 @@ traversal (`strongConnect`) to an explicit worklist stack if very large reposito
 ## Recommended priorities and trade-offs
 
 - **Address first: BL-1.** It is the only finding with a user-visible false result on a compliant
-  repository *and* a falsified guide claim. The lowest-risk fix is documentation-only (narrow the
+  repository _and_ a falsified guide claim. The lowest-risk fix is documentation-only (narrow the
   guide/requirement to "Markdown within `include`"), which ships immediately; the higher-value fix
   (filesystem resolution) changes a `project`-scope rule's reach and needs a fixture for the
   present-non-`.md` case. Trade-off: doc-only is honest and cheap but leaves the rule unable to
@@ -230,13 +230,13 @@ traversal (`strongConnect`) to an explicit worklist stack if very large reposito
 These are unresolved or unverified and are **not** asserted as confirmed defects:
 
 - **OG-1 (custom rules in MCP `lint`).** Confirmed that the schema rejects `custom` entries and the
-  description is silent; *unconfirmed* whether that narrowing is intentional. Needs a maintainer
+  description is silent; _unconfirmed_ whether that narrowing is intentional. Needs a maintainer
   decision (widen schema vs. document the limit) before it is a defect vs. an accepted boundary.
 - **SC-3 (recursive DFS depth).** The four recursion sites are confirmed to lack a depth guard;
-  *unverified* whether any realistic corpus can reach the stack limit. No upstream contract settles
+  _unverified_ whether any realistic corpus can reach the stack limit. No upstream contract settles
   this beyond the generic Node recursion caveat, and no in-scope requirement states a corpus bound.
 - **BL-1 filesystem-resolution intent.** Confirmed that `STR-001` reads only the corpus and that the
-  `LICENSE` example is falsified; *unconfirmed* whether the maintainers intend `STR-001` to reach
+  `LICENSE` example is falsified; _unconfirmed_ whether the maintainers intend `STR-001` to reach
   the filesystem or to be corpus-only-by-design (which would make it a docs-only fix).
 
 ---
@@ -308,16 +308,17 @@ re-counted as new problems:
 
 ## Summary
 
-| Category | Count | Highest severity |
-|---|---|---|
-| Business/logic defect | 1 (BL-1) | Medium |
-| Technical problem | 1 (TP-1) | Low–Medium |
-| Omission / gap | 1 (OG-1) | Low |
-| Shortcoming | 3 (SC-1, SC-2, SC-3) | Low |
+| Category              | Count                | Highest severity |
+| --------------------- | -------------------- | ---------------- |
+| Business/logic defect | 1 (BL-1)             | Medium           |
+| Technical problem     | 1 (TP-1)             | Low–Medium       |
+| Omission / gap        | 1 (OG-1)             | Low              |
+| Shortcoming           | 3 (SC-1, SC-2, SC-3) | Low              |
 
 **Total: 6 findings (4 confirmed, 2 needs-confirmation). No HIGH / release-blocking defect.**
 
 **Address first:**
+
 1. **BL-1** — `STR-001`'s corpus-only reach silently fails to verify non-`.md` / out-of-`include`
    required files, and the guide's `LICENSE` example is wrong: a real correctness + documentation
    gap.
@@ -325,5 +326,5 @@ re-counted as new problems:
    findings whenever a `g`/`y` flag is configured on `TBL-004` or a `custom` `columnMatches`.
 
 **Confidence:** BL-1, TP-1, SC-1, SC-2 are confirmed against cited code, docs, and (for TP-1)
-MDN/ECMA-262. OG-1 and SC-3 are recorded as *needs confirmation* and carried in Open questions
+MDN/ECMA-262. OG-1 and SC-3 are recorded as _needs confirmation_ and carried in Open questions
 rather than asserted as defects.

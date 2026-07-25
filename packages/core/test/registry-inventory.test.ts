@@ -57,7 +57,9 @@ describe("BUILTIN_RULE_DEFINITIONS inventory (L-12)", () => {
   it("ships exactly the documented 8 category prefixes (no CHK)", () => {
     const categories = [
       ...new Set(
-        BUILTIN_RULE_DEFINITIONS.map((definition) => definition.metadata.category),
+        BUILTIN_RULE_DEFINITIONS.map(
+          (definition) => definition.metadata.category,
+        ),
       ),
     ].sort(compareStrings);
     expect(categories).toEqual(EXPECTED_CATEGORIES);
@@ -72,8 +74,7 @@ describe("BUILTIN_RULE_DEFINITIONS inventory (L-12)", () => {
   });
 
   it("matches the documented scope/severity per rule (catches silent metadata drift)", () => {
-    const actual: Record<string, { scope: RuleScope; severity: Severity }> =
-      {};
+    const actual: Record<string, { scope: RuleScope; severity: Severity }> = {};
     for (const definition of BUILTIN_RULE_DEFINITIONS) {
       actual[definition.metadata.id] = {
         scope: definition.metadata.scope,
