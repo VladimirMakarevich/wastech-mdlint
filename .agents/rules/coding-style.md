@@ -77,8 +77,9 @@ Match the repository's actual tooling and configuration unless a phase task expl
 
 ## Repository Structure
 
-- Until P0 fully lands, current single-package code may still live in `src/` and `test/`; do not force future
-  workspace paths into unrelated tasks.
+- All product code lives under `packages/*`; the single-package code was relocated into
+  `packages/core` at P0.04 and the legacy pipeline was removed at the P3.09 cutover, so there is
+  no root `src/` or `test/`.
 - When a task explicitly belongs to P0+ workspace migration, place code in the package layout
   defined by the roadmap instead of inventing a new structure.
 
