@@ -310,6 +310,10 @@ node packages/cli/dist/index.js lint . --fail-on warning   # fail CI on warnings
 - No external HTTP link checking or link caching.
 - No runtime `.ts`/`.cjs`/`.mjs` config or user-code plugins (custom rules are data-only).
 - The context graph is rebuilt each run (no incremental cache yet).
+- Dangling reference-style links (`[text][missing]` with no matching `[missing]: url`
+  definition) are parsed as literal text, not a link, so `REF-001` never sees them — this
+  matches GitHub's own rendering and is intentional, not a gap. See
+  [REF-001](docs/guide/rules/REF-001.md#notes).
 
 ## Planning docs
 
