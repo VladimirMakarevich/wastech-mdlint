@@ -416,7 +416,11 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
   `{ id, kind: "static" | "generated", path, frontmatter }` (`skillModelSchema`), the one shape
   shared by static skills (P8) and the compiler's generated output (P5). `validateSkill` is the
   non-throwing validator (deterministic, sorted issues) over `skillFrontmatterSchema`;
-  `parseSkillFrontmatter` is the throwing frontmatter helper `synthesize` routes through. Decision
+  `parseSkillFrontmatter` is the throwing frontmatter helper retained as a public API export (the
+  package barrel re-exports it); it has no internal caller — P8.05 CI uses `validateSkill`, and
+  `synthesize` (`compile/synthesize.ts`) validates by calling `skillFrontmatterSchema.parse`
+  directly rather than through `parseSkillFrontmatter`, so `compile` never imports from `skills/`
+  ([P10.07](P10-consistency/07-frontmatter-import-direction.md)). Decision
   [S5](requirements/04-skills-compile.md).
 - **Compile budget** — The LLM context-budget summary embedded in the generated skill
   (corpus token estimate + entrypoints over budget). Reuses the token estimator. Decision

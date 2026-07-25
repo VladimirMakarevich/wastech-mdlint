@@ -5,7 +5,7 @@ import type { ContextGraphEdge } from "../graph/context-graph-types.js";
 import type { DocumentProfile } from "./doc-profile.js";
 import type { RuleDescriptionGroup } from "./describe-rules.js";
 import type { GraphAnalysis } from "./graph-analysis.js";
-import { parseSkillFrontmatter } from "../skills/skill-model.js";
+import { skillFrontmatterSchema } from "./skill-frontmatter.js";
 
 // P5.04 pure renderer (S1/S2/S4/S6): assembles the final SKILL.md text from already-computed P5.01
 // (`GraphAnalysis`), P5.02 (`DocumentProfile`), and P5.03 (`RuleDescriptionGroup`) data. `synthesize`
@@ -383,8 +383,10 @@ export function synthesize(input: SynthesizeInput): CompileResult {
   // Validate before rendering (S1): an empty `skill.name`/`skill.description` throws a ZodError
   // here rather than silently emitting invalid frontmatter. `compile-context.ts`'s lenient reader
   // defaults missing fields to `""`, so this is the one place that actually enforces S1 today —
-  // P5.05 replaces it with a proper load-time diagnostic.
-  parseSkillFrontmatter({
+  // P5.05 replaces it with a proper load-time diagnostic. Parses against the schema directly
+  // (rather than via skills/skill-model.ts's `parseSkillFrontmatter`) so this P5 module doesn't
+  // route its own validation through the P8 skills layer.
+  skillFrontmatterSchema.parse({
     name: input.skill.name,
     description: input.skill.description,
   });

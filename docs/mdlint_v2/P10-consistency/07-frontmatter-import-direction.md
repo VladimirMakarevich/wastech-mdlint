@@ -1,7 +1,7 @@
 # P10.07 · Decouple frontmatter-schema import direction
 
 > Phase: [P10 — Post-audit consistency](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** ·
-> Status **Not started**. Audit finding **L-5** ([report](../audit-2026-07-23-p0-p8.md)).
+> Status **Done**. Audit finding **L-5** ([report](../audit-2026-07-23-p0-p8.md)).
 
 ## Goal
 
@@ -27,6 +27,18 @@ an unnecessary coupling of a lower phase onto a higher one. No runtime issue.
 
 ## Exit criteria
 
-- [ ] `compile/synthesize.ts` no longer imports from `skills/`.
-- [ ] The schema still has exactly one definition, reused by both compile and skills.
-- [ ] `npm run typecheck && npm test` green.
+- [x] `compile/synthesize.ts` no longer imports from `skills/`.
+- [x] The schema still has exactly one definition, reused by both compile and skills.
+- [x] `npm run typecheck && npm test` green.
+
+## Implementation notes
+
+`synthesize.ts` no longer imports `parseSkillFrontmatter` from `skills/skill-model.ts`. Since
+that helper was a one-line wrapper around `skillFrontmatterSchema.parse(...)`, `synthesize.ts`
+now imports `skillFrontmatterSchema` directly from its sibling `compile/skill-frontmatter.ts` and
+calls `.parse(...)` itself — no re-export was needed. `skills/skill-model.ts` is unchanged: it
+still imports `skillFrontmatterSchema` from `compile/skill-frontmatter.ts` (the correct
+direction) and still exports its own `parseSkillFrontmatter` as a public API export, so the
+schema keeps exactly one definition. That throwing helper now has no internal caller (P8.05 CI
+uses the non-throwing `validateSkill`); it is retained deliberately as a package-barrel export
+rather than deleted, since it is public surface exercised by tests.

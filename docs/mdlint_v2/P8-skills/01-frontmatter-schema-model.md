@@ -46,9 +46,11 @@ covers both static and generated skills.
   (that module is done and byte-stable, and P5's imports point at it). Two wrappers exist because
   the two callers need opposite ergonomics: `validateSkill` (non-throwing `safeParse`, sorted
   issues) serves P8.05 CI, which must report every bad skill in one pass; `parseSkillFrontmatter`
-  (throwing) serves `synthesize`, whose existing ZodError-on-invalid contract is pinned by a test.
-  `synthesize` now routes through `parseSkillFrontmatter`, so the compiler is a genuine consumer of
-  the shared validator rather than merely importing the same schema.
+  (throwing) served `synthesize`'s existing ZodError-on-invalid contract, pinned by a test.
+  [P10.07](../P10-consistency/07-frontmatter-import-direction.md) later had `synthesize` call
+  `skillFrontmatterSchema.parse` directly instead, so a P5 (compile) module no longer routes its
+  own validation through the P8 (skills) layer; the schema itself still has exactly one
+  definition, in `compile/skill-frontmatter.ts`.
 - **`path` is validated, not trusted.** `Skill.path` is public core data, so `skillModelSchema`
   enforces the repo-relative POSIX invariant in core instead of leaving normalization to callers:
   it rejects backslash separators, drive/absolute roots, and any empty/`.`/`..` segment (which also
