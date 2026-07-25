@@ -11,6 +11,7 @@ Produce a full, implementation-ready plan from the task and its enriched spec. D
 
 Ground the plan in the code as it exists today, not an idealized version of it:
 
+- Read the repository's own root instruction files first — `AGENTS.md`/`CLAUDE.md` and the rules they import under `.agents/rules/`; they carry the conventions and invariants this change must follow and override defaults on conflict.
 - Read the files named in the task and the enriched spec first, then follow them into the modules they touch.
 - Find the conventions and patterns this change must follow, and name a similar existing feature to model the work on rather than inventing a new shape.
 - Trace the relevant code paths end to end — real call sites, types, and package boundaries — so the plan never assumes an interface that isn't there. Verify every path you cite against the current tree.
@@ -44,8 +45,8 @@ Reuse the existing core primitives rather than rewriting them (confirm each path
 
 - A unit test per rule/algorithm, co-located in the touched package's `test/` directory (for example `packages/core/test/`).
 - A focused per-scenario e2e fixture under `packages/cli/test/fixtures/<scenario>/` when the behavior is user-visible.
-- Determinism invariants: sorted output arrays and repository-relative POSIX paths.
+- Determinism invariants: sorted output arrays and repository-relative POSIX paths.{?memory_path}
 
-## Additional Project Context
+## Repository Memory
 
-{?memory_path}A brief of repository memory relevant to this task — distilled lessons, conventions, known-fragile areas, and entity notes from prior runs — is at {memory_path}. Read it first and let it inform the plan; treat it as advisory and verify each point against the current code (it can be stale).{/memory_path}
+A brief of repository memory relevant to this task — distilled lessons, conventions, known-fragile areas, and entity notes from prior runs — is at {memory_path}. Read it first and let it inform the plan; treat it as advisory and verify each point against the current code (it can be stale).{/memory_path}

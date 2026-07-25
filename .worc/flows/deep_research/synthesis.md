@@ -23,7 +23,7 @@ nothing anywhere else:
   "<repo-relative file>", "line": <1-based int, optional>, "snippet": "<exact text expected at that
   location, optional>"}`. For an external reference use `{"id": "...", "claim": "...", "url": "..."}`
   instead of `path`. When a finding is measured against a documented standard, cite both the code location
-  *and* the requirement/decision/invariant clause — a claim that "the code diverges from the plan" needs a
+  _and_ the requirement/decision/invariant clause — a claim that "the code diverges from the plan" needs a
   citation to each side.
 
 Every repository citation must point at a real file/line whose snippet is actually present — a citation

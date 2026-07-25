@@ -13,7 +13,7 @@ against `{repo}`:
 - The **model** side: confirm the threat respects the declared posture in `{repo}/.agents/rules/security.md`.
   A claim that an out-of-scope surface (a remote `$schema`, runtime-TS/`.cjs`/`.mjs` config, a Tier-2
   code-plugin loader, a mutating or HTTP/SSE MCP tool, an install-time write) **exists** is a real
-  finding only if that code is actually present; a claim that such a thing merely *ought* to be hardened
+  finding only if that code is actually present; a claim that such a thing merely _ought_ to be hardened
   when it does not exist is a false positive.
 
 {?checks_path}Cross-check any dependency-related threat against the scan advisories at {checks_path}:

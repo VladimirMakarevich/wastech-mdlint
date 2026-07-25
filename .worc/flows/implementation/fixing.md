@@ -33,10 +33,12 @@ Keep the project's invariants intact while fixing:
 - ESM / `NodeNext` imports with explicit `.js` specifiers, and `strict` types with no `any`
 - the mandatory rules in `.agents/rules/` (architecture, coding-style, security, testing)
 
-`npm` may warn that the host Node is older than the project's `engines` range (`>=24.17.0`); that warning is not itself a failure to chase.
+`npm` may warn that the host Node is older than the project's `engines` range (`>=24.17.0`); that warning is not itself a failure to chase.{?memory_path}
 
-## Additional Project Context
+## Repository Memory
 
-{?memory_path}A brief of repository memory relevant to this task — failure signatures with their canonical remedy, known-fragile areas, and entity notes for the files you are touching — is at {memory_path}. Check it for a known fix before improvising; treat it as advisory and verify each point against the current code (it can be stale).{/memory_path}
+A brief of repository memory relevant to this task — failure signatures with their canonical remedy, known-fragile areas, and entity notes for the files you are touching — is at {memory_path}. Check it for a known fix before improvising; treat it as advisory and verify each point against the current code (it can be stale).{/memory_path}{?subtask_spec_path}
 
-{?subtask_spec_path}You are fixing subtask {subtask_order} of {subtask_count}; keep your change scoped to that subtask's spec: {subtask_spec_path}{/subtask_spec_path}
+## Subtask Scope
+
+You are fixing subtask {subtask_order} of {subtask_count}; keep your change scoped to that subtask's spec: {subtask_spec_path}{/subtask_spec_path}

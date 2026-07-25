@@ -1,4 +1,6 @@
-Review the current diff against the task and plan. Report each finding with a severity, and mark anything that must change before merge as **blocking**. Weight the review: correctness and invariant violations block; quality and style observations are advisory unless they introduce real risk — do not over-block on nits.
+Review the current diff against the task{?plan_path} and plan{/plan_path}. Report each finding with a severity, and mark anything that must change before merge as **blocking**. Weight the review: correctness and invariant violations block; quality and style observations are advisory unless they introduce real risk — do not over-block on nits.
+
+When a `prior_fix` context file is present, this is a re-review after a fix attempt — read it first. It is the implementer's own account of what they changed and what they could not, so you judge "was my finding addressed" against their reasoning, not the diff alone. If it reports an **unresolvable environmental blocker** (a sandbox or permission wall, a missing host toolchain — something no code change can fix), do not re-issue the same finding as if the code were merely wrong: say plainly in that finding that the change is blocked on a human, rather than sending an unchanged diff back for another round.
 
 ## Output
 
@@ -14,7 +16,7 @@ Your findings are consumed by a downstream LLM agent that will do the rework, no
 
 ## Requirements And Correctness
 
-- Confirm the change actually satisfies the task's business requirements and the plan's acceptance criteria — not just that it compiles.
+- Confirm the change actually satisfies the task's business requirements{?plan_path} and the plan's acceptance criteria{/plan_path} — not just that it compiles.
 - Check the edges the task implies: empty input, missing/duplicate/circular data, unusual paths, and error handling.
 - When the diff is an authoring/documentation deliverable (a `SKILL.md`, README, or doc asserting facts about this product), enumerate every product-surface reference it makes — each command, flag, option value, output field, MCP tool — and verify each against current source in this one pass, so the whole set of skill-vs-product drift surfaces now rather than one instance per later round.
 - Confirm behavior matches the phase task file and the locked decisions under `docs/mdlint_v2/`; flag any silent divergence.
@@ -47,8 +49,8 @@ Advisory (raise these, but do **not** block on them unless a real correctness ri
 
 - A unit test per new/changed rule or algorithm, and a focused per-scenario fixture when the behavior is user-visible.
 - Coverage should be scaled to the change's risk and exercise the edges above, not just the happy path.
-- Tests must stay deterministic and local (no network); fixtures small enough that a failure points at one behavior.
+- Tests must stay deterministic and local (no network); fixtures small enough that a failure points at one behavior.{?memory_path}
 
-## Additional Project Context
+## Repository Memory
 
-{?memory_path}A brief of repository memory relevant to this task — recurring reviewer expectations, known-fragile areas, and entity notes for the changed files — is at {memory_path}. Use it to focus the review on areas with a history; treat it as advisory and verify each point against the current code (it can be stale).{/memory_path}
+A brief of repository memory relevant to this task — recurring reviewer expectations, known-fragile areas, and entity notes for the changed files — is at {memory_path}. Use it to focus the review on areas with a history; treat it as advisory and verify each point against the current code (it can be stale).{/memory_path}

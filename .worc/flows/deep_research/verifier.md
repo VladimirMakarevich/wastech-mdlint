@@ -4,7 +4,7 @@ is actually **supported** by what it cites and whether the conclusions follow.
 
 For this **wastech-mdlint** full-solution audit, a finding asserts a business/logic defect, a technical
 problem, an omission/gap, or a shortcoming — usually that shipped code is wrong, weak, or missing against
-a documented or implied standard. Verify *both* sides against `{repo}`:
+a documented or implied standard. Verify _both_ sides against `{repo}`:
 
 - The **code** side: open the cited `packages/**` (or `src/**`) `path:line` and confirm it really says
   what the finding claims, in the way the finding claims.
