@@ -16,7 +16,7 @@
 #   Full reference: docs/configuration.md → "Per-node overrides in flows".
 #
 # Operator note: every agent/evaluator node below is pinned to Claude (provider: claude,
-# model: claude-opus-4-8) with per-node reasoning — the heavy evidence/synthesis/critic nodes at
+# model: claude-opus-5) with per-node reasoning — the heavy evidence/synthesis/critic nodes at
 # xhigh, the lighter passes at high. Codex is intentionally not used by this flow.
 # ----------------------------------------------------------------------------------------------------
 flow:
@@ -40,7 +40,7 @@ flow:
       hitl: { allow_question: true, allow_approval: false }
       when: { fact: derived.needs_refinement }
       provider: claude
-      model: claude-opus-4-8
+      model: claude-opus-5
       reasoning: high
       # timeout_seconds: 7200
       # extra_args: []
@@ -51,7 +51,7 @@ flow:
       permission_profile: read-only
       network_access: false
       provider: claude
-      model: claude-opus-4-8
+      model: claude-opus-5
       reasoning: xhigh
       # timeout_seconds: 7200
       # extra_args: []
@@ -63,7 +63,7 @@ flow:
       network_access: true
       when: { fact: config.external_research }
       provider: claude
-      model: claude-opus-4-8
+      model: claude-opus-5
       reasoning: high
       # timeout_seconds: 7200
       # extra_args: []
@@ -74,7 +74,7 @@ flow:
       permission_profile: workspace-write
       network_access: false
       provider: claude
-      model: claude-opus-4-8
+      model: claude-opus-5
       reasoning: xhigh
       # timeout_seconds: 7200
       # extra_args: []
@@ -85,7 +85,7 @@ flow:
       permission_profile: workspace-write
       network_access: false
       provider: claude
-      model: claude-opus-4-8
+      model: claude-opus-5
       reasoning: xhigh
       # timeout_seconds: 7200
       # extra_args: []
@@ -102,7 +102,7 @@ flow:
       blocking: false
       max_rework_per_stage: 1
       provider: claude
-      model: claude-opus-4-8
+      model: claude-opus-5
       reasoning: high
     - id: critical_review
       kind: evaluator
@@ -114,7 +114,7 @@ flow:
       blocking: false
       max_rework_per_stage: 3
       provider: claude
-      model: claude-opus-4-8
+      model: claude-opus-5
       reasoning: xhigh
     - id: publish
       kind: publish
