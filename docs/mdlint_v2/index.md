@@ -180,6 +180,8 @@ with an explicit prev/next/depends/blocks chain). Effort is a rough T-shirt size
 [P8 Skills](P8-skills/index.md) ·
 [P9 Remediation](P9-remediation/index.md) ·
 [P10 Consistency](P10-consistency/index.md) ·
+[P11 Post-P9 Remediation](P11-remediation/index.md) ·
+[P12 Post-P9 Consistency](P12-consistency/index.md) ·
 [P-release Release](P-release/index.md)
 
 **Reference:** [Glossary](glossary.md) — the canonical vocabulary (public types, config
@@ -322,7 +324,39 @@ product. See [P10 tasks](P10-consistency/index.md).
 - **Maps to:** [audit report](audit-2026-07-23-p0-p8.md) documentation/contract/test-depth findings.
 - **Exit:** docs/tests describe the current product; no stale-state or phantom-category references.
 
-### Phase P-release — Distribution, CI & release · `M` · depends on: all (incl. P9, P10) · reuse: Medium
+### Phase 11 — Post-P9 audit remediation (code) · `M–L` · depends on: P10 · reuse: n/a
+
+**Goal:** close the code-level **release-blocking**, **security**, **correctness**, and **data-loss**
+defects from the [post-P9 audit](audit-2026-07-25-post-p9.md) and the confirmed rule defects from the
+[`p9-09` deep audit](../research/p9-09-full-solution-deep-audit/report.md). See
+[P11 tasks](P11-remediation/index.md).
+
+- Two **release-blockers first**: the CLI `bin` no-op through the npm symlink (H-1) and `SEC-003`
+  reading files outside the analyzed root (H-2).
+- `init` data-loss guards: bounded `findConfig` walk-up (H-3) and an existing-`schema.json` guard (H-4).
+- Rule-engine correctness by class: unescaped regex substitution (M-1/L-1); `exclude` ignored and
+  stateful `g`/`y` regex (M-2/TP-1); `custom`-without-`id` crash (M-3); duplicate findings (L-3/SC-2);
+  `STR-001` reach (BL-1); dead `GRP` options (SC-1).
+- CLI contract: operational failures exit `2` (M-6); unknown subcommand ≠ `exit 0` (M-7); atomic
+  newline-safe writes (M-5/L-6); `init`-scan honesty (L-7…L-11).
+- **Maps to:** [post-P9 audit](audit-2026-07-25-post-p9.md) HIGH/MEDIUM + code-level LOWs; `p9-09`
+  BL-1/TP-1/SC-1/SC-2.
+- **Exit:** both release-blockers closed; no false-`error`/crash/data-loss path; gates green.
+
+### Phase 12 — Post-P9 audit consistency & coverage (tests/docs) · `S–M` · depends on: P11 · reuse: n/a
+
+**Goal:** close the **test-boundary**, **performance**, **docs-vs-code**, and **decision** findings
+from the same two audits, so coverage and contracts describe the shipped product and the missed-defect
+class cannot recur silently. See [P12 tasks](P12-consistency/index.md).
+
+- The systemic backstop: end-to-end `exclude` coverage across the rule families (L-4) and a standing
+  process-boundary test checklist (audit §4) plus a format-gate publish process (audit §1).
+- Docs/decisions: glossary `custom.target` optional (L-2); MCP `lint` custom-rule boundary (OG-1);
+  recursive-DFS corpus bound (SC-3); quadratic hot paths (L-5).
+- **Maps to:** [post-P9 audit](audit-2026-07-25-post-p9.md) test-depth/perf LOWs; `p9-09` OG-1/SC-3.
+- **Exit:** `exclude` e2e everywhere it applies; boundary-test checklist in place; docs/decisions reconciled.
+
+### Phase P-release — Distribution, CI & release · `M` · depends on: all (incl. P9–P12) · reuse: Medium
 
 **Goal:** production packaging.
 
@@ -341,12 +375,12 @@ product. See [P10 tasks](P10-consistency/index.md).
 P0 ─► P1 ─► P2 ─► P3
             │
             └► P4 ─► P5 ─┐
-            └► P6        ├─► P7 ─► P8 ─► P9 ─► P10 ─► P-release
+            └► P6        ├─► P7 ─► P8 ─► P9 ─► P10 ─► P11 ─► P12 ─► P-release
 
 Critical path: P0 → P1 → P2 → P3 (rules) and P0 → P1 → P4 → P5 (graph/compile)
 run largely in parallel after P2. P7 (MCP) needs P2+P4+P5. P8 (skills) needs the
-CLI/MCP surface stable. P9 (code remediation) and P10 (docs/tests consistency) close out
-the post-audit gaps; P-release ships it.
+CLI/MCP surface stable. P9/P10 close the first (P0–P8) audit; P11 (post-P9 code
+remediation) and P12 (post-P9 consistency/coverage) close the second audit; P-release ships it.
 ```
 
 Recommended milestones:
@@ -354,8 +388,8 @@ Recommended milestones:
 - **M1 "Engine":** P0–P2 — workspace + new config + rule engine + first rules runnable.
 - **M2 "Lint parity+":** P3 — all 22 built-in rules + current LLM rules; this is a usable linter.
 - **M3 "Graph & agents":** P4–P5 + P7 — slice/impact/compile + MCP.
-- **M4 "Launch":** P6, P8, then P9/P10 (post-audit remediation) and P-release — init, skills,
-  audit fixes, packaging, release.
+- **M4 "Launch":** P6, P8, then P9/P10 and P11/P12 (two post-audit remediation rounds), then
+  P-release — init, skills, audit fixes, packaging, release.
 
 ---
 
@@ -401,15 +435,17 @@ Recommended milestones:
 
 ### Appendix A — Requirement area → phase traceability
 
-| Requirement area                     | Primary phase(s)                         |
-| ------------------------------------ | ---------------------------------------- |
-| Configuration                        | P2 (model), P6 (init writes it)          |
-| Rules & rule engine                  | P2 (engine), P3 (22 built-in rules)      |
-| Context graph & search               | P1 (parse), P4 (graph/slice/impact)      |
-| Skills (generated)                   | P5 (compile)                             |
-| MCP server                           | P7                                       |
-| Skills (static) + skill installation | P8                                       |
-| MCP server installation              | P7, P-release                            |
-| Linter installation                  | P6, P-release                            |
-| Post-audit remediation (code)        | P9 ([audit](audit-2026-07-23-p0-p8.md))  |
-| Post-audit consistency (docs/tests)  | P10 ([audit](audit-2026-07-23-p0-p8.md)) |
+| Requirement area                     | Primary phase(s)                           |
+| ------------------------------------ | ------------------------------------------ |
+| Configuration                        | P2 (model), P6 (init writes it)            |
+| Rules & rule engine                  | P2 (engine), P3 (22 built-in rules)        |
+| Context graph & search               | P1 (parse), P4 (graph/slice/impact)        |
+| Skills (generated)                   | P5 (compile)                               |
+| MCP server                           | P7                                         |
+| Skills (static) + skill installation | P8                                         |
+| MCP server installation              | P7, P-release                              |
+| Linter installation                  | P6, P-release                              |
+| Post-audit remediation (code)        | P9 ([audit](audit-2026-07-23-p0-p8.md))    |
+| Post-audit consistency (docs/tests)  | P10 ([audit](audit-2026-07-23-p0-p8.md))   |
+| Post-P9 remediation (code)           | P11 ([audit](audit-2026-07-25-post-p9.md)) |
+| Post-P9 consistency (tests/docs)     | P12 ([audit](audit-2026-07-25-post-p9.md)) |

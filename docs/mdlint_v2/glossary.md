@@ -23,7 +23,8 @@
 - **Cross-links** use repo-relative POSIX paths, the same convention as the rest of the
   product.
 - **Shipped vs planned.** Phases **P0–P8 are shipped**; **P9/P10** (post-audit remediation
-  and consistency) and **P-release** are pending. Terms for unshipped surfaces are marked
+  and consistency), **P11/P12** (post-P9 remediation and consistency), and **P-release** are
+  pending. Terms for unshipped surfaces are marked
   _(planned, PN)_ so the glossary stays honest about the current state (roadmap §8, "honesty
   in docs"). Update these markers as phases land.
 - **Not-yet and never.** Concepts that are deferred, backlog, or explicitly out of v2 scope
@@ -649,15 +650,16 @@ underlying scan/inference.
 - **Sources of truth / precedence** — When docs disagree: (1) the specific phase task file,
   (2) the relevant locked requirement, (3) the relevant decision, (4) the roadmap summary.
   See [AGENTS.md](../../AGENTS.md).
-- **Phase (P0–P8, P9/P10, P-release)** — The roadmap epics:
+- **Phase (P0–P8, P9/P10, P11/P12, P-release)** — The roadmap epics:
   `P0` Foundations · `P1` ParsedDocument · `P2` Rule engine · `P3` Rules · `P4` Graph ·
   `P5` Compile · `P6` init · `P7` MCP server · `P8` Skills · `P9` Remediation ·
-  `P10` Consistency · `P-release` Release. Each has a folder (meta `index.md` + numbered task
-  files). **P0–P8 are Done; P9 (post-audit remediation) is in progress; P10 (consistency) and
-  P-release are pending.**
+  `P10` Consistency · `P11` Post-P9 Remediation · `P12` Post-P9 Consistency ·
+  `P-release` Release. Each has a folder (meta `index.md` + numbered task
+  files). **P0–P8 are Done; P9 (post-audit remediation) is in progress; P10 (consistency),
+  P11/P12 (post-P9 remediation/consistency), and P-release are pending.**
 - **Milestone (M1–M4)** — Delivery groupings: **M1** "Engine" (P0–P2), **M2** "Lint parity+"
   (P3), **M3** "Graph & agents" (P4–P5 + P7), **M4** "Launch" (P6, P8, then P9/P10 and
-  P-release). See roadmap §6.
+  P11/P12, then P-release). See roadmap §6.
 - **Task file** — A numbered file inside a phase folder with a `Previous` / `Next` /
   `Depends on` / `Blocks` chain and exit criteria; the most specific source of truth for the
   work it describes.
