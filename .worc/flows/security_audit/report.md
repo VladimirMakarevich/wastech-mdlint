@@ -1,16 +1,4 @@
-Write the security-audit report for **wastech-mdlint** to **exactly one file** and write nothing
-anywhere else:
-
-`{repo}/.worc/security-reports/{task_id}/report.md`
-
-## The write constraint (do not violate)
-
-Under this flow's `private_control_workspace_report` output policy, `{repo}/.worc/security-reports/{task_id}/`
-is the **only** writable directory, and `report.md` is the only file you create in it. Any write outside
-it fails validation — do **not** create a scratch, notes, or draft file in the repository root, in
-`{repo}/packages/`, in a `{repo}/src/` tree, in `{repo}/docs/`, or anywhere else, and do not modify any
-source file. This is a private control-workspace report: it stays under the gitignored `.worc/` home and
-is **never committed**. Keep everything you need to say inside the single `report.md`.
+Produce the security-audit report for **wastech-mdlint** as your structured output — you write no files.
 
 ## What to write
 
@@ -25,5 +13,7 @@ each with the reason, so a reader sees what was considered and cleared. If nothi
 plainly — an empty confirmed set is a valid, honest result, not a gap to pad.
 
 Keep the report deterministic and bounded to the analyzed repository state; do not dump secrets,
-environment variables, or unrelated local filesystem data into it. Return the typed structured result
-required by the output schema.
+environment variables, or unrelated local filesystem data into it.
+
+Return the whole report as the `content` field of the structured output. The orchestrator writes it to the
+private report directory for you — you are a read-only node and must not create or modify any file.

@@ -18,7 +18,7 @@ directly actionable:
   wrong or how far short of the requirements/plan the shipped state is and the blast radius of the issue.
 - For each finding capture: the exact `path:line` evidence; the standard it violates or falls short of
   (a requirement, decision, architecture invariant, glossary/guide claim, or phase exit criterion) with
-  its own citation; *why* it matters (correctness, determinism, cross-platform, test-coverage, or
+  its own citation; _why_ it matters (correctness, determinism, cross-platform, test-coverage, or
   architectural-drift consequence); and a concrete **recommended direction** (what to change — not an
   implementation), pointing at the subsystem/file where it should be addressed.
 - Ensure the organization reflects coverage of every subsystem the analysis walked (core engine +
