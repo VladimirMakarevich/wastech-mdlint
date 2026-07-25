@@ -18,9 +18,9 @@ describe("parseStaticSkill", () => {
         'compatibility: "coupled: same tag"',
         "metadata:",
         '  homepage: "https://example.com"',
-        '  source: "https://example.com"'
+        '  source: "https://example.com"',
       ]),
-      PATH
+      PATH,
     );
 
     expect(result.ok).toBe(true);
@@ -28,7 +28,9 @@ describe("parseStaticSkill", () => {
       expect(result.skill.id).toBe("wastech-mdlint-init");
       expect(result.skill.kind).toBe("static");
       expect(result.skill.path).toBe(PATH);
-      expect(result.skill.frontmatter.metadata?.homepage).toBe("https://example.com");
+      expect(result.skill.frontmatter.metadata?.homepage).toBe(
+        "https://example.com",
+      );
     }
   });
 
@@ -37,19 +39,21 @@ describe("parseStaticSkill", () => {
       'name: "wastech-mdlint-init"',
       'description: "Bootstrap the tool."',
       "metadata:",
-      '  homepage: "https://example.com"'
+      '  homepage: "https://example.com"',
     ]);
     const result = parseStaticSkill(lf.replace(/\n/g, "\r\n"), PATH);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.skill.frontmatter.metadata?.homepage).toBe("https://example.com");
+      expect(result.skill.frontmatter.metadata?.homepage).toBe(
+        "https://example.com",
+      );
     }
   });
 
   it("accepts a minimal frontmatter block with only the required fields", () => {
     const result = parseStaticSkill(
       frontmatter(['name: "x"', 'description: "y"']),
-      PATH
+      PATH,
     );
     expect(result.ok).toBe(true);
   });
@@ -58,7 +62,12 @@ describe("parseStaticSkill", () => {
     const result = parseStaticSkill("# no frontmatter\n", PATH);
     expect(result).toEqual({
       ok: false,
-      issues: [{ path: "frontmatter", message: expect.stringContaining("must begin with") }]
+      issues: [
+        {
+          path: "frontmatter",
+          message: expect.stringContaining("must begin with"),
+        },
+      ],
     });
   });
 
@@ -70,13 +79,15 @@ describe("parseStaticSkill", () => {
         "metadata:",
         '  homepage: "https://example.com"',
         'description: "y"',
-        '  source: "https://example.com"'
+        '  source: "https://example.com"',
       ]),
-      PATH
+      PATH,
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.issues.some((i) => /no open parent map/.test(i.message))).toBe(true);
+      expect(
+        result.issues.some((i) => /no open parent map/.test(i.message)),
+      ).toBe(true);
     }
   });
 
@@ -103,15 +114,20 @@ describe("parseStaticSkill", () => {
   it("rejects an unknown top-level key via the strict schema", () => {
     const result = parseStaticSkill(
       frontmatter(['name: "x"', 'description: "y"', 'bogus: "z"']),
-      PATH
+      PATH,
     );
     expect(result.ok).toBe(false);
   });
 
   it("rejects an unknown metadata key via the strict schema", () => {
     const result = parseStaticSkill(
-      frontmatter(['name: "x"', 'description: "y"', "metadata:", '  bogus: "z"']),
-      PATH
+      frontmatter([
+        'name: "x"',
+        'description: "y"',
+        "metadata:",
+        '  bogus: "z"',
+      ]),
+      PATH,
     );
     expect(result.ok).toBe(false);
   });
@@ -119,11 +135,13 @@ describe("parseStaticSkill", () => {
   it("reports a duplicate top-level key instead of letting the last win", () => {
     const result = parseStaticSkill(
       frontmatter(['name: "x"', 'name: "y"', 'description: "z"']),
-      PATH
+      PATH,
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.issues.some((i) => /duplicate frontmatter key/.test(i.message))).toBe(true);
+      expect(
+        result.issues.some((i) => /duplicate frontmatter key/.test(i.message)),
+      ).toBe(true);
     }
   });
 
@@ -134,39 +152,43 @@ describe("parseStaticSkill", () => {
         'description: "y"',
         "metadata:",
         '  homepage: "https://a.example"',
-        '  homepage: "https://b.example"'
+        '  homepage: "https://b.example"',
       ]),
-      PATH
+      PATH,
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.issues.some((i) => /duplicate metadata key/.test(i.message))).toBe(true);
+      expect(
+        result.issues.some((i) => /duplicate metadata key/.test(i.message)),
+      ).toBe(true);
     }
   });
 
   it("reports a malformed (unquoted) scalar line", () => {
     const result = parseStaticSkill(
-      frontmatter(['name: unquoted', 'description: "y"']),
-      PATH
+      frontmatter(["name: unquoted", 'description: "y"']),
+      PATH,
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.issues.some((i) => i.path === "frontmatter.name")).toBe(true);
+      expect(result.issues.some((i) => i.path === "frontmatter.name")).toBe(
+        true,
+      );
     }
   });
 
   it("reports an indented entry with no parent map", () => {
     const result = parseStaticSkill(
       frontmatter(['name: "x"', 'description: "y"', '  orphan: "z"']),
-      PATH
+      PATH,
     );
     expect(result.ok).toBe(false);
   });
 
   it("emits issues sorted by path then message", () => {
     const result = parseStaticSkill(
-      frontmatter(['description: bad', 'name: alsobad']),
-      PATH
+      frontmatter(["description: bad", "name: alsobad"]),
+      PATH,
     );
     expect(result.ok).toBe(false);
     if (!result.ok) {

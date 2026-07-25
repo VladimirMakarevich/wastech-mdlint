@@ -14,8 +14,11 @@ import { createServer } from "../src/index.js";
 // the skill body and asserts the parsed contract against the live input/output schemas. A skill that
 // documents a different tool, or renames/moves a field, changes this parse and fails here.
 const impactSkill = readFileSync(
-  path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../skills/wastech-mdlint-impact/SKILL.md"),
-  "utf8"
+  path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../../../skills/wastech-mdlint-impact/SKILL.md",
+  ),
+  "utf8",
 );
 
 interface DocumentedTool {
@@ -47,21 +50,28 @@ function parseDocumentedTools(): DocumentedTool[] {
     const nextStarts = names
       .map((other) => impactSkill.indexOf(`\`${other}\` tool`))
       .filter((index) => index > start);
-    const end = nextStarts.length > 0 ? Math.min(...nextStarts) : impactSkill.length;
+    const end =
+      nextStarts.length > 0 ? Math.min(...nextStarts) : impactSkill.length;
     const section = impactSkill.slice(start, end);
 
     const inputMatch = /Input\s*`?\{[^}]*\}/.exec(section);
-    const inputFields = braceFields(inputMatch?.[0] ?? /`?\{[^}]*\}/.exec(section)?.[0] ?? "");
+    const inputFields = braceFields(
+      inputMatch?.[0] ?? /`?\{[^}]*\}/.exec(section)?.[0] ?? "",
+    );
 
-    const outputMatch = /(?:returns|Returns|shaped)[^`]*`\{[^}]*\}/.exec(section);
-    const outputFields = outputMatch === null ? [] : braceFields(outputMatch[0]);
+    const outputMatch = /(?:returns|Returns|shaped)[^`]*`\{[^}]*\}/.exec(
+      section,
+    );
+    const outputFields =
+      outputMatch === null ? [] : braceFields(outputMatch[0]);
 
     return { name, inputFields, outputFields };
   });
 }
 
 function properties(schema: unknown): string[] {
-  const props = (schema as { properties?: Record<string, unknown> } | undefined)?.properties;
+  const props = (schema as { properties?: Record<string, unknown> } | undefined)
+    ?.properties;
   return props === undefined ? [] : Object.keys(props);
 }
 
@@ -72,13 +82,17 @@ describe("skills reference a live MCP surface", () => {
     expect(documented.map((tool) => tool.name).sort()).toEqual([
       "context-graph",
       "context-slice",
-      "impact-analysis"
+      "impact-analysis",
     ]);
 
     const server = await createServer();
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
     const client = new Client({ name: "skills-surface", version: "0.0.0" });
-    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    await Promise.all([
+      server.connect(serverTransport),
+      client.connect(clientTransport),
+    ]);
 
     const { tools } = await client.listTools();
     const byName = new Map(tools.map((tool) => [tool.name, tool]));
@@ -88,16 +102,25 @@ describe("skills reference a live MCP surface", () => {
       expect(tool, `tool ${name} is not advertised`).toBeDefined();
 
       // The parse must have found something to check — an empty field list would silently pass.
-      expect(inputFields.length, `no documented inputs parsed for ${name}`).toBeGreaterThan(0);
+      expect(
+        inputFields.length,
+        `no documented inputs parsed for ${name}`,
+      ).toBeGreaterThan(0);
 
       const inputProps = properties(tool?.inputSchema);
       for (const field of inputFields) {
-        expect(inputProps, `${name} input schema is missing documented field ${field}`).toContain(field);
+        expect(
+          inputProps,
+          `${name} input schema is missing documented field ${field}`,
+        ).toContain(field);
       }
 
       const outputProps = properties(tool?.outputSchema);
       for (const field of outputFields) {
-        expect(outputProps, `${name} output schema is missing documented field ${field}`).toContain(field);
+        expect(
+          outputProps,
+          `${name} output schema is missing documented field ${field}`,
+        ).toContain(field);
       }
     }
 

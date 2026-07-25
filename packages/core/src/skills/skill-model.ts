@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { skillFrontmatterSchema, type SkillFrontmatter } from "../compile/skill-frontmatter.js";
+import { compareStrings } from "../deterministic-sort.js";
+import {
+  skillFrontmatterSchema,
+  type SkillFrontmatter,
+} from "../compile/skill-frontmatter.js";
 
 // Unified skill model (S5). Static skills (P8) and the compiler's generated output (P5) are the
 // same shape so the two provenances stay provably interchangeable. The `frontmatter` field is the
@@ -19,19 +23,18 @@ function isRepoRelativePosixPath(value: string): boolean {
   if (value.includes("\\") || /^[A-Za-z]:/.test(value)) {
     return false;
   }
-  return value.split("/").every((segment) => segment !== "" && segment !== "." && segment !== "..");
+  return value
+    .split("/")
+    .every((segment) => segment !== "" && segment !== "." && segment !== "..");
 }
 
 export const skillModelSchema = z
   .object({
     id: z.string().min(1),
     kind: z.enum(["static", "generated"]),
-    path: z
-      .string()
-      .min(1)
-      .refine(isRepoRelativePosixPath, {
-        message: "path must be a repository-relative POSIX path",
-      }),
+    path: z.string().min(1).refine(isRepoRelativePosixPath, {
+      message: "path must be a repository-relative POSIX path",
+    }),
     frontmatter: skillFrontmatterSchema,
   })
   .strict();
@@ -62,7 +65,10 @@ export function validateSkill(input: unknown): SkillValidationResult {
 
   const issues = result.error.issues
     .map((issue) => ({ path: issue.path.join("."), message: issue.message }))
-    .sort((a, b) => a.path.localeCompare(b.path) || a.message.localeCompare(b.message));
+    .sort(
+      (a, b) =>
+        compareStrings(a.path, b.path) || compareStrings(a.message, b.message),
+    );
 
   return { ok: false, issues };
 }

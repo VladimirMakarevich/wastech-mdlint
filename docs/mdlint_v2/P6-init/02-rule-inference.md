@@ -36,13 +36,13 @@ categories to concrete canonical rule IDs with rationale.
 
 - Only 7 of the 24 built-in ids are gated on detectable sample evidence: `REF-001/002/003`,
   `TBL-002`, `CTX-001/002`, and `GRP-001` (presence-only gates — link/anchor/image/table/
-  checklist/placeholder counts > 0, no magic thresholds). Every other built-in has a *required*
+  checklist/placeholder counts > 0, no magic thresholds). Every other built-in has a _required_
   option with no safe way to derive it from 3–5 sampled files (a pipeline `chain`, a `template`
   file, a `zonesDir`, an idColumn/idPattern split, a glossary table, an enumerated `values` set,
   etc.) and proposing one with a fabricated required option risks either a `ConfigError` or a
   misleading, made-up constraint — worse than not proposing it at all.
 - `SEC-001` is the one rule proposed cluster-scoped (`options.files`/`options.sections`) rather
-  than repo-wide: it is the only gated rule whose Zod schema both supports `files` scoping *and*
+  than repo-wide: it is the only gated rule whose Zod schema both supports `files` scoping _and_
   has a derivable option (`sections`, from a shared ADR heading triplet). `REF-003`'s schema has
   no `files` key at all — passing one is a `.strict()` violation, not a no-op — and `GRP-001`
   declares `fileScopeShape` but its check body explicitly ignores `files`/`exclude` for now, so
@@ -50,13 +50,13 @@ categories to concrete canonical rule IDs with rationale.
   (reference/table/checklist/placeholder integrity), so they are proposed once, globally.
 - ADR-triplet detection is a two-part, deliberately asymmetric gate: a case-insensitive vocabulary
   match against `{status, context, decision}` (≥2 of 3, every sampled doc in the cluster) decides
-  *whether* the cluster is ADR-like; a case-**sensitive** exact-string intersection of
+  _whether_ the cluster is ADR-like; a case-**sensitive** exact-string intersection of
   `doc.sections` across every sample in the cluster (filtered to the ADR vocabulary, now including
-  `consequences`/`alternatives`) decides *what to require*. The split exists because
+  `consequences`/`alternatives`) decides _what to require_. The split exists because
   `sectionPresent` (SEC-001's own primitive) matches section names case-sensitively — requiring a
   heading whose casing isn't guaranteed identical across every sample would risk a false SEC-001
   finding later, which is worse than the alternative (a missed proposal), a trade-off the exit
-  criteria explicitly allow. That intersection preserves the *first* sampled doc's reading order
+  criteria explicitly allow. That intersection preserves the _first_ sampled doc's reading order
   rather than alphabetizing: `doc.sections` is a reading-order sequence, and SEC-001's fix
   scaffolds any missing section in the order `options.sections` lists them, so alphabetizing would
   silently reorder that scaffold away from how the sampled ADRs actually read.
@@ -77,7 +77,7 @@ categories to concrete canonical rule IDs with rationale.
   root-relative link isn't misresolved as source-relative) and only counts an anchored link as an
   edge when the target sample's heading slugs actually contain that anchor (as `REF-002` does) —
   otherwise the heuristic could report a cycle the real `ContextGraph` would never build. It
-  returns the *entire* sampled cycle path, not just the DFS back-edge, for the same reason: for a
+  returns the _entire_ sampled cycle path, not just the DFS back-edge, for the same reason: for a
   3-node sampled cycle `a -> b -> c -> a` the back-edge alone is `(c, a)`, and wording that pair as
   "c and a reference each other" would be false — only `a -> b` and `c -> a` actually exist as
   sampled links.

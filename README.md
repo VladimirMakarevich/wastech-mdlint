@@ -44,10 +44,10 @@ configuration guide, and an annotated config with every option — lives in
 `wastech-mdlint` is an npm-workspaces monorepo. `@wastech-mdlint/core` owns the entire
 pipeline; the CLI and MCP server are thin hosts over it.
 
-| Package | Role | Bin |
-| --- | --- | --- |
-| [`@wastech-mdlint/core`](packages/core) | Parsing, config, rule engine, graph, and formatting — the whole pipeline. | — |
-| [`@wastech-mdlint/cli`](packages/cli) | commander CLI host: argument parsing, command dispatch, exit codes. | `wastech-mdlint` |
+| Package                                             | Role                                                                                                                                       | Bin                  |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------- |
+| [`@wastech-mdlint/core`](packages/core)             | Parsing, config, rule engine, graph, and formatting — the whole pipeline.                                                                  | —                    |
+| [`@wastech-mdlint/cli`](packages/cli)               | commander CLI host: argument parsing, command dispatch, exit codes.                                                                        | `wastech-mdlint`     |
 | [`@wastech-mdlint/mcp-server`](packages/mcp-server) | stdio MCP host; `lint`/`lint-files` ship in P7.02, `context-graph`/`context-slice`/`impact-analysis` in P7.03, `compile-context` in P7.04. | `wastech-mdlint-mcp` |
 
 Build and test the whole workspace from the repo root:
@@ -58,6 +58,7 @@ npm run typecheck # tsc -b across project references
 npm run build     # tsc -b -> each package's dist/
 npm test          # vitest across all packages
 npm run lint      # eslint across the workspace
+npm run format    # prettier --check . (CI-enforced; run before pushing)
 ```
 
 ## Quick start
@@ -126,8 +127,11 @@ wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-
   to `skip` when omitted; interactive mode always prompts, and pressing Enter without choosing
   lands on that same safe default rather than the first listed option. `--with-ci-workflow`
   (under `--yes` only) also drops a `.github/workflows/wastech-mdlint.yml`; interactive runs
-  offer it with a default of no. If `[path]` is below a repo's existing config, `init` works
-  from the config's own directory instead. Without `--yes`, `init` requires an interactive
+  offer it with a default of no. That workflow always installs and runs the CLI via npm
+  (`npm install --no-save` + `npx`), regardless of the bun/pnpm/yarn/npm package manager `init`
+  detects and reports — it only fetches the external CLI tool, never the repo's own dependencies,
+  so it never needs that repo's lockfile. If `[path]` is below a repo's existing config, `init`
+  works from the config's own directory instead. Without `--yes`, `init` requires an interactive
   terminal. Ctrl+C during any prompt exits `0`.
 
 ## MCP server
@@ -147,20 +151,25 @@ Add it to any stdio-based MCP host (Claude Code's `.mcp.json`, Claude Desktop's
 ```jsonc
 {
   "mcpServers": {
-    "wastech-mdlint": { "command": "npx", "args": ["-y", "@wastech-mdlint/mcp-server"] }
-  }
+    "wastech-mdlint": {
+      "command": "npx",
+      "args": ["-y", "@wastech-mdlint/mcp-server"],
+    },
+  },
 }
 ```
 
 <!-- BEGIN GENERATED MCP TOOLS -->
+<!-- prettier-ignore -->
 | Tool | Description | Read-only | Structured output |
 | --- | --- | --- | --- |
-| `lint` | Lint ad-hoc Markdown content against an explicit set of rules. Reads no filesystem or config. | yes | yes |
+| `lint` | Lint ad-hoc Markdown content against an explicit set of rules. Does not load project config; file-resolving rules such as REF-001/REF-003 and SEC-003 may probe or read paths relative to the server's working directory. | yes | yes |
 | `lint-files` | Lint the project's Markdown files using the resolved config (or the zero-config `**/*.md` default). Read-only. | yes | yes |
 | `context-graph` | Build the project's context graph. `format: "json"` (default) returns the raw graph (nodes, edges, cycles); `format: "summary"` returns nodes, edges, connected components, and topological reading order. Read-only. | yes | yes |
 | `context-slice` | Files reachable within `depth` hops of a resolved query, following graph edges forward. Resolves the query by exact match against defined IDs, heading/anchor slugs, and file paths — no fuzzy, substring, keyword, or LLM matching. Read-only. | yes | yes |
 | `impact-analysis` | Compute the blast radius of changing a Markdown file: files that reference it directly, files affected transitively, and the reading order over the affected subgraph. A file not in the corpus returns an actionable error. Read-only. | yes | yes |
 | `compile-context` | Compile the project skill (SKILL.md) from `config.compile`, producing the same deterministic output as the CLI `compile` command: the skill content plus a Documents/Rules/Components metadata line. Requires `config.compile`; its absence returns an actionable error. Read-only. | yes | no |
+
 <!-- END GENERATED MCP TOOLS -->
 
 All 6 tools carry a `readOnlyHint` annotation; five return `structuredContent` + `outputSchema`
@@ -179,7 +188,11 @@ Configuration is JSONC (comments + trailing commas) in `wastech-mdlint.config.js
   "exclude": ["node_modules/**", "dist/**", ".git/**"],
   "respectGitignore": false,
   "settings": {
-    "siteRouter": { "preset": "starlight", "contentDir": "src/content/docs", "defaultLocale": "en" }
+    "siteRouter": {
+      "preset": "starlight",
+      "contentDir": "src/content/docs",
+      "defaultLocale": "en",
+    },
   },
   "rules": [
     { "rule": "REF-001", "severity": "warning" },
@@ -190,13 +203,16 @@ Configuration is JSONC (comments + trailing commas) in `wastech-mdlint.config.js
       "description": "Each requirement row must have an Owner",
       "severity": "error",
       "target": "table",
-      "options": { "files": ["docs/requirements/**/*.md"], "assert": { "kind": "columnNotEmpty", "column": "Owner" } }
-    }
+      "options": {
+        "files": ["docs/requirements/**/*.md"],
+        "assert": { "kind": "columnNotEmpty", "column": "Owner" },
+      },
+    },
   ],
   "compile": {
     "outdir": ".claude/skills/wastech-mdlint",
-    "skill": { "name": "...", "description": "..." }
-  }
+    "skill": { "name": "...", "description": "..." },
+  },
 }
 ```
 
@@ -229,6 +245,7 @@ The following table is generated from the rule metadata (`npm run generate:docs`
 edit it by hand.
 
 <!-- BEGIN GENERATED RULES -->
+<!-- prettier-ignore -->
 | Rule | Category | Default severity | Scope | Fixable | Description |
 | --- | --- | --- | --- | --- | --- |
 | `CTX-001` | CTX | warning | document | no | Sections are not empty or placeholder-only. |
@@ -255,6 +272,7 @@ edit it by hand.
 | `TBL-004` | TBL | error | document | no | Cell values match a required pattern. |
 | `TBL-005` | TBL | error | document | no | Cross-column conditional holds (when → then). |
 | `TBL-006` | TBL | error | project | no | Column IDs are unique across files. |
+
 <!-- END GENERATED RULES -->
 
 `custom` (not shown above) is resolved from config, so its id and behavior are
@@ -264,11 +282,14 @@ project-defined.
 
 ```md
 <!-- wastech-mdlint-disable REF-001 -->
+
 [intentionally broken](does-not-exist.md)
+
 <!-- wastech-mdlint-enable REF-001 -->
 
 <!-- wastech-mdlint-disable-next-line TBL-002 -->
-| REQ-1 |  |
+
+| REQ-1 | |
 ```
 
 A directive with no rule IDs applies to all rules. `disable` runs until a matching
@@ -289,6 +310,10 @@ node packages/cli/dist/index.js lint . --fail-on warning   # fail CI on warnings
 - No external HTTP link checking or link caching.
 - No runtime `.ts`/`.cjs`/`.mjs` config or user-code plugins (custom rules are data-only).
 - The context graph is rebuilt each run (no incremental cache yet).
+- Dangling reference-style links (`[text][missing]` with no matching `[missing]: url`
+  definition) are parsed as literal text, not a link, so `REF-001` never sees them — this
+  matches GitHub's own rendering and is intentional, not a gap. See
+  [REF-001](docs/guide/rules/REF-001.md#notes).
 
 ## Planning docs
 

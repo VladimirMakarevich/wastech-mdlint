@@ -22,16 +22,16 @@ this graph. See the [context-graph requirements](../requirements/03-context-grap
 
 ## Tasks
 
-| # | Task | Size | Depends on |
-| --- | --- | --- | --- |
-| [P4.01](01-context-graph-model.md) | `ContextGraph` model + `buildContextGraph` (semantic edges, metadata) | M | P3 done |
-| [P4.02](02-graph-algorithms.md) | Topo-sort, components, explicit cycles | S | P4.01 |
-| [P4.03](03-query-layer.md) | Unified query layer | M | P4.02 |
-| [P4.04](04-search-index-slice.md) | Deterministic ID/anchor/heading index + `slice` | M | P4.03 |
-| [P4.05](05-impact-analysis.md) | `impact` (`getImpactSet` / `classifyImpact`) | M | P4.03 |
-| [P4.06](06-grp-refactor-coverage.md) | Refactor GRP rules onto shared graph + coverage signal | M | P4.02 |
-| [P4.07](07-cli-graph-slice-impact.md) | CLI `graph`/`slice`/`impact` + Mermaid/DOT export | M | P4.04, P4.05 |
-| [P4.08](08-graph-tests.md) | Graph/slice/impact tests & fixtures | M | all above |
+| #                                     | Task                                                                  | Size | Depends on   |
+| ------------------------------------- | --------------------------------------------------------------------- | ---- | ------------ |
+| [P4.01](01-context-graph-model.md)    | `ContextGraph` model + `buildContextGraph` (semantic edges, metadata) | M    | P3 done      |
+| [P4.02](02-graph-algorithms.md)       | Topo-sort, components, explicit cycles                                | S    | P4.01        |
+| [P4.03](03-query-layer.md)            | Unified query layer                                                   | M    | P4.02        |
+| [P4.04](04-search-index-slice.md)     | Deterministic ID/anchor/heading index + `slice`                       | M    | P4.03        |
+| [P4.05](05-impact-analysis.md)        | `impact` (`getImpactSet` / `classifyImpact`)                          | M    | P4.03        |
+| [P4.06](06-grp-refactor-coverage.md)  | Refactor GRP rules onto shared graph + coverage signal                | M    | P4.02        |
+| [P4.07](07-cli-graph-slice-impact.md) | CLI `graph`/`slice`/`impact` + Mermaid/DOT export                     | M    | P4.04, P4.05 |
+| [P4.08](08-graph-tests.md)            | Graph/slice/impact tests & fixtures                                   | M    | all above    |
 
 ## Sequence
 

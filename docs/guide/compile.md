@@ -4,7 +4,7 @@
 
 `compile` generates a **deterministic** `SKILL.md` — a project-specific agent skill — from the
 [context graph](context-graph.md), the active rule descriptions, and the `compile` config. It lets
-an AI host load a compact, accurate description of *this* repository's docs structure and
+an AI host load a compact, accurate description of _this_ repository's docs structure and
 conventions.
 
 ## Usage

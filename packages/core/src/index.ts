@@ -30,6 +30,7 @@ export {
   normalizeConfigGlobs,
   normalizeRelativePath,
 } from "./discovery/globs.js";
+export { compareStrings } from "./deterministic-sort.js";
 
 // Repo scan (P6.01)
 export {
@@ -171,7 +172,10 @@ export type {
   CompileSections,
   SynthesizeInput,
 } from "./compile/synthesize.js";
-export { compileContext, CompileConfigMissingError } from "./compile/compile-context.js";
+export {
+  compileContext,
+  CompileConfigMissingError,
+} from "./compile/compile-context.js";
 
 // Skills (P8)
 export {

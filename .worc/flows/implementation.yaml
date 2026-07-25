@@ -59,10 +59,10 @@ flow:
     - id: implementation
       kind: agent
       role_file: implementation/implementation.md
-      permission_profile: workspace-write
       session_scope: fresh_disposable
-      provider: codex
-      model: gpt-5.4
+      permission_profile: workspace-write
+      provider: claude
+      model: claude-sonnet-5
       reasoning: xhigh
       # timeout_seconds: 7200
       # network_access: false
@@ -79,7 +79,7 @@ flow:
       permission_profile: read-only
       provider: claude
       model: claude-opus-4-8
-      reasoning: high
+      reasoning: xhigh
       # network_access: false
       # blocking: true
       # max_rework_per_stage: 1
@@ -88,9 +88,9 @@ flow:
       role_file: implementation/fixing.md
       session_scope: fresh_disposable
       permission_profile: workspace-write
-      provider: codex
-      model: gpt-5.4
-      reasoning: high
+      provider: claude
+      model: claude-sonnet-5
+      reasoning: max
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []
@@ -99,9 +99,9 @@ flow:
       role_file: implementation/documentation.md
       session_scope: fresh_disposable
       permission_profile: workspace-write
-      reasoning: low
       provider: claude
-      model: claude-sonnet-5
+      model: claude-opus-4-8
+      reasoning: medium
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []

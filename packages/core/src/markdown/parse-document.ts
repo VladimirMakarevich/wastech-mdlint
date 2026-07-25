@@ -11,13 +11,14 @@ import type {
   Root,
   Table,
   TableRow,
-  Text
+  Text,
 } from "mdast";
 import { remark } from "remark";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import { visit } from "unist-util-visit";
 
+import { findLineNumber } from "../engine/text-position.js";
 import { canonicalizeRuleId } from "../rule-id.js";
 import type {
   InlineDirective,
@@ -30,7 +31,7 @@ import type {
   ParsedLink,
   ParsedLinkKind,
   ParsedTable,
-  ParsedTableRow
+  ParsedTableRow,
 } from "./document-types.js";
 
 // One shared processor: parsing is pure, so a single GFM-enabled instance is reused across every
@@ -82,9 +83,15 @@ function getReferenceDefinitions(tree: Root): Map<string, string> {
   return definitions;
 }
 
-function classifyLink(rawTarget: string): { kind: ParsedLinkKind; anchor?: string } {
+function classifyLink(rawTarget: string): {
+  kind: ParsedLinkKind;
+  anchor?: string;
+} {
   if (rawTarget.startsWith("#")) {
-    return { kind: "same-file-anchor", anchor: decodeComponent(rawTarget.slice(1)) };
+    return {
+      kind: "same-file-anchor",
+      anchor: decodeComponent(rawTarget.slice(1)),
+    };
   }
 
   let parsed: URL | undefined;
@@ -111,13 +118,14 @@ function classifyLink(rawTarget: string): { kind: ParsedLinkKind; anchor?: strin
 
   return {
     kind: "local-file",
-    anchor: rawAnchorPart === undefined ? undefined : decodeComponent(rawAnchorPart)
+    anchor:
+      rawAnchorPart === undefined ? undefined : decodeComponent(rawAnchorPart),
   };
 }
 
 function resolveRawLinkTarget(
   node: LinkLikeNode | ImageLikeNode,
-  definitions: Map<string, string>
+  definitions: Map<string, string>,
 ): string | undefined {
   if ("url" in node) {
     return node.url;
@@ -128,7 +136,10 @@ function resolveRawLinkTarget(
 
 // Map a GFM table into headers + rows keyed by header text. Cells missing from a short row default
 // to "" so column-based rules (TBL-*, custom columnNotEmpty) never index past the row.
-function extractTable(node: Table, section: string | undefined): ParsedTable | undefined {
+function extractTable(
+  node: Table,
+  section: string | undefined,
+): ParsedTable | undefined {
   const [headerRow, ...bodyRows] = node.children as TableRow[];
 
   if (headerRow === undefined) {
@@ -152,7 +163,7 @@ function extractTable(node: Table, section: string | undefined): ParsedTable | u
     headers,
     rows,
     section,
-    line: node.position?.start.line ?? 0
+    line: node.position?.start.line ?? 0,
   };
 }
 
@@ -161,7 +172,7 @@ function extractTable(node: Table, section: string | undefined): ParsedTable | u
 // by its children's text.
 function extractCheckItem(
   node: ListItem,
-  section: string | undefined
+  section: string | undefined,
 ): ParsedCheckItem | undefined {
   if (node.checked === null || node.checked === undefined) {
     return undefined;
@@ -177,7 +188,7 @@ function extractCheckItem(
     text,
     checked: node.checked,
     section,
-    line: node.position?.start.line ?? 0
+    line: node.position?.start.line ?? 0,
   };
 }
 
@@ -202,12 +213,14 @@ function parseDirective(node: Html): InlineDirective | undefined {
   return {
     kind: directiveMatch[1] as InlineDirectiveKind,
     ruleIds,
-    line: node.position?.start.line ?? 0
+    line: node.position?.start.line ?? 0,
   };
 }
 
 function extractImports(node: Text): ParsedImport[] {
   const imports: ParsedImport[] = [];
+  const nodeStartLine = node.position?.start.line ?? 0;
+  const nodeStartColumn = node.position?.start.column ?? 1;
 
   for (const match of node.value.matchAll(IMPORT_PATTERN)) {
     const rawTarget = match.groups?.target;
@@ -216,15 +229,27 @@ function extractImports(node: Text): ParsedImport[] {
       continue;
     }
 
-    // The match may start with a boundary char (space/paren); locate the `@` to report its column.
+    // The match may start with a boundary char (space/paren); locate the `@`'s offset within
+    // node.value so position tracking anchors on the `@` itself, not the leading boundary.
     const matchIndex = match.index ?? 0;
     const atOffset = match[0].lastIndexOf(`@${rawTarget}`);
-    const startColumn = (node.position?.start.column ?? 1) + matchIndex + atOffset;
+    const atCharIndex = matchIndex + atOffset;
+
+    // remark packs consecutive non-blank lines into one `text` node, so a later-line import must not
+    // inherit the node's start line (audit M-1). Derive the position from node.value alone: newlines
+    // before the `@` give the line delta, and the offset from the start of the `@`'s own physical
+    // line gives the column. Column is measured within node.value, which remark reports 1:1 for
+    // ordinary paragraphs; container-prefix/entity-decoded columns are out of scope for P9.01.
+    const lineDelta = findLineNumber(node.value, atCharIndex) - 1;
+    const lastNewlineIndex = node.value.lastIndexOf("\n", atCharIndex - 1);
 
     imports.push({
       rawTarget: `@${rawTarget}`,
-      line: node.position?.start.line ?? 0,
-      column: startColumn
+      line: nodeStartLine + lineDelta,
+      column:
+        lastNewlineIndex === -1
+          ? nodeStartColumn + atCharIndex
+          : atCharIndex - lastNewlineIndex,
     });
   }
 
@@ -238,7 +263,10 @@ function extractImports(node: Text): ParsedImport[] {
  * updates `currentSection` before any block that follows it, so each table/check-item records the
  * most-recent heading above it regardless of level (audit 5.3).
  */
-export function parseDocument(params: { path: string; content: string }): ParsedDocument {
+export function parseDocument(params: {
+  path: string;
+  content: string;
+}): ParsedDocument {
   const tree = markdownProcessor.parse(params.content) as Root;
   const definitions = getReferenceDefinitions(tree);
   const slugger = new GithubSlugger();
@@ -265,7 +293,7 @@ export function parseDocument(params: { path: string; content: string }): Parsed
           text,
           depth: heading.depth,
           slug: slugger.slug(text),
-          line: heading.position?.start.line ?? 0
+          line: heading.position?.start.line ?? 0,
         });
         return;
       }
@@ -298,7 +326,7 @@ export function parseDocument(params: { path: string; content: string }): Parsed
           anchor: classified.anchor,
           kind: classified.kind,
           line: linkNode.position?.start.line ?? 0,
-          column: linkNode.position?.start.column
+          column: linkNode.position?.start.column,
         });
         return;
       }
@@ -338,6 +366,6 @@ export function parseDocument(params: { path: string; content: string }): Parsed
     images,
     imports,
     directives,
-    content: params.content
+    content: params.content,
   };
 }

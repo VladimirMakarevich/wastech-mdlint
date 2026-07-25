@@ -18,5 +18,7 @@ wastech-mdlint lint . --fail-on warning
 ```
 
 **You get:** a `wastech-mdlint.config.json` with a local `$schema` and rationale comments, plus a
-CI-ready lint step. `init` writes nothing on install — configuration is always explicit. See
+CI-ready lint step. The dropped workflow installs and runs the CLI via npm regardless of the
+project's package manager — it only fetches the external tool, never your repo's dependencies, so
+it needs no lockfile. `init` writes nothing on install — configuration is always explicit. See
 [`init`](../cli.md#init) and [Output → exit codes](../output.md#exit-codes).

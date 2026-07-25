@@ -4,7 +4,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["dist/**", "coverage/**", ".vitest/**", "packages/**/dist/**"]
+    ignores: ["dist/**", "coverage/**", ".vitest/**", "packages/**/dist/**"],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -13,15 +13,15 @@ export default tseslint.config(
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
-      globals: globals.node
-    }
+      globals: globals.node,
+    },
   },
   {
     files: ["**/*.{js,mjs,cjs}"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
-      globals: globals.node
-    }
-  }
+      globals: globals.node,
+    },
+  },
 );

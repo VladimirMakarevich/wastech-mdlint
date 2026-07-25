@@ -16,17 +16,17 @@ new algorithms. See the [rules requirements](../requirements/02-rules-engine.md)
 
 ## Tasks
 
-| # | Task | Rules | Depends on |
-| --- | --- | --- | --- |
-| [P3.01](01-shared-rule-utils.md) | Shared rule utils | glob-match, find-line-number, extract-section-body, regex-string, site-router | P2 done |
-| [P3.02](02-tbl-rules.md) | Table rules | TBL-001…006 | P3.01 |
-| [P3.03](03-sec-str-rules.md) | Section + structure rules | SEC-001/002/003, STR-001 | P3.01 |
-| [P3.04](04-ref-rules.md) | Reference rules | REF-001…006 | P3.01 |
-| [P3.05](05-chk-ctx-rules.md) | Content quality | CTX-001/002/003 | P3.01 |
-| [P3.06](06-grp-rules.md) | Graph integrity | GRP-001/002/003 | P3.01 |
-| [P3.07](07-llm-rules.md) | LLM rules ([D3](../index.md)) | SIZE-001, LLM-001 | P2.07 |
-| [P3.08](08-custom-rule.md) | Declarative `custom` rule | `custom` | P3.02–P3.06 |
-| [P3.09](09-rule-tests-and-cutover.md) | Tests, README table, schema sync, `scan→lint` cutover | — | all above |
+| #                                     | Task                                                  | Rules                                                                         | Depends on  |
+| ------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------- | ----------- |
+| [P3.01](01-shared-rule-utils.md)      | Shared rule utils                                     | glob-match, find-line-number, extract-section-body, regex-string, site-router | P2 done     |
+| [P3.02](02-tbl-rules.md)              | Table rules                                           | TBL-001…006                                                                   | P3.01       |
+| [P3.03](03-sec-str-rules.md)          | Section + structure rules                             | SEC-001/002/003, STR-001                                                      | P3.01       |
+| [P3.04](04-ref-rules.md)              | Reference rules                                       | REF-001…006                                                                   | P3.01       |
+| [P3.05](05-chk-ctx-rules.md)          | Content quality                                       | CTX-001/002/003                                                               | P3.01       |
+| [P3.06](06-grp-rules.md)              | Graph integrity                                       | GRP-001/002/003                                                               | P3.01       |
+| [P3.07](07-llm-rules.md)              | LLM rules ([D3](../index.md))                         | SIZE-001, LLM-001                                                             | P2.07       |
+| [P3.08](08-custom-rule.md)            | Declarative `custom` rule                             | `custom`                                                                      | P3.02–P3.06 |
+| [P3.09](09-rule-tests-and-cutover.md) | Tests, README table, schema sync, `scan→lint` cutover | —                                                                             | all above   |
 
 ## Sequence
 

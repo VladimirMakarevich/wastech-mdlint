@@ -26,7 +26,7 @@ export async function loadContext(params: {
   const loaded = await loadDocuments(params.config.include ?? ["**/*.md"], {
     cwd: rootDir,
     exclude: params.config.exclude,
-    respectGitignore: params.config.respectGitignore
+    respectGitignore: params.config.respectGitignore,
   });
 
   // Re-key the loader's absolute-path map to repo-relative POSIX paths — the identity rules and the
@@ -38,7 +38,7 @@ export async function loadContext(params: {
 
   const graph = buildContextGraph(documents, {
     siteRouter: params.settings.siteRouter,
-    idRef: params.settings.idRef
+    idRef: params.settings.idRef,
   });
 
   return { documents, graph };

@@ -23,14 +23,18 @@ export const sec001: RuleDefinition = defineRule({
     description: "Required sections are present.",
     defaultSeverity: "error",
     scope: "document",
-    fixable: true
+    fixable: true,
   },
-  optionsSchema: z.object({ sections: z.array(z.string().min(1)).min(1), ...fileScopeShape }).strict(),
+  optionsSchema: z
+    .object({ sections: z.array(z.string().min(1)).min(1), ...fileScopeShape })
+    .strict(),
   check: (options) => (context) => {
     if (!matchesFileScope(context.filePath!, options)) {
       return;
     }
-    for (const finding of sectionPresent(context.document!, { sections: options.sections })) {
+    for (const finding of sectionPresent(context.document!, {
+      sections: options.sections,
+    })) {
       context.report({ ...finding, fixable: true, helpUri: "SEC-001" });
     }
   },
@@ -39,17 +43,23 @@ export const sec001: RuleDefinition = defineRule({
     if (!matchesFileScope(context.filePath!, options)) {
       return [];
     }
-    const missing = sectionPresent(document, { sections: options.sections }).map(
-      (finding) => finding.data?.section as string
-    );
+    const missing = sectionPresent(document, {
+      sections: options.sections,
+    }).map((finding) => finding.data?.section as string);
     if (missing.length === 0) {
       return [];
     }
     // Append a scaffold section (with a TODO body) per missing heading at end of file.
-    const scaffold = missing.map((section) => `\n## ${section}\n\nTODO\n`).join("");
-    const edit: TextEdit = { start: document.content.length, end: document.content.length, newText: scaffold };
+    const scaffold = missing
+      .map((section) => `\n## ${section}\n\nTODO\n`)
+      .join("");
+    const edit: TextEdit = {
+      start: document.content.length,
+      end: document.content.length,
+      newText: scaffold,
+    };
     return [edit];
-  }
+  },
 });
 
 // SEC-002 — sections appear in order. Reordering is a judgment call, so not auto-fixable.
@@ -60,14 +70,14 @@ export const sec002: RuleDefinition = defineRule({
     description: "Sections appear in the required order.",
     defaultSeverity: "error",
     scope: "document",
-    fixable: false
+    fixable: false,
   },
   optionsSchema: z
     .object({
       order: z.array(z.string().min(1)).min(1),
       level: z.number().int().positive().optional(),
       section: z.string().optional(),
-      ...fileScopeShape
+      ...fileScopeShape,
     })
     .strict(),
   check: (options) => (context) => {
@@ -77,11 +87,11 @@ export const sec002: RuleDefinition = defineRule({
     for (const finding of sectionOrder(context.document!, {
       order: options.order,
       level: options.level,
-      section: options.section
+      section: options.section,
     })) {
       context.report({ ...finding, helpUri: "SEC-002" });
     }
-  }
+  },
 });
 
 // Load the template document from the corpus, or parse it on demand from disk; undefined if it is
@@ -89,7 +99,7 @@ export const sec002: RuleDefinition = defineRule({
 function loadTemplate(
   documents: Map<string, ParsedDocument>,
   rootDir: string,
-  templatePath: string
+  templatePath: string,
 ): ParsedDocument | undefined {
   const fromCorpus = documents.get(templatePath);
   if (fromCorpus !== undefined) {
@@ -109,16 +119,25 @@ export const sec003: RuleDefinition = defineRule({
   metadata: {
     id: "SEC-003",
     category: "SEC",
-    description: "Sections conform to a reference template's heading structure.",
+    description:
+      "Sections conform to a reference template's heading structure.",
     defaultSeverity: "error",
     scope: "project",
-    fixable: false
+    fixable: false,
   },
   optionsSchema: z
-    .object({ template: z.string().min(1), level: z.number().int().positive().optional(), ...fileScopeShape })
+    .object({
+      template: z.string().min(1),
+      level: z.number().int().positive().optional(),
+      ...fileScopeShape,
+    })
     .strict(),
   check: (options) => (context) => {
-    const template = loadTemplate(context.documents!, context.rootDir!, options.template);
+    const template = loadTemplate(
+      context.documents!,
+      context.rootDir!,
+      options.template,
+    );
 
     if (template === undefined) {
       // Missing template ⇒ one config-attributed error, then skip (no false positives).
@@ -126,7 +145,7 @@ export const sec003: RuleDefinition = defineRule({
         message: `SEC-003 template "${options.template}" was not found; skipping conformance checks.`,
         line: 0,
         filePath: options.template,
-        data: { template: options.template }
+        data: { template: options.template },
       });
       return;
     }
@@ -138,13 +157,19 @@ export const sec003: RuleDefinition = defineRule({
     const requiredHeadings = [
       ...new Set(
         template.headings
-          .filter((heading) => options.level === undefined || heading.depth === options.level)
-          .map((heading) => heading.text)
-      )
+          .filter(
+            (heading) =>
+              options.level === undefined || heading.depth === options.level,
+          )
+          .map((heading) => heading.text),
+      ),
     ];
 
     for (const [filePath, document] of context.documents!) {
-      if (filePath === options.template || !matchesFileScope(filePath, options)) {
+      if (
+        filePath === options.template ||
+        !matchesFileScope(filePath, options)
+      ) {
         continue;
       }
       const present = new Set(document.sections);
@@ -154,12 +179,12 @@ export const sec003: RuleDefinition = defineRule({
             message: `Section "${heading}" required by template ${options.template} is missing.`,
             line: 0,
             filePath,
-            data: { section: heading, template: options.template }
+            data: { section: heading, template: options.template },
           });
         }
       }
     }
-  }
+  },
 });
 
 // STR-001 — required files exist in the project (project). `files` here is the *required* set (each
@@ -171,23 +196,32 @@ export const str001: RuleDefinition = defineRule({
     description: "Required files exist in the project.",
     defaultSeverity: "error",
     scope: "project",
-    fixable: false
+    fixable: false,
   },
-  optionsSchema: z.object({ files: z.array(z.string().min(1)).min(1) }).strict(),
+  optionsSchema: z
+    .object({ files: z.array(z.string().min(1)).min(1) })
+    .strict(),
   check: (options) => (context) => {
     const corpus = context.projectFiles ?? [];
     for (const required of options.files) {
-      const satisfied = corpus.some((filePath) => matchesConfigGlob(filePath, [required]));
+      const satisfied = corpus.some((filePath) =>
+        matchesConfigGlob(filePath, [required]),
+      );
       if (!satisfied) {
         context.report({
           message: `Required file "${required}" is missing from the project.`,
           line: 0,
           filePath: required,
-          data: { required }
+          data: { required },
         });
       }
     }
-  }
+  },
 });
 
-export const SEC_STR_RULES: readonly RuleDefinition[] = [sec001, sec002, sec003, str001];
+export const SEC_STR_RULES: readonly RuleDefinition[] = [
+  sec001,
+  sec002,
+  sec003,
+  str001,
+];

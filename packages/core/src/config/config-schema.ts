@@ -12,7 +12,7 @@ const siteRouterSchema = z
   .object({
     preset: z.string().optional(),
     contentDir: z.string().optional(),
-    defaultLocale: z.string().optional()
+    defaultLocale: z.string().optional(),
   })
   .strict();
 
@@ -23,11 +23,16 @@ const idRefSchema = z
   .object({
     idPattern: regexStringSchema,
     definitions: z.array(z.string()).min(1),
-    idColumn: z.string().min(1)
+    idColumn: z.string().min(1),
   })
   .strict();
 
-const settingsSchema = z.object({ siteRouter: siteRouterSchema.optional(), idRef: idRefSchema.optional() }).strict();
+const settingsSchema = z
+  .object({
+    siteRouter: siteRouterSchema.optional(),
+    idRef: idRefSchema.optional(),
+  })
+  .strict();
 
 // Mirrors `synthesize.ts`'s structurally-equal `CompileCommandPreset` as a standalone enum schema
 // (same pattern as `severityOverrideSchema` vs `engine/types.ts`'s `SeverityOverride`) so config
@@ -38,7 +43,7 @@ export const compileCommandPresetSchema = z.enum(["claude", "generic", "none"]);
 const compileSkillSchema = z
   .object({
     name: z.string().min(1),
-    description: z.string().min(1)
+    description: z.string().min(1),
   })
   .strict();
 
@@ -47,7 +52,7 @@ const compileSectionsSchema = z
     architecture: z.boolean().optional(),
     rules: z.boolean().optional(),
     dependencies: z.boolean().optional(),
-    workflow: z.boolean().optional()
+    workflow: z.boolean().optional(),
   })
   .strict();
 
@@ -60,7 +65,7 @@ export const compileConfigSchema = z
     skill: compileSkillSchema,
     sections: compileSectionsSchema.optional(),
     commandPreset: compileCommandPresetSchema.optional(),
-    hubMinInDegree: z.number().int().min(1).optional()
+    hubMinInDegree: z.number().int().min(1).optional(),
   })
   .strict();
 
@@ -71,7 +76,7 @@ export const ruleEntrySchema = z
   .object({
     rule: z.string().min(1),
     severity: severityOverrideSchema.optional(),
-    options: z.unknown().optional()
+    options: z.unknown().optional(),
   })
   .strict();
 
@@ -88,15 +93,18 @@ export const customRuleEntrySchema = z
       .object({
         files: z.array(z.string()).optional(),
         exclude: z.array(z.string()).optional(),
-        assert: assertionSchema
+        assert: assertionSchema,
       })
-      .strict()
+      .strict(),
   })
   .strict();
 
 // Custom entries (rule: "custom") match the custom schema; everything else is a standard entry.
 // Ordered custom-first so a custom entry's extra keys aren't rejected by the strict standard schema.
-export const ruleEntryUnionSchema = z.union([customRuleEntrySchema, ruleEntrySchema]);
+export const ruleEntryUnionSchema = z.union([
+  customRuleEntrySchema,
+  ruleEntrySchema,
+]);
 
 export const lintConfigSchema = z
   .object({
@@ -107,7 +115,7 @@ export const lintConfigSchema = z
     settings: settingsSchema.optional(),
     // Optional so a minimal config lints nothing rather than erroring; init (P6) writes a real set.
     rules: z.array(ruleEntryUnionSchema).optional(),
-    compile: compileConfigSchema.optional()
+    compile: compileConfigSchema.optional(),
   })
   .strict();
 

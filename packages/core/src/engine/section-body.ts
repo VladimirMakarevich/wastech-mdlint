@@ -7,7 +7,7 @@ import type { ParsedHeading } from "../markdown/document-types.js";
 export function extractSectionBody(
   content: string,
   headings: ParsedHeading[],
-  heading: ParsedHeading
+  heading: ParsedHeading,
 ): string {
   const lines = content.split("\n");
 

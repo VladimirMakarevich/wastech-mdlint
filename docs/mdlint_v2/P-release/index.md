@@ -21,13 +21,13 @@ is needed
 
 ## Tasks
 
-| # | Task | Size | Depends on |
-| --- | --- | --- | --- |
-| [PR.01](01-package-metadata.md) | Finalize per-package publish metadata + supply chain | M | P7, P8 |
-| [PR.02](02-single-tag-release.md) | Single-tag release automation (npm + skills) | M | PR.01 |
-| [PR.03](03-github-action.md) | First-class GitHub Action / reusable CI workflow | M | PR.01 |
-| [PR.04](04-docs-readme.md) | README rewrite (3 install paths) + generated docs + AGENTS.md | M | PR.01 |
-| [PR.05](05-release-verification.md) | Release dry-run & launch verification | M | PR.02–PR.04 |
+| #                                   | Task                                                          | Size | Depends on  |
+| ----------------------------------- | ------------------------------------------------------------- | ---- | ----------- |
+| [PR.01](01-package-metadata.md)     | Finalize per-package publish metadata + supply chain          | M    | P7, P8      |
+| [PR.02](02-single-tag-release.md)   | Single-tag release automation (npm + skills)                  | M    | PR.01       |
+| [PR.03](03-github-action.md)        | First-class GitHub Action / reusable CI workflow              | M    | PR.01       |
+| [PR.04](04-docs-readme.md)          | README rewrite (3 install paths) + generated docs + AGENTS.md | M    | PR.01       |
+| [PR.05](05-release-verification.md) | Release dry-run & launch verification                         | M    | PR.02–PR.04 |
 
 ## Sequence
 

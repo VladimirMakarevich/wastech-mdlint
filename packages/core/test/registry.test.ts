@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { defineRule, RuleRegistry, RuleResolutionError } from "../src/engine/registry.js";
+import {
+  defineRule,
+  RuleRegistry,
+  RuleResolutionError,
+} from "../src/engine/registry.js";
 
 const refRule = defineRule({
   metadata: {
@@ -10,10 +14,10 @@ const refRule = defineRule({
     description: "relative links resolve",
     defaultSeverity: "error",
     scope: "document",
-    fixable: false
+    fixable: false,
   },
   optionsSchema: z.object({ exclude: z.array(z.string()).optional() }).strict(),
-  check: () => () => {}
+  check: () => () => {},
 });
 
 const sizeRule = defineRule({
@@ -23,10 +27,10 @@ const sizeRule = defineRule({
     description: "file size budget",
     defaultSeverity: "warning",
     scope: "document",
-    fixable: false
+    fixable: false,
   },
   optionsSchema: z.object({ maxBytes: z.number().int().positive() }).strict(),
-  check: () => () => {}
+  check: () => () => {},
 });
 
 const registry = new RuleRegistry([refRule, sizeRule]);
@@ -63,7 +67,9 @@ describe("RuleRegistry.resolveRule", () => {
   });
 
   it("rejects unknown option keys (strict schema, C7)", () => {
-    expect(() => registry.resolveRule("REF-001", { nope: true })).toThrow(RuleResolutionError);
+    expect(() => registry.resolveRule("REF-001", { nope: true })).toThrow(
+      RuleResolutionError,
+    );
   });
 });
 
@@ -73,10 +79,15 @@ describe("RuleRegistry metadata", () => {
   });
 
   it("returns metadata sorted by canonical id", () => {
-    expect(registry.getAllMetadata().map((metadata) => metadata.id)).toEqual(["REF-001", "SIZE-001"]);
+    expect(registry.getAllMetadata().map((metadata) => metadata.id)).toEqual([
+      "REF-001",
+      "SIZE-001",
+    ]);
   });
 
   it("rejects duplicate rule ids at construction", () => {
-    expect(() => new RuleRegistry([refRule, refRule])).toThrow(/Duplicate rule id/);
+    expect(() => new RuleRegistry([refRule, refRule])).toThrow(
+      /Duplicate rule id/,
+    );
   });
 });

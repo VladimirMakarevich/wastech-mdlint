@@ -7,9 +7,12 @@
 ```jsonc
 {
   "rules": [
-    { "rule": "GRP-001" },                                            // no cycles
-    { "rule": "GRP-002", "options": { "entryPoints": ["README.md", "docs/index.md"] } }
-  ]
+    { "rule": "GRP-001" }, // no cycles
+    {
+      "rule": "GRP-002",
+      "options": { "entryPoints": ["README.md", "docs/index.md"] },
+    },
+  ],
 }
 ```
 

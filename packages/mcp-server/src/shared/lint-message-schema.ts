@@ -15,5 +15,5 @@ export const lintMessageSchema = z.object({
   endLine: z.number().optional(),
   fixable: z.boolean().optional(),
   data: z.record(z.string(), z.unknown()).optional(),
-  helpUri: z.string().optional()
+  helpUri: z.string().optional(),
 });

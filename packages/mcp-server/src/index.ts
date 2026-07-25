@@ -31,7 +31,7 @@ async function readPackageVersion(): Promise<string> {
 export async function createServer(): Promise<McpServer> {
   const server = new McpServer({
     name: "wastech-mdlint-mcp",
-    version: await readPackageVersion()
+    version: await readPackageVersion(),
   });
 
   registerTools(server);

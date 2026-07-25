@@ -5,7 +5,7 @@ import {
   classifyImpact,
   getImpactSet,
   ImpactAnalysisError,
-  relativizeImpact
+  relativizeImpact,
 } from "../src/graph/impact-analysis.js";
 import type { ParsedDocument } from "../src/markdown/document-types.js";
 import { parseDocument } from "../src/markdown/parse-document.js";
@@ -27,20 +27,22 @@ describe("getImpactSet", () => {
       "a.md": "[b](b.md)\n",
       "b.md": "[c](c.md)\n",
       "c.md": "[d](d.md)\n",
-      "d.md": "# D\n"
+      "d.md": "# D\n",
     });
 
     expect(getImpactSet(graph, "d.md")).toEqual([
       { path: "a.md", depth: 3, via: "b.md" },
       { path: "b.md", depth: 2, via: "c.md" },
-      { path: "c.md", depth: 1, via: "d.md" }
+      { path: "c.md", depth: 1, via: "d.md" },
     ]);
   });
 
   it("normalizes a './'-prefixed path before resolving", () => {
     const graph = graphOf({ "a.md": "[b](b.md)\n", "b.md": "# B\n" });
 
-    expect(getImpactSet(graph, "./b.md")).toEqual([{ path: "a.md", depth: 1, via: "b.md" }]);
+    expect(getImpactSet(graph, "./b.md")).toEqual([
+      { path: "a.md", depth: 1, via: "b.md" },
+    ]);
   });
 });
 
@@ -50,7 +52,7 @@ describe("classifyImpact · linear chain", () => {
       "a.md": "[b](b.md)\n",
       "b.md": "[c](c.md)\n",
       "c.md": "[d](d.md)\n",
-      "d.md": "# D\n"
+      "d.md": "# D\n",
     });
 
     expect(classifyImpact(graph, "d.md")).toEqual({
@@ -58,10 +60,10 @@ describe("classifyImpact · linear chain", () => {
       directlyAffected: [{ path: "c.md", references: 1 }],
       transitivelyAffected: [
         { path: "a.md", depth: 3, via: "b.md" },
-        { path: "b.md", depth: 2, via: "c.md" }
+        { path: "b.md", depth: 2, via: "c.md" },
       ],
       readingOrder: ["a.md", "b.md", "c.md", "d.md"],
-      excluded: []
+      excluded: [],
     });
   });
 });
@@ -79,9 +81,14 @@ describe("classifyImpact · reading order is topological, not lexical", () => {
 
 describe("classifyImpact · reference multiplicity", () => {
   it("counts two links from the same file as two references", () => {
-    const graph = graphOf({ "a.md": "[one](b.md)\n[two](b.md)\n", "b.md": "# B\n" });
+    const graph = graphOf({
+      "a.md": "[one](b.md)\n[two](b.md)\n",
+      "b.md": "# B\n",
+    });
 
-    expect(classifyImpact(graph, "b.md").directlyAffected).toEqual([{ path: "a.md", references: 2 }]);
+    expect(classifyImpact(graph, "b.md").directlyAffected).toEqual([
+      { path: "a.md", references: 2 },
+    ]);
   });
 });
 
@@ -91,16 +98,18 @@ describe("classifyImpact · diamond", () => {
       "a.md": "[b](b.md)\n[c](c.md)\n",
       "b.md": "[d](d.md)\n",
       "c.md": "[d](d.md)\n",
-      "d.md": "# D\n"
+      "d.md": "# D\n",
     });
 
     const result = classifyImpact(graph, "d.md");
     expect(result.directlyAffected).toEqual([
       { path: "b.md", references: 1 },
-      { path: "c.md", references: 1 }
+      { path: "c.md", references: 1 },
     ]);
     // Deterministic via: the smallest predecessor (b.md) at the minimal depth claims a.md.
-    expect(result.transitivelyAffected).toEqual([{ path: "a.md", depth: 2, via: "b.md" }]);
+    expect(result.transitivelyAffected).toEqual([
+      { path: "a.md", depth: 2, via: "b.md" },
+    ]);
   });
 });
 
@@ -109,13 +118,13 @@ describe("classifyImpact · cycle safety", () => {
     const graph = graphOf({
       "a.md": "[b](b.md)\n[c](c.md)\n",
       "b.md": "[a](a.md)\n[c](c.md)\n",
-      "c.md": "# C\n"
+      "c.md": "# C\n",
     });
 
     const result = classifyImpact(graph, "c.md");
     expect(result.directlyAffected).toEqual([
       { path: "a.md", references: 1 },
-      { path: "b.md", references: 1 }
+      { path: "b.md", references: 1 },
     ]);
     expect(result.transitivelyAffected).toEqual([]);
     // a<->b is a cycle, so Kahn's never drains their in-degree to zero: nothing in the affected
@@ -129,7 +138,9 @@ describe("classifyImpact · out-of-corpus input", () => {
   it("throws ImpactAnalysisError with an actionable hint", () => {
     const graph = graphOf({ "a.md": "# A\n" });
 
-    expect(() => classifyImpact(graph, "missing.md")).toThrow(ImpactAnalysisError);
+    expect(() => classifyImpact(graph, "missing.md")).toThrow(
+      ImpactAnalysisError,
+    );
     try {
       classifyImpact(graph, "missing.md");
       expect.unreachable("should have thrown");
@@ -149,7 +160,7 @@ describe("relativizeImpact", () => {
       "docs/a.md": "[b](b.md)\n",
       "docs/b.md": "[c](c.md)\n",
       "docs/c.md": "[d](d.md)\n",
-      "docs/d.md": "# D\n"
+      "docs/d.md": "# D\n",
     });
 
     const impact = classifyImpact(graph, "docs/d.md");
@@ -158,10 +169,10 @@ describe("relativizeImpact", () => {
       directlyAffected: [{ path: "c.md", references: 1 }],
       transitivelyAffected: [
         { path: "a.md", depth: 3, via: "b.md" },
-        { path: "b.md", depth: 2, via: "c.md" }
+        { path: "b.md", depth: 2, via: "c.md" },
       ],
       readingOrder: ["a.md", "b.md", "c.md", "d.md"],
-      excluded: []
+      excluded: [],
     });
   });
 
@@ -177,6 +188,9 @@ describe("relativizeImpact", () => {
 
     const impact = classifyImpact(graph, "docs/a.md");
     // Alphabetical would flip this to ["a.md", "z.md"]; relativize must only map, not re-sort.
-    expect(relativizeImpact(impact, "docs").readingOrder).toEqual(["z.md", "a.md"]);
+    expect(relativizeImpact(impact, "docs").readingOrder).toEqual([
+      "z.md",
+      "a.md",
+    ]);
   });
 });

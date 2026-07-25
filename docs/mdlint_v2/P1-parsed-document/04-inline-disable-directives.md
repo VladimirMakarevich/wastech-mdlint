@@ -7,7 +7,7 @@
 
 Capture inline suppression directives written as HTML comments, with positions and target
 rule IDs, so the rule engine ([P2](../index.md)) can suppress findings precisely. The parser
-only *extracts* them; the engine *applies* them.
+only _extracts_ them; the engine _applies_ them.
 
 ## Sequence
 
@@ -31,6 +31,7 @@ only *extracts* them; the engine *applies* them.
    - `<!-- wastech-mdlint-disable-next-line [RULE-ID, RULE-ID…] -->`
 
    A directive with **no rule IDs applies to all rules**.
+
 2. Emit `directives: { kind: "disable" | "enable" | "disable-next-line", ruleIds, line }[]` on
    `ParsedDocument` (`ruleIds` empty ⇒ all rules).
 3. Normalize rule IDs to canonical form ([C3](../requirements/01-configuration.md):

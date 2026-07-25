@@ -1,7 +1,7 @@
 # P9.01 · Fix line/column for multi-line `@import` blocks
 
 > Phase: [P9 — Post-audit remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** ·
-> Status **Not started**. Audit finding **M-1** ([report](../audit-2026-07-23-p0-p8.md)).
+> Status **Done**. Audit finding **M-1** ([report](../audit-2026-07-23-p0-p8.md)).
 
 ## Goal
 
@@ -35,8 +35,18 @@ point at the wrong location.
 3. **Regression test** in `parse-document.test.ts`: a multi-line `@import` block asserting each
    import's `line` and `column` (single-line imports already covered at `:145-159`).
 
+## Out of scope
+
+Columns for imports on **continuation lines inside a container** (list item / blockquote) or
+after **decoded character references** are not corrected here. remark strips container prefixes
+and decodes entities in `Text.value`, so mapping a value offset back to a raw source column needs
+a full source remapper — which is broader than this S task and was the source of repeated edge-case
+regressions (astral/named entities, adjacent references, backslash escapes) during implementation.
+The `line` is still correct for these cases; only the `column` inherits the continuation line's
+node-relative offset. Split raw-source column remapping into its own task if it is ever needed.
+
 ## Exit criteria
 
-- [ ] Each import in a multi-line block reports its own correct `line`/`column`.
-- [ ] New multi-line-block test fails on the old code and passes on the fix.
-- [ ] `npm run typecheck && npm test` green.
+- [x] Each import in a multi-line block reports its own correct `line`/`column`.
+- [x] New multi-line-block test fails on the old code and passes on the fix.
+- [x] `npm run typecheck && npm test` green.

@@ -2,6 +2,10 @@
   "include": ["**/*.md"],
   "rules": [],
   "settings": {
-    "idRef": { "idPattern": "^REQ-\\d+$", "definitions": ["requirements.md"], "idColumn": "ID" }
+    "idRef": {
+      "idPattern": "^REQ-\\d+$",
+      "definitions": ["requirements.md"],
+      "idColumn": "ID"
+    }
   }
 }

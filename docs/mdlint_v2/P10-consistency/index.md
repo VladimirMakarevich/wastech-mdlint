@@ -5,7 +5,7 @@
 >
 > **Goal:** close the **documentation drift**, **contract-text**, and **test-guard** findings
 > from the [P0–P8 audit](../audit-2026-07-23-p0-p8.md), so governance docs, the glossary,
-> requirements, and the test suite describe the *current* product — before release.
+> requirements, and the test suite describe the _current_ product — before release.
 
 ## Why this phase exists
 
@@ -17,16 +17,16 @@ fixed the code; this phase brings the words and the guards back in line.
 
 ## Tasks
 
-| # | Task | Findings | Sev | Size | Depends on |
-| --- | --- | --- | --- | --- | --- |
-| [P10.01](01-governance-docs.md) | Fix governance docs (root `src/`/`test/`, post-P3.09 wording, typo) | M-7, L-4 | MEDIUM | S | P9 |
-| [P10.02](02-glossary-status.md) | Refresh glossary phase-status markers (P6–P8 shipped) | M-8 | MEDIUM | S | P9 |
-| [P10.03](03-stale-comments.md) | Clean stale source comments/notes | L-1, L-2 | LOW | S | P9 |
-| [P10.04](04-registry-inventory-guard.md) | Add a registry inventory guard test (24 IDs / 8 categories) | L-12 | LOW | S | P9 |
-| [P10.05](05-test-depth.md) | Deepen parser & per-rule tests | L-13, L-14 | LOW | M | P9 |
-| [P10.06](06-requirement-reconciliation.md) | Reconcile requirement/plan text | L-8, L-9, L-10 | LOW | S | P9 |
-| [P10.07](07-frontmatter-import-direction.md) | Decouple frontmatter-schema import direction | L-5 | LOW | S | P9 |
-| [P10.08](08-accepted-behaviors.md) | Document accepted behaviors & release-coupled checks | L-15, L-11 | LOW | S | P9 |
+| #                                            | Task                                                                | Findings       | Sev    | Size | Depends on |
+| -------------------------------------------- | ------------------------------------------------------------------- | -------------- | ------ | ---- | ---------- |
+| [P10.01](01-governance-docs.md)              | Fix governance docs (root `src/`/`test/`, post-P3.09 wording, typo) | M-7, L-4       | MEDIUM | S    | P9         |
+| [P10.02](02-glossary-status.md)              | Refresh glossary phase-status markers (P6–P8 shipped)               | M-8            | MEDIUM | S    | P9         |
+| [P10.03](03-stale-comments.md)               | Clean stale source comments/notes                                   | L-1, L-2       | LOW    | S    | P9         |
+| [P10.04](04-registry-inventory-guard.md)     | Add a registry inventory guard test (24 IDs / 8 categories)         | L-12           | LOW    | S    | P9         |
+| [P10.05](05-test-depth.md)                   | Deepen parser & per-rule tests                                      | L-13, L-14     | LOW    | M    | P9         |
+| [P10.06](06-requirement-reconciliation.md)   | Reconcile requirement/plan text                                     | L-8, L-9, L-10 | LOW    | S    | P9         |
+| [P10.07](07-frontmatter-import-direction.md) | Decouple frontmatter-schema import direction                        | L-5            | LOW    | S    | P9         |
+| [P10.08](08-accepted-behaviors.md)           | Document accepted behaviors & release-coupled checks                | L-15, L-11     | LOW    | S    | P9         |
 
 ## Sequence
 

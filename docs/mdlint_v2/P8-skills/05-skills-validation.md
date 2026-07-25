@@ -55,8 +55,8 @@ drift would this miss?", and the answer shaped every choice below.
 - **Strictness the schema alone would not catch.** Because the reader builds a plain object, several
   malformed-but-plausible files could slip past a naive parse, so each is rejected explicitly:
   duplicate keys (YAML would reject; a plain object lets the last win), an indented line after a
-  top-level key dedents out of `metadata:` (the map is only the *active* parent while its children
-  directly follow it), and a fence that merely *starts* with `---` (`----`, `--- extra`) — fences
+  top-level key dedents out of `metadata:` (the map is only the _active_ parent while its children
+  directly follow it), and a fence that merely _starts_ with `---` (`----`, `--- extra`) — fences
   are matched line-by-line and must equal `---`. CRLF input is normalized first so a Windows
   checkout validates.
 - **Host-neutrality (S7) rejects the general injection form.** The guard bans any non-image bang

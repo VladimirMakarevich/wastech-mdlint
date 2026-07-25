@@ -13,9 +13,14 @@ export function filePart(rawTarget: string): string {
 }
 
 // Resolve a relative target against the source file's directory → repo-relative POSIX path.
-export function resolveRelativeToSource(sourcePath: string, target: string): string {
+export function resolveRelativeToSource(
+  sourcePath: string,
+  target: string,
+): string {
   const sourceDir = path.posix.dirname(sourcePath);
-  return normalizeRelativePath(path.posix.normalize(path.posix.join(sourceDir, target)));
+  return normalizeRelativePath(
+    path.posix.normalize(path.posix.join(sourceDir, target)),
+  );
 }
 
 // True when a repo-relative path escapes the repository root (can't be resolved in-corpus).
@@ -24,7 +29,10 @@ export function escapesRoot(relPath: string): boolean {
 }
 
 // The locale segment of a source path under a router content dir (e.g. `.../docs/de/x.md` → "de").
-export function sourceLocale(sourcePath: string, router: SiteRouterSettings): string | undefined {
+export function sourceLocale(
+  sourcePath: string,
+  router: SiteRouterSettings,
+): string | undefined {
   const contentDir = router.contentDir ?? "src/content/docs";
   if (!sourcePath.startsWith(`${contentDir}/`)) {
     return undefined;
@@ -41,7 +49,7 @@ export function sourceLocale(sourcePath: string, router: SiteRouterSettings): st
 export function resolveTargetCandidates(
   sourcePath: string,
   targetFilePart: string,
-  siteRouter?: SiteRouterSettings
+  siteRouter?: SiteRouterSettings,
 ): string[] {
   if (targetFilePart.length === 0) {
     return [];
@@ -52,10 +60,16 @@ export function resolveTargetCandidates(
   }
 
   if (siteRouter !== undefined) {
-    return resolveRoutedUrl(targetFilePart, siteRouter, sourceLocale(sourcePath, siteRouter)).map((candidate) =>
-      normalizeRelativePath(candidate)
-    );
+    return resolveRoutedUrl(
+      targetFilePart,
+      siteRouter,
+      sourceLocale(sourcePath, siteRouter),
+    ).map((candidate) => normalizeRelativePath(candidate));
   }
 
-  return [normalizeRelativePath(path.posix.normalize(targetFilePart.replace(/^\/+/, "")))];
+  return [
+    normalizeRelativePath(
+      path.posix.normalize(targetFilePart.replace(/^\/+/, "")),
+    ),
+  ];
 }

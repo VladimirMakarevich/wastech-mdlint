@@ -1,4 +1,9 @@
-import { validateSkill, type SkillValidationIssue, type SkillValidationResult } from "./skill-model.js";
+import { compareStrings } from "../deterministic-sort.js";
+import {
+  validateSkill,
+  type SkillValidationIssue,
+  type SkillValidationResult,
+} from "./skill-model.js";
 
 // Read and validate a committed `skills/<id>/SKILL.md` for CI (P8.05). The repo deliberately ships
 // no YAML dependency — `synthesize` (P5.04) hand-renders frontmatter with the same posture — so this
@@ -30,7 +35,10 @@ function deriveId(repoRelativePath: string): string | null {
   return segments[segments.length - 2] ?? null;
 }
 
-export function parseStaticSkill(content: string, repoRelativePath: string): SkillValidationResult {
+export function parseStaticSkill(
+  content: string,
+  repoRelativePath: string,
+): SkillValidationResult {
   // Normalize CRLF/CR to LF before any fence detection or line splitting: a Windows checkout commits
   // `SKILL.md` with `\r\n` endings, and without this the LF-only fence/line logic below would reject
   // every otherwise-valid skill — defeating the cross-platform CI check this reader exists for.
@@ -41,11 +49,17 @@ export function parseStaticSkill(content: string, repoRelativePath: string): Ski
   // malformed terminators like `----` or `--- extra` as valid and let a broken file pass validation.
   const lines = normalized.split("\n");
   if (lines[0] !== "---") {
-    return makeIssue("frontmatter", "SKILL.md must begin with a '---' frontmatter fence");
+    return makeIssue(
+      "frontmatter",
+      "SKILL.md must begin with a '---' frontmatter fence",
+    );
   }
   const closingLine = lines.indexOf("---", 1);
   if (closingLine === -1) {
-    return makeIssue("frontmatter", "frontmatter fence is not terminated with a closing '---'");
+    return makeIssue(
+      "frontmatter",
+      "frontmatter fence is not terminated with a closing '---'",
+    );
   }
   const blockLines = lines.slice(1, closingLine);
 
@@ -69,7 +83,10 @@ export function parseStaticSkill(content: string, repoRelativePath: string): Ski
 
     const match = ENTRY_PATTERN.exec(rawLine);
     if (match === null) {
-      issues.push({ path: "frontmatter", message: `unparseable frontmatter line: ${rawLine}` });
+      issues.push({
+        path: "frontmatter",
+        message: `unparseable frontmatter line: ${rawLine}`,
+      });
       continue;
     }
 
@@ -78,7 +95,10 @@ export function parseStaticSkill(content: string, repoRelativePath: string): Ski
 
     if (indent === "") {
       if (seenTop.has(key!)) {
-        issues.push({ path: `frontmatter.${key}`, message: `duplicate frontmatter key '${key}'` });
+        issues.push({
+          path: `frontmatter.${key}`,
+          message: `duplicate frontmatter key '${key}'`,
+        });
         continue;
       }
       seenTop.add(key!);
@@ -103,11 +123,17 @@ export function parseStaticSkill(content: string, repoRelativePath: string): Ski
 
     if (indent === "  ") {
       if (activeMap === undefined) {
-        issues.push({ path: "frontmatter", message: `indented entry '${key}' has no open parent map` });
+        issues.push({
+          path: "frontmatter",
+          message: `indented entry '${key}' has no open parent map`,
+        });
         continue;
       }
       if (seenMeta.has(key!)) {
-        issues.push({ path: `frontmatter.metadata.${key}`, message: `duplicate metadata key '${key}'` });
+        issues.push({
+          path: `frontmatter.metadata.${key}`,
+          message: `duplicate metadata key '${key}'`,
+        });
         continue;
       }
       seenMeta.add(key!);
@@ -116,34 +142,53 @@ export function parseStaticSkill(content: string, repoRelativePath: string): Ski
       if (parsed.ok) {
         activeMap[key!] = parsed.value;
       } else {
-        issues.push({ path: `frontmatter.metadata.${key}`, message: parsed.message });
+        issues.push({
+          path: `frontmatter.metadata.${key}`,
+          message: parsed.message,
+        });
       }
       continue;
     }
 
-    issues.push({ path: "frontmatter", message: `unexpected indentation for '${key}'` });
+    issues.push({
+      path: "frontmatter",
+      message: `unexpected indentation for '${key}'`,
+    });
   }
 
   if (issues.length > 0) {
     // Sort so a multi-issue report is deterministic regardless of source line order, matching the
     // ordering `validateSkill` already applies to schema issues.
-    issues.sort((a, b) => a.path.localeCompare(b.path) || a.message.localeCompare(b.message));
+    issues.sort(
+      (a, b) =>
+        compareStrings(a.path, b.path) || compareStrings(a.message, b.message),
+    );
     return { ok: false, issues };
   }
 
   const id = deriveId(repoRelativePath);
   if (id === null) {
-    return makeIssue("path", "path must contain a skill directory segment (skills/<id>/SKILL.md)");
+    return makeIssue(
+      "path",
+      "path must contain a skill directory segment (skills/<id>/SKILL.md)",
+    );
   }
 
   // Delegate to the single schema-backed validator (strict unknown-key rejection + the
   // repository-relative POSIX-path invariant) so static and generated skills validate one way.
-  return validateSkill({ id, kind: "static", path: repoRelativePath, frontmatter });
+  return validateSkill({
+    id,
+    kind: "static",
+    path: repoRelativePath,
+    frontmatter,
+  });
 }
 
 // Scalars are authored as JSON double-quoted strings; `JSON.parse` both unquotes them and rejects the
 // bare/single-quoted forms our subset does not accept, turning any deviation into a reportable issue.
-function parseScalar(raw: string): { ok: true; value: unknown } | { ok: false; message: string } {
+function parseScalar(
+  raw: string,
+): { ok: true; value: unknown } | { ok: false; message: string } {
   if (raw === "") {
     return { ok: false, message: "expected a double-quoted value" };
   }

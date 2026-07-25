@@ -1,29 +1,46 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 
-import { matchesConfigGlob, normalizeRelativePath } from "../../discovery/globs.js";
-import type { ParsedDocument, ParsedLink } from "../../markdown/document-types.js";
-import { escapesRoot, filePart, resolveRelativeToSource, sourceLocale } from "../path-resolve.js";
+import {
+  matchesConfigGlob,
+  normalizeRelativePath,
+} from "../../discovery/globs.js";
+import type {
+  ParsedDocument,
+  ParsedLink,
+} from "../../markdown/document-types.js";
+import {
+  escapesRoot,
+  filePart,
+  resolveRelativeToSource,
+  sourceLocale,
+} from "../path-resolve.js";
 import { resolveRoutedUrl } from "../site-router.js";
 import type { SiteRouterSettings } from "../types.js";
 import type { PrimitiveContext, PrimitiveFinding } from "./types.js";
 
-type ReferenceContext = Pick<PrimitiveContext, "documents" | "rootDir" | "settings">;
+type ReferenceContext = Pick<
+  PrimitiveContext,
+  "documents" | "rootDir" | "settings"
+>;
 
 // A repo-relative target "resolves" if it is in the Markdown corpus or exists on disk (the latter
 // covers files outside `include`, e.g. images — audit P3 REF gap, avoids false positives).
-function targetResolves(
-  relPath: string,
-  context: ReferenceContext
-): boolean {
+function targetResolves(relPath: string, context: ReferenceContext): boolean {
   if (escapesRoot(relPath)) {
     return false;
   }
 
-  return context.documents.has(relPath) || existsSync(path.resolve(context.rootDir, relPath));
+  return (
+    context.documents.has(relPath) ||
+    existsSync(path.resolve(context.rootDir, relPath))
+  );
 }
 
-export type LinkResolvesOptions = { exclude?: string[]; siteRouter?: SiteRouterSettings };
+export type LinkResolvesOptions = {
+  exclude?: string[];
+  siteRouter?: SiteRouterSettings;
+};
 
 // linkResolves — relative links resolve to a real file (REF-001). Relative links resolve against the
 // source file; root-relative links go through the site router (same-locale first). Same-file anchors
@@ -31,7 +48,7 @@ export type LinkResolvesOptions = { exclude?: string[]; siteRouter?: SiteRouterS
 export function linkResolves(
   document: ParsedDocument,
   context: ReferenceContext,
-  options: LinkResolvesOptions
+  options: LinkResolvesOptions,
 ): PrimitiveFinding[] {
   const router = options.siteRouter ?? context.settings.siteRouter;
   const findings: PrimitiveFinding[] = [];
@@ -51,14 +68,25 @@ export function linkResolves(
     let resolved: boolean;
 
     if (isRootRelative && router !== undefined) {
-      const candidates = resolveRoutedUrl(target, router, sourceLocale(document.path, router));
-      resolved = candidates.some((candidate) => targetResolves(normalizeRelativePath(candidate), context));
+      const candidates = resolveRoutedUrl(
+        target,
+        router,
+        sourceLocale(document.path, router),
+      );
+      resolved = candidates.some((candidate) =>
+        targetResolves(normalizeRelativePath(candidate), context),
+      );
     } else {
       const relTarget = isRootRelative
-        ? normalizeRelativePath(path.posix.normalize(target.replace(/^\/+/, "")))
+        ? normalizeRelativePath(
+            path.posix.normalize(target.replace(/^\/+/, "")),
+          )
         : resolveRelativeToSource(document.path, target);
 
-      if (options.exclude !== undefined && matchesConfigGlob(relTarget, options.exclude)) {
+      if (
+        options.exclude !== undefined &&
+        matchesConfigGlob(relTarget, options.exclude)
+      ) {
         continue;
       }
 
@@ -70,7 +98,7 @@ export function linkResolves(
         message: `Link target "${link.rawTarget}" does not resolve to a file.`,
         line: link.line,
         column: link.column,
-        data: { target: link.rawTarget }
+        data: { target: link.rawTarget },
       });
     }
   }
@@ -86,7 +114,7 @@ export type ImageResolvesOptions = { exclude?: string[] };
 export function imageResolves(
   document: ParsedDocument,
   context: ReferenceContext,
-  options: ImageResolvesOptions
+  options: ImageResolvesOptions,
 ): PrimitiveFinding[] {
   const findings: PrimitiveFinding[] = [];
 
@@ -102,15 +130,21 @@ export function imageResolves(
       ? normalizeRelativePath(path.posix.normalize(target.replace(/^\/+/, "")))
       : resolveRelativeToSource(document.path, target);
 
-    if (options.exclude !== undefined && matchesConfigGlob(relTarget, options.exclude)) {
+    if (
+      options.exclude !== undefined &&
+      matchesConfigGlob(relTarget, options.exclude)
+    ) {
       continue;
     }
 
-    if (escapesRoot(relTarget) || !existsSync(path.resolve(context.rootDir, relTarget))) {
+    if (
+      escapesRoot(relTarget) ||
+      !existsSync(path.resolve(context.rootDir, relTarget))
+    ) {
       findings.push({
         message: `Image target "${image.rawTarget}" does not resolve to a file.`,
         line: image.line,
-        data: { target: image.rawTarget }
+        data: { target: image.rawTarget },
       });
     }
   }

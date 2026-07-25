@@ -24,7 +24,11 @@ export type GraphAnalysis = {
   cycles: string[][];
 };
 
-function classifyNode(inDegree: number, outDegree: number, hubMinInDegree: number): NodeRole {
+function classifyNode(
+  inDegree: number,
+  outDegree: number,
+  hubMinInDegree: number,
+): NodeRole {
   if (inDegree === 0 && outDegree === 0) {
     return "isolated";
   }
@@ -44,7 +48,7 @@ function classifyNode(inDegree: number, outDegree: number, hubMinInDegree: numbe
 
 export function classifyNodes(
   graph: ContextGraph,
-  options: GraphAnalysisOptions = {}
+  options: GraphAnalysisOptions = {},
 ): NodeClassification[] {
   const hubMinInDegree = options.hubMinInDegree ?? DEFAULT_HUB_MIN_IN_DEGREE;
 
@@ -52,11 +56,14 @@ export function classifyNodes(
   // deterministic node list they already have, instead of this compile layer inventing a new one.
   return graph.nodes.map((node) => ({
     path: node.path,
-    role: classifyNode(node.inDegree, node.outDegree, hubMinInDegree)
+    role: classifyNode(node.inDegree, node.outDegree, hubMinInDegree),
   }));
 }
 
-export function analyzeGraph(graph: ContextGraph, options: GraphAnalysisOptions = {}): GraphAnalysis {
+export function analyzeGraph(
+  graph: ContextGraph,
+  options: GraphAnalysisOptions = {},
+): GraphAnalysis {
   const { order, excluded } = topologicalSort(graph);
 
   return {
@@ -66,6 +73,6 @@ export function analyzeGraph(graph: ContextGraph, options: GraphAnalysisOptions 
     classification: classifyNodes(graph, options),
     // The illustrative task shape omits `cycles`, but the same task explicitly requires threading
     // `graph.cycles` through so P5.04 can report truncated reading order honestly.
-    cycles: graph.cycles.map((cycle) => [...cycle])
+    cycles: graph.cycles.map((cycle) => [...cycle]),
   };
 }

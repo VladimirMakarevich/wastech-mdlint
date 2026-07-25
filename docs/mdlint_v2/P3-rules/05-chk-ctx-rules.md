@@ -15,11 +15,11 @@ primitives.
 
 ## Rules
 
-| ID | Scope | Severity | Checks | Key options |
-| --- | --- | --- | --- | --- |
-| CTX-001 | document | warning | no empty/placeholder sections | `section?`, `placeholders?`, `files?` |
-| CTX-002 | document | warning | all checklist items checked | `section?`, `files?` |
-| CTX-003 | project | warning | glossary alias usage → canonical | `glossary`, `termColumn`, `aliasColumn?`, `section?`, `files?` |
+| ID      | Scope    | Severity | Checks                           | Key options                                                    |
+| ------- | -------- | -------- | -------------------------------- | -------------------------------------------------------------- |
+| CTX-001 | document | warning  | no empty/placeholder sections    | `section?`, `placeholders?`, `files?`                          |
+| CTX-002 | document | warning  | all checklist items checked      | `section?`, `files?`                                           |
+| CTX-003 | project  | warning  | glossary alias usage → canonical | `glossary`, `termColumn`, `aliasColumn?`, `section?`, `files?` |
 
 ## Deliverables / steps
 

@@ -22,9 +22,10 @@
   core barrel [`packages/core/src/index.ts`](../../packages/core/src/index.ts).
 - **Cross-links** use repo-relative POSIX paths, the same convention as the rest of the
   product.
-- **Shipped vs planned.** Phases **P0–P5 are shipped**; **P6–P9 are not started**. Terms
-  for unshipped surfaces are marked _(planned, PN)_ so the glossary stays honest about the
-  current state (roadmap §8, "honesty in docs"). Update these markers as phases land.
+- **Shipped vs planned.** Phases **P0–P8 are shipped**; **P9/P10** (post-audit remediation
+  and consistency) and **P-release** are pending. Terms for unshipped surfaces are marked
+  _(planned, PN)_ so the glossary stays honest about the current state (roadmap §8, "honesty
+  in docs"). Update these markers as phases land.
 - **Not-yet and never.** Concepts that are deferred, backlog, or explicitly out of v2 scope
   are catalogued in the **Deferred, backlog & out of scope** section near the end — named so
   planned and deliberately-excluded work is discoverable, not just what ships today.
@@ -78,8 +79,8 @@ treats this as part of "bring the affected docs in line."
   [`packages/core/src/index.ts`](../../packages/core/src/index.ts).
 - **`@wastech-mdlint/cli`** — The commander-based CLI host. Bin: `wastech-mdlint`.
   Argument parsing, command dispatch, exit codes, file output only.
-- **`@wastech-mdlint/mcp-server`** — The stdio MCP host. Bin: `wastech-mdlint-mcp`. A stub
-  today; its six read-only tools land in P7 _(planned, P7)_.
+- **`@wastech-mdlint/mcp-server`** — The stdio MCP host. Bin: `wastech-mdlint-mcp`. Its six
+  read-only tools shipped in P7.
 - **Host / adapter** — Any package that imports core and assembles a user-facing surface
   (CLI, MCP, a future LSP). Hosts hold host-specific concerns only; shared computation
   stays in core.
@@ -212,11 +213,13 @@ Vocabulary the rules operate on, beyond the rule IDs themselves. Full option sha
 the [rules requirements](requirements/02-rules-engine.md) and each rule's source under
 [`engine/rules/`](../../packages/core/src/engine/rules/).
 
-- **File scope (`files` / `exclude`)** — The shared per-rule scoping base every rule mixes in
-  (Decision [R7](requirements/02-rules-engine.md), type `FileScope`): a rule runs on a file
-  when it matches the rule's `files` and not its `exclude` (`exclude` wins, the per-rule form
-  of C1). Glob semantics are picomatch with `{ dot: true }`, so dotfiles such as `.claude/…`
-  match.
+- **File scope (`files` / `exclude`)** — The shared per-rule scoping shape (`fileScopeShape`,
+  `rules/scope.ts`) available to every rule, but mixed in per-rule rather than universal
+  (Decision [R7](requirements/02-rules-engine.md), type `FileScope`): a rule that opts in runs
+  on a file when it matches the rule's `files` and not its `exclude` (`exclude` wins, the
+  per-rule form of C1). Identity/whole-corpus rules (REF-001/003/004/005, LLM-001) intentionally
+  omit it; the P3 task tables are authoritative on which rules take it. Glob semantics are
+  picomatch with `{ dot: true }`, so dotfiles such as `.claude/…` match.
 - **Zone / Dependencies section (REF-004)** — A **zone** is a top-level docs area: the first
   directory segment under the configured `zonesDir` (a file lives at `<zonesDir>/<zone>/…`). A
   **cross-zone link** points from one zone into another and must be declared in the source
@@ -259,10 +262,12 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
 - **`custom` rule** — The declarative rule that composes the primitive vocabulary from
   config — no code, no rebuild, pure JSONC, safe to run inside the MCP server. Requires a
   namespaced `id` that must not shadow a built-in prefix, a `target`
-  (`table | section | content | checklist | link | heading`), and an `assert`. Decision
+  (`table | section | content | checklist | link`), and an `assert`. Decision
   [R9](requirements/02-rules-engine.md); see [`engine/rules/custom.ts`](../../packages/core/src/engine/rules/custom.ts).
 - **Target** — Which parsed construct a custom assertion runs against
-  (`table | section | content | checklist | link | heading`).
+  (`table | section | content | checklist | link`). No `heading` target exists — the
+  `sectionPresent`/`sectionOrder` primitives cover heading-scoped checks under `section`
+  (decision P9.05, [audit M-2](audit-2026-07-23-p0-p8.md)).
 - **Code-plugins (Tier 2)** — User-authored rule code (`plugins: [...]`). **Deferred from
   v2** (would execute arbitrary code — a security risk inside the MCP server). No `plugins`
   config key ships in v2. Decision [R9](requirements/02-rules-engine.md).
@@ -411,13 +416,17 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
   `{ id, kind: "static" | "generated", path, frontmatter }` (`skillModelSchema`), the one shape
   shared by static skills (P8) and the compiler's generated output (P5). `validateSkill` is the
   non-throwing validator (deterministic, sorted issues) over `skillFrontmatterSchema`;
-  `parseSkillFrontmatter` is the throwing frontmatter helper `synthesize` routes through. Decision
+  `parseSkillFrontmatter` is the throwing frontmatter helper retained as a public API export (the
+  package barrel re-exports it); it has no internal caller — P8.05 CI uses `validateSkill`, and
+  `synthesize` (`compile/synthesize.ts`) validates by calling `skillFrontmatterSchema.parse`
+  directly rather than through `parseSkillFrontmatter`, so `compile` never imports from `skills/`
+  ([P10.07](P10-consistency/07-frontmatter-import-direction.md)). Decision
   [S5](requirements/04-skills-compile.md).
 - **Compile budget** — The LLM context-budget summary embedded in the generated skill
   (corpus token estimate + entrypoints over budget). Reuses the token estimator. Decision
   [S6](requirements/04-skills-compile.md).
 
-## Init & repo scan _(planned, P6)_
+## Init & repo scan
 
 Core-only groundwork for `init`'s situational awareness, plus the CLI `init` command that wires
 it up. Shipped: the pure `scanRepository` scanner and its helpers, `inferRuleSet` which turns a
@@ -475,7 +484,7 @@ underlying scan/inference.
 - **`generateInitConfig` / `config-writer.ts`** — The pure, fs-free P6.04 writer that turns a
   confirmed draft into the `wastech-mdlint.config.json` bytes (a hand-rolled JSONC serializer, so
   each newly-inferred rule can carry its rationale as a trailing `//` comment) and wires the local
-  `$schema` — the CLI passes a `packageSchemaRef` computed relative to the config's *own* directory
+  `$schema` — the CLI passes a `packageSchemaRef` computed relative to the config's _own_ directory
   and anchored on the actual installed schema (walked up on disk), falling back to the repository
   root, so a subdirectory config points up at the hoisted node_modules (`../node_modules/...`) rather
   than a fixed root literal. `"fresh"` writes `$schema` + `include` (omitted when empty) + `exclude`
@@ -493,13 +502,17 @@ underlying scan/inference.
   can't corrupt the JSONC, and a project schema is generated only for custom ids the loader would
   actually accept. Also exports `buildCiWorkflowYaml(configPath?)` / `CI_WORKFLOW_YAML`, the opt-in CI
   workflow template `init` offers to drop — a self-contained install-and-run-the-CLI workflow
-  (`npm install` + `npx wastech-mdlint lint --fail-on error`), **not** a `uses:` reference to P9.03's
-  composite Action, which is not built yet (P9.03 can later swap the template to the `uses:` form). It
+  (`npm install` + `npx wastech-mdlint lint --fail-on error`), **not** a `uses:` reference to the
+  P-release composite Action (decision I6), which is not built yet (P-release can later swap the
+  template to the `uses:` form). It
   is anchored at the repository root — the `.git` root when one exists (a nested workspace package
   still anchors at the real repo root, not `packages/foo`), else the nearest `package.json`/
   `node_modules` — where GitHub loads workflows. For a subdirectory config it scopes lint to the
   config's directory (`lint <dir>`, so `include`/`exclude` resolve there) plus a shell-quoted
-  `--config`; a path with a line terminator is declined rather than emitted broken. The offer belongs
+  `--config`; a path with a line terminator is declined rather than emitted broken. The template is
+  npm-universal by design regardless of the repo's detected bun/pnpm/yarn/npm package manager — it
+  only fetches the external `@wastech-mdlint/cli` tool, never the repo's own dependencies, so it never
+  needs that repo's lockfile ([P9.07](P9-remediation/07-init-ci-package-manager.md)). The offer belongs
   only to the confirmed config-write branch — `--on-existing skip` is a strict no-write outcome and
   never drops a workflow — and a Ctrl+C at its post-write prompt is treated as "no workflow" so the
   config/schema write summary still prints. The CLI host does the actual `writeFile` and reports
@@ -551,8 +564,8 @@ underlying scan/inference.
 
 - **MCP / stdio** — Model Context Protocol; the server exposes core operations to agents over
   **stdio only** (no HTTP/SSE in v2). It is read-only and never loads code-plugins. Decision
-  [M8](requirements/05-mcp-server.md). `lint`/`lint-files` ship in P7.02; `context-graph`,
-  `context-slice`, and `impact-analysis` ship in P7.03; `compile-context` ships in P7.04,
+  [M8](requirements/05-mcp-server.md). `lint`/`lint-files` shipped in P7.02; `context-graph`,
+  `context-slice`, and `impact-analysis` shipped in P7.03; `compile-context` shipped in P7.04,
   completing the six-tool surface.
 - **The six tools** — `lint`, `lint-files`, `context-graph`, `context-slice`,
   `impact-analysis`, `compile-context`. Each is a thin wrapper over core with a Zod input
@@ -578,8 +591,8 @@ underlying scan/inference.
   payload is carried in `structuredContent` (P7.05), because a spec-compliant client validates any
   present `structuredContent` against the tool's advertised `outputSchema` — including on `isError`
   results — so an error that did not conform to the schema would be rejected before the caller saw
-  the code. The type ships in P7.01; tool call-sites that map errors to codes land in P7.02–04.
-  Decision [M6](requirements/05-mcp-server.md).
+  the code. The type shipped in P7.01; tool call-sites that map errors to codes landed in
+  P7.02–04. Decision [M6](requirements/05-mcp-server.md).
 
 ## Agent Skills & distribution
 
@@ -589,14 +602,14 @@ underlying scan/inference.
 - **agentskills.io** — The vendor-neutral skill standard; skills install via
   `gh skill install VladimirMakarevich/wastech-mdlint <skill> [--pin vX.Y.Z]` (GitHub CLI
   v2.90+). Decision: [vendor-neutral-skill-distribution](decisions/vendor-neutral-skill-distribution.md).
-- **Static skills** — The three hand-authored skills `wastech-mdlint-{init,fix,impact}`
-  _(planned, P8)_. `-fix` delegates mechanical fixes to core `--fix` and reserves AI for
+- **Static skills** — The three hand-authored skills `wastech-mdlint-{init,fix,impact}`,
+  shipped in P8. `-fix` delegates mechanical fixes to core `--fix` and reserves AI for
   judgement calls. Decision [S7/S8](requirements/04-skills-compile.md).
 - **Host-neutral / vendor-neutral** — The rule that skills avoid Claude-Code-specific syntax
   (e.g. dynamic command injection) so they work across 35+ agentskills.io clients.
 - **Single-tag release** — One `vX.Y.Z` git tag publishes `@wastech-mdlint/{core,cli,mcp-server}`
   and tags the skills together, preventing version skew. Decision
-  [I4](requirements/06-installation.md) _(planned, P9)_.
+  [I4](requirements/06-installation.md) _(planned, P-release)_.
 
 ## LLM context & tokens
 
@@ -616,6 +629,13 @@ underlying scan/inference.
 - **Repo-relative POSIX path** — The canonical path form in all public data and reports:
   relative to the repo root, `\` normalized to `/`. Node identity, finding attribution, and
   `documents` keys all use it.
+- **`compareStrings`** — The shared, host-independent string comparator (exported from
+  `core`) used for every user-visible ordering path (loader keys, `projectFiles`, findings,
+  graph nodes/edges, rule metadata, config-writer keys). Plain relational comparison
+  (`<`/`>`), i.e. UTF-16 code-unit order, rather than `String.prototype.localeCompare`, whose
+  result depends on the host ICU data and default locale. Consequence: ordering is stable
+  across locales/OSes but not locale-aware — ASCII uppercase sorts before lowercase, and
+  non-ASCII sorts by code point.
 - **Fixture** — A small, scenario-focused test input under a package's test tree. Preferred
   over linting the repo's real docs so a failure points to one behavior. See
   [testing rules](../../.agents/rules/testing.md).
@@ -629,12 +649,15 @@ underlying scan/inference.
 - **Sources of truth / precedence** — When docs disagree: (1) the specific phase task file,
   (2) the relevant locked requirement, (3) the relevant decision, (4) the roadmap summary.
   See [AGENTS.md](../../AGENTS.md).
-- **Phase (P0–P9)** — The nine roadmap epics:
+- **Phase (P0–P8, P9/P10, P-release)** — The roadmap epics:
   `P0` Foundations · `P1` ParsedDocument · `P2` Rule engine · `P3` Rules · `P4` Graph ·
-  `P5` Compile · `P6` init · `P7` MCP server · `P8` Skills · `P9` Release. Each has a folder
-  (meta `index.md` + numbered task files). **P0–P5 are Done; P6–P9 are Not started.**
+  `P5` Compile · `P6` init · `P7` MCP server · `P8` Skills · `P9` Remediation ·
+  `P10` Consistency · `P-release` Release. Each has a folder (meta `index.md` + numbered task
+  files). **P0–P8 are Done; P9 (post-audit remediation) is in progress; P10 (consistency) and
+  P-release are pending.**
 - **Milestone (M1–M4)** — Delivery groupings: **M1** "Engine" (P0–P2), **M2** "Lint parity+"
-  (P3), **M3** "Graph & agents" (P4–P5 + P7), **M4** "Launch" (P6, P8, P9). See roadmap §6.
+  (P3), **M3** "Graph & agents" (P4–P5 + P7), **M4** "Launch" (P6, P8, then P9/P10 and
+  P-release). See roadmap §6.
 - **Task file** — A numbered file inside a phase folder with a `Previous` / `Next` /
   `Depends on` / `Blocks` chain and exit criteria; the most specific source of truth for the
   work it describes.
@@ -654,7 +677,7 @@ underlying scan/inference.
 - **Task numbering (`PN.NN`)** — Within a phase, task files are numbered `P4.01`, `P4.06`,
   etc.; this glossary and the journals cite that number to point at the exact task.
 
-## Distribution & release _(planned, P9)_
+## Distribution & release _(planned, P-release)_
 
 Production packaging. The mechanics land in [P-release](P-release/index.md); the decisions are in
 [requirements/06-installation.md](requirements/06-installation.md).
@@ -673,10 +696,11 @@ Production packaging. The mechanics land in [P-release](P-release/index.md); the
 - **`--pin` / `compatibility`** — `gh skill install … --pin vX.Y.Z` plus each skill's
   `compatibility` frontmatter pins a skill to a matching CLI version. Decision
   [I7](requirements/06-installation.md).
-- **CHANGELOG** — The release changelog, produced in the P9 README/packaging pass.
+- **CHANGELOG** — The release changelog, produced in the P-release README/packaging pass.
 - **`release:check` / `npm pack --dry-run`** — The `npm run release:check` script
   (typecheck + test + build + `npm pack --dry-run`) exists today and validates each package's
-  published `files` set without publishing; the full release workflow around it is P9.
+  published `files` set without publishing; the full release workflow around it is
+  P-release.
 
 ## Deferred, backlog & out of scope
 
@@ -729,16 +753,16 @@ Not needed:
 
 - **Node 24.17.0 LTS** — The runtime target. `engines.node` is `>=24.17.0` with no upper
   bound; CI validates on the Node 24 LTS line.
-- **Vitest / ESLint / Prettier** — Test runner, linter, formatter. Verification gates:
-  `npm run typecheck`, `npm test`, `npm run build`; `npm run lint` / `npm run format` when the
-  scope needs style checks.
+- **Vitest / ESLint / Prettier** — Test runner, linter, formatter. The CI `verify` job runs
+  `npm run typecheck`, `npm run lint`, `npm run format`, `npm test`, and `npm run build` on every
+  push (`npm run format` is `prettier --check .`, enforced since [P9.06](P9-remediation/06-format-gate.md)),
+  so style drift fails fast alongside type/lint/test/build failures. Locally, `npm run lint` /
+  `npm run format` are still the discretionary steps to run when a change's scope touches style.
 - **`generate:docs`** — `npm run generate:docs` regenerates the README rules table from rule
   metadata (the `BEGIN/END GENERATED RULES` block) and the README MCP tool inventory from the live
   tool registration (the `BEGIN/END GENERATED MCP TOOLS` block); neither block is hand-edited.
 - **micromatch / picomatch** — The glob engines used for `include`/`exclude` matching
   (`{ dot: true }`).
-- **RTK (Rust Token Killer)** — A local token-optimizing CLI proxy used during development;
-  prefix shell commands with `rtk`. See [RTK.md](../../RTK.md).
 - **wastech-orchestrator (`.worc/`)** — The task orchestrator that drives multi-step
   implementation via flows. The documentation step lives at
   [`.worc/flows/implementation/documentation.md`](../../.worc/flows/implementation/documentation.md).

@@ -6,18 +6,22 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   detectWorkspacePackages,
-  detectWorkspacePackagesWithNoise
+  detectWorkspacePackagesWithNoise,
 } from "../src/discovery/workspace-packages.js";
 
 const tempDirs: string[] = [];
 
 afterEach(async () => {
   await Promise.all(
-    tempDirs.splice(0).map((tempDir) => rm(tempDir, { recursive: true, force: true }))
+    tempDirs
+      .splice(0)
+      .map((tempDir) => rm(tempDir, { recursive: true, force: true })),
   );
 });
 
-async function createFixtureTree(files: Record<string, string>): Promise<string> {
+async function createFixtureTree(
+  files: Record<string, string>,
+): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-ws-"));
   tempDirs.push(root);
 
@@ -35,20 +39,20 @@ describe("detectWorkspacePackages", () => {
     const root = await createFixtureTree({
       "package.json": JSON.stringify({ workspaces: ["packages/*"] }),
       "packages/core/package.json": JSON.stringify({ name: "@scope/core" }),
-      "packages/cli/package.json": JSON.stringify({ name: "@scope/cli" })
+      "packages/cli/package.json": JSON.stringify({ name: "@scope/cli" }),
     });
 
     const packages = await detectWorkspacePackages(root);
     expect(packages).toEqual([
       { path: "packages/cli", name: "@scope/cli" },
-      { path: "packages/core", name: "@scope/core" }
+      { path: "packages/core", name: "@scope/core" },
     ]);
   });
 
   it("detects yarn-style workspaces (object form with packages key)", async () => {
     const root = await createFixtureTree({
       "package.json": JSON.stringify({ workspaces: { packages: ["apps/*"] } }),
-      "apps/web/package.json": JSON.stringify({ name: "web" })
+      "apps/web/package.json": JSON.stringify({ name: "web" }),
     });
 
     const packages = await detectWorkspacePackages(root);
@@ -59,7 +63,7 @@ describe("detectWorkspacePackages", () => {
     const root = await createFixtureTree({
       "package.json": JSON.stringify({ name: "root" }),
       "pnpm-workspace.yaml": "packages:\n  - 'packages/*'\n",
-      "packages/foo/package.json": JSON.stringify({ name: "foo" })
+      "packages/foo/package.json": JSON.stringify({ name: "foo" }),
     });
 
     const packages = await detectWorkspacePackages(root);
@@ -70,13 +74,13 @@ describe("detectWorkspacePackages", () => {
     const root = await createFixtureTree({
       "package.json": JSON.stringify({ name: "root" }),
       "packages/foo/package.json": JSON.stringify({ name: "foo" }),
-      "packages/bar/package.json": JSON.stringify({ name: "bar" })
+      "packages/bar/package.json": JSON.stringify({ name: "bar" }),
     });
 
     const packages = await detectWorkspacePackages(root);
     expect(packages).toEqual([
       { path: "packages/bar", name: "bar" },
-      { path: "packages/foo", name: "foo" }
+      { path: "packages/foo", name: "foo" },
     ]);
   });
 
@@ -84,20 +88,20 @@ describe("detectWorkspacePackages", () => {
     const root = await createFixtureTree({
       "package.json": JSON.stringify({ name: "root" }),
       "apps/one/package.json": JSON.stringify({ name: "one" }),
-      "apps/two/package.json": JSON.stringify({ name: "two" })
+      "apps/two/package.json": JSON.stringify({ name: "two" }),
     });
 
     const packages = await detectWorkspacePackages(root);
     expect(packages).toEqual([
       { path: "apps/one", name: "one" },
-      { path: "apps/two", name: "two" }
+      { path: "apps/two", name: "two" },
     ]);
   });
 
   it("does not treat a single stray package.json under packages/ as a monorepo", async () => {
     const root = await createFixtureTree({
       "package.json": JSON.stringify({ name: "root" }),
-      "packages/only/package.json": JSON.stringify({ name: "only" })
+      "packages/only/package.json": JSON.stringify({ name: "only" }),
     });
 
     expect(await detectWorkspacePackages(root)).toEqual([]);
@@ -106,7 +110,7 @@ describe("detectWorkspacePackages", () => {
   it("returns [] for an ordinary single-package repo", async () => {
     const root = await createFixtureTree({
       "package.json": JSON.stringify({ name: "root" }),
-      "src/index.ts": "export {};\n"
+      "src/index.ts": "export {};\n",
     });
 
     expect(await detectWorkspacePackages(root)).toEqual([]);
@@ -116,7 +120,7 @@ describe("detectWorkspacePackages", () => {
     const root = await createFixtureTree({
       "package.json": JSON.stringify({ workspaces: [] }),
       "packages/foo/package.json": JSON.stringify({ name: "foo" }),
-      "packages/bar/package.json": JSON.stringify({ name: "bar" })
+      "packages/bar/package.json": JSON.stringify({ name: "bar" }),
     });
 
     expect(await detectWorkspacePackages(root)).toEqual([]);
@@ -126,7 +130,7 @@ describe("detectWorkspacePackages", () => {
     const root = await createFixtureTree({
       "package.json": JSON.stringify({ workspaces: { packages: [] } }),
       "apps/one/package.json": JSON.stringify({ name: "one" }),
-      "apps/two/package.json": JSON.stringify({ name: "two" })
+      "apps/two/package.json": JSON.stringify({ name: "two" }),
     });
 
     expect(await detectWorkspacePackages(root)).toEqual([]);
@@ -137,13 +141,13 @@ describe("detectWorkspacePackages", () => {
       "package.json": JSON.stringify({ name: "root" }),
       "pnpm-workspace.yaml": "packages:\n- packages/*\n- apps/*\n",
       "packages/foo/package.json": JSON.stringify({ name: "foo" }),
-      "apps/web/package.json": JSON.stringify({ name: "web" })
+      "apps/web/package.json": JSON.stringify({ name: "web" }),
     });
 
     const packages = await detectWorkspacePackages(root);
     expect(packages).toEqual([
       { path: "apps/web", name: "web" },
-      { path: "packages/foo", name: "foo" }
+      { path: "packages/foo", name: "foo" },
     ]);
   });
 
@@ -153,13 +157,13 @@ describe("detectWorkspacePackages", () => {
       "pnpm-workspace.yaml":
         "packages:\n  - 'packages/*' # workspace packages\n  - \"apps/*\"   # apps\n",
       "packages/foo/package.json": JSON.stringify({ name: "foo" }),
-      "apps/web/package.json": JSON.stringify({ name: "web" })
+      "apps/web/package.json": JSON.stringify({ name: "web" }),
     });
 
     const packages = await detectWorkspacePackages(root);
     expect(packages).toEqual([
       { path: "apps/web", name: "web" },
-      { path: "packages/foo", name: "foo" }
+      { path: "packages/foo", name: "foo" },
     ]);
   });
 
@@ -168,7 +172,7 @@ describe("detectWorkspacePackages", () => {
       "package.json": JSON.stringify({ name: "root" }),
       "pnpm-workspace.yaml": "packages:\n",
       "packages/foo/package.json": JSON.stringify({ name: "foo" }),
-      "packages/bar/package.json": JSON.stringify({ name: "bar" })
+      "packages/bar/package.json": JSON.stringify({ name: "bar" }),
     });
 
     expect(await detectWorkspacePackages(root)).toEqual([]);
@@ -177,31 +181,42 @@ describe("detectWorkspacePackages", () => {
   it("detectWorkspacePackagesWithNoise honors a custom noiseDirNames, pruning a package.json inside a caller-ignored directory", async () => {
     const root = await createFixtureTree({
       "package.json": JSON.stringify({ workspaces: ["packages/*"] }),
-      "packages/foo/package.json": JSON.stringify({ name: "foo" })
+      "packages/foo/package.json": JSON.stringify({ name: "foo" }),
     });
 
-    expect(await detectWorkspacePackages(root)).toEqual([{ path: "packages/foo", name: "foo" }]);
-    expect(await detectWorkspacePackagesWithNoise(root, ["packages"])).toEqual([]);
+    expect(await detectWorkspacePackages(root)).toEqual([
+      { path: "packages/foo", name: "foo" },
+    ]);
+    expect(await detectWorkspacePackagesWithNoise(root, ["packages"])).toEqual(
+      [],
+    );
   });
 
   it("honors an ordered negated glob from package.json#workspaces", async () => {
     const root = await createFixtureTree({
-      "package.json": JSON.stringify({ workspaces: ["packages/*", "!packages/private"] }),
+      "package.json": JSON.stringify({
+        workspaces: ["packages/*", "!packages/private"],
+      }),
       "packages/foo/package.json": JSON.stringify({ name: "foo" }),
-      "packages/private/package.json": JSON.stringify({ name: "private" })
+      "packages/private/package.json": JSON.stringify({ name: "private" }),
     });
 
-    expect(await detectWorkspacePackages(root)).toEqual([{ path: "packages/foo", name: "foo" }]);
+    expect(await detectWorkspacePackages(root)).toEqual([
+      { path: "packages/foo", name: "foo" },
+    ]);
   });
 
   it("honors an ordered negated glob from pnpm-workspace.yaml", async () => {
     const root = await createFixtureTree({
       "package.json": JSON.stringify({ name: "root" }),
-      "pnpm-workspace.yaml": "packages:\n  - 'packages/*'\n  - '!packages/private'\n",
+      "pnpm-workspace.yaml":
+        "packages:\n  - 'packages/*'\n  - '!packages/private'\n",
       "packages/foo/package.json": JSON.stringify({ name: "foo" }),
-      "packages/private/package.json": JSON.stringify({ name: "private" })
+      "packages/private/package.json": JSON.stringify({ name: "private" }),
     });
 
-    expect(await detectWorkspacePackages(root)).toEqual([{ path: "packages/foo", name: "foo" }]);
+    expect(await detectWorkspacePackages(root)).toEqual([
+      { path: "packages/foo", name: "foo" },
+    ]);
   });
 });

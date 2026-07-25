@@ -17,7 +17,7 @@ export const TOOL_ERROR_CODES = [
   "TARGET_NOT_FOUND",
   "COMPILE_CONFIG_MISSING",
   "INVALID_INPUT",
-  "INTERNAL_ERROR"
+  "INTERNAL_ERROR",
 ] as const;
 
 // Derived from the runtime array so the type and the membership check cannot drift apart.
@@ -32,10 +32,14 @@ export interface StructuredErrorInfo {
 // Membership must be an allowlist against TOOL_ERROR_CODES, not "has a string `.code`": Node fs
 // errors (ENOENT, etc.) also carry a `.code`, and duck-typing them through would leak an unrelated
 // system error to an MCP client instead of falling through to a sanitized INTERNAL_ERROR.
-export function isStructuredError(error: unknown): error is Error & StructuredErrorInfo {
+export function isStructuredError(
+  error: unknown,
+): error is Error & StructuredErrorInfo {
   return (
     error instanceof Error &&
     typeof (error as { code?: unknown }).code === "string" &&
-    (TOOL_ERROR_CODES as readonly string[]).includes((error as unknown as { code: string }).code)
+    (TOOL_ERROR_CODES as readonly string[]).includes(
+      (error as unknown as { code: string }).code,
+    )
   );
 }

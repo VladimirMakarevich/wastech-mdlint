@@ -23,17 +23,17 @@ for the design/roadmap see [docs/mdlint_v2](../mdlint_v2/index.md).
 
 ## Capabilities
 
-| Area | What it does | Doc |
-| --- | --- | --- |
-| **Rules & rule engine** | 24 built-in rules + a declarative `custom` rule over one parse pass. | [Rules](rules/README.md) |
-| **Configuration** | JSONC config, local `$schema`, per-rule severity/options, shared settings. | [Configuration](configuration.md) |
-| **Context graph** | `graph` / `slice` / `impact` over the reference graph between documents. | [Context graph](context-graph.md) |
-| **Context compiler** | `compile` generates a deterministic `SKILL.md` from the graph + rules + config. | [Compile](compile.md) |
-| **MCP server** | 6 read-only stdio tools exposing the same pipeline to AI agents. | [MCP server](mcp-server.md) |
-| **Agent skills** | 3 hand-authored, host-neutral Agent Skills (`-init`, `-fix`, `-impact`). | [Skills](skills.md) |
-| **Inline suppression** | `disable` / `disable-next-line` directives per rule. | [Suppression](suppression.md) |
-| **Output & exit codes** | Text and JSON reports; CI-friendly exit codes. | [Output](output.md) |
-| **Concepts** | Parse model, determinism, path handling, token estimation. | [Concepts](concepts.md) |
+| Area                    | What it does                                                                    | Doc                               |
+| ----------------------- | ------------------------------------------------------------------------------- | --------------------------------- |
+| **Rules & rule engine** | 24 built-in rules + a declarative `custom` rule over one parse pass.            | [Rules](rules/README.md)          |
+| **Configuration**       | JSONC config, local `$schema`, per-rule severity/options, shared settings.      | [Configuration](configuration.md) |
+| **Context graph**       | `graph` / `slice` / `impact` over the reference graph between documents.        | [Context graph](context-graph.md) |
+| **Context compiler**    | `compile` generates a deterministic `SKILL.md` from the graph + rules + config. | [Compile](compile.md)             |
+| **MCP server**          | 6 read-only stdio tools exposing the same pipeline to AI agents.                | [MCP server](mcp-server.md)       |
+| **Agent skills**        | 3 hand-authored, host-neutral Agent Skills (`-init`, `-fix`, `-impact`).        | [Skills](skills.md)               |
+| **Inline suppression**  | `disable` / `disable-next-line` directives per rule.                            | [Suppression](suppression.md)     |
+| **Output & exit codes** | Text and JSON reports; CI-friendly exit codes.                                  | [Output](output.md)               |
+| **Concepts**            | Parse model, determinism, path handling, token estimation.                      | [Concepts](concepts.md)           |
 
 ## Rules at a glance
 

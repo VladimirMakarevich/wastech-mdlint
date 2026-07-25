@@ -6,17 +6,22 @@ import { fileURLToPath } from "node:url";
 import { ConfigError } from "@wastech-mdlint/core";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { resolveToolConfiguration, resolveToolContext } from "../src/shared/tool-context.js";
+import {
+  resolveToolConfiguration,
+  resolveToolContext,
+} from "../src/shared/tool-context.js";
 
 const fixtureDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  "fixtures/basic-project"
+  "fixtures/basic-project",
 );
 
 const tempDirs: string[] = [];
 
 afterAll(async () => {
-  await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirs.map((dir) => rm(dir, { recursive: true, force: true })),
+  );
 });
 
 async function makeTempDir(prefix: string): Promise<string> {
@@ -47,18 +52,27 @@ describe("resolveToolConfiguration", () => {
     await writeFile(
       path.join(dir, "custom.config.json"),
       JSON.stringify({ include: ["**/*.md"], rules: [] }),
-      "utf8"
+      "utf8",
     );
 
-    const loaded = await resolveToolConfiguration({ cwd: dir, configPath: "custom.config.json" });
+    const loaded = await resolveToolConfiguration({
+      cwd: dir,
+      configPath: "custom.config.json",
+    });
     expect(loaded.configPath).toBe(path.join(dir, "custom.config.json"));
   });
 
   it("propagates a structured ConfigError on invalid JSON", async () => {
     const dir = await makeTempDir("mcp-tc-invalid-");
-    await writeFile(path.join(dir, "wastech-mdlint.config.json"), "{ not valid ", "utf8");
+    await writeFile(
+      path.join(dir, "wastech-mdlint.config.json"),
+      "{ not valid ",
+      "utf8",
+    );
 
-    const error = await resolveToolConfiguration({ cwd: dir }).catch((e: unknown) => e);
+    const error = await resolveToolConfiguration({ cwd: dir }).catch(
+      (e: unknown) => e,
+    );
     expect(error).toBeInstanceOf(ConfigError);
     expect((error as ConfigError).code).toBe("CONFIG_INVALID");
   });

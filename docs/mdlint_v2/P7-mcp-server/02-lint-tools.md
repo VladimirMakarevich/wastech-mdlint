@@ -47,7 +47,7 @@ Expose ad-hoc text lint and project file lint as MCP tools over core.
   and template targets against, exactly as they do under `lint-files`. Core stays the single owner
   of REF/SEC resolution semantics; the host does not fork them. The practical consequence — and the
   honest limitation behind the deliverable's "no filesystem/config needed" — is narrower than it
-  reads: `lint` never *loads project config*, but those few rules may still touch the filesystem
+  reads: `lint` never _loads project config_, but those few rules may still touch the filesystem
   relative to the server's working directory. A non-existent target is reported as a normal
   finding, never a crash.
 - **Rule requests reuse core's `ruleEntrySchema`, so `severity` (including `"off"`) is honored.**
@@ -60,9 +60,8 @@ Expose ad-hoc text lint and project file lint as MCP tools over core.
   graph, and building a real `ContextGraph` for one document needs `siteRouter`/`idRef` wiring that
   the `{ content, rules }` input has no slot for — and would only ever flag the lone document as an
   orphan. This is a scope boundary, not a gap.
-- **`lint-files` leaves the zero-config `**/*.md` fallback to core.** The tool only sets
-  `config.include` when an explicit `patterns` arg is given (replacing, not merging); absent it,
-  core's own `include ?? ["**/*.md"]` applies, so the fallback behavior is provably core's, not
+- **`lint-files` leaves the zero-config `**/_.md`fallback to core.** The tool only sets`config.include`when an explicit`patterns`arg is given (replacing, not merging); absent it,
+core's own`include ?? ["\*\*/_.md"]` applies, so the fallback behavior is provably core's, not
   reimplemented at the boundary.
 
 ## Hand-off to next

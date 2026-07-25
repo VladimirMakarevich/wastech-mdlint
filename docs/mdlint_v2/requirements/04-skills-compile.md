@@ -9,17 +9,17 @@
 
 ## Decisions
 
-| # | Improvement | Layer | Status | Notes |
-| --- | --- | --- | --- | --- |
-| **S1** | Typed Zod schema + validation for SKILL.md frontmatter | both | ✅ Accepted | Validate static skills in CI + generated output. The "typed model" the spec says is missing. |
-| **S2** | Host-neutral / templated command block in generated skill | A | ✅ Accepted | Presets `claude\|generic\|none`; default = plain instructions + MCP-tool reference, not `!npx … $ARGUMENTS`. |
-| **S3** | Localizable scaffold template | A | ⛔ Skipped | Generated skill stays English-scaffold (data localized), as in the reference. |
-| **S4** | Deterministic, stable generated output | A | ✅ Accepted | Sorted, no timestamps; "generated from N docs, M rules" header + content hash → clean git diffs. |
-| **S5** | Unified typed skill model/registry | both | ✅ Accepted | `{ id, kind: "static"\|"generated", path, frontmatter }`. |
-| **S6** | LLM context-budget summary inside generated skill | A | ✅ Accepted | Reuses the D3 SIZE/LLM estimator; differentiator tying budget into compile. |
-| **S7** | Host-neutral static skills + replace upstream placeholders | B | ✅ Accepted | Swap `vladimir-makarevich` / `wastech-mdlint.dev` for our repo; no Claude-specific syntax (the vendor-neutral skill distribution decision). |
-| **S8** | `-fix` skill delegates to deterministic `--fix` | B | ✅ Accepted | Mechanical fixes → core `--fix` (R2); AI handles only judgement. |
-| **S9** | A 4th skill (`-compile` / `-review`) | B | 🔵 Backlog | Next version; keep 3 skills (init/fix/impact) in v2. |
+| #      | Improvement                                                | Layer | Status      | Notes                                                                                                                                       |
+| ------ | ---------------------------------------------------------- | ----- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **S1** | Typed Zod schema + validation for SKILL.md frontmatter     | both  | ✅ Accepted | Validate static skills in CI + generated output. The "typed model" the spec says is missing.                                                |
+| **S2** | Host-neutral / templated command block in generated skill  | A     | ✅ Accepted | Presets `claude\|generic\|none`; default = plain instructions + MCP-tool reference, not `!npx … $ARGUMENTS`.                                |
+| **S3** | Localizable scaffold template                              | A     | ⛔ Skipped  | Generated skill stays English-scaffold (data localized), as in the reference.                                                               |
+| **S4** | Deterministic, stable generated output                     | A     | ✅ Accepted | Sorted, no timestamps; "generated from N docs, M rules" header + content hash → clean git diffs.                                            |
+| **S5** | Unified typed skill model/registry                         | both  | ✅ Accepted | `{ id, kind: "static"\|"generated", path, frontmatter }`.                                                                                   |
+| **S6** | LLM context-budget summary inside generated skill          | A     | ✅ Accepted | Reuses the D3 SIZE/LLM estimator; differentiator tying budget into compile.                                                                 |
+| **S7** | Host-neutral static skills + replace upstream placeholders | B     | ✅ Accepted | Swap `vladimir-makarevich` / `wastech-mdlint.dev` for our repo; no Claude-specific syntax (the vendor-neutral skill distribution decision). |
+| **S8** | `-fix` skill delegates to deterministic `--fix`            | B     | ✅ Accepted | Mechanical fixes → core `--fix` (R2); AI handles only judgement.                                                                            |
+| **S9** | A 4th skill (`-compile` / `-review`)                       | B     | 🔵 Backlog  | Next version; keep 3 skills (init/fix/impact) in v2.                                                                                        |
 
 ## Detail & rationale
 
@@ -28,7 +28,7 @@
 - **S1 — frontmatter schema.** The spec notes static skills have no runtime validation
   ("process-level only"). v2 defines a Zod schema for SKILL.md frontmatter (`name`,
   `description`, `license`, `compatibility`, `metadata.{homepage,source}`), validates the
-  3 static skills in CI, and validates the compiler's output. This *is* the typed model
+  3 static skills in CI, and validates the compiler's output. This _is_ the typed model
   the spec says is missing (with S5).
 
 - **S2 — host-neutral commands.** The generated skill hardcodes

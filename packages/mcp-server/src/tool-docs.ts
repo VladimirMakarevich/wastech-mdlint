@@ -19,9 +19,16 @@ function escapeCell(text: string): string {
 
 export async function generateToolInventory(): Promise<string> {
   const server = await createServer();
-  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: "wastech-mdlint-doc-generator", version: "0.0.0" });
-  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+  const [clientTransport, serverTransport] =
+    InMemoryTransport.createLinkedPair();
+  const client = new Client({
+    name: "wastech-mdlint-doc-generator",
+    version: "0.0.0",
+  });
+  await Promise.all([
+    server.connect(serverTransport),
+    client.connect(clientTransport),
+  ]);
 
   try {
     const { tools } = await client.listTools();

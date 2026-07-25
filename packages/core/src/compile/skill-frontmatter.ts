@@ -15,10 +15,10 @@ export const skillFrontmatterSchema = z
     metadata: z
       .object({
         homepage: z.string().optional(),
-        source: z.string().optional()
+        source: z.string().optional(),
       })
       .strict()
-      .optional()
+      .optional(),
   })
   .strict();
 

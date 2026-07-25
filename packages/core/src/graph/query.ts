@@ -1,11 +1,15 @@
-import type { ContextGraph, ContextGraphEdgeType } from "./context-graph-types.js";
+import { compareStrings } from "../deterministic-sort.js";
+import type {
+  ContextGraph,
+  ContextGraphEdgeType,
+} from "./context-graph-types.js";
 
 // P4.03 unified traversal (G2): the one BFS that `slice`/`impact`/MCP/compile call instead of each
 // hand-rolling its own walk. Cycle-safety is by construction — a node enters `visited` at most once
 // and is never re-expanded — so cyclic graphs terminate without any cycle-removal step; GRP-001
 // (`graph.cycles`) stays the sole owner of *reporting* cycles.
 
-const byPath = (left: string, right: string): number => left.localeCompare(right);
+const byPath = compareStrings;
 
 export type QueryDirection = "forward" | "reverse";
 
@@ -39,7 +43,7 @@ export type QueryResult = {
 function buildAdjacency(
   graph: ContextGraph,
   direction: QueryDirection,
-  edgeTypes: ContextGraphEdgeType[] | undefined
+  edgeTypes: ContextGraphEdgeType[] | undefined,
 ): Map<string, string[]> {
   const adjacency = new Map<string, string[]>();
   for (const node of graph.nodes) {
@@ -87,7 +91,10 @@ export function query(graph: ContextGraph, options: QueryOptions): QueryResult {
   // deterministic `via` (smallest predecessor at minimal depth) without a tie-break pass.
   let frontier = [start];
   let currentDepth = 0;
-  while (frontier.length > 0 && (maxDepth === undefined || currentDepth < maxDepth)) {
+  while (
+    frontier.length > 0 &&
+    (maxDepth === undefined || currentDepth < maxDepth)
+  ) {
     const nextDepth = currentDepth + 1;
     const nextFrontier: string[] = [];
     for (const current of frontier) {
@@ -95,7 +102,11 @@ export function query(graph: ContextGraph, options: QueryOptions): QueryResult {
         if (visited.has(neighbor)) {
           continue;
         }
-        visited.set(neighbor, { path: neighbor, depth: nextDepth, via: current });
+        visited.set(neighbor, {
+          path: neighbor,
+          depth: nextDepth,
+          via: current,
+        });
         nextFrontier.push(neighbor);
       }
     }
@@ -104,19 +115,27 @@ export function query(graph: ContextGraph, options: QueryOptions): QueryResult {
     currentDepth = nextDepth;
   }
 
-  return { visited: [...visited.values()].sort((left, right) => byPath(left.path, right.path)) };
+  return {
+    visited: [...visited.values()].sort((left, right) =>
+      byPath(left.path, right.path),
+    ),
+  };
 }
 
 export function slice(
   graph: ContextGraph,
   start: string,
   depth = 2,
-  edgeTypes?: ContextGraphEdgeType[]
+  edgeTypes?: ContextGraphEdgeType[],
 ): QueryResult {
   return query(graph, { start, direction: "forward", depth, edgeTypes });
 }
 
-export function impact(graph: ContextGraph, start: string, edgeTypes?: ContextGraphEdgeType[]): QueryResult {
+export function impact(
+  graph: ContextGraph,
+  start: string,
+  edgeTypes?: ContextGraphEdgeType[],
+): QueryResult {
   // No depth ⇒ full closure: blast-radius analysis needs every upstream reference, not a bounded
   // neighborhood.
   return query(graph, { start, direction: "reverse", edgeTypes });

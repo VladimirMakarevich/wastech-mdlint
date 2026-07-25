@@ -23,10 +23,17 @@ function directiveApplies(directive: InlineDirective, ruleId: string): boolean {
  * Build a per-document suppression checker from its extracted directives. Directives are pre-sorted
  * by line once so each query is a cheap linear scan of the (typically few) block directives.
  */
-export function createSuppressionChecker(directives: readonly InlineDirective[]): SuppressionChecker {
-  const nextLine = directives.filter((directive) => directive.kind === "disable-next-line");
+export function createSuppressionChecker(
+  directives: readonly InlineDirective[],
+): SuppressionChecker {
+  const nextLine = directives.filter(
+    (directive) => directive.kind === "disable-next-line",
+  );
   const blocks = directives
-    .filter((directive) => directive.kind === "disable" || directive.kind === "enable")
+    .filter(
+      (directive) =>
+        directive.kind === "disable" || directive.kind === "enable",
+    )
     .sort((left, right) => left.line - right.line);
 
   return (ruleId, line) => {

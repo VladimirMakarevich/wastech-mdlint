@@ -1,7 +1,7 @@
 # P9.02 · Replace `localeCompare` with a deterministic sort
 
 > Phase: [P9 — Post-audit remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** ·
-> Status **Not started**. Audit finding **M-4** ([report](../audit-2026-07-23-p0-p8.md)).
+> Status **Done**. Audit finding **M-4** ([report](../audit-2026-07-23-p0-p8.md)).
 
 ## Goal
 
@@ -30,6 +30,24 @@ cannot catch cross-environment drift.
 
 ## Exit criteria
 
-- [ ] No `localeCompare` on any determinism-critical output path (loader keys, `projectFiles`).
-- [ ] A test pins the ordering of a fixture containing non-ASCII + mixed-case names.
-- [ ] `npm test` green.
+- [x] No `localeCompare` on any determinism-critical output path (loader keys, `projectFiles`).
+- [x] A test pins the ordering of a fixture containing non-ASCII + mixed-case names.
+- [x] `npm test` green.
+
+## Implementation notes
+
+- **Code-point comparison, not a pinned-locale collator.** The two acceptable options were a
+  plain relational comparator and an explicit `Intl.Collator` with a fixed locale. We took the
+  relational one: it needs no ICU data, no new dependency (a stated constraint), and its result
+  is fixed by the ECMAScript spec rather than by whatever ICU version a host ships. The cost is
+  that ordering is not human-locale-aware (ASCII uppercase before lowercase, non-ASCII by code
+  point) — an acceptable trade for output that must be byte-stable and diffable everywhere.
+- **One shared comparator, applied everywhere ordering is user-visible.** The audit named the
+  loader and `projectFiles`, but the same `localeCompare` pattern had spread across the graph,
+  compile, discovery/init, registry, skills, and rule paths. Rather than fix the two named
+  spots, the change routes every such sort through a single `compareStrings`
+  (`packages/core/src/deterministic-sort.ts`), so "user-visible order is code-point order" is
+  enforced in one place instead of re-derived per call site. It is exported from `core` so hosts
+  and tests assert against the exact production comparator rather than re-implementing it.
+- **Scope held to comparators.** Only sort comparators changed; the set of documents discovered
+  and their contents are untouched, per the task constraint.

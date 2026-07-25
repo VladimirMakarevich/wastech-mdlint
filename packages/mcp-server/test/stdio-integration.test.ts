@@ -18,8 +18,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // the documented verification order (`npm run typecheck` is `tsc -b`, which emits before `npm test`
 // runs), but a bare `vitest run` on a never-built checkout will fail to spawn — build first.
 
-const DIST_INDEX = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../dist/index.js");
-const fixturesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "fixtures");
+const DIST_INDEX = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../dist/index.js",
+);
+const fixturesDir = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "fixtures",
+);
 const graphProject = path.join(fixturesDir, "graph-project");
 const lintFindingsProject = path.join(fixturesDir, "lint-findings-project");
 
@@ -37,7 +43,7 @@ const EXPECTED_TOOL_NAMES = [
   "context-slice",
   "impact-analysis",
   "lint",
-  "lint-files"
+  "lint-files",
 ];
 
 // One persistent connection for the whole file (not one spawn per test): this matches how a real
@@ -52,7 +58,7 @@ beforeAll(async () => {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [DIST_INDEX],
-    stderr: "pipe"
+    stderr: "pipe",
   });
   client = new Client({ name: "mcp-server-stdio-it", version: "0.0.0" });
   await client.connect(transport);
@@ -67,10 +73,14 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await client.close();
-  await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirs.map((dir) => rm(dir, { recursive: true, force: true })),
+  );
 });
 
-function structuredOf(result: Awaited<ReturnType<Client["callTool"]>>): Record<string, unknown> {
+function structuredOf(
+  result: Awaited<ReturnType<Client["callTool"]>>,
+): Record<string, unknown> {
   return result.structuredContent as Record<string, unknown>;
 }
 
@@ -84,11 +94,15 @@ function structuredOf(result: Awaited<ReturnType<Client["callTool"]>>): Record<s
 async function expectToolError(
   name: string,
   args: Record<string, unknown>,
-  code: string
+  code: string,
 ): Promise<void> {
   const result = await client.callTool({ name, arguments: args });
   expect(result.isError).toBe(true);
-  const error = result.structuredContent as { code?: unknown; message?: unknown; hint?: unknown };
+  const error = result.structuredContent as {
+    code?: unknown;
+    message?: unknown;
+    hint?: unknown;
+  };
   expect(error.code).toBe(code);
   expect(typeof error.message).toBe("string");
   expect(error.message as string).not.toBe("");
@@ -128,8 +142,8 @@ describe("mcp-server over stdio", () => {
       name: "lint",
       arguments: {
         content: "# Title\n\nsome body\nmore body\n",
-        rules: [{ rule: "SIZE-001", options: { lines: { error: 1 } } }]
-      }
+        rules: [{ rule: "SIZE-001", options: { lines: { error: 1 } } }],
+      },
     });
     expect(ok.isError).toBeFalsy();
     expect(structuredOf(ok).errorCount).toBe(1);
@@ -137,33 +151,50 @@ describe("mcp-server over stdio", () => {
 
     // `SIZE-002` is a near-miss of the real `SIZE-001`, so the error carries a "did you mean" hint —
     // exercising the *guided* INVALID_INPUT path (a bare unknown id like "NOT-A-RULE" yields none).
-    await expectToolError("lint", { content: "# Title\n", rules: [{ rule: "SIZE-002" }] }, "INVALID_INPUT");
+    await expectToolError(
+      "lint",
+      { content: "# Title\n", rules: [{ rule: "SIZE-002" }] },
+      "INVALID_INPUT",
+    );
   });
 
   it("lint-files: reports REF-001 from a fixture and CONFIG_INVALID on malformed config", async () => {
     const ok = await client.callTool({
       name: "lint-files",
-      arguments: { cwd: lintFindingsProject }
+      arguments: { cwd: lintFindingsProject },
     });
     expect(ok.isError).toBeFalsy();
     const output = structuredOf(ok);
     expect(output.errorCount).toBe(1);
-    expect((output.messages as Array<{ ruleId: string }>)[0]!.ruleId).toBe("REF-001");
+    expect((output.messages as Array<{ ruleId: string }>)[0]!.ruleId).toBe(
+      "REF-001",
+    );
 
     const dir = await makeTempDir("mcp-it-lf-invalid-");
-    await writeFile(path.join(dir, "wastech-mdlint.config.json"), "{ not valid ", "utf8");
+    await writeFile(
+      path.join(dir, "wastech-mdlint.config.json"),
+      "{ not valid ",
+      "utf8",
+    );
     await expectToolError("lint-files", { cwd: dir }, "CONFIG_INVALID");
   });
 
   it("context-graph: returns nodes with a cycle and CONFIG_INVALID on malformed config", async () => {
-    const ok = await client.callTool({ name: "context-graph", arguments: { cwd: graphProject } });
+    const ok = await client.callTool({
+      name: "context-graph",
+      arguments: { cwd: graphProject },
+    });
     expect(ok.isError).toBeFalsy();
     const output = structuredOf(ok);
     expect((output.nodes as unknown[]).length).toBe(7);
     expect((output.cycles as unknown[]).length).toBe(1);
 
     const dir = await makeTempDir("mcp-it-cg-invalid-");
-    await writeFile(path.join(dir, "wastech-mdlint.config.json"), "{ not valid ", "utf8");
+    await writeFile(
+      path.join(dir, "wastech-mdlint.config.json"),
+      "{ not valid ",
+      "utf8",
+    );
     await expectToolError("context-graph", { cwd: dir }, "CONFIG_INVALID");
   });
 
@@ -172,7 +203,7 @@ describe("mcp-server over stdio", () => {
     // tool's contract), so the error case uses the malformed-config path instead.
     const ok = await client.callTool({
       name: "context-slice",
-      arguments: { cwd: graphProject, query: "guide.md", depth: 1 }
+      arguments: { cwd: graphProject, query: "guide.md", depth: 1 },
     });
     expect(ok.isError).toBeFalsy();
     const output = structuredOf(ok);
@@ -180,24 +211,38 @@ describe("mcp-server over stdio", () => {
     expect(output.files).toEqual(["guide.md", "requirements.md"]);
 
     const dir = await makeTempDir("mcp-it-cs-invalid-");
-    await writeFile(path.join(dir, "wastech-mdlint.config.json"), "{ not valid ", "utf8");
-    await expectToolError("context-slice", { cwd: dir, query: "guide.md" }, "CONFIG_INVALID");
+    await writeFile(
+      path.join(dir, "wastech-mdlint.config.json"),
+      "{ not valid ",
+      "utf8",
+    );
+    await expectToolError(
+      "context-slice",
+      { cwd: dir, query: "guide.md" },
+      "CONFIG_INVALID",
+    );
   });
 
   it("impact-analysis: classifies a blast radius and TARGET_NOT_FOUND for a missing file", async () => {
     const ok = await client.callTool({
       name: "impact-analysis",
-      arguments: { cwd: graphProject, file: "requirements.md" }
+      arguments: { cwd: graphProject, file: "requirements.md" },
     });
     expect(ok.isError).toBeFalsy();
     const output = structuredOf(ok);
     expect(output.directlyAffected).toEqual([
       { path: "design.md", references: 1 },
-      { path: "guide.md", references: 1 }
+      { path: "guide.md", references: 1 },
     ]);
-    expect(output.transitivelyAffected).toEqual([{ path: "index.md", depth: 2, via: "guide.md" }]);
+    expect(output.transitivelyAffected).toEqual([
+      { path: "index.md", depth: 2, via: "guide.md" },
+    ]);
 
-    await expectToolError("impact-analysis", { cwd: graphProject, file: "missing.md" }, "TARGET_NOT_FOUND");
+    await expectToolError(
+      "impact-analysis",
+      { cwd: graphProject, file: "missing.md" },
+      "TARGET_NOT_FOUND",
+    );
   });
 
   it("compile-context: matches core's oracle on success and COMPILE_CONFIG_MISSING when absent", async () => {
@@ -207,14 +252,17 @@ describe("mcp-server over stdio", () => {
       JSON.stringify({
         include: ["**/*.md"],
         rules: [{ rule: "REF-001" }],
-        compile: { skill: { name: "docs-skill", description: "Docs skill" } }
+        compile: { skill: { name: "docs-skill", description: "Docs skill" } },
       }),
-      "utf8"
+      "utf8",
     );
     await writeFile(path.join(dir, "a.md"), "# A\n\n[b](b.md)\n", "utf8");
     await writeFile(path.join(dir, "b.md"), "# B\n", "utf8");
 
-    const ok = await client.callTool({ name: "compile-context", arguments: { cwd: dir } });
+    const ok = await client.callTool({
+      name: "compile-context",
+      arguments: { cwd: dir },
+    });
     expect(ok.isError).toBeFalsy();
 
     // Independent oracle: core's own pipeline, proving the tool reshapes nothing. This is also the
@@ -225,7 +273,7 @@ describe("mcp-server over stdio", () => {
     expect(content[0]!.text).toBe(expected.skillContent);
     expect(content[1]!.text).toBe(
       `Documents: ${expected.metadata.documentCount}, Rules: ${expected.metadata.ruleCount}, ` +
-        `Components: ${expected.metadata.componentCount}`
+        `Components: ${expected.metadata.componentCount}`,
     );
 
     const missingDir = await makeTempDir("mcp-it-cc-missing-");
@@ -233,6 +281,10 @@ describe("mcp-server over stdio", () => {
     // compile-context's success path returns no structuredContent (M1); its error path returns the
     // machine payload in `structuredContent` (no `outputSchema` to conflict with) like every other
     // tool — pinned here at the wire level.
-    await expectToolError("compile-context", { cwd: missingDir }, "COMPILE_CONFIG_MISSING");
+    await expectToolError(
+      "compile-context",
+      { cwd: missingDir },
+      "COMPILE_CONFIG_MISSING",
+    );
   });
 });

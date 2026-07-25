@@ -18,10 +18,14 @@ export const ctx001: RuleDefinition = defineRule({
     description: "Sections are not empty or placeholder-only.",
     defaultSeverity: "warning",
     scope: "document",
-    fixable: false
+    fixable: false,
   },
   optionsSchema: z
-    .object({ section: z.string().optional(), placeholders: z.array(z.string()).optional(), ...fileScopeShape })
+    .object({
+      section: z.string().optional(),
+      placeholders: z.array(z.string()).optional(),
+      ...fileScopeShape,
+    })
     .strict(),
   check: (options) => (context) => {
     if (!matchesFileScope(context.filePath!, options)) {
@@ -29,11 +33,11 @@ export const ctx001: RuleDefinition = defineRule({
     }
     for (const finding of noPlaceholders(context.document!, {
       section: options.section,
-      placeholders: options.placeholders
+      placeholders: options.placeholders,
     })) {
       context.report({ ...finding, helpUri: "CTX-001" });
     }
-  }
+  },
 });
 
 // CTX-002 — all checklist items checked.
@@ -44,17 +48,21 @@ export const ctx002: RuleDefinition = defineRule({
     description: "All checklist items are checked.",
     defaultSeverity: "warning",
     scope: "document",
-    fixable: false
+    fixable: false,
   },
-  optionsSchema: z.object({ section: z.string().optional(), ...fileScopeShape }).strict(),
+  optionsSchema: z
+    .object({ section: z.string().optional(), ...fileScopeShape })
+    .strict(),
   check: (options) => (context) => {
     if (!matchesFileScope(context.filePath!, options)) {
       return;
     }
-    for (const finding of allChecked(context.document!, { section: options.section })) {
+    for (const finding of allChecked(context.document!, {
+      section: options.section,
+    })) {
       context.report({ ...finding, helpUri: "CTX-002" });
     }
-  }
+  },
 });
 
 // Match a term as a whole word (so "APIs" or "myapi" do not match "api"). Escapes regex-special
@@ -73,7 +81,7 @@ export const ctx003: RuleDefinition = defineRule({
     description: "Content uses canonical glossary terms instead of aliases.",
     defaultSeverity: "warning",
     scope: "project",
-    fixable: false
+    fixable: false,
   },
   optionsSchema: z
     .object({
@@ -81,7 +89,7 @@ export const ctx003: RuleDefinition = defineRule({
       termColumn: z.string().min(1),
       aliasColumn: z.string().min(1).optional(),
       section: z.string().optional(),
-      ...fileScopeShape
+      ...fileScopeShape,
     })
     .strict(),
   check: (options) => (context) => {
@@ -100,7 +108,9 @@ export const ctx003: RuleDefinition = defineRule({
           if (canonical.length === 0 || options.aliasColumn === undefined) {
             continue;
           }
-          for (const alias of (row.cells[options.aliasColumn] ?? "").split(/\s*,\s*/)) {
+          for (const alias of (row.cells[options.aliasColumn] ?? "").split(
+            /\s*,\s*/,
+          )) {
             const trimmed = alias.trim();
             if (trimmed.length > 0 && trimmed !== canonical) {
               aliasToCanonical.set(trimmed, canonical);
@@ -116,7 +126,10 @@ export const ctx003: RuleDefinition = defineRule({
 
     for (const document of context.documents!.values()) {
       // Never flag the glossary itself, and honor file scoping.
-      if (matchesConfigGlob(document.path, [options.glossary]) || !matchesFileScope(document.path, options)) {
+      if (
+        matchesConfigGlob(document.path, [options.glossary]) ||
+        !matchesFileScope(document.path, options)
+      ) {
         continue;
       }
 
@@ -126,8 +139,12 @@ export const ctx003: RuleDefinition = defineRule({
           : document.headings
               .filter((heading) => heading.text === options.section)
               .map((heading) => ({
-                text: extractSectionBody(document.content, document.headings, heading),
-                baseLine: heading.line
+                text: extractSectionBody(
+                  document.content,
+                  document.headings,
+                  heading,
+                ),
+                baseLine: heading.line,
               }));
 
       for (const { text, baseLine } of scanTargets) {
@@ -135,16 +152,18 @@ export const ctx003: RuleDefinition = defineRule({
           for (const match of text.matchAll(wholeWordRegex(alias))) {
             context.report({
               message: `Use canonical term "${canonical}" instead of alias "${alias}".`,
-              line: baseLine + findLineNumber(text, (match.index ?? 0) + match[1]!.length),
+              line:
+                baseLine +
+                findLineNumber(text, (match.index ?? 0) + match[1]!.length),
               filePath: document.path,
               data: { alias, canonical },
-              helpUri: "CTX-003"
+              helpUri: "CTX-003",
             });
           }
         }
       }
     }
-  }
+  },
 });
 
 export const CTX_RULES: readonly RuleDefinition[] = [ctx001, ctx002, ctx003];

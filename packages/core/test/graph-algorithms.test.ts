@@ -4,7 +4,7 @@ import { buildContextGraph } from "../src/graph/build-context-graph.js";
 import {
   formatContextGraphSummary,
   getComponents,
-  topologicalSort
+  topologicalSort,
 } from "../src/graph/graph-algorithms.js";
 import type { ParsedDocument } from "../src/markdown/document-types.js";
 import { parseDocument } from "../src/markdown/parse-document.js";
@@ -21,21 +21,38 @@ function graphOf(entries: Record<string, string>) {
 
 describe("topologicalSort", () => {
   it("orders a linear chain with nothing excluded", () => {
-    const graph = graphOf({ "a.md": "[b](b.md)\n", "b.md": "[c](c.md)\n", "c.md": "# C\n" });
+    const graph = graphOf({
+      "a.md": "[b](b.md)\n",
+      "b.md": "[c](c.md)\n",
+      "c.md": "# C\n",
+    });
 
-    expect(topologicalSort(graph)).toEqual({ order: ["a.md", "b.md", "c.md"], excluded: [] });
+    expect(topologicalSort(graph)).toEqual({
+      order: ["a.md", "b.md", "c.md"],
+      excluded: [],
+    });
   });
 
   it("emits multiple zero-in-degree roots in sorted order", () => {
-    const graph = graphOf({ "a.md": "[z](z.md)\n", "b.md": "[z](z.md)\n", "z.md": "# Z\n" });
+    const graph = graphOf({
+      "a.md": "[z](z.md)\n",
+      "b.md": "[z](z.md)\n",
+      "z.md": "# Z\n",
+    });
 
-    expect(topologicalSort(graph)).toEqual({ order: ["a.md", "b.md", "z.md"], excluded: [] });
+    expect(topologicalSort(graph)).toEqual({
+      order: ["a.md", "b.md", "z.md"],
+      excluded: [],
+    });
   });
 
   it("excludes both members of a 2-cycle and emits an empty order", () => {
     const graph = graphOf({ "a.md": "[b](b.md)\n", "b.md": "[a](a.md)\n" });
 
-    expect(topologicalSort(graph)).toEqual({ order: [], excluded: ["a.md", "b.md"] });
+    expect(topologicalSort(graph)).toEqual({
+      order: [],
+      excluded: ["a.md", "b.md"],
+    });
   });
 
   it("excludes a node reachable only through a cycle (honest excluded-set semantics)", () => {
@@ -46,20 +63,26 @@ describe("topologicalSort", () => {
       "b.md": "[a](a.md)\n[c](c.md)\n",
       "c.md": "# C\n",
       "x.md": "[y](y.md)\n",
-      "y.md": "# Y\n"
+      "y.md": "# Y\n",
     });
 
     expect(topologicalSort(graph)).toEqual({
       order: ["x.md", "y.md"],
-      excluded: ["a.md", "b.md", "c.md"]
+      excluded: ["a.md", "b.md", "c.md"],
     });
   });
 
   it("still orders a target fed by parallel edges (deduped-in-degree regression)", () => {
     // Two `a→b` links: raw in-degree of b is 2, so an un-deduped Kahn's would strand b in `excluded`.
-    const graph = graphOf({ "a.md": "[one](b.md)\n[two](b.md)\n", "b.md": "# B\n" });
+    const graph = graphOf({
+      "a.md": "[one](b.md)\n[two](b.md)\n",
+      "b.md": "# B\n",
+    });
 
-    expect(topologicalSort(graph)).toEqual({ order: ["a.md", "b.md"], excluded: [] });
+    expect(topologicalSort(graph)).toEqual({
+      order: ["a.md", "b.md"],
+      excluded: [],
+    });
   });
 });
 
@@ -70,12 +93,12 @@ describe("getComponents", () => {
       "b.md": "[c](c.md)\n",
       "c.md": "# C\n",
       "x.md": "[y](y.md)\n",
-      "y.md": "# Y\n"
+      "y.md": "# Y\n",
     });
 
     expect(getComponents(graph)).toEqual([
       ["a.md", "b.md", "c.md"],
-      ["x.md", "y.md"]
+      ["x.md", "y.md"],
     ]);
   });
 
@@ -84,17 +107,21 @@ describe("getComponents", () => {
       "a.md": "[b](b.md)\n",
       "b.md": "# B\n",
       "c.md": "[d](d.md)\n",
-      "d.md": "# D\n"
+      "d.md": "# D\n",
     });
 
     expect(getComponents(graph)).toEqual([
       ["a.md", "b.md"],
-      ["c.md", "d.md"]
+      ["c.md", "d.md"],
     ]);
   });
 
   it("reports an unlinked file as its own singleton component", () => {
-    const graph = graphOf({ "a.md": "[b](b.md)\n", "b.md": "# B\n", "lonely.md": "# Lonely\n" });
+    const graph = graphOf({
+      "a.md": "[b](b.md)\n",
+      "b.md": "# B\n",
+      "lonely.md": "# Lonely\n",
+    });
 
     expect(getComponents(graph)).toEqual([["a.md", "b.md"], ["lonely.md"]]);
   });
@@ -111,7 +138,7 @@ describe("formatContextGraphSummary", () => {
     const graph = graphOf({
       "index.md": "[a](a.md)\n[b](b.md)\n",
       "a.md": "[b](b.md)\n",
-      "b.md": "# B\n"
+      "b.md": "# B\n",
     });
 
     expect(formatContextGraphSummary(graph)).toBe(
@@ -123,8 +150,8 @@ describe("formatContextGraphSummary", () => {
         "top hubs:",
         "  a.md (2)",
         "  b.md (2)",
-        "  index.md (2)"
-      ].join("\n")
+        "  index.md (2)",
+      ].join("\n"),
     );
   });
 
@@ -141,8 +168,8 @@ describe("formatContextGraphSummary", () => {
         "  a.md (2)",
         "  b.md (2)",
         "cycles:",
-        "  a.md -> b.md -> a.md"
-      ].join("\n")
+        "  a.md -> b.md -> a.md",
+      ].join("\n"),
     );
   });
 });

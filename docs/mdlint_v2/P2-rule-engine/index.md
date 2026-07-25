@@ -11,7 +11,7 @@
 
 The current implementation has three hardcoded rule functions and a sectioned config. The target is a
 schema-validated registry over a closed **assertion-primitive vocabulary**, where the 22
-built-ins are *presets* and users add **declarative custom rules** with no rebuild
+built-ins are _presets_ and users add **declarative custom rules** with no rebuild
 ([R9](../requirements/02-rules-engine.md)). Severity resolution ([R1](../requirements/02-rules-engine.md)/[C2](../requirements/01-configuration.md)),
 inline-disable ([R8](../requirements/02-rules-engine.md)), structured findings
 ([R3](../requirements/02-rules-engine.md)), the new config
@@ -20,15 +20,15 @@ inline-disable ([R8](../requirements/02-rules-engine.md)), structured findings
 
 ## Tasks
 
-| # | Task | Size | Depends on |
-| --- | --- | --- | --- |
-| [P2.01](01-engine-core-types.md) | Engine core types: `Rule`/`RuleContext`/`LintMessage`/`runRules` | M | P1 done |
-| [P2.02](02-assertion-primitives.md) | Assertion primitive vocabulary (executors over `ParsedDocument`) | L | P2.01 |
-| [P2.03](03-registry-metadata.md) | Rule registry + single metadata source + canonical IDs | M | P2.02 |
-| [P2.04](04-config-model-loader.md) | New config model + JSONC loader + `findConfig` | L | P2.03 |
-| [P2.05](05-orchestration-lintfiles.md) | `lintFiles()` orchestration (scope, severity, inline-disable) | L | P2.04 |
-| [P2.06](06-schema-generation.md) | `schema.json` generation + sync test + `schema` command | M | P2.03, P2.04 |
-| [P2.07](07-first-rules-lint-command.md) | First rules through the engine + `lint` command (D4) | M | P2.05, P2.06 |
+| #                                       | Task                                                             | Size | Depends on   |
+| --------------------------------------- | ---------------------------------------------------------------- | ---- | ------------ |
+| [P2.01](01-engine-core-types.md)        | Engine core types: `Rule`/`RuleContext`/`LintMessage`/`runRules` | M    | P1 done      |
+| [P2.02](02-assertion-primitives.md)     | Assertion primitive vocabulary (executors over `ParsedDocument`) | L    | P2.01        |
+| [P2.03](03-registry-metadata.md)        | Rule registry + single metadata source + canonical IDs           | M    | P2.02        |
+| [P2.04](04-config-model-loader.md)      | New config model + JSONC loader + `findConfig`                   | L    | P2.03        |
+| [P2.05](05-orchestration-lintfiles.md)  | `lintFiles()` orchestration (scope, severity, inline-disable)    | L    | P2.04        |
+| [P2.06](06-schema-generation.md)        | `schema.json` generation + sync test + `schema` command          | M    | P2.03, P2.04 |
+| [P2.07](07-first-rules-lint-command.md) | First rules through the engine + `lint` command (D4)             | M    | P2.05, P2.06 |
 
 ## Sequence
 

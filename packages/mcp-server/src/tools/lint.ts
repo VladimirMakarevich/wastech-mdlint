@@ -11,7 +11,7 @@ import {
   type ResolvedRule,
   type Rule,
   type RuleConfigEntry,
-  type ToolErrorCode
+  type ToolErrorCode,
 } from "@wastech-mdlint/core";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
@@ -22,13 +22,13 @@ import {
   errorResult,
   READ_ONLY_ANNOTATIONS,
   successResult,
-  withErrorOutput
+  withErrorOutput,
 } from "../shared/tool-response.js";
 
-// `lint` — lint ad-hoc Markdown text against an explicit set of rules. This tool never touches the
-// filesystem or a config file (that is `lint-files`' job): the whole contract is "content + rules
-// in, findings out", so the input carries the rules to run rather than resolving them from a
-// project config.
+// `lint` — lint ad-hoc Markdown text against an explicit set of rules. This tool never loads a
+// project config (that is `lint-files`' job): the whole contract is "content + rules in, findings
+// out", so the input carries the rules to run rather than resolving them from a config. Core still
+// owns rule semantics, so file-resolving rules may inspect paths under the server cwd.
 
 // A synthetic in-memory path for the single document. Ends in `.md` because some built-in rules
 // accept `files`/`exclude` glob options (fileScopeShape) and match them against the document path;
@@ -41,13 +41,13 @@ const AD_HOC_DOCUMENT_PATH = "content.md";
 // than silently ignoring it.
 const lintInputShape = {
   content: z.string(),
-  rules: z.array(ruleEntrySchema)
+  rules: z.array(ruleEntrySchema),
 } as const;
 
 const lintOutputShape = {
   messages: z.array(lintMessageSchema),
   errorCount: z.number().int(),
-  warningCount: z.number().int()
+  warningCount: z.number().int(),
 } as const;
 
 // Wire clients validate `structuredContent` against `outputSchema` even on errors, so the error
@@ -55,7 +55,7 @@ const lintOutputShape = {
 const EMPTY_LINT_OUTPUT = {
   messages: [],
   errorCount: 0,
-  warningCount: 0
+  warningCount: 0,
 } as const;
 
 type LintToolInput = { content: string; rules: RuleConfigEntry[] };
@@ -80,7 +80,9 @@ class ToolInputError extends Error {
 function toToolInputError(error: RuleResolutionError): ToolInputError {
   if (error.code === "UNKNOWN_RULE") {
     const hint =
-      error.suggestion === undefined ? undefined : `Did you mean "${error.suggestion}"?`;
+      error.suggestion === undefined
+        ? undefined
+        : `Did you mean "${error.suggestion}"?`;
     return new ToolInputError(error.message, hint);
   }
 
@@ -93,7 +95,9 @@ function toToolInputError(error: RuleResolutionError): ToolInputError {
 
 // Resolve requested entries to runnable rules, mirroring lintFiles' resolve-then-filter of `"off"`
 // (that helper isn't exported and is only ~6 lines — not worth a core export for one caller).
-function resolveRequestedRules(entries: readonly RuleConfigEntry[]): ResolvedRule[] {
+function resolveRequestedRules(
+  entries: readonly RuleConfigEntry[],
+): ResolvedRule[] {
   const resolved: ResolvedRule[] = [];
   for (const entry of entries) {
     let rule: Rule;
@@ -116,7 +120,10 @@ function resolveRequestedRules(entries: readonly RuleConfigEntry[]): ResolvedRul
 export function handleLint(input: LintToolInput): CallToolResult {
   try {
     const resolved = resolveRequestedRules(input.rules);
-    const document = parseDocument({ path: AD_HOC_DOCUMENT_PATH, content: input.content });
+    const document = parseDocument({
+      path: AD_HOC_DOCUMENT_PATH,
+      content: input.content,
+    });
 
     // Build a "corpus of one" so R4's project-scope fail-fast is satisfied uniformly for any rule
     // scope without special-casing: `documents` and `projectFiles` are non-empty.
@@ -132,14 +139,16 @@ export function handleLint(input: LintToolInput): CallToolResult {
     // a real ContextGraph for a one-document corpus needs siteRouter/idRef wiring this tool's
     // `{ content, rules }` input has no slot for — and would only ever flag the lone doc as an
     // orphan. Intentional scope boundary, not a gap.
-    const documents = new Map<string, ParsedDocument>([[document.path, document]]);
+    const documents = new Map<string, ParsedDocument>([
+      [document.path, document],
+    ]);
     const rawMessages: LintMessage[] = runRules(resolved, {
       document,
       filePath: document.path,
       documents,
       projectFiles: [document.path],
       rootDir: process.cwd(),
-      settings: {}
+      settings: {},
     });
 
     // Apply inline-disable suppression (R8), matching `lintFiles`: drop each message whose
@@ -147,10 +156,16 @@ export function handleLint(input: LintToolInput): CallToolResult {
     // Without this the `lint` tool would disagree with `lint-files` on the same directive-bearing
     // text. The runner already sorted `rawMessages`, so filtering preserves that order.
     const isSuppressed = createSuppressionChecker(document.directives);
-    const messages = rawMessages.filter((message) => !isSuppressed(message.ruleId, message.line));
+    const messages = rawMessages.filter(
+      (message) => !isSuppressed(message.ruleId, message.line),
+    );
 
-    const errorCount = messages.filter((message) => message.severity === "error").length;
-    const warningCount = messages.filter((message) => message.severity === "warning").length;
+    const errorCount = messages.filter(
+      (message) => message.severity === "error",
+    ).length;
+    const warningCount = messages.filter(
+      (message) => message.severity === "warning",
+    ).length;
 
     // Reuse core's text formatter so `lint` and `lint-files` render byte-for-byte consistently.
     // `formatLintResultText` never reads `.files`, so the one-entry placeholder only satisfies the
@@ -159,10 +174,13 @@ export function handleLint(input: LintToolInput): CallToolResult {
       messages,
       files: [AD_HOC_DOCUMENT_PATH],
       errorCount,
-      warningCount
+      warningCount,
     });
 
-    return successResult({ summary, structured: { messages, errorCount, warningCount } });
+    return successResult({
+      summary,
+      structured: { messages, errorCount, warningCount },
+    });
   } catch (error) {
     return errorResult(error, EMPTY_LINT_OUTPUT);
   }
@@ -174,11 +192,13 @@ export function registerLintTool(server: McpServer): void {
     {
       title: "Lint Markdown content",
       description:
-        "Lint ad-hoc Markdown content against an explicit set of rules. Reads no filesystem or config.",
+        "Lint ad-hoc Markdown content against an explicit set of rules. Does not load project config; " +
+        "file-resolving rules such as REF-001/REF-003 and SEC-003 may probe or read paths relative " +
+        "to the server's working directory.",
       inputSchema: lintInputShape,
       outputSchema: withErrorOutput(lintOutputShape),
-      annotations: READ_ONLY_ANNOTATIONS
+      annotations: READ_ONLY_ANNOTATIONS,
     },
-    (input) => handleLint(input)
+    (input) => handleLint(input),
   );
 }

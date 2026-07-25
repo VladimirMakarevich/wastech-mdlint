@@ -25,7 +25,7 @@ implementing the locked [configuration requirements](../requirements/01-configur
 ## Deliverables / steps
 
 1. Zod **root schema**: `{ $schema?, include?, exclude?, respectGitignore?, settings?,
-   rules: [{ rule, severity?: "error"|"warning"|"off", options? }], compile? }`.
+rules: [{ rule, severity?: "error"|"warning"|"off", options? }], compile? }`.
    - top-level `exclude` ([C1](../requirements/01-configuration.md), wins over include);
    - per-rule `severity` ([C2](../requirements/01-configuration.md));
    - `settings.siteRouter` shared/inheritable ([C5](../requirements/01-configuration.md));

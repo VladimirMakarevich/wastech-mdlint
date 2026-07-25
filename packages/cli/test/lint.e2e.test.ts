@@ -4,7 +4,11 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { EXIT_CODE_RUNTIME_ERROR, EXIT_CODE_SUCCESS, EXIT_CODE_USAGE_ERROR } from "../src/commands.js";
+import {
+  EXIT_CODE_RUNTIME_ERROR,
+  EXIT_CODE_SUCCESS,
+  EXIT_CODE_USAGE_ERROR,
+} from "../src/commands.js";
 import { runCli } from "../src/program.js";
 
 function createMemoryWriter() {
@@ -14,22 +18,26 @@ function createMemoryWriter() {
       write(chunk: string) {
         text += chunk;
         return true;
-      }
+      },
     },
     read() {
       return text;
-    }
+    },
   };
 }
 
 const tempDirs: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
+  );
 });
 
 async function fixtureRepo(files: Record<string, string>): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-cli-lint-"));
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "wastech-mdlint-cli-lint-"),
+  );
   tempDirs.push(root);
   for (const [relativePath, content] of Object.entries(files)) {
     await writeFile(path.join(root, relativePath), content, "utf8");
@@ -40,7 +48,11 @@ async function fixtureRepo(files: Record<string, string>): Promise<string> {
 async function run(args: string[], cwd: string) {
   const stdout = createMemoryWriter();
   const stderr = createMemoryWriter();
-  const exitCode = await runCli(args, { cwd, stdout: stdout.stream, stderr: stderr.stream });
+  const exitCode = await runCli(args, {
+    cwd,
+    stdout: stdout.stream,
+    stderr: stderr.stream,
+  });
   return { exitCode, stdout: stdout.read(), stderr: stderr.read() };
 }
 
@@ -48,7 +60,9 @@ describe("lint command", () => {
   it("reports findings and exits 1 under the default fail-on error", async () => {
     const cwd = await fixtureRepo({
       "a.md": "[broken](missing.md)\n",
-      "wastech-mdlint.config.json": JSON.stringify({ rules: [{ rule: "REF-001" }] })
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "REF-001" }],
+      }),
     });
 
     const result = await run(["lint", cwd], cwd);
@@ -61,7 +75,9 @@ describe("lint command", () => {
     const cwd = await fixtureRepo({
       "a.md": "[ok](b.md)\n",
       "b.md": "# B\n",
-      "wastech-mdlint.config.json": JSON.stringify({ rules: [{ rule: "REF-001" }] })
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "REF-001" }],
+      }),
     });
 
     const result = await run(["lint", cwd], cwd);
@@ -72,12 +88,20 @@ describe("lint command", () => {
   it("emits structured JSON with --format json", async () => {
     const cwd = await fixtureRepo({
       "a.md": "[broken](missing.md)\n",
-      "wastech-mdlint.config.json": JSON.stringify({ rules: [{ rule: "REF-001" }] })
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "REF-001" }],
+      }),
     });
 
-    const result = await run(["lint", cwd, "--format", "json", "--fail-on", "off"], cwd);
+    const result = await run(
+      ["lint", cwd, "--format", "json", "--fail-on", "off"],
+      cwd,
+    );
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
-    const parsed = JSON.parse(result.stdout) as { summary: { errors: number }; messages: unknown[] };
+    const parsed = JSON.parse(result.stdout) as {
+      summary: { errors: number };
+      messages: unknown[];
+    };
     expect(parsed.summary.errors).toBe(1);
     expect(parsed.messages).toHaveLength(1);
   });
@@ -86,8 +110,8 @@ describe("lint command", () => {
     const cwd = await fixtureRepo({
       "a.md": ["| ID | Owner |", "| --- | --- |", "| REQ-1 |  |"].join("\n"),
       "wastech-mdlint.config.json": JSON.stringify({
-        rules: [{ rule: "TBL-002", options: { columns: ["Owner"] } }]
-      })
+        rules: [{ rule: "TBL-002", options: { columns: ["Owner"] } }],
+      }),
     });
 
     const result = await run(["lint", cwd, "--fix"], cwd);
@@ -100,12 +124,16 @@ describe("lint command", () => {
   it("maps config errors to exit 2 with a did-you-mean diagnostic", async () => {
     const cwd = await fixtureRepo({
       "a.md": "# A\n",
-      "wastech-mdlint.config.json": JSON.stringify({ rules: [{ rule: "REF-999" }] })
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "REF-999" }],
+      }),
     });
 
     const result = await run(["lint", cwd], cwd);
     expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
-    expect(result.stderr).toMatch(/Unknown rule "REF-999"\. Did you mean "REF-001"\?/);
+    expect(result.stderr).toMatch(
+      /Unknown rule "REF-999"\. Did you mean "REF-001"\?/,
+    );
   });
 });
 
@@ -119,6 +147,9 @@ describe("schema command", () => {
 
     const written = await readFile(outPath, "utf8");
     expect(written).not.toMatch(/raw\.githubusercontent|https:\/\/github/);
-    expect(JSON.parse(written)).toHaveProperty("title", "wastech-mdlint configuration");
+    expect(JSON.parse(written)).toHaveProperty(
+      "title",
+      "wastech-mdlint configuration",
+    );
   });
 });

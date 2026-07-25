@@ -7,17 +7,17 @@
 
 ## Decisions
 
-| # | Improvement | Status | Notes |
-| --- | --- | --- | --- |
-| **G1** | ID / anchor / eager-import edges as first-class | ✅ Accepted | Extend `GraphEdge.type`; promote semantic links into real edges. Ties to [D3](../index.md), [R5/R9](02-rules-engine.md). |
-| **G2** | Unified query layer for slice/impact/MCP/skills | ✅ Accepted | One `query(graph, …)` API. Ties to R5. |
-| **G3** | Edge metadata (`text`, `rawTarget`) | ✅ Accepted | Explainability for CLI/MCP/`--fix`. |
-| **G4** | Honest deterministic ID/anchor/heading index for `slice` | ✅ Accepted | Real index, no fuzzy/LLM. Fixes the "search" misnomer. |
-| **G5** | Coverage signal when graph input is incomplete | ✅ Accepted | Warn on linked-to on-disk files outside `include`. |
-| **G6** | Explicit cycle detection (reuse the existing Tarjan SCC) | ✅ Accepted | Replaces silent Kahn truncation; feeds `GRP-001`. |
-| **G7** | Collapse duplicate edges with `count` | 🔵 Backlog | Next implementation iteration. |
-| **G8** | Incremental / cached graph rebuild | 🔵 Backlog | Next iteration; design loader so a cache can slot in. |
-| **G9** | `graph` export to Mermaid / DOT | ✅ Accepted | `--format mermaid\|dot` alongside JSON. |
+| #      | Improvement                                              | Status      | Notes                                                                                                                    |
+| ------ | -------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **G1** | ID / anchor / eager-import edges as first-class          | ✅ Accepted | Extend `GraphEdge.type`; promote semantic links into real edges. Ties to [D3](../index.md), [R5/R9](02-rules-engine.md). |
+| **G2** | Unified query layer for slice/impact/MCP/skills          | ✅ Accepted | One `query(graph, …)` API. Ties to R5.                                                                                   |
+| **G3** | Edge metadata (`text`, `rawTarget`)                      | ✅ Accepted | Explainability for CLI/MCP/`--fix`.                                                                                      |
+| **G4** | Honest deterministic ID/anchor/heading index for `slice` | ✅ Accepted | Real index, no fuzzy/LLM. Fixes the "search" misnomer.                                                                   |
+| **G5** | Coverage signal when graph input is incomplete           | ✅ Accepted | Warn on linked-to on-disk files outside `include`.                                                                       |
+| **G6** | Explicit cycle detection (reuse the existing Tarjan SCC) | ✅ Accepted | Replaces silent Kahn truncation; feeds `GRP-001`.                                                                        |
+| **G7** | Collapse duplicate edges with `count`                    | 🔵 Backlog  | Next implementation iteration.                                                                                           |
+| **G8** | Incremental / cached graph rebuild                       | 🔵 Backlog  | Next iteration; design loader so a cache can slot in.                                                                    |
+| **G9** | `graph` export to Mermaid / DOT                          | ✅ Accepted | `--format mermaid\|dot` alongside JSON.                                                                                  |
 
 ## Detail & rationale
 
@@ -38,12 +38,12 @@
   file→file. **Exactly one edge is materialized per source construct**, typed by the construct —
   the types are mutually exclusive:
 
-  | Type | Source construct | Target | Example |
-  | --- | --- | --- | --- |
-  | `link` | Markdown link **without** a `#fragment` | target file | `[API](api.md)` → edge to `api.md` |
-  | `anchor` | Markdown link **with** a `#fragment` | target file | `[API](api.md#auth)` → `anchor` edge to `api.md` |
-  | `image` | `![alt](img)` | image target | `![d](d.png)` → `image` edge |
-  | `import` | `@path.md` eager import (D3) | imported file | `@glossary.md` → `import` edge |
+  | Type     | Source construct                                                            | Target        | Example                                                                |
+  | -------- | --------------------------------------------------------------------------- | ------------- | ---------------------------------------------------------------------- |
+  | `link`   | Markdown link **without** a `#fragment`                                     | target file   | `[API](api.md)` → edge to `api.md`                                     |
+  | `anchor` | Markdown link **with** a `#fragment`                                        | target file   | `[API](api.md#auth)` → `anchor` edge to `api.md`                       |
+  | `image`  | `![alt](img)`                                                               | image target  | `![d](d.png)` → `image` edge                                           |
+  | `import` | `@path.md` eager import (D3)                                                | imported file | `@glossary.md` → `import` edge                                         |
   | `id-ref` | plain-text token matching an ID defined elsewhere (via `extractDefinedIds`) | defining file | `REQ-001` in `design.md` → `id-ref` edge to the doc defining `REQ-001` |
 
   Rules: the presence of a `#fragment` decides `link` vs `anchor` (so `file.md#sec` is **one**
@@ -59,7 +59,7 @@
   re-implemented traversals in graph rules ([R5](02-rules-engine.md)).
 
 - **G3 — edge metadata.** Add `text?` (link/anchor label) and `rawTarget?` (`line`
-  already exists) so hosts can explain *why* an edge exists
+  already exists) so hosts can explain _why_ an edge exists
   (`design.md:42 → via "[see REQ-001]"`). Spec extension #4.
 
 - **G4 — honest deterministic search.** Both the graph spec and the MCP spec flag that

@@ -19,16 +19,16 @@ target, and a red-but-unenforced format gate. This phase fixes the code and its 
 
 ## Tasks
 
-| # | Task | Finding | Sev | Size | Depends on |
-| --- | --- | --- | --- | --- | --- |
-| [P9.01](01-import-positions.md) | Fix line/column for multi-line `@import` blocks | M-1 | MEDIUM | S | P8 |
-| [P9.02](02-deterministic-sort.md) | Replace `localeCompare` with a deterministic sort | M-4 | MEDIUM | S | P8 |
-| [P9.03](03-cross-os-ci.md) | Add Windows/macOS to the CI matrix | M-5 | MEDIUM | S | P8 |
-| [P9.04](04-mcp-lint-description.md) | Make the MCP `lint` tool description honest | M-3 | MEDIUM | S | P8 |
-| [P9.05](05-custom-heading-target.md) | Resolve the `custom` `target: "heading"` mismatch | M-2 | MEDIUM | S–M | P8 |
-| [P9.06](06-format-gate.md) | Fix and enforce the Prettier format gate | M-6 | MEDIUM | S | P8 |
-| [P9.07](07-init-ci-package-manager.md) | `init` CI workflow respects the detected package manager | L-7 | LOW | S | P8 |
-| [P9.08](08-idref-prose-scan.md) | (Stretch) Scope the id-ref scan to prose, not code fences | L-6 | LOW | M | P1 parser |
+| #                                      | Task                                                      | Finding | Sev    | Size | Depends on |
+| -------------------------------------- | --------------------------------------------------------- | ------- | ------ | ---- | ---------- |
+| [P9.01](01-import-positions.md)        | Fix line/column for multi-line `@import` blocks           | M-1     | MEDIUM | S    | P8         |
+| [P9.02](02-deterministic-sort.md)      | Replace `localeCompare` with a deterministic sort         | M-4     | MEDIUM | S    | P8         |
+| [P9.03](03-cross-os-ci.md)             | Add Windows/macOS to the CI matrix                        | M-5     | MEDIUM | S    | P8         |
+| [P9.04](04-mcp-lint-description.md)    | Make the MCP `lint` tool description honest               | M-3     | MEDIUM | S    | P8         |
+| [P9.05](05-custom-heading-target.md)   | Resolve the `custom` `target: "heading"` mismatch         | M-2     | MEDIUM | S–M  | P8         |
+| [P9.06](06-format-gate.md)             | Fix and enforce the Prettier format gate                  | M-6     | MEDIUM | S    | P8         |
+| [P9.07](07-init-ci-package-manager.md) | `init` CI workflow respects the detected package manager  | L-7     | LOW    | S    | P8         |
+| [P9.08](08-idref-prose-scan.md)        | (Stretch) Scope the id-ref scan to prose, not code fences | L-6     | LOW    | M    | P1 parser  |
 
 ## Sequence
 

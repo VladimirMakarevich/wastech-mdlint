@@ -10,11 +10,15 @@ const tempDirs: string[] = [];
 
 afterEach(async () => {
   await Promise.all(
-    tempDirs.splice(0).map((tempDir) => rm(tempDir, { recursive: true, force: true }))
+    tempDirs
+      .splice(0)
+      .map((tempDir) => rm(tempDir, { recursive: true, force: true })),
   );
 });
 
-async function createFixtureTree(files: Record<string, string>): Promise<string> {
+async function createFixtureTree(
+  files: Record<string, string>,
+): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-pm-"));
   tempDirs.push(root);
 
@@ -75,7 +79,7 @@ describe("detectPackageManager", () => {
       "package-lock.json": "",
       "yarn.lock": "",
       "pnpm-lock.yaml": "",
-      "bun.lock": ""
+      "bun.lock": "",
     });
     expect(await detectPackageManager(root)).toBe("bun");
 

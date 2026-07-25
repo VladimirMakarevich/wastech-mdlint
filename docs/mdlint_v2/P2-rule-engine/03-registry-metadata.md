@@ -31,7 +31,7 @@ metadata source that also generates `schema.json` and docs ([R6](../requirements
    - validate options via the rule's Zod schema; on failure produce a path-prefixed,
      did-you-mean diagnostic ([C7](../requirements/01-configuration.md)).
 2. Single **metadata source** per rule: `{ id, category, defaultSeverity, scope, fixable,
-   docsUrl, optionsSchema, messages }` — consumed by the registry, `schema.json` generation
+docsUrl, optionsSchema, messages }` — consumed by the registry, `schema.json` generation
    (P2.06), README, `describeRules` (P5), and `init` categories (P6).
 3. Registry stays **static** (no code-plugins, [R9 Tier 2 deferred](../requirements/02-rules-engine.md)),
    but the `custom` rule (P3) is registered as a first-class entry over the primitives. The

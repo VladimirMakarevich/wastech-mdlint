@@ -1,7 +1,7 @@
 # P9.07 · `init` CI workflow respects the detected package manager
 
 > Phase: [P9 — Post-audit remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** ·
-> Status **Not started**. Audit finding **L-7** ([report](../audit-2026-07-23-p0-p8.md)).
+> Status **Done**. Audit finding **L-7** ([report](../audit-2026-07-23-p0-p8.md)).
 
 ## Goal
 
@@ -29,6 +29,30 @@ silently discarded here.
 
 ## Exit criteria
 
-- [ ] Generated CI either uses the detected package manager or documents npm-universal by design.
-- [ ] A test pins the chosen behavior.
-- [ ] `npm test` green.
+- [x] Generated CI either uses the detected package manager or documents npm-universal by design.
+- [x] A test pins the chosen behavior.
+- [x] `npm test` green.
+
+## Implementation notes
+
+- **Chose npm-universal by design over threading the manager through.** The audit's own guess —
+  "probably a deliberate simplification, but the detection result is silently discarded" — is the
+  root cause the fix addresses: the simplification was reasonable, only undocumented. The install
+  step only fetches the external `@wastech-mdlint/cli` tool into a scratch `node_modules`; it never
+  touches the target repo's own dependency graph or lockfile, so a bun/pnpm/yarn repo's lockfile is
+  simply irrelevant to what this step does. `actions/setup-node` already provides npm on every
+  runner, so branching per manager would only add setup actions (`pnpm/action-setup`,
+  `oven-sh/setup-bun`, …) for a step whose behavior would not actually change.
+- **`detectPackageManager`/`scanRepository` are unchanged** — the detected manager is still
+  surfaced in the `init` draft summary (`Package manager: pnpm.`, etc.); only `buildCiWorkflowYaml`'s
+  doc comment and the surrounding docs were touched, per the task's scoping constraint.
+- **Documented in five places** so the decision doesn't silently re-drift: a rationale comment on
+  `buildCiWorkflowYaml` (`packages/core/src/discovery/config-writer.ts`), this task file, the
+  glossary's `config-writer.ts` entry, the P6.04 task's CI-workflow deliverable/implementation
+  notes, and the `init` section of `README.md`.
+- **Test pins the CLI-integration behavior, not just the pure function.** `buildCiWorkflowYaml`
+  already had no `packageManager` parameter to vary, so a unit test alone could not have caught the
+  audit's actual concern (the detection reaching `init-command.ts` and then going nowhere). Extended
+  `packages/cli/test/init.e2e.test.ts`'s package-manager-detection suite with one case per lockfile
+  (bun/pnpm/yarn/npm) asserting the written `.github/workflows/wastech-mdlint.yml` is still the
+  npm-based template even though the same run's draft summary reports the non-npm manager.

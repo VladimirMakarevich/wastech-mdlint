@@ -14,7 +14,7 @@ type Metric = (typeof METRICS)[number];
 const thresholdSchema = z
   .object({
     warn: z.number().int().positive().optional(),
-    error: z.number().int().positive().optional()
+    error: z.number().int().positive().optional(),
   })
   .strict();
 
@@ -23,7 +23,7 @@ const overrideSchema = z
     pattern: z.string().min(1),
     bytes: thresholdSchema.optional(),
     lines: thresholdSchema.optional(),
-    tokens: thresholdSchema.optional()
+    tokens: thresholdSchema.optional(),
   })
   .strict();
 
@@ -32,11 +32,15 @@ const size001OptionsSchema = z
     bytes: thresholdSchema.optional(),
     lines: thresholdSchema.optional(),
     tokens: thresholdSchema.optional(),
-    overrides: z.array(overrideSchema).optional()
+    overrides: z.array(overrideSchema).optional(),
   })
   .strict();
 
-const METRIC_UNIT: Record<Metric, string> = { bytes: "bytes", lines: "lines", tokens: "tokens" };
+const METRIC_UNIT: Record<Metric, string> = {
+  bytes: "bytes",
+  lines: "lines",
+  tokens: "tokens",
+};
 
 function countLines(content: string): number {
   // Count newline occurrences (P3.07): matches the legacy line metric.
@@ -56,7 +60,7 @@ export const size001: RuleDefinition = defineRule({
     description: "File stays within byte / line / token budgets.",
     defaultSeverity: "warning",
     scope: "document",
-    fixable: false
+    fixable: false,
   },
   optionsSchema: size001OptionsSchema,
   check: (options) => (context) => {
@@ -64,13 +68,13 @@ export const size001: RuleDefinition = defineRule({
     const actuals: Record<Metric, number> = {
       bytes: Buffer.byteLength(document.content, "utf8"),
       lines: countLines(document.content),
-      tokens: estimateTokens(document.content)
+      tokens: estimateTokens(document.content),
     };
 
     // First matching override supplies per-metric thresholds; unspecified metrics fall back to the
     // top-level option (P3.07).
     const override = (options.overrides ?? []).find((entry) =>
-      matchesConfigGlob(document.path, [entry.pattern])
+      matchesConfigGlob(document.path, [entry.pattern]),
     );
 
     for (const metric of METRICS) {
@@ -80,7 +84,12 @@ export const size001: RuleDefinition = defineRule({
       }
 
       const actual = actuals[metric];
-      const data = { metric, actual, warnAt: thresholds.warn, errorAt: thresholds.error };
+      const data = {
+        metric,
+        actual,
+        warnAt: thresholds.warn,
+        errorAt: thresholds.error,
+      };
 
       // Independent firing (P3.07): both a warning and an error finding can appear for one metric.
       if (thresholds.warn !== undefined && actual > thresholds.warn) {
@@ -89,7 +98,7 @@ export const size001: RuleDefinition = defineRule({
           message: `File exceeds ${metric} warn budget: ${actual} ${METRIC_UNIT[metric]} > ${thresholds.warn}.`,
           line: 0,
           data,
-          helpUri: "SIZE-001"
+          helpUri: "SIZE-001",
         });
       }
       if (thresholds.error !== undefined && actual > thresholds.error) {
@@ -98,9 +107,9 @@ export const size001: RuleDefinition = defineRule({
           message: `File exceeds ${metric} error budget: ${actual} ${METRIC_UNIT[metric]} > ${thresholds.error}.`,
           line: 0,
           data,
-          helpUri: "SIZE-001"
+          helpUri: "SIZE-001",
         });
       }
     }
-  }
+  },
 });

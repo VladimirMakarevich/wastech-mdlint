@@ -9,16 +9,28 @@ are unique across files; `Status` is from a fixed set; a `done` row must have an
 {
   "include": ["docs/requirements/**/*.md"],
   "rules": [
-    { "rule": "TBL-001", "options": { "requiredColumns": ["ID", "Owner", "Status"] } },
+    {
+      "rule": "TBL-001",
+      "options": { "requiredColumns": ["ID", "Owner", "Status"] },
+    },
     { "rule": "TBL-002", "options": { "columns": ["ID", "Status"] } },
-    { "rule": "TBL-004", "options": { "column": "ID", "pattern": "^REQ-\\d+$" } },
-    { "rule": "TBL-003", "options": { "column": "Status", "values": ["todo", "doing", "done"] } },
+    {
+      "rule": "TBL-004",
+      "options": { "column": "ID", "pattern": "^REQ-\\d+$" },
+    },
+    {
+      "rule": "TBL-003",
+      "options": { "column": "Status", "values": ["todo", "doing", "done"] },
+    },
     { "rule": "TBL-006", "options": { "column": "ID" } },
-    { "rule": "TBL-005", "options": {
-      "when": { "column": "Status", "equals": "done" },
-      "then": { "column": "Owner", "notEmpty": true }
-    } }
-  ]
+    {
+      "rule": "TBL-005",
+      "options": {
+        "when": { "column": "Status", "equals": "done" },
+        "then": { "column": "Owner", "notEmpty": true },
+      },
+    },
+  ],
 }
 ```
 

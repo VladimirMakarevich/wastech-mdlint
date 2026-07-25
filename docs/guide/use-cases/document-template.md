@@ -8,17 +8,28 @@ has its mandatory top-level files.
 ```jsonc
 {
   "rules": [
-    { "rule": "SEC-001", "options": {
-      "sections": ["Context", "Decision", "Consequences"],
-      "files": ["docs/adr/**/*.md"]
-    } },
-    { "rule": "SEC-002", "options": {
-      "order": ["Context", "Decision", "Consequences"],
-      "files": ["docs/adr/**/*.md"]
-    } },
+    {
+      "rule": "SEC-001",
+      "options": {
+        "sections": ["Context", "Decision", "Consequences"],
+        "files": ["docs/adr/**/*.md"],
+      },
+    },
+    {
+      "rule": "SEC-002",
+      "options": {
+        "order": ["Context", "Decision", "Consequences"],
+        "files": ["docs/adr/**/*.md"],
+      },
+    },
     { "rule": "SEC-003", "options": { "template": "docs/adr/_template.md" } },
-    { "rule": "STR-001", "options": { "files": ["README.md", "CONTRIBUTING.md", "docs/adr/index.md"] } }
-  ]
+    {
+      "rule": "STR-001",
+      "options": {
+        "files": ["README.md", "CONTRIBUTING.md", "docs/adr/index.md"],
+      },
+    },
+  ],
 }
 ```
 

@@ -17,14 +17,14 @@ Implement the six table rules as presets over the table primitives from
 
 ## Rules
 
-| ID | Scope | Severity | Checks | Key options |
-| --- | --- | --- | --- | --- |
-| TBL-001 | document | error | required columns present | `requiredColumns`, `section?`, `files?` |
-| TBL-002 | document | warning | target cells non-empty | `columns?`, `files?` |
-| TBL-003 | document | error | cell values in allowed set | `column`, `values`, `files?` |
-| TBL-004 | document | error | cell values match regex | `column`, `pattern`, `files?` |
-| TBL-005 | document | error | cross-column conditional (when→then) | `when`, `then`, `section?`, `files?` |
-| TBL-006 | project | error | column IDs unique across files | `files`, `column`, `idPattern?` |
+| ID      | Scope    | Severity | Checks                               | Key options                             |
+| ------- | -------- | -------- | ------------------------------------ | --------------------------------------- |
+| TBL-001 | document | error    | required columns present             | `requiredColumns`, `section?`, `files?` |
+| TBL-002 | document | warning  | target cells non-empty               | `columns?`, `files?`                    |
+| TBL-003 | document | error    | cell values in allowed set           | `column`, `values`, `files?`            |
+| TBL-004 | document | error    | cell values match regex              | `column`, `pattern`, `files?`           |
+| TBL-005 | document | error    | cross-column conditional (when→then) | `when`, `then`, `section?`, `files?`    |
+| TBL-006 | project  | error    | column IDs unique across files       | `files`, `column`, `idPattern?`         |
 
 ## Deliverables / steps
 

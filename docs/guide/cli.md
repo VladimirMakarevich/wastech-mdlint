@@ -21,11 +21,11 @@ wastech-mdlint -v | --version
 
 Every command uses the same taxonomy:
 
-| Code | Meaning |
-| --- | --- |
-| `0` | Success / clean (no findings at the `--fail-on` threshold). |
-| `1` | Findings at or above the `--fail-on` severity (lint-style commands). |
-| `2` | Operational/usage error — bad flag, invalid choice, missing config section, target outside the corpus, unreadable config. |
+| Code | Meaning                                                                                                                   |
+| ---- | ------------------------------------------------------------------------------------------------------------------------- |
+| `0`  | Success / clean (no findings at the `--fail-on` threshold).                                                               |
+| `1`  | Findings at or above the `--fail-on` severity (lint-style commands).                                                      |
+| `2`  | Operational/usage error — bad flag, invalid choice, missing config section, target outside the corpus, unreadable config. |
 
 `--help` and `--version` always exit `0`.
 
@@ -34,13 +34,13 @@ Every command uses the same taxonomy:
 Lints Markdown files with the configured rule engine. Running `wastech-mdlint` with **no
 subcommand** lints the cwd — `lint` is the default command. `scan` is a hidden, deprecated alias.
 
-| Flag | Default | Description |
-| --- | --- | --- |
-| `[path]` | cwd | Directory to lint. |
-| `--config <file>` | auto-discovered | Path to a config file (otherwise `findConfig` walks up). |
-| `--format text\|json` | `text` | Human report vs machine `{ summary, messages, files }`. |
-| `--fail-on error\|warning\|off` | `error` | Minimum severity that forces exit `1`. `off` never fails. |
-| `--fix` | — | Apply deterministic fixes in place (SEC-001, TBL-002), then re-report what remains. |
+| Flag                            | Default         | Description                                                                         |
+| ------------------------------- | --------------- | ----------------------------------------------------------------------------------- |
+| `[path]`                        | cwd             | Directory to lint.                                                                  |
+| `--config <file>`               | auto-discovered | Path to a config file (otherwise `findConfig` walks up).                            |
+| `--format text\|json`           | `text`          | Human report vs machine `{ summary, messages, files }`.                             |
+| `--fail-on error\|warning\|off` | `error`         | Minimum severity that forces exit `1`. `off` never fails.                           |
+| `--fix`                         | —               | Apply deterministic fixes in place (SEC-001, TBL-002), then re-report what remains. |
 
 ```bash
 wastech-mdlint lint .
@@ -57,10 +57,10 @@ disables.
 Builds and summarizes the [context graph](context-graph.md): clusters, hubs, reading order, and
 the coverage signal.
 
-| Flag | Default | Description |
-| --- | --- | --- |
-| `[path]` | cwd | Directory to scan. |
-| `--config <file>` | auto | Config file. |
+| Flag                                 | Default | Description                                                                                                  |
+| ------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------ |
+| `[path]`                             | cwd     | Directory to scan.                                                                                           |
+| `--config <file>`                    | auto    | Config file.                                                                                                 |
 | `--format human\|json\|mermaid\|dot` | `human` | `human` text; deterministic `{ nodes, edges, components, readingOrder }` JSON; or a `mermaid`/`dot` diagram. |
 
 Read-only; exits `0` on success.
@@ -72,12 +72,12 @@ forward. **Resolution is exact match only** — a defined ID, a heading/anchor s
 file path; never fuzzy, substring, keyword, or LLM matching. A query that matches nothing is an
 honest empty result (`matchKind: null` in JSON), not an error.
 
-| Flag | Default | Description |
-| --- | --- | --- |
-| `<query>` | — | ID, `#slug`, or file path. |
-| `--depth <n>` | `2` | Traversal depth; must be a non-negative integer. |
-| `--config <file>` | auto | Config file. |
-| `--format text\|json` | `text` | — |
+| Flag                  | Default | Description                                      |
+| --------------------- | ------- | ------------------------------------------------ |
+| `<query>`             | —       | ID, `#slug`, or file path.                       |
+| `--depth <n>`         | `2`     | Traversal depth; must be a non-negative integer. |
+| `--config <file>`     | auto    | Config file.                                     |
+| `--format text\|json` | `text`  | —                                                |
 
 `slice` always scans the current working directory — it takes no `[path]` argument.
 
@@ -96,12 +96,12 @@ transitively affected by it.
 Generates a deterministic [`SKILL.md`](compile.md) from the document graph, rule descriptions,
 and config, then writes it to the resolved outdir.
 
-| Flag | Default | Description |
-| --- | --- | --- |
-| `--config <file>` | auto | Config file. |
-| `--outdir <dir>` | `config.compile.outdir` → `.claude/skills/wastech-mdlint/` | Where to write `SKILL.md`. |
-| `--dry-run` | — | Print the generated content to stdout instead of writing. |
-| `--cwd <dir>` | cwd | Working directory to compile from. |
+| Flag              | Default                                                    | Description                                               |
+| ----------------- | ---------------------------------------------------------- | --------------------------------------------------------- |
+| `--config <file>` | auto                                                       | Config file.                                              |
+| `--outdir <dir>`  | `config.compile.outdir` → `.claude/skills/wastech-mdlint/` | Where to write `SKILL.md`.                                |
+| `--dry-run`       | —                                                          | Print the generated content to stdout instead of writing. |
+| `--cwd <dir>`     | cwd                                                        | Working directory to compile from.                        |
 
 Unlike other commands, `compile` takes `--cwd` (not `[path]`) and resolves a relative
 `--config`/`--outdir` against it. Requires a `compile` section in config; a missing one exits `2`
@@ -112,12 +112,12 @@ with guidance instead of a stack trace.
 Scans the repo for doc clusters, infers a rule set with rationale, and — on confirmation — writes
 `wastech-mdlint.config.json` with a **local** `$schema`.
 
-| Flag | Default | Description |
-| --- | --- | --- |
-| `[path]` | cwd | Directory to scan. |
-| `-y, --yes` | — | Accept the inferred draft with no prompts (CI). Defaults `--on-existing` to `skip`. |
-| `--on-existing overwrite\|merge\|skip` | prompt (interactive) / `skip` (`--yes`) | How to treat an existing config. `merge` is additive/existing-wins. |
-| `--with-ci-workflow` | — | Under `--yes` only, also drop `.github/workflows/wastech-mdlint.yml`. |
+| Flag                                   | Default                                 | Description                                                                         |
+| -------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------- |
+| `[path]`                               | cwd                                     | Directory to scan.                                                                  |
+| `-y, --yes`                            | —                                       | Accept the inferred draft with no prompts (CI). Defaults `--on-existing` to `skip`. |
+| `--on-existing overwrite\|merge\|skip` | prompt (interactive) / `skip` (`--yes`) | How to treat an existing config. `merge` is additive/existing-wins.                 |
+| `--with-ci-workflow`                   | —                                       | Under `--yes` only, also drop `.github/workflows/wastech-mdlint.yml`.               |
 
 - Without `--yes`, `init` requires an interactive terminal (both stdin and stdout must be TTYs);
   otherwise it fails fast rather than hanging on a prompt.
@@ -128,6 +128,12 @@ Scans the repo for doc clusters, infers a rule set with rationale, and — on co
 - **Ctrl+C** during any prompt exits `0`.
 - When custom rules are present, `init` also generates a project-local `schema.json` and points
   `$schema` at it. No remote URL is ever emitted.
+- The `--with-ci-workflow` template is **npm-universal by design**: even when `init` detects and
+  reports a bun/pnpm/yarn project, the generated workflow still installs and runs the CLI via
+  `npm install --no-save @wastech-mdlint/cli` + `npx`. That step only fetches the external CLI
+  tool, never the repo's own dependencies, so it never needs the repo's lockfile — and
+  `actions/setup-node` provides npm on every runner, so a per-manager branch would add setup for
+  no functional gain.
 
 See [Configuration](configuration.md) for the written file.
 
@@ -135,8 +141,8 @@ See [Configuration](configuration.md) for the written file.
 
 Writes the config JSON schema to a local file (never a remote URL).
 
-| Flag | Default | Description |
-| --- | --- | --- |
+| Flag           | Default       | Description  |
+| -------------- | ------------- | ------------ |
 | `--out <file>` | `schema.json` | Output path. |
 
 ```bash

@@ -80,7 +80,10 @@ describe("handleContextSlice", () => {
     const server = await createServer();
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();
-    const client = new Client({ name: "context-slice-depth", version: "0.0.0" });
+    const client = new Client({
+      name: "context-slice-depth",
+      version: "0.0.0",
+    });
     await Promise.all([
       server.connect(serverTransport),
       client.connect(clientTransport),

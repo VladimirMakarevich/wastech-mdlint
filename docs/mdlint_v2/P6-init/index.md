@@ -9,7 +9,7 @@
 
 ## Why this phase exists
 
-Earlier designs split a *dumb* CLI `init` (writes a fixed config) from a *smart* skill-driven
+Earlier designs split a _dumb_ CLI `init` (writes a fixed config) from a _smart_ skill-driven
 one. v2 applies [I2](../requirements/06-installation.md): the smart inference lives in the CLI
 itself
 (cluster detection, sampling, rule suggestion, package-manager detection), with `--yes` for
@@ -29,13 +29,13 @@ invariant) and lets tests exercise inference without a TTY.
 
 ## Tasks
 
-| # | Task | Size | Depends on |
-| --- | --- | --- | --- |
-| [P6.01](01-repo-scan-detection.md) | Repo scan: doc clusters + package-manager detection | M | P3 done |
-| [P6.02](02-rule-inference.md) | Rule inference / category → zero-config rule set | M | P6.01 |
-| [P6.03](03-interactive-prompts.md) | Interactive prompts (inquirer) + `--yes` | M | P6.02 |
-| [P6.04](04-config-writer-schema.md) | Config writer + local `$schema` wiring (+ optional CI workflow) | M | P6.03 |
-| [P6.05](05-init-tests.md) | `init` tests & fixtures | M | all above |
+| #                                   | Task                                                            | Size | Depends on |
+| ----------------------------------- | --------------------------------------------------------------- | ---- | ---------- |
+| [P6.01](01-repo-scan-detection.md)  | Repo scan: doc clusters + package-manager detection             | M    | P3 done    |
+| [P6.02](02-rule-inference.md)       | Rule inference / category → zero-config rule set                | M    | P6.01      |
+| [P6.03](03-interactive-prompts.md)  | Interactive prompts (inquirer) + `--yes`                        | M    | P6.02      |
+| [P6.04](04-config-writer-schema.md) | Config writer + local `$schema` wiring (+ optional CI workflow) | M    | P6.03      |
+| [P6.05](05-init-tests.md)           | `init` tests & fixtures                                         | M    | all above  |
 
 ## Sequence
 

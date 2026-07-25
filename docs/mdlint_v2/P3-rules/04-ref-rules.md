@@ -15,14 +15,14 @@ traceability — reusing current link logic and the [P3.01](01-shared-rule-utils
 
 ## Rules
 
-| ID | Scope | Severity | Checks | Key options |
-| --- | --- | --- | --- | --- |
-| REF-001 | document | error | relative links resolve | `exclude?`, `siteRouter?` |
-| REF-002 | document | error | anchors match heading slugs | `files?` |
-| REF-003 | document | error | images resolve | `exclude?` |
-| REF-004 | document | error | cross-zone links declared in zone Dependencies | `zonesDir`, `dependencySection?` |
-| REF-005 | project | error | ID traceability (refs↔definitions) | `definitions`, `references`, `idColumn`, `idPattern` |
-| REF-006 | project | warning | stability consistency | `stabilityColumn`, `stabilityOrder`, `definitions`, `references`, `idColumn?`, `idPattern?` |
+| ID      | Scope    | Severity | Checks                                         | Key options                                                                                 |
+| ------- | -------- | -------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| REF-001 | document | error    | relative links resolve                         | `exclude?`, `siteRouter?`                                                                   |
+| REF-002 | document | error    | anchors match heading slugs                    | `files?`                                                                                    |
+| REF-003 | document | error    | images resolve                                 | `exclude?`                                                                                  |
+| REF-004 | document | error    | cross-zone links declared in zone Dependencies | `zonesDir`, `dependencySection?`                                                            |
+| REF-005 | project  | error    | ID traceability (refs↔definitions)             | `definitions`, `references`, `idColumn`, `idPattern`                                        |
+| REF-006 | project  | warning  | stability consistency                          | `stabilityColumn`, `stabilityOrder`, `definitions`, `references`, `idColumn?`, `idPattern?` |
 
 ## Deliverables / steps
 
@@ -48,7 +48,7 @@ traceability — reusing current link logic and the [P3.01](01-shared-rule-utils
 4. `siteRouter` from `settings` with per-rule override ([C5](../requirements/01-configuration.md)).
 
 > REF rules use the `documents` map + `existsSync` + site-router (no full graph needed). The
-> graph-dependent rules are GRP-* ([P3.06](06-grp-rules.md)).
+> graph-dependent rules are GRP-\* ([P3.06](06-grp-rules.md)).
 
 ## Decisions applied
 

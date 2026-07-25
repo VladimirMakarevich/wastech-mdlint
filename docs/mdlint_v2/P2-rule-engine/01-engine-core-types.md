@@ -24,7 +24,7 @@ with structured findings, orchestrator-owned severity, and a fix hook.
 ## Deliverables / steps
 
 1. `Rule { id, description, category, defaultSeverity, scope?: "document"|"project",
-   fixable?, docsUrl?, check(ctx), fix?(ctx) }` — severity is a **default**
+fixable?, docsUrl?, check(ctx), fix?(ctx) }` — severity is a **default**
    ([R1](../requirements/02-rules-engine.md)); optional `fix?` returning text edits
    ([R2](../requirements/02-rules-engine.md)).
 2. `RuleContext { document, filePath, projectFiles?, documents?, settings, graph?, report() }`
@@ -38,7 +38,7 @@ with structured findings, orchestrator-owned severity, and a fix hook.
    `ContextGraph` type ([P4.01](../P4-graph/01-context-graph-model.md)) and does not change when
    the builder is swapped.
 3. `LintMessage { ruleId, severity, message, line, column?, endLine?, filePath?, fixable?,
-   data?, helpUri? }` — structured fields per [R3](../requirements/02-rules-engine.md);
+data?, helpUri? }` — structured fields per [R3](../requirements/02-rules-engine.md);
    existing fields unchanged (superset).
 4. `runRules(rules, document, filePath, ctxExtras)` — callback `report()` model; **throws**
    if a project rule is missing `documents` ([R4](../requirements/02-rules-engine.md)).

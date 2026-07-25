@@ -10,7 +10,11 @@ import { fileScopeShape, matchesFileScope } from "./scope.js";
 // adjacency. GRP-003 is graph-independent (walks chain columns).
 
 const siteRouterOptionSchema = z
-  .object({ preset: z.string().optional(), contentDir: z.string().optional(), defaultLocale: z.string().optional() })
+  .object({
+    preset: z.string().optional(),
+    contentDir: z.string().optional(),
+    defaultLocale: z.string().optional(),
+  })
   .strict();
 
 // GRP-001 — no circular references. Reads the graph's explicit cycle list (G6). `files`/`exclude`/
@@ -23,9 +27,14 @@ export const grp001: RuleDefinition = defineRule({
     description: "No circular references between documents.",
     defaultSeverity: "error",
     scope: "project",
-    fixable: false
+    fixable: false,
   },
-  optionsSchema: z.object({ siteRouter: siteRouterOptionSchema.optional(), ...fileScopeShape }).strict(),
+  optionsSchema: z
+    .object({
+      siteRouter: siteRouterOptionSchema.optional(),
+      ...fileScopeShape,
+    })
+    .strict(),
   check: () => (context) => {
     const graph = context.graph;
     if (graph === undefined) {
@@ -34,16 +43,18 @@ export const grp001: RuleDefinition = defineRule({
     for (const cycle of graph.cycles) {
       const first = cycle[0]!;
       // Attribute to the first arc (audit): the edge from cycle[0] to cycle[1].
-      const firstArc = graph.edges.find((edge) => edge.from === first && edge.to === cycle[1]);
+      const firstArc = graph.edges.find(
+        (edge) => edge.from === first && edge.to === cycle[1],
+      );
       context.report({
         message: `Dependency cycle detected: ${cycle.join(" -> ")}.`,
         line: firstArc?.line ?? 0,
         filePath: first,
         data: { cycle },
-        helpUri: "GRP-001"
+        helpUri: "GRP-001",
       });
     }
-  }
+  },
 });
 
 // GRP-002 — every document has ≥1 incoming reference, except declared entry points.
@@ -51,16 +62,17 @@ export const grp002: RuleDefinition = defineRule({
   metadata: {
     id: "GRP-002",
     category: "GRP",
-    description: "Documents have at least one incoming reference (except entry points).",
+    description:
+      "Documents have at least one incoming reference (except entry points).",
     defaultSeverity: "warning",
     scope: "project",
-    fixable: false
+    fixable: false,
   },
   optionsSchema: z
     .object({
       entryPoints: z.array(z.string()).optional(),
       siteRouter: siteRouterOptionSchema.optional(),
-      ...fileScopeShape
+      ...fileScopeShape,
     })
     .strict(),
   check: (options) => (context) => {
@@ -75,7 +87,10 @@ export const grp002: RuleDefinition = defineRule({
       if (!matchesFileScope(node.path, options)) {
         continue;
       }
-      if (options.entryPoints !== undefined && matchesConfigGlob(node.path, options.entryPoints)) {
+      if (
+        options.entryPoints !== undefined &&
+        matchesConfigGlob(node.path, options.entryPoints)
+      ) {
         continue;
       }
       context.report({
@@ -83,10 +98,10 @@ export const grp002: RuleDefinition = defineRule({
         line: 0,
         filePath: node.path,
         data: { path: node.path },
-        helpUri: "GRP-002"
+        helpUri: "GRP-002",
       });
     }
-  }
+  },
 });
 
 const chainStageSchema = z
@@ -94,7 +109,7 @@ const chainStageSchema = z
     stage: z.string().min(1),
     files: z.array(z.string()).min(1),
     idColumn: z.string().min(1).optional(),
-    refColumn: z.string().min(1)
+    refColumn: z.string().min(1),
   })
   .strict();
 
@@ -107,9 +122,14 @@ export const grp003: RuleDefinition = defineRule({
     description: "IDs are carried forward across pipeline stages.",
     defaultSeverity: "warning",
     scope: "project",
-    fixable: false
+    fixable: false,
   },
-  optionsSchema: z.object({ chain: z.array(chainStageSchema).min(2), idPattern: regexStringSchema.optional() }).strict(),
+  optionsSchema: z
+    .object({
+      chain: z.array(chainStageSchema).min(2),
+      idPattern: regexStringSchema.optional(),
+    })
+    .strict(),
   check: (options) => (context) => {
     const idPattern = options.idPattern ?? "^.+$";
     const documents = [...context.documents!.values()];
@@ -127,7 +147,7 @@ export const grp003: RuleDefinition = defineRule({
         for (const occurrence of extractColumnIds(document, {
           files: next.files,
           column: next.refColumn,
-          idPattern
+          idPattern,
         })) {
           nextReferences.add(occurrence.id);
         }
@@ -138,21 +158,25 @@ export const grp003: RuleDefinition = defineRule({
         for (const occurrence of extractColumnIds(document, {
           files: current.files,
           column: current.idColumn,
-          idPattern
+          idPattern,
         })) {
           if (!nextReferences.has(occurrence.id)) {
             context.report({
               message: `ID "${occurrence.id}" from stage "${current.stage}" is not carried into stage "${next.stage}".`,
               line: occurrence.line,
               filePath: occurrence.filePath,
-              data: { id: occurrence.id, fromStage: current.stage, toStage: next.stage },
-              helpUri: "GRP-003"
+              data: {
+                id: occurrence.id,
+                fromStage: current.stage,
+                toStage: next.stage,
+              },
+              helpUri: "GRP-003",
             });
           }
         }
       }
     }
-  }
+  },
 });
 
 export const GRP_RULES: readonly RuleDefinition[] = [grp001, grp002, grp003];

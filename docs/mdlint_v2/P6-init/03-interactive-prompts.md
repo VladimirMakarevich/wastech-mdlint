@@ -12,7 +12,7 @@ config before writing.
 - **Previous:** [P6.02 — Rule inference](02-rule-inference.md) (draft rule set + rationale).
 - **Next:** [P6.04 — Config writer](04-config-writer-schema.md).
 - **Depends on:** P6.02. **This task adds `@inquirer/prompts`** to `@wastech-mdlint/cli` —
-  [P0.05](../P0-foundations/05-cli-package-commander.md) only *reserved* it for P6 and never
+  [P0.05](../P0-foundations/05-cli-package-commander.md) only _reserved_ it for P6 and never
   installed it (the CLI currently depends on `commander` alone), so add the dependency here.
   · **Blocks:** P6.04.
 
@@ -28,7 +28,7 @@ config before writing.
 3. Handle existing config: **overwrite / merge / skip** (semantics decided 2026-07-02, audit —
    P6 merge gap):
    - **overwrite** — replace with the freshly inferred config (after confirmation);
-   - **merge** — *additive, existing-wins*: keep every existing `rules[]` entry verbatim
+   - **merge** — _additive, existing-wins_: keep every existing `rules[]` entry verbatim
      (severity/options preserved), append only inferred rules whose canonical ID is absent;
      leave `include`/`exclude`/`settings` untouched (optionally offer to add newly-detected
      clusters not already covered). **Never modify or drop an existing entry.**

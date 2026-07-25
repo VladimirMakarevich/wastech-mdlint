@@ -12,33 +12,33 @@
 
 ## All rules
 
-| Rule | Category | Scope | Default | Fixable | Checks |
-| --- | --- | --- | --- | --- | --- |
-| [TBL-001](TBL-001.md) | TBL | document | error | no | Tables declare their required columns. |
-| [TBL-002](TBL-002.md) | TBL | document | warning | **yes** | Target table cells are not empty. |
-| [TBL-003](TBL-003.md) | TBL | document | error | no | Cell values fall within an allowed set. |
-| [TBL-004](TBL-004.md) | TBL | document | error | no | Cell values match a required pattern. |
-| [TBL-005](TBL-005.md) | TBL | document | error | no | Cross-column conditional holds (when → then). |
-| [TBL-006](TBL-006.md) | TBL | project | error | no | Column IDs are unique across files. |
-| [SEC-001](SEC-001.md) | SEC | document | error | **yes** | Required sections are present. |
-| [SEC-002](SEC-002.md) | SEC | document | error | no | Sections appear in the required order. |
-| [SEC-003](SEC-003.md) | SEC | project | error | no | Sections conform to a template's heading structure. |
-| [STR-001](STR-001.md) | STR | project | error | no | Required files exist in the project. |
-| [REF-001](REF-001.md) | REF | document | error | no | Relative links resolve to a file. |
-| [REF-002](REF-002.md) | REF | document | error | no | Link anchors match a heading slug. |
-| [REF-003](REF-003.md) | REF | document | error | no | Image targets resolve to a file. |
-| [REF-004](REF-004.md) | REF | document | error | no | Cross-zone links are declared in the zone's Dependencies. |
-| [REF-005](REF-005.md) | REF | project | error | no | IDs are traceable between definitions and references. |
-| [REF-006](REF-006.md) | REF | project | warning | no | References do not depend on less-stable entities. |
-| [CTX-001](CTX-001.md) | CTX | document | warning | no | Sections are not empty or placeholder-only. |
-| [CTX-002](CTX-002.md) | CTX | document | warning | no | All checklist items are checked. |
-| [CTX-003](CTX-003.md) | CTX | project | warning | no | Content uses canonical glossary terms instead of aliases. |
-| [GRP-001](GRP-001.md) | GRP | project | error | no | No circular references between documents. |
-| [GRP-002](GRP-002.md) | GRP | project | warning | no | Documents have at least one incoming reference (except entry points). |
-| [GRP-003](GRP-003.md) | GRP | project | warning | no | IDs are carried forward across pipeline stages. |
-| [SIZE-001](SIZE-001.md) | SIZE | document | warning | no | File stays within byte / line / token budgets. |
-| [LLM-001](LLM-001.md) | LLM | project | warning | no | Eager-import context stays within the per-entrypoint token budget. |
-| [custom](custom.md) | custom | derived | error | no | Declarative rule composed from a closed assertion vocabulary. |
+| Rule                    | Category | Scope    | Default | Fixable | Checks                                                                |
+| ----------------------- | -------- | -------- | ------- | ------- | --------------------------------------------------------------------- |
+| [TBL-001](TBL-001.md)   | TBL      | document | error   | no      | Tables declare their required columns.                                |
+| [TBL-002](TBL-002.md)   | TBL      | document | warning | **yes** | Target table cells are not empty.                                     |
+| [TBL-003](TBL-003.md)   | TBL      | document | error   | no      | Cell values fall within an allowed set.                               |
+| [TBL-004](TBL-004.md)   | TBL      | document | error   | no      | Cell values match a required pattern.                                 |
+| [TBL-005](TBL-005.md)   | TBL      | document | error   | no      | Cross-column conditional holds (when → then).                         |
+| [TBL-006](TBL-006.md)   | TBL      | project  | error   | no      | Column IDs are unique across files.                                   |
+| [SEC-001](SEC-001.md)   | SEC      | document | error   | **yes** | Required sections are present.                                        |
+| [SEC-002](SEC-002.md)   | SEC      | document | error   | no      | Sections appear in the required order.                                |
+| [SEC-003](SEC-003.md)   | SEC      | project  | error   | no      | Sections conform to a template's heading structure.                   |
+| [STR-001](STR-001.md)   | STR      | project  | error   | no      | Required files exist in the project.                                  |
+| [REF-001](REF-001.md)   | REF      | document | error   | no      | Relative links resolve to a file.                                     |
+| [REF-002](REF-002.md)   | REF      | document | error   | no      | Link anchors match a heading slug.                                    |
+| [REF-003](REF-003.md)   | REF      | document | error   | no      | Image targets resolve to a file.                                      |
+| [REF-004](REF-004.md)   | REF      | document | error   | no      | Cross-zone links are declared in the zone's Dependencies.             |
+| [REF-005](REF-005.md)   | REF      | project  | error   | no      | IDs are traceable between definitions and references.                 |
+| [REF-006](REF-006.md)   | REF      | project  | warning | no      | References do not depend on less-stable entities.                     |
+| [CTX-001](CTX-001.md)   | CTX      | document | warning | no      | Sections are not empty or placeholder-only.                           |
+| [CTX-002](CTX-002.md)   | CTX      | document | warning | no      | All checklist items are checked.                                      |
+| [CTX-003](CTX-003.md)   | CTX      | project  | warning | no      | Content uses canonical glossary terms instead of aliases.             |
+| [GRP-001](GRP-001.md)   | GRP      | project  | error   | no      | No circular references between documents.                             |
+| [GRP-002](GRP-002.md)   | GRP      | project  | warning | no      | Documents have at least one incoming reference (except entry points). |
+| [GRP-003](GRP-003.md)   | GRP      | project  | warning | no      | IDs are carried forward across pipeline stages.                       |
+| [SIZE-001](SIZE-001.md) | SIZE     | document | warning | no      | File stays within byte / line / token budgets.                        |
+| [LLM-001](LLM-001.md)   | LLM      | project  | warning | no      | Eager-import context stays within the per-entrypoint token budget.    |
+| [custom](custom.md)     | custom   | derived  | error   | no      | Declarative rule composed from a closed assertion vocabulary.         |
 
 The built-in rows mirror the machine-generated table in the top-level [README](../../../README.md)
 (`npm run generate:docs`). The per-rule pages here add prose, options tables, and examples.

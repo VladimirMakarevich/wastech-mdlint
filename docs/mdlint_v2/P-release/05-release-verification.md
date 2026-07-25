@@ -17,7 +17,7 @@ Prove the whole release works end-to-end across all three channels before taggin
 ## Deliverables / steps
 
 1. Full workspace gate green: run the existing root `release:check` script (`npm run typecheck
-   && npm test && npm run build && npm pack --dry-run`); it currently omits `lint` and the
+&& npm test && npm run build && npm pack --dry-run`); it currently omits `lint` and the
    schema-sync/skill-frontmatter checks, so either extend the script or also run `npm run lint`
    and those tests explicitly on the pinned Node 24 line.
 2. **End-to-end smoke** across the three channels:

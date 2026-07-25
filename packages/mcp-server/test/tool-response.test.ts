@@ -6,12 +6,15 @@ import {
   errorResult,
   READ_ONLY_ANNOTATIONS,
   successResult,
-  withErrorOutput
+  withErrorOutput,
 } from "../src/shared/tool-response.js";
 
 describe("successResult", () => {
   it("carries structuredContent plus a text summary", () => {
-    const result = successResult({ summary: "2 files", structured: { count: 2 } });
+    const result = successResult({
+      summary: "2 files",
+      structured: { count: 2 },
+    });
     expect(result.isError).toBeUndefined();
     expect(result.structuredContent).toEqual({ count: 2 });
     expect(result.content).toEqual([{ type: "text", text: "2 files" }]);
@@ -20,12 +23,14 @@ describe("successResult", () => {
 
 describe("errorResult", () => {
   it("passes a structured error's code/message/hint through verbatim in structuredContent", () => {
-    const result = errorResult(new ConfigError("CONFIG_INVALID", "bad config", "fix line 3"));
+    const result = errorResult(
+      new ConfigError("CONFIG_INVALID", "bad config", "fix line 3"),
+    );
     expect(result.isError).toBe(true);
     expect(result.structuredContent).toEqual({
       code: "CONFIG_INVALID",
       message: "bad config",
-      hint: "fix line 3"
+      hint: "fix line 3",
     });
     expect(result.content).toEqual([{ type: "text", text: "bad config" }]);
   });
@@ -36,7 +41,7 @@ describe("errorResult", () => {
     expect(result.isError).toBe(true);
     expect(result.structuredContent).toEqual({
       code: "INTERNAL_ERROR",
-      message: "An unexpected internal error occurred."
+      message: "An unexpected internal error occurred.",
     });
     // Neither the raw message nor the stack may reach the client.
     const serialized = JSON.stringify(result);
@@ -49,7 +54,7 @@ describe("errorResult", () => {
     const result = errorResult("leaky /etc/passwd detail");
     expect(result.structuredContent).toEqual({
       code: "INTERNAL_ERROR",
-      message: "An unexpected internal error occurred."
+      message: "An unexpected internal error occurred.",
     });
     expect(JSON.stringify(result)).not.toContain("/etc/passwd");
   });
@@ -60,31 +65,34 @@ describe("withErrorOutput", () => {
     const schema = z.object(
       withErrorOutput({
         files: z.array(z.string()),
-        errorCount: z.number().int()
-      })
+        errorCount: z.number().int(),
+      }),
     );
 
     expect(() =>
       schema.parse({
         code: "CONFIG_INVALID",
         message: "bad config",
-        hint: "fix line 3"
-      })
+        hint: "fix line 3",
+      }),
     ).toThrow();
 
-    const result = errorResult(new ConfigError("CONFIG_INVALID", "bad config", "fix line 3"), {
-      files: [],
-      errorCount: 0
-    });
+    const result = errorResult(
+      new ConfigError("CONFIG_INVALID", "bad config", "fix line 3"),
+      {
+        files: [],
+        errorCount: 0,
+      },
+    );
 
     expect(
-      schema.parse(result.structuredContent as Record<string, unknown>)
+      schema.parse(result.structuredContent as Record<string, unknown>),
     ).toEqual({
       files: [],
       errorCount: 0,
       code: "CONFIG_INVALID",
       message: "bad config",
-      hint: "fix line 3"
+      hint: "fix line 3",
     });
   });
 });

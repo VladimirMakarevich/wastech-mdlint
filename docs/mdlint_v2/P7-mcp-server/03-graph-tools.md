@@ -31,7 +31,7 @@ semantics.
 3. `impact-analysis` — `{ file, configPath?, cwd? }`: validate file in corpus →
    `classifyImpact` → `relativizeImpact` (this is `relativizeImpact`'s first consumer — it had none
    before) → structured `ImpactClassification` `{ file, directlyAffected, transitivelyAffected,
-   readingOrder, excluded }`, plus a text summary via `renderImpactSummary`. (Field is `file`, not
+readingOrder, excluded }`, plus a text summary via `renderImpactSummary`. (Field is `file`, not
    `changedFile`; there is no `summary` field on the core type.) Out-of-corpus →
    `{ code, message, hint }` ([M6](../requirements/05-mcp-server.md)).
 4. Structured output ([M1](../requirements/05-mcp-server.md)); read-only annotations
@@ -65,7 +65,7 @@ semantics.
   disk re-scan beyond the loaded corpus — work a minimal read-only tool has no mandate to do by
   default. Left out entirely rather than pre-declaring an always-optional, unused `coverage` field.
 - **`impact-analysis` calls `relativizeImpact(classification, "")` — an intentional identity
-  transform.** This tool's `cwd` is both the corpus root the graph is built from *and* the base the
+  transform.** This tool's `cwd` is both the corpus root the graph is built from _and_ the base the
   classification's paths are already relative to, so "repo-relative cwd" is `""`. The call is still
   made (this tool is `relativizeImpact`'s first real consumer, per the deliverable), it just changes
   no path here — unlike CLI `compile`, which has a genuine `--cwd`/`--outdir` split.

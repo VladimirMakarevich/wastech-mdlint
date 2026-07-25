@@ -1,7 +1,11 @@
 import path from "node:path";
 
+import { compareStrings } from "../deterministic-sort.js";
 import { canonicalizeRuleId } from "../rule-id.js";
-import { generateConfigSchema, type CustomRuleDefinition } from "../engine/schema.js";
+import {
+  generateConfigSchema,
+  type CustomRuleDefinition,
+} from "../engine/schema.js";
 import { ruleRegistry } from "../engine/rules/index.js";
 import { CUSTOM_ID_GRAMMAR } from "../engine/rules/custom.js";
 import { DEFAULT_NOISE_DIR_NAMES } from "./repo-scan-constants.js";
@@ -55,7 +59,12 @@ const PROJECT_SCHEMA_REF = `./${PROJECT_SCHEMA_FILE_NAME}`;
 // The CLI package (`@wastech-mdlint/cli`) ships `schema.json` at this path once installed. Exported
 // so the CLI's (fs-bound) ancestor walk for the actual installed location checks the same segments
 // this module's own (fs-free) relative-path math resolves `resolvePackageSchemaRef` against.
-export const PACKAGE_SCHEMA_SEGMENTS = ["node_modules", "@wastech-mdlint", "cli", "schema.json"] as const;
+export const PACKAGE_SCHEMA_SEGMENTS = [
+  "node_modules",
+  "@wastech-mdlint",
+  "cli",
+  "schema.json",
+] as const;
 
 /**
  * The default `$schema` value (C9): the relative POSIX path from the config's own directory to the
@@ -65,9 +74,15 @@ export const PACKAGE_SCHEMA_SEGMENTS = ["node_modules", "@wastech-mdlint", "cli"
  * gets `../node_modules/...` and a root config `./node_modules/...`. Pure path math — lives here
  * (not in the CLI host) so the config-text-generation logic this module owns stays in one place.
  */
-export function resolvePackageSchemaRef(configDir: string, schemaAnchorDir: string): string {
+export function resolvePackageSchemaRef(
+  configDir: string,
+  schemaAnchorDir: string,
+): string {
   const relative = normalizeRelativePath(
-    path.relative(configDir, path.join(schemaAnchorDir, ...PACKAGE_SCHEMA_SEGMENTS))
+    path.relative(
+      configDir,
+      path.join(schemaAnchorDir, ...PACKAGE_SCHEMA_SEGMENTS),
+    ),
   );
   // A same-dir/descendant path needs an explicit `./` prefix; a `../` path already reads as relative.
   return relative.startsWith("../") ? relative : `./${relative}`;
@@ -80,7 +95,7 @@ export function resolvePackageSchemaRef(configDir: string, schemaAnchorDir: stri
 // `exclude`; this is only for the fresh/overwrite path.
 const DEFAULT_EXCLUDE_GLOBS = [...DEFAULT_NOISE_DIR_NAMES]
   .map((name) => `${name}/**`)
-  .sort((left, right) => left.localeCompare(right));
+  .sort(compareStrings);
 
 // Canonical top-level key order, applied on every write rather than preserving an existing file's
 // original order — simpler and fully deterministic, at only the cosmetic cost of reordering a merged
@@ -92,7 +107,7 @@ const TOP_LEVEL_KEY_ORDER = [
   "respectGitignore",
   "settings",
   "rules",
-  "compile"
+  "compile",
 ] as const;
 
 // Single-quote a value for POSIX sh so spaces or shell metacharacters (`#`, `&`, …) in an otherwise
@@ -119,10 +134,20 @@ function shellSingleQuote(value: string): string {
  * A line terminator in the path cannot be represented in the block scalar and would silently mis-run,
  * so it is rejected (the CLI declines the opt-in workflow rather than reach this) — an explicit
  * contract guard, not a silent strip that would mis-target the config.
+ *
+ * Deliberately npm-universal (P9.07 / audit L-7): this never takes the repo's detected package
+ * manager (`detectPackageManager` — bun/pnpm/yarn/npm), and `init-command.ts` does not thread it in
+ * here. The install step only fetches the external `@wastech-mdlint/cli` tool into a scratch
+ * `node_modules` — it never resolves or touches the target repo's own lockfile/workspace — and
+ * `actions/setup-node` always provides npm, so every runner can execute this step with no extra
+ * per-manager setup action. A bun/pnpm/yarn repo's own lockfile is simply irrelevant to what this
+ * step installs, so the detection result is intentionally unused here, not silently dropped.
  */
 export function buildCiWorkflowYaml(configPath?: string): string {
   if (configPath !== undefined && /[\r\n]/.test(configPath)) {
-    throw new TypeError("buildCiWorkflowYaml: configPath must not contain a line terminator.");
+    throw new TypeError(
+      "buildCiWorkflowYaml: configPath must not contain a line terminator.",
+    );
   }
 
   let lintStep = "      - run: npx wastech-mdlint lint --fail-on error";
@@ -162,7 +187,10 @@ export const CI_WORKFLOW_YAML = buildCiWorkflowYaml();
 type RuleItem = { entry: unknown; comment?: string };
 
 function toRuleEntry(rule: InferredRule): Record<string, unknown> {
-  return { rule: rule.rule, ...(rule.options === undefined ? {} : { options: rule.options }) };
+  return {
+    rule: rule.rule,
+    ...(rule.options === undefined ? {} : { options: rule.options }),
+  };
 }
 
 // C3 requires the written config to always emit canonical ids. A merged existing entry keeps its
@@ -176,9 +204,13 @@ function canonicalizeExistingEntry(entry: unknown): unknown {
   }
   const record = entry as Record<string, unknown>;
   if (record.rule === "custom") {
-    return typeof record.id === "string" ? { ...record, id: canonicalizeRuleId(record.id) } : entry;
+    return typeof record.id === "string"
+      ? { ...record, id: canonicalizeRuleId(record.id) }
+      : entry;
   }
-  return typeof record.rule === "string" ? { ...record, rule: canonicalizeRuleId(record.rule) } : entry;
+  return typeof record.rule === "string"
+    ? { ...record, rule: canonicalizeRuleId(record.rule) }
+    : entry;
 }
 
 // Re-indents a `JSON.stringify(value, null, 2)` block so its continuation lines sit inside the
@@ -204,7 +236,8 @@ function renderRulesValue(items: RuleItem[]): string {
   }
   const lines = items.map((item, index) => {
     const comma = index === items.length - 1 ? "" : ",";
-    const comment = item.comment === undefined ? "" : `  // ${toCommentLine(item.comment)}`;
+    const comment =
+      item.comment === undefined ? "" : `  // ${toCommentLine(item.comment)}`;
     return `    ${JSON.stringify(item.entry)}${comma}${comment}`;
   });
   return `[\n${lines.join("\n")}\n  ]`;
@@ -221,7 +254,10 @@ function isResolvableCustomId(canonicalId: string): boolean {
     return false;
   }
   const prefix = canonicalId.split("-")[0] ?? "";
-  return !ruleRegistry.getReservedPrefixes().has(prefix) && !ruleRegistry.has(canonicalId);
+  return (
+    !ruleRegistry.getReservedPrefixes().has(prefix) &&
+    !ruleRegistry.has(canonicalId)
+  );
 }
 
 // The merge identity of an existing `rules[]` entry. A built-in is keyed by its canonical `rule`; a
@@ -243,7 +279,11 @@ export function identifyExistingRule(entry: unknown): ExistingRuleIdentity {
   if (entry === null || typeof entry !== "object") {
     return { kind: "invalid" };
   }
-  const record = entry as { rule?: unknown; id?: unknown; description?: unknown };
+  const record = entry as {
+    rule?: unknown;
+    id?: unknown;
+    description?: unknown;
+  };
   if (typeof record.rule !== "string") {
     return { kind: "invalid" };
   }
@@ -257,7 +297,12 @@ export function identifyExistingRule(entry: unknown): ExistingRuleIdentity {
     }
     return {
       kind: "custom",
-      rule: { id, ...(typeof record.description === "string" ? { description: record.description } : {}) }
+      rule: {
+        id,
+        ...(typeof record.description === "string"
+          ? { description: record.description }
+          : {}),
+      },
     };
   }
   return { kind: "builtin", canonicalId: canonicalizeRuleId(record.rule) };
@@ -287,17 +332,23 @@ function collectCustomRules(entries: unknown[]): CustomRuleDefinition[] {
  * round-trips every existing top-level key verbatim except `rules` (existing entries kept, new ones
  * appended) and `$schema` (always rewired — wiring it is this task's whole point).
  */
-export function generateInitConfig(params: GenerateInitConfigParams): GeneratedInitConfig {
+export function generateInitConfig(
+  params: GenerateInitConfigParams,
+): GeneratedInitConfig {
   const { action, existing, include, newRules, packageSchemaRef } = params;
 
   const newItems: RuleItem[] = newRules.map((rule) => ({
     entry: toRuleEntry(rule),
-    comment: rule.rationale
+    comment: rule.rationale,
   }));
 
   const existingRules =
-    action === "merge" && Array.isArray(existing?.raw.rules) ? (existing.raw.rules as unknown[]) : [];
-  const existingItems: RuleItem[] = existingRules.map((entry) => ({ entry: canonicalizeExistingEntry(entry) }));
+    action === "merge" && Array.isArray(existing?.raw.rules)
+      ? (existing.raw.rules as unknown[])
+      : [];
+  const existingItems: RuleItem[] = existingRules.map((entry) => ({
+    entry: canonicalizeExistingEntry(entry),
+  }));
   const ruleItems = [...existingItems, ...newItems];
 
   const finalEntries = ruleItems.map((item) => item.entry);
@@ -305,7 +356,8 @@ export function generateInitConfig(params: GenerateInitConfigParams): GeneratedI
 
   // Custom rules always live next to the config (`./schema.json`, written into the same dir), so the
   // project-schema ref is dir-independent; the package-schema default is the CLI-computed relative path.
-  const schemaRef = customRules.length > 0 ? PROJECT_SCHEMA_REF : packageSchemaRef;
+  const schemaRef =
+    customRules.length > 0 ? PROJECT_SCHEMA_REF : packageSchemaRef;
 
   const values = new Map<string, string>();
   values.set("$schema", JSON.stringify(schemaRef));
@@ -324,7 +376,10 @@ export function generateInitConfig(params: GenerateInitConfigParams): GeneratedI
     if (include.length > 0) {
       values.set("include", indentValue(JSON.stringify(include, null, 2)));
     }
-    values.set("exclude", indentValue(JSON.stringify(DEFAULT_EXCLUDE_GLOBS, null, 2)));
+    values.set(
+      "exclude",
+      indentValue(JSON.stringify(DEFAULT_EXCLUDE_GLOBS, null, 2)),
+    );
   }
 
   values.set("rules", renderRulesValue(ruleItems));
@@ -334,20 +389,32 @@ export function generateInitConfig(params: GenerateInitConfigParams): GeneratedI
   const orderedKeys = [
     ...TOP_LEVEL_KEY_ORDER.filter((key) => values.has(key)),
     ...[...values.keys()]
-      .filter((key) => !TOP_LEVEL_KEY_ORDER.includes(key as (typeof TOP_LEVEL_KEY_ORDER)[number]))
-      .sort((left, right) => left.localeCompare(right))
+      .filter(
+        (key) =>
+          !TOP_LEVEL_KEY_ORDER.includes(
+            key as (typeof TOP_LEVEL_KEY_ORDER)[number],
+          ),
+      )
+      .sort(compareStrings),
   ];
 
-  const body = orderedKeys.map((key) => `  ${JSON.stringify(key)}: ${values.get(key)!}`).join(",\n");
+  const body = orderedKeys
+    .map((key) => `  ${JSON.stringify(key)}: ${values.get(key)!}`)
+    .join(",\n");
   const configText = `{\n${body}\n}\n`;
 
   return {
     configText,
     schemaRef,
     ...(customRules.length > 0
-      ? { projectSchema: { fileName: PROJECT_SCHEMA_FILE_NAME, text: generateConfigSchema({ customRules }) } }
+      ? {
+          projectSchema: {
+            fileName: PROJECT_SCHEMA_FILE_NAME,
+            text: generateConfigSchema({ customRules }),
+          },
+        }
       : {}),
     addedRuleCount: newItems.length,
-    totalRuleCount: ruleItems.length
+    totalRuleCount: ruleItems.length,
   };
 }

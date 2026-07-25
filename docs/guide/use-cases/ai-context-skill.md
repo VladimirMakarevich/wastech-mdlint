@@ -9,8 +9,11 @@ same analysis the CLI runs.
 {
   "compile": {
     "outdir": ".claude/skills/wastech-mdlint",
-    "skill": { "name": "my-project-context", "description": "Docs context for my project" }
-  }
+    "skill": {
+      "name": "my-project-context",
+      "description": "Docs context for my project",
+    },
+  },
 }
 ```
 

@@ -1,7 +1,7 @@
 # P10.02 · Refresh glossary phase-status markers (P6–P8 shipped)
 
 > Phase: [P10 — Post-audit consistency](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** ·
-> Status **Not started**. Audit finding **M-8** ([report](../audit-2026-07-23-p0-p8.md)).
+> Status **Done**. Audit finding **M-8** ([report](../audit-2026-07-23-p0-p8.md)).
 
 ## Goal
 
@@ -33,5 +33,37 @@ nonexistent.
 
 ## Exit criteria
 
-- [ ] Glossary status markers show P6/P7/P8 as shipped.
-- [ ] No glossary entry describes a shipped surface as planned.
+- [x] Glossary status markers show P6/P7/P8 as shipped.
+- [x] No glossary entry describes a shipped surface as planned.
+
+## Implementation notes
+
+Updated `glossary.md`:
+
+- The roll-up lines (banner "Shipped vs planned" bullet and the Planning taxonomy's
+  `Phase (P0–P9)` / `Milestone (M1–M4)` entries) now read "P0–P8 shipped; P9/P10 (post-audit
+  remediation + consistency) and P-release pending", matching the phase structure in
+  `index.md` §6.
+- Flipped the three flagged per-entry markers to shipped: `@wastech-mdlint/mcp-server`'s "A
+  stub today ... _(planned, P7)_" became "shipped in P7"; the `## Init & repo scan _(planned,
+P6)_` header dropped its marker (the section body already said "Shipped:"); `Static skills`
+  dropped `_(planned, P8)_` in favor of "shipped in P8".
+- Spot-checked **Compile & generated skill** and **Context graph & queries** — already clean,
+  no stale markers. Spot-checked the custom-rule **Target** entry coupled to P9.05 — it already
+  documents the resolved five-value enum (no `heading`) with no planned marker, so no change
+  needed there.
+- While here, also fixed stale `_(planned, P9)_` / bare `P9` references that predate the
+  P9-remediation/P10-consistency/P-release split, where "P9" used to mean "Release": the
+  `Single-tag release` entry, the `## Distribution & release` header, and the `CHANGELOG` /
+  `release:check` entries now say `P-release` instead of the old `P9`, so `P9` in the glossary
+  consistently means "post-audit remediation" everywhere. This sweep also caught the
+  config-writer note that credited P9.03 (actually the cross-OS CI matrix) with the P-release
+  composite Action (decision I6) — retargeted to `P-release`.
+- Exit criterion 2 required more than the flagged headers: the **MCP server** entries described
+  the already-shipped six-tool surface and error contract in future tense ("`compile-context`
+  ships in P7.04", "The type ships in P7.01"), which reads as not-yet-available now that P7 is
+  Done. Converted those phase-mapping clauses to past tense so no shipped surface reads as
+  planned.
+- The Planning-taxonomy status line said P9 is "Not started", but P9 remediation is in progress
+  on this branch. Marked P9 **in progress** and reserved "pending" for P10/P-release so the
+  banner bullet and the taxonomy state the same thing.

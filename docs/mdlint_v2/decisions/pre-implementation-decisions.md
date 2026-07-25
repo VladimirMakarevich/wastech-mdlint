@@ -58,7 +58,7 @@ breadcrumbs. Load-bearing forks that warrant their own ADR stay separate:
 - **3.2 — LLM-001 single budget** `maxTokensPerEntrypoint`; per-type limits dropped (no import
   "type" model; parity with current `llm/budget`). → `P3.07`.
 - **3.3 — Node role thresholds:** degree-only, first-match `isolated → hub → entry → leaf →
-  bridge`; hub = `inDegree >= compile.hubMinInDegree` (default 3). Fixed/configurable for
+bridge`; hub = `inDegree >= compile.hubMinInDegree` (default 3). Fixed/configurable for
   deterministic, corpus-independent roles. → `P5.01`, `P5.05`.
 - **3.4 — Compile preset examples** for `claude | generic | none` (default `generic`
   host-neutral). → `P5.04`.
@@ -127,7 +127,7 @@ breadcrumbs. Load-bearing forks that warrant their own ADR stay separate:
 
 ## Consequences
 
-- **+** One place to see *why* each contested decision went the way it did, cross-linked to the
+- **+** One place to see _why_ each contested decision went the way it did, cross-linked to the
   canonical task files that carry the implementation-level detail.
 - **+** Task-file breadcrumbs "(audit N.N)" remain meaningful — they map to the entries above.
 - **−** This log must be kept honest if a decision is later revisited: update the entry here and

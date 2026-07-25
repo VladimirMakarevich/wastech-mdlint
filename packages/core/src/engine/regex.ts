@@ -16,13 +16,17 @@ function isValidRegex(pattern: string, flags?: string): boolean {
 
 export const regexStringSchema = z
   .string()
-  .refine((value) => isValidRegex(value), { message: "expected a valid regular expression" });
+  .refine((value) => isValidRegex(value), {
+    message: "expected a valid regular expression",
+  });
 
 // Optional JS regex flag string (subset of d,g,i,m,s,u,y). Validated so a bad flag surfaces as a
 // config error rather than a runtime throw.
 export const regexFlagsSchema = z
   .string()
-  .refine((value) => isValidRegex(".", value), { message: "expected valid regular-expression flags" });
+  .refine((value) => isValidRegex(".", value), {
+    message: "expected valid regular-expression flags",
+  });
 
 // Compile a validated pattern. Callers pass strings that already passed `regexStringSchema`, so this
 // only throws on a genuine programming error.

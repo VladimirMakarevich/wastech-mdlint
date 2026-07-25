@@ -9,7 +9,7 @@ import { matchesConfigGlob } from "../../discovery/globs.js";
 // object; these are just the shared fields.
 export const fileScopeShape = {
   files: z.array(z.string()).optional(),
-  exclude: z.array(z.string()).optional()
+  exclude: z.array(z.string()).optional(),
 } as const;
 
 export type FileScope = { files?: string[]; exclude?: string[] };
@@ -22,7 +22,10 @@ export function matchesFileScope(filePath: string, scope: FileScope): boolean {
   if (scope.files !== undefined && !matchesConfigGlob(filePath, scope.files)) {
     return false;
   }
-  if (scope.exclude !== undefined && matchesConfigGlob(filePath, scope.exclude)) {
+  if (
+    scope.exclude !== undefined &&
+    matchesConfigGlob(filePath, scope.exclude)
+  ) {
     return false;
   }
   return true;

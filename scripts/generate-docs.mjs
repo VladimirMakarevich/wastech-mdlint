@@ -19,23 +19,30 @@ import { generateConfigSchema, generateRuleDocs } from "@wastech-mdlint/core";
 
 import { generateToolInventory } from "../packages/mcp-server/dist/tool-docs.js";
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
 
 const schemaPath = path.join(repoRoot, "packages", "cli", "schema.json");
 writeFileSync(schemaPath, generateConfigSchema(), "utf8");
 
 const readmePath = path.join(repoRoot, "README.md");
 const readme = readFileSync(readmePath, "utf8");
+// `<!-- prettier-ignore -->` plus the trailing blank line keep `npm run format` (P9.06) from
+// re-wrapping these machine-generated tables into padded columns, which would desync them from
+// the raw, unpadded strings generateRuleDocs()/generateToolInventory() return; the docs-sync
+// tests' extraction regexes mirror this exact wrapper shape.
 const withRules = readme.replace(
   /(<!-- BEGIN GENERATED RULES -->)[\s\S]*?(<!-- END GENERATED RULES -->)/,
-  `$1\n${generateRuleDocs()}\n$2`
+  `$1\n<!-- prettier-ignore -->\n${generateRuleDocs()}\n\n$2`,
 );
 const updated = withRules.replace(
   /(<!-- BEGIN GENERATED MCP TOOLS -->)[\s\S]*?(<!-- END GENERATED MCP TOOLS -->)/,
-  `$1\n${await generateToolInventory()}\n$2`
+  `$1\n<!-- prettier-ignore -->\n${await generateToolInventory()}\n\n$2`,
 );
 writeFileSync(readmePath, updated, "utf8");
 
 process.stdout.write(
-  "Wrote packages/cli/schema.json and README.md (rule table + MCP tool inventory)\n"
+  "Wrote packages/cli/schema.json and README.md (rule table + MCP tool inventory)\n",
 );

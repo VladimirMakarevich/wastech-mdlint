@@ -158,7 +158,7 @@ describe("extractDocProfile", () => {
           from: "consumer.md",
           to: "shared.md",
           type: "import",
-          line: 2,
+          line: 3,
           rawTarget: "@shared.md",
         },
         {
@@ -183,7 +183,7 @@ describe("extractDocProfile", () => {
           from: "inbound.md",
           to: "consumer.md",
           type: "import",
-          line: 1,
+          line: 2,
           rawTarget: "@consumer.md",
         },
       ],

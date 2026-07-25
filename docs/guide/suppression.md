@@ -10,18 +10,21 @@ deliberately broken example link, a placeholder that is expected — without tur
 
 ```md
 <!-- wastech-mdlint-disable REF-001 -->
+
 [intentionally broken](does-not-exist.md)
+
 <!-- wastech-mdlint-enable REF-001 -->
 
 <!-- wastech-mdlint-disable-next-line TBL-002 -->
-| REQ-1 |  |
+
+| REQ-1 | |
 ```
 
-| Directive | Effect |
-| --- | --- |
-| `wastech-mdlint-disable [IDs]` | Disable the listed rules from here until a matching `enable` or end of file. |
-| `wastech-mdlint-enable [IDs]` | Re-enable the listed rules. |
-| `wastech-mdlint-disable-next-line [IDs]` | Disable the listed rules for the **next line only**. |
+| Directive                                | Effect                                                                       |
+| ---------------------------------------- | ---------------------------------------------------------------------------- |
+| `wastech-mdlint-disable [IDs]`           | Disable the listed rules from here until a matching `enable` or end of file. |
+| `wastech-mdlint-enable [IDs]`            | Re-enable the listed rules.                                                  |
+| `wastech-mdlint-disable-next-line [IDs]` | Disable the listed rules for the **next line only**.                         |
 
 ## Rules
 
