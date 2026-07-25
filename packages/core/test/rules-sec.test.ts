@@ -75,6 +75,47 @@ describe("SEC-002 section order", () => {
       expectedAfter: "Overview",
     });
   });
+
+  it("filters headings by level before checking order", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "### Overview\n## Usage\n## Overview\n",
+    });
+
+    const unfiltered = await lint(cwd, [
+      rule("SEC-002", { order: ["Overview", "Usage"] }),
+    ]);
+    expect(unfiltered.messages).toEqual([]);
+
+    const filtered = await lint(cwd, [
+      rule("SEC-002", { order: ["Overview", "Usage"], level: 2 }),
+    ]);
+    expect(filtered.messages).toHaveLength(1);
+    expect(filtered.messages[0]?.data).toMatchObject({
+      section: "Usage",
+      expectedAfter: "Overview",
+    });
+  });
+
+  it("scopes order checking to headings under a given parent section", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "## Section A\n### Two\n### One\n\n## Section B\n### One\n### Two\n",
+    });
+
+    const inSectionA = await lint(cwd, [
+      rule("SEC-002", { order: ["One", "Two"], section: "Section A" }),
+    ]);
+    expect(inSectionA.messages).toHaveLength(1);
+    expect(inSectionA.messages[0]?.data).toMatchObject({
+      section: "Two",
+      expectedAfter: "One",
+    });
+
+    const inSectionB = await lint(cwd, [
+      rule("SEC-002", { order: ["One", "Two"], section: "Section B" }),
+    ]);
+    expect(inSectionB.messages).toEqual([]);
+  });
 });
 
 describe("SEC-003 template conformance", () => {

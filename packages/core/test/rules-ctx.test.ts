@@ -93,4 +93,33 @@ describe("CTX-003 glossary aliases", () => {
       result.messages.every((message) => message.data?.canonical === "GraphQL"),
     ).toBe(true);
   });
+
+  it("scopes alias scanning to a named section, ignoring the same alias elsewhere", async () => {
+    const cwd = await fixtureRepo({
+      "glossary.md": "| Term | Aliases |\n| --- | --- |\n| GraphQL | gql |\n",
+      "doc.md": [
+        "## Intro",
+        "",
+        "Uses gql here.",
+        "",
+        "## Notes",
+        "",
+        "Also mentions gql here.",
+      ].join("\n"),
+    });
+    const result = await lint(cwd, [
+      rule("CTX-003", {
+        glossary: "glossary.md",
+        termColumn: "Term",
+        aliasColumn: "Aliases",
+        section: "Intro",
+      }),
+    ]);
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.line).toBe(3);
+    expect(result.messages[0]?.data).toMatchObject({
+      alias: "gql",
+      canonical: "GraphQL",
+    });
+  });
 });

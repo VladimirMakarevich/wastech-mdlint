@@ -1,7 +1,7 @@
 # P10.05 · Deepen parser & per-rule tests
 
 > Phase: [P10 — Post-audit consistency](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** ·
-> Status **Not started**. Audit findings **L-13**, **L-14** ([report](../audit-2026-07-23-p0-p8.md)).
+> Status **Done**. Audit findings **L-13**, **L-14** ([report](../audit-2026-07-23-p0-p8.md)).
 
 ## Goal
 
@@ -34,6 +34,32 @@ exercised.
 
 ## Exit criteria
 
-- [ ] Reference-style images, CJK content/anchor, and value-level loader determinism are tested.
-- [ ] Each named rule has at least one edge-case test beyond the smoke pass/fail pair.
-- [ ] `npm test` green.
+- [x] Reference-style images, CJK content/anchor, and value-level loader determinism are tested.
+- [x] Each named rule has at least one edge-case test beyond the smoke pass/fail pair.
+- [x] `npm test` green.
+
+## Implementation notes
+
+Test-only change; no parser or rule behavior was modified.
+
+- `packages/core/test/parse-document.test.ts` — added a reference-style image test (closes the
+  "images … untested" half of L-13) and a new `describe("parseDocument · CJK content and
+  anchors", ...)` block with a CJK table/checklist content-scanning case and a CJK
+  percent-encoded-anchor decode case.
+- `packages/core/test/load-documents.test.ts` — added an additive test asserting
+  `JSON.stringify` equality of full `ParsedDocument` values across two loads, alongside (not
+  replacing) the existing key-order determinism test.
+- `packages/core/test/rules-sec.test.ts` — added SEC-002 `level` filtering and `section`-scoped
+  inversion cases.
+- `packages/core/test/rules-ref.test.ts` — added REF-004 `dependencySection` override, REF-005
+  heading-as-definition widening (audit 5.5), and REF-006 multi-id cell tokenization cases.
+- `packages/core/test/rules-ctx.test.ts` — added a CTX-003 `section`-scoped alias-scanning case.
+- `packages/core/test/rules-grp.test.ts` — added a GRP-003 3-stage chain case exercising the
+  `idColumn`-omitted stage-skip branch.
+- `packages/core/test/rules-size.test.ts` (new) and `packages/core/test/rules-str.test.ts` (new)
+  — dedicated option-branch coverage for SIZE-001 (lines/tokens metrics, pass case, override
+  precedence and per-metric fallback) and STR-001 (glob-satisfied pass case, independent
+  multi-miss reporting), left `rules-proof.test.ts`'s and `rules-sec.test.ts`'s existing
+  end-to-end smoke tests for these rules untouched.
+
+Verified with `npm run typecheck`, `npm test` (614 tests passing), and `npm run build`.

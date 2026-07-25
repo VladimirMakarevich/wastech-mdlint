@@ -79,6 +79,23 @@ describe("REF-004 cross-zone links", () => {
       toZone: "payments",
     });
   });
+
+  it("recognizes a custom dependencySection heading instead of the 'Dependencies' default", async () => {
+    const cwd = await fixtureRepo({
+      "zones/auth/page.md":
+        "## Deps\n\n- payments\n\n## Body\n\n[bill](../billing/x.md)\n[pay](../payments/y.md)\n",
+      "zones/billing/x.md": "# x\n",
+      "zones/payments/y.md": "# y\n",
+    });
+    const result = await lint(cwd, [
+      rule("REF-004", { zonesDir: "zones", dependencySection: "Deps" }),
+    ]);
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.data).toMatchObject({
+      fromZone: "auth",
+      toZone: "billing",
+    });
+  });
 });
 
 describe("REF-005 ID traceability", () => {
@@ -111,6 +128,22 @@ describe("REF-005 ID traceability", () => {
       data: { id: "REQ-2" },
     });
   });
+
+  it("treats a matching heading token as a definition too, not just a table row (audit 5.5)", async () => {
+    const cwd = await fixtureRepo({
+      "reqs.md": "# REQ-1\n\nIntroductory requirement.\n",
+      "design.md": "| ID |\n| --- |\n| REQ-1 |\n",
+    });
+    const result = await lint(cwd, [
+      rule("REF-005", {
+        definitions: ["reqs.md"],
+        references: ["design.md"],
+        idColumn: "ID",
+        idPattern: "^REQ-\\d+$",
+      }),
+    ]);
+    expect(result.messages).toEqual([]);
+  });
 });
 
 describe("REF-006 stability consistency", () => {
@@ -137,6 +170,29 @@ describe("REF-006 stability consistency", () => {
         referencedStability: "experimental",
         referencerStability: "stable",
       },
+    });
+  });
+
+  it("evaluates every id in a multi-id cell independently", async () => {
+    const cwd = await fixtureRepo({
+      "defs.md":
+        "| ID | Stability |\n| --- | --- |\n| A | stable |\n| B | experimental |\n",
+      "refs.md": "| ID | Stability |\n| --- | --- |\n| A, B | stable |\n",
+    });
+    const result = await lint(cwd, [
+      rule("REF-006", {
+        stabilityColumn: "Stability",
+        stabilityOrder: ["experimental", "stable"],
+        definitions: ["defs.md"],
+        references: ["refs.md"],
+        idColumn: "ID",
+      }),
+    ]);
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.data).toMatchObject({
+      referencedId: "B",
+      referencedStability: "experimental",
+      referencerStability: "stable",
     });
   });
 });

@@ -167,6 +167,45 @@ describe("parseDocument · links & images", () => {
       { rawTarget: "a.png", line: 2 },
     ]);
   });
+
+  it("resolves reference-style image definitions (not just reference-style links)", () => {
+    const doc = parse("![Diagram][d]\n\n[d]: assets/diagram.png\n");
+    expect(doc.images).toEqual([{ rawTarget: "assets/diagram.png", line: 1 }]);
+  });
+});
+
+describe("parseDocument · CJK content and anchors", () => {
+  it("captures CJK table and checklist content, not just headings", () => {
+    const doc = parse(
+      [
+        "## 概要",
+        "",
+        "| 項目 | 値 |",
+        "| --- | --- |",
+        "| 名前 | 山田太郎 |",
+        "",
+        "- [x] 完了ですタスク",
+        "- [ ] 未完了のタスク",
+      ].join("\n"),
+    );
+
+    expect(doc.tables).toHaveLength(1);
+    expect(doc.tables[0]).toEqual({
+      headers: ["項目", "値"],
+      section: "概要",
+      line: 3,
+      rows: [{ line: 5, cells: { 項目: "名前", 値: "山田太郎" } }],
+    });
+    expect(doc.checkItems).toEqual([
+      { text: "完了ですタスク", checked: true, section: "概要", line: 7 },
+      { text: "未完了のタスク", checked: false, section: "概要", line: 8 },
+    ]);
+  });
+
+  it("decodes a percent-encoded CJK anchor so it matches a heading slug", () => {
+    const doc = parse("[t](a.md#%E6%A6%82%E8%A6%81)\n");
+    expect(doc.links[0]?.anchor).toBe("概要");
+  });
 });
 
 describe("parseDocument · eager imports", () => {

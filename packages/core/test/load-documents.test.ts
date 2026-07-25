@@ -128,6 +128,22 @@ describe("loadDocuments", () => {
     expect(first).toEqual(second);
   });
 
+  it("produces byte-identical ParsedDocument values across repeated loads, not just key order", async () => {
+    const root = await createFixtureTree({
+      "z.md": "# Z\n\n[a](a.md#z)\n",
+      "a.md": "# A\n\n| ID |\n| --- |\n| REQ-1 |\n",
+    });
+
+    const first = [
+      ...(await loadDocuments(["**/*.md"], { cwd: root })).values(),
+    ];
+    const second = [
+      ...(await loadDocuments(["**/*.md"], { cwd: root })).values(),
+    ];
+
+    expect(JSON.stringify(second)).toBe(JSON.stringify(first));
+  });
+
   it("sorts mixed-case and non-ASCII paths by host-independent string order", async () => {
     const root = await createFixtureTree({
       "alpha.md": "# Lower\n",

@@ -148,4 +148,32 @@ describe("GRP-003 ID chain across stages", () => {
       toStage: "design",
     });
   });
+
+  it("checks every adjacent stage pair independently, skipping a stage whose idColumn is omitted", async () => {
+    const cwd = await fixtureRepo({
+      "reqs.md": "| ID |\n| --- |\n| REQ-1 |\n| REQ-2 |\n",
+      "design.md": "| Requirement |\n| --- |\n| REQ-1 |\n",
+    });
+    const result = await lint(cwd, [
+      rule("GRP-003", {
+        chain: [
+          {
+            stage: "requirements",
+            files: ["reqs.md"],
+            idColumn: "ID",
+            refColumn: "ID",
+          },
+          { stage: "design", files: ["design.md"], refColumn: "Requirement" },
+          { stage: "tests", files: ["tests.md"], refColumn: "Design" },
+        ],
+        idPattern: "^REQ-\\d+$",
+      }),
+    ]);
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.data).toMatchObject({
+      id: "REQ-2",
+      fromStage: "requirements",
+      toStage: "design",
+    });
+  });
 });
