@@ -1,7 +1,7 @@
 # P10.06 · Reconcile requirement/plan text
 
 > Phase: [P10 — Post-audit consistency](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** ·
-> Status **Not started**. Audit findings **L-8**, **L-9**, **L-10** ([report](../audit-2026-07-23-p0-p8.md)).
+> Status **Done**. Audit findings **L-8**, **L-9**, **L-10** ([report](../audit-2026-07-23-p0-p8.md)).
 
 ## Goal
 
@@ -31,6 +31,20 @@ and the requirement text no longer disagree. Documentation-only.
 
 ## Exit criteria
 
-- [ ] R7 text no longer contradicts the shipped per-rule scoping.
-- [ ] The M1 table matches its own detail paragraph.
-- [ ] P5.04 names the actual schema location.
+- [x] R7 text no longer contradicts the shipped per-rule scoping.
+- [x] The M1 table matches its own detail paragraph.
+- [x] P5.04 names the actual schema location.
+
+## Implementation notes
+
+Documentation-only change; no product code touched.
+
+- `requirements/02-rules-engine.md` R7 notes deferred to the P3 task tables as
+  authoritative, and names the rules that intentionally omit `fileScopeShape`
+  (REF-001/003/004/005, LLM-001, SIZE-001's own `overrides[].pattern`).
+- `requirements/05-mcp-server.md` M1 table cell now lists the 5 structured tools by name and
+  notes `compile-context` stays text-only, matching the detail paragraph below it.
+- `P5-compile/04-synthesize.md` step 5 now points at `compile/skill-frontmatter.ts` instead of
+  "here" (`synthesize.ts`).
+- Ran `npx prettier --write` on the two requirement files to re-align the Markdown tables after
+  editing their cells.

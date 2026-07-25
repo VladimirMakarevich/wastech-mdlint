@@ -8,16 +8,16 @@
 
 ## Decisions
 
-| #      | Improvement                                                    | Status      | Notes                                                                                                             |
-| ------ | -------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------- |
-| **M1** | Structured tool output (`structuredContent` + `outputSchema`)  | ✅ Accepted | Typed objects for graph/slice/impact/lint + a human text summary. Schemas derive from core types.                 |
-| **M2** | Honest tool descriptions (align with G4)                       | ✅ Accepted | `context-slice` described as exact ID/anchor/heading/path resolution — no "keyword search" over-promise.          |
-| **M3** | Modular server + shared config helper + docs-from-registration | ✅ Accepted | Split tools into modules; mirror CLI `shared.ts`; generate the tool list to kill the "5 vs 6" drift.              |
-| **M4** | Integration tests over `StdioServerTransport`                  | ✅ Accepted | Wire-level: registration + error shape, not just the computational layer.                                         |
-| **M5** | New `fix` (+ `schema`) MCP tools                               | 🔵 Backlog  | Next version. v2 MCP stays at the 6 tools.                                                                        |
-| **M6** | Standard error contract (machine `code` + hint)                | ✅ Accepted | Generalize the existing include-set hint; carry a code with structured output.                                    |
-| **M7** | Tool safety annotations (`readOnly` / `destructive`)           | ✅ Accepted | All 6 tools `readOnlyHint`; future `fix` would be `destructiveHint`.                                              |
-| **M8** | Invariants: stdio-only + never load code-plugins               | ✅ Accepted | No HTTP/SSE in v2; runs declarative custom rules (data) but never Tier-2 code-plugins ([R9](02-rules-engine.md)). |
+| #      | Improvement                                                    | Status      | Notes                                                                                                                                                                                                       |
+| ------ | -------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **M1** | Structured tool output (`structuredContent` + `outputSchema`)  | ✅ Accepted | Typed objects for the 5 structured tools (`lint`/`lint-files`/`context-graph`/`context-slice`/`impact-analysis`) + a human text summary; `compile-context` stays text-only. Schemas derive from core types. |
+| **M2** | Honest tool descriptions (align with G4)                       | ✅ Accepted | `context-slice` described as exact ID/anchor/heading/path resolution — no "keyword search" over-promise.                                                                                                    |
+| **M3** | Modular server + shared config helper + docs-from-registration | ✅ Accepted | Split tools into modules; mirror CLI `shared.ts`; generate the tool list to kill the "5 vs 6" drift.                                                                                                        |
+| **M4** | Integration tests over `StdioServerTransport`                  | ✅ Accepted | Wire-level: registration + error shape, not just the computational layer.                                                                                                                                   |
+| **M5** | New `fix` (+ `schema`) MCP tools                               | 🔵 Backlog  | Next version. v2 MCP stays at the 6 tools.                                                                                                                                                                  |
+| **M6** | Standard error contract (machine `code` + hint)                | ✅ Accepted | Generalize the existing include-set hint; carry a code with structured output.                                                                                                                              |
+| **M7** | Tool safety annotations (`readOnly` / `destructive`)           | ✅ Accepted | All 6 tools `readOnlyHint`; future `fix` would be `destructiveHint`.                                                                                                                                        |
+| **M8** | Invariants: stdio-only + never load code-plugins               | ✅ Accepted | No HTTP/SSE in v2; runs declarative custom rules (data) but never Tier-2 code-plugins ([R9](02-rules-engine.md)).                                                                                           |
 
 ## Detail & rationale
 

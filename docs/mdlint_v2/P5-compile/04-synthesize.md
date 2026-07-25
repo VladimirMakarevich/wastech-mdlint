@@ -30,9 +30,10 @@ budget-aware — and return `CompileResult`.
    `ceil(len/4)` heuristic can be swapped later) — corpus token estimate + entrypoints over
    budget.
 5. **Frontmatter schema** ([S1](../requirements/04-skills-compile.md)): **define and export the
-   SKILL.md frontmatter Zod schema here** (`name`, `description`, `license`, `compatibility`,
-   `metadata.{homepage, source}`) and validate the emitted frontmatter against it. This schema
-   does **not** exist yet — P5 is its first consumer. Export it from `@wastech-mdlint/core` so
+   SKILL.md frontmatter Zod schema** (`name`, `description`, `license`, `compatibility`,
+   `metadata.{homepage, source}`) in `compile/skill-frontmatter.ts` (still core/compile, not
+   `synthesize.ts`) and validate the emitted frontmatter against it. This schema does **not**
+   exist yet — P5 is its first consumer. Export it from `@wastech-mdlint/core` so
    [P8.01](../P8-skills/01-frontmatter-schema-model.md) reuses (does not redefine) it for static
    skills and P9 CI validates against the same schema (single source, S1).
 

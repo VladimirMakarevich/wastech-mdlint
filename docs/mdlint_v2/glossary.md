@@ -213,11 +213,13 @@ Vocabulary the rules operate on, beyond the rule IDs themselves. Full option sha
 the [rules requirements](requirements/02-rules-engine.md) and each rule's source under
 [`engine/rules/`](../../packages/core/src/engine/rules/).
 
-- **File scope (`files` / `exclude`)** — The shared per-rule scoping base every rule mixes in
-  (Decision [R7](requirements/02-rules-engine.md), type `FileScope`): a rule runs on a file
-  when it matches the rule's `files` and not its `exclude` (`exclude` wins, the per-rule form
-  of C1). Glob semantics are picomatch with `{ dot: true }`, so dotfiles such as `.claude/…`
-  match.
+- **File scope (`files` / `exclude`)** — The shared per-rule scoping shape (`fileScopeShape`,
+  `rules/scope.ts`) available to every rule, but mixed in per-rule rather than universal
+  (Decision [R7](requirements/02-rules-engine.md), type `FileScope`): a rule that opts in runs
+  on a file when it matches the rule's `files` and not its `exclude` (`exclude` wins, the
+  per-rule form of C1). Identity/whole-corpus rules (REF-001/003/004/005, LLM-001) intentionally
+  omit it; the P3 task tables are authoritative on which rules take it. Glob semantics are
+  picomatch with `{ dot: true }`, so dotfiles such as `.claude/…` match.
 - **Zone / Dependencies section (REF-004)** — A **zone** is a top-level docs area: the first
   directory segment under the configured `zonesDir` (a file lives at `<zonesDir>/<zone>/…`). A
   **cross-zone link** points from one zone into another and must be declared in the source
