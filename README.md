@@ -127,8 +127,11 @@ wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-
   to `skip` when omitted; interactive mode always prompts, and pressing Enter without choosing
   lands on that same safe default rather than the first listed option. `--with-ci-workflow`
   (under `--yes` only) also drops a `.github/workflows/wastech-mdlint.yml`; interactive runs
-  offer it with a default of no. If `[path]` is below a repo's existing config, `init` works
-  from the config's own directory instead. Without `--yes`, `init` requires an interactive
+  offer it with a default of no. That workflow always installs and runs the CLI via npm
+  (`npm install --no-save` + `npx`), regardless of the bun/pnpm/yarn/npm package manager `init`
+  detects and reports — it only fetches the external CLI tool, never the repo's own dependencies,
+  so it never needs that repo's lockfile. If `[path]` is below a repo's existing config, `init`
+  works from the config's own directory instead. Without `--yes`, `init` requires an interactive
   terminal. Ctrl+C during any prompt exits `0`.
 
 ## MCP server

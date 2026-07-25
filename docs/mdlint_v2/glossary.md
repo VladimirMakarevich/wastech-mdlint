@@ -501,7 +501,10 @@ underlying scan/inference.
   still anchors at the real repo root, not `packages/foo`), else the nearest `package.json`/
   `node_modules` — where GitHub loads workflows. For a subdirectory config it scopes lint to the
   config's directory (`lint <dir>`, so `include`/`exclude` resolve there) plus a shell-quoted
-  `--config`; a path with a line terminator is declined rather than emitted broken. The offer belongs
+  `--config`; a path with a line terminator is declined rather than emitted broken. The template is
+  npm-universal by design regardless of the repo's detected bun/pnpm/yarn/npm package manager — it
+  only fetches the external `@wastech-mdlint/cli` tool, never the repo's own dependencies, so it never
+  needs that repo's lockfile ([P9.07](P9-remediation/07-init-ci-package-manager.md)). The offer belongs
   only to the confirmed config-write branch — `--on-existing skip` is a strict no-write outcome and
   never drops a workflow — and a Ctrl+C at its post-write prompt is treated as "no workflow" so the
   config/schema write summary still prints. The CLI host does the actual `writeFile` and reports

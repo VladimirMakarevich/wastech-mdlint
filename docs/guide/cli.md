@@ -128,6 +128,12 @@ Scans the repo for doc clusters, infers a rule set with rationale, and — on co
 - **Ctrl+C** during any prompt exits `0`.
 - When custom rules are present, `init` also generates a project-local `schema.json` and points
   `$schema` at it. No remote URL is ever emitted.
+- The `--with-ci-workflow` template is **npm-universal by design**: even when `init` detects and
+  reports a bun/pnpm/yarn project, the generated workflow still installs and runs the CLI via
+  `npm install --no-save @wastech-mdlint/cli` + `npx`. That step only fetches the external CLI
+  tool, never the repo's own dependencies, so it never needs the repo's lockfile — and
+  `actions/setup-node` provides npm on every runner, so a per-manager branch would add setup for
+  no functional gain.
 
 See [Configuration](configuration.md) for the written file.
 

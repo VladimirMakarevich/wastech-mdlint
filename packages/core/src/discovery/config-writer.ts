@@ -134,6 +134,14 @@ function shellSingleQuote(value: string): string {
  * A line terminator in the path cannot be represented in the block scalar and would silently mis-run,
  * so it is rejected (the CLI declines the opt-in workflow rather than reach this) — an explicit
  * contract guard, not a silent strip that would mis-target the config.
+ *
+ * Deliberately npm-universal (P9.07 / audit L-7): this never takes the repo's detected package
+ * manager (`detectPackageManager` — bun/pnpm/yarn/npm), and `init-command.ts` does not thread it in
+ * here. The install step only fetches the external `@wastech-mdlint/cli` tool into a scratch
+ * `node_modules` — it never resolves or touches the target repo's own lockfile/workspace — and
+ * `actions/setup-node` always provides npm, so every runner can execute this step with no extra
+ * per-manager setup action. A bun/pnpm/yarn repo's own lockfile is simply irrelevant to what this
+ * step installs, so the detection result is intentionally unused here, not silently dropped.
  */
 export function buildCiWorkflowYaml(configPath?: string): string {
   if (configPath !== undefined && /[\r\n]/.test(configPath)) {

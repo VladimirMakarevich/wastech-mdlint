@@ -1749,4 +1749,30 @@ describe("init command · package-manager detection e2e (P6.05)", () => {
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
     expect(result.stdout).toContain("Package manager: not detected.");
   });
+
+  // P9.07 (L-7): the detected manager is surfaced in the draft summary above, but the opt-in CI
+  // workflow is npm-universal BY DESIGN (buildCiWorkflowYaml's own comment explains why) — a
+  // bun/pnpm/yarn repo must still get the same npm-based workflow, not have its detection leak in.
+  for (const { lockfile, expected } of lockfileCases) {
+    it(`still writes an npm-based CI workflow for a detected "${expected}" manager (${lockfile})`, async () => {
+      const cwd = await fixtureRepo({
+        ...CROSS_LINKED_DOCS_FIXTURE,
+        [lockfile]: "",
+      });
+
+      const result = await run(
+        ["init", cwd, "--yes", "--with-ci-workflow"],
+        cwd,
+      );
+
+      expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+      expect(result.stdout).toContain(`Package manager: ${expected}.`);
+      const workflow = await readFile(
+        path.join(cwd, ".github", "workflows", "wastech-mdlint.yml"),
+        "utf8",
+      );
+      expect(workflow).toContain("npm install --no-save @wastech-mdlint/cli");
+      expect(workflow).toContain("npx wastech-mdlint lint --fail-on error");
+    });
+  }
 });

@@ -331,6 +331,21 @@ describe("buildCiWorkflowYaml", () => {
       buildCiWorkflowYaml("bad\rname/wastech-mdlint.config.json"),
     ).toThrow(/line terminator/);
   });
+
+  // P9.07 (audit L-7): the function takes no package-manager input at all — it is npm-universal by
+  // design, not a detection result that got lost on the way in. See the function's own doc comment
+  // for why (the install step only fetches the external CLI, never the target repo's dependencies).
+  it("has no package-manager parameter — the workflow is npm-universal by design (P9.07)", () => {
+    // Only `configPath` is accepted; there is no second parameter a caller could use to thread a
+    // detected package manager through.
+    expect(buildCiWorkflowYaml.length).toBe(1);
+    const rootYaml = buildCiWorkflowYaml();
+    const subdirYaml = buildCiWorkflowYaml("docs/wastech-mdlint.config.json");
+    for (const yaml of [rootYaml, subdirYaml]) {
+      expect(yaml).toContain("npm install --no-save @wastech-mdlint/cli");
+      expect(yaml).not.toMatch(/\b(pnpm|bunx?|yarn)\b/);
+    }
+  });
 });
 
 describe("resolvePackageSchemaRef", () => {

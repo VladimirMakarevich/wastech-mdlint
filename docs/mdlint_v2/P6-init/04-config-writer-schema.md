@@ -34,6 +34,8 @@ Write the final config and wire it to the **local** schema, optionally dropping 
    form once the Action exists. The workflow is anchored at the repository root (where GitHub loads
    workflows) and, for a subdirectory config, scopes lint to the config's directory and passes
    `--config` (both single-quoted) so the run resolves `include`/`exclude` against the right tree.
+   The template is deliberately npm-universal regardless of the repo's detected package manager
+   (bun/pnpm/yarn/npm) — see [P9.07](../P9-remediation/07-init-ci-package-manager.md).
 4. Print a summary of what was written (repository-relative POSIX paths).
 
 ## Decisions applied
@@ -80,6 +82,12 @@ Decisions that are load-bearing but not obvious from the code:
   print rather than the whole command unwinding to look like a no-op).
 - **CI template is self-contained, not `uses:`** — see deliverable 3; `buildCiWorkflowYaml` is the
   single swap point once P9.03 publishes the Action.
+- **CI template is npm-universal by design**, not a discarded detection. `runInitCommand` detects
+  bun/pnpm/yarn/npm (via `packageManager` in the draft summary) but never threads it into
+  `buildCiWorkflowYaml`: the install step only fetches the external `@wastech-mdlint/cli` tool, never
+  the target repo's own dependencies, so it never touches that repo's lockfile/workspace resolution;
+  `actions/setup-node` already provides npm on every runner, so branching per manager would only add
+  setup steps for no functional benefit. See [P9.07](../P9-remediation/07-init-ci-package-manager.md).
 
 ## Hand-off to next
 
