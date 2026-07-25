@@ -14,7 +14,9 @@ These invariants should guide implementation work.
 
 ## Current vs Target State
 
-- The current repository still contains current single-package single-package code in `src/`.
+- The single-package code was relocated into `packages/core` at P0.04, and the legacy pipeline
+  was removed at the P3.09 cutover. All product code lives under `packages/*`; there is no root
+  `src/`.
 - The target architecture is an npm-workspaces monorepo with:
   - `@wastech-mdlint/core`
   - `@wastech-mdlint/cli`

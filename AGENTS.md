@@ -6,9 +6,12 @@ These instructions apply to the entire repository.
 
 ## Project State
 
-`wastech-mdlint` is being rebuilt from the current single-package implementation into the v2 production target.
+`wastech-mdlint` is now the v2 production target: an npm-workspaces monorepo under `packages/*`,
+not a pre-migration single package.
 
-- The current repository still contains the single-package codebase in `src/` and `test/`.
+- The single-package codebase was relocated into `packages/core` at P0.04, and the legacy
+  pipeline was removed at the P3.09 cutover. All product code lives under `packages/*`; there is
+  no root `src/` or `test/`.
 - The target product is the v2 monorepo/workspace design documented under `docs/mdlint_v2/`.
 - Treat the current filesystem state as truth for where code lives today.
 - Treat the v2 roadmap as truth for where the product is going next.
