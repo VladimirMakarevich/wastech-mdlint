@@ -1,7 +1,7 @@
 # P10.03 · Clean stale source comments/notes
 
 > Phase: [P10 — Post-audit consistency](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** ·
-> Status **Not started**. Audit findings **L-1**, **L-2** ([report](../audit-2026-07-23-p0-p8.md)).
+> Status **Done**. Audit findings **L-1**, **L-2** ([report](../audit-2026-07-23-p0-p8.md)).
 
 ## Goal
 
@@ -26,6 +26,24 @@ reverse-engineer false assumptions from them. Comment-only edits — no behavior
 
 ## Exit criteria
 
-- [ ] No `CHK-*` reference remains in source comments.
-- [ ] No "not yet config-driven — P2 wires" (or similar already-done future-tense) comment remains.
-- [ ] `npm run typecheck` green (comment-only change).
+- [x] No `CHK-*` reference remains in source comments.
+- [x] No "not yet config-driven — P2 wires" (or similar already-done future-tense) comment remains.
+- [x] `npm run typecheck` green (comment-only change).
+
+## Implementation notes
+
+Both flagged comments were corrected in place; no runtime code, signature, or logic changed.
+
+- **L-1** — `load-documents.ts` now states `exclude`/`respectGitignore` are config-driven,
+  reached via `lintFiles` passing `config.exclude` / `config.respectGitignore` as this
+  function's `options`. The old "not yet config-driven — P2 wires …" phrasing described a
+  future that already happened, so the comment described the wrong world; the fix is deliberately
+  a re-statement of fact, not a signature note, since `loadDocuments`'s parameters were already
+  the intended shape.
+- **L-2** — the `checkItems` provenance comment in `document-types.ts` now reads
+  `checkItems → CTX-002 checklist rules`. Dropping the `CHK-001` reference matters beyond
+  accuracy: `CHK-*` is a phantom rule category the roadmap explicitly warns against, so leaving
+  it in a header comment would seed a nonexistent ID back into readers' mental model of the rule
+  taxonomy. Checklist completeness lives under `CTX-002`; there is no `CHK` family.
+- The step-3 grep sweep (`CHK`, "P2 wires", already-done future tense) surfaced no further
+  occurrences, so the change stayed scoped to the two audited lines.

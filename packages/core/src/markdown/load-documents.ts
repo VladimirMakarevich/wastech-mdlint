@@ -168,8 +168,8 @@ async function collectFiles(params: {
  * Deterministic document loader (P1.05): expand `patterns` under `cwd`, read + parse each match into
  * a `ParsedDocument`, and return `Map<absolutePathPosix, ParsedDocument>` with sorted, POSIX keys.
  *
- * `exclude`/`respectGitignore` are honored when passed but are not yet config-driven — P2 wires
- * `config.exclude` / `config.respectGitignore` through here without changing this signature.
+ * `exclude`/`respectGitignore` are config-driven: `lintFiles` passes `config.exclude` /
+ * `config.respectGitignore` through as this function's `options`.
  */
 export async function loadDocuments(
   patterns: string[],
