@@ -44,7 +44,7 @@ Test-only change; no parser or rule behavior was modified.
 
 - `packages/core/test/parse-document.test.ts` — added a reference-style image test (closes the
   "images … untested" half of L-13) and a new `describe("parseDocument · CJK content and
-  anchors", ...)` block with a CJK table/checklist content-scanning case and a CJK
+anchors", ...)` block with a CJK table/checklist content-scanning case and a CJK
   percent-encoded-anchor decode case.
 - `packages/core/test/load-documents.test.ts` — added an additive test asserting
   `JSON.stringify` equality of full `ParsedDocument` values across two loads, alongside (not

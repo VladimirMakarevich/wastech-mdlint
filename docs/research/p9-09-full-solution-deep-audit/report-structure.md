@@ -16,7 +16,7 @@ tree on `feat/p9-remediation`. It is a blueprint for the writer, not the finishe
   2 confirmed real defects (1 business/logic, 1 technical), 1 needs-confirmation gap, and 3
   shortcomings (2 confirmed, 1 needs-confirmation).
 - **Confidence framing:** BL-1, TP-1, SC-1, SC-2 are confirmed against cited code/tests/spec;
-  OG-1 and SC-3 are explicitly *needs confirmation* and belong under Open questions, not asserted
+  OG-1 and SC-3 are explicitly _needs confirmation_ and belong under Open questions, not asserted
   as defects.
 
 Every code and doc citation below was re-opened and confirmed during this structuring pass.
@@ -36,21 +36,21 @@ _Order: severity high → low. One finding._
   - `packages/core/src/engine/lint-files.ts:87` — `projectFiles = [...documents.keys()]`, i.e. the
     `include`-matched (default `**/*.md`) Markdown corpus only.
   - `packages/core/src/discovery/globs.ts:7-15` — `normalizeConfigGlob` rewrites a bare
-    `README.md` → `**/README.md`, so a required *root* file is satisfied by any `docs/README.md`
+    `README.md` → `**/README.md`, so a required _root_ file is satisfied by any `docs/README.md`
     anywhere in the tree.
   - `packages/core/test/rules-str.test.ts:50-61` — tests only assert genuinely-absent `.md` names;
     the false-missing (present, non-`.md`) case is untested.
 - **Standard it falls short of (with citation):**
-  - Guide `docs/guide/rules/STR-001.md:11-13` motivates the rule with *"every project must ship a
-    `README.md`, a `CONTRIBUTING.md`, a `LICENSE`"* — `LICENSE` has no `.md` suffix and can never
+  - Guide `docs/guide/rules/STR-001.md:11-13` motivates the rule with _"every project must ship a
+    `README.md`, a `CONTRIBUTING.md`, a `LICENSE`"_ — `LICENSE` has no `.md` suffix and can never
     enter the corpus, so the guide's own example fails.
-  - Guide `docs/guide/rules/STR-001.md:66` claims *"literal paths must match exactly,"* which
+  - Guide `docs/guide/rules/STR-001.md:66` claims _"literal paths must match exactly,"_ which
     `normalizeConfigGlob` (`globs.ts:7-15`) directly contradicts — a bare literal is rewritten to
     match anywhere. Two distinct doc-vs-code mismatches in one guide.
-  - Rule description `packages/core/src/engine/rules/sec.ts:196`: *"Required files exist in the
-    project."* — asserts a filesystem property the implementation does not check.
+  - Rule description `packages/core/src/engine/rules/sec.ts:196`: _"Required files exist in the
+    project."_ — asserts a filesystem property the implementation does not check.
 - **Why it matters:** **correctness** (a `LICENSE`, `package.json`, or any non-`.md` /
-  out-of-`include` file present on disk is reported *missing*, a false positive on a real repo
+  out-of-`include` file present on disk is reported _missing_, a false positive on a real repo
   state) **+ documentation drift** (guide example is wrong; "literal paths match exactly" is
   false) **+ test-coverage gap** (no fixture with a present non-`.md` required file).
 - **Recommended direction (subsystem/file):** in `sec.ts` STR-001, resolve required paths against
@@ -72,14 +72,14 @@ _Order: severity high → low. One finding._
   - `packages/core/src/engine/primitives/table.ts:137` — `const regex = compileRegex(options.pattern, options.flags)`
     compiled **once**, then `:147` — `regex.test(value)` called inside the per-row loop.
   - `packages/core/src/engine/regex.ts:25-29` — `regexFlagsSchema` validates only that flags are
-    *legal*, so `g` and `y` pass unchecked.
+    _legal_, so `g` and `y` pass unchecked.
   - Wired via TBL-004 (`packages/core/src/engine/rules/tbl.ts:207,219`) and the declarative
     `custom` `columnMatches` assertion (`packages/core/src/engine/primitives/assert.ts:66-73`).
   - No `g`/`y` test exists: `packages/core/test/primitives.test.ts:110-118` and
     `packages/core/test/rules-tbl.test.ts:80-88` use flag-less patterns.
 - **Standard it violates (with citation):**
   - **External spec — MDN / ECMA-262 §22.2.6.16** (`RegExp.prototype.test`): a `g`/`y`-flagged
-    `RegExp` is *stateful*, storing `lastIndex` between calls and **not resetting even across a
+    `RegExp` is _stateful_, storing `lastIndex` between calls and **not resetting even across a
     different input string** while it keeps matching. Confirmed in external validation
     (run-000077, source 1). So `regex.test(cell)` over consecutive cells starts from a stale
     offset — an anchored `^REQ-\d+$` with `"flags":"g"` wrongly flags valid cells after the first
@@ -124,7 +124,7 @@ cross-phase contract split._
 - **Why it matters:** **architectural drift / contract split across the MCP surface** — the same
   "run custom rules" capability is available through one MCP tool and silently absent from the
   other, with no description saying so. Likely an intentional narrowing (ad-hoc lint = built-ins),
-  which is why it is *needs confirmation*, not asserted.
+  which is why it is _needs confirmation_, not asserted.
 - **Cross-phase chain to state:** the custom-rule contract is exercised end-to-end by `lint-files`
   (P7 MCP wiring over P2/P3 engine) but the ad-hoc `lint` tool schema was left built-in-only and
   never revisited — an earlier-surface decision that the honesty-of-descriptions remediation
@@ -187,7 +187,7 @@ confirmation)._
   bound.
 - **Why it matters:** **robustness at scale** — a pathologically deep link/import chain (thousands
   of docs) could exceed the call stack. Almost certainly fine for realistic repos; unverified at
-  scale, hence *needs confirmation*.
+  scale, hence _needs confirmation_.
 - **Recommended direction (subsystem/file):** document the practical corpus-size assumption in the
   graph subsystem, **or** convert the hottest traversal in `graph/build-context-graph.ts` to an
   explicit stack if very large repos are in scope.
@@ -199,23 +199,23 @@ confirmation)._
 _Acceptance criterion: no subsystem silently skipped. Each row states finding-or-clean and how it
 was covered._
 
-| Subsystem | Coverage | Finding(s) / status |
-|---|---|---|
-| Core engine — rules & primitives (assert, checklist, content, reference, section, table) | Deep-read | **TP-1** (`table.ts` `columnMatches`); primitives otherwise clean — `content.ts` `contentNotMatch` is the correct pattern |
-| Core engine — orchestration (run-rules, suppression, fix, severity) | Deep-read | Clean; `run-rules.ts:42` override precedence is the mechanism behind **SC-2**, not itself a defect |
-| Rules — STR/SEC family | Deep-read | **BL-1** (`sec.ts` STR-001) |
-| Rules — GRP family | Deep-read | **SC-1** (`grp.ts` unused scoping options) |
-| Rules — SIZE family | Deep-read | **SC-2** (`size.ts` dual firing under override) |
-| Graph subsystem (`build-context-graph`, query/BFS, slice, impact) | Deep-read | **SC-3** (recursive DFS); one shared `ContextGraph` + one `query()` confirmed, no parallel traversal |
-| Compile (context, graph-analysis, skill-frontmatter, synthesize) | Deep-read | **No findings** |
-| Discovery (globs, repo-scan, rule-inference, config-writer, package-manager, workspace-packages) | Mixed | `globs.ts` `normalizeConfigGlob` compounds **BL-1**; `rule-inference.ts` DFS in **SC-3**; repo-scan / package-manager / workspace-packages spot-checked at call sites — **no findings** |
-| Config (config-schema, load-config) | Deep-read | **No findings** |
-| Generated schema (`engine/schema.ts` enum, committed `packages/cli/schema.json`) | Deep-read | **No findings**; registry inventory guard now asserts exactly 24 ids / 8 categories (remediated) |
-| CLI + init (program wiring, commands, init flow, prompter) | Spot-checked at call sites | **No findings** surfaced through consumers |
-| MCP server (lint, lint-files, registry, graph/slice/impact/compile tool wrappers) | Deep-read (lint/lint-files/registry); wrappers spot-checked | **OG-1** (`lint` tool custom-rule schema); 6 read-only stdio tools confirmed |
-| Docs — requirements / decisions / glossary | Cross-referenced | Clean on audited terms; M-2 heading-target removal confirmed in `requirements/02-rules-engine.md:47` + `glossary.md:268-269` |
-| Docs — guide (`docs/guide/**`) | Cross-referenced | **BL-1** (STR-001.md:11-13, :66) and **TP-1** (TBL-004.md:25) doc-vs-code mismatches |
-| Test suite (depth, meaningful vs shape-only, gaps) | Deep-read | Coverage gaps feed **BL-1** (no present non-`.md` required-file test) and **TP-1** (no `g`/`y` flag test); registry inventory guard added |
+| Subsystem                                                                                        | Coverage                                                    | Finding(s) / status                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core engine — rules & primitives (assert, checklist, content, reference, section, table)         | Deep-read                                                   | **TP-1** (`table.ts` `columnMatches`); primitives otherwise clean — `content.ts` `contentNotMatch` is the correct pattern                                                               |
+| Core engine — orchestration (run-rules, suppression, fix, severity)                              | Deep-read                                                   | Clean; `run-rules.ts:42` override precedence is the mechanism behind **SC-2**, not itself a defect                                                                                      |
+| Rules — STR/SEC family                                                                           | Deep-read                                                   | **BL-1** (`sec.ts` STR-001)                                                                                                                                                             |
+| Rules — GRP family                                                                               | Deep-read                                                   | **SC-1** (`grp.ts` unused scoping options)                                                                                                                                              |
+| Rules — SIZE family                                                                              | Deep-read                                                   | **SC-2** (`size.ts` dual firing under override)                                                                                                                                         |
+| Graph subsystem (`build-context-graph`, query/BFS, slice, impact)                                | Deep-read                                                   | **SC-3** (recursive DFS); one shared `ContextGraph` + one `query()` confirmed, no parallel traversal                                                                                    |
+| Compile (context, graph-analysis, skill-frontmatter, synthesize)                                 | Deep-read                                                   | **No findings**                                                                                                                                                                         |
+| Discovery (globs, repo-scan, rule-inference, config-writer, package-manager, workspace-packages) | Mixed                                                       | `globs.ts` `normalizeConfigGlob` compounds **BL-1**; `rule-inference.ts` DFS in **SC-3**; repo-scan / package-manager / workspace-packages spot-checked at call sites — **no findings** |
+| Config (config-schema, load-config)                                                              | Deep-read                                                   | **No findings**                                                                                                                                                                         |
+| Generated schema (`engine/schema.ts` enum, committed `packages/cli/schema.json`)                 | Deep-read                                                   | **No findings**; registry inventory guard now asserts exactly 24 ids / 8 categories (remediated)                                                                                        |
+| CLI + init (program wiring, commands, init flow, prompter)                                       | Spot-checked at call sites                                  | **No findings** surfaced through consumers                                                                                                                                              |
+| MCP server (lint, lint-files, registry, graph/slice/impact/compile tool wrappers)                | Deep-read (lint/lint-files/registry); wrappers spot-checked | **OG-1** (`lint` tool custom-rule schema); 6 read-only stdio tools confirmed                                                                                                            |
+| Docs — requirements / decisions / glossary                                                       | Cross-referenced                                            | Clean on audited terms; M-2 heading-target removal confirmed in `requirements/02-rules-engine.md:47` + `glossary.md:268-269`                                                            |
+| Docs — guide (`docs/guide/**`)                                                                   | Cross-referenced                                            | **BL-1** (STR-001.md:11-13, :66) and **TP-1** (TBL-004.md:25) doc-vs-code mismatches                                                                                                    |
+| Test suite (depth, meaningful vs shape-only, gaps)                                               | Deep-read                                                   | Coverage gaps feed **BL-1** (no present non-`.md` required-file test) and **TP-1** (no `g`/`y` flag test); registry inventory guard added                                               |
 
 **Explicitly out of scope / not line-audited (named per acceptance criterion):** `graph-render`,
 `doc-profile`, `describe-rules`, `repo-scan`, `package-manager`, `workspace-packages`, skills
@@ -277,14 +277,15 @@ JSONC with a local `$schema`; MCP is stdio-only with 6 read-only tools.
 
 ## Closing summary the report must end on
 
-| Category | Count | Highest severity |
-|---|---|---|
-| Business/logic defect | 1 (BL-1) | Medium |
-| Technical problem | 1 (TP-1) | Low–Medium |
-| Omission / gap | 1 (OG-1) | Low (needs confirmation) |
-| Shortcoming | 3 (SC-1, SC-2, SC-3) | Low |
+| Category              | Count                | Highest severity         |
+| --------------------- | -------------------- | ------------------------ |
+| Business/logic defect | 1 (BL-1)             | Medium                   |
+| Technical problem     | 1 (TP-1)             | Low–Medium               |
+| Omission / gap        | 1 (OG-1)             | Low (needs confirmation) |
+| Shortcoming           | 3 (SC-1, SC-2, SC-3) | Low                      |
 
 **Address first:**
+
 1. **BL-1** — STR-001's corpus-only reach silently fails to verify non-`.md` / out-of-`include`
    required files, and the guide's `LICENSE` example + "literal paths match exactly" claim are
    wrong. Real, user-visible correctness + documentation gap.
