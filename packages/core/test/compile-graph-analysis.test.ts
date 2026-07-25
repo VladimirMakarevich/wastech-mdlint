@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   analyzeGraph,
   classifyNodes,
-  DEFAULT_HUB_MIN_IN_DEGREE
+  DEFAULT_HUB_MIN_IN_DEGREE,
 } from "../src/compile/graph-analysis.js";
 import { buildContextGraph } from "../src/graph/build-context-graph.js";
 import type { ParsedDocument } from "../src/markdown/document-types.js";
@@ -27,7 +27,7 @@ describe("classifyNodes", () => {
       "hub-ref.md": "[hub](hub.md)\n",
       "hub.md": "# Hub\n",
       "isolated.md": "# Isolated\n",
-      "leaf.md": "# Leaf\n"
+      "leaf.md": "# Leaf\n",
     });
 
     expect(classifyNodes(graph)).toEqual([
@@ -36,7 +36,7 @@ describe("classifyNodes", () => {
       { path: "hub-ref.md", role: "entry" },
       { path: "hub.md", role: "hub" },
       { path: "isolated.md", role: "isolated" },
-      { path: "leaf.md", role: "leaf" }
+      { path: "leaf.md", role: "leaf" },
     ]);
   });
 
@@ -45,14 +45,14 @@ describe("classifyNodes", () => {
       "a.md": "[hub](hub.md)\n",
       "b.md": "[hub](hub.md)\n",
       "c.md": "[hub](hub.md)\n",
-      "hub.md": "# Hub\n"
+      "hub.md": "# Hub\n",
     });
 
     expect(classifyNodes(graph)).toEqual([
       { path: "a.md", role: "entry" },
       { path: "b.md", role: "entry" },
       { path: "c.md", role: "entry" },
-      { path: "hub.md", role: "hub" }
+      { path: "hub.md", role: "hub" },
     ]);
   });
 
@@ -63,7 +63,7 @@ describe("classifyNodes", () => {
       "bridge.md": "[sink](sink.md)\n",
       "c.md": "[bridge](bridge.md)\n[leaf](leaf.md)\n",
       "leaf.md": "# Leaf\n",
-      "sink.md": "# Sink\n"
+      "sink.md": "# Sink\n",
     });
 
     expect(DEFAULT_HUB_MIN_IN_DEGREE).toBe(3);
@@ -73,7 +73,7 @@ describe("classifyNodes", () => {
       { path: "bridge.md", role: "hub" },
       { path: "c.md", role: "entry" },
       { path: "leaf.md", role: "hub" },
-      { path: "sink.md", role: "leaf" }
+      { path: "sink.md", role: "leaf" },
     ]);
     expect(classifyNodes(graph, { hubMinInDegree: 4 })).toEqual([
       { path: "a.md", role: "entry" },
@@ -81,23 +81,23 @@ describe("classifyNodes", () => {
       { path: "bridge.md", role: "bridge" },
       { path: "c.md", role: "entry" },
       { path: "leaf.md", role: "leaf" },
-      { path: "sink.md", role: "leaf" }
+      { path: "sink.md", role: "leaf" },
     ]);
   });
 
   it("uses the raw retained-multiplicity degrees from the graph nodes", () => {
     const graph = graphOf({
       "a.md": "[one](target.md)\n[two](target.md)\n[three](target.md)\n",
-      "target.md": "# Target\n"
+      "target.md": "# Target\n",
     });
 
     expect(graph.nodes).toEqual([
       { path: "a.md", inDegree: 0, outDegree: 3 },
-      { path: "target.md", inDegree: 3, outDegree: 0 }
+      { path: "target.md", inDegree: 3, outDegree: 0 },
     ]);
     expect(classifyNodes(graph)).toEqual([
       { path: "a.md", role: "entry" },
-      { path: "target.md", role: "hub" }
+      { path: "target.md", role: "hub" },
     ]);
   });
 
@@ -106,7 +106,7 @@ describe("classifyNodes", () => {
       "a.md": "[b](b.md)\n",
       "b.md": "[c](c.md)\n",
       "c.md": "# C\n",
-      "isolated.md": "# Isolated\n"
+      "isolated.md": "# Isolated\n",
     });
 
     expect(classifyNodes(graph)).toEqual(classifyNodes(graph));
@@ -119,7 +119,7 @@ describe("analyzeGraph", () => {
       "a.md": "[b](b.md)\n",
       "b.md": "[a](a.md)\n",
       "x.md": "[y](y.md)\n",
-      "y.md": "# Y\n"
+      "y.md": "# Y\n",
     });
 
     expect(analyzeGraph(graph)).toEqual({
@@ -127,15 +127,15 @@ describe("analyzeGraph", () => {
       excludedFromReadingOrder: ["a.md", "b.md"],
       components: [
         ["a.md", "b.md"],
-        ["x.md", "y.md"]
+        ["x.md", "y.md"],
       ],
       classification: [
         { path: "a.md", role: "bridge" },
         { path: "b.md", role: "bridge" },
         { path: "x.md", role: "entry" },
-        { path: "y.md", role: "leaf" }
+        { path: "y.md", role: "leaf" },
       ],
-      cycles: [["a.md", "b.md", "a.md"]]
+      cycles: [["a.md", "b.md", "a.md"]],
     });
   });
 });

@@ -59,9 +59,9 @@ Create `wastech-mdlint.config.json`:
   "$schema": "./node_modules/@wastech-mdlint/cli/schema.json",
   "include": ["**/*.md"],
   "rules": [
-    { "rule": "REF-001" },                                  // broken relative links → error
-    { "rule": "SEC-001", "options": { "sections": ["Overview", "Usage"] } }
-  ]
+    { "rule": "REF-001" }, // broken relative links → error
+    { "rule": "SEC-001", "options": { "sections": ["Overview", "Usage"] } },
+  ],
 }
 ```
 

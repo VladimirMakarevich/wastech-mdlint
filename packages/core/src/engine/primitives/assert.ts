@@ -7,7 +7,7 @@ import {
   columnNotEmpty,
   columnUnique,
   crossColumn,
-  requiredColumns
+  requiredColumns,
 } from "./table.js";
 import { sectionOrder, sectionPresent } from "./section.js";
 import { contentNotMatch, noPlaceholders } from "./content.js";
@@ -27,7 +27,7 @@ export const columnConditionSchema = z
     column: z.string().min(1),
     equals: z.string().optional(),
     matches: regexStringSchema.optional(),
-    notEmpty: z.boolean().optional()
+    notEmpty: z.boolean().optional(),
   })
   .strict()
   .refine(
@@ -35,21 +35,31 @@ export const columnConditionSchema = z
       condition.equals !== undefined ||
       condition.matches !== undefined ||
       condition.notEmpty !== undefined,
-    { message: "condition requires one of: equals, matches, notEmpty" }
+    { message: "condition requires one of: equals, matches, notEmpty" },
   );
 
 export const assertionSchema = z.discriminatedUnion("kind", [
   z
-    .object({ kind: z.literal("requiredColumns"), columns: z.array(z.string().min(1)).min(1), section: z.string().optional() })
+    .object({
+      kind: z.literal("requiredColumns"),
+      columns: z.array(z.string().min(1)).min(1),
+      section: z.string().optional(),
+    })
     .strict(),
-  z.object({ kind: z.literal("columnNotEmpty"), column: z.string().min(1), section: z.string().optional() }).strict(),
+  z
+    .object({
+      kind: z.literal("columnNotEmpty"),
+      column: z.string().min(1),
+      section: z.string().optional(),
+    })
+    .strict(),
   z
     .object({
       kind: z.literal("columnInSet"),
       column: z.string().min(1),
       values: z.array(z.string()).min(1),
       caseSensitive: z.boolean().optional(),
-      section: z.string().optional()
+      section: z.string().optional(),
     })
     .strict(),
   z
@@ -58,24 +68,68 @@ export const assertionSchema = z.discriminatedUnion("kind", [
       column: z.string().min(1),
       pattern: regexStringSchema,
       flags: regexFlagsSchema.optional(),
-      section: z.string().optional()
+      section: z.string().optional(),
     })
     .strict(),
   z
-    .object({ kind: z.literal("columnUnique"), column: z.string().min(1), idPattern: regexStringSchema.optional(), section: z.string().optional() })
+    .object({
+      kind: z.literal("columnUnique"),
+      column: z.string().min(1),
+      idPattern: regexStringSchema.optional(),
+      section: z.string().optional(),
+    })
     .strict(),
   z
-    .object({ kind: z.literal("crossColumn"), when: columnConditionSchema, then: columnConditionSchema, section: z.string().optional() })
+    .object({
+      kind: z.literal("crossColumn"),
+      when: columnConditionSchema,
+      then: columnConditionSchema,
+      section: z.string().optional(),
+    })
     .strict(),
-  z.object({ kind: z.literal("sectionPresent"), sections: z.array(z.string().min(1)).min(1) }).strict(),
   z
-    .object({ kind: z.literal("sectionOrder"), order: z.array(z.string().min(1)).min(1), level: z.number().int().positive().optional(), section: z.string().optional() })
+    .object({
+      kind: z.literal("sectionPresent"),
+      sections: z.array(z.string().min(1)).min(1),
+    })
     .strict(),
-  z.object({ kind: z.literal("contentNotMatch"), pattern: regexStringSchema, flags: regexFlagsSchema.optional() }).strict(),
-  z.object({ kind: z.literal("noPlaceholders"), section: z.string().optional(), placeholders: z.array(z.string()).optional() }).strict(),
-  z.object({ kind: z.literal("allChecked"), section: z.string().optional() }).strict(),
-  z.object({ kind: z.literal("linkResolves"), exclude: z.array(z.string()).optional() }).strict(),
-  z.object({ kind: z.literal("imageResolves"), exclude: z.array(z.string()).optional() }).strict()
+  z
+    .object({
+      kind: z.literal("sectionOrder"),
+      order: z.array(z.string().min(1)).min(1),
+      level: z.number().int().positive().optional(),
+      section: z.string().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("contentNotMatch"),
+      pattern: regexStringSchema,
+      flags: regexFlagsSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("noPlaceholders"),
+      section: z.string().optional(),
+      placeholders: z.array(z.string()).optional(),
+    })
+    .strict(),
+  z
+    .object({ kind: z.literal("allChecked"), section: z.string().optional() })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("linkResolves"),
+      exclude: z.array(z.string()).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("imageResolves"),
+      exclude: z.array(z.string()).optional(),
+    })
+    .strict(),
 ]);
 
 export type Assertion = z.infer<typeof assertionSchema>;
@@ -95,7 +149,7 @@ export const ASSERTION_TARGETS = {
   noPlaceholders: "content",
   allChecked: "checklist",
   linkResolves: "link",
-  imageResolves: "link"
+  imageResolves: "link",
 } as const satisfies Record<Assertion["kind"], string>;
 
 // Kinds whose evaluation spans the whole corpus (project scope). Everything else is per-document.
@@ -113,49 +167,77 @@ export type RunAssertionOptions = {
 export function runAssertion(
   assertion: Assertion,
   context: PrimitiveContext,
-  options: RunAssertionOptions = {}
+  options: RunAssertionOptions = {},
 ): PrimitiveFinding[] {
   switch (assertion.kind) {
     case "requiredColumns":
-      return requiredColumns(context.document, { columns: assertion.columns, section: assertion.section });
+      return requiredColumns(context.document, {
+        columns: assertion.columns,
+        section: assertion.section,
+      });
     case "columnNotEmpty":
-      return columnNotEmpty(context.document, { columns: [assertion.column], section: assertion.section });
+      return columnNotEmpty(context.document, {
+        columns: [assertion.column],
+        section: assertion.section,
+      });
     case "columnInSet":
       return columnInSet(context.document, {
         column: assertion.column,
         values: assertion.values,
         caseSensitive: assertion.caseSensitive,
-        section: assertion.section
+        section: assertion.section,
       });
     case "columnMatches":
       return columnMatches(context.document, {
         column: assertion.column,
         pattern: assertion.pattern,
         flags: assertion.flags,
-        section: assertion.section
+        section: assertion.section,
       });
     case "columnUnique":
       return columnUnique(
         context,
-        { column: assertion.column, idPattern: assertion.idPattern, section: assertion.section },
-        options.fileMatches ?? (() => true)
+        {
+          column: assertion.column,
+          idPattern: assertion.idPattern,
+          section: assertion.section,
+        },
+        options.fileMatches ?? (() => true),
       );
     case "crossColumn":
-      return crossColumn(context.document, { when: assertion.when, then: assertion.then, section: assertion.section });
+      return crossColumn(context.document, {
+        when: assertion.when,
+        then: assertion.then,
+        section: assertion.section,
+      });
     case "sectionPresent":
       return sectionPresent(context.document, { sections: assertion.sections });
     case "sectionOrder":
-      return sectionOrder(context.document, { order: assertion.order, level: assertion.level, section: assertion.section });
+      return sectionOrder(context.document, {
+        order: assertion.order,
+        level: assertion.level,
+        section: assertion.section,
+      });
     case "contentNotMatch":
-      return contentNotMatch(context.document, { pattern: assertion.pattern, flags: assertion.flags });
+      return contentNotMatch(context.document, {
+        pattern: assertion.pattern,
+        flags: assertion.flags,
+      });
     case "noPlaceholders":
-      return noPlaceholders(context.document, { section: assertion.section, placeholders: assertion.placeholders });
+      return noPlaceholders(context.document, {
+        section: assertion.section,
+        placeholders: assertion.placeholders,
+      });
     case "allChecked":
       return allChecked(context.document, { section: assertion.section });
     case "linkResolves":
-      return linkResolves(context.document, context, { exclude: assertion.exclude });
+      return linkResolves(context.document, context, {
+        exclude: assertion.exclude,
+      });
     case "imageResolves":
-      return imageResolves(context.document, context, { exclude: assertion.exclude });
+      return imageResolves(context.document, context, {
+        exclude: assertion.exclude,
+      });
     default: {
       const exhaustiveCheck: never = assertion;
       return exhaustiveCheck;

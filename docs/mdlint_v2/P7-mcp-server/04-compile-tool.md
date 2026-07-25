@@ -48,10 +48,10 @@ Expose `compileContext` over MCP, returning the generated skill content + a meta
   tools that get structured output and omits `compile-context`; the [phase index](index.md)
   roadmap-summary bullet reads as if all six are structured. Per `AGENTS.md` precedence (task file
   > requirement > roadmap summary), the task file and M1 win: `registerTool` omits `outputSchema`
-  and the handler returns exactly `content: [skillContent block, metadata block]`. The SDK treats
-  a tool without an `outputSchema` as returning `content` (not `structuredContent`), so this is
-  mechanically valid. `successResult` (which always attaches `structuredContent`) is deliberately
-  not reused for this tool.
+  > and the handler returns exactly `content: [skillContent block, metadata block]`. The SDK treats
+  > a tool without an `outputSchema` as returning `content` (not `structuredContent`), so this is
+  > mechanically valid. `successResult` (which always attaches `structuredContent`) is deliberately
+  > not reused for this tool.
 - **No error-translation wrapper.** `CompileConfigMissingError.code` (`COMPILE_CONFIG_MISSING`) is
   already in `TOOL_ERROR_CODES` and it carries `.hint`, so `errorResult` passes it through verbatim
   — like `impact-analysis`'s `ImpactAnalysisError`, and unlike `lint`'s `RuleResolutionError` whose

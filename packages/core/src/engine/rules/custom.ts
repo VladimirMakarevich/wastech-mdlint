@@ -3,7 +3,7 @@ import {
   ASSERTION_TARGETS,
   isProjectAssertion,
   runAssertion,
-  type Assertion
+  type Assertion,
 } from "../primitives/assert.js";
 import { columnUnique } from "../primitives/table.js";
 import { RuleResolutionError, type RuleRegistry } from "../registry.js";
@@ -28,12 +28,15 @@ export type CustomRuleEntry = {
   options: { files?: string[]; exclude?: string[]; assert: Assertion };
 };
 
-function invalid(path: (string | number)[], message: string): RuleResolutionError {
+function invalid(
+  path: (string | number)[],
+  message: string,
+): RuleResolutionError {
   return new RuleResolutionError({
     code: "INVALID_OPTIONS",
     ruleName: "custom",
     issues: [{ path, message }],
-    message
+    message,
   });
 }
 
@@ -43,13 +46,16 @@ function invalid(path: (string | number)[], message: string): RuleResolutionErro
  * (reserved prefixes derived from the registry, audit 3.5). Scope is derived from the assert kind
  * (columnUnique ⇒ project).
  */
-export function resolveCustomRule(entry: CustomRuleEntry, registry: RuleRegistry): Rule {
+export function resolveCustomRule(
+  entry: CustomRuleEntry,
+  registry: RuleRegistry,
+): Rule {
   const id = canonicalizeRuleId(entry.id);
 
   if (!CUSTOM_ID_GRAMMAR.test(id)) {
     throw invalid(
       ["id"],
-      `id "${entry.id}": custom rule ids must be uppercase, dash-separated with at least one dash (e.g. "REQ-OWNER").`
+      `id "${entry.id}": custom rule ids must be uppercase, dash-separated with at least one dash (e.g. "REQ-OWNER").`,
     );
   }
 
@@ -57,7 +63,7 @@ export function resolveCustomRule(entry: CustomRuleEntry, registry: RuleRegistry
   if (registry.getReservedPrefixes().has(prefix) || registry.has(id)) {
     throw invalid(
       ["id"],
-      `id "${id}": "${prefix}" is a reserved built-in prefix — use your own namespace, e.g. "REQ-100".`
+      `id "${id}": "${prefix}" is a reserved built-in prefix — use your own namespace, e.g. "REQ-100".`,
     );
   }
 
@@ -68,12 +74,15 @@ export function resolveCustomRule(entry: CustomRuleEntry, registry: RuleRegistry
   if (entry.target !== undefined && entry.target !== expectedTarget) {
     throw invalid(
       ["target"],
-      `target "${entry.target}" does not match assert kind "${assert.kind}" (expected "${expectedTarget}").`
+      `target "${entry.target}" does not match assert kind "${assert.kind}" (expected "${expectedTarget}").`,
     );
   }
 
   const scope = isProjectAssertion(assert.kind) ? "project" : "document";
-  const fileScope = { files: entry.options.files, exclude: entry.options.exclude };
+  const fileScope = {
+    files: entry.options.files,
+    exclude: entry.options.exclude,
+  };
 
   return {
     id,
@@ -91,8 +100,13 @@ export function resolveCustomRule(entry: CustomRuleEntry, registry: RuleRegistry
         }
         for (const finding of columnUnique(
           { documents: context.documents! },
-          { column: assert.column, idPattern: assert.idPattern, section: assert.section, files: fileScope.files },
-          (filePath) => matchesFileScope(filePath, fileScope)
+          {
+            column: assert.column,
+            idPattern: assert.idPattern,
+            section: assert.section,
+            files: fileScope.files,
+          },
+          (filePath) => matchesFileScope(filePath, fileScope),
         )) {
           context.report({ ...finding, helpUri: id });
         }
@@ -106,10 +120,10 @@ export function resolveCustomRule(entry: CustomRuleEntry, registry: RuleRegistry
         document: context.document!,
         documents: context.documents!,
         rootDir: context.rootDir!,
-        settings: context.settings
+        settings: context.settings,
       })) {
         context.report({ ...finding, helpUri: id });
       }
-    }
+    },
   };
 }

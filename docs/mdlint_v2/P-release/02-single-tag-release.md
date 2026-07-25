@@ -22,6 +22,12 @@ One `vX.Y.Z` tag publishes all npm packages and tags the skills together — no 
 3. Update `.github/workflows/publish.yml` (the P0.07 placeholder) to do the coupled publish
    with provenance.
 4. Document the release process (tag → publish → skill tag) in the repo.
+5. **Audit follow-up (L-11, tracked here, not resolved in P10):** add a test that asserts each
+   `SKILL.md` `compatibility` field names the CLI version this tag publishes. Pre-release the
+   field is prose (`"Version-coupled to @wastech-mdlint/cli…"`) with no test tying it to the
+   package version — acceptable at `v0.0.0`, but once this task stamps a real `vX.Y.Z` the I7
+   coupling needs a machine check, not just a manual convention
+   ([audit L-11](../audit-2026-07-23-p0-p8.md)).
 
 ## Decisions applied
 
@@ -33,6 +39,7 @@ One `vX.Y.Z` tag publishes all npm packages and tags the skills together — no 
 - [ ] A single tag publishes core+cli+mcp and tags the skills together.
 - [ ] Skill `compatibility` matches the published CLI version.
 - [ ] Publish runs with provenance.
+- [ ] A test guards skill `compatibility` against the published CLI version (closes audit L-11).
 
 ## Hand-off to next
 

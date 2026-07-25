@@ -7,7 +7,9 @@ import { ImpactAnalysisError } from "../src/graph/impact-analysis.js";
 
 describe("isStructuredError", () => {
   it("accepts core's coded error classes", () => {
-    expect(isStructuredError(new ConfigError("CONFIG_INVALID", "bad"))).toBe(true);
+    expect(isStructuredError(new ConfigError("CONFIG_INVALID", "bad"))).toBe(
+      true,
+    );
     expect(isStructuredError(new ImpactAnalysisError("missing.md"))).toBe(true);
     expect(isStructuredError(new CompileConfigMissingError())).toBe(true);
   });
@@ -24,7 +26,9 @@ describe("isStructuredError", () => {
   });
 
   it("rejects a non-Error thrown value even if it structurally has a valid code", () => {
-    expect(isStructuredError({ code: "CONFIG_INVALID", message: "x" })).toBe(false);
+    expect(isStructuredError({ code: "CONFIG_INVALID", message: "x" })).toBe(
+      false,
+    );
     expect(isStructuredError("CONFIG_INVALID")).toBe(false);
   });
 

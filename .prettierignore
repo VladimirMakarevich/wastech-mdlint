@@ -2,3 +2,15 @@ dist
 coverage
 .vitest
 packages/**/dist
+
+# Raw JSON.stringify(schema, null, 2) output (packages/core/src/engine/schema.ts); a byte-sync
+# test (schema-generation.test.ts, R6) requires this file to match that output exactly, which
+# collapses short arrays differently than Prettier's JSON formatting would.
+packages/cli/schema.json
+
+# Agent/orchestrator tooling config, not product surface — out of scope for this repo's format gate.
+.worc/
+.claude/
+
+# Missing a trailing newline only; left as-is (governance doc, not touched incidentally by this change).
+AGENTS.md

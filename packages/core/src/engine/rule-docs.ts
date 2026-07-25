@@ -4,7 +4,8 @@ import { ruleRegistry } from "./rules/index.js";
 // AND this table — so docs never drift. Includes the per-rule fixable column (audit 4.2), whose
 // `yes` set is exactly the deterministic-fixable subset (SEC-001 scaffold, TBL-002 empty→TODO).
 export function generateRuleDocs(): string {
-  const header = "| Rule | Category | Default severity | Scope | Fixable | Description |";
+  const header =
+    "| Rule | Category | Default severity | Scope | Fixable | Description |";
   const divider = "| --- | --- | --- | --- | --- | --- |";
   const rows = ruleRegistry.getAllMetadata().map((metadata) => {
     const fixable = metadata.fixable ? "yes" : "no";

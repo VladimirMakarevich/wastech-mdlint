@@ -15,12 +15,12 @@ including template-based section conformance (SEC-003).
 
 ## Rules
 
-| ID | Scope | Severity | Checks | Key options |
-| --- | --- | --- | --- | --- |
-| SEC-001 | document | error | required sections present | `sections`, `files?` |
-| SEC-002 | document | error | sections appear in order | `order`, `level?`, `section?`, `files?` |
-| SEC-003 | project | error | sections match a reference file's heading structure | `template`, `files?`, `exclude?`, `level?` |
-| STR-001 | project | error | required files exist in project | `files` |
+| ID      | Scope    | Severity | Checks                                              | Key options                                |
+| ------- | -------- | -------- | --------------------------------------------------- | ------------------------------------------ |
+| SEC-001 | document | error    | required sections present                           | `sections`, `files?`                       |
+| SEC-002 | document | error    | sections appear in order                            | `order`, `level?`, `section?`, `files?`    |
+| SEC-003 | project  | error    | sections match a reference file's heading structure | `template`, `files?`, `exclude?`, `level?` |
+| STR-001 | project  | error    | required files exist in project                     | `files`                                    |
 
 ## Deliverables / steps
 
@@ -53,8 +53,8 @@ including template-based section conformance (SEC-003).
     "template": "docs/adr/0001-record-architecture-decisions.md",
     "files": ["docs/adr/**/*.md"],
     "exclude": ["docs/adr/0001-record-architecture-decisions.md"],
-    "level": 2
-  }
+    "level": 2,
+  },
 }
 ```
 

@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { compareStrings } from "../deterministic-sort.js";
 import { normalizeRelativePath } from "../discovery/globs.js";
 import type { ToolErrorCode } from "../errors.js";
 import type { ContextGraph } from "./context-graph-types.js";
@@ -10,7 +11,7 @@ import { impact, type QueryVisit } from "./query.js";
 // P4.03 reverse traversal (`impact`) and the P4.02 topo-sort. No new traversal is written here —
 // the architecture invariant is "one traversal, one topo-sort", not per-feature reimplementations.
 
-const byPath = (left: string, right: string): number => left.localeCompare(right);
+const byPath = compareStrings;
 
 // Thrown when the requested file is not a node in the graph (typo, or excluded by config globs).
 // Mirrors the ConfigError/RuleResolutionError dedicated-error pattern so a host (P4.07 CLI, P7 MCP
@@ -25,7 +26,7 @@ export class ImpactAnalysisError extends Error {
 
   constructor(file: string) {
     const hint =
-      "The path must be repository-relative POSIX (for example \"docs/guide.md\") and included " +
+      'The path must be repository-relative POSIX (for example "docs/guide.md") and included ' +
       "by the configured file globs.";
     super(`File not found in the context graph: "${file}". ${hint}`);
     this.name = "ImpactAnalysisError";
@@ -66,7 +67,10 @@ export type ImpactClassification = {
   excluded: string[];
 };
 
-export function classifyImpact(graph: ContextGraph, file: string): ImpactClassification {
+export function classifyImpact(
+  graph: ContextGraph,
+  file: string,
+): ImpactClassification {
   const start = requireNode(graph, file);
   const visited = impact(graph, start).visited;
 
@@ -76,7 +80,9 @@ export function classifyImpact(graph: ContextGraph, file: string): ImpactClassif
       path: visit.path,
       // Retained edge multiplicity (P4.01 constraint, mirrored from graph-algorithms.ts's degree
       // semantics): two `visit.path -> start` links are two references, not one deduped edge.
-      references: graph.edges.filter((edge) => edge.from === visit.path && edge.to === start).length
+      references: graph.edges.filter(
+        (edge) => edge.from === visit.path && edge.to === start,
+      ).length,
     }))
     .sort((left, right) => byPath(left.path, right.path));
 
@@ -88,7 +94,7 @@ export function classifyImpact(graph: ContextGraph, file: string): ImpactClassif
       // `via` is null only for the depth-0 start (query.ts); every depth>=2 visit has a real
       // predecessor. `?? ""` mirrors search-index.ts's compareVisit rather than a non-null
       // assertion, so a future change to that invariant fails loudly as a wrong value, not a crash.
-      via: visit.via ?? ""
+      via: visit.via ?? "",
     }))
     .sort((left, right) => byPath(left.path, right.path));
 
@@ -99,12 +105,20 @@ export function classifyImpact(graph: ContextGraph, file: string): ImpactClassif
   const affectedPaths = new Set(visited.map((visit) => visit.path));
   const subgraph: ContextGraph = {
     nodes: graph.nodes.filter((node) => affectedPaths.has(node.path)),
-    edges: graph.edges.filter((edge) => affectedPaths.has(edge.from) && affectedPaths.has(edge.to)),
-    cycles: []
+    edges: graph.edges.filter(
+      (edge) => affectedPaths.has(edge.from) && affectedPaths.has(edge.to),
+    ),
+    cycles: [],
   };
   const { order, excluded } = topologicalSort(subgraph);
 
-  return { file: start, directlyAffected, transitivelyAffected, readingOrder: order, excluded };
+  return {
+    file: start,
+    directlyAffected,
+    transitivelyAffected,
+    readingOrder: order,
+    excluded,
+  };
 }
 
 /**
@@ -116,16 +130,24 @@ export function classifyImpact(graph: ContextGraph, file: string): ImpactClassif
  * is topological, not lexical, so it is only mapped — re-sorting it would silently replace the
  * topo-sort's reading order with an alphabetical one.
  */
-export function relativizeImpact(impactResult: ImpactClassification, cwd: string): ImpactClassification {
+export function relativizeImpact(
+  impactResult: ImpactClassification,
+  cwd: string,
+): ImpactClassification {
   const normalizedCwd = normalizeRelativePath(cwd);
-  const relativize = (value: string): string => path.posix.relative(normalizedCwd, value);
+  const relativize = (value: string): string =>
+    path.posix.relative(normalizedCwd, value);
 
   const directlyAffected = impactResult.directlyAffected
     .map((entry) => ({ ...entry, path: relativize(entry.path) }))
     .sort((left, right) => byPath(left.path, right.path));
 
   const transitivelyAffected = impactResult.transitivelyAffected
-    .map((entry) => ({ ...entry, path: relativize(entry.path), via: relativize(entry.via) }))
+    .map((entry) => ({
+      ...entry,
+      path: relativize(entry.path),
+      via: relativize(entry.via),
+    }))
     .sort((left, right) => byPath(left.path, right.path));
 
   return {
@@ -133,6 +155,6 @@ export function relativizeImpact(impactResult: ImpactClassification, cwd: string
     directlyAffected,
     transitivelyAffected,
     readingOrder: impactResult.readingOrder.map(relativize),
-    excluded: [...impactResult.excluded.map(relativize)].sort(byPath)
+    excluded: [...impactResult.excluded.map(relativize)].sort(byPath),
   };
 }

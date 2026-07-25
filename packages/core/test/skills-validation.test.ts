@@ -8,7 +8,10 @@ import { parseStaticSkill } from "../src/skills/parse-static-skill.js";
 
 // Resolve the committed `skills/` tree relative to this test file (repo root is three levels up from
 // packages/core/test), the same anchoring the README docs-sync check uses.
-const skillsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../skills");
+const skillsDir = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../../skills",
+);
 
 // Enumerate on disk rather than hard-coding a list so a future skill is covered automatically; sort so
 // iteration order is deterministic regardless of filesystem readdir order.
@@ -23,17 +26,26 @@ function readSkill(id: string): string {
 
 describe("shipped skills", () => {
   it("ships exactly the three P8 skills", () => {
-    expect(skillIds).toEqual(["wastech-mdlint-fix", "wastech-mdlint-impact", "wastech-mdlint-init"]);
+    expect(skillIds).toEqual([
+      "wastech-mdlint-fix",
+      "wastech-mdlint-impact",
+      "wastech-mdlint-init",
+    ]);
   });
 
   // S1: every static skill's frontmatter validates against the one shared schema.
-  it.each(skillIds)("validates %s frontmatter against the schema (S1)", (id) => {
-    const result = parseStaticSkill(readSkill(id), `skills/${id}/SKILL.md`);
-    if (!result.ok) {
-      throw new Error(`${id} failed validation: ${JSON.stringify(result.issues, null, 2)}`);
-    }
-    expect(result.skill.id).toBe(id);
-  });
+  it.each(skillIds)(
+    "validates %s frontmatter against the schema (S1)",
+    (id) => {
+      const result = parseStaticSkill(readSkill(id), `skills/${id}/SKILL.md`);
+      if (!result.ok) {
+        throw new Error(
+          `${id} failed validation: ${JSON.stringify(result.issues, null, 2)}`,
+        );
+      }
+      expect(result.skill.id).toBe(id);
+    },
+  );
 
   // S7: host-neutrality — no Claude-specific command injection, no leftover placeholders.
   describe.each(skillIds)("host-neutrality of %s (S7)", (id) => {

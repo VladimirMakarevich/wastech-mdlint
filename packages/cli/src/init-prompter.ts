@@ -2,16 +2,27 @@ import { Writable } from "node:stream";
 
 import { checkbox, confirm, select } from "@inquirer/prompts";
 
-import type { DetectedPackageManager, DocCluster, RuleCategory } from "@wastech-mdlint/core";
+import type {
+  DetectedPackageManager,
+  DocCluster,
+  RuleCategory,
+} from "@wastech-mdlint/core";
 
-import { DEFAULT_EXISTING_CONFIG_ACTION, type ExistingConfigAction, type InitPrompter } from "./init-command.js";
+import {
+  DEFAULT_EXISTING_CONFIG_ACTION,
+  type ExistingConfigAction,
+  type InitPrompter,
+} from "./init-command.js";
 
-const PACKAGE_MANAGER_CHOICES: { name: string; value: DetectedPackageManager }[] = [
+const PACKAGE_MANAGER_CHOICES: {
+  name: string;
+  value: DetectedPackageManager;
+}[] = [
   { name: "bun", value: "bun" },
   { name: "pnpm", value: "pnpm" },
   { name: "yarn", value: "yarn" },
   { name: "npm", value: "npm" },
-  { name: "none of these", value: undefined }
+  { name: "none of these", value: undefined },
 ];
 
 // Real `@inquirer/prompts` calls can't be driven in a test without a live TTY (confirmed: even a
@@ -32,11 +43,17 @@ export function buildExistingConfigActionPromptConfig(configPath: string): {
   return {
     message: `An existing config was found at ${configPath}. What should init do?`,
     choices: [
-      { name: "Overwrite — replace it with the freshly inferred config", value: "overwrite" },
-      { name: "Merge — keep every existing rule, append only the new ones", value: "merge" },
-      { name: "Skip — leave it untouched", value: "skip" }
+      {
+        name: "Overwrite — replace it with the freshly inferred config",
+        value: "overwrite",
+      },
+      {
+        name: "Merge — keep every existing rule, append only the new ones",
+        value: "merge",
+      },
+      { name: "Skip — leave it untouched", value: "skip" },
     ],
-    default: DEFAULT_EXISTING_CONFIG_ACTION
+    default: DEFAULT_EXISTING_CONFIG_ACTION,
   };
 }
 
@@ -51,9 +68,10 @@ export function buildPackageManagerPromptConfig(): {
   default: DetectedPackageManager;
 } {
   return {
-    message: "No lockfile was detected. Which package manager does this project use?",
+    message:
+      "No lockfile was detected. Which package manager does this project use?",
     choices: PACKAGE_MANAGER_CHOICES,
-    default: undefined
+    default: undefined,
   };
 }
 
@@ -61,10 +79,14 @@ export function buildPackageManagerPromptConfig(): {
  * `default: false` — "ask first, don't write silently" (I6) means a bare Enter must not opt into
  * dropping a CI workflow file; `@inquirer/confirm` otherwise defaults to yes.
  */
-export function buildCiWorkflowPromptConfig(): { message: string; default: boolean } {
+export function buildCiWorkflowPromptConfig(): {
+  message: string;
+  default: boolean;
+} {
   return {
-    message: "Also add a GitHub Actions workflow (.github/workflows/wastech-mdlint.yml)?",
-    default: false
+    message:
+      "Also add a GitHub Actions workflow (.github/workflows/wastech-mdlint.yml)?",
+    default: false,
   };
 }
 
@@ -77,7 +99,7 @@ function toWritableStream(stream: Pick<NodeJS.WriteStream, "write">): Writable {
     write(chunk: Buffer | string, _encoding, callback) {
       stream.write(chunk.toString());
       callback();
-    }
+    },
   });
 }
 
@@ -91,16 +113,26 @@ function toWritableStream(stream: Pick<NodeJS.WriteStream, "write">): Writable {
  * interactive `init` never splits its output across the injected seam and the real
  * `process.stdout`.
  */
-export function createInquirerPrompter(stdout: Pick<NodeJS.WriteStream, "write"> = process.stdout): InitPrompter {
+export function createInquirerPrompter(
+  stdout: Pick<NodeJS.WriteStream, "write"> = process.stdout,
+): InitPrompter {
   const context = { output: toWritableStream(stdout) };
 
   return {
-    async resolveExistingConfigAction(configPath: string): Promise<ExistingConfigAction> {
-      return select<ExistingConfigAction>(buildExistingConfigActionPromptConfig(configPath), context);
+    async resolveExistingConfigAction(
+      configPath: string,
+    ): Promise<ExistingConfigAction> {
+      return select<ExistingConfigAction>(
+        buildExistingConfigActionPromptConfig(configPath),
+        context,
+      );
     },
 
     async choosePackageManager(): Promise<DetectedPackageManager> {
-      return select<DetectedPackageManager>(buildPackageManagerPromptConfig(), context);
+      return select<DetectedPackageManager>(
+        buildPackageManagerPromptConfig(),
+        context,
+      );
     },
 
     async selectClusters(clusters: DocCluster[]): Promise<DocCluster[]> {
@@ -110,20 +142,26 @@ export function createInquirerPrompter(stdout: Pick<NodeJS.WriteStream, "write">
           choices: clusters.map((cluster) => ({
             name: `${cluster.includeGlob} (${cluster.subtreeCount} file(s))`,
             value: cluster,
-            checked: true
-          }))
+            checked: true,
+          })),
         },
-        context
+        context,
       );
     },
 
-    async selectCategories(categories: RuleCategory[]): Promise<RuleCategory[]> {
+    async selectCategories(
+      categories: RuleCategory[],
+    ): Promise<RuleCategory[]> {
       return checkbox<RuleCategory>(
         {
           message: "Enable these rule categories?",
-          choices: categories.map((category) => ({ name: category, value: category, checked: true }))
+          choices: categories.map((category) => ({
+            name: category,
+            value: category,
+            checked: true,
+          })),
         },
-        context
+        context,
       );
     },
 
@@ -131,11 +169,14 @@ export function createInquirerPrompter(stdout: Pick<NodeJS.WriteStream, "write">
       // Shown exactly once, here — `runInitCommand` relies on this and does not re-print `summary`
       // itself after a confirmed interactive run (see the `InitPrompter.confirmDraft` contract).
       stdout.write(summary);
-      return confirm({ message: "Confirm this draft configuration?", default: true }, context);
+      return confirm(
+        { message: "Confirm this draft configuration?", default: true },
+        context,
+      );
     },
 
     async confirmCiWorkflow(): Promise<boolean> {
       return confirm(buildCiWorkflowPromptConfig(), context);
-    }
+    },
   };
 }

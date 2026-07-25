@@ -46,7 +46,7 @@ not code.
    ([P0.03](03-core-package-skeleton.md), [P0.05](05-cli-package-commander.md)), so `core` must
    build before `cli`/`mcp-server`; `tsc -b` enforces that order automatically and rebuilds
    incrementally via `.tsbuildinfo`. Independent per-package `tsc` was rejected: `npm run
-   --workspaces` does not guarantee topological order (cli could build before core) and gives
+--workspaces` does not guarantee topological order (cli could build before core) and gives
    no cross-package incremental caching.
 6. **Test/lint/format:** Vitest workspace, ESLint flat config + Prettier at the root, run
    per package via root scripts.
@@ -63,10 +63,10 @@ not code.
 - [x] Zod version chosen and written down. → **v4** (`zod@^4`), decided 2026-07-02.
 - [x] Build strategy (project references vs independent `tsc`) chosen. → **project references** (`tsc -b`), decided 2026-07-02.
 - [x] Package names/bins confirmed against the requirements. → `@wastech-mdlint/core`,
-  `@wastech-mdlint/cli` (bin `wastech-mdlint`), `@wastech-mdlint/mcp-server`
-  (bin `wastech-mdlint-mcp`), confirmed 2026-07-02 against requirement **I4**
-  ([requirements/06-installation.md](../requirements/06-installation.md)) and roadmap §4
-  ([../index.md](../index.md)). No conflict found.
+      `@wastech-mdlint/cli` (bin `wastech-mdlint`), `@wastech-mdlint/mcp-server`
+      (bin `wastech-mdlint-mcp`), confirmed 2026-07-02 against requirement **I4**
+      ([requirements/06-installation.md](../requirements/06-installation.md)) and roadmap §4
+      ([../index.md](../index.md)). No conflict found.
 
 ## Hand-off to next
 

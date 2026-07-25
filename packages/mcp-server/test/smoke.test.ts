@@ -46,6 +46,13 @@ describe("mcp-server", () => {
     const slice = tools.find((tool) => tool.name === "context-slice");
     expect(slice?.description).toContain(SLICE_RESOLUTION_DESCRIPTION);
 
+    // P9.04/M2: ad-hoc lint does not load config, but selected rules can still touch cwd paths.
+    const lint = tools.find((tool) => tool.name === "lint");
+    expect(lint?.description).toContain("Does not load project config");
+    expect(lint?.description).toContain("REF-001/REF-003");
+    expect(lint?.description).toContain("server's working directory");
+    expect(lint?.description).not.toContain("Reads no filesystem");
+
     await client.close();
     await server.close();
   });

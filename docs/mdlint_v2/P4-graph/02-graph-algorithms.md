@@ -53,7 +53,7 @@ topo order.
   `topologicalSort` never emits — a cycle's own nodes plus anything reachable only through them.
   This is the G6 honesty fix the task calls for: the prior behavior silently truncated the topo
   array with no record of what was dropped or why. Pair `excluded` with `graph.cycles` to explain
-  *which* cycle caused a given exclusion.
+  _which_ cycle caused a given exclusion.
 
 ## Exit criteria
 

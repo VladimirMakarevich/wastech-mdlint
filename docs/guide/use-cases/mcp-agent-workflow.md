@@ -11,8 +11,11 @@ First register the server in the host (once):
 // .mcp.json (Claude Code) or claude_desktop_config.json (Claude Desktop)
 {
   "mcpServers": {
-    "wastech-mdlint": { "command": "npx", "args": ["-y", "@wastech-mdlint/mcp-server"] }
-  }
+    "wastech-mdlint": {
+      "command": "npx",
+      "args": ["-y", "@wastech-mdlint/mcp-server"],
+    },
+  },
 }
 ```
 
@@ -21,7 +24,7 @@ all 6 tools are read-only. Optional `cwd`/`configPath` default to the process cw
 config.
 
 **Step 1 — lint a draft before writing it to disk.** The agent drafted a section and checks it
-against explicit rules *without* touching the filesystem (the `lint` tool takes literal content):
+against explicit rules _without_ touching the filesystem (the `lint` tool takes literal content):
 
 ```jsonc
 // tool: lint
@@ -29,8 +32,8 @@ against explicit rules *without* touching the filesystem (the `lint` tool takes 
   "content": "# API\n\n## Overview\n\nTODO\n",
   "rules": [
     { "rule": "CTX-001" },
-    { "rule": "SEC-001", "options": { "sections": ["Overview", "Usage"] } }
-  ]
+    { "rule": "SEC-001", "options": { "sections": ["Overview", "Usage"] } },
+  ],
 }
 // → { messages: [ {ruleId:"SEC-001",…"missing Usage"}, {ruleId:"CTX-001",…"placeholder"} ],
 //     errorCount: 1, warningCount: 1 }

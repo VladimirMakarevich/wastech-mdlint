@@ -3,6 +3,7 @@ import path from "node:path";
 
 import micromatch from "micromatch";
 
+import { compareStrings } from "../deterministic-sort.js";
 import { normalizeRelativePath } from "./globs.js";
 import { DEFAULT_NOISE_DIR_NAMES } from "./repo-scan-constants.js";
 
@@ -28,7 +29,9 @@ function extractPackageName(parsed: unknown): string | undefined {
   return typeof name === "string" ? name : undefined;
 }
 
-function extractWorkspaceGlobsFromPackageJson(parsed: unknown): string[] | undefined {
+function extractWorkspaceGlobsFromPackageJson(
+  parsed: unknown,
+): string[] | undefined {
   if (parsed === undefined || parsed === null || typeof parsed !== "object") {
     return undefined;
   }
@@ -36,13 +39,17 @@ function extractWorkspaceGlobsFromPackageJson(parsed: unknown): string[] | undef
   const workspaces = (parsed as { workspaces?: unknown }).workspaces;
 
   if (Array.isArray(workspaces)) {
-    return workspaces.filter((entry): entry is string => typeof entry === "string");
+    return workspaces.filter(
+      (entry): entry is string => typeof entry === "string",
+    );
   }
 
   if (workspaces !== null && typeof workspaces === "object") {
     const packages = (workspaces as { packages?: unknown }).packages;
     if (Array.isArray(packages)) {
-      return packages.filter((entry): entry is string => typeof entry === "string");
+      return packages.filter(
+        (entry): entry is string => typeof entry === "string",
+      );
     }
   }
 
@@ -55,9 +62,13 @@ function extractWorkspaceGlobsFromPackageJson(parsed: unknown): string[] | undef
 // `packages: [a, b]` and anchors are unsupported) to avoid adding a `yaml` dependency for a
 // narrow, common-case need. Upgrade this (or add the dependency) later if a real-world config
 // needs the flow form.
-function extractWorkspaceGlobsFromPnpmYaml(content: string): string[] | undefined {
+function extractWorkspaceGlobsFromPnpmYaml(
+  content: string,
+): string[] | undefined {
   const lines = content.split(/\r?\n/);
-  const packagesLineIndex = lines.findIndex((line) => /^packages:\s*$/.test(line));
+  const packagesLineIndex = lines.findIndex((line) =>
+    /^packages:\s*$/.test(line),
+  );
 
   if (packagesLineIndex === -1) {
     return undefined;
@@ -84,7 +95,9 @@ function extractWorkspaceGlobsFromPnpmYaml(content: string): string[] | undefine
     // Accept a quoted (`- 'a'`) or bare (`- a`) glob, each optionally followed by a trailing
     // YAML comment (`- 'a' # note`) — a real pnpm-workspace.yaml commonly annotates entries
     // this way, and dropping the whole line for it would silently under-detect the monorepo.
-    const match = /^-\s*(?:(['"])([^'"]*)\1|([^'"#\s][^#]*?))\s*(?:#.*)?$/.exec(trimmed);
+    const match = /^-\s*(?:(['"])([^'"]*)\1|([^'"#\s][^#]*?))\s*(?:#.*)?$/.exec(
+      trimmed,
+    );
     const value = match?.[2] ?? match?.[3];
     if (value !== undefined) {
       globs.push(value);
@@ -99,12 +112,17 @@ function extractWorkspaceGlobsFromPnpmYaml(content: string): string[] | undefine
 
 async function collectPackageJsonDirs(
   cwd: string,
-  noiseDirNames: readonly string[]
+  noiseDirNames: readonly string[],
 ): Promise<string[]> {
   const results: string[] = [];
 
-  async function walk(directoryPath: string, relDirectory: string): Promise<void> {
-    const entries = await readdir(directoryPath, { withFileTypes: true }).catch(() => []);
+  async function walk(
+    directoryPath: string,
+    relDirectory: string,
+  ): Promise<void> {
+    const entries = await readdir(directoryPath, { withFileTypes: true }).catch(
+      () => [],
+    );
     let hasPackageJson = false;
 
     for (const entry of entries) {
@@ -120,7 +138,8 @@ async function collectPackageJsonDirs(
 
     for (const entry of entries) {
       if (entry.isDirectory() && !noiseDirNames.includes(entry.name)) {
-        const childRel = relDirectory === "" ? entry.name : `${relDirectory}/${entry.name}`;
+        const childRel =
+          relDirectory === "" ? entry.name : `${relDirectory}/${entry.name}`;
         await walk(path.join(directoryPath, entry.name), childRel);
       }
     }
@@ -147,7 +166,10 @@ function detectSiblingFallback(packageJsonDirs: string[]): string[] {
 
   for (const [parent, children] of byParent) {
     const parentBasename = path.posix.basename(parent);
-    if ((parentBasename === "packages" || parentBasename === "apps") && children.length >= 2) {
+    if (
+      (parentBasename === "packages" || parentBasename === "apps") &&
+      children.length >= 2
+    ) {
       detected.push(...children);
     }
   }
@@ -165,7 +187,9 @@ function detectSiblingFallback(packageJsonDirs: string[]): string[] {
  * `@wastech-mdlint/core`) — see {@link detectWorkspacePackagesWithNoise} for the internal,
  * noise-dir-aware variant `scanRepository` uses.
  */
-export async function detectWorkspacePackages(cwd: string): Promise<WorkspacePackage[]> {
+export async function detectWorkspacePackages(
+  cwd: string,
+): Promise<WorkspacePackage[]> {
   return detectWorkspacePackagesWithNoise(cwd, DEFAULT_NOISE_DIR_NAMES);
 }
 
@@ -179,16 +203,17 @@ export async function detectWorkspacePackages(cwd: string): Promise<WorkspacePac
  */
 export async function detectWorkspacePackagesWithNoise(
   cwd: string,
-  noiseDirNames: readonly string[]
+  noiseDirNames: readonly string[],
 ): Promise<WorkspacePackage[]> {
   const packageJsonPath = path.join(cwd, "package.json");
   const rootPackageJson = await readJsonFile(packageJsonPath);
   let globs = extractWorkspaceGlobsFromPackageJson(rootPackageJson);
 
   if (globs === undefined) {
-    const pnpmYaml = await readFile(path.join(cwd, "pnpm-workspace.yaml"), "utf8").catch(
-      () => undefined
-    );
+    const pnpmYaml = await readFile(
+      path.join(cwd, "pnpm-workspace.yaml"),
+      "utf8",
+    ).catch(() => undefined);
     if (pnpmYaml !== undefined) {
       globs = extractWorkspaceGlobsFromPnpmYaml(pnpmYaml);
     }
@@ -214,9 +239,12 @@ export async function detectWorkspacePackagesWithNoise(
 
   for (const dir of matchedDirs) {
     const parsed = await readJsonFile(path.join(cwd, dir, "package.json"));
-    packages.push({ path: normalizeRelativePath(dir), name: extractPackageName(parsed) });
+    packages.push({
+      path: normalizeRelativePath(dir),
+      name: extractPackageName(parsed),
+    });
   }
 
-  packages.sort((left, right) => left.path.localeCompare(right.path));
+  packages.sort((left, right) => compareStrings(left.path, right.path));
   return packages;
 }

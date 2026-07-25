@@ -25,7 +25,7 @@ resolve severity, apply inline-disable, and return file-attributed results.
 
 1. `lintFiles(config, cwd)`:
    - `loadDocuments(config.include ?? ["**/*.md"], { cwd, exclude: config.exclude,
-     respectGitignore: config.respectGitignore })`;
+respectGitignore: config.respectGitignore })`;
    - resolve rules; split `document` vs `project` scope;
    - run project rules once over the `documents` map (file-attributed messages);
    - run document rules per file.

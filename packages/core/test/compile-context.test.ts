@@ -6,18 +6,25 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { LintConfig } from "../src/config/config-schema.js";
 import type { LoadedConfiguration } from "../src/config/load-config.js";
-import { compileContext, CompileConfigMissingError } from "../src/compile/compile-context.js";
+import {
+  compileContext,
+  CompileConfigMissingError,
+} from "../src/compile/compile-context.js";
 import { lintFiles } from "../src/engine/lint-files.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
 
 const tempDirs: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
+  );
 });
 
 async function fixtureRepo(files: Record<string, string>): Promise<string> {
-  const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-compile-context-"));
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "wastech-mdlint-compile-context-"),
+  );
   tempDirs.push(root);
   for (const [relativePath, content] of Object.entries(files)) {
     const absolutePath = path.join(root, relativePath);
@@ -36,15 +43,22 @@ describe("compileContext", () => {
     const root = await fixtureRepo({ "a.md": "# A\n" });
     const config = loadedConfig({ include: ["**/*.md"] });
 
-    await expect(compileContext(config, root)).rejects.toBeInstanceOf(CompileConfigMissingError);
-    await expect(compileContext(config, root)).rejects.toMatchObject({ code: "COMPILE_CONFIG_MISSING" });
+    await expect(compileContext(config, root)).rejects.toBeInstanceOf(
+      CompileConfigMissingError,
+    );
+    await expect(compileContext(config, root)).rejects.toMatchObject({
+      code: "COMPILE_CONFIG_MISSING",
+    });
   });
 
   it("compiles a minimal fixture into a valid CompileResult", async () => {
-    const root = await fixtureRepo({ "a.md": "# A\n[b](b.md)\n", "b.md": "# B\n" });
+    const root = await fixtureRepo({
+      "a.md": "# A\n[b](b.md)\n",
+      "b.md": "# B\n",
+    });
     const config = loadedConfig({
       include: ["**/*.md"],
-      compile: { skill: { name: "docs-skill", description: "Docs skill" } }
+      compile: { skill: { name: "docs-skill", description: "Docs skill" } },
     });
 
     const result = await compileContext(config, root);
@@ -63,34 +77,46 @@ describe("compileContext", () => {
       "bridge.md": "[sink](sink.md)\n",
       "c.md": "[bridge](bridge.md)\n[leaf](leaf.md)\n",
       "leaf.md": "# Leaf\n",
-      "sink.md": "# Sink\n"
+      "sink.md": "# Sink\n",
     });
 
     const defaultResult = await compileContext(
-      loadedConfig({ include: ["**/*.md"], compile: { skill: { name: "s", description: "d" } } }),
-      root
+      loadedConfig({
+        include: ["**/*.md"],
+        compile: { skill: { name: "s", description: "d" } },
+      }),
+      root,
     );
     const raisedThreshold = await compileContext(
       loadedConfig({
         include: ["**/*.md"],
-        compile: { skill: { name: "s", description: "d" }, hubMinInDegree: 4 }
+        compile: { skill: { name: "s", description: "d" }, hubMinInDegree: 4 },
       }),
-      root
+      root,
     );
 
-    expect(defaultResult.skillContent).toContain("| bridge.md | hub | narrative |");
-    expect(raisedThreshold.skillContent).toContain("| bridge.md | bridge | narrative |");
+    expect(defaultResult.skillContent).toContain(
+      "| bridge.md | hub | narrative |",
+    );
+    expect(raisedThreshold.skillContent).toContain(
+      "| bridge.md | bridge | narrative |",
+    );
   });
 
   it("names an over-budget entrypoint in the Context Budget section", async () => {
     const root = await fixtureRepo({
       "CLAUDE.md": "Preamble @docs/big.md\n",
-      "docs/big.md": `${"x".repeat(400)}\n`
+      "docs/big.md": `${"x".repeat(400)}\n`,
     });
     const config = loadedConfig({
       include: ["**/*.md"],
       compile: { skill: { name: "s", description: "d" } },
-      rules: [{ rule: "LLM-001", options: { entrypoints: ["CLAUDE.md"], maxTokensPerEntrypoint: 50 } }]
+      rules: [
+        {
+          rule: "LLM-001",
+          options: { entrypoints: ["CLAUDE.md"], maxTokensPerEntrypoint: 50 },
+        },
+      ],
     });
 
     const result = await compileContext(config, root);
@@ -108,9 +134,18 @@ describe("compileContext", () => {
       include: ["**/*.md"],
       compile: { skill: { name: "s", description: "d" } },
       rules: [
-        { rule: "LLM-001", options: { entrypoints: ["CLAUDE.md"], maxTokensPerEntrypoint: 100000 } },
-        { rule: "LLM-001", options: { entrypoints: ["CLAUDE.md"], maxTokensPerEntrypoint: 1 } }
-      ]
+        {
+          rule: "LLM-001",
+          options: {
+            entrypoints: ["CLAUDE.md"],
+            maxTokensPerEntrypoint: 100000,
+          },
+        },
+        {
+          rule: "LLM-001",
+          options: { entrypoints: ["CLAUDE.md"], maxTokensPerEntrypoint: 1 },
+        },
+      ],
     });
 
     const result = await compileContext(config, root);
@@ -131,7 +166,7 @@ describe("compileContext", () => {
       // literal `.md` suffix), whose first router candidate is `<contentDir>/big.md.md` — an
       // unusual but valid repo-relative path, chosen deliberately so this fixture only resolves
       // through real router candidate generation, not a coincidental leading-slash strip.
-      "src/content/docs/big.md.md": `${"x".repeat(400)}\n`
+      "src/content/docs/big.md.md": `${"x".repeat(400)}\n`,
     });
     const siteRouter = { preset: "starlight", contentDir: "src/content/docs" };
     const entrypoints = ["src/content/docs/entry.md"];
@@ -140,23 +175,34 @@ describe("compileContext", () => {
     const lintResult = await lintFiles({
       cwd: root,
       config: { include: ["**/*.md"] },
-      rules: [{ rule: ruleRegistry.resolveRule("LLM-001", { entrypoints, maxTokensPerEntrypoint }) }],
-      settings: { siteRouter }
+      rules: [
+        {
+          rule: ruleRegistry.resolveRule("LLM-001", {
+            entrypoints,
+            maxTokensPerEntrypoint,
+          }),
+        },
+      ],
+      settings: { siteRouter },
     });
-    const overBudget = lintResult.messages.find((message) => message.message.includes("over context budget"));
+    const overBudget = lintResult.messages.find((message) =>
+      message.message.includes("over context budget"),
+    );
     const lintTotalTokens = overBudget?.data?.totalTokens;
 
     const config = loadedConfig({
       include: ["**/*.md"],
       compile: { skill: { name: "s", description: "d" } },
       settings: { siteRouter },
-      rules: [{ rule: "LLM-001", options: { entrypoints, maxTokensPerEntrypoint } }]
+      rules: [
+        { rule: "LLM-001", options: { entrypoints, maxTokensPerEntrypoint } },
+      ],
     });
     const compileResult = await compileContext(config, root);
 
     expect(typeof lintTotalTokens).toBe("number");
     expect(compileResult.skillContent).toContain(
-      `\`src/content/docs/entry.md\`: ${lintTotalTokens} estimated tokens exceeds 50`
+      `\`src/content/docs/entry.md\`: ${lintTotalTokens} estimated tokens exceeds 50`,
     );
   });
 
@@ -168,20 +214,33 @@ describe("compileContext", () => {
     const config = loadedConfig({
       include: ["**/*.md"],
       compile: { skill: { name: "s", description: "d" } },
-      rules: [{ rule: "LLM-001", options: { entrypoints: ["missing-entrypoint.md"], maxTokensPerEntrypoint: 50 } }]
+      rules: [
+        {
+          rule: "LLM-001",
+          options: {
+            entrypoints: ["missing-entrypoint.md"],
+            maxTokensPerEntrypoint: 50,
+          },
+        },
+      ],
     });
 
     const result = await compileContext(config, root);
 
     expect(result.skillContent).toContain(
-      "LLM-001 is enabled, but its configured entrypoints matched no files in this corpus."
+      "LLM-001 is enabled, but its configured entrypoints matched no files in this corpus.",
     );
-    expect(result.skillContent).not.toContain("No entrypoints configured (LLM-001 not enabled).");
+    expect(result.skillContent).not.toContain(
+      "No entrypoints configured (LLM-001 not enabled).",
+    );
   });
 
   it("is deterministic across repeated calls on the same fixture", async () => {
     const root = await fixtureRepo({ "a.md": "[b](b.md)\n", "b.md": "# B\n" });
-    const config = loadedConfig({ include: ["**/*.md"], compile: { skill: { name: "s", description: "d" } } });
+    const config = loadedConfig({
+      include: ["**/*.md"],
+      compile: { skill: { name: "s", description: "d" } },
+    });
 
     const first = await compileContext(config, root);
     const second = await compileContext(config, root);
@@ -199,21 +258,25 @@ describe("compileContext", () => {
     const root = await fixtureRepo({ "doc.md": fileContent });
     const config = loadedConfig({
       include: ["**/*.md"],
-      compile: { skill: { name: "概要スキル", description: "日本語の説明文です" } }
+      compile: {
+        skill: { name: "概要スキル", description: "日本語の説明文です" },
+      },
     });
 
     const result = await compileContext(config, root);
     const expected = Math.ceil(fileContent.length / 4);
 
     expect(expected).toBe(17);
-    expect(result.skillContent).toContain(`Corpus token estimate: ${expected} tokens.`);
+    expect(result.skillContent).toContain(
+      `Corpus token estimate: ${expected} tokens.`,
+    );
   });
 
   it("compiles an empty corpus without throwing", async () => {
     const root = await fixtureRepo({});
     const config = loadedConfig({
       include: ["**/*.md"],
-      compile: { skill: { name: "s", description: "d" } }
+      compile: { skill: { name: "s", description: "d" } },
     });
 
     const result = await compileContext(config, root);
@@ -228,15 +291,22 @@ describe("compileContext", () => {
       include: ["**/*.md"],
       compile: {
         skill: { name: "s", description: "d" },
-        sections: { architecture: false, rules: true, dependencies: true, workflow: false },
-        commandPreset: "claude"
-      }
+        sections: {
+          architecture: false,
+          rules: true,
+          dependencies: true,
+          workflow: false,
+        },
+        commandPreset: "claude",
+      },
     });
 
     const result = await compileContext(config, root);
 
     expect(result.skillContent).not.toContain("## Document Architecture");
     expect(result.skillContent).not.toContain("## Workflow");
-    expect(result.skillContent).toContain("!npx wastech-mdlint impact $ARGUMENTS");
+    expect(result.skillContent).toContain(
+      "!npx wastech-mdlint impact $ARGUMENTS",
+    );
   });
 });

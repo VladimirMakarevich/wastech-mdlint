@@ -23,7 +23,7 @@ function starlightCandidates(routePath: string, contentDir: string): string[] {
     `${contentDir}/${routePath}.md`,
     `${contentDir}/${routePath}.mdx`,
     `${contentDir}/${routePath}/index.md`,
-    `${contentDir}/${routePath}/index.mdx`
+    `${contentDir}/${routePath}/index.mdx`,
   ];
 }
 
@@ -38,7 +38,7 @@ function starlightCandidates(routePath: string, contentDir: string): string[] {
 export function resolveRoutedUrl(
   url: string,
   router: SiteRouterSettings,
-  sourceLocale?: string
+  sourceLocale?: string,
 ): string[] {
   const contentDir = router.contentDir ?? DEFAULT_CONTENT_DIR;
   const routePath = stripSlashes(url);
@@ -51,7 +51,8 @@ export function resolveRoutedUrl(
   const candidates: string[] = [];
   const firstSegment = routePath.split("/")[0];
   const hasExplicitLocale =
-    firstSegment.length > 0 && firstSegment === (sourceLocale ?? router.defaultLocale);
+    firstSegment.length > 0 &&
+    firstSegment === (sourceLocale ?? router.defaultLocale);
 
   // Same-locale first when the source lives under a non-default locale and the URL is not already
   // locale-qualified (audit — P3 REF gap i18n).
@@ -60,7 +61,9 @@ export function resolveRoutedUrl(
     sourceLocale !== router.defaultLocale &&
     !hasExplicitLocale
   ) {
-    candidates.push(...starlightCandidates(`${sourceLocale}/${routePath}`, contentDir));
+    candidates.push(
+      ...starlightCandidates(`${sourceLocale}/${routePath}`, contentDir),
+    );
   }
 
   candidates.push(...starlightCandidates(routePath, contentDir));

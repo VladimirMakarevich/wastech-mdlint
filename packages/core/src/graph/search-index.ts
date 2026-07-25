@@ -1,3 +1,4 @@
+import { compareStrings } from "../deterministic-sort.js";
 import { normalizeRelativePath } from "../discovery/globs.js";
 import { extractDefinedIds, type IdRef } from "../engine/defined-ids.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
@@ -10,7 +11,7 @@ import { query as runQuery, type QueryVisit } from "./query.js";
 // index lookups. Exact match only, never fuzzy/substring/keyword/LLM, so `slice` results stay
 // deterministic and the CLI/MCP surfaces (P4.07/P7) can advertise honest semantics.
 
-const byPath = (left: string, right: string): number => left.localeCompare(right);
+const byPath = compareStrings;
 
 export type SliceMatchKind = "id" | "anchor" | "heading" | "path";
 
@@ -49,7 +50,11 @@ function decodeFragment(value: string): string {
 // Mirrors `buildIdRefEdges`'s `definers` construction in build-context-graph.ts: accumulate
 // unsorted-but-deduped, sort once after every document has contributed, rather than re-sorting on
 // every push.
-function addToIndex(index: Map<string, string[]>, key: string, filePath: string): void {
+function addToIndex(
+  index: Map<string, string[]>,
+  key: string,
+  filePath: string,
+): void {
   const existing = index.get(key);
   if (existing === undefined) {
     index.set(key, [filePath]);
@@ -66,7 +71,10 @@ function addToIndex(index: Map<string, string[]>, key: string, filePath: string)
  * coupling `buildContextGraph` has with its own optional `idRef` (id-ref edges only exist when a
  * host supplies one). Callers that want ID resolution must load config and pass `idRef` through.
  */
-export function buildSearchIndex(documents: Map<string, ParsedDocument>, idRef?: IdRef): ContextSearchIndex {
+export function buildSearchIndex(
+  documents: Map<string, ParsedDocument>,
+  idRef?: IdRef,
+): ContextSearchIndex {
   const documentsByPath = new Map<string, ParsedDocument>();
   for (const document of documents.values()) {
     documentsByPath.set(document.path, document);
@@ -109,7 +117,10 @@ export function buildSearchIndex(documents: Map<string, ParsedDocument>, idRef?:
  * `.md`/`/`, IDs match `idPattern`, slugs are lowercased) so a fixed precedence keeps results
  * deterministic without ranking or merging across categories.
  */
-export function resolveQuery(index: ContextSearchIndex, query: string): { kind: SliceMatchKind; starts: string[] } | null {
+export function resolveQuery(
+  index: ContextSearchIndex,
+  query: string,
+): { kind: SliceMatchKind; starts: string[] } | null {
   if (query.startsWith("#")) {
     const files = index.bySlug.get(decodeFragment(query.slice(1)));
     return files === undefined ? null : { kind: "anchor", starts: files };
@@ -137,7 +148,9 @@ export function resolveQuery(index: ContextSearchIndex, query: string): { kind: 
 // and a depth tie can only happen between two non-start nodes (each start uniquely owns depth 0 for
 // its own path), so comparing `via` as a plain string at that point is always meaningful.
 function compareVisit(left: QueryVisit, right: QueryVisit): number {
-  return left.depth - right.depth || (left.via ?? "").localeCompare(right.via ?? "");
+  return (
+    left.depth - right.depth || compareStrings(left.via ?? "", right.via ?? "")
+  );
 }
 
 function mergeVisited(perStart: QueryVisit[][]): QueryVisit[] {
@@ -150,7 +163,9 @@ function mergeVisited(perStart: QueryVisit[][]): QueryVisit[] {
       }
     }
   }
-  return [...merged.values()].sort((left, right) => byPath(left.path, right.path));
+  return [...merged.values()].sort((left, right) =>
+    byPath(left.path, right.path),
+  );
 }
 
 /**
@@ -164,7 +179,7 @@ export function getContextSlice(
   documents: Map<string, ParsedDocument>,
   query: string,
   depth = 2,
-  idRef?: IdRef
+  idRef?: IdRef,
 ): ContextSliceResult {
   const resolved = resolveQuery(buildSearchIndex(documents, idRef), query);
   if (resolved === null) {
@@ -174,9 +189,22 @@ export function getContextSlice(
   // `query()` already no-ops on an unknown start, but filtering here keeps `starts` itself honest —
   // it should never list a node the graph doesn't have.
   const nodePaths = new Set(graph.nodes.map((node) => node.path));
-  const starts = resolved.starts.filter((start) => nodePaths.has(start)).sort(byPath);
+  const starts = resolved.starts
+    .filter((start) => nodePaths.has(start))
+    .sort(byPath);
 
-  const visited = mergeVisited(starts.map((start) => runQuery(graph, { start, direction: "forward", depth }).visited));
+  const visited = mergeVisited(
+    starts.map(
+      (start) =>
+        runQuery(graph, { start, direction: "forward", depth }).visited,
+    ),
+  );
 
-  return { query, matchKind: resolved.kind, starts, files: visited.map((visit) => visit.path), visited };
+  return {
+    query,
+    matchKind: resolved.kind,
+    starts,
+    files: visited.map((visit) => visit.path),
+    visited,
+  };
 }

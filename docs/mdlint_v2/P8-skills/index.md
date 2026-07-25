@@ -20,13 +20,13 @@ A 4th skill is [S9 backlog](../requirements/04-skills-compile.md).
 
 ## Tasks
 
-| # | Task | Size | Depends on |
-| --- | --- | --- | --- |
-| [P8.01](01-frontmatter-schema-model.md) | Frontmatter schema + unified skill model | S | P7 done |
-| [P8.02](02-skill-init.md) | `wastech-mdlint-init` skill | S | P8.01, P6 |
-| [P8.03](03-skill-fix.md) | `wastech-mdlint-fix` skill | M | P8.01, P3 (`--fix`) |
-| [P8.04](04-skill-impact.md) | `wastech-mdlint-impact` skill | S | P8.01, P7 |
-| [P8.05](05-skills-validation.md) | Skill validation tests + host-neutrality check | S | P8.02–P8.04 |
+| #                                       | Task                                           | Size | Depends on          |
+| --------------------------------------- | ---------------------------------------------- | ---- | ------------------- |
+| [P8.01](01-frontmatter-schema-model.md) | Frontmatter schema + unified skill model       | S    | P7 done             |
+| [P8.02](02-skill-init.md)               | `wastech-mdlint-init` skill                    | S    | P8.01, P6           |
+| [P8.03](03-skill-fix.md)                | `wastech-mdlint-fix` skill                     | M    | P8.01, P3 (`--fix`) |
+| [P8.04](04-skill-impact.md)             | `wastech-mdlint-impact` skill                  | S    | P8.01, P7           |
+| [P8.05](05-skills-validation.md)        | Skill validation tests + host-neutrality check | S    | P8.02–P8.04         |
 
 ## Sequence
 

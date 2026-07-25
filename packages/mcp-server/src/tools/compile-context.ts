@@ -3,7 +3,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
-import { resolveToolConfiguration, type ToolFileInput } from "../shared/tool-context.js";
+import {
+  resolveToolConfiguration,
+  type ToolFileInput,
+} from "../shared/tool-context.js";
 import { errorResult, READ_ONLY_ANNOTATIONS } from "../shared/tool-response.js";
 
 // `compile-context` — compile the project skill (the same deterministic `SKILL.md` the CLI's
@@ -23,10 +26,12 @@ import { errorResult, READ_ONLY_ANNOTATIONS } from "../shared/tool-response.js";
 // `ToolFileInput` directly rather than aliasing a one-field-wider input type.
 const compileContextInputShape = {
   configPath: z.string().optional(),
-  cwd: z.string().optional()
+  cwd: z.string().optional(),
 } as const;
 
-export async function handleCompileContext(input: ToolFileInput): Promise<CallToolResult> {
+export async function handleCompileContext(
+  input: ToolFileInput,
+): Promise<CallToolResult> {
   try {
     // `resolveToolConfiguration` computes this same default internally but doesn't return it, so we
     // recompute `cwd` here — the same one-liner duplication lint-files.ts already documents.
@@ -51,9 +56,9 @@ export async function handleCompileContext(input: ToolFileInput): Promise<CallTo
         { type: "text", text: result.skillContent },
         {
           type: "text",
-          text: `Documents: ${documentCount}, Rules: ${ruleCount}, Components: ${componentCount}`
-        }
-      ]
+          text: `Documents: ${documentCount}, Rules: ${ruleCount}, Components: ${componentCount}`,
+        },
+      ],
     };
   } catch (error) {
     return errorResult(error);
@@ -70,8 +75,8 @@ export function registerCompileContextTool(server: McpServer): void {
         "output as the CLI `compile` command: the skill content plus a Documents/Rules/Components " +
         "metadata line. Requires `config.compile`; its absence returns an actionable error. Read-only.",
       inputSchema: compileContextInputShape,
-      annotations: READ_ONLY_ANNOTATIONS
+      annotations: READ_ONLY_ANNOTATIONS,
     },
-    (input) => handleCompileContext(input)
+    (input) => handleCompileContext(input),
   );
 }

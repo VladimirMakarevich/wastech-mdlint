@@ -137,5 +137,3 @@ verification.
   code. This is part of "bring the affected docs in line," not optional polish.
 - If a task is documentation-only, do not change product code, public interfaces, package
   metadata, or dependencies unless the user explicitly expands scope.
-
-@RTK.md

@@ -13,7 +13,9 @@ import type { ResolvedSettings } from "../src/engine/types.js";
 const tempDirs: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
+  );
 });
 
 async function fixtureRepo(files: Record<string, string>): Promise<string> {
@@ -31,15 +33,23 @@ function rule(id: string, options?: unknown): ConfiguredRule {
   return { rule: ruleRegistry.resolveRule(id, options) };
 }
 
-async function lint(cwd: string, rules: ConfiguredRule[], settings: ResolvedSettings = {}) {
+async function lint(
+  cwd: string,
+  rules: ConfiguredRule[],
+  settings: ResolvedSettings = {},
+) {
   return lintFiles({ cwd, config: { rules: [] }, rules, settings });
 }
 
 describe("SIZE-001 line and token metrics", () => {
   it("flags line and token budgets independently", async () => {
     const cwd = await fixtureRepo({ "a.md": `${"line\n".repeat(10)}` });
-    const result = await lint(cwd, [rule("SIZE-001", { lines: { error: 5 }, tokens: { warn: 2 } })]);
-    const metrics = result.messages.map((message) => `${message.data?.metric}:${message.severity}`).sort();
+    const result = await lint(cwd, [
+      rule("SIZE-001", { lines: { error: 5 }, tokens: { warn: 2 } }),
+    ]);
+    const metrics = result.messages
+      .map((message) => `${message.data?.metric}:${message.severity}`)
+      .sort();
     expect(metrics).toEqual(["lines:error", "tokens:warning"]);
   });
 });
@@ -48,12 +58,17 @@ describe("LLM-001 eager-import budget", () => {
   it("flags an entrypoint whose own + imported tokens exceed the budget", async () => {
     const cwd = await fixtureRepo({
       "CLAUDE.md": `Preamble @docs/big.md\n`,
-      "docs/big.md": `${"x".repeat(400)}\n`
+      "docs/big.md": `${"x".repeat(400)}\n`,
     });
     const result = await lint(cwd, [
-      rule("LLM-001", { entrypoints: ["CLAUDE.md"], maxTokensPerEntrypoint: 50 })
+      rule("LLM-001", {
+        entrypoints: ["CLAUDE.md"],
+        maxTokensPerEntrypoint: 50,
+      }),
     ]);
-    const overBudget = result.messages.find((message) => message.message.includes("over context budget"));
+    const overBudget = result.messages.find((message) =>
+      message.message.includes("over context budget"),
+    );
     expect(overBudget).toMatchObject({ filePath: "CLAUDE.md" });
     expect(overBudget?.data).toMatchObject({ maxTokens: 50 });
   });
@@ -61,22 +76,34 @@ describe("LLM-001 eager-import budget", () => {
   it("reports a missing eager import", async () => {
     const cwd = await fixtureRepo({ "CLAUDE.md": "See @docs/missing.md\n" });
     const result = await lint(cwd, [
-      rule("LLM-001", { entrypoints: ["CLAUDE.md"], maxTokensPerEntrypoint: 100000 })
+      rule("LLM-001", {
+        entrypoints: ["CLAUDE.md"],
+        maxTokensPerEntrypoint: 100000,
+      }),
     ]);
     expect(result.messages).toHaveLength(1);
-    expect(result.messages[0]?.message).toMatch(/Missing eager import @docs\/missing\.md/);
+    expect(result.messages[0]?.message).toMatch(
+      /Missing eager import @docs\/missing\.md/,
+    );
   });
 
   it("detects an eager-import cycle", async () => {
     const cwd = await fixtureRepo({
       "CLAUDE.md": "@a.md\n",
       "a.md": "@b.md\n",
-      "b.md": "@a.md\n"
+      "b.md": "@a.md\n",
     });
     const result = await lint(cwd, [
-      rule("LLM-001", { entrypoints: ["CLAUDE.md"], maxTokensPerEntrypoint: 100000 })
+      rule("LLM-001", {
+        entrypoints: ["CLAUDE.md"],
+        maxTokensPerEntrypoint: 100000,
+      }),
     ]);
-    expect(result.messages.some((message) => message.message.includes("Eager import cycle detected"))).toBe(true);
+    expect(
+      result.messages.some((message) =>
+        message.message.includes("Eager import cycle detected"),
+      ),
+    ).toBe(true);
   });
 
   it("resolves a routed root-relative eager import through settings.siteRouter", async () => {
@@ -90,34 +117,53 @@ describe("LLM-001 eager-import budget", () => {
       "src/content/docs/entry.md": entrypointContent,
       // Under the starlight preset, `@/big.md`'s route path is "big.md" (imports always carry a
       // literal `.md` suffix), whose first router candidate is `<contentDir>/big.md.md`.
-      "src/content/docs/big.md.md": importedContent
+      "src/content/docs/big.md.md": importedContent,
     });
     const siteRouter = { preset: "starlight", contentDir: "src/content/docs" };
 
     const result = await lint(
       cwd,
-      [rule("LLM-001", { entrypoints: ["src/content/docs/entry.md"], maxTokensPerEntrypoint: 50 })],
-      { siteRouter }
+      [
+        rule("LLM-001", {
+          entrypoints: ["src/content/docs/entry.md"],
+          maxTokensPerEntrypoint: 50,
+        }),
+      ],
+      { siteRouter },
     );
 
-    const overBudget = result.messages.find((message) => message.message.includes("over context budget"));
+    const overBudget = result.messages.find((message) =>
+      message.message.includes("over context budget"),
+    );
     expect(overBudget).toMatchObject({ filePath: "src/content/docs/entry.md" });
     expect(overBudget?.data).toMatchObject({
-      totalTokens: estimateTokens(entrypointContent) + estimateTokens(importedContent),
+      totalTokens:
+        estimateTokens(entrypointContent) + estimateTokens(importedContent),
       maxTokens: 50,
-      importedFiles: 1
+      importedFiles: 1,
     });
-    expect(result.messages.some((message) => message.message.includes("Missing eager import"))).toBe(false);
+    expect(
+      result.messages.some((message) =>
+        message.message.includes("Missing eager import"),
+      ),
+    ).toBe(false);
   });
 
   it("reports a missing eager import when a routed root-relative target has no router candidate on disk", async () => {
-    const cwd = await fixtureRepo({ "src/content/docs/entry.md": "@/missing.md\n" });
+    const cwd = await fixtureRepo({
+      "src/content/docs/entry.md": "@/missing.md\n",
+    });
     const siteRouter = { preset: "starlight", contentDir: "src/content/docs" };
 
     const result = await lint(
       cwd,
-      [rule("LLM-001", { entrypoints: ["src/content/docs/entry.md"], maxTokensPerEntrypoint: 100000 })],
-      { siteRouter }
+      [
+        rule("LLM-001", {
+          entrypoints: ["src/content/docs/entry.md"],
+          maxTokensPerEntrypoint: 100000,
+        }),
+      ],
+      { siteRouter },
     );
 
     expect(result.messages).toHaveLength(1);
@@ -125,8 +171,10 @@ describe("LLM-001 eager-import budget", () => {
     // — a regression back to the old ad hoc slash-strip resolver would resolve to a different path
     // ("missing.md") and still match a prefix-only assertion.
     expect(result.messages[0]?.message).toBe(
-      "Missing eager import @/missing.md; resolved to src/content/docs/missing.md.md."
+      "Missing eager import @/missing.md; resolved to src/content/docs/missing.md.md.",
     );
-    expect(result.messages[0]?.data).toMatchObject({ targetPath: "src/content/docs/missing.md.md" });
+    expect(result.messages[0]?.data).toMatchObject({
+      targetPath: "src/content/docs/missing.md.md",
+    });
   });
 });

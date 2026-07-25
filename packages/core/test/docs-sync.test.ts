@@ -6,10 +6,19 @@ import { describe, expect, it } from "vitest";
 
 import { generateRuleDocs } from "../src/engine/rule-docs.js";
 
-const readmePath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../README.md");
+const readmePath = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../../README.md",
+);
 
 function extractGeneratedTable(readme: string): string {
-  const match = /<!-- BEGIN GENERATED RULES -->\n([\s\S]*?)\n<!-- END GENERATED RULES -->/.exec(readme);
+  // The `<!-- prettier-ignore -->` line and trailing blank line are formatting scaffolding
+  // (P9.06) that keep `npm run format` from re-wrapping the table's padding; they sit outside
+  // the captured group so this still compares the raw generated string byte-for-byte.
+  const match =
+    /<!-- BEGIN GENERATED RULES -->\n<!-- prettier-ignore -->\n([\s\S]*?)\n\n<!-- END GENERATED RULES -->/.exec(
+      readme,
+    );
   if (match === null) {
     throw new Error("README is missing the generated-rules markers");
   }

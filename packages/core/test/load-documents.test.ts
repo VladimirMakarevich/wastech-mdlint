@@ -10,11 +10,15 @@ const tempDirs: string[] = [];
 
 afterEach(async () => {
   await Promise.all(
-    tempDirs.splice(0).map((tempDir) => rm(tempDir, { recursive: true, force: true }))
+    tempDirs
+      .splice(0)
+      .map((tempDir) => rm(tempDir, { recursive: true, force: true })),
   );
 });
 
-async function createFixtureTree(files: Record<string, string>): Promise<string> {
+async function createFixtureTree(
+  files: Record<string, string>,
+): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-load-"));
   tempDirs.push(root);
 
@@ -32,30 +36,39 @@ describe("loadDocuments", () => {
     const root = await createFixtureTree({
       "b.md": "# B\n",
       "docs/a.md": "# A\n",
-      "notes.txt": "ignored"
+      "notes.txt": "ignored",
     });
 
     const documents = await loadDocuments(["**/*.md"], { cwd: root });
     const keys = [...documents.keys()];
 
+    // On the Windows CI leg this makes the normalization assertion non-vacuous: the fixture root
+    // must contain native separators before loadDocuments returns POSIX map keys.
+    if (path.sep === "\\") {
+      expect(root).toContain("\\");
+    }
+
     expect(keys).toEqual([
       `${root}/b.md`.replaceAll("\\", "/"),
-      `${root}/docs/a.md`.replaceAll("\\", "/")
+      `${root}/docs/a.md`.replaceAll("\\", "/"),
     ]);
     expect(keys.every((key) => !key.includes("\\"))).toBe(true);
-    expect([...documents.values()].map((doc) => doc.path)).toEqual(["b.md", "docs/a.md"]);
+    expect([...documents.values()].map((doc) => doc.path)).toEqual([
+      "b.md",
+      "docs/a.md",
+    ]);
   });
 
   it("honors explicit exclude patterns (exclude wins over include)", async () => {
     const root = await createFixtureTree({
       "keep.md": "# Keep\n",
       "dist/generated.md": "# Gen\n",
-      "vendor/lib.md": "# Vendor\n"
+      "vendor/lib.md": "# Vendor\n",
     });
 
     const documents = await loadDocuments(["**/*.md"], {
       cwd: root,
-      exclude: ["dist/**", "vendor/**"]
+      exclude: ["dist/**", "vendor/**"],
     });
 
     expect([...documents.values()].map((doc) => doc.path)).toEqual(["keep.md"]);
@@ -69,11 +82,17 @@ describe("loadDocuments", () => {
       "scratch.tmp.md": "# Tmp\n",
       "docs/.gitignore": "local.md\n",
       "docs/page.md": "# Page\n",
-      "docs/local.md": "# Local\n"
+      "docs/local.md": "# Local\n",
     });
 
-    const enabled = await loadDocuments(["**/*.md"], { cwd: root, respectGitignore: true });
-    expect([...enabled.values()].map((doc) => doc.path)).toEqual(["docs/page.md", "keep.md"]);
+    const enabled = await loadDocuments(["**/*.md"], {
+      cwd: root,
+      respectGitignore: true,
+    });
+    expect([...enabled.values()].map((doc) => doc.path)).toEqual([
+      "docs/page.md",
+      "keep.md",
+    ]);
 
     // Opt-out: without the flag every Markdown file is loaded.
     const disabled = await loadDocuments(["**/*.md"], { cwd: root });
@@ -82,13 +101,13 @@ describe("loadDocuments", () => {
       "docs/local.md",
       "docs/page.md",
       "keep.md",
-      "scratch.tmp.md"
+      "scratch.tmp.md",
     ]);
   });
 
   it("returns an empty map when the root does not exist", async () => {
     const documents = await loadDocuments(["**/*.md"], {
-      cwd: path.join(os.tmpdir(), "wastech-mdlint-does-not-exist-xyz")
+      cwd: path.join(os.tmpdir(), "wastech-mdlint-does-not-exist-xyz"),
     });
 
     expect(documents.size).toBe(0);
@@ -98,12 +117,48 @@ describe("loadDocuments", () => {
     const root = await createFixtureTree({
       "z.md": "# Z\n",
       "a.md": "# A\n",
-      "m/n.md": "# N\n"
+      "m/n.md": "# N\n",
     });
 
     const first = [...(await loadDocuments(["**/*.md"], { cwd: root })).keys()];
-    const second = [...(await loadDocuments(["**/*.md"], { cwd: root })).keys()];
+    const second = [
+      ...(await loadDocuments(["**/*.md"], { cwd: root })).keys(),
+    ];
 
     expect(first).toEqual(second);
+  });
+
+  it("produces byte-identical ParsedDocument values across repeated loads, not just key order", async () => {
+    const root = await createFixtureTree({
+      "z.md": "# Z\n\n[a](a.md#z)\n",
+      "a.md": "# A\n\n| ID |\n| --- |\n| REQ-1 |\n",
+    });
+
+    const first = [
+      ...(await loadDocuments(["**/*.md"], { cwd: root })).values(),
+    ];
+    const second = [
+      ...(await loadDocuments(["**/*.md"], { cwd: root })).values(),
+    ];
+
+    expect(JSON.stringify(second)).toBe(JSON.stringify(first));
+  });
+
+  it("sorts mixed-case and non-ASCII paths by host-independent string order", async () => {
+    const root = await createFixtureTree({
+      "alpha.md": "# Lower\n",
+      "Zulu.md": "# Upper z\n",
+      "Beta.md": "# Upper b\n",
+      "文.md": "# CJK\n",
+    });
+
+    const documents = await loadDocuments(["**/*.md"], { cwd: root });
+
+    expect([...documents.values()].map((doc) => doc.path)).toEqual([
+      "Beta.md",
+      "Zulu.md",
+      "alpha.md",
+      "文.md",
+    ]);
   });
 });

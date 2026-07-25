@@ -1,6 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { compareStrings } from "../deterministic-sort.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
 import { loadDocuments } from "../markdown/load-documents.js";
 import type { LintFilesInput } from "./lint-files.js";
@@ -11,8 +12,13 @@ import type { RuleContext, TextEdit } from "./types.js";
  * down so earlier offsets stay valid; overlapping edits are skipped (last-writer-wins by position)
  * so a malformed rule can never corrupt the file.
  */
-export function applyEdits(content: string, edits: readonly TextEdit[]): string {
-  const sorted = [...edits].sort((left, right) => right.start - left.start || right.end - left.end);
+export function applyEdits(
+  content: string,
+  edits: readonly TextEdit[],
+): string {
+  const sorted = [...edits].sort(
+    (left, right) => right.start - left.start || right.end - left.end,
+  );
   let result = content;
   let lastStart = Number.POSITIVE_INFINITY;
 
@@ -20,7 +26,8 @@ export function applyEdits(content: string, edits: readonly TextEdit[]): string 
     if (edit.end > lastStart) {
       continue;
     }
-    result = result.slice(0, edit.start) + edit.newText + result.slice(edit.end);
+    result =
+      result.slice(0, edit.start) + edit.newText + result.slice(edit.end);
     lastStart = edit.start;
   }
 
@@ -35,19 +42,21 @@ export type ApplyFixesResult = { fixedFiles: string[] };
  * document's content — so project-scope rules never contribute fixes. Returns the fixed file list;
  * the caller re-lints to report what remains.
  */
-export async function applyFixes(input: LintFilesInput): Promise<ApplyFixesResult> {
+export async function applyFixes(
+  input: LintFilesInput,
+): Promise<ApplyFixesResult> {
   const rootDir = path.resolve(input.cwd);
   const loaded = await loadDocuments(input.config.include ?? ["**/*.md"], {
     cwd: rootDir,
     exclude: input.config.exclude,
-    respectGitignore: input.config.respectGitignore
+    respectGitignore: input.config.respectGitignore,
   });
 
   const documents = new Map<string, ParsedDocument>();
   for (const document of loaded.values()) {
     documents.set(document.path, document);
   }
-  const projectFiles = [...documents.keys()].sort((left, right) => left.localeCompare(right));
+  const projectFiles = [...documents.keys()].sort(compareStrings);
 
   const fixRules = input.rules
     .filter((configured) => configured.severity !== "off")
@@ -65,7 +74,7 @@ export async function applyFixes(input: LintFilesInput): Promise<ApplyFixesResul
       rootDir,
       settings: input.settings,
       graph: input.graph,
-      report: () => {}
+      report: () => {},
     };
 
     const edits: TextEdit[] = [];
@@ -83,5 +92,5 @@ export async function applyFixes(input: LintFilesInput): Promise<ApplyFixesResul
     }
   }
 
-  return { fixedFiles: fixedFiles.sort((left, right) => left.localeCompare(right)) };
+  return { fixedFiles: fixedFiles.sort(compareStrings) };
 }

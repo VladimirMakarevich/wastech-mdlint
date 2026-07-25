@@ -26,7 +26,7 @@ content.
 
 1. Extend the single remark visit pass to also collect:
    - **headings** → `{ text, depth, slug, line }` (reuse `github-slugger` for `slug`);
-   - **sections** → array of heading texts (cheap existence checks for SEC-*/CTX-*);
+   - **sections** → array of heading texts (cheap existence checks for SEC-_/CTX-_);
    - **tables** → headers + `rows[{ line, cells: Record<header,string> }]` + enclosing
      `section` + table `line` (GFM tables; map each cell to its header key);
    - **checkItems** → `{ text, checked, section?, line }` (GFM task list items);
@@ -34,7 +34,7 @@ content.
 2. Track the "current section" while walking so tables/checkItems record their enclosing
    heading. **Ownership rule (decided 2026-07-02, audit 5.3):** a block belongs to the
    **most-recent heading above it, regardless of level** — a table after an H3 (itself under an
-   H2) has `section` = that H3's text. A new heading of *any* level simply becomes the current
+   H2) has `section` = that H3's text. A new heading of _any_ level simply becomes the current
    section (flat "last heading wins"; no hierarchical section paths, matching the single-string
    `section?` field — a higher-level heading does not reopen ancestors). If **no heading
    precedes** the block, `section` is `undefined`.
@@ -44,7 +44,7 @@ content.
 **canonical** slug — not an implementation detail — because the tool targets GitHub-rendered
 Markdown, where github-slugger is the reference. It is authoritative for REF-002 anchor
 validation, anchor graph edges ([P4.01](../P4-graph/01-context-graph-model.md)), and the slice
-index ([P4.04](../P4-graph/04-search-index-slice.md)) — all consume the *same* slugs. Duplicates
+index ([P4.04](../P4-graph/04-search-index-slice.md)) — all consume the _same_ slugs. Duplicates
 are deduped in **document order** with **one slugger instance per document** (`heading`,
 `heading-1`, `heading-2`, …); a bare `#heading` link resolves to the first occurrence,
 `#heading-1` to the second. CJK/Unicode letters and punctuation follow github-slugger's behavior
@@ -53,7 +53,7 @@ verbatim — **no custom normalization**.
 ## Decisions applied
 
 - [R9](../requirements/02-rules-engine.md) — tables/sections/checklist are primitive sources
-  for TBL-*/SEC-*/CHK-*/CTX-* and declarative custom rules.
+  for TBL-_/SEC-_/CHK-_/CTX-_ and declarative custom rules.
 
 ## Exit criteria
 

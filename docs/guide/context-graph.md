@@ -14,13 +14,13 @@ is no parallel traversal logic.
 - **Edges** are directed references, each with a `line` and the raw target text for
   explainability. There are five semantic edge types:
 
-| Edge type | Created by |
-| --- | --- |
-| `link` | A relative Markdown link `[text](other.md)`. |
-| `anchor` | A link to a heading/anchor (`other.md#slug` or `#slug`). |
-| `image` | An image reference `![alt](diagram.png)`. |
-| `import` | An eager import directive `@path` (also feeds [LLM-001](rules/LLM-001.md)). |
-| `id-ref` | An ID reference resolved via [`settings.idRef`](configuration.md#settingsidref). |
+| Edge type | Created by                                                                       |
+| --------- | -------------------------------------------------------------------------------- |
+| `link`    | A relative Markdown link `[text](other.md)`.                                     |
+| `anchor`  | A link to a heading/anchor (`other.md#slug` or `#slug`).                         |
+| `image`   | An image reference `![alt](diagram.png)`.                                        |
+| `import`  | An eager import directive `@path` (also feeds [LLM-001](rules/LLM-001.md)).      |
+| `id-ref`  | An ID reference resolved via [`settings.idRef`](configuration.md#settingsidref). |
 
 `id-ref` edges only materialize when `settings.idRef` is configured; without it, ID references do
 not affect graph-based rules.

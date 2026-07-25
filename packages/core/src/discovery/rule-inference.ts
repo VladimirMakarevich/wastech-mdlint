@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { compareStrings } from "../deterministic-sort.js";
 import { matchesConfigGlob } from "./globs.js";
 import { filePart, resolveTargetCandidates } from "../engine/path-resolve.js";
 import { noPlaceholders } from "../engine/primitives/content.js";
@@ -56,7 +57,10 @@ export type RuleInferenceResult = {
 // Reads + parses one cluster's sample files, mirroring load-documents.ts's read+parse pairing. A
 // sample path going stale between P6.01's scan and this call (e.g. deleted or renamed) must not
 // crash the whole inference, so a failed read is skipped rather than thrown.
-async function readSampleDocuments(cwd: string, sampleFiles: string[]): Promise<ParsedDocument[]> {
+async function readSampleDocuments(
+  cwd: string,
+  sampleFiles: string[],
+): Promise<ParsedDocument[]> {
   const results = await Promise.all(
     sampleFiles.map(async (relPath) => {
       try {
@@ -65,7 +69,7 @@ async function readSampleDocuments(cwd: string, sampleFiles: string[]): Promise<
       } catch {
         return undefined;
       }
-    })
+    }),
   );
   return results.filter((doc): doc is ParsedDocument => doc !== undefined);
 }
@@ -78,7 +82,9 @@ async function readSampleDocuments(cwd: string, sampleFiles: string[]): Promise<
 // GRP-001's graph edges actually evaluate — otherwise a rule gets proposed from evidence it would
 // never look at (an empty `[]()` target, or an `http:`/`data:` image `imageResolves` skips
 // outright), which is not a "justified" proposal.
-function tallyPatterns(docs: ParsedDocument[]): Omit<DetectedPatterns, "adrSections"> {
+function tallyPatterns(
+  docs: ParsedDocument[],
+): Omit<DetectedPatterns, "adrSections"> {
   let localLinkCount = 0;
   let anchorLinkCount = 0;
   let imageCount = 0;
@@ -117,11 +123,22 @@ function tallyPatterns(docs: ParsedDocument[]): Omit<DetectedPatterns, "adrSecti
     placeholderSectionCount += noPlaceholders(doc, {}).length;
   }
 
-  return { localLinkCount, anchorLinkCount, imageCount, tableCount, checklistItemCount, placeholderSectionCount };
+  return {
+    localLinkCount,
+    anchorLinkCount,
+    imageCount,
+    tableCount,
+    checklistItemCount,
+    placeholderSectionCount,
+  };
 }
 
 const ADR_CORE_TERMS = ["status", "context", "decision"];
-const ADR_VOCABULARY = new Set([...ADR_CORE_TERMS, "consequences", "alternatives"]);
+const ADR_VOCABULARY = new Set([
+  ...ADR_CORE_TERMS,
+  "consequences",
+  "alternatives",
+]);
 
 // ADR-triplet detection. Two-part gate, deliberately: the lower-cased vocabulary match decides
 // *whether* a cluster is ADR-like (case-insensitive, so "STATUS" and "Status" both count as
@@ -139,8 +156,12 @@ function detectAdrSections(docs: ParsedDocument[]): string[] {
   let sharedSections: string[] | undefined;
 
   for (const doc of docs) {
-    const lowerSections = new Set(doc.sections.map((section) => section.toLowerCase()));
-    const coreMatchCount = ADR_CORE_TERMS.filter((term) => lowerSections.has(term)).length;
+    const lowerSections = new Set(
+      doc.sections.map((section) => section.toLowerCase()),
+    );
+    const coreMatchCount = ADR_CORE_TERMS.filter((term) =>
+      lowerSections.has(term),
+    ).length;
     if (coreMatchCount < 2) {
       return [];
     }
@@ -148,7 +169,10 @@ function detectAdrSections(docs: ParsedDocument[]): string[] {
     const vocabSections: string[] = [];
     const seenVocabSections = new Set<string>();
     for (const section of doc.sections) {
-      if (ADR_VOCABULARY.has(section.toLowerCase()) && !seenVocabSections.has(section)) {
+      if (
+        ADR_VOCABULARY.has(section.toLowerCase()) &&
+        !seenVocabSections.has(section)
+      ) {
         vocabSections.push(section);
         seenVocabSections.add(section);
       }
@@ -158,7 +182,9 @@ function detectAdrSections(docs: ParsedDocument[]): string[] {
       sharedSections = vocabSections;
     } else {
       const vocabSectionSet = new Set(vocabSections);
-      sharedSections = sharedSections.filter((section) => vocabSectionSet.has(section));
+      sharedSections = sharedSections.filter((section) =>
+        vocabSectionSet.has(section),
+      );
     }
   }
 
@@ -176,7 +202,7 @@ function sumPatterns(patterns: DetectedPatterns[]): DetectedPatterns {
     tableCount: 0,
     checklistItemCount: 0,
     placeholderSectionCount: 0,
-    adrSections: []
+    adrSections: [],
   };
 
   for (const entry of patterns) {
@@ -207,7 +233,9 @@ type SampleCycle = string[];
 // heuristic can fabricate an edge — e.g. misresolving a root-relative link as source-relative, or
 // treating a broken anchor as a same-target edge — that the shared graph would never actually
 // create.
-function findSampleCycle(sampleDocs: Map<string, ParsedDocument>): SampleCycle | undefined {
+function findSampleCycle(
+  sampleDocs: Map<string, ParsedDocument>,
+): SampleCycle | undefined {
   const adjacency = new Map<string, string[]>();
   for (const [sourcePath, doc] of sampleDocs) {
     const targets: string[] = [];
@@ -220,7 +248,10 @@ function findSampleCycle(sampleDocs: Map<string, ParsedDocument>): SampleCycle |
         continue;
       }
 
-      for (const candidate of resolveTargetCandidates(sourcePath, targetFilePart)) {
+      for (const candidate of resolveTargetCandidates(
+        sourcePath,
+        targetFilePart,
+      )) {
         if (candidate === sourcePath) {
           continue;
         }
@@ -271,7 +302,7 @@ function findSampleCycle(sampleDocs: Map<string, ParsedDocument>): SampleCycle |
     return undefined;
   }
 
-  for (const sourcePath of [...sampleDocs.keys()].sort((left, right) => left.localeCompare(right))) {
+  for (const sourcePath of [...sampleDocs.keys()].sort(compareStrings)) {
     if (!visited.has(sourcePath)) {
       const found = visit(sourcePath);
       if (found !== undefined) {
@@ -297,49 +328,55 @@ const PATTERN_GATES: Record<
   string,
   {
     gate: (patterns: DetectedPatterns) => boolean;
-    rationale: (patterns: DetectedPatterns, cycle: SampleCycle | undefined) => string;
+    rationale: (
+      patterns: DetectedPatterns,
+      cycle: SampleCycle | undefined,
+    ) => string;
   }
 > = {
   "REF-001": {
     gate: (patterns) => patterns.localLinkCount > 0,
     rationale: (patterns) =>
-      `Sampled files contain ${patterns.localLinkCount} relative link(s) to other files; REF-001 checks that every one resolves to a file in the corpus.`
+      `Sampled files contain ${patterns.localLinkCount} relative link(s) to other files; REF-001 checks that every one resolves to a file in the corpus.`,
   },
   "REF-002": {
     gate: (patterns) => patterns.anchorLinkCount > 0,
     rationale: (patterns) =>
-      `Sampled files contain ${patterns.anchorLinkCount} link(s) carrying a heading anchor; REF-002 checks that each anchor matches a real heading slug.`
+      `Sampled files contain ${patterns.anchorLinkCount} link(s) carrying a heading anchor; REF-002 checks that each anchor matches a real heading slug.`,
   },
   "REF-003": {
     gate: (patterns) => patterns.imageCount > 0,
     rationale: (patterns) =>
-      `Sampled files contain ${patterns.imageCount} image reference(s); REF-003 checks that every one resolves to a file on disk.`
+      `Sampled files contain ${patterns.imageCount} image reference(s); REF-003 checks that every one resolves to a file on disk.`,
   },
   "TBL-002": {
     gate: (patterns) => patterns.tableCount > 0,
     rationale: (patterns) =>
-      `Sampled files contain ${patterns.tableCount} table(s); TBL-002 checks that target cells are not left empty.`
+      `Sampled files contain ${patterns.tableCount} table(s); TBL-002 checks that target cells are not left empty.`,
   },
   "CTX-001": {
     gate: (patterns) => patterns.placeholderSectionCount > 0,
     rationale: (patterns) =>
-      `Sampled files contain ${patterns.placeholderSectionCount} section(s) that are empty or placeholder-only; CTX-001 flags these.`
+      `Sampled files contain ${patterns.placeholderSectionCount} section(s) that are empty or placeholder-only; CTX-001 flags these.`,
   },
   "CTX-002": {
     gate: (patterns) => patterns.checklistItemCount > 0,
     rationale: (patterns) =>
-      `Sampled files contain ${patterns.checklistItemCount} checklist item(s); CTX-002 checks that every one is checked.`
+      `Sampled files contain ${patterns.checklistItemCount} checklist item(s); CTX-002 checks that every one is checked.`,
   },
   "GRP-001": {
     gate: (patterns) => patterns.localLinkCount > 0,
     rationale: (patterns, cycle) =>
       cycle === undefined
         ? `Sampled files contain ${patterns.localLinkCount} relative link(s) forming a reference graph; GRP-001 checks the full corpus for circular references.`
-        : `Sampled files form a reference chain that loops back on itself (${[...cycle, cycle[0]].join(" -> ")}); GRP-001 checks the full corpus for circular references.`
-  }
+        : `Sampled files form a reference chain that loops back on itself (${[...cycle, cycle[0]].join(" -> ")}); GRP-001 checks the full corpus for circular references.`,
+  },
 };
 
-function sec001Rationale(cluster: { includeGlob: string; adrSections: string[] }): string {
+function sec001Rationale(cluster: {
+  includeGlob: string;
+  adrSections: string[];
+}): string {
   return `Sampled files in ${cluster.includeGlob} share the ADR sections ${cluster.adrSections.join(", ")}; SEC-001 checks that every file in this cluster has all of them.`;
 }
 
@@ -350,8 +387,13 @@ function sec001Rationale(cluster: { includeGlob: string; adrSections: string[] }
 // `.mdx`-aware — it mirrors the tool's real zero-config default, not the scan's own discovery
 // criteria). Proposing `SEC-001` scoped to a glob that misses its own sampled `.mdx` evidence
 // would be a dead rule: valid config, but it would check none of the files that justified it.
-function sec001ScopeMatchesSamples(cluster: { includeGlob: string; sampledFiles: string[] }): boolean {
-  return cluster.sampledFiles.every((file) => matchesConfigGlob(file, [cluster.includeGlob]));
+function sec001ScopeMatchesSamples(cluster: {
+  includeGlob: string;
+  sampledFiles: string[];
+}): boolean {
+  return cluster.sampledFiles.every((file) =>
+    matchesConfigGlob(file, [cluster.includeGlob]),
+  );
 }
 
 // Groups registry metadata by category (the literal "group ruleRegistry.getAllMetadata() on
@@ -377,7 +419,11 @@ function buildIdIndex(registry: RuleRegistry): Map<string, RuleMetadata> {
   return idIndex;
 }
 
-function toInferredRule(metadata: RuleMetadata, rationale: string, options?: Record<string, unknown>): InferredRule {
+function toInferredRule(
+  metadata: RuleMetadata,
+  rationale: string,
+  options?: Record<string, unknown>,
+): InferredRule {
   return {
     rule: metadata.id,
     category: metadata.category,
@@ -385,7 +431,7 @@ function toInferredRule(metadata: RuleMetadata, rationale: string, options?: Rec
     defaultSeverity: metadata.defaultSeverity,
     fixable: metadata.fixable,
     rationale,
-    ...(options === undefined ? {} : { options })
+    ...(options === undefined ? {} : { options }),
   };
 }
 
@@ -410,7 +456,7 @@ export async function inferRuleSet(params: {
   const idIndex = buildIdIndex(registry);
 
   const perClusterDocs = await Promise.all(
-    clusters.map((cluster) => readSampleDocuments(cwd, cluster.sampleFiles))
+    clusters.map((cluster) => readSampleDocuments(cwd, cluster.sampleFiles)),
   );
 
   // Combined map for the cross-cluster cycle heuristic; later clusters win on an (unexpected)
@@ -423,34 +469,46 @@ export async function inferRuleSet(params: {
   }
   const cycle = findSampleCycle(combinedSamples);
 
-  const clusterInferences: ClusterRuleInference[] = clusters.map((cluster, index) => {
-    const docs = perClusterDocs[index];
-    const adrSections = detectAdrSections(docs);
-    const patterns: DetectedPatterns = { ...tallyPatterns(docs), adrSections };
-    const sampledFiles = docs.map((doc) => doc.path).sort((left, right) => left.localeCompare(right));
+  const clusterInferences: ClusterRuleInference[] = clusters.map(
+    (cluster, index) => {
+      const docs = perClusterDocs[index];
+      const adrSections = detectAdrSections(docs);
+      const patterns: DetectedPatterns = {
+        ...tallyPatterns(docs),
+        adrSections,
+      };
+      const sampledFiles = docs.map((doc) => doc.path).sort(compareStrings);
 
-    const contributesTo = Object.entries(PATTERN_GATES)
-      .filter(([id, definition]) => idIndex.has(id) && definition.gate(patterns))
-      .map(([id]) => id);
-    if (
-      adrSections.length > 0 &&
-      idIndex.has("SEC-001") &&
-      sec001ScopeMatchesSamples({ includeGlob: cluster.includeGlob, sampledFiles })
-    ) {
-      contributesTo.push("SEC-001");
-    }
-    contributesTo.sort((left, right) => left.localeCompare(right));
+      const contributesTo = Object.entries(PATTERN_GATES)
+        .filter(
+          ([id, definition]) => idIndex.has(id) && definition.gate(patterns),
+        )
+        .map(([id]) => id);
+      if (
+        adrSections.length > 0 &&
+        idIndex.has("SEC-001") &&
+        sec001ScopeMatchesSamples({
+          includeGlob: cluster.includeGlob,
+          sampledFiles,
+        })
+      ) {
+        contributesTo.push("SEC-001");
+      }
+      contributesTo.sort(compareStrings);
 
-    return {
-      clusterPath: cluster.path,
-      includeGlob: cluster.includeGlob,
-      sampledFiles,
-      patterns,
-      contributesTo
-    };
-  });
+      return {
+        clusterPath: cluster.path,
+        includeGlob: cluster.includeGlob,
+        sampledFiles,
+        patterns,
+        contributesTo,
+      };
+    },
+  );
 
-  const globalPatterns = sumPatterns(clusterInferences.map((cluster) => cluster.patterns));
+  const globalPatterns = sumPatterns(
+    clusterInferences.map((cluster) => cluster.patterns),
+  );
 
   const rules: InferredRule[] = [];
 
@@ -459,28 +517,41 @@ export async function inferRuleSet(params: {
     if (metadata === undefined || !definition.gate(globalPatterns)) {
       continue;
     }
-    rules.push(toInferredRule(metadata, definition.rationale(globalPatterns, cycle)));
+    rules.push(
+      toInferredRule(metadata, definition.rationale(globalPatterns, cycle)),
+    );
   }
 
   const sec001Metadata = idIndex.get("SEC-001");
   if (sec001Metadata !== undefined) {
     for (const cluster of clusterInferences) {
-      if (cluster.patterns.adrSections.length === 0 || !sec001ScopeMatchesSamples(cluster)) {
+      if (
+        cluster.patterns.adrSections.length === 0 ||
+        !sec001ScopeMatchesSamples(cluster)
+      ) {
         continue;
       }
       rules.push(
         toInferredRule(
           sec001Metadata,
-          sec001Rationale({ includeGlob: cluster.includeGlob, adrSections: cluster.patterns.adrSections }),
-          { files: [cluster.includeGlob], sections: cluster.patterns.adrSections }
-        )
+          sec001Rationale({
+            includeGlob: cluster.includeGlob,
+            adrSections: cluster.patterns.adrSections,
+          }),
+          {
+            files: [cluster.includeGlob],
+            sections: cluster.patterns.adrSections,
+          },
+        ),
       );
     }
   }
 
   rules.sort((left, right) => {
-    const idDiff = left.rule.localeCompare(right.rule);
-    return idDiff !== 0 ? idDiff : fileScopeSortKey(left).localeCompare(fileScopeSortKey(right));
+    const idDiff = compareStrings(left.rule, right.rule);
+    return idDiff !== 0
+      ? idDiff
+      : compareStrings(fileScopeSortKey(left), fileScopeSortKey(right));
   });
 
   return { clusters: clusterInferences, rules };

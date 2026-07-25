@@ -8,12 +8,17 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { handleLintFiles } from "../src/tools/lint-files.js";
 
-const fixturesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "fixtures");
+const fixturesDir = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "fixtures",
+);
 
 const tempDirs: string[] = [];
 
 afterAll(async () => {
-  await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirs.map((dir) => rm(dir, { recursive: true, force: true })),
+  );
 });
 
 async function makeTempDir(prefix: string): Promise<string> {
@@ -22,7 +27,9 @@ async function makeTempDir(prefix: string): Promise<string> {
   return dir;
 }
 
-function structured(result: Awaited<ReturnType<typeof handleLintFiles>>): LintResult {
+function structured(
+  result: Awaited<ReturnType<typeof handleLintFiles>>,
+): LintResult {
   return result.structuredContent as unknown as LintResult;
 }
 
@@ -39,7 +46,9 @@ describe("handleLintFiles", () => {
   });
 
   it("reports a REF-001 error from a real project fixture", async () => {
-    const result = await handleLintFiles({ cwd: path.join(fixturesDir, "lint-findings-project") });
+    const result = await handleLintFiles({
+      cwd: path.join(fixturesDir, "lint-findings-project"),
+    });
 
     expect(result.isError).toBeFalsy();
     const output = structured(result);
@@ -53,7 +62,7 @@ describe("handleLintFiles", () => {
   it("replaces config.include when an explicit patterns arg is passed", async () => {
     const result = await handleLintFiles({
       cwd: path.join(fixturesDir, "basic-project"),
-      patterns: ["guide.md"]
+      patterns: ["guide.md"],
     });
 
     expect(result.isError).toBeFalsy();
@@ -62,11 +71,17 @@ describe("handleLintFiles", () => {
 
   it("passes a structured CONFIG_INVALID error through on malformed config", async () => {
     const dir = await makeTempDir("mcp-lf-invalid-");
-    await writeFile(path.join(dir, "wastech-mdlint.config.json"), "{ not valid ", "utf8");
+    await writeFile(
+      path.join(dir, "wastech-mdlint.config.json"),
+      "{ not valid ",
+      "utf8",
+    );
 
     const result = await handleLintFiles({ cwd: dir });
 
     expect(result.isError).toBe(true);
-    expect((result.structuredContent as { code: string }).code).toBe("CONFIG_INVALID");
+    expect((result.structuredContent as { code: string }).code).toBe(
+      "CONFIG_INVALID",
+    );
   });
 });

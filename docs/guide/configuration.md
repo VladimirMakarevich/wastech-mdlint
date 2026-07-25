@@ -26,24 +26,30 @@ nothing fails until you opt in.
   "include": ["**/*.md"],
   "exclude": ["node_modules/**", "dist/**", ".git/**"],
   "respectGitignore": false,
-  "settings": { /* shared settings inherited by rules */ },
-  "rules": [ /* rule entries */ ],
-  "compile": { /* config for the `compile` command */ }
+  "settings": {
+    /* shared settings inherited by rules */
+  },
+  "rules": [
+    /* rule entries */
+  ],
+  "compile": {
+    /* config for the `compile` command */
+  },
 }
 ```
 
 Unknown top-level keys are rejected. Validation is two-stage: the root shape first, then each
 rule's own options schema.
 
-| Key | Type | Default | Purpose |
-| --- | --- | --- | --- |
-| `$schema` | string | — | **Local** path to the JSON schema (for editor completion). Never a remote URL. |
-| `include` | string[] | `["**/*.md"]` | Globs of files to lint. |
-| `exclude` | string[] | — | Globs to remove; **`exclude` wins over `include`**. |
-| `respectGitignore` | boolean | `false` | When `true`, also skip `.gitignore`d files. |
-| `settings` | object | — | Shared settings (`siteRouter`, `idRef`) inherited by rules. |
-| `rules` | array | `[]` | The rules to run (see below). |
-| `compile` | object | — | Config for [`compile`](compile.md); required by that command. |
+| Key                | Type     | Default       | Purpose                                                                        |
+| ------------------ | -------- | ------------- | ------------------------------------------------------------------------------ |
+| `$schema`          | string   | —             | **Local** path to the JSON schema (for editor completion). Never a remote URL. |
+| `include`          | string[] | `["**/*.md"]` | Globs of files to lint.                                                        |
+| `exclude`          | string[] | —             | Globs to remove; **`exclude` wins over `include`**.                            |
+| `respectGitignore` | boolean  | `false`       | When `true`, also skip `.gitignore`d files.                                    |
+| `settings`         | object   | —             | Shared settings (`siteRouter`, `idRef`) inherited by rules.                    |
+| `rules`            | array    | `[]`          | The rules to run (see below).                                                  |
+| `compile`          | object   | —             | Config for [`compile`](compile.md); required by that command.                  |
 
 ## Rule entries
 

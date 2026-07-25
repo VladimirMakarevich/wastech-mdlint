@@ -3,7 +3,7 @@
 > Roadmap: [v2 Index](../index.md) · Phase **P1** · Size **M** · Status **Done** ·
 > Reuse from current implementation: **High**.
 >
-> **Goal:** one parse pass produces *everything* every downstream consumer needs. Extend the
+> **Goal:** one parse pass produces _everything_ every downstream consumer needs. Extend the
 > remark parser (now in `@wastech-mdlint/core` after [P0.04](../P0-foundations/04-relocate-current-source-into-core.md))
 > into a rich `ParsedDocument` and a deterministic `loadDocuments()` loader.
 
@@ -25,14 +25,14 @@ consumer.
 
 ## Tasks
 
-| # | Task | Size | Depends on |
-| --- | --- | --- | --- |
-| [P1.01](01-parsed-document-contract.md) | Define the `ParsedDocument` contract (types) | S | P0 done |
-| [P1.02](02-block-structure.md) | Block structure: headings(+slug), sections, tables, checklist, content | M | P1.01 |
-| [P1.03](03-references-extraction.md) | References: links(+text), images, anchors, eager `@imports` | M | P1.02 |
-| [P1.04](04-inline-disable-directives.md) | Inline-disable directive extraction | S | P1.03 |
-| [P1.05](05-load-documents.md) | `loadDocuments()` deterministic loader | M | P1.04 |
-| [P1.06](06-parser-tests-fixtures.md) | Parser tests & fixtures (incl. CJK, determinism) | M | P1.05 |
+| #                                        | Task                                                                   | Size | Depends on |
+| ---------------------------------------- | ---------------------------------------------------------------------- | ---- | ---------- |
+| [P1.01](01-parsed-document-contract.md)  | Define the `ParsedDocument` contract (types)                           | S    | P0 done    |
+| [P1.02](02-block-structure.md)           | Block structure: headings(+slug), sections, tables, checklist, content | M    | P1.01      |
+| [P1.03](03-references-extraction.md)     | References: links(+text), images, anchors, eager `@imports`            | M    | P1.02      |
+| [P1.04](04-inline-disable-directives.md) | Inline-disable directive extraction                                    | S    | P1.03      |
+| [P1.05](05-load-documents.md)            | `loadDocuments()` deterministic loader                                 | M    | P1.04      |
+| [P1.06](06-parser-tests-fixtures.md)     | Parser tests & fixtures (incl. CJK, determinism)                       | M    | P1.05      |
 
 ## Sequence
 

@@ -13,7 +13,9 @@ import { defineRule, RuleRegistry } from "../src/engine/registry.js";
 const tempDirs: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
+  );
 });
 
 const registry = new RuleRegistry([
@@ -24,10 +26,12 @@ const registry = new RuleRegistry([
       description: "links resolve",
       defaultSeverity: "error",
       scope: "document",
-      fixable: false
+      fixable: false,
     },
-    optionsSchema: z.object({ exclude: z.array(z.string()).optional() }).strict(),
-    check: () => () => {}
+    optionsSchema: z
+      .object({ exclude: z.array(z.string()).optional() })
+      .strict(),
+    check: () => () => {},
   }),
   defineRule({
     metadata: {
@@ -36,14 +40,17 @@ const registry = new RuleRegistry([
       description: "size budget",
       defaultSeverity: "warning",
       scope: "document",
-      fixable: false
+      fixable: false,
     },
     optionsSchema: z.object({ maxBytes: z.number().int().positive() }).strict(),
-    check: () => () => {}
-  })
+    check: () => () => {},
+  }),
 ]);
 
-async function writeConfig(contents: string, fileName = "wastech-mdlint.config.json"): Promise<string> {
+async function writeConfig(
+  contents: string,
+  fileName = "wastech-mdlint.config.json",
+): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-config-"));
   tempDirs.push(root);
   await writeFile(path.join(root, fileName), contents, "utf8");
@@ -55,13 +62,13 @@ describe("loadConfiguration", () => {
     const root = await writeConfig(
       [
         "{",
-        '  // a comment',
+        "  // a comment",
         '  "include": ["docs/**/*.md"],',
         '  "rules": [',
         '    { "rule": "ref-001", "severity": "warning" }, // trailing comma next',
         "  ],",
-        "}"
-      ].join("\n")
+        "}",
+      ].join("\n"),
     );
 
     const loaded = await loadConfiguration({ cwd: root, registry });
@@ -75,54 +82,83 @@ describe("loadConfiguration", () => {
   it("resolves settings and exposes them (C5)", async () => {
     const root = await writeConfig(
       JSON.stringify({
-        settings: { siteRouter: { preset: "starlight", contentDir: "src/content/docs" } },
-        rules: []
-      })
+        settings: {
+          siteRouter: { preset: "starlight", contentDir: "src/content/docs" },
+        },
+        rules: [],
+      }),
     );
 
     const loaded = await loadConfiguration({ cwd: root, registry });
-    expect(loaded.settings.siteRouter).toEqual({ preset: "starlight", contentDir: "src/content/docs" });
+    expect(loaded.settings.siteRouter).toEqual({
+      preset: "starlight",
+      contentDir: "src/content/docs",
+    });
   });
 
   it("resolves settings.idRef and exposes it for the graph builder (P4.06)", async () => {
     const root = await writeConfig(
       JSON.stringify({
-        settings: { idRef: { idPattern: "^REQ-\\d+$", definitions: ["reqs.md"], idColumn: "ID" } },
-        rules: []
-      })
+        settings: {
+          idRef: {
+            idPattern: "^REQ-\\d+$",
+            definitions: ["reqs.md"],
+            idColumn: "ID",
+          },
+        },
+        rules: [],
+      }),
     );
 
     const loaded = await loadConfiguration({ cwd: root, registry });
-    expect(loaded.settings.idRef).toEqual({ idPattern: "^REQ-\\d+$", definitions: ["reqs.md"], idColumn: "ID" });
+    expect(loaded.settings.idRef).toEqual({
+      idPattern: "^REQ-\\d+$",
+      definitions: ["reqs.md"],
+      idColumn: "ID",
+    });
   });
 
   it("rejects a malformed settings.idRef missing idColumn (C7)", async () => {
     const root = await writeConfig(
       JSON.stringify({
-        settings: { idRef: { idPattern: "^REQ-\\d+$", definitions: ["reqs.md"] } },
-        rules: []
-      })
+        settings: {
+          idRef: { idPattern: "^REQ-\\d+$", definitions: ["reqs.md"] },
+        },
+        rules: [],
+      }),
     );
 
-    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(/idColumn/);
+    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(
+      /idColumn/,
+    );
   });
 
   it("rejects unknown top-level keys (C7)", async () => {
-    const root = await writeConfig(JSON.stringify({ nonsense: true, rules: [] }));
-    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(/nonsense/);
+    const root = await writeConfig(
+      JSON.stringify({ nonsense: true, rules: [] }),
+    );
+    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(
+      /nonsense/,
+    );
   });
 
   it("reports an unknown rule with a did-you-mean suggestion", async () => {
-    const root = await writeConfig(JSON.stringify({ rules: [{ rule: "REF-009" }] }));
+    const root = await writeConfig(
+      JSON.stringify({ rules: [{ rule: "REF-009" }] }),
+    );
     await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(
-      /rules\[0\]: Unknown rule "REF-009"\. Did you mean "REF-001"\?/
+      /rules\[0\]: Unknown rule "REF-009"\. Did you mean "REF-001"\?/,
     );
   });
 
   it("reports bad rule options with a path-prefixed error", async () => {
-    const root = await writeConfig(JSON.stringify({ rules: [{ rule: "SIZE-001", options: { maxBytes: -1 } }] }));
+    const root = await writeConfig(
+      JSON.stringify({
+        rules: [{ rule: "SIZE-001", options: { maxBytes: -1 } }],
+      }),
+    );
     await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(
-      /rules\[0\]\.options\.maxBytes:/
+      /rules\[0\]\.options\.maxBytes:/,
     );
   });
 
@@ -130,14 +166,18 @@ describe("loadConfiguration", () => {
     const root = await writeConfig("{ not valid ");
     // The structured code/hint (M6) accompany the message so an MCP host can render the error
     // contract without re-classifying it.
-    const error = await loadConfiguration({ cwd: root, registry }).catch((e: unknown) => e);
+    const error = await loadConfiguration({ cwd: root, registry }).catch(
+      (e: unknown) => e,
+    );
     expect(error).toBeInstanceOf(ConfigError);
     expect((error as ConfigError).code).toBe("CONFIG_INVALID");
     expect((error as ConfigError).hint).toBeTruthy();
   });
 
   it("returns a zero-config default when no config is found", async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-noconfig-"));
+    const root = await mkdtemp(
+      path.join(os.tmpdir(), "wastech-mdlint-noconfig-"),
+    );
     tempDirs.push(root);
     const loaded = await loadConfiguration({ cwd: root, registry });
     expect(loaded.configPath).toBeUndefined();
@@ -149,7 +189,7 @@ describe("loadConfiguration", () => {
     const error = await loadConfiguration({
       cwd: process.cwd(),
       explicitConfigPath: "/nope/x.json",
-      registry
+      registry,
     }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ConfigError);
     expect((error as ConfigError).message).toMatch(/Config file not found/);
@@ -166,77 +206,119 @@ describe("compile config (P5.05)", () => {
         compile: {
           outdir: ".claude/skills/wastech-mdlint",
           skill: { name: "docs-skill", description: "Docs skill" },
-          sections: { architecture: true, rules: true, dependencies: false, workflow: true },
+          sections: {
+            architecture: true,
+            rules: true,
+            dependencies: false,
+            workflow: true,
+          },
           commandPreset: "claude",
-          hubMinInDegree: 5
-        }
-      })
+          hubMinInDegree: 5,
+        },
+      }),
     );
 
     const loaded = await loadConfiguration({ cwd: root, registry });
     expect(loaded.config.compile).toEqual({
       outdir: ".claude/skills/wastech-mdlint",
       skill: { name: "docs-skill", description: "Docs skill" },
-      sections: { architecture: true, rules: true, dependencies: false, workflow: true },
+      sections: {
+        architecture: true,
+        rules: true,
+        dependencies: false,
+        workflow: true,
+      },
       commandPreset: "claude",
-      hubMinInDegree: 5
+      hubMinInDegree: 5,
     });
   });
 
   it("rejects compile: {} for missing skill", async () => {
     const root = await writeConfig(JSON.stringify({ rules: [], compile: {} }));
-    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(/compile\.skill/);
+    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(
+      /compile\.skill/,
+    );
   });
 
   it("rejects an empty compile.skill.name", async () => {
     const root = await writeConfig(
-      JSON.stringify({ rules: [], compile: { skill: { name: "", description: "d" } } })
+      JSON.stringify({
+        rules: [],
+        compile: { skill: { name: "", description: "d" } },
+      }),
     );
-    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(/compile\.skill\.name/);
+    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(
+      /compile\.skill\.name/,
+    );
   });
 
   it("rejects an empty compile.skill.description", async () => {
     const root = await writeConfig(
-      JSON.stringify({ rules: [], compile: { skill: { name: "s", description: "" } } })
+      JSON.stringify({
+        rules: [],
+        compile: { skill: { name: "s", description: "" } },
+      }),
     );
-    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(/compile\.skill\.description/);
+    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(
+      /compile\.skill\.description/,
+    );
   });
 
-  it.each([0, -1, 1.5])("rejects a hubMinInDegree of %s", async (hubMinInDegree) => {
-    const root = await writeConfig(
-      JSON.stringify({ rules: [], compile: { skill: { name: "s", description: "d" }, hubMinInDegree } })
-    );
-    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(/compile\.hubMinInDegree/);
-  });
+  it.each([0, -1, 1.5])(
+    "rejects a hubMinInDegree of %s",
+    async (hubMinInDegree) => {
+      const root = await writeConfig(
+        JSON.stringify({
+          rules: [],
+          compile: { skill: { name: "s", description: "d" }, hubMinInDegree },
+        }),
+      );
+      await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(
+        /compile\.hubMinInDegree/,
+      );
+    },
+  );
 
   it("rejects an unknown compile.commandPreset value", async () => {
     const root = await writeConfig(
       JSON.stringify({
         rules: [],
-        compile: { skill: { name: "s", description: "d" }, commandPreset: "bogus-preset" }
-      })
+        compile: {
+          skill: { name: "s", description: "d" },
+          commandPreset: "bogus-preset",
+        },
+      }),
     );
-    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(/compile\.commandPreset/);
+    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(
+      /compile\.commandPreset/,
+    );
   });
 
   it("rejects a non-boolean compile.sections.rules", async () => {
     const root = await writeConfig(
       JSON.stringify({
         rules: [],
-        compile: { skill: { name: "s", description: "d" }, sections: { rules: "bogus" } }
-      })
+        compile: {
+          skill: { name: "s", description: "d" },
+          sections: { rules: "bogus" },
+        },
+      }),
     );
-    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(/compile\.sections\.rules/);
+    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(
+      /compile\.sections\.rules/,
+    );
   });
 
   it("rejects an unknown compile.* key (C7)", async () => {
     const root = await writeConfig(
       JSON.stringify({
         rules: [],
-        compile: { skill: { name: "s", description: "d" }, bogus: true }
-      })
+        compile: { skill: { name: "s", description: "d" }, bogus: true },
+      }),
     );
-    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(/config\.compile:.*"bogus"/);
+    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(
+      /config\.compile:.*"bogus"/,
+    );
   });
 });
 

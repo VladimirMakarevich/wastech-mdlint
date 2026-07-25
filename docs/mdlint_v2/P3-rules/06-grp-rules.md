@@ -21,11 +21,11 @@ change to this rule code (audit 2.2).
 
 ## Rules
 
-| ID | Scope | Severity | Checks | Key options |
-| --- | --- | --- | --- | --- |
-| GRP-001 | project | error | no circular references | `files?`, `exclude?`, `siteRouter?` |
-| GRP-002 | project | warning | every doc has ≥1 incoming ref (except entry points) | `files?`, `entryPoints?`, `siteRouter?` |
-| GRP-003 | project | warning | ID chain across stages (stage N IDs appear at N+1) | `chain[{stage,files,idColumn?,refColumn}]`, `idPattern?` |
+| ID      | Scope   | Severity | Checks                                              | Key options                                              |
+| ------- | ------- | -------- | --------------------------------------------------- | -------------------------------------------------------- |
+| GRP-001 | project | error    | no circular references                              | `files?`, `exclude?`, `siteRouter?`                      |
+| GRP-002 | project | warning  | every doc has ≥1 incoming ref (except entry points) | `files?`, `entryPoints?`, `siteRouter?`                  |
+| GRP-003 | project | warning  | ID chain across stages (stage N IDs appear at N+1)  | `chain[{stage,files,idColumn?,refColumn}]`, `idPattern?` |
 
 ## Deliverables / steps
 

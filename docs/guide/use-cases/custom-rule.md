@@ -16,10 +16,10 @@
       "target": "table",
       "options": {
         "files": ["docs/ownership/**/*.md"],
-        "assert": { "kind": "columnNotEmpty", "column": "Owner" }
-      }
-    }
-  ]
+        "assert": { "kind": "columnNotEmpty", "column": "Owner" },
+      },
+    },
+  ],
 }
 ```
 

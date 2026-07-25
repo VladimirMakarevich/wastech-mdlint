@@ -1,3 +1,4 @@
+import { compareStrings } from "../deterministic-sort.js";
 import type { ContextGraph } from "./context-graph-types.js";
 
 // P4.02 graph algorithms over the frozen `ContextGraph` read shape (G6): Kahn topo-sort with honest
@@ -5,10 +6,10 @@ import type { ContextGraph } from "./context-graph-types.js";
 // cycles themselves are already computed by P4.01's Tarjan pass and stored on `graph.cycles`; this
 // module consumes that data (that *is* the "reuse the existing Tarjan implementation" the task asks
 // for) rather than re-running SCC. Every returned array is sorted before it leaves a function, and
-// all ordering is `localeCompare` on repo-relative POSIX node paths — matching build-context-graph.ts
-// — so output is byte-stable across filesystems.
+// all ordering uses the shared host-independent string comparator on repo-relative POSIX node paths
+// — matching build-context-graph.ts — so output is byte-stable across filesystems.
 
-const byPath = (left: string, right: string): number => left.localeCompare(right);
+const byPath = compareStrings;
 
 // Deduped, reachability-oriented views of the edge list. `node.inDegree` and the raw edge list
 // retain edge multiplicity (P4.01 constraint: two `A→B` edges are two references), but the algorithms
@@ -124,7 +125,9 @@ export function getComponents(graph: ContextGraph): string[][] {
 
   // Seed BFS in sorted node path order so which node represents a component (and the discovery order)
   // is deterministic. Every node participates, so isolated files surface as singleton components.
-  for (const node of [...graph.nodes].sort((left, right) => byPath(left.path, right.path))) {
+  for (const node of [...graph.nodes].sort((left, right) =>
+    byPath(left.path, right.path),
+  )) {
     if (visited.has(node.path)) {
       continue;
     }
@@ -147,7 +150,9 @@ export function getComponents(graph: ContextGraph): string[][] {
 
   // Size descending, then by the component's smallest node path ascending — after the per-component
   // sort above that smallest path is `component[0]` (audit — P4 component-sort gap).
-  components.sort((left, right) => right.length - left.length || byPath(left[0]!, right[0]!));
+  components.sort(
+    (left, right) => right.length - left.length || byPath(left[0]!, right[0]!),
+  );
   return components;
 }
 
@@ -166,7 +171,8 @@ export function formatContextGraphSummary(graph: ContextGraph): string {
   const hubs = [...graph.nodes]
     .sort(
       (left, right) =>
-        right.inDegree + right.outDegree - (left.inDegree + left.outDegree) || byPath(left.path, right.path)
+        right.inDegree + right.outDegree - (left.inDegree + left.outDegree) ||
+        byPath(left.path, right.path),
     )
     .slice(0, TOP_HUB_LIMIT);
 
@@ -175,7 +181,7 @@ export function formatContextGraphSummary(graph: ContextGraph): string {
     `edges: ${graph.edges.length}`,
     `cycles: ${graph.cycles.length}`,
     `entry points (${entryPoints.length}): ${entryPoints.join(", ")}`,
-    "top hubs:"
+    "top hubs:",
   ];
   for (const hub of hubs) {
     lines.push(`  ${hub.path} (${hub.inDegree + hub.outDegree})`);

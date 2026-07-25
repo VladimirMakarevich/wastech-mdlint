@@ -41,12 +41,12 @@ Prove the server works at the wire level and ship its docs from a single source.
   that crosses a process boundary; `smoke.test.ts` and the six `handle*.test.ts` files stay as the
   in-memory/in-process layers this builds on. `process.execPath` (not the literal `"node"`) is used
   for cross-platform spawning without depending on PATH.
-- **New implicit precondition.** The wire suite requires `packages/mcp-server`'s *own* `dist` to be
+- **New implicit precondition.** The wire suite requires `packages/mcp-server`'s _own_ `dist` to be
   built (previously only `core`'s dist was needed before mcp-server tests). True under the
   documented order (`npm run typecheck` == `tsc -b`, which emits before `npm test`); called out in
   an inline comment so a "failed to spawn" surprise resolves fast.
 - **Generated tool inventory.** `src/tool-docs.ts` renders the README table by introspecting the
-  *live* registered tools (`createServer()` + `InMemoryTransport` + `listTools()`), never a
+  _live_ registered tools (`createServer()` + `InMemoryTransport` + `listTools()`), never a
   hand-maintained name list — closing the "5 vs 6" drift M3 targets. Registration order is
   preserved deliberately (groups by family; still deterministic from a fixed array), and cell text
   is `|`/newline-escaped against future descriptions. `scripts/generate-docs.mjs` imports it by
@@ -56,14 +56,14 @@ Prove the server works at the wire level and ship its docs from a single source.
   exposed that the five tools with an `outputSchema` could not deliver their `{ code, message, hint }`
   error as `structuredContent` unchanged: a spec-compliant host caches an output validator from
   `listTools()` and the SDK client validates any present `structuredContent` against that schema
-  *including on `isError` results*, so an error payload that didn't match the success schema made
-  `callTool` reject instead of return. (The SDK *server* skips this validation on error — which is
-  why the in-process `handle*.test.ts` never saw it — but a real stdio *client* does not.) The fix
+  _including on `isError` results_, so an error payload that didn't match the success schema made
+  `callTool` reject instead of return. (The SDK _server_ skips this validation on error — which is
+  why the in-process `handle*.test.ts` never saw it — but a real stdio _client_ does not.) The fix
   keeps the payload in `structuredContent` as the public machine result (per M1's "carry a code with
   structured output") without weakening the advertised success contract: `withErrorOutput` adds only
   the optional `code`/`message`/`hint` metadata to the existing success schema, and each error path
   supplies schema-compatible empty/default success fields alongside that metadata. A Zod union /
-  `oneOf` can't express this because the pinned SDK (1.29) only advertises *object* schemas and
+  `oneOf` can't express this because the pinned SDK (1.29) only advertises _object_ schemas and
   silently drops a union — verified — which would erase M1's structured output entirely. `compile-context`
   has no `outputSchema`, so it returns its structured error directly with no placeholder fields.
 

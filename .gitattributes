@@ -1,0 +1,5 @@
+# Force LF on checkout regardless of the client's core.autocrlf (Git for Windows defaults to
+# true), so `npm run format` (prettier --check, endOfLine: "lf") doesn't spuriously fail on the
+# windows-latest CI runner over a checkout-time line-ending conversion rather than real style
+# drift (P9.06).
+* text=auto eol=lf

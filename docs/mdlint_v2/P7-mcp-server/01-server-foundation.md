@@ -30,7 +30,7 @@ config/context helper, and the output/error/annotation conventions every tool fo
    via `findConfig` internally — then `loadContext({ cwd, config, settings })`. Map the tool inputs
    `cwd?` / `configPath?` onto core's `cwd` / `explicitConfigPath`. Used by all file-based tools.
 3. **Conventions:** register each tool with `server.registerTool(name, { inputSchema, outputSchema,
-   annotations }, cb)` — the deprecated `tool()` overloads in `@modelcontextprotocol/sdk` don't
+annotations }, cb)` — the deprecated `tool()` overloads in `@modelcontextprotocol/sdk` don't
    carry `outputSchema`. Follow a `structuredContent` + `outputSchema` pattern
    ([M1](../requirements/05-mcp-server.md)) plus a text summary; an error contract
    `{ code, message, hint }` with `isError: true` ([M6](../requirements/05-mcp-server.md));

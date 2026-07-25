@@ -30,12 +30,12 @@ invariants **without rebuilding or publishing** ([R9 Tier 1](../requirements/02-
      normalized to canonical uppercase (C3).
    - **No built-in prefix:** the first segment must **not** be a built-in prefix. The reserved
      set is **derived from the registry** (the prefixes of all built-in rule IDs, [P2.03](../P2-rule-engine/03-registry-metadata.md)),
-     so it never drifts and blocks collisions with current *and* future built-ins.
+     so it never drifts and blocks collisions with current _and_ future built-ins.
    - **Enforced twice:** the generated `schema.json` ([P2.06](../P2-rule-engine/06-schema-generation.md))
      bakes the current built-in prefixes into a negative-lookahead `pattern` (editor-time); the
      registry/loader runtime check is authoritative and emits a [C7](../requirements/01-configuration.md)
      diagnostic (e.g. `id "REF-100": "REF" is a reserved built-in prefix — use your own
-     namespace, e.g. "REQ-100"`). Validate the rest of the entry via the primitive's Zod schema.
+namespace, e.g. "REQ-100"`). Validate the rest of the entry via the primitive's Zod schema.
 3. Ensure the generic `custom` shape is part of the generated `schema.json`
    ([P2.06](../P2-rule-engine/06-schema-generation.md)) so editors validate it.
 4. Confirm `custom` rules run inside the MCP server (data-only, never code-plugins —

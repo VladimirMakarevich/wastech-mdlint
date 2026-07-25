@@ -9,7 +9,7 @@
 //   headings   → REF-002 anchor slugs, SEC-* ordering, anchor graph edges (P4), slice index (P4)
 //   sections   → cheap SEC-*/CTX-* section-existence checks
 //   tables     → TBL-* rules, REF-005/006 id tables, extractDefinedIds() (P4/REF-005), compile
-//   checkItems → CHK-001 / CTX-002 checklist rules
+//   checkItems → CTX-002 checklist rules
 //   links      → REF-001/002 link resolution, link/anchor graph edges (P4), G3 explainability
 //   images     → REF-003 image resolution, image graph edges (P4)
 //   imports    → D3 LLM eager-import budget (SIZE/LLM rules), import graph edges (P4)
@@ -21,7 +21,12 @@
 // config-light (`idPattern` is config, not a parse input) and avoiding duplicated table data.
 
 // Link classification mirrors the legacy parser so behavior is preserved across the cutover.
-export type ParsedLinkKind = "local-file" | "same-file-anchor" | "external" | "mailto" | "other";
+export type ParsedLinkKind =
+  | "local-file"
+  | "same-file-anchor"
+  | "external"
+  | "mailto"
+  | "other";
 
 export type ParsedHeading = {
   text: string;

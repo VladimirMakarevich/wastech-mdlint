@@ -14,18 +14,20 @@ function createMemoryWriter() {
       write(chunk: string) {
         text += chunk;
         return true;
-      }
+      },
     },
     read() {
       return text;
-    }
+    },
   };
 }
 
 const tempDirs: string[] = [];
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all(
+    tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
+  );
 });
 
 async function fixtureRepo(files: Record<string, string>): Promise<string> {
@@ -40,7 +42,11 @@ async function fixtureRepo(files: Record<string, string>): Promise<string> {
 async function run(argv: string[], cwd: string) {
   const stdout = createMemoryWriter();
   const stderr = createMemoryWriter();
-  const exitCode = await runCli(argv, { cwd, stdout: stdout.stream, stderr: stderr.stream });
+  const exitCode = await runCli(argv, {
+    cwd,
+    stdout: stdout.stream,
+    stderr: stderr.stream,
+  });
   return { exitCode, stdout: stdout.read(), stderr: stderr.read() };
 }
 
@@ -48,7 +54,9 @@ describe("command dispatch", () => {
   it("runs lint as the default command on the injected cwd (D4)", async () => {
     const cwd = await fixtureRepo({
       "a.md": "[broken](missing.md)\n",
-      "wastech-mdlint.config.json": JSON.stringify({ rules: [{ rule: "REF-001" }] })
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "REF-001" }],
+      }),
     });
 
     const result = await run([], cwd);
@@ -58,7 +66,9 @@ describe("command dispatch", () => {
   it("treats scan as a hidden alias of lint", async () => {
     const cwd = await fixtureRepo({
       "a.md": "[broken](missing.md)\n",
-      "wastech-mdlint.config.json": JSON.stringify({ rules: [{ rule: "REF-001" }] })
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "REF-001" }],
+      }),
     });
 
     const asLint = await run(["lint", cwd], cwd);
@@ -112,7 +122,9 @@ describe("graph command", () => {
       readingOrder: string[];
     };
     expect(payload.nodes.map((node) => node.path)).toEqual(["a.md", "b.md"]);
-    expect(payload.edges).toEqual([expect.objectContaining({ from: "a.md", to: "b.md" })]);
+    expect(payload.edges).toEqual([
+      expect.objectContaining({ from: "a.md", to: "b.md" }),
+    ]);
     expect(payload.components).toEqual([["a.md", "b.md"]]);
     expect(payload.readingOrder).toEqual(["a.md", "b.md"]);
   });
@@ -156,12 +168,22 @@ describe("graph command", () => {
 
 describe("slice command", () => {
   it("resolves a path query and lists files within --depth hops (json)", async () => {
-    const cwd = await fixtureRepo({ "a.md": "[b](b.md)\n", "b.md": "[c](c.md)\n", "c.md": "# C\n" });
+    const cwd = await fixtureRepo({
+      "a.md": "[b](b.md)\n",
+      "b.md": "[c](c.md)\n",
+      "c.md": "# C\n",
+    });
 
-    const result = await run(["slice", "a.md", "--depth", "1", "--format", "json"], cwd);
+    const result = await run(
+      ["slice", "a.md", "--depth", "1", "--format", "json"],
+      cwd,
+    );
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
 
-    const payload = JSON.parse(result.stdout) as { matchKind: string; files: string[] };
+    const payload = JSON.parse(result.stdout) as {
+      matchKind: string;
+      files: string[];
+    };
     expect(payload.matchKind).toBe("path");
     expect(payload.files).toEqual(["a.md", "b.md"]);
   });
@@ -179,10 +201,17 @@ describe("slice command", () => {
   it("returns an honest empty result for an unresolved query (exit 0)", async () => {
     const cwd = await fixtureRepo({ "a.md": "# A\n" });
 
-    const result = await run(["slice", "does-not-exist", "--format", "json"], cwd);
+    const result = await run(
+      ["slice", "does-not-exist", "--format", "json"],
+      cwd,
+    );
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
 
-    const payload = JSON.parse(result.stdout) as { matchKind: string | null; starts: string[]; files: string[] };
+    const payload = JSON.parse(result.stdout) as {
+      matchKind: string | null;
+      starts: string[];
+      files: string[];
+    };
     expect(payload).toMatchObject({ matchKind: null, starts: [], files: [] });
   });
 
@@ -192,7 +221,9 @@ describe("slice command", () => {
     const result = await run(["slice", "--help"], cwd);
     // Commander word-wraps the description, so compare against whitespace-collapsed text rather
     // than risking a false negative on wherever the wrap happens to fall.
-    expect(result.stdout.replace(/\s+/g, " ")).toContain("no fuzzy, substring, keyword, or LLM matching");
+    expect(result.stdout.replace(/\s+/g, " ")).toContain(
+      "no fuzzy, substring, keyword, or LLM matching",
+    );
   });
 
   it("rejects a non-integer --depth as a usage error (exit 2)", async () => {
@@ -209,7 +240,9 @@ describe("impact command", () => {
       "a.md": "# A\n",
       "b.md": "[a](a.md)\n[broken](missing.md)\n",
       "c.md": "[broken](missing2.md)\n",
-      "wastech-mdlint.config.json": JSON.stringify({ rules: [{ rule: "REF-001" }] })
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "REF-001" }],
+      }),
     });
 
     const result = await run(["impact", "a.md", "--format", "json"], cwd);
@@ -221,10 +254,20 @@ describe("impact command", () => {
       transitivelyAffected: unknown[];
       readingOrder: string[];
       excluded: string[];
-      lint: { files: string[]; messages: { filePath: string; ruleId: string }[] };
+      lint: {
+        files: string[];
+        messages: { filePath: string; ruleId: string }[];
+      };
     };
     expect(Object.keys(payload).sort()).toEqual(
-      ["changedFile", "directlyAffected", "transitivelyAffected", "readingOrder", "excluded", "lint"].sort()
+      [
+        "changedFile",
+        "directlyAffected",
+        "transitivelyAffected",
+        "readingOrder",
+        "excluded",
+        "lint",
+      ].sort(),
     );
     expect(payload.changedFile).toBe("a.md");
     expect(payload.directlyAffected).toEqual([{ path: "b.md", references: 1 }]);
@@ -234,16 +277,21 @@ describe("impact command", () => {
     expect(payload.excluded).toEqual([]);
     // The corpus-wide lint also flags c.md's broken link, but c.md is outside the affected subgraph.
     expect(payload.lint.files).toEqual(["a.md", "b.md"]);
-    expect(payload.lint.messages.some((message) => message.filePath === "c.md")).toBe(false);
     expect(
-      payload.lint.messages.some((message) => message.filePath === "b.md" && message.ruleId === "REF-001")
+      payload.lint.messages.some((message) => message.filePath === "c.md"),
+    ).toBe(false);
+    expect(
+      payload.lint.messages.some(
+        (message) =>
+          message.filePath === "b.md" && message.ruleId === "REF-001",
+      ),
     ).toBe(true);
   });
 
   it("renders a human summary followed by the scoped lint report", async () => {
     const cwd = await fixtureRepo({
       "a.md": "# A\n",
-      "b.md": "[a](a.md)\n"
+      "b.md": "[a](a.md)\n",
     });
 
     const result = await run(["impact", "a.md"], cwd);
@@ -264,11 +312,14 @@ describe("impact command", () => {
 
 describe("compile command", () => {
   const compileConfig = JSON.stringify({
-    compile: { skill: { name: "docs-skill", description: "Docs skill" } }
+    compile: { skill: { name: "docs-skill", description: "Docs skill" } },
   });
 
   it("writes SKILL.md to the default .claude/skills/wastech-mdlint/ outdir", async () => {
-    const cwd = await fixtureRepo({ "a.md": "# A\n", "wastech-mdlint.config.json": compileConfig });
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": compileConfig,
+    });
 
     const result = await run(["compile", "--cwd", cwd], cwd);
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
@@ -286,22 +337,40 @@ describe("compile command", () => {
     // The process running this test has its own cwd (the repo root), which differs from the
     // fixture directory — exactly the scenario that broke a naive `path.resolve(command.config)`
     // inside loadConfiguration, since that resolves against the real process cwd, not `--cwd`.
-    const cwd = await fixtureRepo({ "a.md": "# A\n", "custom.config.json": compileConfig });
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "custom.config.json": compileConfig,
+    });
 
-    const result = await run(["compile", "--cwd", cwd, "--config", "custom.config.json"], cwd);
+    const result = await run(
+      ["compile", "--cwd", cwd, "--config", "custom.config.json"],
+      cwd,
+    );
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
 
-    const written = await readFile(path.join(cwd, ".claude/skills/wastech-mdlint/SKILL.md"), "utf8");
+    const written = await readFile(
+      path.join(cwd, ".claude/skills/wastech-mdlint/SKILL.md"),
+      "utf8",
+    );
     expect(written).toContain('name: "docs-skill"');
   });
 
   it("writes SKILL.md to a custom --outdir", async () => {
-    const cwd = await fixtureRepo({ "a.md": "# A\n", "wastech-mdlint.config.json": compileConfig });
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": compileConfig,
+    });
 
-    const result = await run(["compile", "--cwd", cwd, "--outdir", "generated-skill"], cwd);
+    const result = await run(
+      ["compile", "--cwd", cwd, "--outdir", "generated-skill"],
+      cwd,
+    );
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
 
-    const written = await readFile(path.join(cwd, "generated-skill/SKILL.md"), "utf8");
+    const written = await readFile(
+      path.join(cwd, "generated-skill/SKILL.md"),
+      "utf8",
+    );
     expect(written).toContain('name: "docs-skill"');
   });
 
@@ -309,29 +378,46 @@ describe("compile command", () => {
     const cwd = await fixtureRepo({
       "a.md": "# A\n",
       "wastech-mdlint.config.json": JSON.stringify({
-        compile: { outdir: "configured-outdir", skill: { name: "docs-skill", description: "Docs skill" } }
-      })
+        compile: {
+          outdir: "configured-outdir",
+          skill: { name: "docs-skill", description: "Docs skill" },
+        },
+      }),
     });
 
     const result = await run(["compile", "--cwd", cwd], cwd);
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
 
-    const written = await readFile(path.join(cwd, "configured-outdir/SKILL.md"), "utf8");
+    const written = await readFile(
+      path.join(cwd, "configured-outdir/SKILL.md"),
+      "utf8",
+    );
     expect(written).toContain('name: "docs-skill"');
   });
 
   it("--dry-run prints content and does not create the file", async () => {
-    const cwd = await fixtureRepo({ "a.md": "# A\n", "wastech-mdlint.config.json": compileConfig });
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": compileConfig,
+    });
 
     const result = await run(["compile", "--cwd", cwd, "--dry-run"], cwd);
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
     expect(result.stdout).toContain('name: "docs-skill"');
 
-    await expect(readFile(path.join(cwd, ".claude/skills/wastech-mdlint/SKILL.md"), "utf8")).rejects.toThrow();
+    await expect(
+      readFile(
+        path.join(cwd, ".claude/skills/wastech-mdlint/SKILL.md"),
+        "utf8",
+      ),
+    ).rejects.toThrow();
   });
 
   it("--dry-run is deterministic: two runs produce byte-identical stdout", async () => {
-    const cwd = await fixtureRepo({ "a.md": "# A\n", "wastech-mdlint.config.json": compileConfig });
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": compileConfig,
+    });
 
     const first = await run(["compile", "--cwd", cwd, "--dry-run"], cwd);
     const second = await run(["compile", "--cwd", cwd, "--dry-run"], cwd);

@@ -22,12 +22,21 @@ import {
   renderContextGraphText,
   renderContextSliceSummary,
   renderImpactSummary,
-  summarizeContextGraph
+  summarizeContextGraph,
 } from "@wastech-mdlint/core";
-import type { CompileResult, ImpactClassification, LintMessage, LintResult } from "@wastech-mdlint/core";
+import type {
+  CompileResult,
+  ImpactClassification,
+  LintMessage,
+  LintResult,
+} from "@wastech-mdlint/core";
 
 import { createInquirerPrompter } from "./init-prompter.js";
-import { runInitCommand, type ExistingConfigAction, type InitPrompter } from "./init-command.js";
+import {
+  runInitCommand,
+  type ExistingConfigAction,
+  type InitPrompter,
+} from "./init-command.js";
 
 // Resolution order (P5.05): an explicit `--outdir` wins, then `config.compile.outdir`, then this
 // fallback — matching the locked example path in docs/mdlint_v2/requirements/01-configuration.md.
@@ -123,7 +132,10 @@ export class CliUsageError extends Error {
 
 // Exit codes (roadmap §8): 0 pass / 1 findings at the fail-on threshold / 2 operational (thrown as
 // ConfigError etc. and mapped in program.ts).
-export function resolveLintExitCode(params: { failOn: FailOn; result: LintResult }): number {
+export function resolveLintExitCode(params: {
+  failOn: FailOn;
+  result: LintResult;
+}): number {
   if (params.failOn === "off") {
     return EXIT_CODE_SUCCESS;
   }
@@ -134,11 +146,18 @@ export function resolveLintExitCode(params: { failOn: FailOn; result: LintResult
       : EXIT_CODE_SUCCESS;
   }
 
-  return params.result.errorCount > 0 ? EXIT_CODE_RUNTIME_ERROR : EXIT_CODE_SUCCESS;
+  return params.result.errorCount > 0
+    ? EXIT_CODE_RUNTIME_ERROR
+    : EXIT_CODE_SUCCESS;
 }
 
-async function handleLint(command: LintCommand): Promise<CommandExecutionResult> {
-  const loaded = await loadConfiguration({ cwd: command.path, explicitConfigPath: command.config });
+async function handleLint(
+  command: LintCommand,
+): Promise<CommandExecutionResult> {
+  const loaded = await loadConfiguration({
+    cwd: command.path,
+    explicitConfigPath: command.config,
+  });
 
   // ESLint-style --fix (audit 4.2): apply deterministic fixes in place, then re-lint the result.
   if (command.fix) {
@@ -146,7 +165,7 @@ async function handleLint(command: LintCommand): Promise<CommandExecutionResult>
       cwd: command.path,
       config: loaded.config,
       rules: loaded.rules,
-      settings: loaded.settings
+      settings: loaded.settings,
     });
   }
 
@@ -154,22 +173,32 @@ async function handleLint(command: LintCommand): Promise<CommandExecutionResult>
     cwd: command.path,
     config: loaded.config,
     rules: loaded.rules,
-    settings: loaded.settings
+    settings: loaded.settings,
   });
   const output =
-    command.format === "json" ? formatLintResultJson(result) : formatLintResultText(result);
+    command.format === "json"
+      ? formatLintResultJson(result)
+      : formatLintResultText(result);
 
-  return { output, exitCode: resolveLintExitCode({ failOn: command.failOn, result }) };
+  return {
+    output,
+    exitCode: resolveLintExitCode({ failOn: command.failOn, result }),
+  };
 }
 
 // `graph`/`slice`/`impact` (P4.07) are thin hosts over the P4 core graph modules: this file only
 // picks a format and shapes stdout, all traversal/analysis/rendering lives in `@wastech-mdlint/core`.
-async function handleGraph(command: GraphCommand): Promise<CommandExecutionResult> {
-  const loaded = await loadConfiguration({ cwd: command.path, explicitConfigPath: command.config });
+async function handleGraph(
+  command: GraphCommand,
+): Promise<CommandExecutionResult> {
+  const loaded = await loadConfiguration({
+    cwd: command.path,
+    explicitConfigPath: command.config,
+  });
   const { documents, graph } = await loadContext({
     cwd: command.path,
     config: loaded.config,
-    settings: loaded.settings
+    settings: loaded.settings,
   });
 
   // The G5 coverage signal is shared by the JSON and human formats (audit B): JSON consumers (CI,
@@ -178,39 +207,61 @@ async function handleGraph(command: GraphCommand): Promise<CommandExecutionResul
   const coverage = () =>
     computeGraphCoverage(documents, graph, {
       rootDir: path.resolve(command.path),
-      siteRouter: loaded.settings.siteRouter
+      siteRouter: loaded.settings.siteRouter,
     });
 
   if (command.format === "json") {
     return {
       output: `${JSON.stringify(summarizeContextGraph(graph, coverage()), null, 2)}\n`,
-      exitCode: EXIT_CODE_SUCCESS
+      exitCode: EXIT_CODE_SUCCESS,
     };
   }
   if (command.format === "mermaid") {
-    return { output: `${renderContextGraphMermaid(graph)}\n`, exitCode: EXIT_CODE_SUCCESS };
+    return {
+      output: `${renderContextGraphMermaid(graph)}\n`,
+      exitCode: EXIT_CODE_SUCCESS,
+    };
   }
   if (command.format === "dot") {
-    return { output: `${renderContextGraphDot(graph)}\n`, exitCode: EXIT_CODE_SUCCESS };
+    return {
+      output: `${renderContextGraphDot(graph)}\n`,
+      exitCode: EXIT_CODE_SUCCESS,
+    };
   }
 
-  return { output: `${renderContextGraphText(graph, coverage())}\n`, exitCode: EXIT_CODE_SUCCESS };
+  return {
+    output: `${renderContextGraphText(graph, coverage())}\n`,
+    exitCode: EXIT_CODE_SUCCESS,
+  };
 }
 
-async function handleSlice(command: SliceCommand): Promise<CommandExecutionResult> {
-  const loaded = await loadConfiguration({ cwd: command.path, explicitConfigPath: command.config });
+async function handleSlice(
+  command: SliceCommand,
+): Promise<CommandExecutionResult> {
+  const loaded = await loadConfiguration({
+    cwd: command.path,
+    explicitConfigPath: command.config,
+  });
   const { documents, graph } = await loadContext({
     cwd: command.path,
     config: loaded.config,
-    settings: loaded.settings
+    settings: loaded.settings,
   });
 
   // An unresolved query is a legitimate answer (G4 honesty), not a usage error — `getContextSlice`
   // already returns an empty result rather than throwing, so this command always exits 0.
-  const result = getContextSlice(graph, documents, command.query, command.depth, loaded.settings.idRef);
+  const result = getContextSlice(
+    graph,
+    documents,
+    command.query,
+    command.depth,
+    loaded.settings.idRef,
+  );
 
   const output =
-    command.format === "json" ? `${JSON.stringify(result, null, 2)}\n` : `${renderContextSliceSummary(result)}\n`;
+    command.format === "json"
+      ? `${JSON.stringify(result, null, 2)}\n`
+      : `${renderContextSliceSummary(result)}\n`;
 
   return { output, exitCode: EXIT_CODE_SUCCESS };
 }
@@ -218,20 +269,36 @@ async function handleSlice(command: SliceCommand): Promise<CommandExecutionResul
 // Filters a full-corpus `LintResult` down to the affected-file set. This is host-side presentation,
 // not a re-implemented lint pipeline: `impact` must still lint against the *full* graph so GRP rules
 // (cycle/orphan detection) see the whole corpus, and only the reported messages/files are narrowed.
-function filterLintResult(result: LintResult, affectedFiles: ReadonlySet<string>): LintResult {
-  const messages: LintMessage[] = result.messages.filter((message) => affectedFiles.has(message.filePath));
+function filterLintResult(
+  result: LintResult,
+  affectedFiles: ReadonlySet<string>,
+): LintResult {
+  const messages: LintMessage[] = result.messages.filter((message) =>
+    affectedFiles.has(message.filePath),
+  );
   const files = result.files.filter((file) => affectedFiles.has(file));
   return {
     messages,
     files,
-    errorCount: messages.filter((message) => message.severity === "error").length,
-    warningCount: messages.filter((message) => message.severity === "warning").length
+    errorCount: messages.filter((message) => message.severity === "error")
+      .length,
+    warningCount: messages.filter((message) => message.severity === "warning")
+      .length,
   };
 }
 
-async function handleImpact(command: ImpactCommand): Promise<CommandExecutionResult> {
-  const loaded = await loadConfiguration({ cwd: command.path, explicitConfigPath: command.config });
-  const { graph } = await loadContext({ cwd: command.path, config: loaded.config, settings: loaded.settings });
+async function handleImpact(
+  command: ImpactCommand,
+): Promise<CommandExecutionResult> {
+  const loaded = await loadConfiguration({
+    cwd: command.path,
+    explicitConfigPath: command.config,
+  });
+  const { graph } = await loadContext({
+    cwd: command.path,
+    config: loaded.config,
+    settings: loaded.settings,
+  });
 
   let classification: ImpactClassification;
   try {
@@ -248,7 +315,7 @@ async function handleImpact(command: ImpactCommand): Promise<CommandExecutionRes
   const affectedFiles = new Set<string>([
     classification.file,
     ...classification.directlyAffected.map((entry) => entry.path),
-    ...classification.transitivelyAffected.map((entry) => entry.path)
+    ...classification.transitivelyAffected.map((entry) => entry.path),
   ]);
 
   // Inject the graph already built above so lintFiles doesn't rebuild it a second time, and GRP
@@ -258,7 +325,7 @@ async function handleImpact(command: ImpactCommand): Promise<CommandExecutionRes
     config: loaded.config,
     rules: loaded.rules,
     settings: loaded.settings,
-    graph
+    graph,
   });
   const lint = filterLintResult(fullLintResult, affectedFiles);
 
@@ -271,16 +338,21 @@ async function handleImpact(command: ImpactCommand): Promise<CommandExecutionRes
       // Parity with the human render (audit C): without `excluded`, a JSON consumer sees a
       // readingOrder shorter than the affected set with no signal that a cycle dropped those nodes.
       excluded: classification.excluded,
-      lint
+      lint,
     };
-    return { output: `${JSON.stringify(payload, null, 2)}\n`, exitCode: EXIT_CODE_SUCCESS };
+    return {
+      output: `${JSON.stringify(payload, null, 2)}\n`,
+      exitCode: EXIT_CODE_SUCCESS,
+    };
   }
 
   const output = `${renderImpactSummary(classification)}\n\n${formatLintResultText(lint)}`;
   return { output, exitCode: EXIT_CODE_SUCCESS };
 }
 
-async function handleSchema(command: SchemaCommand): Promise<CommandExecutionResult> {
+async function handleSchema(
+  command: SchemaCommand,
+): Promise<CommandExecutionResult> {
   const outputPath = path.resolve(command.out);
   const outputStats = await stat(outputPath).catch((error: unknown) => {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") {
@@ -290,25 +362,37 @@ async function handleSchema(command: SchemaCommand): Promise<CommandExecutionRes
   });
 
   if (outputStats?.isDirectory()) {
-    throw new CliUsageError(`Cannot write schema output to directory path: ${command.out}`);
+    throw new CliUsageError(
+      `Cannot write schema output to directory path: ${command.out}`,
+    );
   }
 
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, generateConfigSchema(), "utf8");
 
-  return { output: `schema written to ${command.out}\n`, exitCode: EXIT_CODE_SUCCESS };
+  return {
+    output: `schema written to ${command.out}\n`,
+    exitCode: EXIT_CODE_SUCCESS,
+  };
 }
 
 // `compile` (P5.05): core owns generation (`compileContext`); this handler only resolves `outdir`
 // and does the file I/O, matching the core-hosts-the-pipeline decision.
-async function handleCompile(command: CompileCommand): Promise<CommandExecutionResult> {
+async function handleCompile(
+  command: CompileCommand,
+): Promise<CommandExecutionResult> {
   // `compile` is the one command with a named `--cwd` instead of a `[path]` argument that defaults
   // to the CLI's own injected cwd, so a relative `--config` must be resolved against `command.cwd`
   // explicitly — `loadConfiguration` resolves `explicitConfigPath` against `process.cwd()`, which
   // silently diverges from `command.cwd` when the two differ.
   const explicitConfigPath =
-    command.config === undefined ? undefined : path.resolve(command.cwd, command.config);
-  const loaded = await loadConfiguration({ cwd: command.cwd, explicitConfigPath });
+    command.config === undefined
+      ? undefined
+      : path.resolve(command.cwd, command.config);
+  const loaded = await loadConfiguration({
+    cwd: command.cwd,
+    explicitConfigPath,
+  });
 
   let result: CompileResult;
   try {
@@ -326,7 +410,8 @@ async function handleCompile(command: CompileCommand): Promise<CommandExecutionR
     return { output: result.skillContent, exitCode: EXIT_CODE_SUCCESS };
   }
 
-  const outdirSetting = command.outdir ?? loaded.config.compile?.outdir ?? DEFAULT_COMPILE_OUTDIR;
+  const outdirSetting =
+    command.outdir ?? loaded.config.compile?.outdir ?? DEFAULT_COMPILE_OUTDIR;
   const resolvedOutdir = path.resolve(command.cwd, outdirSetting);
   const outputPath = path.join(resolvedOutdir, "SKILL.md");
 
@@ -335,29 +420,37 @@ async function handleCompile(command: CompileCommand): Promise<CommandExecutionR
 
   // Repository-relative POSIX path in user-visible output (invariant), not an absolute,
   // platform-native one — normalize `\` to `/` so this reads identically on Windows.
-  const relativeOutputPath = normalizeRelativePath(path.relative(command.cwd, outputPath));
-  return { output: `SKILL.md written to ${relativeOutputPath}\n`, exitCode: EXIT_CODE_SUCCESS };
+  const relativeOutputPath = normalizeRelativePath(
+    path.relative(command.cwd, outputPath),
+  );
+  return {
+    output: `SKILL.md written to ${relativeOutputPath}\n`,
+    exitCode: EXIT_CODE_SUCCESS,
+  };
 }
 
 // `init` (P6.04): core generates the config bytes; `runInitCommand` performs the writes. The result
 // output is always informational (draft/write/abort summary), so this handler always exits 0.
-async function handleInit(command: InitCommand, prompter: InitPrompter): Promise<CommandExecutionResult> {
+async function handleInit(
+  command: InitCommand,
+  prompter: InitPrompter,
+): Promise<CommandExecutionResult> {
   const { output } = await runInitCommand(
     {
       cwd: command.cwd,
       yes: command.yes,
       onExisting: command.onExisting,
       isTty: command.isTty,
-      withCiWorkflow: command.withCiWorkflow
+      withCiWorkflow: command.withCiWorkflow,
     },
-    prompter
+    prompter,
   );
   return { output, exitCode: EXIT_CODE_SUCCESS };
 }
 
 export async function executeCommand(
   command: CliCommand,
-  deps?: { prompter?: InitPrompter }
+  deps?: { prompter?: InitPrompter },
 ): Promise<CommandExecutionResult> {
   switch (command.kind) {
     case "lint":

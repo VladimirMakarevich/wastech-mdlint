@@ -8,22 +8,42 @@ and IDs carry forward across pipeline stages. Also make ID references participat
 ```jsonc
 {
   "settings": {
-    "idRef": { "idPattern": "REQ-\\d+", "definitions": ["docs/requirements/**/*.md"], "idColumn": "ID" }
+    "idRef": {
+      "idPattern": "REQ-\\d+",
+      "definitions": ["docs/requirements/**/*.md"],
+      "idColumn": "ID",
+    },
   },
   "rules": [
-    { "rule": "REF-005", "options": {
-      "definitions": ["docs/requirements/**/*.md"],
-      "references": ["docs/design/**/*.md"],
-      "idColumn": "ID",
-      "idPattern": "REQ-\\d+"
-    } },
-    { "rule": "GRP-003", "options": {
-      "chain": [
-        { "stage": "requirements", "files": ["docs/requirements/**/*.md"], "idColumn": "ID", "refColumn": "ID" },
-        { "stage": "design",       "files": ["docs/design/**/*.md"],       "idColumn": "ID", "refColumn": "Requirement" }
-      ]
-    } }
-  ]
+    {
+      "rule": "REF-005",
+      "options": {
+        "definitions": ["docs/requirements/**/*.md"],
+        "references": ["docs/design/**/*.md"],
+        "idColumn": "ID",
+        "idPattern": "REQ-\\d+",
+      },
+    },
+    {
+      "rule": "GRP-003",
+      "options": {
+        "chain": [
+          {
+            "stage": "requirements",
+            "files": ["docs/requirements/**/*.md"],
+            "idColumn": "ID",
+            "refColumn": "ID",
+          },
+          {
+            "stage": "design",
+            "files": ["docs/design/**/*.md"],
+            "idColumn": "ID",
+            "refColumn": "Requirement",
+          },
+        ],
+      },
+    },
+  ],
 }
 ```
 

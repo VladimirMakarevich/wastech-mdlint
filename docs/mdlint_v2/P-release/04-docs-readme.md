@@ -20,7 +20,7 @@ repo's sources of truth at v2.
    The **MCP** install channel already landed in [P7.05](../P7-mcp-server/05-integration-tests-docs.md)
    (`## MCP server` section: `npx @wastech-mdlint/mcp-server` + host-config snippet). The remaining
    gap is the **skills** channel (`gh skill install VladimirMakarevich/wastech-mdlint <skill> --pin
-   vX.Y.Z`, [I7](../requirements/06-installation.md)); refresh quick-start / commands / config.
+vX.Y.Z`, [I7](../requirements/06-installation.md)); refresh quick-start / commands / config.
 2. The rule table is **already generated** by `generateRuleDocs` (`generate:docs` script) and
    sync-checked by `packages/core/test/docs-sync.test.ts` — keep that. The **MCP tool inventory is
    also already generated** (P7.05: `generateToolInventory` in `packages/mcp-server/src/tool-docs.ts`,

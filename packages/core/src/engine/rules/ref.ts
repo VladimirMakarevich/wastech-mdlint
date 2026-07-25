@@ -2,10 +2,21 @@ import path from "node:path";
 
 import { z } from "zod";
 
-import { matchesConfigGlob, normalizeRelativePath } from "../../discovery/globs.js";
+import {
+  matchesConfigGlob,
+  normalizeRelativePath,
+} from "../../discovery/globs.js";
 import type { ParsedDocument } from "../../markdown/document-types.js";
-import { extractColumnIds, extractDefinedIds, type IdOccurrence } from "../defined-ids.js";
-import { filePart, resolveRelativeToSource, sourceLocale } from "../path-resolve.js";
+import {
+  extractColumnIds,
+  extractDefinedIds,
+  type IdOccurrence,
+} from "../defined-ids.js";
+import {
+  filePart,
+  resolveRelativeToSource,
+  sourceLocale,
+} from "../path-resolve.js";
 import { imageResolves, linkResolves } from "../primitives/reference.js";
 import { regexStringSchema } from "../regex.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
@@ -21,7 +32,7 @@ const siteRouterOptionSchema = z
   .object({
     preset: z.string().optional(),
     contentDir: z.string().optional(),
-    defaultLocale: z.string().optional()
+    defaultLocale: z.string().optional(),
   })
   .strict();
 
@@ -33,20 +44,27 @@ export const ref001: RuleDefinition = defineRule({
     description: "Relative links resolve to a file.",
     defaultSeverity: "error",
     scope: "document",
-    fixable: false
+    fixable: false,
   },
   optionsSchema: z
-    .object({ exclude: z.array(z.string()).optional(), siteRouter: siteRouterOptionSchema.optional() })
+    .object({
+      exclude: z.array(z.string()).optional(),
+      siteRouter: siteRouterOptionSchema.optional(),
+    })
     .strict(),
   check: (options) => (context) => {
     for (const finding of linkResolves(
       context.document!,
-      { documents: context.documents!, rootDir: context.rootDir!, settings: context.settings },
-      { exclude: options.exclude, siteRouter: options.siteRouter }
+      {
+        documents: context.documents!,
+        rootDir: context.rootDir!,
+        settings: context.settings,
+      },
+      { exclude: options.exclude, siteRouter: options.siteRouter },
     )) {
       context.report({ ...finding, helpUri: "REF-001" });
     }
-  }
+  },
 });
 
 // Resolve a link target to a corpus document (relative → source dir; root-relative → site router).
@@ -54,10 +72,14 @@ function resolveTargetDoc(
   sourcePath: string,
   target: string,
   context: RuleContext,
-  router?: SiteRouterSettings
+  router?: SiteRouterSettings,
 ): ParsedDocument | undefined {
   if (target.startsWith("/") && router !== undefined) {
-    for (const candidate of resolveRoutedUrl(target, router, sourceLocale(sourcePath, router))) {
+    for (const candidate of resolveRoutedUrl(
+      target,
+      router,
+      sourceLocale(sourcePath, router),
+    )) {
       const found = context.documents!.get(normalizeRelativePath(candidate));
       if (found !== undefined) {
         return found;
@@ -81,9 +103,14 @@ export const ref002: RuleDefinition = defineRule({
     description: "Link anchors match a heading slug.",
     defaultSeverity: "error",
     scope: "document",
-    fixable: false
+    fixable: false,
   },
-  optionsSchema: z.object({ siteRouter: siteRouterOptionSchema.optional(), ...fileScopeShape }).strict(),
+  optionsSchema: z
+    .object({
+      siteRouter: siteRouterOptionSchema.optional(),
+      ...fileScopeShape,
+    })
+    .strict(),
   check: (options) => (context) => {
     if (!matchesFileScope(context.filePath!, options)) {
       return;
@@ -100,7 +127,12 @@ export const ref002: RuleDefinition = defineRule({
       if (link.kind === "same-file-anchor") {
         target = document;
       } else if (link.kind === "local-file") {
-        target = resolveTargetDoc(document.path, filePart(link.rawTarget), context, router);
+        target = resolveTargetDoc(
+          document.path,
+          filePart(link.rawTarget),
+          context,
+          router,
+        );
         if (target === undefined) {
           continue;
         }
@@ -114,11 +146,11 @@ export const ref002: RuleDefinition = defineRule({
           line: link.line,
           column: link.column,
           data: { anchor: link.anchor, targetPath: target.path },
-          helpUri: "REF-002"
+          helpUri: "REF-002",
         });
       }
     }
-  }
+  },
 });
 
 // REF-003 — images resolve on disk.
@@ -129,18 +161,22 @@ export const ref003: RuleDefinition = defineRule({
     description: "Image targets resolve to a file.",
     defaultSeverity: "error",
     scope: "document",
-    fixable: false
+    fixable: false,
   },
   optionsSchema: z.object({ exclude: z.array(z.string()).optional() }).strict(),
   check: (options) => (context) => {
     for (const finding of imageResolves(
       context.document!,
-      { documents: context.documents!, rootDir: context.rootDir!, settings: context.settings },
-      { exclude: options.exclude }
+      {
+        documents: context.documents!,
+        rootDir: context.rootDir!,
+        settings: context.settings,
+      },
+      { exclude: options.exclude },
     )) {
       context.report({ ...finding, helpUri: "REF-003" });
     }
-  }
+  },
 });
 
 // The zone a path belongs to: the first directory segment under `zonesDir` (a file must live at
@@ -161,12 +197,18 @@ export const ref004: RuleDefinition = defineRule({
   metadata: {
     id: "REF-004",
     category: "REF",
-    description: "Cross-zone links are declared in the zone's Dependencies section.",
+    description:
+      "Cross-zone links are declared in the zone's Dependencies section.",
     defaultSeverity: "error",
     scope: "document",
-    fixable: false
+    fixable: false,
   },
-  optionsSchema: z.object({ zonesDir: z.string().min(1), dependencySection: z.string().optional() }).strict(),
+  optionsSchema: z
+    .object({
+      zonesDir: z.string().min(1),
+      dependencySection: z.string().optional(),
+    })
+    .strict(),
   check: (options) => (context) => {
     const document = context.document!;
     const sourceZone = zoneOf(document.path, options.zonesDir);
@@ -196,7 +238,9 @@ export const ref004: RuleDefinition = defineRule({
         }
         const body = extractSectionBody(other.content, other.headings, heading);
         for (const zone of allZones) {
-          if (new RegExp(`(^|[^A-Za-z0-9_-])${zone}([^A-Za-z0-9_-]|$)`).test(body)) {
+          if (
+            new RegExp(`(^|[^A-Za-z0-9_-])${zone}([^A-Za-z0-9_-]|$)`).test(body)
+          ) {
             declared.add(zone);
           }
         }
@@ -207,9 +251,16 @@ export const ref004: RuleDefinition = defineRule({
       if (link.kind !== "local-file") {
         continue;
       }
-      const targetRel = resolveRelativeToSource(document.path, filePart(link.rawTarget));
+      const targetRel = resolveRelativeToSource(
+        document.path,
+        filePart(link.rawTarget),
+      );
       const targetZone = zoneOf(targetRel, options.zonesDir);
-      if (targetZone === undefined || targetZone === sourceZone || declared.has(targetZone)) {
+      if (
+        targetZone === undefined ||
+        targetZone === sourceZone ||
+        declared.has(targetZone)
+      ) {
         continue;
       }
       context.report({
@@ -217,10 +268,10 @@ export const ref004: RuleDefinition = defineRule({
         line: link.line,
         column: link.column,
         data: { fromZone: sourceZone, toZone: targetZone },
-        helpUri: "REF-004"
+        helpUri: "REF-004",
       });
     }
-  }
+  },
 });
 
 // REF-005 — ID traceability: every referenced ID has a definition (dangling ref = error) and every
@@ -234,14 +285,14 @@ export const ref005: RuleDefinition = defineRule({
     description: "IDs are traceable between definitions and references.",
     defaultSeverity: "error",
     scope: "project",
-    fixable: false
+    fixable: false,
   },
   optionsSchema: z
     .object({
       definitions: z.array(z.string()).min(1),
       references: z.array(z.string()).min(1),
       idColumn: z.string().min(1),
-      idPattern: regexStringSchema
+      idPattern: regexStringSchema,
     })
     .strict(),
   check: (options) => (context) => {
@@ -252,7 +303,7 @@ export const ref005: RuleDefinition = defineRule({
       for (const occurrence of extractDefinedIds(document, {
         idPattern: options.idPattern,
         definitions: options.definitions,
-        idColumn: options.idColumn
+        idColumn: options.idColumn,
       })) {
         if (!definitions.has(occurrence.id)) {
           definitions.set(occurrence.id, occurrence);
@@ -262,8 +313,8 @@ export const ref005: RuleDefinition = defineRule({
         ...extractColumnIds(document, {
           files: options.references,
           column: options.idColumn,
-          idPattern: options.idPattern
-        })
+          idPattern: options.idPattern,
+        }),
       );
     }
 
@@ -278,7 +329,7 @@ export const ref005: RuleDefinition = defineRule({
           filePath: reference.filePath,
           severity: "error",
           data: { id: reference.id },
-          helpUri: "REF-005"
+          helpUri: "REF-005",
         });
       }
     }
@@ -292,11 +343,11 @@ export const ref005: RuleDefinition = defineRule({
           filePath: occurrence.filePath,
           severity: "warning",
           data: { id },
-          helpUri: "REF-005"
+          helpUri: "REF-005",
         });
       }
     }
-  }
+  },
 });
 
 // REF-006 — stability consistency: a row must not depend on a less-stable entity. Reference rows
@@ -309,7 +360,7 @@ export const ref006: RuleDefinition = defineRule({
     description: "References do not depend on less-stable entities.",
     defaultSeverity: "warning",
     scope: "project",
-    fixable: false
+    fixable: false,
   },
   optionsSchema: z
     .object({
@@ -318,12 +369,14 @@ export const ref006: RuleDefinition = defineRule({
       definitions: z.array(z.string()).min(1),
       references: z.array(z.string()).min(1),
       idColumn: z.string().min(1),
-      idPattern: regexStringSchema.optional()
+      idPattern: regexStringSchema.optional(),
     })
     .strict(),
   check: (options) => (context) => {
     // stabilityOrder lists least → most stable; rank is the index.
-    const rank = new Map(options.stabilityOrder.map((value, index) => [value, index]));
+    const rank = new Map(
+      options.stabilityOrder.map((value, index) => [value, index]),
+    );
     const idPattern = options.idPattern ?? "^.+$";
     const definitionStability = new Map<string, string>();
 
@@ -333,7 +386,10 @@ export const ref006: RuleDefinition = defineRule({
         continue;
       }
       for (const table of document.tables) {
-        if (!table.headers.includes(options.idColumn) || !table.headers.includes(options.stabilityColumn)) {
+        if (
+          !table.headers.includes(options.idColumn) ||
+          !table.headers.includes(options.stabilityColumn)
+        ) {
           continue;
         }
         for (const row of table.rows) {
@@ -354,11 +410,16 @@ export const ref006: RuleDefinition = defineRule({
         continue;
       }
       for (const table of document.tables) {
-        if (!table.headers.includes(options.idColumn) || !table.headers.includes(options.stabilityColumn)) {
+        if (
+          !table.headers.includes(options.idColumn) ||
+          !table.headers.includes(options.stabilityColumn)
+        ) {
           continue;
         }
         for (const row of table.rows) {
-          const referencerStability = (row.cells[options.stabilityColumn] ?? "").trim();
+          const referencerStability = (
+            row.cells[options.stabilityColumn] ?? ""
+          ).trim();
           const referencerRank = rank.get(referencerStability);
           if (referencerRank === undefined) {
             continue;
@@ -369,21 +430,38 @@ export const ref006: RuleDefinition = defineRule({
 
           for (const referencedId of referencedIds) {
             const referencedStability = definitionStability.get(referencedId);
-            const referencedRank = referencedStability === undefined ? undefined : rank.get(referencedStability);
-            if (referencedRank !== undefined && referencedRank < referencerRank) {
+            const referencedRank =
+              referencedStability === undefined
+                ? undefined
+                : rank.get(referencedStability);
+            if (
+              referencedRank !== undefined &&
+              referencedRank < referencerRank
+            ) {
               context.report({
                 message: `Depends on "${referencedId}" (stability "${referencedStability}") which is less stable than this entry (stability "${referencerStability}").`,
                 line: row.line,
                 filePath: document.path,
-                data: { referencedId, referencedStability, referencerStability },
-                helpUri: "REF-006"
+                data: {
+                  referencedId,
+                  referencedStability,
+                  referencerStability,
+                },
+                helpUri: "REF-006",
               });
             }
           }
         }
       }
     }
-  }
+  },
 });
 
-export const REF_RULES: readonly RuleDefinition[] = [ref001, ref002, ref003, ref004, ref005, ref006];
+export const REF_RULES: readonly RuleDefinition[] = [
+  ref001,
+  ref002,
+  ref003,
+  ref004,
+  ref005,
+  ref006,
+];

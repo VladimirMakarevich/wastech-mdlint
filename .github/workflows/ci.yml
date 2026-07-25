@@ -12,8 +12,18 @@ permissions:
 jobs:
   verify:
     # Workspace-wide gate on the pinned Node 24 LTS line (.node-version). tsc -b, vitest, and
-    # eslint all fan out across packages/{core,cli,mcp-server} through the root scripts.
-    runs-on: ubuntu-latest
+    # eslint all fan out across packages/{core,cli,mcp-server} through the root scripts; prettier
+    # --check runs once over the whole tree (M-6 / P9.06) so style drift fails fast alongside them.
+    # Keep the OS matrix scoped here so path/newline/glob behavior is covered on every runtime
+    # host without multiplying the package-shaped tarball checks below.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -25,6 +35,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
+      - run: npm run format
       - run: npm test
       - run: npm run build
 

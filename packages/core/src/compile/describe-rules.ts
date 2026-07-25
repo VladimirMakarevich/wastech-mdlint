@@ -1,3 +1,4 @@
+import { compareStrings } from "../deterministic-sort.js";
 import type {
   CustomRuleConfigEntry,
   RuleConfigEntry,
@@ -207,7 +208,7 @@ export function describeRules(
       (left, right) =>
         CATEGORY_DETAILS[left.category].order -
           CATEGORY_DETAILS[right.category].order ||
-        left.id.localeCompare(right.id) ||
+        compareStrings(left.id, right.id) ||
         left.index - right.index,
     );
 

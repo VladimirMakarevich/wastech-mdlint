@@ -1,10 +1,17 @@
-import type { ParsedDocument, ParsedTable } from "../../markdown/document-types.js";
+import { compareStrings } from "../../deterministic-sort.js";
+import type {
+  ParsedDocument,
+  ParsedTable,
+} from "../../markdown/document-types.js";
 import { compileRegex } from "../regex.js";
 import type { PrimitiveContext, PrimitiveFinding } from "./types.js";
 
 // Table-scoping shared by every table primitive: restrict to tables under a given section (audit
 // 5.3 flat ownership), or all tables when `section` is omitted.
-function tablesInScope(document: ParsedDocument, section?: string): ParsedTable[] {
+function tablesInScope(
+  document: ParsedDocument,
+  section?: string,
+): ParsedTable[] {
   if (section === undefined) {
     return document.tables;
   }
@@ -21,7 +28,7 @@ export type RequiredColumnsOptions = { columns: string[]; section?: string };
 // requiredColumns — every scoped table must declare each required column (TBL-001).
 export function requiredColumns(
   document: ParsedDocument,
-  options: RequiredColumnsOptions
+  options: RequiredColumnsOptions,
 ): PrimitiveFinding[] {
   const findings: PrimitiveFinding[] = [];
 
@@ -31,7 +38,7 @@ export function requiredColumns(
         findings.push({
           message: `Table is missing required column "${column}".`,
           line: table.line,
-          data: { column }
+          data: { column },
         });
       }
     }
@@ -47,7 +54,7 @@ export type ColumnNotEmptyOptions = { columns?: string[]; section?: string };
 // TBL-002 fix hook (empty → TODO, P3) can act; custom rules ignore the flag (no fix hook).
 export function columnNotEmpty(
   document: ParsedDocument,
-  options: ColumnNotEmptyOptions
+  options: ColumnNotEmptyOptions,
 ): PrimitiveFinding[] {
   const findings: PrimitiveFinding[] = [];
 
@@ -65,7 +72,7 @@ export function columnNotEmpty(
             message: `Cell in column "${column}" is empty.`,
             line: row.line,
             fixable: true,
-            data: { column }
+            data: { column },
           });
         }
       }
@@ -85,11 +92,12 @@ export type ColumnInSetOptions = {
 // columnInSet — cell values must be one of an allowed set (TBL-003).
 export function columnInSet(
   document: ParsedDocument,
-  options: ColumnInSetOptions
+  options: ColumnInSetOptions,
 ): PrimitiveFinding[] {
   const findings: PrimitiveFinding[] = [];
   const caseSensitive = options.caseSensitive ?? true;
-  const normalize = (value: string): string => (caseSensitive ? value : value.toLowerCase());
+  const normalize = (value: string): string =>
+    caseSensitive ? value : value.toLowerCase();
   const allowed = new Set(options.values.map(normalize));
 
   for (const table of tablesInScope(document, options.section)) {
@@ -104,7 +112,7 @@ export function columnInSet(
         findings.push({
           message: `Cell value "${value}" in column "${options.column}" is not one of the allowed values: ${options.values.join(", ")}.`,
           line: row.line,
-          data: { column: options.column, value, allowed: options.values }
+          data: { column: options.column, value, allowed: options.values },
         });
       }
     }
@@ -123,7 +131,7 @@ export type ColumnMatchesOptions = {
 // columnMatches — cell values must match a regex (TBL-004).
 export function columnMatches(
   document: ParsedDocument,
-  options: ColumnMatchesOptions
+  options: ColumnMatchesOptions,
 ): PrimitiveFinding[] {
   const findings: PrimitiveFinding[] = [];
   const regex = compileRegex(options.pattern, options.flags);
@@ -140,7 +148,7 @@ export function columnMatches(
         findings.push({
           message: `Cell value "${value}" in column "${options.column}" does not match ${options.pattern}.`,
           line: row.line,
-          data: { column: options.column, value, pattern: options.pattern }
+          data: { column: options.column, value, pattern: options.pattern },
         });
       }
     }
@@ -168,7 +176,10 @@ function evaluateCondition(value: string, condition: ColumnCondition): boolean {
   if (condition.equals !== undefined && trimmed !== condition.equals) {
     return false;
   }
-  if (condition.matches !== undefined && !compileRegex(condition.matches).test(trimmed)) {
+  if (
+    condition.matches !== undefined &&
+    !compileRegex(condition.matches).test(trimmed)
+  ) {
     return false;
   }
   if (condition.notEmpty === true && trimmed.length === 0) {
@@ -182,12 +193,15 @@ function evaluateCondition(value: string, condition: ColumnCondition): boolean {
 // its condition (TBL-005). Rows missing either column are skipped (nothing to assert against).
 export function crossColumn(
   document: ParsedDocument,
-  options: CrossColumnOptions
+  options: CrossColumnOptions,
 ): PrimitiveFinding[] {
   const findings: PrimitiveFinding[] = [];
 
   for (const table of tablesInScope(document, options.section)) {
-    if (!tableHasColumn(table, options.when.column) || !tableHasColumn(table, options.then.column)) {
+    if (
+      !tableHasColumn(table, options.when.column) ||
+      !tableHasColumn(table, options.then.column)
+    ) {
       continue;
     }
 
@@ -208,8 +222,8 @@ export function crossColumn(
             whenColumn: options.when.column,
             whenValue: whenValue.trim(),
             thenColumn: options.then.column,
-            thenValue: thenValue.trim()
-          }
+            thenValue: thenValue.trim(),
+          },
         });
       }
     }
@@ -235,15 +249,18 @@ type UniqueOccurrence = { filePath: string; line: number };
 export function columnUnique(
   context: Pick<PrimitiveContext, "documents">,
   options: ColumnUniqueOptions,
-  fileMatches: (filePath: string) => boolean
+  fileMatches: (filePath: string) => boolean,
 ): PrimitiveFinding[] {
   const findings: PrimitiveFinding[] = [];
   const seen = new Map<string, UniqueOccurrence>();
-  const idRegex = options.idPattern === undefined ? undefined : compileRegex(options.idPattern);
+  const idRegex =
+    options.idPattern === undefined
+      ? undefined
+      : compileRegex(options.idPattern);
 
   // Deterministic corpus order: sort documents by repo-relative path before scanning.
   const documents = [...context.documents.values()].sort((left, right) =>
-    left.path.localeCompare(right.path)
+    compareStrings(left.path, right.path),
   );
 
   for (const document of documents) {
@@ -259,7 +276,10 @@ export function columnUnique(
       for (const row of table.rows) {
         const value = (row.cells[options.column] ?? "").trim();
 
-        if (value.length === 0 || (idRegex !== undefined && !idRegex.test(value))) {
+        if (
+          value.length === 0 ||
+          (idRegex !== undefined && !idRegex.test(value))
+        ) {
           continue;
         }
 
@@ -274,7 +294,12 @@ export function columnUnique(
           message: `Duplicate value "${value}" in column "${options.column}" (first seen in ${previous.filePath}:${previous.line}).`,
           line: row.line,
           filePath: document.path,
-          data: { column: options.column, value, firstSeenIn: previous.filePath, firstSeenLine: previous.line }
+          data: {
+            column: options.column,
+            value,
+            firstSeenIn: previous.filePath,
+            firstSeenLine: previous.line,
+          },
         });
       }
     }

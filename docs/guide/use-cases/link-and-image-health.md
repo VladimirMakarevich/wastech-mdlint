@@ -9,10 +9,10 @@
   "include": ["**/*.md"],
   "exclude": ["node_modules/**", "CHANGELOG.md"],
   "rules": [
-    { "rule": "REF-001" },   // relative links resolve
-    { "rule": "REF-002" },   // #anchors match a real heading slug
-    { "rule": "REF-003" }    // images resolve
-  ]
+    { "rule": "REF-001" }, // relative links resolve
+    { "rule": "REF-002" }, // #anchors match a real heading slug
+    { "rule": "REF-003" }, // images resolve
+  ],
 }
 ```
 
