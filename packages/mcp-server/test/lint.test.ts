@@ -1,5 +1,9 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
 import type { LintMessage } from "@wastech-mdlint/core";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { handleLint } from "../src/tools/lint.js";
 
@@ -11,6 +15,14 @@ function structured(
 ): Record<string, unknown> {
   return result.structuredContent as Record<string, unknown>;
 }
+
+const tempDirs: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(
+    tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
+  );
+});
 
 describe("handleLint", () => {
   it("returns structured findings and a text summary for a firing rule", () => {
@@ -146,6 +158,35 @@ describe("handleLint", () => {
     expect(
       messages.every((message) => !/was not found/.test(message.message)),
     ).toBe(true);
+  });
+
+  it("rejects an absolute SEC-003 template path — closes the MCP host-read attack surface (audit H-2)", async () => {
+    // The `lint` tool takes its whole `rules` array from the caller and hard-codes
+    // `rootDir: process.cwd()`; an absolute `template` must be rejected before any read, not just
+    // reported as "not found" — otherwise a prompt-injected caller turns this read-only tool into a
+    // host file-read primitive.
+    const outsideRoot = await mkdtemp(
+      path.join(os.tmpdir(), "wastech-mdlint-mcp-sec-"),
+    );
+    tempDirs.push(outsideRoot);
+    const secretPath = path.join(outsideRoot, "secret.md");
+    await writeFile(secretPath, "# Secret\n## TopSecretSection\n", "utf8");
+
+    const result = handleLint({
+      content: "# Title\n\n## Overview\n",
+      rules: [{ rule: "SEC-003", options: { template: secretPath } }],
+    });
+
+    expect(result.isError).toBeFalsy();
+    const messages = structured(result).messages as LintMessage[];
+    expect(
+      messages.some((message) =>
+        /escapes the analyzed root/.test(message.message),
+      ),
+    ).toBe(true);
+    expect(
+      messages.some((message) => message.message.includes("TopSecretSection")),
+    ).toBe(false);
   });
 
   it("resolves an existing on-disk REF-001 target via core's standard disk fallback", () => {

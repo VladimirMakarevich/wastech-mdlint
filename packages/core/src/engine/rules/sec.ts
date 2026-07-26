@@ -6,6 +6,7 @@ import { z } from "zod";
 import { matchesConfigGlob } from "../../discovery/globs.js";
 import type { ParsedDocument } from "../../markdown/document-types.js";
 import { parseDocument } from "../../markdown/parse-document.js";
+import { resolvesOutsideRoot } from "../path-resolve.js";
 import { sectionOrder, sectionPresent } from "../primitives/section.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
@@ -133,9 +134,27 @@ export const sec003: RuleDefinition = defineRule({
     })
     .strict(),
   check: (options) => (context) => {
+    const rootDir = context.rootDir!;
+
+    if (resolvesOutsideRoot(rootDir, options.template)) {
+      // Reject before any existsSync/readFileSync attempt: trying the read first and
+      // special-casing the failure would still leak a file-existence oracle for arbitrary host
+      // paths (audit H-2's third repro).
+      context.report({
+        message: `SEC-003 template "${options.template}" escapes the analyzed root; skipping conformance checks.`,
+        line: 0,
+        // filePath/data intentionally carry the raw (possibly absolute/Windows-separated) config
+        // value, same as the "was not found" branch below: this finding is attributed to the
+        // option itself, not a location inside the corpus, so it is not normalized.
+        filePath: options.template,
+        data: { template: options.template },
+      });
+      return;
+    }
+
     const template = loadTemplate(
       context.documents!,
-      context.rootDir!,
+      rootDir,
       options.template,
     );
 

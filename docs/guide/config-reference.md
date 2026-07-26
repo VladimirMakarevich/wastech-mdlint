@@ -135,7 +135,9 @@ generated schema (`wastech-mdlint schema`).
     {
       "rule": "SEC-003",
       "options": {
-        "template": "docs/_templates/adr.md", // required: template file
+        // required: template file — repo-relative only; an absolute or `..`-escaping
+        // path is rejected unread so a config cannot read outside the analyzed root
+        "template": "docs/_templates/adr.md",
         "level": 2, // heading level to compare (optional)
       },
     },
