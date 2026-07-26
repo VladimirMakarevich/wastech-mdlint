@@ -172,6 +172,13 @@ placeholders plus `DRAFT`/`???` (same check as `CTX-001`, as a warning).
   `severity` on the entry to override to `warning` or `off`.
 - **Not fixable.** `custom` rules report findings only; none of the assertion kinds emit an
   autofix.
+- **A malformed `custom` entry is a config error, never a crash.** `rule: "custom"` is treated as a
+  commitment: an entry that sets it but omits `id` or `options.assert` fails config validation with
+  a `CONFIG_INVALID` diagnostic naming the offending entry (e.g. `config.rules.0`), rather than
+  being accepted as an ordinary rule entry named "custom". Forgetting `id` is the likeliest typo
+  here, so it is worth the strictness — the entry can never silently degrade into something else.
+  The diagnostic reports the whole entry's shape, not just the first missing field, because both
+  `id` and `options.assert` are needed before the rule can be resolved at all.
 
 ## See also
 

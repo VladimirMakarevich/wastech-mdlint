@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { ConfigError } from "../src/config/config-error.js";
 import { loadConfiguration } from "../src/config/load-config.js";
 import { lintFiles } from "../src/engine/lint-files.js";
 
@@ -164,5 +165,72 @@ describe("declarative custom rule", () => {
     await expect(loadConfiguration({ cwd })).rejects.toThrow(
       /target "heading" does not match assert kind "sectionPresent" \(expected "section"\)/,
     );
+  });
+
+  // Audit M-3: {"rule":"custom"} without `id` used to fall through the permissive standard
+  // ruleEntrySchema and crash in resolveCustomRule's canonicalizeRuleId(undefined). These three
+  // shapes must now surface as a structured CONFIG_INVALID, not a TypeError.
+  it("rejects a custom entry missing id, options, and severity (C7, not a crash)", async () => {
+    const cwd = await repo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "custom" }],
+      }),
+    });
+
+    const error = await loadConfiguration({ cwd }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ConfigError);
+    expect((error as ConfigError).code).toBe("CONFIG_INVALID");
+    expect((error as ConfigError).message).toMatch(/config\.rules\.0/);
+    expect((error as ConfigError).message).toMatch(
+      /"id" and "options\.assert"/,
+    );
+  });
+
+  it("rejects a custom entry with options but no id (C7, not a crash)", async () => {
+    const cwd = await repo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [
+          {
+            rule: "custom",
+            options: { assert: { kind: "allChecked" } },
+          },
+        ],
+      }),
+    });
+
+    const error = await loadConfiguration({ cwd }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ConfigError);
+    expect((error as ConfigError).code).toBe("CONFIG_INVALID");
+    expect((error as ConfigError).message).toMatch(/config\.rules\.0/);
+  });
+
+  it("rejects a custom entry with severity but no id (C7, not a crash)", async () => {
+    const cwd = await repo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "custom", severity: "warning" }],
+      }),
+    });
+
+    const error = await loadConfiguration({ cwd }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ConfigError);
+    expect((error as ConfigError).code).toBe("CONFIG_INVALID");
+    expect((error as ConfigError).message).toMatch(/config\.rules\.0/);
+  });
+
+  it("rejects a custom entry with id but no options (still CONFIG_INVALID, not a new behavior)", async () => {
+    const cwd = await repo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "custom", id: "REQ-1" }],
+      }),
+    });
+
+    const error = await loadConfiguration({ cwd }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ConfigError);
+    expect((error as ConfigError).code).toBe("CONFIG_INVALID");
+    expect((error as ConfigError).message).toMatch(/config\.rules\.0/);
   });
 });
