@@ -120,10 +120,15 @@ wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-
   rule IDs, optional per-rule rationale comments, and an `exclude` list of the build/vendor
   directories the scan skips so lint never re-scans them). When custom rules are present it also
   generates a project-local `schema.json` and points `$schema` at it; no remote URL is ever
-  emitted. `--on-existing merge` is additive/existing-wins — it keeps every existing rule and
-  appends only new ones; a merge whose existing config is unreadable or would not load (unknown
-  key, unknown rule, invalid options) aborts the write rather than risk an invalid or lossy
-  result. `--yes` skips every prompt (for CI) and defaults `--on-existing`
+  emitted. `init` never replaces an existing `schema.json` — that filename is common enough (and
+  is `wastech-mdlint schema`'s own default output) that a hand-written one could otherwise be
+  silently destroyed — so the write summary instead reports whether the file already matches what
+  `init` would generate or differs from it. Regenerating a differing one means removing or
+  renaming it and re-running `init` with `--on-existing merge`. `--on-existing merge` is
+  additive/existing-wins — it keeps every
+  existing rule and appends only new ones; a merge whose existing config is unreadable or would
+  not load (unknown key, unknown rule, invalid options) aborts the write rather than risk an
+  invalid or lossy result. `--yes` skips every prompt (for CI) and defaults `--on-existing`
   to `skip` when omitted; interactive mode always prompts, and pressing Enter without choosing
   lands on that same safe default rather than the first listed option. `--with-ci-workflow`
   (under `--yes` only) also drops a `.github/workflows/wastech-mdlint.yml`; interactive runs

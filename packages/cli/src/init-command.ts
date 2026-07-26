@@ -535,6 +535,67 @@ async function offerCiWorkflow(params: {
 }
 
 /**
+ * Outcome of the project-local `schema.json` write, decided by `resolveSchemaWriteOutcome` before
+ * any filesystem write happens. `path` is a repository-relative POSIX path.
+ */
+export type SchemaWriteOutcome =
+  | { kind: "written"; path: string }
+  | { kind: "unchanged"; path: string }
+  | { kind: "kept"; path: string }
+  | { kind: "overwritten"; path: string };
+
+/**
+ * Guards the project-local `schema.json` write with the same `--on-existing` signal that already
+ * governs the config write (H-4: this write previously had no guard at all, unlike the sibling
+ * CI-workflow write). Byte-compares an existing file against the freshly generated text first:
+ * identical bytes mean there is nothing to preserve, so a repeat `init` run reports "unchanged"
+ * (no write) instead of the "kept" warning — that warning is reserved for a real divergence worth
+ * flagging. Only once the bytes actually differ does `"overwrite"` bypass the guard; `"merge"` and
+ * `"none"` both leave a differing file untouched. Pure so the decision itself — not just its
+ * string rendering — is directly testable.
+ */
+export function resolveSchemaWriteOutcome(params: {
+  existingConfigAction: ExistingConfigAction | "none";
+  existingSchemaText: string | undefined;
+  generatedSchemaText: string;
+}): { shouldWrite: boolean; kind: SchemaWriteOutcome["kind"] } {
+  const { existingConfigAction, existingSchemaText, generatedSchemaText } =
+    params;
+  if (existingSchemaText === undefined) {
+    return { shouldWrite: true, kind: "written" };
+  }
+  if (existingSchemaText === generatedSchemaText) {
+    return { shouldWrite: false, kind: "unchanged" };
+  }
+  if (existingConfigAction === "overwrite") {
+    return { shouldWrite: true, kind: "overwritten" };
+  }
+  return { shouldWrite: false, kind: "kept" };
+}
+
+function formatSchemaWriteLine(schema: SchemaWriteOutcome): string {
+  switch (schema.kind) {
+    case "written":
+      return `Wrote project-local schema ${schema.path} (custom rules present).`;
+    case "unchanged":
+      return `Project-local schema ${schema.path} is already up to date (custom rules present).`;
+    case "kept":
+      return (
+        `Kept existing schema.json at ${schema.path} (custom rules present) — its contents ` +
+        "differ from what init would generate, and the config's $schema still points at it, " +
+        "so it may not validate the current rules until they match. Remove or rename it and " +
+        "re-run init with --on-existing merge to regenerate it."
+      );
+    case "overwritten":
+      return `Overwrote schema.json at ${schema.path} (custom rules present), per --on-existing overwrite.`;
+    default: {
+      const exhaustiveCheck: never = schema;
+      return exhaustiveCheck;
+    }
+  }
+}
+
+/**
  * Deterministic write-outcome summary: how the config was written (fresh/merge), rule counts, which
  * `$schema` it points at, and where the config / project schema / CI workflow landed. Every path is
  * a repository-relative POSIX path (so a subdirectory run reports `docs/wastech-mdlint.config.json`,
@@ -544,10 +605,10 @@ export function formatWriteSummary(params: {
   action: InitConfigAction;
   result: GeneratedInitConfig;
   configPath: string;
-  schemaPath?: string;
+  schema?: SchemaWriteOutcome;
   ciWorkflowPath?: string;
 }): string {
-  const { action, result, configPath, schemaPath, ciWorkflowPath } = params;
+  const { action, result, configPath, schema, ciWorkflowPath } = params;
   const lines: string[] = [];
 
   if (action === "merge") {
@@ -559,10 +620,8 @@ export function formatWriteSummary(params: {
   }
 
   lines.push(`Schema: ${result.schemaRef}`);
-  if (schemaPath !== undefined) {
-    lines.push(
-      `Wrote project-local schema ${schemaPath} (custom rules present).`,
-    );
+  if (schema !== undefined) {
+    lines.push(formatSchemaWriteLine(schema));
   }
   if (ciWorkflowPath !== undefined) {
     lines.push(`Wrote CI workflow ${ciWorkflowPath}.`);
@@ -781,11 +840,25 @@ export async function runInitCommand(
   });
 
   await writeFile(configPath, result.configText, "utf8");
-  let schemaRelativePath: string | undefined;
+  let schemaOutcome: SchemaWriteOutcome | undefined;
   if (result.projectSchema !== undefined) {
     const schemaPath = path.join(cwd, result.projectSchema.fileName);
-    await writeFile(schemaPath, result.projectSchema.text, "utf8");
-    schemaRelativePath = toRepoRelative(schemaPath);
+    const schemaRelativePath = toRepoRelative(schemaPath);
+    // A full read (not just fileExists) so an identical repeat run can report "unchanged" rather
+    // than the "kept" warning — any read failure (missing file, permission error) degrades to
+    // undefined, the same "treat it as absent" behavior fileExists uses elsewhere in this file.
+    const existingSchemaText = await readFile(schemaPath, "utf8").catch(
+      () => undefined,
+    );
+    const decision = resolveSchemaWriteOutcome({
+      existingConfigAction,
+      existingSchemaText,
+      generatedSchemaText: result.projectSchema.text,
+    });
+    if (decision.shouldWrite) {
+      await writeFile(schemaPath, result.projectSchema.text, "utf8");
+    }
+    schemaOutcome = { kind: decision.kind, path: schemaRelativePath };
   }
 
   const ciWorkflowRelativePath = await offerCiWorkflow({
@@ -802,7 +875,7 @@ export async function runInitCommand(
         action,
         result,
         configPath: toRepoRelative(configPath),
-        schemaPath: schemaRelativePath,
+        schema: schemaOutcome,
         ciWorkflowPath: ciWorkflowRelativePath,
       }),
     ),
