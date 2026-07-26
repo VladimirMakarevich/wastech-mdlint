@@ -105,6 +105,9 @@ export type InitCommand = {
   onExisting?: ExistingConfigAction;
   isTty: boolean;
   withCiWorkflow?: boolean;
+  // Whether the CLI's `[path]` argument was actually typed (vs. omitted and defaulted to cwd) —
+  // see `InitCommandOptions.pathWasExplicit` for why this must be known this far down (H-3, P11.04).
+  pathWasExplicit: boolean;
 };
 
 export type CliCommand =
@@ -442,6 +445,7 @@ async function handleInit(
       onExisting: command.onExisting,
       isTty: command.isTty,
       withCiWorkflow: command.withCiWorkflow,
+      pathWasExplicit: command.pathWasExplicit,
     },
     prompter,
   );

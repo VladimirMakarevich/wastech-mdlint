@@ -279,7 +279,11 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
     .description(
       "Scan the repo, infer a rule set, and write a wastech-mdlint.config.json.",
     )
-    .argument("[path]", "directory to scan", cwd)
+    // Deliberately no default value here (unlike `lint`/`graph`'s identical-looking `[path]`
+    // arguments): the action callback below must be able to tell "omitted" (`undefined`) apart
+    // from "typed, and happens to equal cwd" — an explicit target must not be silently re-rooted
+    // onto an ancestor's config (H-3, P11.04).
+    .argument("[path]", "directory to scan")
     .addOption(
       new Option("-y, --yes", "accept the inferred draft without prompts"),
     )
@@ -297,7 +301,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
     )
     .action(
       async (
-        targetPath: string,
+        targetPath: string | undefined,
         options: {
           yes?: boolean;
           onExisting?: ExistingConfigAction;
@@ -321,10 +325,11 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
           );
         }
 
-        // `targetPath` may be a relative argument like "." or "docs"; resolve it against this run's
-        // own `cwd` (the injected `io.cwd`, when set) rather than letting `findConfig`/
-        // `scanRepository` fall back to the real `process.cwd()` inside core.
-        const resolvedCwd = path.resolve(cwd, targetPath);
+        // `targetPath` may be a relative argument like "." or "docs", or omitted entirely; resolve
+        // it against this run's own `cwd` (the injected `io.cwd`, when set) rather than letting
+        // `findConfig`/`scanRepository` fall back to the real `process.cwd()` inside core.
+        const pathWasExplicit = targetPath !== undefined;
+        const resolvedCwd = path.resolve(cwd, targetPath ?? ".");
 
         // Construct the real prompter here (not inside commands.ts) so its `confirmDraft` writes
         // through this run's own `stdout` seam instead of the real `process.stdout` — the same
@@ -337,6 +342,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
             onExisting: options.onExisting,
             isTty,
             withCiWorkflow: options.withCiWorkflow,
+            pathWasExplicit,
           },
           { prompter: io.initPrompter ?? createInquirerPrompter(stdout) },
         );

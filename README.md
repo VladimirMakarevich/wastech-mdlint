@@ -135,9 +135,13 @@ wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-
   offer it with a default of no. That workflow always installs and runs the CLI via npm
   (`npm install --no-save` + `npx`), regardless of the bun/pnpm/yarn/npm package manager `init`
   detects and reports — it only fetches the external CLI tool, never the repo's own dependencies,
-  so it never needs that repo's lockfile. If `[path]` is below a repo's existing config, `init`
-  works from the config's own directory instead. Without `--yes`, `init` requires an interactive
-  terminal. Ctrl+C during any prompt exits `0`.
+  so it never needs that repo's lockfile. Existing-config discovery never walks above the user's
+  home directory. When `[path]` is omitted, a config found at an ancestor directory governs the
+  whole run and `init` works from that config's own directory instead, reporting its path relative
+  to the original working directory (e.g. `../../wastech-mdlint.config.json`); when `[path]` is
+  given explicitly, only a config found exactly at that directory counts, so an ancestor's config
+  is left untouched. Without `--yes`, `init` requires an interactive terminal. Ctrl+C during any
+  prompt exits `0`.
 
 ## MCP server
 

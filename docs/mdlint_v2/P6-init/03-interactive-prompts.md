@@ -45,12 +45,16 @@ config before writing.
   run returns `""`. `confirmDraft` is the one place the draft is shown interactively (it writes the
   summary, then prompts), so echoing it again from the return value would print it twice — the
   asymmetry is deliberate, not an oversight.
-- When `[path]` resolves to a subdirectory of a repo whose config lives at an ancestor directory,
-  the whole flow — scan, inference, existing-rule diffing, and the config path in the printed
-  summary — re-roots to that config's own directory rather than the originally-passed path. Without
-  this, the preview would show a `../`-relative config path, miss a lockfile that only exists at
-  the real root, and infer include globs/rule scopes relative to the wrong directory even though
-  the config being overwritten/merged governs the whole repo.
+- When `[path]` is **not given explicitly** (a bare/default invocation) and resolves to a
+  subdirectory of a repo whose config lives at an ancestor directory, the whole flow — scan,
+  inference, existing-rule diffing, and the config path in the printed summary — re-roots to that
+  config's own directory rather than the originally-passed path. Without this, the preview would
+  show a `../`-relative config path, miss a lockfile that only exists at the real root, and infer
+  include globs/rule scopes relative to the wrong directory even though the config being
+  overwritten/merged governs the whole repo. **P11.04** narrows this: when `[path]` **is** given
+  explicitly, only a config found exactly at that directory counts as existing, so an explicit
+  target is never silently re-rooted onto an ancestor's config — see
+  [P11.04](../P11-remediation/04-findconfig-boundary.md).
 - Every interactive prompt's own default (what pressing Enter without choosing resolves to) mirrors
   the matching `--yes` default: `resolveExistingConfigAction` defaults to
   `DEFAULT_EXISTING_CONFIG_ACTION` (`"skip"`, the same constant `--yes`'s fallback uses), and

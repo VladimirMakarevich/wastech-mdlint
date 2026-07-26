@@ -139,6 +139,15 @@ Scans the repo for doc clusters, infers a rule set with rationale, and — on co
   tool, never the repo's own dependencies, so it never needs the repo's lockfile — and
   `actions/setup-node` provides npm on every runner, so a per-manager branch would add setup for
   no functional gain.
+- Existing-config discovery walks up from the target directory looking for
+  `wastech-mdlint.config.json`, stopping at the user's home directory (never above it) so an
+  unrelated ancestor config can't be mistaken for the project's own. **When `[path]` is omitted**
+  (the bare/default invocation), a config found at an ancestor governs the whole run — scan,
+  inference, and the write all re-root to that config's own directory, and the existing-config
+  prompt/summary reports its path relative to the original working directory (e.g.
+  `../../wastech-mdlint.config.json`). **When `[path]` is given explicitly**, only a config found
+  exactly at that directory counts as existing; an ancestor's config is left untouched and reported
+  as "none found" for that target.
 
 See [Configuration](configuration.md) for the written file.
 
