@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -21,7 +21,9 @@ async function fixtureRepo(files: Record<string, string>): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-tbl-"));
   tempDirs.push(root);
   for (const [relativePath, content] of Object.entries(files)) {
-    await writeFile(path.join(root, relativePath), content, "utf8");
+    const absolutePath = path.join(root, relativePath);
+    await mkdir(path.dirname(absolutePath), { recursive: true });
+    await writeFile(absolutePath, content, "utf8");
   }
   return root;
 }
@@ -85,6 +87,20 @@ describe("TBL rules", () => {
     expect(result.messages).toHaveLength(2);
   });
 
+  it('TBL-004 is order-independent under a stateful "g" flag', async () => {
+    const cwd = await fixtureRepo({
+      "a.md": ["| ID |", "| --- |", "| REQ-1 |", "| REQ-2 |", "| BUG-1 |"].join(
+        "\n",
+      ),
+    });
+    const result = await lint(cwd, [
+      rule("TBL-004", { column: "ID", pattern: "^REQ-\\d+$", flags: "g" }),
+    ]);
+    expect(result.messages.map((message) => message.data?.value)).toEqual([
+      "BUG-1",
+    ]);
+  });
+
   it("TBL-005 enforces a cross-column conditional", async () => {
     const cwd = await fixtureRepo({
       "a.md": ["| Status | Resolution |", "| --- | --- |", "| done |  |"].join(
@@ -113,6 +129,17 @@ describe("TBL rules", () => {
       filePath: "b.md",
       data: { firstSeenIn: "a.md" },
     });
+  });
+
+  it("TBL-006 honors an exclude-only scope (no files) without false duplicates", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "| ID |\n| --- |\n| REQ-1 |\n",
+      "archive/old.md": "| ID |\n| --- |\n| REQ-1 |\n",
+    });
+    const result = await lint(cwd, [
+      rule("TBL-006", { column: "ID", exclude: ["archive/**"] }),
+    ]);
+    expect(result.messages).toHaveLength(0);
   });
 });
 
