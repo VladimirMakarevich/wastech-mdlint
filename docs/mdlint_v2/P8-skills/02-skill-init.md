@@ -60,11 +60,14 @@ Non-obvious decisions the prose encodes, and why:
   run/install command pins `@wastech-mdlint/cli@<skill-version>`, and the README example uses the
   pinned `gh skill install … --pin vX.Y.Z` form. The `compatibility` value is same-tag wording,
   not a version floor; its concrete tag is owned by the P-release single-tag release.
-- **Everything runs from the effective init root.** `init` re-roots detection to the found
-  config's directory (or the target when none exists), which is also the correct
+- **Everything runs from the effective init root.** The skill always invokes `init` bare (no
+  explicit `[path]` token), and when `[path]` is not given explicitly, `init` re-roots detection
+  to the found config's directory (or the target when none exists) — which is also the correct
   package-manager root for a nested `packages/foo/`. The skill `cd`s there once and runs `init`,
   install, `lint`, and any CI rerun from that one directory, so the package manager, written
-  config, and lint scope stay aligned — avoiding wrong-project installs and path-doubling.
+  config, and lint scope stay aligned — avoiding wrong-project installs and path-doubling. See
+  [P11.04](../P11-remediation/04-findconfig-boundary.md): an explicit `[path]` (not used by this
+  skill) is honored instead of re-rooted.
 - **CI workflow is CLI-owned; the README is skill-owned.** The workflow is routed through
   `init --with-ci-workflow` (never hand-authored YAML) to keep it single-sourced. Adding CI
   after the fact means rerunning `init`, and the rerun must reuse the _same_ existing-config

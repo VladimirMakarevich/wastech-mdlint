@@ -631,64 +631,107 @@ describe("init command · existing config handling", () => {
     ).resolves.toBe(invalidConfigText);
   });
 
-  // `findConfig` walks up from `[path]` to find the root config; the whole flow must then re-root
-  // there too instead of scanning/inferring against the subdirectory the user happened to pass.
-  describe("[path] targets a subdirectory of a repo with a root config", () => {
+  // An explicit `[path]` names the exact directory init must operate on — a config found while
+  // walking up from it must not govern that run (H-3, P11.04). This replaces the pre-fix behavior
+  // (an explicit `[path]` silently re-rooted onto an ancestor's config) with the corrected one.
+  describe("explicit [path] vs. an ancestor's config found while walking up (H-3)", () => {
     async function fixtureWithRootConfigAndLockfile(): Promise<string> {
       return fixtureRepo({
         ...CROSS_LINKED_DOCS_FIXTURE,
+        ".git/HEAD": "ref: refs/heads/main\n",
         "wastech-mdlint.config.json": existingConfigText,
         "package-lock.json": "{}",
       });
     }
 
-    it("--on-existing overwrite: re-rooted subdirectory run matches the root-invoked run byte for byte", async () => {
-      // Separate fixtures per run: init now writes, so reusing one cwd would let the first run's
-      // write change what the second run observes.
-      const rootCwd = await fixtureWithRootConfigAndLockfile();
-      const subdirCwd = await fixtureWithRootConfigAndLockfile();
+    it("--on-existing overwrite: an explicit [path] is honored, not re-rooted onto the root config", async () => {
+      const cwd = await fixtureWithRootConfigAndLockfile();
 
-      const fromRoot = await run(
-        ["init", rootCwd, "--yes", "--on-existing", "overwrite"],
-        rootCwd,
-      );
-      const fromSubdirectory = await run(
+      const result = await run(
         ["init", "docs", "--yes", "--on-existing", "overwrite"],
-        subdirCwd,
+        cwd,
       );
 
-      expect(fromSubdirectory.exitCode).toBe(EXIT_CODE_SUCCESS);
-      expect(fromSubdirectory.stdout).toBe(fromRoot.stdout);
-      // Re-rooted to the repo root: the config line names the file directly (no "../" prefix),
-      // the root lockfile is detected, and the include glob is scoped from the repo root.
-      expect(fromSubdirectory.stdout).toContain(
-        "Existing config found at wastech-mdlint.config.json:",
-      );
-      expect(fromSubdirectory.stdout).not.toContain("..");
-      expect(fromSubdirectory.stdout).toContain("Package manager: npm.");
-      expect(fromSubdirectory.stdout).toContain("docs/**/*.{md,mdx}");
+      expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+      // Nothing exists at the exact target (`docs/`), so the root config found while walking up
+      // does not count as this run's existing config.
+      expect(result.stdout).toContain("Existing config: none found.");
+      expect(result.stdout).toContain("Wrote docs/wastech-mdlint.config.json");
+      // Deliberate: detectPackageManager only checks exactly cwd (non-recursive), and scanning is
+      // no longer re-rooted to the parent, so the root's package-lock.json is correctly out of view.
+      expect(result.stdout).toContain("Package manager: not detected.");
+      await expect(
+        readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8"),
+      ).resolves.toBe(existingConfigText);
     });
 
-    it("--on-existing merge: re-rooted subdirectory run matches the root-invoked run byte for byte", async () => {
-      const rootCwd = await fixtureWithRootConfigAndLockfile();
-      const subdirCwd = await fixtureWithRootConfigAndLockfile();
+    it("--on-existing merge: an explicit [path] is honored, not re-rooted onto the root config", async () => {
+      const cwd = await fixtureWithRootConfigAndLockfile();
 
-      const fromRoot = await run(
-        ["init", rootCwd, "--yes", "--on-existing", "merge"],
-        rootCwd,
-      );
-      const fromSubdirectory = await run(
+      const result = await run(
         ["init", "docs", "--yes", "--on-existing", "merge"],
-        subdirCwd,
+        cwd,
       );
 
-      expect(fromSubdirectory.exitCode).toBe(EXIT_CODE_SUCCESS);
-      expect(fromSubdirectory.stdout).toBe(fromRoot.stdout);
-      expect(fromSubdirectory.stdout).toContain(
-        "Existing config found at wastech-mdlint.config.json:",
+      // `--on-existing merge` is moot once nothing exists at the exact target — both flags degrade
+      // to a fresh write.
+      expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+      expect(result.stdout).toContain("Existing config: none found.");
+      expect(result.stdout).toContain("Wrote docs/wastech-mdlint.config.json");
+      expect(result.stdout).toContain("Package manager: not detected.");
+      await expect(
+        readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8"),
+      ).resolves.toBe(existingConfigText);
+    });
+
+    it("the literal H-3 repro: init . in a nested sub-project never touches the parent's config", async () => {
+      const rootConfigText = JSON.stringify({ include: ["parent-only.md"] });
+      const cwd = await fixtureRepo({
+        "wastech-mdlint.config.json": rootConfigText,
+        "sub-project/a.md": "# A\n\nSee [B](b.md).\n",
+        "sub-project/b.md": "# B\n\nSee [A](a.md).\n",
+      });
+      const subProjectDir = path.join(cwd, "sub-project");
+
+      const result = await run(["init", ".", "--yes"], subProjectDir);
+
+      expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+      expect(result.stdout).toContain("Existing config: none found.");
+      const subProjectConfig = readConfig(
+        await readFile(
+          path.join(subProjectDir, "wastech-mdlint.config.json"),
+          "utf8",
+        ),
       );
-      expect(fromSubdirectory.stdout).not.toContain("..");
-      expect(fromSubdirectory.stdout).toContain("Package manager: npm.");
+      // Proves the written config reflects the sub-project's own scan, not a copy of the parent's
+      // content — a regression that re-rooted onto the parent would carry this entry across.
+      expect(subProjectConfig.include).not.toContain("parent-only.md");
+      // The parent's config is byte-identical to what it was before this run.
+      await expect(
+        readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8"),
+      ).resolves.toBe(rootConfigText);
+    });
+
+    it("a bare invocation (no [path]) still re-roots and shows the true relative path", async () => {
+      const cwd = await fixtureWithRootConfigAndLockfile();
+      const nestedDir = path.join(cwd, "docs", "nested");
+      await mkdir(nestedDir, { recursive: true });
+
+      const receivedPaths: string[] = [];
+      const prompter = createDefaultFakePrompter({
+        resolveExistingConfigAction: async (configPath) => {
+          receivedPaths.push(configPath);
+          return "skip";
+        },
+      });
+      const result = await run(["init"], nestedDir, {
+        isTty: true,
+        initPrompter: prompter,
+      });
+
+      expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+      // Two levels up: nested -> docs -> the repo root where the config actually lives.
+      expect(receivedPaths).toEqual(["../../wastech-mdlint.config.json"]);
     });
   });
 });

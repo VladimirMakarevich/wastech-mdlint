@@ -25,8 +25,11 @@ steps are ask-first: the optional CI workflow and the README edit.
 ## 1. Check for an existing config
 
 Mirror how `init` resolves a config: start from the requested target directory and
-walk up its ancestors, since `init` may re-root to a config found above the target
-(and a nested `docs/` or `packages/foo/` can carry its own `wastech-mdlint.config.json`).
+walk up its ancestors, stopping at the user's home directory (never above it), since
+`init` may re-root to a config found above the target (and a nested `docs/` or
+`packages/foo/` can carry its own `wastech-mdlint.config.json`). This skill always
+invokes `init` bare, so its own runs re-root the same way; do not stop the walk short of
+the home-directory boundary just because a config might be found sooner.
 Report the actual existing config path you find rather than assuming a root filename.
 Tell the user what you found. Do **not** decide the disposition yourself: `init`
 handles overwrite / merge / skip, and it is the single owner of that choice.

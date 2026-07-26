@@ -33,6 +33,9 @@ rules: [{ rule, severity?: "error"|"warning"|"off", options? }], compile? }`.
 2. **JSONC** parsing ([C4](../requirements/01-configuration.md)) — comments + trailing commas;
    file stays `.json`.
 3. `findConfig()` walk-up (parent dirs to FS root); `--config` overrides.
+   - **Superseded by [P11.04](../P11-remediation/04-findconfig-boundary.md):** the walk now stops
+     at the user's home directory instead of the FS root (audit finding H-3 — an unbounded walk let
+     `init` overwrite an unrelated ancestor's config). `--config` behavior is unchanged.
 4. **Two-stage validation:** root shape here; per-rule options via `resolveRule` (P2.03).
 5. **Rich diagnostics** ([C7](../requirements/01-configuration.md)): unknown keys, unknown
    rules (did-you-mean), option path errors.

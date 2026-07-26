@@ -70,6 +70,12 @@ export type InitCommandOptions = {
   // Pre-answers the CI-workflow prompt under `--yes` only (mirrors `--on-existing`): interactive
   // runs always prompt regardless of this flag.
   withCiWorkflow?: boolean;
+  // True only when the CLI's `[path]` argument was actually typed by the user (program.ts is the
+  // one layer that can tell "typed, and happens to equal cwd" apart from "omitted"). A required
+  // field, not optional, so every call site is forced to decide it explicitly (H-3, P11.04): an
+  // explicit target directory must not be silently re-rooted onto a config found at a strict
+  // ancestor — see the re-rooting comment in `runInitCommand` below.
+  pathWasExplicit: boolean;
 };
 
 // The confirmed draft handed to formatDraftSummary. `"none"` distinguishes "no config existed" from
@@ -635,7 +641,8 @@ export function formatWriteSummary(params: {
  * read/parsed/validated. The deliverable requires never modifying or dropping an existing entry and
  * writing only a valid config — both unprovable when the existing config can't be parsed or would be
  * rejected by the loader — so the safe answer is to write nothing.
- * `configPath` is a repository-relative POSIX path.
+ * `configPath` is a normalized POSIX path, relative to the same directory the draft summary's
+ * existing-config line already used (the original target directory, not necessarily the repo root).
  */
 export function formatNotWrittenSummary(
   configPath: string | undefined,
@@ -655,27 +662,48 @@ export function formatNotWrittenSummary(
  * existing config when merging, and confirm the draft. On confirmation, writes the config (and an
  * optional project-local schema + CI workflow); a `merge` whose existing config is unreadable aborts
  * the write entirely rather than risk dropping an entry it cannot even parse.
+ *
+ * When no `[path]` was explicitly typed, a config found at a strict ancestor of `options.cwd`
+ * governs the whole run (scan/inference/write all re-root to that ancestor's directory). When
+ * `options.pathWasExplicit` is true, only a config found exactly at `options.cwd` counts as
+ * existing — an ancestor's config is left untouched and reported as "none found" for this target
+ * (H-3, P11.04).
  */
 export async function runInitCommand(
   options: InitCommandOptions,
   prompter: InitPrompter,
 ): Promise<RunInitCommandResult> {
-  const existingConfigPath = await findConfig(options.cwd);
-  // `findConfig` walks up to an ancestor directory when `options.cwd` is a subdirectory of a repo
-  // that already has a config — the config being merged/overwritten governs from *its own*
-  // directory, so the whole flow re-roots there too. Scanning/inferring against `options.cwd`
-  // instead would produce include globs/rule scopes relative to the wrong root and could miss a
-  // lockfile that only lives at the real root. A no-op when the config is already at `options.cwd`.
+  const discoveredConfigPath = await findConfig(options.cwd);
+  const targetDir = path.resolve(options.cwd);
+
+  // An explicit `[path]` names the exact directory init must operate on — a config found at a
+  // strict ancestor of that directory does not govern it, and must not be silently re-rooted onto
+  // (H-3). Only a config found exactly at the target counts as this run's existing config in that
+  // case. A bare/default invocation (no `[path]` typed) keeps the original re-root behavior below.
+  const existingConfigPath =
+    options.pathWasExplicit &&
+    discoveredConfigPath !== undefined &&
+    path.dirname(discoveredConfigPath) !== targetDir
+      ? undefined
+      : discoveredConfigPath;
+
+  // `findConfig` walks up to an ancestor directory when the target is a subdirectory of a repo that
+  // already has a config — the config being merged/overwritten governs from *its own* directory, so
+  // the whole flow re-roots there too. Scanning/inferring against the original target instead would
+  // produce include globs/rule scopes relative to the wrong root and could miss a lockfile that only
+  // lives at the real root. A no-op when the config is already at the target directory.
   const cwd =
     existingConfigPath === undefined
       ? options.cwd
       : path.dirname(existingConfigPath);
-  // Repository-relative POSIX path (public-output invariant) — computed up front so both the
-  // existing-config prompt and the printed summary use it instead of the raw absolute path.
+  // Relative to the ORIGINAL target directory, not `cwd` above — so a config found at an ancestor
+  // renders honestly as `../…` instead of the bare filename the previous re-pointed computation
+  // produced (H-3). Repository-relative POSIX path (public-output invariant), computed up front so
+  // both the existing-config prompt and the printed summary use it instead of the raw absolute path.
   const relativeConfigPath =
     existingConfigPath === undefined
       ? undefined
-      : normalizeRelativePath(path.relative(cwd, existingConfigPath));
+      : normalizeRelativePath(path.relative(targetDir, existingConfigPath));
 
   let existingConfigAction: ExistingConfigAction | "none" = "none";
 
@@ -800,12 +828,11 @@ export async function runInitCommand(
   // drop an existing entry" is unprovable when the entries can't be parsed, so writing nothing is
   // the only safe outcome (no config, no schema, no CI workflow touch the disk here).
   if (existingConfigAction === "merge" && existingConfigUnreadable) {
-    const notWrittenPath =
-      existingConfigPath === undefined
-        ? relativeConfigPath
-        : toRepoRelative(existingConfigPath);
+    // `relativeConfigPath` (not `toRepoRelative(existingConfigPath)`) so this message names the same
+    // path the draft summary above already showed — target-directory-relative, can read `../…` — and
+    // never mismatches it for the same file (H-3: the two used different bases before this fix).
     return {
-      output: composeOutput(formatNotWrittenSummary(notWrittenPath)),
+      output: composeOutput(formatNotWrittenSummary(relativeConfigPath)),
       // The user did confirm the draft above (`confirmed === true`) — only the write itself was
       // withheld, for a reason unrelated to their choice. See the type's own comment.
       wasConfirmed: true,

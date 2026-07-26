@@ -306,7 +306,9 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
   [C9](requirements/01-configuration.md).
 - **`findConfig` / `loadConfiguration` / `ConfigError`** — The walk-up config search, the
   JSONC loader + two-stage validation (root, then per-rule), and the structured error type.
-  `CONFIG_FILE_NAME` is the canonical filename.
+  `CONFIG_FILE_NAME` is the canonical filename. `findConfig`'s walk stops at the user's home
+  directory (never above it), mirroring the CLI's own `findRepositoryRoot`/`findInstalledSchemaDir`
+  boundary — see [P11.04](P11-remediation/04-findconfig-boundary.md).
 - **Did-you-mean diagnostics** — Rich config errors: unknown rule → suggestion; bad option →
   exact path (`rules[3].options.idPattern: expected valid RegExp`). Decision
   [C7](requirements/01-configuration.md).
@@ -545,8 +547,14 @@ underlying scan/inference.
 - **`init`** — Zero-to-config bootstrap: scans for doc clusters, re-infers rules against the
   confirmed cluster subset, and prints a confirmable draft preview (include globs, rules grouped
   by category with rationale, existing-config disposition, package manager). `[path]` defaults to
-  the cwd, but re-roots to an ancestor directory's config when `[path]` is below one (see
-  [P6.03](P6-init/03-interactive-prompts.md)'s implementation notes for why). `-y`/`--yes` skips
+  the cwd. **When `[path]` is omitted**, `init` re-roots to an ancestor directory's config when one
+  is found while walking up from the target (see
+  [P6.03](P6-init/03-interactive-prompts.md)'s implementation notes for why), and the existing-config
+  prompt/summary reports that config's path relative to the original working directory (e.g.
+  `../../wastech-mdlint.config.json`). **When `[path]` is given explicitly**, only a config found
+  exactly at that directory counts as existing — an ancestor's config is left untouched and
+  reported as "none found" for that target, and the walk itself never crosses the user's home
+  directory (H-3, [P11.04](P11-remediation/04-findconfig-boundary.md)). `-y`/`--yes` skips
   every prompt (for CI / the `-init` skill) and defaults `--on-existing` to `skip` when omitted —
   interactive mode always prompts for it, and every prompt's own unchosen-Enter default matches
   the same `--yes` defaults. With no existing config, both flags are ignored. Ctrl+C during any
