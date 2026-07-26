@@ -1,7 +1,7 @@
 # P11.05 · Table primitives — honor `exclude`, use stateless `g`/`y` regex
 
 > Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** ·
-> Status **Not started**. Findings **M-2** ([post-P9 audit](../audit-2026-07-25-post-p9.md)) and
+> Status **Done**. Findings **M-2** ([post-P9 audit](../audit-2026-07-25-post-p9.md)) and
 > **TP-1** ([`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md)).
 
 ## Goal
@@ -50,7 +50,43 @@ state via `matchAll` (`primitives/content.ts:22`).
 
 ## Exit criteria
 
-- [ ] `columnUnique` honors `exclude` with or without `files`; no false `error` on excluded files.
-- [ ] `columnMatches` is order-independent under `g`/`y` flags (reset, stripped, or rejected).
-- [ ] Regression tests cover both the `exclude`-only and the `g`-flag cases.
-- [ ] `npm run typecheck && npm run lint && npm run format && npm test && npm run build` green.
+- [x] `columnUnique` honors `exclude` with or without `files`; no false `error` on excluded files.
+- [x] `columnMatches` is order-independent under `g`/`y` flags (reset, stripped, or rejected).
+- [x] Regression tests cover both the `exclude`-only and the `g`-flag cases.
+- [x] `npm run typecheck && npm run lint && npm run format && npm test && npm run build` green.
+
+## Implementation notes
+
+- **M-2 fix**: `columnUnique` (`packages/core/src/engine/primitives/table.ts`) now calls
+  `fileMatches` unconditionally, dropping the `options.files !== undefined` precondition. The
+  `ColumnUniqueOptions.files` field comment was updated to note that scoping is actually enforced
+  through the `fileMatches` callback (which already honors both `files` and `exclude` at its call
+  sites in `rules/tbl.ts` and `rules/custom.ts`), not through this field being read directly inside
+  the primitive. `options.files` itself is now unread inside `columnUnique` — left in place as a
+  documented, deliberate wart rather than restructuring the exported option shape, per this task's
+  "do not restructure the primitive vocabulary" constraint.
+- **TP-1 fix — reset over reject**: `columnMatches` now resets `regex.lastIndex = 0` immediately
+  before each per-row `test()` call, rather than rejecting `g`/`y` in the flags schema. The
+  alternative (schema rejection) is explicitly suggested by the source research report, but this
+  task's own step 3 requires a regression test where a `"flags":"g"` config **produces correct
+  findings** rather than a validation error — that's only possible if `g`/`y` stay legal. No schema
+  changes were made; the entire code fix is inside `table.ts`, matching the task's "same file"
+  framing. Because `g`/`y` remain accepted while carrying no meaning for a per-cell membership
+  test, `docs/guide/rules/TBL-004.md` and the `columnMatches` bullet in `docs/guide/rules/custom.md`
+  now say so explicitly — an accepted-but-inert option is exactly the kind of thing a reader would
+  otherwise have to infer from the source.
+- `columnUnique`'s `idPattern`-derived regex and `crossColumn`'s `evaluateCondition` regex were
+  checked and are structurally unaffected: `idPattern` has no accompanying `flags` field in either
+  schema (`tbl.ts`, `assert.ts`), so it can never carry `g`/`y`; `evaluateCondition` compiles a fresh
+  `RegExp` per call rather than hoisting one outside the row loop, so it was never stateful.
+- **Tests**: `packages/core/test/primitives.test.ts` gained primitive-level regression tests for
+  both fixes (order-independence under `"flags":"g"`; `exclude`-only `fileMatches` with
+  `options.files` omitted). `packages/core/test/rules-tbl.test.ts` gained rule-level (`lintFiles`)
+  regression tests for `TBL-004` and `TBL-006`, and its `fixtureRepo` helper gained a
+  `mkdir(recursive: true)` step (matching the helper already used in `rules-sec.test.ts` and
+  siblings) to support a nested `archive/old.md` fixture.
+- **No changes needed** to `docs/guide/rules/TBL-006.md` (it already documents `files`/`exclude` as
+  narrowing the participating file set — this fix makes reality match the existing promise rather
+  than changing it), `rules/tbl.ts` / `rules/custom.ts` (no schema/wiring changes; both already
+  build the `fileMatches` closure correctly), `docs/mdlint_v2/glossary.md` (no term added, renamed,
+  or retired), or `packages/cli/schema.json` (no schema shape changed).

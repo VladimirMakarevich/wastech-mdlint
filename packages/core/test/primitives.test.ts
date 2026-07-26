@@ -118,6 +118,24 @@ describe("table primitives", () => {
     ).toHaveLength(2);
   });
 
+  it('columnMatches is order-independent under a stateful "g" flag', () => {
+    const table = [
+      "| ID |",
+      "| --- |",
+      "| REQ-1 |",
+      "| REQ-2 |",
+      "| BUG-1 |",
+    ].join("\n");
+
+    const findings = columnMatches(doc(table), {
+      column: "ID",
+      pattern: "^REQ-\\d+$",
+      flags: "g",
+    });
+
+    expect(findings.map((finding) => finding.data?.value)).toEqual(["BUG-1"]);
+  });
+
   it("crossColumn enforces a when→then conditional", () => {
     const table = [
       "| Status | Resolution |",
@@ -146,6 +164,23 @@ describe("table primitives", () => {
       filePath: "b.md",
       data: { value: "REQ-1", firstSeenIn: "a.md" },
     });
+  });
+
+  it("columnUnique honors an exclude-only fileMatches even when options.files is omitted", () => {
+    const a = doc("| ID |\n| --- |\n| REQ-1 |\n", "a.md");
+    const excluded = doc("| ID |\n| --- |\n| REQ-1 |\n", "archive/old.md");
+    const documents = new Map([
+      [a.path, a],
+      [excluded.path, excluded],
+    ]);
+
+    const findings = columnUnique(
+      { documents },
+      { column: "ID" },
+      (filePath) => !filePath.startsWith("archive/"),
+    );
+
+    expect(findings).toHaveLength(0);
   });
 });
 
