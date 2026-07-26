@@ -10,7 +10,7 @@ import type {
   ParsedLink,
 } from "../../markdown/document-types.js";
 import {
-  escapesRoot,
+  candidateEscapesRoot,
   filePart,
   resolveRelativeToSource,
   sourceLocale,
@@ -27,7 +27,7 @@ type ReferenceContext = Pick<
 // A repo-relative target "resolves" if it is in the Markdown corpus or exists on disk (the latter
 // covers files outside `include`, e.g. images — audit P3 REF gap, avoids false positives).
 function targetResolves(relPath: string, context: ReferenceContext): boolean {
-  if (escapesRoot(relPath)) {
+  if (candidateEscapesRoot(relPath)) {
     return false;
   }
 
@@ -138,7 +138,7 @@ export function imageResolves(
     }
 
     if (
-      escapesRoot(relTarget) ||
+      candidateEscapesRoot(relTarget) ||
       !existsSync(path.resolve(context.rootDir, relTarget))
     ) {
       findings.push({

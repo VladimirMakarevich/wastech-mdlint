@@ -193,8 +193,9 @@ export function registerLintTool(server: McpServer): void {
       title: "Lint Markdown content",
       description:
         "Lint ad-hoc Markdown content against an explicit set of rules. Does not load project config; " +
-        "file-resolving rules such as REF-001/REF-003 and SEC-003 may probe or read paths relative " +
-        "to the server's working directory.",
+        "file-resolving rules such as REF-001/REF-003 and SEC-003 may probe or read paths inside the " +
+        "server's working directory; an absolute path or a `..`-escaping relative path is rejected " +
+        "rather than followed.",
       inputSchema: lintInputShape,
       outputSchema: withErrorOutput(lintOutputShape),
       annotations: READ_ONLY_ANNOTATIONS,

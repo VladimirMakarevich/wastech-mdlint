@@ -55,4 +55,7 @@ consistently — they are thin adapters over one pipeline, not separate implemen
 - **stdio only**, **read-only**, **local** — no network, no external HTTP link checking.
 - The ad-hoc `lint` tool does not load project config. File-resolving rules such as
   [REF-001](rules/REF-001.md)/[REF-003](rules/REF-003.md) and [SEC-003](rules/SEC-003.md) may probe
-  or read paths relative to the server's working directory.
+  or read paths **inside** the server's working directory; an absolute path or a `..`-escaping
+  relative path is rejected rather than followed. The tool takes its whole `rules` array from the
+  caller, so this containment is what keeps a read-only linter from becoming a host file-read
+  primitive for a caller acting on untrusted input.

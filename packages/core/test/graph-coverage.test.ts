@@ -110,4 +110,33 @@ describe("computeGraphCoverage", () => {
 
     expect(coverage.filesOutsideCorpus).toEqual(["x.md"]);
   });
+
+  // Audit H-2 class sweep: same drive-absolute-remainder gap as REF-001/REF-003 (see
+  // primitives.test.ts) — a `..`-cancelled link target must not surface a real out-of-root host
+  // path as if it were merely "outside the corpus". Windows-only: the remainder is a harmless
+  // relative segment named "C:" on POSIX.
+  it.runIf(process.platform === "win32")(
+    "does not list a `..`-cancelled drive-absolute target, even though it exists on disk",
+    async () => {
+      const outsideRoot = await mkdtemp(
+        path.join(os.tmpdir(), "wastech-mdlint-coverage-escape-"),
+      );
+      tempDirs.push(outsideRoot);
+      const secretPath = path.join(outsideRoot, "secret.md");
+      await writeFile(secretPath, "# Secret\n", "utf8");
+      const rawTarget = `../${secretPath.replaceAll("\\", "/")}`;
+
+      const root = await fixtureRepo({
+        "sub/index.md": `[outside](${rawTarget})\n`,
+      });
+      const documents = await loadCorpus(root);
+      const graph = buildContextGraph(documents);
+
+      const coverage = computeGraphCoverage(documents, graph, {
+        rootDir: root,
+      });
+
+      expect(coverage.filesOutsideCorpus).toEqual([]);
+    },
+  );
 });

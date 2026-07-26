@@ -146,6 +146,78 @@ describe("SEC-003 template conformance", () => {
     expect(missingTemplate.messages).toHaveLength(1);
     expect(missingTemplate.messages[0]?.message).toMatch(/was not found/);
   });
+
+  it("rejects an absolute template path without leaking the target file's content", async () => {
+    const outsideRoot = await fixtureRepo({
+      "secret.md": "# Secret\n## TopSecretSection\n",
+    });
+    const cwd = await fixtureRepo({ "adr/one.md": "# One\n## Context\n" });
+
+    const result = await lint(cwd, [
+      rule("SEC-003", {
+        template: path.join(outsideRoot, "secret.md"),
+        files: ["adr/**/*.md"],
+      }),
+    ]);
+
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.message).toMatch(/escapes the analyzed root/);
+    expect(
+      result.messages.some((message) =>
+        message.message.includes("TopSecretSection"),
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects a `..`-escaping relative template path without leaking the target file's content", async () => {
+    const outerRoot = await fixtureRepo({
+      "secret.md": "# Secret\n## TopSecretSection\n",
+      "project/adr/one.md": "# One\n## Context\n",
+    });
+    const cwd = path.join(outerRoot, "project");
+
+    const result = await lint(cwd, [
+      rule("SEC-003", {
+        template: "../secret.md",
+        files: ["adr/**/*.md"],
+      }),
+    ]);
+
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.message).toMatch(/escapes the analyzed root/);
+    expect(
+      result.messages.some((message) =>
+        message.message.includes("TopSecretSection"),
+      ),
+    ).toBe(false);
+  });
+
+  it("still loads an in-root template from disk when it is excluded from the corpus", async () => {
+    const cwd = await fixtureRepo({
+      "templates/template.md": "# T\n## Context\n## Decision\n",
+      "adr/one.md": "# One\n## Context\n",
+    });
+
+    const result = await lintFiles({
+      cwd,
+      config: { rules: [], exclude: ["templates/**"] },
+      rules: [
+        rule("SEC-003", {
+          template: "templates/template.md",
+          files: ["adr/**/*.md"],
+          level: 2,
+        }),
+      ],
+      settings: {},
+    });
+
+    expect(result.messages).toEqual([
+      expect.objectContaining({
+        filePath: "adr/one.md",
+        data: { section: "Decision", template: "templates/template.md" },
+      }),
+    ]);
+  });
 });
 
 describe("STR-001 required files", () => {

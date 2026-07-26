@@ -28,6 +28,39 @@ export function escapesRoot(relPath: string): boolean {
   return relPath === ".." || relPath.startsWith("../");
 }
 
+// True when an internally-built, repo-relative candidate (as produced by
+// `resolveRelativeToSource`/`resolveTargetCandidates`) escapes the repository root. Complements
+// the literal `..`-prefix check in `escapesRoot`: enough `../` segments can cancel out the source
+// directory and leave a bare drive-absolute remainder (e.g. `c:/Windows/x.md`, from a link like
+// `../c:/Windows/x.md`) that never starts with `..` but that `path.win32.resolve` still treats as
+// absolute, ignoring `rootDir` entirely — a no-op on POSIX, where these candidates never carry a
+// leading `/` by construction.
+export function candidateEscapesRoot(relPath: string): boolean {
+  return escapesRoot(relPath) || path.isAbsolute(relPath);
+}
+
+// True when a raw, filesystem-facing path — as supplied directly by config or an MCP caller, not
+// yet corpus-normalized — would resolve outside `rootDir`. Complements `escapesRoot` above: that
+// helper only ever sees repo-relative POSIX candidates link/image resolution builds internally
+// (never OS-absolute by construction), whereas an option like SEC-003's `template` hands
+// `path.resolve` a raw string that can itself be absolute (which `path.resolve` honors verbatim,
+// ignoring `rootDir` entirely — audit H-2) or a relative path whose `..` segments climb past it.
+export function resolvesOutsideRoot(rootDir: string, rawPath: string): boolean {
+  if (path.isAbsolute(rawPath)) {
+    return true;
+  }
+  const relativeToRoot = path.relative(rootDir, path.resolve(rootDir, rawPath));
+  // A Windows drive-relative path (e.g. "D:secret.md") is not `path.isAbsolute`, but resolves
+  // against a different drive than `rootDir`. `path.relative` cannot express a cross-drive
+  // relationship as a "../"-prefixed path, so it returns the absolute `to` path unchanged — treat
+  // that as escaping too, instead of falling through as "inside root".
+  return (
+    relativeToRoot === ".." ||
+    relativeToRoot.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relativeToRoot)
+  );
+}
+
 // The locale segment of a source path under a router content dir (e.g. `.../docs/de/x.md` → "de").
 export function sourceLocale(
   sourcePath: string,

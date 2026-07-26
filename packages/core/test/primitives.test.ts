@@ -274,6 +274,61 @@ describe("reference primitives", () => {
       "missing.png",
     ]);
   });
+
+  // Audit H-2 class sweep: a relative link/image target whose leading `../` segments exactly
+  // cancel the source directory can leave a bare drive-absolute remainder (e.g. `C:/Users/...`)
+  // that `escapesRoot`'s literal `..`-prefix check would miss, and that `path.win32.resolve` then
+  // treats as absolute — ignoring `rootDir` entirely, just like SEC-003's H-2 repro. Windows-only:
+  // on POSIX the remainder is just a harmless relative segment named "C:".
+  it.runIf(process.platform === "win32")(
+    "linkResolves rejects a `..`-cancelled drive-absolute target instead of treating it as resolved",
+    async () => {
+      const outsideRoot = await mkdtemp(
+        path.join(os.tmpdir(), "wastech-mdlint-ref-escape-"),
+      );
+      tempDirs.push(outsideRoot);
+      const secretPath = path.join(outsideRoot, "secret.md");
+      await writeFile(secretPath, "# Secret\n", "utf8");
+      // One "../" exactly cancels the source's own "sub" directory below, leaving the absolute
+      // remainder untouched.
+      const rawTarget = `../${secretPath.replaceAll("\\", "/")}`;
+
+      const source = doc(`[x](${rawTarget})\n`, "sub/doc.md");
+      const findings = linkResolves(
+        source,
+        { documents: new Map(), rootDir: "/nonexistent-root", settings: {} },
+        {},
+      );
+
+      expect(findings.map((finding) => finding.data?.target)).toEqual([
+        rawTarget,
+      ]);
+    },
+  );
+
+  it.runIf(process.platform === "win32")(
+    "imageResolves rejects a `..`-cancelled drive-absolute target instead of treating it as resolved",
+    async () => {
+      const outsideRoot = await mkdtemp(
+        path.join(os.tmpdir(), "wastech-mdlint-img-escape-"),
+      );
+      tempDirs.push(outsideRoot);
+      const secretPath = path.join(outsideRoot, "secret.png");
+      await writeFile(secretPath, "x", "utf8");
+      const rawTarget = `../${secretPath.replaceAll("\\", "/")}`;
+
+      const source = doc(`![x](${rawTarget})\n`, "sub/doc.md");
+      const findings = imageResolves(
+        source,
+        { documents: new Map(), rootDir: "/nonexistent-root", settings: {} },
+        {},
+      );
+
+      expect(findings.map((finding) => finding.data?.target)).toEqual([
+        rawTarget,
+      ]);
+    },
+  );
 });
 
 describe("runAssertion dispatch", () => {
