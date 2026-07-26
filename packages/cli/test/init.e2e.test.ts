@@ -26,6 +26,7 @@ import {
   formatWriteSummary,
   groupInferredRulesByCategory,
   readExistingRuleIds,
+  resolveSchemaWriteOutcome,
   type ConfirmedInitSelections,
   type InitPrompter,
 } from "../src/init-command.js";
@@ -750,6 +751,84 @@ describe("init command · writing the config (P6.04)", () => {
     );
   });
 
+  it("merge preserves an existing schema.json byte-for-byte and reports it in the summary", async () => {
+    const customConfig = JSON.stringify({
+      rules: [
+        {
+          rule: "custom",
+          id: "REQ-100",
+          description: "Requires an Owner section.",
+          options: { assert: { kind: "sectionPresent", sections: ["Owner"] } },
+        },
+      ],
+    });
+    const existingSchemaText = '{"hand-written":true}\n';
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      [CONFIG_FILE]: customConfig,
+      "schema.json": existingSchemaText,
+    });
+
+    const result = await run(
+      ["init", cwd, "--yes", "--on-existing", "merge"],
+      cwd,
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain("Kept existing schema.json at schema.json");
+    expect(result.stdout).not.toContain("Wrote project-local schema");
+    await expect(readFile(path.join(cwd, "schema.json"), "utf8")).resolves.toBe(
+      existingSchemaText,
+    );
+    // Config write itself is unaffected by the schema guard — still merges and still points at it.
+    const written = readConfig(
+      await readFile(path.join(cwd, CONFIG_FILE), "utf8"),
+    );
+    expect(written.$schema).toBe("./schema.json");
+  });
+
+  it("a second merge run reports the schema as already up to date, not falsely 'kept'", async () => {
+    const customConfig = JSON.stringify({
+      rules: [
+        {
+          rule: "custom",
+          id: "REQ-100",
+          description: "Requires an Owner section.",
+          options: { assert: { kind: "sectionPresent", sections: ["Owner"] } },
+        },
+      ],
+    });
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      [CONFIG_FILE]: customConfig,
+    });
+
+    const first = await run(
+      ["init", cwd, "--yes", "--on-existing", "merge"],
+      cwd,
+    );
+    expect(first.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(first.stdout).toContain("Wrote project-local schema schema.json");
+    const schemaAfterFirstRun = await readFile(
+      path.join(cwd, "schema.json"),
+      "utf8",
+    );
+
+    const second = await run(
+      ["init", cwd, "--yes", "--on-existing", "merge"],
+      cwd,
+    );
+
+    expect(second.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(second.stdout).toContain(
+      "Project-local schema schema.json is already up to date",
+    );
+    expect(second.stdout).not.toContain("Kept existing schema.json");
+    await expect(readFile(path.join(cwd, "schema.json"), "utf8")).resolves.toBe(
+      schemaAfterFirstRun,
+    );
+  });
+
   it("--yes --with-ci-workflow writes the workflow file; plain --yes does not", async () => {
     const workflowPath = path.join(
       ".github",
@@ -1437,7 +1516,7 @@ describe("formatWriteSummary", () => {
       action: "fresh",
       result: buildResult({ schemaRef: "./schema.json" }),
       configPath: CONFIG_FILE,
-      schemaPath: "schema.json",
+      schema: { kind: "written", path: "schema.json" },
       ciWorkflowPath: ".github/workflows/wastech-mdlint.yml",
     });
 
@@ -1447,6 +1526,120 @@ describe("formatWriteSummary", () => {
     expect(summary).toContain(
       "Wrote CI workflow .github/workflows/wastech-mdlint.yml.",
     );
+  });
+
+  it("reports a kept existing schema.json without claiming a write happened", () => {
+    const summary = formatWriteSummary({
+      action: "merge",
+      result: buildResult({ schemaRef: "./schema.json" }),
+      configPath: CONFIG_FILE,
+      schema: { kind: "kept", path: "schema.json" },
+    });
+
+    expect(summary).toContain("Kept existing schema.json at schema.json");
+    expect(summary).not.toContain("Wrote project-local schema");
+    // H-4 follow-up: the config's $schema still points at the pre-existing file even though the
+    // write was skipped, and the only working regeneration route is --on-existing merge — a real
+    // --on-existing overwrite run always discards the custom rules this write depends on, so it
+    // can never reach this branch and must not be advertised as a fix.
+    expect(summary).toContain("the config's $schema still points at it");
+    expect(summary).toContain("--on-existing merge");
+    expect(summary).not.toContain("run again with --on-existing overwrite");
+  });
+
+  it("reports an up-to-date project-local schema without claiming a write happened", () => {
+    const summary = formatWriteSummary({
+      action: "merge",
+      result: buildResult({ schemaRef: "./schema.json" }),
+      configPath: CONFIG_FILE,
+      schema: { kind: "unchanged", path: "schema.json" },
+    });
+
+    expect(summary).toContain(
+      "Project-local schema schema.json is already up to date",
+    );
+    expect(summary).not.toContain("Wrote project-local schema");
+    expect(summary).not.toContain("Kept existing schema.json");
+  });
+
+  it("reports an explicit overwrite of an existing schema.json", () => {
+    const summary = formatWriteSummary({
+      action: "fresh",
+      result: buildResult({ schemaRef: "./schema.json" }),
+      configPath: CONFIG_FILE,
+      schema: { kind: "overwritten", path: "schema.json" },
+    });
+
+    expect(summary).toContain("Overwrote schema.json at schema.json");
+    expect(summary).toContain("--on-existing overwrite");
+  });
+});
+
+describe("resolveSchemaWriteOutcome", () => {
+  const generatedSchemaText = '{"generated":true}\n';
+
+  it("writes fresh when no schema.json exists yet, regardless of the existing-config action", () => {
+    expect(
+      resolveSchemaWriteOutcome({
+        existingConfigAction: "merge",
+        existingSchemaText: undefined,
+        generatedSchemaText,
+      }),
+    ).toEqual({ shouldWrite: true, kind: "written" });
+    expect(
+      resolveSchemaWriteOutcome({
+        existingConfigAction: "none",
+        existingSchemaText: undefined,
+        generatedSchemaText,
+      }),
+    ).toEqual({ shouldWrite: true, kind: "written" });
+  });
+
+  it("reports an existing schema.json as already up to date when its bytes match exactly, even under overwrite", () => {
+    expect(
+      resolveSchemaWriteOutcome({
+        existingConfigAction: "merge",
+        existingSchemaText: generatedSchemaText,
+        generatedSchemaText,
+      }),
+    ).toEqual({ shouldWrite: false, kind: "unchanged" });
+    expect(
+      resolveSchemaWriteOutcome({
+        existingConfigAction: "overwrite",
+        existingSchemaText: generatedSchemaText,
+        generatedSchemaText,
+      }),
+    ).toEqual({ shouldWrite: false, kind: "unchanged" });
+  });
+
+  it("overwrites an existing schema.json that differs, only under an explicit overwrite action", () => {
+    expect(
+      resolveSchemaWriteOutcome({
+        existingConfigAction: "overwrite",
+        existingSchemaText: '{"hand-written":true}\n',
+        generatedSchemaText,
+      }),
+    ).toEqual({ shouldWrite: true, kind: "overwritten" });
+  });
+
+  it("keeps a differing existing schema.json on a merge", () => {
+    expect(
+      resolveSchemaWriteOutcome({
+        existingConfigAction: "merge",
+        existingSchemaText: '{"hand-written":true}\n',
+        generatedSchemaText,
+      }),
+    ).toEqual({ shouldWrite: false, kind: "kept" });
+  });
+
+  it("keeps a differing existing schema.json when there is no existing-config action at all", () => {
+    expect(
+      resolveSchemaWriteOutcome({
+        existingConfigAction: "none",
+        existingSchemaText: '{"hand-written":true}\n',
+        generatedSchemaText,
+      }),
+    ).toEqual({ shouldWrite: false, kind: "kept" });
   });
 });
 
