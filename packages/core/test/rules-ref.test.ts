@@ -96,6 +96,44 @@ describe("REF-004 cross-zone links", () => {
       toZone: "billing",
     });
   });
+
+  it("does not crash on a regex-special zone name and matches it literally (audit M-1)", async () => {
+    const cwd = await fixtureRepo({
+      "zones/auth/page.md":
+        "## Dependencies\n\n- c++\n\n## Body\n\n[cpp](../c++/x.md)\n[bill](../billing/x.md)\n",
+      "zones/c++/x.md": "# x\n",
+      "zones/billing/x.md": "# x\n",
+    });
+    const result = await lint(cwd, [rule("REF-004", { zonesDir: "zones" })]);
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.data).toMatchObject({
+      fromZone: "auth",
+      toZone: "billing",
+    });
+  });
+
+  it("does not crash on a zone name with an unbalanced paren (audit M-1)", async () => {
+    const cwd = await fixtureRepo({
+      "zones/auth/page.md": "## Dependencies\n\nNothing special here.\n",
+      "zones/we)ird/x.md": "# x\n",
+    });
+    const result = await lint(cwd, [rule("REF-004", { zonesDir: "zones" })]);
+    expect(result.messages).toEqual([]);
+  });
+
+  it("does not let a dot in a zone name match any character (audit M-1)", async () => {
+    const cwd = await fixtureRepo({
+      "zones/auth/page.md":
+        "## Dependencies\n\nWe rely on nodeXjs for scripting.\n\n## Body\n\n[link](../node.js/x.md)\n",
+      "zones/node.js/x.md": "# x\n",
+    });
+    const result = await lint(cwd, [rule("REF-004", { zonesDir: "zones" })]);
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.data).toMatchObject({
+      fromZone: "auth",
+      toZone: "node.js",
+    });
+  });
 });
 
 describe("REF-005 ID traceability", () => {

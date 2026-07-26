@@ -33,3 +33,11 @@ export const regexFlagsSchema = z
 export function compileRegex(pattern: string, flags?: string): RegExp {
   return new RegExp(pattern, flags);
 }
+
+// Escape regex metacharacters so a runtime string (a directory/zone name, a glossary alias) can be
+// embedded in a RegExp source as a literal instead of a pattern. Un-escaped interpolation is exactly
+// what let a directory named "c++" crash the whole lint run and "node.js" match more than intended
+// (audit M-1).
+export function escapeRegExp(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
