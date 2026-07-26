@@ -122,4 +122,37 @@ describe("CTX-003 glossary aliases", () => {
       canonical: "GraphQL",
     });
   });
+
+  it("counts every occurrence, including ones separated by a single space (audit L-1)", async () => {
+    const cwd = await fixtureRepo({
+      "glossary.md": "| Term | Aliases |\n| --- | --- |\n| GraphQL | gql |\n",
+      "doc.md": "gql gql gql\n",
+    });
+    const result = await lint(cwd, [
+      rule("CTX-003", {
+        glossary: "glossary.md",
+        termColumn: "Term",
+        aliasColumn: "Aliases",
+      }),
+    ]);
+    expect(result.messages).toHaveLength(3);
+    expect(
+      result.messages.every((message) => message.data?.alias === "gql"),
+    ).toBe(true);
+  });
+
+  it("still requires whole-word boundaries (no separator means no match)", async () => {
+    const cwd = await fixtureRepo({
+      "glossary.md": "| Term | Aliases |\n| --- | --- |\n| GraphQL | gql |\n",
+      "doc.md": "gqlgql\n",
+    });
+    const result = await lint(cwd, [
+      rule("CTX-003", {
+        glossary: "glossary.md",
+        termColumn: "Term",
+        aliasColumn: "Aliases",
+      }),
+    ]);
+    expect(result.messages).toEqual([]);
+  });
 });

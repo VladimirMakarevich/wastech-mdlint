@@ -3,6 +3,7 @@ import { z } from "zod";
 import { matchesConfigGlob } from "../../discovery/globs.js";
 import { allChecked } from "../primitives/checklist.js";
 import { noPlaceholders } from "../primitives/content.js";
+import { escapeRegExp } from "../regex.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
 import { extractSectionBody } from "../section-body.js";
 import { findLineNumber } from "../text-position.js";
@@ -66,10 +67,13 @@ export const ctx002: RuleDefinition = defineRule({
 });
 
 // Match a term as a whole word (so "APIs" or "myapi" do not match "api"). Escapes regex-special
-// characters in the term.
+// characters in the term. The trailing boundary is a lookahead, not a consumed group: `matchAll`
+// advances `lastIndex` past whatever a match consumes, so consuming the boundary character made
+// adjacent occurrences separated by exactly one character unreachable (audit L-1, e.g. "api api api"
+// under-counted as 2).
 function wholeWordRegex(term: string): RegExp {
-  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(^|[^A-Za-z0-9_])(${escaped})([^A-Za-z0-9_]|$)`, "g");
+  const escaped = escapeRegExp(term);
+  return new RegExp(`(^|[^A-Za-z0-9_])(${escaped})(?=[^A-Za-z0-9_]|$)`, "g");
 }
 
 // CTX-003 — glossary alias usage should use the canonical term (project). Builds alias→canonical

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { matchesFileScope } from "../src/engine/rules/scope.js";
 import { findLineNumber } from "../src/engine/text-position.js";
 import { extractSectionBody } from "../src/engine/section-body.js";
-import { regexStringSchema } from "../src/engine/regex.js";
+import { escapeRegExp, regexStringSchema } from "../src/engine/regex.js";
 import { resolveRoutedUrl } from "../src/engine/site-router.js";
 import { parseDocument } from "../src/markdown/parse-document.js";
 
@@ -65,6 +65,22 @@ describe("regexStringSchema", () => {
   it("accepts valid patterns and rejects invalid ones", () => {
     expect(regexStringSchema.safeParse("^REQ-\\d+$").success).toBe(true);
     expect(regexStringSchema.safeParse("(unclosed").success).toBe(false);
+  });
+});
+
+describe("escapeRegExp", () => {
+  it("escapes metacharacters so a raw string embeds as a literal, not a pattern", () => {
+    // "c++" is itself an invalid regex ("nothing to repeat") — go through
+    // `regexStringSchema` rather than a literal `new RegExp("c++")` here, since the
+    // no-invalid-regexp lint rule would (rightly) flag that as unescaped regex source.
+    expect(regexStringSchema.safeParse("c++").success).toBe(false);
+    expect(new RegExp(escapeRegExp("c++")).test("c++")).toBe(true);
+
+    expect(() => new RegExp(escapeRegExp("we)ird"))).not.toThrow();
+
+    const dotRegex = new RegExp(escapeRegExp("node.js"));
+    expect(dotRegex.test("node.js")).toBe(true);
+    expect(dotRegex.test("nodeXjs")).toBe(false);
   });
 });
 
