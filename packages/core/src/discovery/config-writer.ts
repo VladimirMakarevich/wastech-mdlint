@@ -90,11 +90,23 @@ export function resolvePackageSchemaRef(
 
 // The fresh-write `exclude` (C1 / deliverable 1): the scanner's own pruned noise directories as
 // globs, so a written config never re-scans the `node_modules`/`.git`/`dist`/… trees that `init`
-// deliberately ignored — including when `include` falls back to the implicit `**/*.md`. Sorted for a
-// deterministic, set-like array (order is not meaningful here). A `merge` never touches an existing
-// `exclude`; this is only for the fresh/overwrite path.
+// deliberately ignored — including when `include` falls back to the implicit `**/*.md`.
+//
+// The `**/` prefix is load-bearing: `collectMarkdownFiles` prunes these by *basename at every depth*
+// (`repo-scan.ts`), so only a depth-agnostic glob faithfully mirrors what the scan skipped. The
+// earlier root-anchored `<name>/**` form silently under-delivered on this same promise in a monorepo
+// — `packages/foo/dist/**` was still linted (audit M-4). A leading `**/` matches zero leading
+// segments in picomatch, so root-level `node_modules/` stays pruned too.
+//
+// Accepted tradeoff: hand-written docs under a nested directory literally named `build`/`out`/
+// `vendor`/… are now pruned as well, and `exclude` wins over `include` (C1). `init` could never have
+// proposed such files anyway (same basename prune), and the written config is a starting point the
+// user is expected to edit.
+//
+// Sorted for a deterministic, set-like array (order is not meaningful here). A `merge` never touches
+// an existing `exclude`; this is only for the fresh/overwrite path.
 const DEFAULT_EXCLUDE_GLOBS = [...DEFAULT_NOISE_DIR_NAMES]
-  .map((name) => `${name}/**`)
+  .map((name) => `**/${name}/**`)
   .sort(compareStrings);
 
 // Canonical top-level key order, applied on every write rather than preserving an existing file's

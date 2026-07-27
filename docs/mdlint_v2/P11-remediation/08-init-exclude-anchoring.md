@@ -1,7 +1,7 @@
 # P11.08 · `init` `exclude` prunes noise at every depth
 
 > Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** ·
-> Status **Not started**. Audit finding **M-4** ([post-P9 audit](../audit-2026-07-25-post-p9.md)).
+> Status **Done**. Audit finding **M-4** ([post-P9 audit](../audit-2026-07-25-post-p9.md)).
 
 ## Goal
 
@@ -38,7 +38,43 @@ no built-in noise list (`markdown/load-documents.ts:85-91` prunes only by `exclu
 
 ## Exit criteria
 
-- [ ] The written `exclude` uses `**/<noise>/**` and prunes noise directories at any depth.
-- [ ] A monorepo `init` no longer lints `packages/*/dist/**` or `packages/*/node_modules/**`.
-- [ ] The `config-writer` test asserts nested-path exclusion, not just literal presence.
-- [ ] `npm run typecheck && npm run lint && npm run format && npm test && npm run build` green.
+- [x] The written `exclude` uses `**/<noise>/**` and prunes noise directories at any depth.
+- [x] A monorepo `init` no longer lints `packages/*/dist/**` or `packages/*/node_modules/**`.
+- [x] The `config-writer` test asserts nested-path exclusion, not just literal presence.
+- [x] `npm run typecheck && npm run lint && npm run format && npm test && npm run build` green.
+
+## Implementation notes
+
+- **Fix**: one line — `DEFAULT_EXCLUDE_GLOBS` (`config-writer.ts`) maps `DEFAULT_NOISE_DIR_NAMES` to
+  `` `**/${name}/**` `` instead of `` `${name}/**` ``. `.sort(compareStrings)` is retained and the
+  resulting order is byte-identical to before, since every entry gains the same constant prefix.
+- **Zero-segment prefix**: a leading `**/` matches zero leading segments, so this widens the match
+  rather than moving it. picomatch compiles a `bos`-anchored `**/` to `(?:^|/|<globstar>/)`, so
+  `**/node_modules/**` matches root-level `node_modules/x.md` as well as
+  `packages/foo/node_modules/x.md`. This was the one real risk (a naive read would trade a nested
+  miss for a root-level regression), so it is pinned as a contract by an explicit root-level
+  assertion in `config-writer.test.ts`, not left as an assumption.
+- **Correct, not merely wider**: `init`'s own scanner already prunes these directories **by basename
+  at every depth** (`collectMarkdownFiles` in `repo-scan.ts`).
+  The root-anchored form was never a faithful mirror of what the scan skipped. It also follows that
+  **no file the scan proposed can be excluded by the new globs** — the scan never walked into a
+  `<noise>/` directory at any depth — so the written `exclude` cannot contradict the written
+  `include` (deliverable 2).
+- **Accepted tradeoff**: hand-written docs under a nested directory literally named
+  `build`/`out`/`target`/`vendor`/… are now pruned too, with `exclude` winning over `include` (C1).
+  Bounded by the fact that `init` could never have proposed such files itself, and the written config
+  is a user-editable starting point; documented in the comment at the code.
+- **The `merge` path is untouched**: only the fresh/overwrite branch writes `exclude`, and the merge
+  tests still assert an existing `exclude: ["dist/**"]` round-trips verbatim — a merge must never
+  rewrite a user's `exclude`.
+- **Tests**: `config-writer.test.ts` replaces the literal-presence checks with semantic
+  `matchesConfigGlob` assertions (both M-4 repros, the root-level guard, `.git/config.md` for
+  `dot: true`, and two non-excluded doc paths); `load-documents.test.ts` gains a directory-prune case
+  proving `shouldPruneDirectory`'s synthetic-child probe matches at depth and at the root;
+  `init.e2e.test.ts` gains the end-to-end exit criterion — a monorepo `init --yes` followed by
+  `lint --format json`, asserting the written `include` _equals_ `["**/*.md"]` (so the case cannot
+  pass vacuously if a future scan-heuristic change narrows it) and that `files` excludes the nested
+  `dist`/`node_modules` paths. That e2e failed against the pre-fix build with exactly the audit's
+  reported corpus, confirming it reproduces M-4.
+- No public export, dependency, or config-schema change, so `packages/cli/schema.json` and the
+  generated README tables stay byte-identical (no sync-test churn).

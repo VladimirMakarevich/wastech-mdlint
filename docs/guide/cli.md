@@ -126,6 +126,16 @@ Scans the repo for doc clusters, infers a rule set with rationale, and — on co
 - A `merge` whose existing config is unreadable or wouldn't load aborts the write rather than risk
   a lossy result.
 - **Ctrl+C** during any prompt exits `0`.
+- A fresh write includes an `exclude` list of the noise directories the scan itself skipped
+  (`node_modules`, `.git`, `dist`, …), written as **depth-agnostic** `**/<name>/**` globs. The scan
+  skips those directories by name wherever they appear, so anchoring the globs to the repository
+  root would have left a monorepo's `packages/*/dist` and `packages/*/node_modules` in the lint
+  corpus — exactly what the list exists to prevent. The tradeoff is deliberate: hand-written docs
+  living under a nested directory literally named `build`, `out`, `vendor`, … are pruned too, and
+  [`exclude` wins over `include`](configuration.md#top-level-shape). `init` could never have
+  proposed such files in the first place (its scan skips them by the same name), and the written
+  config is a starting point you are expected to edit — drop the offending glob if you need those
+  files linted. A `merge` never rewrites an existing `exclude`.
 - When custom rules are present, `init` also generates a project-local `schema.json` and points
   `$schema` at it. No remote URL is ever emitted. `init` never replaces an existing `schema.json`
   — that filename collides easily (it is also `schema`'s own default `--out`), so an unguarded
