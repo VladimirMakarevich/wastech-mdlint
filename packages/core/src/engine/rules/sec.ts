@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { matchesConfigGlob } from "../../discovery/globs.js";
 import type { ParsedDocument } from "../../markdown/document-types.js";
+import { detectNewline } from "../../markdown/newline.js";
 import { parseDocument } from "../../markdown/parse-document.js";
 import { resolvesOutsideRoot } from "../path-resolve.js";
 import { sectionOrder, sectionPresent } from "../primitives/section.js";
@@ -50,9 +51,13 @@ export const sec001: RuleDefinition = defineRule({
     if (missing.length === 0) {
       return [];
     }
-    // Append a scaffold section (with a TODO body) per missing heading at end of file.
+    // Append a scaffold section (with a TODO body) per missing heading at end of file, joined with
+    // the document's own line ending so a CRLF file does not come back with mixed endings
+    // (audit L-6). `applyFixes` normalizes every edit's `newText` too; doing it here keeps this
+    // fix hook correct when it is exercised on its own.
+    const newline = detectNewline(document.content);
     const scaffold = missing
-      .map((section) => `\n## ${section}\n\nTODO\n`)
+      .map((section) => ["", `## ${section}`, "", "TODO", ""].join(newline))
       .join("");
     const edit: TextEdit = {
       start: document.content.length,

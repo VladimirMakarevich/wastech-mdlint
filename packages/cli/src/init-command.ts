@@ -1,4 +1,4 @@
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -19,6 +19,8 @@ import {
   resolvePackageSchemaRef,
   ruleRegistry,
   scanRepository,
+  writeFilesAtomic,
+  type AtomicFileWrite,
   type DetectedPackageManager,
   type DocCluster,
   type ExistingConfigDocument,
@@ -103,6 +105,11 @@ export type RunInitCommandResult = {
   // whether anything was *written*: the unreadable-merge abort still sets this `true` because the
   // draft was confirmed, even though the write itself was then withheld for an unrelated safety reason.
   wasConfirmed: boolean;
+  // True only when a write the user asked for actually *failed* (P11.09) — an operational failure the
+  // host maps to a non-zero exit code. Required, not optional, so every return path has to state its
+  // answer: a deliberate no-write outcome (`skip`, an unconfirmed draft, the unreadable-merge abort)
+  // is `false`, because nothing failed — the command correctly chose not to write.
+  writeFailed: boolean;
 };
 
 const DRAFT_SUMMARY_HEADER = "wastech-mdlint init — draft configuration";
@@ -473,12 +480,22 @@ async function findInstalledSchemaDir(
 }
 
 /**
+ * Outcome of the opt-in CI-workflow write. `path` is a repository-relative POSIX path. `"failed"`
+ * exists because this write happens *after* the config and schema are already committed: dropping the
+ * whole summary on its failure would leave an already-mutated repo looking untouched, so the failure
+ * becomes a summary line (plus a non-zero exit) instead of a thrown error.
+ */
+export type CiWorkflowOutcome =
+  | { kind: "written"; path: string }
+  | { kind: "failed"; path: string; code?: string };
+
+/**
  * Offer — and, if accepted, write — the opt-in CI workflow (I6, deliverable 3). Only called from the
  * confirmed config-write branch of `runInitCommand` — `skip` returns earlier and never reaches this,
  * so `--with-ci-workflow` has no effect when the existing config is left untouched (skip is a strict
  * no-write outcome). Never overwrites an existing workflow. Anchors at the project root (where GitHub
  * loads workflows) and points the workflow at `configAbsPath` relative to that root. Returns the
- * project-relative POSIX path written, or undefined when nothing was written.
+ * write outcome, or undefined when the offer was declined/withheld and nothing was attempted.
  */
 async function offerCiWorkflow(params: {
   repoRoot: string;
@@ -486,7 +503,7 @@ async function offerCiWorkflow(params: {
   yes: boolean;
   withCiWorkflow: boolean | undefined;
   prompter: InitPrompter;
-}): Promise<string | undefined> {
+}): Promise<CiWorkflowOutcome | undefined> {
   const { repoRoot, configAbsPath, yes, withCiWorkflow, prompter } = params;
 
   // Under `--yes` the flag fully decides (mirroring `--on-existing`), so do no filesystem work when
@@ -535,9 +552,23 @@ async function offerCiWorkflow(params: {
 
   const configArg =
     configFromRoot === CONFIG_FILE_NAME ? undefined : configFromRoot;
-  await mkdir(path.dirname(ciWorkflowPath), { recursive: true });
-  await writeFile(ciWorkflowPath, buildCiWorkflowYaml(configArg), "utf8");
-  return normalizeRelativePath(path.relative(repoRoot, ciWorkflowPath));
+  const relativeWorkflowPath = normalizeRelativePath(
+    path.relative(repoRoot, ciWorkflowPath),
+  );
+  try {
+    // The atomic helper deliberately leaves directory creation to its caller, and `.github/workflows`
+    // routinely does not exist yet — a failure here is reported the same way a failed write is, just
+    // without an errno to attribute it to.
+    await mkdir(path.dirname(ciWorkflowPath), { recursive: true });
+  } catch {
+    return { kind: "failed", path: relativeWorkflowPath };
+  }
+  const written = await writeFilesAtomic([
+    { path: ciWorkflowPath, content: buildCiWorkflowYaml(configArg) },
+  ]);
+  return written.ok
+    ? { kind: "written", path: relativeWorkflowPath }
+    : { kind: "failed", path: relativeWorkflowPath, code: written.code };
 }
 
 /**
@@ -548,7 +579,8 @@ export type SchemaWriteOutcome =
   | { kind: "written"; path: string }
   | { kind: "unchanged"; path: string }
   | { kind: "kept"; path: string }
-  | { kind: "overwritten"; path: string };
+  | { kind: "overwritten"; path: string }
+  | { kind: "unreadable"; path: string };
 
 /**
  * Guards the project-local `schema.json` write with the same `--on-existing` signal that already
@@ -559,14 +591,29 @@ export type SchemaWriteOutcome =
  * flagging. Only once the bytes actually differ does `"overwrite"` bypass the guard; `"merge"` and
  * `"none"` both leave a differing file untouched. Pure so the decision itself — not just its
  * string rendering — is directly testable.
+ *
+ * `existingSchemaUnreadable` takes precedence over every other check and is a required field (P11.09):
+ * the read that produces `existingSchemaText` degrades *any* failure to `undefined`, which used to be
+ * harmless because the write would then fail identically. Atomic writes changed that — `rename` needs
+ * write permission on the *directory*, not on the target — so without this signal a present-but-
+ * unreadable `schema.json` would be silently replaced, exactly the implicit file-clobbering (I1) the
+ * guard exists to prevent.
  */
 export function resolveSchemaWriteOutcome(params: {
   existingConfigAction: ExistingConfigAction | "none";
   existingSchemaText: string | undefined;
+  existingSchemaUnreadable: boolean;
   generatedSchemaText: string;
 }): { shouldWrite: boolean; kind: SchemaWriteOutcome["kind"] } {
-  const { existingConfigAction, existingSchemaText, generatedSchemaText } =
-    params;
+  const {
+    existingConfigAction,
+    existingSchemaText,
+    existingSchemaUnreadable,
+    generatedSchemaText,
+  } = params;
+  if (existingSchemaUnreadable) {
+    return { shouldWrite: false, kind: "unreadable" };
+  }
   if (existingSchemaText === undefined) {
     return { shouldWrite: true, kind: "written" };
   }
@@ -594,8 +641,35 @@ function formatSchemaWriteLine(schema: SchemaWriteOutcome): string {
       );
     case "overwritten":
       return `Overwrote schema.json at ${schema.path} (custom rules present), per --on-existing overwrite.`;
+    case "unreadable":
+      return (
+        `Kept existing schema.json at ${schema.path} (custom rules present) — it exists but could ` +
+        "not be read, so init cannot tell whether it matches and will not replace a file it is " +
+        "unable to inspect. Fix its permissions (or remove it) and re-run init with " +
+        "--on-existing merge to regenerate it."
+      );
     default: {
       const exhaustiveCheck: never = schema;
+      return exhaustiveCheck;
+    }
+  }
+}
+
+function formatCiWorkflowLine(ciWorkflow: CiWorkflowOutcome): string {
+  switch (ciWorkflow.kind) {
+    case "written":
+      return `Wrote CI workflow ${ciWorkflow.path}.`;
+    case "failed": {
+      const reason =
+        ciWorkflow.code === undefined ? "" : ` (${ciWorkflow.code})`;
+      return (
+        `Could not write the CI workflow ${ciWorkflow.path}${reason} — the config above was still ` +
+        "written, and no partial workflow file was left behind. Re-run init to retry it, or add " +
+        "the workflow by hand."
+      );
+    }
+    default: {
+      const exhaustiveCheck: never = ciWorkflow;
       return exhaustiveCheck;
     }
   }
@@ -612,9 +686,9 @@ export function formatWriteSummary(params: {
   result: GeneratedInitConfig;
   configPath: string;
   schema?: SchemaWriteOutcome;
-  ciWorkflowPath?: string;
+  ciWorkflow?: CiWorkflowOutcome;
 }): string {
-  const { action, result, configPath, schema, ciWorkflowPath } = params;
+  const { action, result, configPath, schema, ciWorkflow } = params;
   const lines: string[] = [];
 
   if (action === "merge") {
@@ -629,10 +703,53 @@ export function formatWriteSummary(params: {
   if (schema !== undefined) {
     lines.push(formatSchemaWriteLine(schema));
   }
-  if (ciWorkflowPath !== undefined) {
-    lines.push(`Wrote CI workflow ${ciWorkflowPath}.`);
+  if (ciWorkflow !== undefined) {
+    lines.push(formatCiWorkflowLine(ciWorkflow));
   }
 
+  return `${lines.join("\n")}\n`;
+}
+
+/**
+ * The partial-write summary (P11.09, audit M-5): a write that failed must still tell the user what
+ * landed and what did not, on stdout, instead of leaving them to guess from a bare stderr errno.
+ * `written`/`notWritten`/`failedPath` are repository-relative POSIX paths; the two lists are sorted
+ * here (their order is incidental once the commit sequence has already happened) so the output is
+ * deterministic.
+ *
+ * Only the errno `code` is rendered, never the raw fs message: Node's `rename` error embeds two
+ * absolute, platform-native paths plus the random temp file name.
+ */
+export function formatWriteFailureSummary(params: {
+  written: string[];
+  notWritten: string[];
+  failedPath: string;
+  code?: string;
+}): string {
+  const reason = params.code === undefined ? "" : ` (${params.code})`;
+  const lines: string[] = [
+    `Write failed: could not replace ${params.failedPath}${reason}.`,
+  ];
+
+  const written = [...params.written].sort(compareStrings);
+  lines.push(
+    written.length === 0
+      ? "Written: nothing."
+      : `Written: ${written.join(", ")}.`,
+  );
+
+  // Always non-empty in practice (it holds at least the file that failed), but guarded so this pure
+  // formatter never renders a dangling "Not written: ." line.
+  const notWritten = [...params.notWritten].sort(compareStrings);
+  if (notWritten.length > 0) {
+    lines.push(
+      `Not written: ${notWritten.join(", ")}. Every file listed as not written is ` +
+        "byte-unchanged on disk: init stages each file next to its target and renames it into " +
+        "place, so a failed write never truncates or partially replaces an existing file.",
+    );
+  }
+
+  lines.push("Fix the cause and re-run init.");
   return `${lines.join("\n")}\n`;
 }
 
@@ -718,6 +835,7 @@ export async function runInitCommand(
       return {
         output: `${DRAFT_SUMMARY_HEADER}\n\nskipped — existing config left untouched.\n`,
         wasConfirmed: false,
+        writeFailed: false,
       };
     }
   }
@@ -808,6 +926,7 @@ export async function runInitCommand(
     return {
       output: "Aborted: configuration not confirmed.\n",
       wasConfirmed: false,
+      writeFailed: false,
     };
   }
 
@@ -836,6 +955,9 @@ export async function runInitCommand(
       // The user did confirm the draft above (`confirmed === true`) — only the write itself was
       // withheld, for a reason unrelated to their choice. See the type's own comment.
       wasConfirmed: true,
+      // A deliberate refusal to write, not a failed write: nothing was attempted, so this stays 0-exit
+      // (the summary tells the user how to recover).
+      writeFailed: false,
     };
   }
 
@@ -866,7 +988,13 @@ export async function runInitCommand(
     packageSchemaRef: resolvePackageSchemaRef(cwd, schemaAnchor),
   });
 
-  await writeFile(configPath, result.configText, "utf8");
+  // Staged as one batch and committed schema-first, config-last (P11.09, audit M-5). The order is
+  // load-bearing: the config is what points at the schema, so if the schema rename fails the old
+  // config — and its old, still-accurate `$schema` — survives untouched. The previous config-first
+  // order produced exactly the audit's repro (a rewritten config pointing at a stale schema).
+  // `writeFilesAtomic` stages every temp before renaming any of them, so the common failure (no space,
+  // no permission on the directory) leaves the repository entirely untouched.
+  const writes: AtomicFileWrite[] = [];
   let schemaOutcome: SchemaWriteOutcome | undefined;
   if (result.projectSchema !== undefined) {
     const schemaPath = path.join(cwd, result.projectSchema.fileName);
@@ -880,15 +1008,42 @@ export async function runInitCommand(
     const decision = resolveSchemaWriteOutcome({
       existingConfigAction,
       existingSchemaText,
+      // Separates "absent" from "present but unreadable", which the read above collapses into one
+      // `undefined`. Under the old truncate-and-write that conflation was harmless (an unreadable
+      // file usually failed the write too); a temp+rename commit only needs write permission on the
+      // directory, so without this the guard would happily replace a file it could not even read.
+      existingSchemaUnreadable:
+        existingSchemaText === undefined && (await fileExists(schemaPath)),
       generatedSchemaText: result.projectSchema.text,
     });
     if (decision.shouldWrite) {
-      await writeFile(schemaPath, result.projectSchema.text, "utf8");
+      writes.push({ path: schemaPath, content: result.projectSchema.text });
     }
     schemaOutcome = { kind: decision.kind, path: schemaRelativePath };
   }
+  writes.push({ path: configPath, content: result.configText });
 
-  const ciWorkflowRelativePath = await offerCiWorkflow({
+  const writeResult = await writeFilesAtomic(writes);
+  if (!writeResult.ok) {
+    // Return the failure summary on stdout rather than throwing: the audit's complaint was an *empty*
+    // stdout on a failed write, leaving the user unable to tell what state their repo was in. The
+    // CI-workflow offer is deliberately skipped — prompting to add a workflow for a config that was
+    // never written would be nonsense.
+    return {
+      output: composeOutput(
+        formatWriteFailureSummary({
+          written: writeResult.written.map(toRepoRelative),
+          notWritten: writeResult.notWritten.map(toRepoRelative),
+          failedPath: toRepoRelative(writeResult.failedPath),
+          code: writeResult.code,
+        }),
+      ),
+      wasConfirmed: true,
+      writeFailed: true,
+    };
+  }
+
+  const ciWorkflow = await offerCiWorkflow({
     repoRoot,
     configAbsPath: configPath,
     yes: options.yes,
@@ -903,10 +1058,13 @@ export async function runInitCommand(
         result,
         configPath: toRepoRelative(configPath),
         schema: schemaOutcome,
-        ciWorkflowPath: ciWorkflowRelativePath,
+        ciWorkflow,
       }),
     ),
     wasConfirmed: true,
+    // The config and schema landed; only the opt-in workflow the user asked for did not. Still a
+    // failed write, so the exit code has to say so — the summary above names which file it was.
+    writeFailed: ciWorkflow?.kind === "failed",
   };
 }
 

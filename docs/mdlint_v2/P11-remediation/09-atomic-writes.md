@@ -1,7 +1,7 @@
 # P11.09 · Atomic, newline-safe writes for `init` and `--fix`
 
 > Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** ·
-> Status **Not started**. Findings **M-5** (`init` non-atomic) and **L-6** (`--fix` non-atomic /
+> Status **Done**. Findings **M-5** (`init` non-atomic) and **L-6** (`--fix` non-atomic /
 > newline), [post-P9 audit](../audit-2026-07-25-post-p9.md). Depends on
 > [P11.03](03-init-schema-clobber.md) (shares the guarded write path).
 
@@ -44,8 +44,130 @@ Redesigning the `--fix` engine or `SEC-003`'s fix content — only its newline h
 
 ## Exit criteria
 
-- [ ] `init` and `--fix` writes are temp-file + rename; a mid-write failure never truncates an existing file.
-- [ ] `--fix` preserves the document's newline style (CRLF stays CRLF).
-- [ ] A partial-failure write reports what succeeded and what did not.
-- [ ] Regression tests cover the read-only-`schema.json` and the CRLF-`--fix` cases.
-- [ ] `npm run typecheck && npm run lint && npm run format && npm test && npm run build` green.
+- [x] `init` and `--fix` writes are temp-file + rename; a mid-write failure never truncates an existing file.
+- [x] `--fix` preserves the document's newline style (CRLF stays CRLF).
+- [x] A partial-failure write reports what succeeded and what did not.
+- [x] Regression tests cover the read-only-`schema.json` and the CRLF-`--fix` cases.
+- [x] `npm run typecheck && npm run lint && npm run format && npm test && npm run build` green.
+
+## Implementation notes
+
+- **One new cross-cutting core module, `packages/core/src/atomic-write.ts`** (root level, like
+  `deterministic-sort.ts`/`rule-id.ts`/`errors.ts` — a single-file `fs/` directory would have been
+  premature structure). Two exported entry points over one implementation:
+  `writeFileAtomic(filePath, content)` throws (the call sites with nothing partial to report) and
+  `writeFilesAtomic(writes)` returns a structured `AtomicWriteResult` (`init`, which must report
+  partial state). Both stage a temp file **in the target's own directory** and `rename` it into
+  place. `writeFilesAtomic` stages _every_ temp before renaming any of them: that two-phase split is
+  the point — an `ENOSPC` staging file 2 means file 1 is never renamed, so the common failure leaves
+  the repo entirely untouched. Once renaming starts a partial commit is unavoidable without a
+  journal, hence the result shape rather than a boolean.
+- **Deliberate scope boundaries, all commented at the module head:** no `fsync` (the guarantee owed
+  is "a failed write never truncates an existing file", which temp+rename gives; power-loss
+  durability would need an fsync of both file and directory and would tax `--fix` on a large corpus
+  for a property nothing in the product promises); no cross-filesystem fallback (the temp always
+  sits beside its target, so `rename` never crosses a mount and `EXDEV` is unreachable by
+  construction — a shared temp dir would have _created_ the case the task lists as out of scope);
+  directory creation stays with the caller, matching the `writeFile` calls this replaces.
+- **Temp naming: `.${basename}.${random}.tmp`, flag `wx`.** The random suffix is deliberately _after_
+  the extension so an orphaned temp from a hard kill can never match `**/*.md` and be linted (or
+  fixed) as a document. `wx` turns a name collision into `EEXIST` instead of two concurrent runs
+  sharing a temp.
+- **Two semantics `writeFile` had for free, restored explicitly:** the target's `realpath` is
+  resolved before deriving the temp directory, so a **symlinked** config is written _through_ the
+  link rather than replaced by a regular file; and the target's mode is `stat`ed and `chmod`ed onto
+  the temp (masked to `0o7777` — POSIX leaves `chmod` with `st_mode`'s file-type bits unspecified),
+  so a `0600` config does not silently widen to `0644`. Both are best-effort and both are
+  POSIX-gated in the tests.
+- **Commit order in `init` is schema-first, config-last** — the inverse of the audit's complaint. The
+  config is what points at the schema, so if the schema rename fails the old config _and its old,
+  still-accurate `$schema`_ survive. The residual asymmetry (schema committed, then the config
+  rename fails) is inherent without a journal, so it is reported rather than prevented.
+- **Reachability finding — the audit's exact repro no longer fails, for two independent reasons.**
+  Recorded honestly rather than papered over. (1) P11.03 already keeps a readable, differing
+  `schema.json`: it resolves to `kind: "kept"`, `shouldWrite: false`, so no schema write is even
+  attempted. (2) POSIX `rename()` needs write permission on the _directory_, not on the target, so a
+  `chmod 0444 schema.json` that used to yield `EACCES` from `writeFile` now succeeds. Consequently
+  the only CLI-reachable failure shape is "nothing written" (a fault during staging, or on the very
+  first rename); the committed-prefix shape is proven through `writeFilesAtomic` and
+  `formatWriteFailureSummary` unit tests instead, exactly as P11.03 did for its unreachable
+  `"overwrite"` branch.
+- **Accepted, documented side effect of that same `rename()` semantic: a target's own read-only mode
+  no longer blocks a write.** On Linux/macOS `--fix` now rewrites a `0444` Markdown file, and
+  `init --on-existing overwrite` now replaces a read-only config, where truncate-and-write failed
+  with `EACCES` (mode preservation copies the `0444` back onto the replacement, so the file looks
+  unchanged afterwards). Not guarded against: an `access(target, W_OK)` pre-check would be a TOCTOU
+  race, would not hold on Windows (where `rename` over a read-only file fails anyway), and file mode
+  was never the intended way to opt a document out of `--fix` — `exclude` is. The `"unreadable"`
+  guard above keys off _readability_, which protects a file `init` cannot compare against; it does
+  not and should not stand in for write protection. Recorded in
+  [`docs/guide/output.md`](../../guide/output.md) so the behavior change is not silent.
+- **The atomicity switch weakened I1, and fixing that is part of this task.** P11.03 degrades _any_
+  read failure to `existingSchemaText === undefined` → `kind: "written"` → write. That was safe under
+  truncate-and-write (the write failed the same way); under temp+rename it would have silently
+  replaced an unreadable existing file. `resolveSchemaWriteOutcome` therefore gained a **required**
+  `existingSchemaUnreadable: boolean` (required, not optional, so every call site states its
+  answer — the `pathWasExplicit` precedent from P11.04) and a fifth `SchemaWriteOutcome` kind,
+  `"unreadable"` (`shouldWrite: false`), checked _ahead of every other branch_ including an explicit
+  `overwrite`: an overwrite cannot be an informed instruction about a file nobody could read. The
+  call site computes it as `existingSchemaText === undefined && (await fileExists(schemaPath))`.
+- **Newline policy lives on the write path, not in `applyEdits`.** `applyEdits` stays a pure offset
+  primitive. `applyFixes` detects the document's newline once (`markdown/newline.ts` —
+  `detectNewline`, first terminator wins, `"\n"` default, never `os.EOL`, since the host running the
+  linter is not necessarily the host that authored the file) and normalizes every edit's `newText`,
+  so _no_ fix hook can leave a CRLF file with mixed endings. `sec001.fix` additionally joins its
+  scaffold with the document newline, so the rule is correct when exercised in isolation —
+  deliberate belt-and-braces, commented as such at both sites. `newline.ts` is core-internal (not in
+  the barrel), following `engine/path-resolve.ts`. `tbl002`'s `emptyCellEdits` needed no change (it
+  only ever edits between a row's pipes, so `content.split("\n")` leaves the `\r` outside the cell
+  range) but gained a CRLF regression test to pin that down.
+- **Failure messages carry the errno `code`, never the raw fs message.** Node's `rename` error embeds
+  two absolute, platform-native paths plus the random temp name — neither deterministic nor
+  repo-relative. `formatWriteFailureSummary` (new, exported, pure) renders
+  `could not replace <repo-relative path> (EISDIR)`, sorts both lists with `compareStrings` (their
+  order is incidental once the commit sequence has happened), and states explicitly that every file
+  listed as not written is byte-unchanged. `FixWriteError` does the same for `--fix`.
+- **Exit codes reuse `EXIT_CODE_USAGE_ERROR` (= 2)**, which is what the docs already define as the
+  one operational/usage code (`docs/guide/output.md`, `docs/guide/cli.md`); only the constant's
+  _name_ is off, and renaming it belongs to [P11.10](10-cli-exit-contract.md).
+  `RunInitCommandResult` gained a required `writeFailed: boolean` (a deliberate no-write outcome —
+  `skip`, an unconfirmed draft, the unreadable-`merge` abort — is `false`, because nothing failed);
+  `handleInit` maps it, replacing the old "always exits 0" comment. `handleLint` catches
+  `FixWriteError` and rethrows it as `CliUsageError`, the same precedent `handleImpact`/`handleCompile`
+  already use for `ImpactAnalysisError`/`CompileConfigMissingError`.
+- **No stderr channel added.** The audit's complaint was an _empty stdout_, so the failure summary
+  goes to stdout and the exit code carries the failure. P11.10 may add a stderr line.
+- **`offerCiWorkflow` now returns a `CiWorkflowOutcome`** (`"written" | "failed"`, or `undefined` when
+  the offer was declined and nothing was attempted) and `formatWriteSummary`'s
+  `ciWorkflowPath?: string` became `ciWorkflow?: CiWorkflowOutcome` — the same shape of change P11.03
+  made for `schema`, with the same `formatCiWorkflowLine` exhaustive-switch treatment. The workflow
+  write happens _after_ the config is committed, so its failure must not discard the (accurate)
+  summary for the files that did land: it becomes a summary line plus a non-zero exit, and the offer
+  is skipped entirely after a failed config write.
+- **The other three product writes** (`schema --out`, `compile` → `SKILL.md`, the CI workflow) route
+  through the same helper, so no surface is left on truncate-and-write. That is the full inventory —
+  verified against the tree, since the audit's line numbers had gone stale.
+- **Tests.** New: `packages/core/test/atomic-write.test.ts` (replace; create; staging failure writes
+  nothing; committed-prefix on a later rename failure; nothing written when the _first_ rename fails;
+  commit order is not sorted; POSIX-gated mode preservation and symlink write-through; `.tmp` residue
+  asserted absent on every failure path) and `packages/core/test/newline.test.ts`.
+  Extended: `rules-sec.test.ts` (CRLF scaffold + the LF case pinned byte-exact),
+  `rules-tbl.test.ts` (CRLF cell fill; a POSIX/non-root-gated `FixWriteError` case using a `0o555`
+  subdirectory, restoring the mode in a `finally` so the shared `afterEach` `rm` can still run),
+  `lint.e2e.test.ts` (`lint --fix` on a runtime-built CRLF fixture — both fix hooks on one document —
+  stays CRLF), and `init.e2e.test.ts` (cross-platform failed config write via a _directory_ named
+  `wastech-mdlint.config.json`, since `findConfig` uses `stat`: summary on stdout, exit 2, corpus
+  untouched, no temp residue; POSIX/non-root-gated byte-unchanged config under a `0o555` root;
+  POSIX/non-root-gated unreadable `schema.json` reported kept, byte-unchanged, config still written,
+  exit 0; unit tests for `existingSchemaUnreadable` precedence, both `formatWriteFailureSummary`
+  shapes, and `formatWriteSummary` with the `"unreadable"` schema kind and a failed `ciWorkflow`).
+  All CRLF fixtures are built at runtime in `mkdtemp` — `.gitattributes` forces `eol=lf`, so a
+  committed CRLF fixture would be silently converted.
+- **Docs updated in the same change**, per `AGENTS.md`'s hygiene rule: `docs/guide/output.md`
+  (`--fix` newline preservation + the truncation guarantee + the non-durability boundary; exit-code
+  table), `docs/guide/cli.md` (exit-code table; `init`'s atomic/partial-write behavior and the
+  unreadable-`schema.json` case), `docs/guide/rules/SEC-001.md` (the scaffold adopts the document's
+  newline), and `docs/mdlint_v2/glossary.md` (a new **Atomic write** entry under _Cross-cutting
+  conventions_, plus the `--fix`/`TextEdit`, CLI `init`, and **Exit codes** entries extended). No
+  `npm run generate:docs`: the only byte-synced artifacts are `README.md`'s rule table and
+  `packages/cli/schema.json`, and neither changes here.

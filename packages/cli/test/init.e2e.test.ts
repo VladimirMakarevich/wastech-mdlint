@@ -1,4 +1,12 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -23,6 +31,7 @@ import {
   diffAgainstExistingRuleIds,
   formatDraftSummary,
   formatNotWrittenSummary,
+  formatWriteFailureSummary,
   formatWriteSummary,
   groupInferredRulesByCategory,
   readExistingRuleIds,
@@ -911,6 +920,127 @@ describe("init command · writing the config (P6.04)", () => {
     );
   });
 
+  // P11.09 (audit M-5). A directory sitting where the config file belongs is the one write fault
+  // reachable on every platform: `findConfig` uses `stat`, so the directory counts as an existing
+  // config, staging succeeds, and only the rename fails.
+  it("reports a failed config write on stdout, exits 2, and leaves the corpus untouched", async () => {
+    const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+    await mkdir(path.join(cwd, CONFIG_FILE));
+    const docBefore = await readFile(path.join(cwd, "docs/a.md"), "utf8");
+
+    // `overwrite` (not the `--yes` default `skip`) so the run actually reaches the write, and it
+    // skips the merge-readability abort that would otherwise return first.
+    const result = await run(
+      ["init", cwd, "--yes", "--on-existing", "overwrite"],
+      cwd,
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    expect(result.stdout).toContain(
+      `Write failed: could not replace ${CONFIG_FILE}`,
+    );
+    expect(result.stdout).toContain("Written: nothing.");
+    expect(result.stdout).toContain(
+      "Every file listed as not written is byte-unchanged on disk",
+    );
+    expect(result.stdout).not.toContain(`Wrote ${CONFIG_FILE}`);
+    await expect(readFile(path.join(cwd, "docs/a.md"), "utf8")).resolves.toBe(
+      docBefore,
+    );
+    // No temp file left beside the target the rename could not reach.
+    await expect(
+      readdir(cwd).then((entries) =>
+        entries.filter((entry) => entry.endsWith(".tmp")),
+      ),
+    ).resolves.toEqual([]);
+  });
+
+  // Root ignores directory permissions and Windows has no equivalent model, so the fault this
+  // relies on only exists for an unprivileged POSIX user.
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "leaves an existing config byte-unchanged when the write cannot be staged",
+    async () => {
+      const existingConfigText = `${JSON.stringify({ rules: [{ rule: "REF-001" }] }, null, 2)}\n`;
+      const cwd = await fixtureRepo({
+        ...CROSS_LINKED_DOCS_FIXTURE,
+        [CONFIG_FILE]: existingConfigText,
+      });
+      // `r-x`: the corpus and the existing config stay readable, but no new file can be created —
+      // so the temp write fails and no rename is ever attempted.
+      await chmod(cwd, 0o555);
+
+      try {
+        const result = await run(
+          ["init", cwd, "--yes", "--on-existing", "overwrite"],
+          cwd,
+        );
+
+        expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+        expect(result.stdout).toContain(
+          `Write failed: could not replace ${CONFIG_FILE} (EACCES).`,
+        );
+        expect(result.stdout).toContain("Written: nothing.");
+        // The point of the change: the truncate-and-write path used to leave this file clobbered.
+        await expect(
+          readFile(path.join(cwd, CONFIG_FILE), "utf8"),
+        ).resolves.toBe(existingConfigText);
+      } finally {
+        // Without this the shared afterEach `rm(..., { recursive: true })` fails with EACCES.
+        await chmod(cwd, 0o755);
+      }
+    },
+  );
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "keeps an unreadable existing schema.json, still writes the config, and exits 0",
+    async () => {
+      const customConfig = JSON.stringify({
+        rules: [
+          {
+            rule: "custom",
+            id: "REQ-100",
+            description: "Requires an Owner section.",
+            options: {
+              assert: { kind: "sectionPresent", sections: ["Owner"] },
+            },
+          },
+        ],
+      });
+      const existingSchemaText = '{"hand-written":true}\n';
+      const cwd = await fixtureRepo({
+        ...CROSS_LINKED_DOCS_FIXTURE,
+        [CONFIG_FILE]: customConfig,
+        "schema.json": existingSchemaText,
+      });
+      const schemaPath = path.join(cwd, "schema.json");
+      // Unreadable but present. The read that feeds the byte-comparison degrades any failure to
+      // `undefined`, which used to be safe only because the write would fail identically — a
+      // temp+rename commit would have replaced it (P11.09).
+      await chmod(schemaPath, 0o000);
+
+      const result = await run(
+        ["init", cwd, "--yes", "--on-existing", "merge"],
+        cwd,
+      );
+      await chmod(schemaPath, 0o644);
+
+      expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+      expect(result.stdout).toContain(
+        "Kept existing schema.json at schema.json",
+      );
+      expect(result.stdout).toContain("exists but could not be read");
+      expect(result.stdout).not.toContain("Wrote project-local schema");
+      await expect(readFile(schemaPath, "utf8")).resolves.toBe(
+        existingSchemaText,
+      );
+      // The config write is independent of the schema guard and still lands.
+      const written = readConfig(
+        await readFile(path.join(cwd, CONFIG_FILE), "utf8"),
+      );
+      expect(written.$schema).toBe("./schema.json");
+    },
+  );
+
   it("--yes --with-ci-workflow writes the workflow file; plain --yes does not", async () => {
     const workflowPath = path.join(
       ".github",
@@ -1599,7 +1729,10 @@ describe("formatWriteSummary", () => {
       result: buildResult({ schemaRef: "./schema.json" }),
       configPath: CONFIG_FILE,
       schema: { kind: "written", path: "schema.json" },
-      ciWorkflowPath: ".github/workflows/wastech-mdlint.yml",
+      ciWorkflow: {
+        kind: "written",
+        path: ".github/workflows/wastech-mdlint.yml",
+      },
     });
 
     expect(summary).toContain(
@@ -1655,6 +1788,57 @@ describe("formatWriteSummary", () => {
     expect(summary).toContain("Overwrote schema.json at schema.json");
     expect(summary).toContain("--on-existing overwrite");
   });
+
+  it("reports an unreadable existing schema.json as kept, saying why it could not be compared", () => {
+    const summary = formatWriteSummary({
+      action: "merge",
+      result: buildResult({ schemaRef: "./schema.json" }),
+      configPath: CONFIG_FILE,
+      schema: { kind: "unreadable", path: "schema.json" },
+    });
+
+    expect(summary).toContain("Kept existing schema.json at schema.json");
+    expect(summary).toContain("exists but could not be read");
+    expect(summary).toContain("--on-existing merge");
+    expect(summary).not.toContain("Wrote project-local schema");
+  });
+
+  it("reports a failed CI-workflow write without implying the config failed too", () => {
+    const summary = formatWriteSummary({
+      action: "fresh",
+      result: buildResult(),
+      configPath: CONFIG_FILE,
+      ciWorkflow: {
+        kind: "failed",
+        path: ".github/workflows/wastech-mdlint.yml",
+        code: "EACCES",
+      },
+    });
+
+    expect(summary).toContain(`Wrote ${CONFIG_FILE} with 2 rule(s).`);
+    expect(summary).toContain(
+      "Could not write the CI workflow .github/workflows/wastech-mdlint.yml (EACCES)",
+    );
+    expect(summary).toContain("the config above was still written");
+    expect(summary).not.toContain("Wrote CI workflow");
+  });
+
+  it("omits the errno from a failed CI-workflow line when there is none", () => {
+    const summary = formatWriteSummary({
+      action: "fresh",
+      result: buildResult(),
+      configPath: CONFIG_FILE,
+      ciWorkflow: {
+        kind: "failed",
+        path: ".github/workflows/wastech-mdlint.yml",
+      },
+    });
+
+    expect(summary).toContain(
+      "Could not write the CI workflow .github/workflows/wastech-mdlint.yml —",
+    );
+    expect(summary).not.toContain("()");
+  });
 });
 
 describe("resolveSchemaWriteOutcome", () => {
@@ -1665,6 +1849,7 @@ describe("resolveSchemaWriteOutcome", () => {
       resolveSchemaWriteOutcome({
         existingConfigAction: "merge",
         existingSchemaText: undefined,
+        existingSchemaUnreadable: false,
         generatedSchemaText,
       }),
     ).toEqual({ shouldWrite: true, kind: "written" });
@@ -1672,6 +1857,7 @@ describe("resolveSchemaWriteOutcome", () => {
       resolveSchemaWriteOutcome({
         existingConfigAction: "none",
         existingSchemaText: undefined,
+        existingSchemaUnreadable: false,
         generatedSchemaText,
       }),
     ).toEqual({ shouldWrite: true, kind: "written" });
@@ -1682,6 +1868,7 @@ describe("resolveSchemaWriteOutcome", () => {
       resolveSchemaWriteOutcome({
         existingConfigAction: "merge",
         existingSchemaText: generatedSchemaText,
+        existingSchemaUnreadable: false,
         generatedSchemaText,
       }),
     ).toEqual({ shouldWrite: false, kind: "unchanged" });
@@ -1689,6 +1876,7 @@ describe("resolveSchemaWriteOutcome", () => {
       resolveSchemaWriteOutcome({
         existingConfigAction: "overwrite",
         existingSchemaText: generatedSchemaText,
+        existingSchemaUnreadable: false,
         generatedSchemaText,
       }),
     ).toEqual({ shouldWrite: false, kind: "unchanged" });
@@ -1699,6 +1887,7 @@ describe("resolveSchemaWriteOutcome", () => {
       resolveSchemaWriteOutcome({
         existingConfigAction: "overwrite",
         existingSchemaText: '{"hand-written":true}\n',
+        existingSchemaUnreadable: false,
         generatedSchemaText,
       }),
     ).toEqual({ shouldWrite: true, kind: "overwritten" });
@@ -1709,6 +1898,7 @@ describe("resolveSchemaWriteOutcome", () => {
       resolveSchemaWriteOutcome({
         existingConfigAction: "merge",
         existingSchemaText: '{"hand-written":true}\n',
+        existingSchemaUnreadable: false,
         generatedSchemaText,
       }),
     ).toEqual({ shouldWrite: false, kind: "kept" });
@@ -1719,9 +1909,65 @@ describe("resolveSchemaWriteOutcome", () => {
       resolveSchemaWriteOutcome({
         existingConfigAction: "none",
         existingSchemaText: '{"hand-written":true}\n',
+        existingSchemaUnreadable: false,
         generatedSchemaText,
       }),
     ).toEqual({ shouldWrite: false, kind: "kept" });
+  });
+
+  // P11.09: `rename` only needs write permission on the *directory*, so an unreadable target no
+  // longer blocks the write the way a truncating `writeFile` did. This branch must therefore win
+  // ahead of everything else — including an explicit `overwrite`, which cannot be an informed
+  // instruction about a file nobody could read.
+  it("refuses to touch a present-but-unreadable schema.json, ahead of every other check", () => {
+    for (const existingConfigAction of [
+      "overwrite",
+      "merge",
+      "none",
+    ] as const) {
+      expect(
+        resolveSchemaWriteOutcome({
+          existingConfigAction,
+          existingSchemaText: undefined,
+          existingSchemaUnreadable: true,
+          generatedSchemaText,
+        }),
+      ).toEqual({ shouldWrite: false, kind: "unreadable" });
+    }
+  });
+});
+
+describe("formatWriteFailureSummary", () => {
+  it("reports a failure before anything was committed, with the errno and the byte-unchanged guarantee", () => {
+    const summary = formatWriteFailureSummary({
+      written: [],
+      notWritten: ["schema.json", CONFIG_FILE],
+      failedPath: "schema.json",
+      code: "EISDIR",
+    });
+
+    expect(summary).toContain(
+      "Write failed: could not replace schema.json (EISDIR).",
+    );
+    expect(summary).toContain("Written: nothing.");
+    expect(summary).toContain(
+      `Not written: schema.json, ${CONFIG_FILE}. Every file listed as not written is byte-unchanged on disk`,
+    );
+    expect(summary).toContain("Fix the cause and re-run init.");
+  });
+
+  it("names the committed prefix on a partial write and sorts both lists", () => {
+    const summary = formatWriteFailureSummary({
+      written: ["schema.json", "docs/schema.json"],
+      notWritten: [CONFIG_FILE],
+      failedPath: CONFIG_FILE,
+    });
+
+    expect(summary).toContain("Written: docs/schema.json, schema.json.");
+    expect(summary).toContain(`Not written: ${CONFIG_FILE}.`);
+    // No errno available (e.g. a failed mkdir) must not render an empty "()" placeholder.
+    expect(summary).toContain(`could not replace ${CONFIG_FILE}.`);
+    expect(summary).not.toContain("()");
   });
 });
 

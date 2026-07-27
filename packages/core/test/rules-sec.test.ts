@@ -61,6 +61,49 @@ describe("SEC-001 required sections", () => {
     ]);
     expect(after.messages).toEqual([]);
   });
+
+  // Audit L-6: the scaffold used to be a hard-coded `\n## X\n\nTODO\n`, so fixing a CRLF document
+  // left it with mixed line endings. The fixture is built at runtime because `.gitattributes` forces
+  // `eol=lf` on committed files, which would silently convert a checked-in CRLF fixture.
+  it("scaffolds with CRLF in a CRLF document, leaving no lone LF behind", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "# Title\r\n\r\n## Intro\r\n",
+    });
+
+    await applyFixes({
+      cwd,
+      config: { rules: [] },
+      rules: [rule("SEC-001", { sections: ["Intro", "Summary"] })],
+      settings: {},
+    });
+
+    const written = await readFile(path.join(cwd, "a.md"), "utf8");
+    expect(written).toBe(
+      "# Title\r\n\r\n## Intro\r\n\r\n## Summary\r\n\r\nTODO\r\n",
+    );
+    expect(written.replace(/\r\n/g, "")).not.toContain("\n");
+    expect(written).not.toContain("\r\r");
+
+    const after = await lint(cwd, [
+      rule("SEC-001", { sections: ["Intro", "Summary"] }),
+    ]);
+    expect(after.messages).toEqual([]);
+  });
+
+  it("still scaffolds with LF in an LF document", async () => {
+    const cwd = await fixtureRepo({ "a.md": "# Title\n\n## Intro\n" });
+
+    await applyFixes({
+      cwd,
+      config: { rules: [] },
+      rules: [rule("SEC-001", { sections: ["Intro", "Summary"] })],
+      settings: {},
+    });
+
+    await expect(readFile(path.join(cwd, "a.md"), "utf8")).resolves.toBe(
+      "# Title\n\n## Intro\n\n## Summary\n\nTODO\n",
+    );
+  });
 });
 
 describe("SEC-002 section order", () => {

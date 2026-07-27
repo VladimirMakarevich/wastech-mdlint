@@ -1,11 +1,19 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { ConfiguredRule } from "../src/config/load-config.js";
-import { applyEdits, applyFixes } from "../src/engine/fix.js";
+import { applyEdits, applyFixes, FixWriteError } from "../src/engine/fix.js";
 import { lintFiles } from "../src/engine/lint-files.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
 
@@ -163,7 +171,83 @@ describe("TBL-002 --fix", () => {
     const after = await lint(cwd, [rule("TBL-002", { columns: ["Owner"] })]);
     expect(after.messages).toEqual([]);
   });
+
+  // `emptyCellEdits` only ever edits *between* a row's pipes, so its offsets were already CRLF-safe
+  // (`content.split("\n")` leaves the `\r` outside the cell range) — this pins that down so the
+  // P11.09 newline normalization on the write path cannot regress it in the other direction.
+  it("fills the cell without disturbing a CRLF document's line endings", async () => {
+    const cwd = await fixtureRepo({ "a.md": TABLE.replace(/\n/g, "\r\n") });
+
+    await applyFixes({
+      cwd,
+      config: { rules: [] },
+      rules: [rule("TBL-002", { columns: ["Owner"] })],
+      settings: {},
+    });
+
+    const written = await readFile(path.join(cwd, "a.md"), "utf8");
+    expect(written).toBe(
+      [
+        "| ID | Owner | Status |",
+        "| --- | --- | --- |",
+        "| REQ-1 | Ann | open |",
+        "| REQ-2 | TODO | bogus |",
+      ].join("\r\n"),
+    );
+    expect(written.replace(/\r\n/g, "")).not.toContain("\n");
+    expect(written).not.toContain("\r\r");
+  });
 });
+
+// Root can write into a 0o555 directory, so the fault this relies on does not exist there; Windows
+// has no equivalent directory-permission model.
+describe.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+  "applyFixes write failures",
+  () => {
+    it("fails fast with a FixWriteError naming the unwritten file and the ones already fixed", async () => {
+      const cwd = await fixtureRepo({ "a.md": TABLE, "sub/b.md": TABLE });
+      const readOnlyDir = path.join(cwd, "sub");
+      // `r-x` keeps `sub/b.md` readable (so it still enters the corpus) while making the temp write
+      // inside `sub/` fail — the closest thing to a real mid-write fault without a fault injector.
+      await chmod(readOnlyDir, 0o555);
+
+      try {
+        const failure = await applyFixes({
+          cwd,
+          config: { rules: [] },
+          rules: [rule("TBL-002", { columns: ["Owner"] })],
+          settings: {},
+        }).catch((error: unknown) => error);
+
+        expect(failure).toBeInstanceOf(FixWriteError);
+        expect(failure).toMatchObject({
+          filePath: "sub/b.md",
+          fixedFiles: ["a.md"],
+          errnoCode: "EACCES",
+        });
+        expect((failure as FixWriteError).message).toContain(
+          "--fix could not write sub/b.md (EACCES); it is unchanged on disk.",
+        );
+        expect((failure as FixWriteError).message).toContain(
+          "Already fixed: a.md.",
+        );
+
+        // The documents that did get written are committed; the failed one is byte-unchanged and has
+        // no temp left beside it.
+        await expect(
+          readFile(path.join(cwd, "a.md"), "utf8"),
+        ).resolves.toContain("| REQ-2 | TODO | bogus |");
+        await expect(
+          readFile(path.join(readOnlyDir, "b.md"), "utf8"),
+        ).resolves.toBe(TABLE);
+        await expect(readdir(readOnlyDir)).resolves.toEqual(["b.md"]);
+      } finally {
+        // Without this the shared afterEach `rm(..., { recursive: true })` fails with EACCES.
+        await chmod(readOnlyDir, 0o755);
+      }
+    });
+  },
+);
 
 describe("applyEdits", () => {
   it("applies non-overlapping edits from the end and skips overlaps", () => {

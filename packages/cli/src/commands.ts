@@ -1,4 +1,4 @@
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,6 +8,7 @@ import {
   compileContext,
   CompileConfigMissingError,
   computeGraphCoverage,
+  FixWriteError,
   formatLintResultJson,
   formatLintResultText,
   generateConfigSchema,
@@ -23,6 +24,7 @@ import {
   renderContextSliceSummary,
   renderImpactSummary,
   summarizeContextGraph,
+  writeFileAtomic,
 } from "@wastech-mdlint/core";
 import type {
   CompileResult,
@@ -164,12 +166,22 @@ async function handleLint(
 
   // ESLint-style --fix (audit 4.2): apply deterministic fixes in place, then re-lint the result.
   if (command.fix) {
-    await applyFixes({
-      cwd: command.path,
-      config: loaded.config,
-      rules: loaded.rules,
-      settings: loaded.settings,
-    });
+    try {
+      await applyFixes({
+        cwd: command.path,
+        config: loaded.config,
+        rules: loaded.rules,
+        settings: loaded.settings,
+      });
+    } catch (error) {
+      // FixWriteError already names the unwritable file, the files that were fixed, and that the
+      // failed one is unchanged; re-throw as CliUsageError so program.ts maps it to exit 2 (an
+      // operational failure) instead of a bare stack trace — same precedent as handleImpact/handleCompile.
+      if (error instanceof FixWriteError) {
+        throw new CliUsageError(error.message);
+      }
+      throw error;
+    }
   }
 
   const result = await lintFiles({
@@ -371,7 +383,7 @@ async function handleSchema(
   }
 
   await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, generateConfigSchema(), "utf8");
+  await writeFileAtomic(outputPath, generateConfigSchema());
 
   return {
     output: `schema written to ${command.out}\n`,
@@ -419,7 +431,7 @@ async function handleCompile(
   const outputPath = path.join(resolvedOutdir, "SKILL.md");
 
   await mkdir(resolvedOutdir, { recursive: true });
-  await writeFile(outputPath, result.skillContent, "utf8");
+  await writeFileAtomic(outputPath, result.skillContent);
 
   // Repository-relative POSIX path in user-visible output (invariant), not an absolute,
   // platform-native one — normalize `\` to `/` so this reads identically on Windows.
@@ -432,13 +444,16 @@ async function handleCompile(
   };
 }
 
-// `init` (P6.04): core generates the config bytes; `runInitCommand` performs the writes. The result
-// output is always informational (draft/write/abort summary), so this handler always exits 0.
+// `init` (P6.04): core generates the config bytes; `runInitCommand` performs the writes. Its output is
+// informational on every path (draft / write / abort / partial-write summary) and always goes to
+// stdout — but a *failed* write is an operational failure, so it exits 2 rather than reporting success
+// for files that never landed (P11.09). A deliberate no-write outcome (`skip`, an unconfirmed draft,
+// the unreadable-merge abort) is not a failure and still exits 0.
 async function handleInit(
   command: InitCommand,
   prompter: InitPrompter,
 ): Promise<CommandExecutionResult> {
-  const { output } = await runInitCommand(
+  const { output, writeFailed } = await runInitCommand(
     {
       cwd: command.cwd,
       yes: command.yes,
@@ -449,7 +464,10 @@ async function handleInit(
     },
     prompter,
   );
-  return { output, exitCode: EXIT_CODE_SUCCESS };
+  return {
+    output,
+    exitCode: writeFailed ? EXIT_CODE_USAGE_ERROR : EXIT_CODE_SUCCESS,
+  };
 }
 
 export async function executeCommand(
