@@ -29,11 +29,11 @@ operating systems (no timestamps, no host-dependent ordering).
 
 ## Exit codes
 
-| Code | Meaning                                                                                                   |
-| ---- | --------------------------------------------------------------------------------------------------------- |
-| `0`  | Clean — no findings at or above the `--fail-on` threshold.                                                |
-| `1`  | Findings at or above `--fail-on` (default `error`).                                                       |
-| `2`  | Operational/usage error (bad flag, missing config section, target outside the corpus, unreadable config). |
+| Code | Meaning                                                                                                                                          |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `0`  | Clean — no findings at or above the `--fail-on` threshold.                                                                                       |
+| `1`  | Findings at or above `--fail-on` (default `error`).                                                                                              |
+| `2`  | Operational/usage error (bad flag, missing config section, target outside the corpus, unreadable config, a file `--fix`/`init` could not write). |
 
 Control what fails CI with `--fail-on`:
 
@@ -49,6 +49,24 @@ wastech-mdlint lint . --fail-on off        # never fail; report only
 fix hook change files — currently [SEC-001](rules/SEC-001.md) (scaffold missing sections) and
 [TBL-002](rules/TBL-002.md) (empty target cell → `TODO`). Everything else is reported, never
 rewritten.
+
+Two properties hold for every file `--fix` touches:
+
+- **Line endings are preserved.** Each document's own style is detected from its bytes (whatever
+  terminates its first line wins; a file with none, or with lone classic-Mac `\r`, is treated as
+  LF), and inserted content adopts it. A CRLF file stays CRLF on a Linux runner, and no fix ever
+  leaves a file with mixed endings.
+- **A failed write never damages the file.** Each document is written to a temp file beside it and
+  then renamed into place, so the file on disk is either the old content or the new content, never a
+  truncated mix. If a write fails, `--fix` stops at that file and exits `2`, naming the file it
+  could not write (with its errno), stating that it is unchanged on disk, and listing the files it
+  had already fixed. Durability across a power loss is not claimed — the guarantee is against
+  truncation, not an un-`fsync`ed page cache.
+
+Replacing a file by rename has one visible consequence: on Linux/macOS a **read-only document no
+longer blocks a fix**, because `rename` checks write permission on the containing directory, not on
+the file (the replacement does inherit the original's mode). Keep a file out of `--fix` with
+[`exclude`](configuration.md#top-level-shape) rather than with its file mode.
 
 ## Other commands
 

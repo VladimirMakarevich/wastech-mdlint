@@ -21,11 +21,11 @@ wastech-mdlint -v | --version
 
 Every command uses the same taxonomy:
 
-| Code | Meaning                                                                                                                   |
-| ---- | ------------------------------------------------------------------------------------------------------------------------- |
-| `0`  | Success / clean (no findings at the `--fail-on` threshold).                                                               |
-| `1`  | Findings at or above the `--fail-on` severity (lint-style commands).                                                      |
-| `2`  | Operational/usage error — bad flag, invalid choice, missing config section, target outside the corpus, unreadable config. |
+| Code | Meaning                                                                                                                                                                  |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `0`  | Success / clean (no findings at the `--fail-on` threshold).                                                                                                              |
+| `1`  | Findings at or above the `--fail-on` severity (lint-style commands).                                                                                                     |
+| `2`  | Operational/usage error — bad flag, invalid choice, missing config section, target outside the corpus, unreadable config, a file `lint --fix` or `init` could not write. |
 
 `--help` and `--version` always exit `0`.
 
@@ -142,7 +142,21 @@ Scans the repo for doc clusters, infers a rule set with rationale, and — on co
   write could destroy a hand-written file. The write summary reports whether the existing file
   already matches what `init` would generate or differs from it; regenerating a differing one
   means removing or renaming it and re-running `init` with `--on-existing merge`, which is the
-  only action that produces a project-local schema at all.
+  only action that produces a project-local schema at all. An existing `schema.json` that exists
+  but cannot be **read** is kept too, and reported as such: `init` will not replace a file it
+  cannot compare against.
+- **Writes are atomic and reported even when they fail.** Each file is written to a temp file beside
+  its target and then renamed into place, so no failure can leave a truncated config behind. Every
+  temp is staged before any rename happens, so a failure while staging leaves the repository
+  entirely untouched; once the renames begin, a prefix of them may already have landed. That prefix
+  is ordered deliberately — the schema is committed before the config, so a failed schema write
+  leaves the old config (and its old, still-accurate `$schema`) intact. On failure the
+  write summary still goes to **stdout**, naming what was written, what was not (everything listed
+  as not written is byte-unchanged), and the errno of the file that failed; the command then exits
+  `2`. A deliberate no-write outcome — `skip`, declining the draft, or the unreadable-`merge` abort
+  — is not a failure and still exits `0`. The opt-in CI workflow is written last and is never
+  offered after a failed config write; if only the workflow fails, the summary says so and the exit
+  code is still `2`.
 - The `--with-ci-workflow` template is **npm-universal by design**: even when `init` detects and
   reports a bun/pnpm/yarn project, the generated workflow still installs and runs the CLI via
   `npm install --no-save @wastech-mdlint/cli` + `npx`. That step only fetches the external CLI

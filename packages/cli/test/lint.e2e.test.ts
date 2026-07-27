@@ -121,6 +121,42 @@ describe("lint command", () => {
     expect(written).toContain("| REQ-1 | TODO |");
   });
 
+  // Audit L-6 end to end: the CRLF fixture is built at runtime (`.gitattributes` forces `eol=lf` on
+  // committed files, so a checked-in CRLF fixture would be silently converted).
+  it("keeps a CRLF document's line endings when --fix rewrites it", async () => {
+    const crlfDocument = [
+      "# Title",
+      "",
+      "## Intro",
+      "",
+      "| ID | Owner |",
+      "| --- | --- |",
+      "| REQ-1 |  |",
+      "",
+    ].join("\r\n");
+    const cwd = await fixtureRepo({
+      "a.md": crlfDocument,
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [
+          { rule: "TBL-002", options: { columns: ["Owner"] } },
+          { rule: "SEC-001", options: { sections: ["Intro", "Summary"] } },
+        ],
+      }),
+    });
+
+    const result = await run(["lint", cwd, "--fix"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain("No problems found.");
+    const written = await readFile(path.join(cwd, "a.md"), "utf8");
+    expect(written).toContain("| REQ-1 | TODO |");
+    expect(written).toContain("## Summary");
+    // Both fix hooks ran on the same document, so a single lone LF anywhere means one of them forced
+    // its own terminator into the file.
+    expect(written.replace(/\r\n/g, "")).not.toContain("\n");
+    expect(written).not.toContain("\r\r");
+  });
+
   it("maps config errors to exit 2 with a did-you-mean diagnostic", async () => {
     const cwd = await fixtureRepo({
       "a.md": "# A\n",

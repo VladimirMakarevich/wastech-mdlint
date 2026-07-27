@@ -1,9 +1,10 @@
-import { writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { writeFilesAtomic } from "../atomic-write.js";
 import { compareStrings } from "../deterministic-sort.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
 import { loadDocuments } from "../markdown/load-documents.js";
+import { detectNewline, normalizeNewlines } from "../markdown/newline.js";
 import type { LintFilesInput } from "./lint-files.js";
 import type { RuleContext, TextEdit } from "./types.js";
 
@@ -35,6 +36,43 @@ export function applyEdits(
 }
 
 export type ApplyFixesResult = { fixedFiles: string[] };
+
+/**
+ * A `--fix` document write that could not be committed (P11.09). Thrown rather than swallowed: the
+ * user asked for their files to be rewritten, and silently continuing would report a clean re-lint
+ * for a file that was never actually fixed.
+ *
+ * The message is built from the errno `code` only, never the underlying fs message — Node embeds two
+ * absolute, platform-native paths (including the random temp name) in a `rename` error, which would
+ * make this output both host-specific and nondeterministic. `filePath`/`fixedFiles` are
+ * repo-relative POSIX paths, so a host can render them without further translation.
+ */
+export class FixWriteError extends Error {
+  readonly filePath: string;
+  readonly fixedFiles: string[];
+  readonly errnoCode: string | undefined;
+
+  constructor(params: {
+    filePath: string;
+    fixedFiles: string[];
+    errnoCode: string | undefined;
+  }) {
+    const reason =
+      params.errnoCode === undefined ? "" : ` (${params.errnoCode})`;
+    const already =
+      params.fixedFiles.length === 0
+        ? "No files were changed."
+        : `Already fixed: ${params.fixedFiles.join(", ")}.`;
+    super(
+      `--fix could not write ${params.filePath}${reason}; it is unchanged on disk. ` +
+        `${already} Resolve the write failure and re-run with --fix.`,
+    );
+    this.name = "FixWriteError";
+    this.filePath = params.filePath;
+    this.fixedFiles = params.fixedFiles;
+    this.errnoCode = params.errnoCode;
+  }
+}
 
 /**
  * Apply the deterministic fixes of document-scope fixable rules to the repo, writing changed files
@@ -77,9 +115,21 @@ export async function applyFixes(
       report: () => {},
     };
 
+    // Enforced once here rather than inside `applyEdits` (which stays a pure offset primitive):
+    // whatever a rule hands back adopts the host document's line ending, so no rule can leave a
+    // CRLF file with mixed endings (audit L-6). Fixable rules also do this themselves where they
+    // build multi-line content, so each is correct when called in isolation — deliberately
+    // belt-and-braces, since a future fix hook that forgets is the exact failure mode this class-level
+    // guarantee exists to absorb.
+    const newline = detectNewline(document.content);
     const edits: TextEdit[] = [];
     for (const rule of fixRules) {
-      edits.push(...rule.fix!(context));
+      for (const edit of rule.fix!(context)) {
+        edits.push({
+          ...edit,
+          newText: normalizeNewlines(edit.newText, newline),
+        });
+      }
     }
     if (edits.length === 0) {
       continue;
@@ -87,7 +137,19 @@ export async function applyFixes(
 
     const fixed = applyEdits(document.content, edits);
     if (fixed !== document.content) {
-      await writeFile(path.resolve(rootDir, document.path), fixed, "utf8");
+      const write = await writeFilesAtomic([
+        { path: path.resolve(rootDir, document.path), content: fixed },
+      ]);
+      if (!write.ok) {
+        // Fail fast on the first unwritable document: continuing would keep rewriting files while
+        // the user has no idea one was skipped, and turning this into a per-file report means
+        // redesigning the fix engine's result contract, which is out of scope here.
+        throw new FixWriteError({
+          filePath: document.path,
+          fixedFiles: [...fixedFiles].sort(compareStrings),
+          errnoCode: write.code,
+        });
+      }
       fixedFiles.push(document.path);
     }
   }
