@@ -9,14 +9,16 @@ import {
   type GenerateInitConfigParams,
 } from "../src/discovery/config-writer.js";
 import { compareStrings } from "../src/deterministic-sort.js";
+import { matchesConfigGlob } from "../src/discovery/globs.js";
 import { generateConfigSchema } from "../src/engine/schema.js";
 import { DEFAULT_NOISE_DIR_NAMES } from "../src/discovery/repo-scan-constants.js";
 import type { InferredRule } from "../src/discovery/rule-inference.js";
 
-// The fresh-write `exclude` mirrors the scanner's pruned noise directories as globs, sorted by the
-// same host-independent comparator as production.
+// The fresh-write `exclude` mirrors the scanner's pruned noise directories as depth-agnostic globs
+// (the scan prunes by basename at any depth), sorted by the same host-independent comparator as
+// production.
 const EXPECTED_EXCLUDE = [...DEFAULT_NOISE_DIR_NAMES]
-  .map((name) => `${name}/**`)
+  .map((name) => `**/${name}/**`)
   .sort(compareStrings);
 
 function buildRule(
@@ -90,8 +92,27 @@ describe("generateInitConfig · fresh", () => {
     // trees so init never broadens the scanned corpus back to node_modules/.git/dist/…
     expect("include" in config).toBe(false);
     expect(config.exclude).toEqual(EXPECTED_EXCLUDE);
-    expect(config.exclude).toContain("node_modules/**");
-    expect(config.exclude).toContain(".git/**");
+
+    // Asserted semantically (what the globs *match*), not by literal presence: the anchoring is the
+    // actual contract, and literals passed while nested noise was still being linted (audit M-4).
+    const exclude = config.exclude as string[];
+    for (const excluded of [
+      // The two M-4 repros: noise nested under a monorepo package.
+      "packages/foo/node_modules/somelib/README.md",
+      "packages/foo/dist/OUT.md",
+      // Root-level regression guard — this is what makes the leading `**/` matching zero segments a
+      // contract rather than an assumption about picomatch.
+      "node_modules/somelib/README.md",
+      // `dot: true` still applies through the new prefix.
+      ".git/config.md",
+    ]) {
+      expect(matchesConfigGlob(excluded, exclude)).toBe(true);
+    }
+
+    // No over-exclusion: a real cluster's docs stay in the corpus at the root and under a package.
+    for (const kept of ["docs/guide.md", "packages/foo/docs/guide.md"]) {
+      expect(matchesConfigGlob(kept, exclude)).toBe(false);
+    }
   });
 
   it("appends each new rule's rationale as a trailing // comment while staying valid JSONC", () => {

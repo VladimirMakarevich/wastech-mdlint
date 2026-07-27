@@ -491,8 +491,9 @@ underlying scan/inference.
   and anchored on the actual installed schema (walked up on disk), falling back to the repository
   root, so a subdirectory config points up at the hoisted node_modules (`../node_modules/...`) rather
   than a fixed root literal. `"fresh"` writes `$schema` + `include` (omitted when empty) + `exclude`
-  (the scanner's pruned noise dirs as globs, so a written config never re-scans `node_modules`/`.git`/…
-  — C1) + inferred `rules`; `"merge"` is additive/existing-wins — it round-trips every existing
+  (the scanner's pruned noise dirs as depth-agnostic `**/<name>/**` globs, mirroring the scanner's
+  basename pruning at every depth, so a written config never re-scans `node_modules`/`.git`/… at any
+  depth — C1) + inferred `rules`; `"merge"` is additive/existing-wins — it round-trips every existing
   top-level key verbatim, keeps every existing `rules[]` entry (canonicalizing its id per C3), and
   only appends rules whose canonical id is absent. `identifyExistingRule` keys a built-in by its
   canonical `rule` and a custom rule by its canonical `id` (never the literal `"custom"`); a `merge`

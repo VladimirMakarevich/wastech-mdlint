@@ -118,7 +118,9 @@ wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-
 - `init` scans the repo for doc clusters, infers a rule set with rationale, and — on
   confirmation — writes `wastech-mdlint.config.json` with a **local** `$schema` (canonical
   rule IDs, optional per-rule rationale comments, and an `exclude` list of the build/vendor
-  directories the scan skips so lint never re-scans them). When custom rules are present it also
+  directories the scan skips — matched at any depth, so a monorepo's
+  `packages/*/dist` and `packages/*/node_modules` stay out of the lint corpus too). When custom
+  rules are present it also
   generates a project-local `schema.json` and points `$schema` at it; no remote URL is ever
   emitted. `init` never replaces an existing `schema.json` — that filename is common enough (and
   is `wastech-mdlint schema`'s own default output) that a hand-written one could otherwise be

@@ -752,10 +752,49 @@ describe("init command · writing the config (P6.04)", () => {
     );
     // Deliverable 1 / C1: the fresh write prunes the noise trees, so init never broadens the
     // scanned corpus back to node_modules/.git/dist after writing.
-    expect(written.exclude).toContain("node_modules/**");
-    expect(written.exclude).toContain(".git/**");
+    expect(written.exclude).toContain("**/node_modules/**");
+    expect(written.exclude).toContain("**/.git/**");
     // Forward-compat smoke check: the written config must load without a ConfigError.
     await expect(loadConfiguration({ cwd })).resolves.toBeDefined();
+  });
+
+  it("a monorepo init writes an exclude that keeps nested dist/node_modules out of the lint corpus", async () => {
+    // A temp tree, not a checked-in fixture: the repo `.gitignore` ignores `dist/` and
+    // `node_modules/` at any depth, so such a fixture could never be committed.
+    //
+    // Shape chosen so the written `include` is the broad fallback and the test is therefore
+    // non-vacuous: two `.md` files under one non-known-named directory is below
+    // DEFAULT_MIN_CLUSTER_SIZE and there is no root-level `.md`, so no cluster qualifies and
+    // scanRepository emits the `**/*.md` fallback.
+    const cwd = await fixtureRepo({
+      "notes/a.md": "# A\n",
+      "notes/b.md": "# B\n",
+      "packages/foo/dist/OUT.md": "# Generated\n",
+      "packages/foo/node_modules/somelib/README.md": "# Dep\n",
+    });
+
+    const init = await run(["init", cwd, "--yes"], cwd);
+    expect(init.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const written = readConfig(
+      await readFile(path.join(cwd, CONFIG_FILE), "utf8"),
+    );
+    // Pins the setup assumption: if a future scan-heuristic change narrows the include, this fails
+    // loudly instead of passing because nothing was in scope to begin with.
+    expect(written.include).toEqual(["**/*.md"]);
+
+    // `--fail-on off` keeps the exit code at 0 regardless of findings; `files` carries the full
+    // analyzed corpus, so the assertion holds even when the inferred rules report nothing.
+    const lint = await run(
+      ["lint", cwd, "--format", "json", "--fail-on", "off"],
+      cwd,
+    );
+    expect(lint.exitCode).toBe(EXIT_CODE_SUCCESS);
+    const { files } = JSON.parse(lint.stdout) as { files: string[] };
+
+    expect(files).toContain("notes/a.md");
+    expect(files).not.toContain("packages/foo/dist/OUT.md");
+    expect(files).not.toContain("packages/foo/node_modules/somelib/README.md");
   });
 
   it("merge preserving a custom rule writes a project-local schema and points $schema at it", async () => {
