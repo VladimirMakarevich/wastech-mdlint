@@ -51,8 +51,8 @@ flow:
       output_artifact: plan
       hitl: { allow_question: true, allow_approval: true }
       provider: claude
-      model: claude-sonnet-5
-      reasoning: max
+      model: claude-opus-5
+      reasoning: xhigh
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []
@@ -62,7 +62,7 @@ flow:
       session_scope: fresh_disposable
       permission_profile: workspace-write
       provider: claude
-      model: claude-sonnet-5
+      model: claude-opus-5
       reasoning: xhigh
       # timeout_seconds: 7200
       # network_access: false
@@ -79,7 +79,7 @@ flow:
       permission_profile: read-only
       provider: claude
       model: claude-opus-5
-      reasoning: xhigh
+      reasoning: high
       # network_access: false
       # blocking: true
       # max_rework_per_stage: 1
@@ -89,8 +89,8 @@ flow:
       session_scope: fresh_disposable
       permission_profile: workspace-write
       provider: claude
-      model: claude-sonnet-5
-      reasoning: max
+      model: claude-opus-5
+      reasoning: xhigh
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []
