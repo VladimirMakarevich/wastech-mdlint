@@ -128,6 +128,37 @@ describe("CTX-003 glossary aliases", () => {
     });
   });
 
+  it("anchors each alias to its own line when aliases appear out of offset order", async () => {
+    // The per-scan-target line index is queried in alias order, not offset order: `graphql` (line 3)
+    // is resolved before `gql` (lines 1 and 5), so a forward-only cursor would misplace the later
+    // aliases. Aliases are declared `graphql, gql` to fix that traversal order.
+    const cwd = await fixtureRepo({
+      "glossary.md":
+        "| Term | Aliases |\n| --- | --- |\n| GraphQL | graphql, gql |\n",
+      "doc.md": [
+        "Intro about gql.",
+        "",
+        "Then graphql here.",
+        "",
+        "And gql again.",
+      ].join("\n"),
+    });
+    const result = await lint(cwd, [
+      rule("CTX-003", {
+        glossary: "glossary.md",
+        termColumn: "Term",
+        aliasColumn: "Aliases",
+        files: ["doc.md"],
+      }),
+    ]);
+
+    expect(
+      result.messages.map(
+        (message) => `${String(message.data?.alias)}@${message.line}`,
+      ),
+    ).toEqual(["gql@1", "graphql@3", "gql@5"]);
+  });
+
   it("counts every occurrence, including ones separated by a single space (audit L-1)", async () => {
     const cwd = await fixtureRepo({
       "glossary.md": "| Term | Aliases |\n| --- | --- |\n| GraphQL | gql |\n",

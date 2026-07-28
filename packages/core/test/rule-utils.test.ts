@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { isGlobPattern } from "../src/discovery/globs.js";
 import { matchesFileScope } from "../src/engine/rules/scope.js";
-import { findLineNumber } from "../src/engine/text-position.js";
+import {
+  createLineNumberLookup,
+  findLineNumber,
+} from "../src/engine/text-position.js";
 import { extractSectionBody } from "../src/engine/section-body.js";
 import { escapeRegExp, regexStringSchema } from "../src/engine/regex.js";
 import { resolveRoutedUrl } from "../src/engine/site-router.js";
@@ -59,6 +62,47 @@ describe("findLineNumber", () => {
     expect(findLineNumber(content, 0)).toBe(1);
     expect(findLineNumber(content, content.indexOf("two"))).toBe(2);
     expect(findLineNumber(content, content.indexOf("three"))).toBe(3);
+  });
+
+  // Deliberately a different formulation from either implementation under test (slice+split rather
+  // than a charCode scan or a precomputed index), so agreement means the semantics match rather
+  // than the same loop being restated three times.
+  function naiveLineNumber(content: string, index: number): number {
+    const clamped = Math.max(0, Math.min(index, content.length));
+
+    return content.slice(0, clamped).split("\n").length;
+  }
+
+  // `createLineNumberLookup` feeds the `line` of every content-match finding (CTX-003,
+  // contentNotMatch, id-ref edges), so a binary-search off-by-one at a line start or past EOF would
+  // silently shift user-visible line numbers. Pin both forms to the reference at *every* offset.
+  const fixtures: Record<string, string> = {
+    lf: "one\ntwo\nthree",
+    crlf: "one\r\ntwo\r\nthree",
+    empty: "",
+    trailingNewline: "a\n",
+    blankLines: "a\n\n\nb\n",
+    leadingNewline: "\nb",
+  };
+
+  for (const [name, content] of Object.entries(fixtures)) {
+    it(`agrees with the naive reference at every offset (${name})`, () => {
+      // Past both ends: the contract clamps, so out-of-range offsets stay in-range lines.
+      for (let index = -2; index <= content.length + 2; index += 1) {
+        const expected = naiveLineNumber(content, index);
+
+        expect(findLineNumber(content, index)).toBe(expected);
+        expect(createLineNumberLookup(content)(index)).toBe(expected);
+      }
+    });
+  }
+
+  it("resolves offsets queried out of order, as CTX-003 does per alias", () => {
+    const lineAt = createLineNumberLookup("a\nb\nc\nd\ne");
+
+    expect([lineAt(8), lineAt(0), lineAt(4), lineAt(2), lineAt(6)]).toEqual([
+      5, 1, 3, 2, 4,
+    ]);
   });
 });
 

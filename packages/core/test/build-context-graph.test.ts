@@ -208,6 +208,27 @@ describe("buildContextGraph · id-ref edges", () => {
     ]);
   });
 
+  it("anchors repeated mentions of one ID to their own lines", () => {
+    // Every other id-ref assertion here lands on line 1, so this is the case that pins the
+    // per-document line index against the old per-match scan.
+    const documents = docs({
+      "reqs.md": "| ID |\n| --- |\n| REQ-001 |\n",
+      "design.md": [
+        "REQ-001 first.",
+        "",
+        "REQ-001 again.",
+        "",
+        "",
+        "",
+        "REQ-001 last.",
+      ].join("\n"),
+    });
+
+    expect(
+      buildContextGraph(documents, { idRef }).edges.map((edge) => edge.line),
+    ).toEqual([1, 3, 7]);
+  });
+
   it("builds no id-ref edges when idRef is not configured", () => {
     const documents = docs({
       "reqs.md": "| ID |\n| --- |\n| REQ-001 |\n",

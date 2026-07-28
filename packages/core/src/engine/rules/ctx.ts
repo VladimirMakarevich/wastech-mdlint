@@ -6,7 +6,7 @@ import { noPlaceholders } from "../primitives/content.js";
 import { escapeRegExp } from "../regex.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
 import { extractSectionBody } from "../section-body.js";
-import { findLineNumber } from "../text-position.js";
+import { createLineNumberLookup } from "../text-position.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
 
 // Content-quality rules (P3.05).
@@ -152,13 +152,17 @@ export const ctx003: RuleDefinition = defineRule({
               }));
 
       for (const { text, baseLine } of scanTargets) {
+        // Indexed per scan target, not per document: `text` is either the whole content or one
+        // section body, so a lookup hoisted above this loop would resolve offsets against the
+        // wrong string. Every alias re-scans `text` from zero, so one shared index turns
+        // O(aliases · matches · text length) into O(text length + matches · log lines).
+        const lineAt = createLineNumberLookup(text);
+
         for (const [alias, canonical] of aliasToCanonical) {
           for (const match of text.matchAll(wholeWordRegex(alias))) {
             context.report({
               message: `Use canonical term "${canonical}" instead of alias "${alias}".`,
-              line:
-                baseLine +
-                findLineNumber(text, (match.index ?? 0) + match[1]!.length),
+              line: baseLine + lineAt((match.index ?? 0) + match[1]!.length),
               filePath: document.path,
               data: { alias, canonical },
               helpUri: "CTX-003",

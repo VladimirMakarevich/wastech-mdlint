@@ -2,7 +2,7 @@ import { compareStrings } from "../deterministic-sort.js";
 import { extractDefinedIds, type IdRef } from "../engine/defined-ids.js";
 import { filePart, resolveTargetCandidates } from "../engine/path-resolve.js";
 import { compileRegex } from "../engine/regex.js";
-import { findLineNumber } from "../engine/text-position.js";
+import { createLineNumberLookup } from "../engine/text-position.js";
 import type { SiteRouterSettings } from "../engine/types.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
 import type {
@@ -85,6 +85,10 @@ function buildIdRefEdges(
   const edges: ContextGraphEdge[] = [];
 
   for (const document of documents.values()) {
+    // One index per document, amortized against the full-content `matchAll` scan this loop already
+    // pays for; per-match `findLineNumber` calls made ID anchoring O(tokens · content length).
+    const lineAt = createLineNumberLookup(document.content);
+
     for (const match of document.content.matchAll(PROSE_TOKEN_PATTERN)) {
       // Trim boundary punctuation (finding H) so "REQ-1." / "(REQ-1)" still match. The trimmed value
       // is also what we store as `rawTarget` — a clean ID reads better downstream than "REQ-1)".
@@ -96,7 +100,7 @@ function buildIdRefEdges(
       if (definingPaths === undefined) {
         continue;
       }
-      const line = findLineNumber(document.content, match.index);
+      const line = lineAt(match.index);
       for (const definingPath of definingPaths) {
         if (definingPath === document.path || !nodeSet.has(definingPath)) {
           continue;
