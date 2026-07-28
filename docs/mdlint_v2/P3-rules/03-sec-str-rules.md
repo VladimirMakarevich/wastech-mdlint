@@ -27,7 +27,10 @@ including template-based section conformance (SEC-003).
 1. SEC-001/002 compose `sectionPresent` / `sectionOrder`; report `line: 0` when a section is
    absent (no precise line), as the reference does.
 2. STR-001 is project-scope: check `projectFiles` for required paths; attribute missing-file
-   messages sensibly.
+   messages sensibly. **Superseded in part by [P11.12](../P11-remediation/12-str001-reach.md):**
+   a literal required path is now resolved against the corpus _or_ the filesystem under the
+   analyzed root, so a required non-Markdown file (`LICENSE`) is no longer reported missing;
+   glob entries remain `projectFiles`-only.
 3. **SEC-003** — template-driven section conformance:
    - Load the file at `template` (repo-relative path) from `documents`; if not present in
      the discovered set, resolve and parse it on demand. If the template file does not exist

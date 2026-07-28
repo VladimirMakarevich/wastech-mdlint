@@ -147,7 +147,9 @@ generated schema (`wastech-mdlint schema`).
     {
       "rule": "STR-001",
       "options": {
-        "files": ["README.md", "CONTRIBUTING.md", "docs/index.md"], // required (≥1)
+        // required: a literal entry is resolved on disk, repo-relative and root-pinned (so it
+        // can require a non-Markdown file); a glob entry only matches the Markdown corpus
+        "files": ["README.md", "LICENSE", "docs/index.md"], // required (≥1)
       },
     },
 

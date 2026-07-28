@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { isGlobPattern } from "../src/discovery/globs.js";
 import { matchesFileScope } from "../src/engine/rules/scope.js";
 import { findLineNumber } from "../src/engine/text-position.js";
 import { extractSectionBody } from "../src/engine/section-body.js";
@@ -23,6 +24,32 @@ describe("matchesFileScope (glob-match, R7)", () => {
     expect(
       matchesFileScope(".claude/skills/SKILL.md", { files: ["**/*.md"] }),
     ).toBe(true);
+  });
+});
+
+describe("isGlobPattern", () => {
+  it("classifies plain paths as literals", () => {
+    // These are the shapes STR-001 must pin to one location: misclassifying any of them as a glob
+    // would send it back to the corpus-only branch and re-open BL-1 for that entry.
+    expect(isGlobPattern("README.md")).toBe(false);
+    expect(isGlobPattern("LICENSE")).toBe(false);
+    expect(isGlobPattern("docs/index.md")).toBe(false);
+    expect(isGlobPattern("package.json")).toBe(false);
+    expect(isGlobPattern("docs")).toBe(false);
+    expect(isGlobPattern("../secret.txt")).toBe(false);
+  });
+
+  it("classifies wildcard, globstar, brace and extglob patterns as globs", () => {
+    expect(isGlobPattern("docs/adr/*.md")).toBe(true);
+    expect(isGlobPattern("**/README.md")).toBe(true);
+    expect(isGlobPattern("a{b,c}.md")).toBe(true);
+    expect(isGlobPattern("!(x).md")).toBe(true);
+  });
+
+  it("normalizes backslashes so a Windows-style path is not read as escapes", () => {
+    // Unnormalized, picomatch treats `\R` as an escaped literal and the whole string parses as a
+    // glob; the rule would then never probe `docs/README.md` on disk.
+    expect(isGlobPattern("docs\\README.md")).toBe(false);
   });
 });
 

@@ -189,6 +189,47 @@ describe("handleLint", () => {
     ).toBe(false);
   });
 
+  it("rejects an absolute STR-001 required path — same containment as SEC-003", async () => {
+    // STR-001's disk probe (P11.12) is reachable from the same caller-supplied `rules` array, so it
+    // is held to the same boundary: rejected outright, never answered as present/absent.
+    const outsideRoot = await mkdtemp(
+      path.join(os.tmpdir(), "wastech-mdlint-mcp-str-"),
+    );
+    tempDirs.push(outsideRoot);
+    await writeFile(
+      path.join(outsideRoot, "secret.txt"),
+      "top secret\n",
+      "utf8",
+    );
+
+    const result = handleLint({
+      content: "# Title\n",
+      rules: [
+        {
+          rule: "STR-001",
+          options: { files: [path.join(outsideRoot, "secret.txt")] },
+        },
+      ],
+    });
+
+    expect(result.isError).toBeFalsy();
+    const messages = structured(result).messages as LintMessage[];
+    expect(messages).toHaveLength(1);
+    expect(messages[0]!.message).toMatch(/escapes the analyzed root/);
+  });
+
+  it("satisfies an in-root STR-001 required file via the disk probe", () => {
+    // The repo-root package.json exists under the test cwd but is never in a Markdown corpus —
+    // exactly the BL-1 shape, checked at the MCP surface.
+    const result = handleLint({
+      content: "# Title\n",
+      rules: [{ rule: "STR-001", options: { files: ["package.json"] } }],
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(structured(result).messages as LintMessage[]).toEqual([]);
+  });
+
   it("resolves an existing on-disk REF-001 target via core's standard disk fallback", () => {
     // A link to a file that really exists under the server cwd (repo-root package.json) resolves,
     // exactly as it would under `lint-files` — ad-hoc lint reuses core REF resolution unchanged.
