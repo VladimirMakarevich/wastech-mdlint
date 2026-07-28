@@ -88,8 +88,12 @@ wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-
 ```
 
 - `lint` is the default command (running `wastech-mdlint` with no subcommand lints the
-  cwd). `scan` is a hidden, deprecated alias of `lint`.
+  cwd). `scan` is a hidden, deprecated alias of `lint`. Default only in that sense: an
+  unrecognized subcommand is an error, not a path, so a typo'd CI step fails loudly — which
+  also means a bare path needs its subcommand (`wastech-mdlint lint docs`).
 - Exit codes: `0` pass · `1` findings at the `--fail-on` threshold · `2` operational error.
+  `1` is reserved exclusively for findings — a nonexistent `[path]`, an unknown subcommand,
+  or an unwritable file is `2` — so CI can tell a failing document from a broken step.
 - `graph` prints the context graph to stdout: clusters, hubs, reading order, and the
   coverage signal as `human` text (default); the deterministic
   `{ nodes, edges, components, readingOrder }` shape as `json`; or a `mermaid`/`dot`

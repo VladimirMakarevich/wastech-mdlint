@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -83,6 +83,58 @@ describe("command dispatch", () => {
     expect(help.stdout).toContain("lint");
     expect(help.stdout).not.toContain("scan");
   });
+
+  // P11.10 moved default-command routing out of commander's `isDefault` and into argv, which shifts
+  // several argv shapes at once — the empty argv, a leading option, `--help`/`-v`, `help <cmd>`, and
+  // an unknown operand. Each is pinned here (with the `--help`/`-v` cases above and in "version and
+  // errors") because getting one wrong is silent: a mis-routed `--help` renders lint's help, and a
+  // mis-routed operand lints an empty corpus and exits 0.
+  it("routes a leading lint option to the default command rather than the program", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "[broken](missing.md)\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "REF-001" }],
+      }),
+    });
+
+    const result = await run(["--format", "json", "--fail-on", "off"], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    const parsed = JSON.parse(result.stdout) as {
+      summary: { errors: number };
+    };
+    expect(parsed.summary.errors).toBe(1);
+  });
+
+  it("rejects an unknown subcommand with a usage message (exit 2)", async () => {
+    const cwd = await fixtureRepo({ "a.md": "# A\n" });
+
+    const result = await run(["bogus-command"], cwd);
+    // The CI-typo scenario (M-7): this used to become lint's `[path]`, lint an empty corpus, and
+    // exit 0 "No problems found." — a broken workflow step passing green.
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    expect(result.stderr).toContain("unknown command 'bogus-command'");
+    expect(result.stderr).toContain("--help");
+    expect(result.stdout).not.toContain("No problems found.");
+  });
+
+  it("rejects a bare path with no subcommand (the documented routing trade-off)", async () => {
+    const cwd = await fixtureRepo({ "a.md": "# A\n" });
+
+    // Rejecting unknown operands and accepting arbitrary operands as paths are mutually exclusive;
+    // only "no subcommand lints the cwd" was ever documented, so `wastech-mdlint <path>` is a usage
+    // error and `wastech-mdlint lint <path>` is the supported spelling.
+    const result = await run(["."], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    expect(result.stderr).toContain("unknown command '.'");
+  });
+
+  it("still dispatches the built-in help command for a subcommand", async () => {
+    const cwd = await fixtureRepo({});
+
+    const result = await run(["help", "lint"], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain("--fail-on");
+  });
 });
 
 describe("version and errors", () => {
@@ -94,11 +146,12 @@ describe("version and errors", () => {
   });
 
   it("returns a usage error (exit 2) for an unknown option", async () => {
-    // With lint as the default command, a bare positional becomes the lint [path]; an unknown
-    // *option* is still a commander parse error → exit 2.
     const cwd = await fixtureRepo({});
     const result = await run(["lint", cwd, "--bogus"], cwd);
     expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    // The help pointer is inherited by subcommands only because showHelpAfterError() runs before
+    // .command() creates them — assert it here so that ordering can't silently regress.
+    expect(result.stderr).toContain("--help");
   });
 
   it("returns a usage error for an invalid --format choice", async () => {
@@ -163,6 +216,18 @@ describe("graph command", () => {
 
     const result = await run(["graph", cwd, "--format", "xml"], cwd);
     expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+  });
+
+  // `graph` shares `[path]` validation with `lint` (P11.10), and shares its failure mode too: without
+  // the check a nonexistent target reports an empty graph at exit 0. Pinned per command because the
+  // wiring is per call site, so dropping it here would not fail lint's own regression test.
+  it("exits 2 for a nonexistent [path] instead of reporting an empty graph", async () => {
+    const cwd = await fixtureRepo({ "a.md": "# A\n" });
+
+    const result = await run(["graph", "./nope"], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    expect(result.stderr).toContain("Target path does not exist: nope");
+    expect(result.stderr).not.toContain(cwd);
   });
 });
 
@@ -433,5 +498,36 @@ describe("compile command", () => {
     const result = await run(["compile", "--cwd", cwd], cwd);
     expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
     expect(result.stderr).toContain("config.compile is missing");
+  });
+
+  it("exits 2 with a repo-relative path when SKILL.md cannot be written", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": compileConfig,
+    });
+    // A directory where the file belongs: the rename that commits the atomic write cannot replace it.
+    // Portable across platforms in a way a permission fault is not, and it proves the failure names
+    // the same repo-relative path the success line reports (P11.10) rather than the fs error's
+    // absolute paths and temp name.
+    await mkdir(path.join(cwd, "generated-skill", "SKILL.md"), {
+      recursive: true,
+    });
+
+    const result = await run(
+      ["compile", "--cwd", cwd, "--outdir", "generated-skill"],
+      cwd,
+    );
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    expect(result.stderr).toContain("Could not write generated-skill/SKILL.md");
+    expect(result.stderr).not.toContain(cwd);
+  });
+
+  it("exits 2 with a repo-relative message for a nonexistent --cwd", async () => {
+    const cwd = await fixtureRepo({});
+
+    const result = await run(["compile", "--cwd", "./nope"], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    expect(result.stderr).toContain("--cwd does not exist: nope");
+    expect(result.stderr).not.toContain(cwd);
   });
 });

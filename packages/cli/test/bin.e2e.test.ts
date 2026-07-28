@@ -7,7 +7,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { EXIT_CODE_RUNTIME_ERROR, EXIT_CODE_SUCCESS } from "../src/commands.js";
+import {
+  EXIT_CODE_FINDINGS,
+  EXIT_CODE_SUCCESS,
+  EXIT_CODE_USAGE_ERROR,
+} from "../src/commands.js";
 
 // The only suite in this package that crosses a real OS process boundary (mirrors
 // packages/mcp-server/test/stdio-integration.test.ts). Every other CLI test calls runCli()
@@ -162,12 +166,26 @@ describe("installed-bin shape via symlink/junction (H-1 regression guard)", () =
       [linkedEntry, "lint", fixtureDir, "--fail-on", "error"],
       repoRoot,
     );
-    expectExitCode(result, EXIT_CODE_RUNTIME_ERROR);
+    expectExitCode(result, EXIT_CODE_FINDINGS);
     expect(result.stdout).toContain("REF-001");
     expect(result.stdout).toContain("missing.md");
     // Pins the exact finding count (1 error, 0 warnings), not just that *a* REF-001 finding
     // exists — this is the "known finding count" the regression guard is meant to check.
     expect(result.stdout).toContain("1 problem (1 error, 0 warnings)");
+  }, 30_000);
+
+  // P11.10 / audit M-7, crossed over a real process boundary because that is the shape the defect
+  // actually shipped in: a typo'd `run:` step in CI, whose only signal is the process exit status.
+  it("a typo'd subcommand exits 2 through the real process boundary, not 0", async () => {
+    const fixtureDir = await fixtureWithError();
+    const result = run(
+      process.execPath,
+      [linkedEntry, "linnt", fixtureDir],
+      repoRoot,
+    );
+    expectExitCode(result, EXIT_CODE_USAGE_ERROR);
+    expect(result.stderr).toContain("unknown command 'linnt'");
+    expect(result.stdout).not.toContain("No problems found.");
   }, 30_000);
 
   it("importing the compiled entrypoint does not execute the CLI as a side effect", async () => {
@@ -244,7 +262,7 @@ describe("npx smoke check (generated CI workflow parity)", () => {
         ],
         npxRoot,
       );
-      expectExitCode(result, EXIT_CODE_RUNTIME_ERROR);
+      expectExitCode(result, EXIT_CODE_FINDINGS);
       expect(result.stdout).toContain("REF-001");
       expect(result.stdout).toContain("1 problem (1 error, 0 warnings)");
     },

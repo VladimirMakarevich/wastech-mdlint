@@ -21,26 +21,39 @@ wastech-mdlint -v | --version
 
 Every command uses the same taxonomy:
 
-| Code | Meaning                                                                                                                                                                  |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `0`  | Success / clean (no findings at the `--fail-on` threshold).                                                                                                              |
-| `1`  | Findings at or above the `--fail-on` severity (lint-style commands).                                                                                                     |
-| `2`  | Operational/usage error — bad flag, invalid choice, missing config section, target outside the corpus, unreadable config, a file `lint --fix` or `init` could not write. |
+| Code | Meaning                                                                                                                                                                                                                                   |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`  | Success / clean (no findings at the `--fail-on` threshold).                                                                                                                                                                               |
+| `1`  | Findings at or above the `--fail-on` severity (lint-style commands). Reserved exclusively for findings.                                                                                                                                   |
+| `2`  | Operational/usage error — unknown subcommand, bad flag, invalid choice, a `[path]`/`--cwd` that does not exist or is not a directory, missing config section, target outside the corpus, unreadable config, or a file it could not write. |
 
 `--help` and `--version` always exit `0`.
+
+Only `1` means "the linter found problems", so a CI job can tell a failing document from a broken
+step. Paths in an error message use `/` separators and are named relative to the directory the
+command works in — its cwd, or the `[path]`/`--cwd` you gave it — rather than as absolute host
+paths; that holds even when you passed the argument absolutely, so a bad `[path]`/`--cwd` is
+reported relative either way. Two limits on it. `schema --out` is echoed back exactly as you typed
+it, because rewriting your own argument inside the error that quotes it back to you is more
+confusing than printing it. And a path outside the working directory can only be named with `../`
+segments — or, on a different Windows drive, not relatively at all.
 
 ## `lint` (default)
 
 Lints Markdown files with the configured rule engine. Running `wastech-mdlint` with **no
 subcommand** lints the cwd — `lint` is the default command. `scan` is a hidden, deprecated alias.
 
-| Flag                            | Default         | Description                                                                         |
-| ------------------------------- | --------------- | ----------------------------------------------------------------------------------- |
-| `[path]`                        | cwd             | Directory to lint.                                                                  |
-| `--config <file>`               | auto-discovered | Path to a config file (otherwise `findConfig` walks up).                            |
-| `--format text\|json`           | `text`          | Human report vs machine `{ summary, messages, files }`.                             |
-| `--fail-on error\|warning\|off` | `error`         | Minimum severity that forces exit `1`. `off` never fails.                           |
-| `--fix`                         | —               | Apply deterministic fixes in place (SEC-001, TBL-002), then re-report what remains. |
+A path still needs its subcommand: `wastech-mdlint docs` is `error: unknown command 'docs'`, not a
+shorthand for `wastech-mdlint lint docs`. That is the trade-off for rejecting typos — an operand
+cannot be both "a path" and "a misspelled command name".
+
+| Flag                            | Default         | Description                                                                                       |
+| ------------------------------- | --------------- | ------------------------------------------------------------------------------------------------- |
+| `[path]`                        | cwd             | Directory to lint; must exist. Resolved against the cwd. Exits `2` if it is missing or is a file. |
+| `--config <file>`               | auto-discovered | Path to a config file (otherwise `findConfig` walks up).                                          |
+| `--format text\|json`           | `text`          | Human report vs machine `{ summary, messages, files }`.                                           |
+| `--fail-on error\|warning\|off` | `error`         | Minimum severity that forces exit `1`. `off` never fails.                                         |
+| `--fix`                         | —               | Apply deterministic fixes in place (SEC-001, TBL-002), then re-report what remains.               |
 
 ```bash
 wastech-mdlint lint .
@@ -59,7 +72,7 @@ the coverage signal.
 
 | Flag                                 | Default | Description                                                                                                  |
 | ------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------ |
-| `[path]`                             | cwd     | Directory to scan.                                                                                           |
+| `[path]`                             | cwd     | Directory to scan; must be an existing directory (exits `2` otherwise).                                      |
 | `--config <file>`                    | auto    | Config file.                                                                                                 |
 | `--format human\|json\|mermaid\|dot` | `human` | `human` text; deterministic `{ nodes, edges, components, readingOrder }` JSON; or a `mermaid`/`dot` diagram. |
 
@@ -96,12 +109,12 @@ transitively affected by it.
 Generates a deterministic [`SKILL.md`](compile.md) from the document graph, rule descriptions,
 and config, then writes it to the resolved outdir.
 
-| Flag              | Default                                                    | Description                                               |
-| ----------------- | ---------------------------------------------------------- | --------------------------------------------------------- |
-| `--config <file>` | auto                                                       | Config file.                                              |
-| `--outdir <dir>`  | `config.compile.outdir` → `.claude/skills/wastech-mdlint/` | Where to write `SKILL.md`.                                |
-| `--dry-run`       | —                                                          | Print the generated content to stdout instead of writing. |
-| `--cwd <dir>`     | cwd                                                        | Working directory to compile from.                        |
+| Flag              | Default                                                    | Description                                                                             |
+| ----------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `--config <file>` | auto                                                       | Config file.                                                                            |
+| `--outdir <dir>`  | `config.compile.outdir` → `.claude/skills/wastech-mdlint/` | Where to write `SKILL.md`.                                                              |
+| `--dry-run`       | —                                                          | Print the generated content to stdout instead of writing.                               |
+| `--cwd <dir>`     | cwd                                                        | Working directory to compile from; must be an existing directory (exits `2` otherwise). |
 
 Unlike other commands, `compile` takes `--cwd` (not `[path]`) and resolves a relative
 `--config`/`--outdir` against it. Requires a `compile` section in config; a missing one exits `2`
@@ -114,7 +127,7 @@ Scans the repo for doc clusters, infers a rule set with rationale, and — on co
 
 | Flag                                   | Default                                 | Description                                                                         |
 | -------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------- |
-| `[path]`                               | cwd                                     | Directory to scan.                                                                  |
+| `[path]`                               | cwd                                     | Directory to scan; must be an existing directory (exits `2` otherwise).             |
 | `-y, --yes`                            | —                                       | Accept the inferred draft with no prompts (CI). Defaults `--on-existing` to `skip`. |
 | `--on-existing overwrite\|merge\|skip` | prompt (interactive) / `skip` (`--yes`) | How to treat an existing config. `merge` is additive/existing-wins.                 |
 | `--with-ci-workflow`                   | —                                       | Under `--yes` only, also drop `.github/workflows/wastech-mdlint.yml`.               |

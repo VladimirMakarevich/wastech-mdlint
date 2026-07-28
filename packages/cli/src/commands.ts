@@ -39,13 +39,19 @@ import {
   type ExistingConfigAction,
   type InitPrompter,
 } from "./init-command.js";
+import { formatWriteFailure } from "./operational-errors.js";
 
 // Resolution order (P5.05): an explicit `--outdir` wins, then `config.compile.outdir`, then this
 // fallback — matching the locked example path in docs/mdlint_v2/requirements/01-configuration.md.
 const DEFAULT_COMPILE_OUTDIR = ".claude/skills/wastech-mdlint/";
 
+// The whole exit-code taxonomy (roadmap §8), in one place because the distinction is load-bearing for
+// CI: `1` means *the linter found problems*, `2` means *the command could not run*. `1` is therefore
+// reserved exclusively for findings at or above `--fail-on` — an operational failure that reuses it
+// leaves a CI job unable to tell a broken step from a failing document (P11.10, audit M-6), which is
+// why the constant is named for findings rather than for a generic runtime error.
 export const EXIT_CODE_SUCCESS = 0;
-export const EXIT_CODE_RUNTIME_ERROR = 1;
+export const EXIT_CODE_FINDINGS = 1;
 export const EXIT_CODE_USAGE_ERROR = 2;
 
 export type OutputFormat = "text" | "json";
@@ -135,8 +141,8 @@ export class CliUsageError extends Error {
   }
 }
 
-// Exit codes (roadmap §8): 0 pass / 1 findings at the fail-on threshold / 2 operational (thrown as
-// ConfigError etc. and mapped in program.ts).
+// The only producer of EXIT_CODE_FINDINGS. Operational failures are thrown (as ConfigError,
+// CliUsageError, or a bare fs error) and mapped to 2 in program.ts.
 export function resolveLintExitCode(params: {
   failOn: FailOn;
   result: LintResult;
@@ -147,13 +153,11 @@ export function resolveLintExitCode(params: {
 
   if (params.failOn === "warning") {
     return params.result.errorCount + params.result.warningCount > 0
-      ? EXIT_CODE_RUNTIME_ERROR
+      ? EXIT_CODE_FINDINGS
       : EXIT_CODE_SUCCESS;
   }
 
-  return params.result.errorCount > 0
-    ? EXIT_CODE_RUNTIME_ERROR
-    : EXIT_CODE_SUCCESS;
+  return params.result.errorCount > 0 ? EXIT_CODE_FINDINGS : EXIT_CODE_SUCCESS;
 }
 
 async function handleLint(
@@ -382,8 +386,18 @@ async function handleSchema(
     );
   }
 
-  await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFileAtomic(outputPath, generateConfigSchema());
+  try {
+    await mkdir(path.dirname(outputPath), { recursive: true });
+    await writeFileAtomic(outputPath, generateConfigSchema());
+  } catch (error) {
+    // An unwritable destination is an operational failure, not a crash: convert it here so the user
+    // sees the path they typed plus the errno instead of a raw fs message carrying the staged temp
+    // file's random name (P11.10). `command.out` is echoed as typed — matching the success line and
+    // the directory guard above, and the documented exception to naming error paths relative to the
+    // working directory (docs/guide/cli.md §Exit codes): an argument the caller chose to spell
+    // absolutely is theirs, not ours to rewrite.
+    throw new CliUsageError(formatWriteFailure(command.out, error));
+  }
 
   return {
     output: `schema written to ${command.out}\n`,
@@ -430,14 +444,20 @@ async function handleCompile(
   const resolvedOutdir = path.resolve(command.cwd, outdirSetting);
   const outputPath = path.join(resolvedOutdir, "SKILL.md");
 
-  await mkdir(resolvedOutdir, { recursive: true });
-  await writeFileAtomic(outputPath, result.skillContent);
-
   // Repository-relative POSIX path in user-visible output (invariant), not an absolute,
-  // platform-native one — normalize `\` to `/` so this reads identically on Windows.
+  // platform-native one — normalize `\` to `/` so this reads identically on Windows. Computed before
+  // the write so a failure can name the same path the success line would have (P11.10).
   const relativeOutputPath = normalizeRelativePath(
     path.relative(command.cwd, outputPath),
   );
+
+  try {
+    await mkdir(resolvedOutdir, { recursive: true });
+    await writeFileAtomic(outputPath, result.skillContent);
+  } catch (error) {
+    throw new CliUsageError(formatWriteFailure(relativeOutputPath, error));
+  }
+
   return {
     output: `SKILL.md written to ${relativeOutputPath}\n`,
     exitCode: EXIT_CODE_SUCCESS,

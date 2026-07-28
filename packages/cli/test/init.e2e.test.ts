@@ -920,6 +920,21 @@ describe("init command · writing the config (P6.04)", () => {
     );
   });
 
+  // P11.10 (audit M-6). This used to reach the write and report an ENOENT partial-write summary,
+  // blaming a write for what is really a bad argument; the target is now validated up front.
+  it("rejects a nonexistent [path] with a repo-relative message and exit 2", async () => {
+    const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+
+    const result = await run(["init", "./does-not-exist", "--yes"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    expect(result.stderr).toContain(
+      "Target path does not exist: does-not-exist",
+    );
+    expect(result.stderr).not.toContain(cwd);
+    expect(result.stdout).not.toContain("Write failed");
+  });
+
   // P11.09 (audit M-5). A directory sitting where the config file belongs is the one write fault
   // reachable on every platform: `findConfig` uses `stat`, so the directory counts as an existing
   // config, staging succeeds, and only the rename fails.
