@@ -95,6 +95,11 @@ export type ImpactCommand = {
 
 export type SchemaCommand = {
   kind: "schema";
+  // The io-seam working directory a relative `--out` resolves against. Required for the same reason
+  // `compile` carries one: resolving against the real `process.cwd()` silently diverges from the
+  // injected `cwd` whenever the two differ, so `schema --out schema.json` wrote outside the target
+  // directory (audit L-11).
+  cwd: string;
   out: string;
 };
 
@@ -372,7 +377,9 @@ async function handleImpact(
 async function handleSchema(
   command: SchemaCommand,
 ): Promise<CommandExecutionResult> {
-  const outputPath = path.resolve(command.out);
+  // Resolved against the command's own `cwd`, mirroring `handleCompile`'s `--outdir` handling below:
+  // an absolute `--out` is unaffected, and a relative one now lands where the caller is standing.
+  const outputPath = path.resolve(command.cwd, command.out);
   const outputStats = await stat(outputPath).catch((error: unknown) => {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") {
       return undefined;

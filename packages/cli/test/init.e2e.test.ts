@@ -20,6 +20,7 @@ import {
   loadConfiguration,
   ruleEntrySchema,
   type DocCluster,
+  type GeneratedInitConfig,
   type InferredRule,
   type RuleCategory,
 } from "@wastech-mdlint/core";
@@ -29,12 +30,13 @@ import {
   buildConfigPreview,
   DEFAULT_EXISTING_CONFIG_ACTION,
   diffAgainstExistingRuleIds,
+  extractExistingRuleIds,
   formatDraftSummary,
   formatNotWrittenSummary,
   formatWriteFailureSummary,
   formatWriteSummary,
   groupInferredRulesByCategory,
-  readExistingRuleIds,
+  readExistingConfigDocument,
   resolveSchemaWriteOutcome,
   type ConfirmedInitSelections,
   type InitPrompter,
@@ -122,6 +124,35 @@ const CONFIG_FILE = "wastech-mdlint.config.json";
 
 function readConfig(text: string): Record<string, unknown> {
   return parseJsonc(text) as Record<string, unknown>;
+}
+
+// Where a locally-installed `@wastech-mdlint/cli` puts its schema. `findInstalledSchemaDir` walks up
+// looking for exactly this path, so its presence in a fixture is the difference between the two
+// scenarios `init` has to get right (audit L-10): a package-relative `$schema` when the CLI is
+// installed, and a generated project-local `./schema.json` when it is not (the `npx` case). Fixtures
+// are temp directories with nothing installed, so the fallback is the default they exercise.
+const INSTALLED_SCHEMA_REL_PATH =
+  "node_modules/@wastech-mdlint/cli/schema.json";
+
+// `node_modules` is a scan noise directory, so seeding it never perturbs cluster detection.
+function withInstalledSchema(
+  files: Record<string, string>,
+): Record<string, string> {
+  return { ...files, [INSTALLED_SCHEMA_REL_PATH]: generateConfigSchema() };
+}
+
+/**
+ * The acceptance check behind L-10: resolve a written `$schema` the way an editor would — relative
+ * to the config's own directory — and read the file it names. A dangling ref is exactly the defect,
+ * so "it is a string that looks right" is not enough.
+ */
+async function readReferencedSchema(configDir: string): Promise<string> {
+  const written = readConfig(
+    await readFile(path.join(configDir, CONFIG_FILE), "utf8"),
+  );
+  const ref = written.$schema;
+  expect(typeof ref).toBe("string");
+  return readFile(path.resolve(configDir, ref as string), "utf8");
 }
 
 // Cross-linked docs/ cluster: two local links (one anchored) + a real anchor match (REF-001/002),
@@ -372,10 +403,12 @@ describe("init command · existing config handling", () => {
   });
 
   it("--on-existing overwrite writes the full inferred config, replacing the existing one", async () => {
-    const cwd = await fixtureRepo({
-      ...CROSS_LINKED_DOCS_FIXTURE,
-      "wastech-mdlint.config.json": existingConfigText,
-    });
+    const cwd = await fixtureRepo(
+      withInstalledSchema({
+        ...CROSS_LINKED_DOCS_FIXTURE,
+        "wastech-mdlint.config.json": existingConfigText,
+      }),
+    );
 
     const result = await run(
       ["init", cwd, "--yes", "--on-existing", "overwrite"],
@@ -404,10 +437,12 @@ describe("init command · existing config handling", () => {
   });
 
   it("--on-existing merge appends only new-by-canonical-id rules and keeps existing ones verbatim", async () => {
-    const cwd = await fixtureRepo({
-      ...CROSS_LINKED_DOCS_FIXTURE,
-      "wastech-mdlint.config.json": existingConfigText,
-    });
+    const cwd = await fixtureRepo(
+      withInstalledSchema({
+        ...CROSS_LINKED_DOCS_FIXTURE,
+        "wastech-mdlint.config.json": existingConfigText,
+      }),
+    );
 
     const result = await run(
       ["init", cwd, "--yes", "--on-existing", "merge"],
@@ -666,9 +701,10 @@ describe("init command · existing config handling", () => {
       // does not count as this run's existing config.
       expect(result.stdout).toContain("Existing config: none found.");
       expect(result.stdout).toContain("Wrote docs/wastech-mdlint.config.json");
-      // Deliberate: detectPackageManager only checks exactly cwd (non-recursive), and scanning is
-      // no longer re-rooted to the parent, so the root's package-lock.json is correctly out of view.
-      expect(result.stdout).toContain("Package manager: not detected.");
+      // The scan is not re-rooted to the parent, but `detectPackageManager` still walks up to the
+      // repo root's lockfile (audit L-11) — a subdirectory of an npm repo is still an npm repo, and
+      // reporting "not detected" there was the defect, not the design.
+      expect(result.stdout).toContain("Package manager: npm.");
       await expect(
         readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8"),
       ).resolves.toBe(existingConfigText);
@@ -687,7 +723,7 @@ describe("init command · existing config handling", () => {
       expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
       expect(result.stdout).toContain("Existing config: none found.");
       expect(result.stdout).toContain("Wrote docs/wastech-mdlint.config.json");
-      expect(result.stdout).toContain("Package manager: not detected.");
+      expect(result.stdout).toContain("Package manager: npm.");
       await expect(
         readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8"),
       ).resolves.toBe(existingConfigText);
@@ -747,7 +783,9 @@ describe("init command · existing config handling", () => {
 
 describe("init command · writing the config (P6.04)", () => {
   it("--yes with no existing config writes a config loadConfiguration accepts", async () => {
-    const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+    const cwd = await fixtureRepo(
+      withInstalledSchema(CROSS_LINKED_DOCS_FIXTURE),
+    );
 
     const result = await run(["init", cwd, "--yes"], cwd);
 
@@ -763,8 +801,136 @@ describe("init command · writing the config (P6.04)", () => {
     // scanned corpus back to node_modules/.git/dist after writing.
     expect(written.exclude).toContain("**/node_modules/**");
     expect(written.exclude).toContain("**/.git/**");
+    // Audit L-7: hidden trees are excluded and gitignore is honored, matching what the scan saw.
+    expect(written.exclude).toContain("**/.*/**");
+    expect(written.respectGitignore).toBe(true);
     // Forward-compat smoke check: the written config must load without a ConfigError.
     await expect(loadConfiguration({ cwd })).resolves.toBeDefined();
+  });
+
+  // Audit L-10. Every assertion here is about the ref resolving to a real file: the previous
+  // behavior emitted `./node_modules/@wastech-mdlint/cli/schema.json` unconditionally, which under
+  // `npx` (nothing installed locally) named a path that does not exist.
+  describe("the written $schema resolves to a file that exists", () => {
+    it("points at the installed package schema when one is on disk", async () => {
+      const cwd = await fixtureRepo(
+        withInstalledSchema(CROSS_LINKED_DOCS_FIXTURE),
+      );
+
+      const result = await run(["init", cwd, "--yes"], cwd);
+      expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+      const written = readConfig(
+        await readFile(path.join(cwd, CONFIG_FILE), "utf8"),
+      );
+      expect(written.$schema).toBe(
+        "./node_modules/@wastech-mdlint/cli/schema.json",
+      );
+      await expect(readReferencedSchema(cwd)).resolves.toBe(
+        generateConfigSchema(),
+      );
+      // Nothing extra is generated when a real package schema is already there.
+      await expect(
+        readFile(path.join(cwd, "schema.json"), "utf8"),
+      ).rejects.toThrow();
+      expect(result.stdout).not.toContain("Wrote project-local schema");
+    });
+
+    it("generates and points at a project-local schema in the npx scenario", async () => {
+      const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+
+      const result = await run(["init", cwd, "--yes"], cwd);
+      expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+      const written = readConfig(
+        await readFile(path.join(cwd, CONFIG_FILE), "utf8"),
+      );
+      expect(written.$schema).toBe("./schema.json");
+      await expect(readReferencedSchema(cwd)).resolves.toBe(
+        generateConfigSchema(),
+      );
+      expect(result.stdout).toContain(
+        "Wrote project-local schema schema.json (no installed package schema to point at).",
+      );
+      // Still a local ref, never a remote URL (C9 / the security boundary).
+      expect(written.$schema).not.toMatch(/https?:\/\//);
+    });
+
+    it("resolves for a subdirectory config in the npx scenario too", async () => {
+      // The ref is relative to the config's own directory, so the nested case is the one where a
+      // wrong base silently produces a dangling path.
+      const cwd = await fixtureRepo({
+        ".git/HEAD": "ref: refs/heads/main\n",
+        ...CROSS_LINKED_DOCS_FIXTURE,
+      });
+
+      const result = await run(["init", "docs", "--yes"], cwd);
+      expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+      const docsDir = path.join(cwd, "docs");
+      const written = readConfig(
+        await readFile(path.join(docsDir, CONFIG_FILE), "utf8"),
+      );
+      expect(written.$schema).toBe("./schema.json");
+      await expect(readReferencedSchema(docsDir)).resolves.toBe(
+        generateConfigSchema(),
+      );
+    });
+
+    it("re-running init over the generated project schema reports it unchanged", async () => {
+      const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+
+      await run(["init", cwd, "--yes"], cwd);
+      const second = await run(
+        ["init", cwd, "--yes", "--on-existing", "merge"],
+        cwd,
+      );
+
+      expect(second.exitCode).toBe(EXIT_CODE_SUCCESS);
+      expect(second.stdout).toContain(
+        "Project-local schema schema.json is already up to date (no installed package schema to point at).",
+      );
+      await expect(readReferencedSchema(cwd)).resolves.toBe(
+        generateConfigSchema(),
+      );
+    });
+
+    // `--on-existing overwrite` is a disposition for the *config*; the user never named
+    // `schema.json`. Once the npx fallback started generating that file for any repo, the overwrite
+    // branch became reachable against a name plenty of projects already use for something else (an
+    // OpenAPI document, a product schema) — so it must degrade to "kept" whenever the only reason
+    // for the project schema is that nothing is installed to point at.
+    it("never replaces an unrelated schema.json under --on-existing overwrite in the npx scenario", async () => {
+      const unrelatedSchema = '{ "openapi": "3.1.0", "paths": {} }\n';
+      const cwd = await fixtureRepo({
+        ...CROSS_LINKED_DOCS_FIXTURE,
+        [CONFIG_FILE]: '{\n  "rules": []\n}\n',
+        "schema.json": unrelatedSchema,
+      });
+
+      const result = await run(
+        ["init", cwd, "--yes", "--on-existing", "overwrite"],
+        cwd,
+      );
+
+      expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+      await expect(
+        readFile(path.join(cwd, "schema.json"), "utf8"),
+      ).resolves.toBe(unrelatedSchema);
+      expect(result.stdout).not.toContain("Overwrote schema.json");
+      expect(result.stdout).toContain(
+        "Kept existing schema.json at schema.json",
+      );
+      // The config was still rewritten and still points at that file, which is the honest — and
+      // reported — cost of not clobbering it.
+      expect(result.stdout).toContain(
+        "The config's $schema points at it even though init did not generate it",
+      );
+      const written = readConfig(
+        await readFile(path.join(cwd, CONFIG_FILE), "utf8"),
+      );
+      expect(written.$schema).toBe("./schema.json");
+    });
   });
 
   it("a monorepo init writes an exclude that keeps nested dist/node_modules out of the lint corpus", async () => {
@@ -954,7 +1120,10 @@ describe("init command · writing the config (P6.04)", () => {
     expect(result.stdout).toContain(
       `Write failed: could not replace ${CONFIG_FILE}`,
     );
-    expect(result.stdout).toContain("Written: nothing.");
+    // The project-local schema is committed first (P11.09's schema-first ordering) and this fixture
+    // has no installed package schema, so it genuinely lands before the config rename fails — the
+    // summary has to name it rather than claim nothing was written.
+    expect(result.stdout).toContain("Written: schema.json.");
     expect(result.stdout).toContain(
       "Every file listed as not written is byte-unchanged on disk",
     );
@@ -976,10 +1145,14 @@ describe("init command · writing the config (P6.04)", () => {
     "leaves an existing config byte-unchanged when the write cannot be staged",
     async () => {
       const existingConfigText = `${JSON.stringify({ rules: [{ rule: "REF-001" }] }, null, 2)}\n`;
-      const cwd = await fixtureRepo({
-        ...CROSS_LINKED_DOCS_FIXTURE,
-        [CONFIG_FILE]: existingConfigText,
-      });
+      // With the package schema installed, the config is the only staged write — so the failure this
+      // test provokes is attributed to the config, which is the file whose bytes it is guarding.
+      const cwd = await fixtureRepo(
+        withInstalledSchema({
+          ...CROSS_LINKED_DOCS_FIXTURE,
+          [CONFIG_FILE]: existingConfigText,
+        }),
+      );
       // `r-x`: the corpus and the existing config stay readable, but no new file can be created —
       // so the temp write fails and no rename is ever attempted.
       await chmod(cwd, 0o555);
@@ -1089,11 +1262,15 @@ describe("init command · writing the config (P6.04)", () => {
       "workflows",
       "wastech-mdlint.yml",
     );
-    // A git repo whose Markdown lives under docs/, with no existing config anywhere.
-    const cwd = await fixtureRepo({
-      ...CROSS_LINKED_DOCS_FIXTURE,
-      ".git/HEAD": "ref: refs/heads/main\n",
-    });
+    // A git repo whose Markdown lives under docs/, with no existing config anywhere. The installed
+    // package schema is what makes the `../` path math below the thing under test rather than the
+    // project-local fallback.
+    const cwd = await fixtureRepo(
+      withInstalledSchema({
+        ...CROSS_LINKED_DOCS_FIXTURE,
+        ".git/HEAD": "ref: refs/heads/main\n",
+      }),
+    );
 
     const result = await run(
       ["init", "docs", "--yes", "--with-ci-workflow"],
@@ -1162,11 +1339,13 @@ describe("init command · writing the config (P6.04)", () => {
       "wastech-mdlint.yml",
     );
     // A valid non-git project: no `.git`, but `package.json` at the root marks the install root.
-    const cwd = await fixtureRepo({
-      "package.json": JSON.stringify({ name: "proj" }),
-      "docs/a.md": "# A\n\nSee [B](b.md).\n",
-      "docs/b.md": "# B\n\nSee [A](a.md).\n",
-    });
+    const cwd = await fixtureRepo(
+      withInstalledSchema({
+        "package.json": JSON.stringify({ name: "proj" }),
+        "docs/a.md": "# A\n\nSee [B](b.md).\n",
+        "docs/b.md": "# B\n\nSee [A](a.md).\n",
+      }),
+    );
 
     const result = await run(
       ["init", "docs", "--yes", "--with-ci-workflow"],
@@ -1198,16 +1377,18 @@ describe("init command · writing the config (P6.04)", () => {
     );
     // A monorepo: `.git` + workspace `package.json` at the root, and a nested package with its own
     // `package.json`. Running init inside the nested package must still anchor at the repo root.
-    const cwd = await fixtureRepo({
-      ".git/HEAD": "ref: refs/heads/main\n",
-      "package.json": JSON.stringify({
-        name: "monorepo",
-        workspaces: ["packages/*"],
+    const cwd = await fixtureRepo(
+      withInstalledSchema({
+        ".git/HEAD": "ref: refs/heads/main\n",
+        "package.json": JSON.stringify({
+          name: "monorepo",
+          workspaces: ["packages/*"],
+        }),
+        "packages/foo/package.json": JSON.stringify({ name: "foo" }),
+        "packages/foo/a.md": "# A\n\nSee [B](b.md).\n",
+        "packages/foo/b.md": "# B\n\nSee [A](a.md).\n",
       }),
-      "packages/foo/package.json": JSON.stringify({ name: "foo" }),
-      "packages/foo/a.md": "# A\n\nSee [B](b.md).\n",
-      "packages/foo/b.md": "# B\n\nSee [A](a.md).\n",
-    });
+    );
 
     const result = await run(
       ["init", "packages/foo", "--yes", "--with-ci-workflow"],
@@ -1254,6 +1435,20 @@ describe("init command · writing the config (P6.04)", () => {
     await writeFile(
       path.join(projectDir, "b.md"),
       "# B\n\nSee [A](a.md).\n",
+      "utf8",
+    );
+    // Installed inside the project itself, so the `$schema` assertion below is about the walk
+    // stopping at `$HOME` rather than about the project-local fallback firing.
+    const installedSchemaDir = path.join(
+      projectDir,
+      "node_modules",
+      "@wastech-mdlint",
+      "cli",
+    );
+    await mkdir(installedSchemaDir, { recursive: true });
+    await writeFile(
+      path.join(installedSchemaDir, "schema.json"),
+      generateConfigSchema(),
       "utf8",
     );
 
@@ -1338,6 +1533,11 @@ describe("init command · writing the config (P6.04)", () => {
     // Never clobber a file the user already owns — no "Wrote CI workflow" line, and the file is
     // byte-for-byte untouched (the offer is skipped before ever reaching the prompt/write step).
     expect(result.stdout).not.toContain("Wrote CI workflow");
+    // ...but the skip is now stated (audit L-11). Silence read identically to "no workflow was ever
+    // offered", leaving a user who passed --with-ci-workflow unsure whether anything happened.
+    expect(result.stdout).toContain(
+      "Kept the existing CI workflow .github/workflows/wastech-mdlint.yml",
+    );
     await expect(readFile(path.join(cwd, workflowPath), "utf8")).resolves.toBe(
       existingWorkflowText,
     );
@@ -1369,6 +1569,210 @@ describe("init command · writing the config (P6.04)", () => {
         "utf8",
       ),
     ).rejects.toThrow();
+  });
+});
+
+// Audit L-7: `init` proposed `.github/**`, `.venv/**` and `generated-docs/**` as doc clusters, and
+// because the written config left `respectGitignore` at its `false` default, lint then read them.
+describe("init command · hidden and gitignored trees (L-7)", () => {
+  const HONEST_SCAN_FIXTURE: Record<string, string> = {
+    ".gitignore": "generated-docs/\n",
+    "docs/a.md": "# A\n\nSee [B](b.md).\n",
+    "docs/b.md": "# B\n\nSee [A](a.md).\n",
+    ".github/PULL_REQUEST_TEMPLATE.md": "# PR\n\nSee [nope](missing.md).\n",
+    ".github/ISSUE_TEMPLATE/bug.md": "# Bug\n",
+    ".venv/lib/pkg/README.md": "# Vendored\n",
+    "generated-docs/api/one.md": "# One\n",
+    "generated-docs/api/two.md": "# Two\n",
+    "generated-docs/api/three.md": "# Three\n",
+  };
+
+  it("proposes none of them, and the written config does not lint them either", async () => {
+    const cwd = await fixtureRepo(HONEST_SCAN_FIXTURE);
+
+    const init = await run(["init", cwd, "--yes"], cwd);
+    expect(init.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    // Not proposed: neither in the printed draft nor in the file that draft produced.
+    for (const noise of [".github", ".venv", "generated-docs"]) {
+      expect(init.stdout).not.toContain(noise);
+    }
+    const written = readConfig(
+      await readFile(path.join(cwd, CONFIG_FILE), "utf8"),
+    );
+    expect(written.include).toEqual(["docs/**/*.{md,mdx}"]);
+    expect(written.exclude).toContain("**/.*/**");
+    expect(written.respectGitignore).toBe(true);
+
+    // Not linted: the honest half of the fix. `--fail-on off` keeps the exit code at 0 regardless
+    // of findings, and `files` carries the full analyzed corpus.
+    const lint = await run(
+      ["lint", cwd, "--format", "json", "--fail-on", "off"],
+      cwd,
+    );
+    expect(lint.exitCode).toBe(EXIT_CODE_SUCCESS);
+    const { files } = JSON.parse(lint.stdout) as { files: string[] };
+
+    expect(files).toEqual(["docs/a.md", "docs/b.md"]);
+  });
+});
+
+// Audit L-9: `include: []` used to be omitted from the written config, and `lintFiles` defaults an
+// absent `include` to `**/*.md` — so turning every cluster down linted the entire repository.
+describe("init command · deselecting every cluster (L-9)", () => {
+  it('writes an explicit "include": [], says so, and lints nothing', async () => {
+    const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+    let offeredClusterCount = 0;
+    const prompter = createDefaultFakePrompter({
+      selectClusters: async (clusters) => {
+        offeredClusterCount = clusters.length;
+        return [];
+      },
+    });
+
+    const result = await run(["init", cwd], cwd, {
+      isTty: true,
+      initPrompter: prompter,
+    });
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    // Pins the setup: the prompter really was offered something to turn down, so the empty result
+    // is a choice rather than a scan that found nothing.
+    expect(offeredClusterCount).toBeGreaterThan(0);
+    expect(result.stdout).toContain(
+      '"include" was written as an empty list, because no doc cluster was selected',
+    );
+
+    const written = readConfig(
+      await readFile(path.join(cwd, CONFIG_FILE), "utf8"),
+    );
+    expect(written.include).toEqual([]);
+
+    const lint = await run(
+      ["lint", cwd, "--format", "json", "--fail-on", "off"],
+      cwd,
+    );
+    expect(lint.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect((JSON.parse(lint.stdout) as { files: string[] }).files).toEqual([]);
+  });
+
+  it("shows the empty selection in the draft before the user confirms it", async () => {
+    const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+    let shownDraft = "";
+    const prompter = createDefaultFakePrompter({
+      selectClusters: async () => [],
+      confirmDraft: async (summary) => {
+        shownDraft = summary;
+        return false;
+      },
+    });
+
+    const result = await run(["init", cwd], cwd, {
+      isTty: true,
+      initPrompter: prompter,
+    });
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(shownDraft).toContain("none selected");
+    expect(shownDraft).toContain("no files will be linted");
+    // Declining leaves nothing behind, so the warning was genuinely actionable.
+    await expect(
+      readFile(path.join(cwd, CONFIG_FILE), "utf8"),
+    ).rejects.toThrow();
+  });
+
+  it("still omits include when the scan found no cluster to offer", async () => {
+    // The opposite reading of the same empty array: nothing was detected, so the tool default is
+    // the right answer and the key stays absent. A repo with no Markdown at all is the only way to
+    // reach it — with any Markdown present, `scanRepository` emits its `**/*.md` fallback cluster.
+    const cwd = await fixtureRepo({ "src/index.ts": "export {};\n" });
+
+    const result = await run(["init", cwd, "--yes"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain("no Markdown clusters detected");
+    expect(result.stdout).not.toContain("empty list");
+    const written = readConfig(
+      await readFile(path.join(cwd, CONFIG_FILE), "utf8"),
+    );
+    expect("include" in written).toBe(false);
+  });
+});
+
+// Audit L-8: the merge is advertised as additive and non-destructive, but it rebuilds the file from
+// parsed values, so every comment the user wrote disappears without a word.
+describe("init command · merge over a comment-bearing config (L-8)", () => {
+  const COMMENTED_CONFIG = [
+    "{",
+    "  // Keep REF-001 at warning until the backlog is cleared.",
+    '  "rules": [{ "rule": "REF-001", "severity": "warning" }]',
+    "}",
+    "",
+  ].join("\n");
+
+  it("reports the comment loss in the write summary", async () => {
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      [CONFIG_FILE]: COMMENTED_CONFIG,
+    });
+
+    const result = await run(
+      ["init", cwd, "--yes", "--on-existing", "merge"],
+      cwd,
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain(
+      "the JSONC comments in the existing file are not preserved",
+    );
+    // The claim has to be true: the rebuilt file really has lost the user's comment.
+    const rewritten = await readFile(path.join(cwd, CONFIG_FILE), "utf8");
+    expect(rewritten).not.toContain("until the backlog is cleared");
+  });
+
+  it("warns in the draft, before the user confirms, so declining is still possible", async () => {
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      [CONFIG_FILE]: COMMENTED_CONFIG,
+    });
+    let shownDraft = "";
+    const prompter = createDefaultFakePrompter({
+      resolveExistingConfigAction: async () => "merge",
+      confirmDraft: async (summary) => {
+        shownDraft = summary;
+        return false;
+      },
+    });
+
+    const result = await run(["init", cwd], cwd, {
+      isTty: true,
+      initPrompter: prompter,
+    });
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(shownDraft).toContain(
+      "WARNING: merge rebuilds the config from its parsed values",
+    );
+    expect(shownDraft).toContain("Back it up first if you need them.");
+    // Declined, so the comment-bearing original survives byte-for-byte.
+    await expect(readFile(path.join(cwd, CONFIG_FILE), "utf8")).resolves.toBe(
+      COMMENTED_CONFIG,
+    );
+  });
+
+  it("stays silent about comments when the existing config has none", async () => {
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      [CONFIG_FILE]: JSON.stringify({ rules: [{ rule: "REF-001" }] }),
+    });
+
+    const result = await run(
+      ["init", cwd, "--yes", "--on-existing", "merge"],
+      cwd,
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).not.toContain("JSONC comments");
   });
 });
 
@@ -1623,6 +2027,8 @@ describe("formatDraftSummary", () => {
       rules: [],
       newRuleIds: [],
       existingConfigUnreadable: false,
+      clustersWereOffered: false,
+      existingConfigHasComments: false,
       ...overrides,
     };
   }
@@ -1631,8 +2037,27 @@ describe("formatDraftSummary", () => {
     const summary = formatDraftSummary(buildSelections(), undefined);
     expect(summary).toContain("Existing config: none found.");
     expect(summary).toContain("Package manager: not detected.");
-    expect(summary).toContain("(none — no Markdown clusters detected)");
+    expect(summary).toContain("(none — no Markdown clusters detected");
     expect(summary).toContain("(none inferred)");
+  });
+
+  // Audit L-9: both empty cases render "Include (0)", so the parenthetical is the only thing telling
+  // the user whether a config that lints everything or one that lints nothing is about to be written.
+  it("distinguishes 'no clusters detected' from 'every offered cluster deselected'", () => {
+    const detectedNone = formatDraftSummary(
+      buildSelections({ clustersWereOffered: false }),
+      undefined,
+    );
+    expect(detectedNone).toContain("no Markdown clusters detected");
+    expect(detectedNone).toContain("the default **/*.md applies");
+
+    const deselectedAll = formatDraftSummary(
+      buildSelections({ clustersWereOffered: true }),
+      undefined,
+    );
+    expect(deselectedAll).toContain("none selected");
+    expect(deselectedAll).toContain("no files will be linted");
+    expect(deselectedAll).not.toContain("no Markdown clusters detected");
   });
 
   it("groups rules under sorted category headings regardless of input order", () => {
@@ -1694,19 +2119,14 @@ describe("formatDraftSummary", () => {
 
 describe("formatWriteSummary", () => {
   function buildResult(
-    overrides: Partial<{
-      configText: string;
-      schemaRef: string;
-      projectSchema?: { fileName: string; text: string };
-      addedRuleCount: number;
-      totalRuleCount: number;
-    }> = {},
-  ) {
+    overrides: Partial<GeneratedInitConfig> = {},
+  ): GeneratedInitConfig {
     return {
       configText: "{}\n",
       schemaRef: "./node_modules/@wastech-mdlint/cli/schema.json",
       addedRuleCount: 2,
       totalRuleCount: 2,
+      wroteEmptyInclude: false,
       ...overrides,
     };
   }
@@ -1716,6 +2136,7 @@ describe("formatWriteSummary", () => {
       action: "fresh",
       result: buildResult(),
       configPath: CONFIG_FILE,
+      commentsDropped: false,
     });
 
     expect(summary).toContain(`Wrote ${CONFIG_FILE} with 2 rule(s).`);
@@ -1731,6 +2152,7 @@ describe("formatWriteSummary", () => {
       action: "merge",
       result: buildResult({ addedRuleCount: 1, totalRuleCount: 3 }),
       configPath: CONFIG_FILE,
+      commentsDropped: false,
     });
 
     expect(summary).toContain(
@@ -1743,7 +2165,8 @@ describe("formatWriteSummary", () => {
       action: "fresh",
       result: buildResult({ schemaRef: "./schema.json" }),
       configPath: CONFIG_FILE,
-      schema: { kind: "written", path: "schema.json" },
+      commentsDropped: false,
+      schema: { kind: "written", path: "schema.json", reason: "custom-rules" },
       ciWorkflow: {
         kind: "written",
         path: ".github/workflows/wastech-mdlint.yml",
@@ -1763,7 +2186,8 @@ describe("formatWriteSummary", () => {
       action: "merge",
       result: buildResult({ schemaRef: "./schema.json" }),
       configPath: CONFIG_FILE,
-      schema: { kind: "kept", path: "schema.json" },
+      commentsDropped: false,
+      schema: { kind: "kept", path: "schema.json", reason: "custom-rules" },
     });
 
     expect(summary).toContain("Kept existing schema.json at schema.json");
@@ -1772,9 +2196,32 @@ describe("formatWriteSummary", () => {
     // write was skipped, and the only working regeneration route is --on-existing merge — a real
     // --on-existing overwrite run always discards the custom rules this write depends on, so it
     // can never reach this branch and must not be advertised as a fix.
-    expect(summary).toContain("the config's $schema still points at it");
+    expect(summary).toContain("The config's $schema still points at it");
     expect(summary).toContain("--on-existing merge");
     expect(summary).not.toContain("run again with --on-existing overwrite");
+  });
+
+  // Under the npx fallback the kept file is somebody else's `schema.json`, not a stale copy of
+  // init's own — so the advice must be "repoint or move it", never "re-run to regenerate over it".
+  it("tells the npx-fallback case that $schema now names a file init did not generate", () => {
+    const summary = formatWriteSummary({
+      action: "fresh",
+      result: buildResult({ schemaRef: "./schema.json" }),
+      configPath: CONFIG_FILE,
+      commentsDropped: false,
+      schema: {
+        kind: "kept",
+        path: "schema.json",
+        reason: "no-installed-package",
+      },
+    });
+
+    expect(summary).toContain(
+      "The config's $schema points at it even though init did not generate it",
+    );
+    expect(summary).toContain("Repoint $schema by hand");
+    expect(summary).not.toContain("--on-existing merge");
+    expect(summary).not.toContain("custom rules present");
   });
 
   it("reports an up-to-date project-local schema without claiming a write happened", () => {
@@ -1782,7 +2229,12 @@ describe("formatWriteSummary", () => {
       action: "merge",
       result: buildResult({ schemaRef: "./schema.json" }),
       configPath: CONFIG_FILE,
-      schema: { kind: "unchanged", path: "schema.json" },
+      commentsDropped: false,
+      schema: {
+        kind: "unchanged",
+        path: "schema.json",
+        reason: "custom-rules",
+      },
     });
 
     expect(summary).toContain(
@@ -1797,7 +2249,12 @@ describe("formatWriteSummary", () => {
       action: "fresh",
       result: buildResult({ schemaRef: "./schema.json" }),
       configPath: CONFIG_FILE,
-      schema: { kind: "overwritten", path: "schema.json" },
+      commentsDropped: false,
+      schema: {
+        kind: "overwritten",
+        path: "schema.json",
+        reason: "custom-rules",
+      },
     });
 
     expect(summary).toContain("Overwrote schema.json at schema.json");
@@ -1809,7 +2266,12 @@ describe("formatWriteSummary", () => {
       action: "merge",
       result: buildResult({ schemaRef: "./schema.json" }),
       configPath: CONFIG_FILE,
-      schema: { kind: "unreadable", path: "schema.json" },
+      commentsDropped: false,
+      schema: {
+        kind: "unreadable",
+        path: "schema.json",
+        reason: "custom-rules",
+      },
     });
 
     expect(summary).toContain("Kept existing schema.json at schema.json");
@@ -1823,6 +2285,7 @@ describe("formatWriteSummary", () => {
       action: "fresh",
       result: buildResult(),
       configPath: CONFIG_FILE,
+      commentsDropped: false,
       ciWorkflow: {
         kind: "failed",
         path: ".github/workflows/wastech-mdlint.yml",
@@ -1843,6 +2306,7 @@ describe("formatWriteSummary", () => {
       action: "fresh",
       result: buildResult(),
       configPath: CONFIG_FILE,
+      commentsDropped: false,
       ciWorkflow: {
         kind: "failed",
         path: ".github/workflows/wastech-mdlint.yml",
@@ -1853,6 +2317,119 @@ describe("formatWriteSummary", () => {
       "Could not write the CI workflow .github/workflows/wastech-mdlint.yml —",
     );
     expect(summary).not.toContain("()");
+  });
+
+  // Audit L-11: both of these used to be silent — the summary simply had no workflow line, which
+  // reads identically to a run that never offered one.
+  it("reports a pre-existing CI workflow as kept rather than saying nothing", () => {
+    const summary = formatWriteSummary({
+      action: "fresh",
+      result: buildResult(),
+      configPath: CONFIG_FILE,
+      commentsDropped: false,
+      ciWorkflow: {
+        kind: "kept",
+        path: ".github/workflows/wastech-mdlint.yml",
+      },
+    });
+
+    expect(summary).toContain(
+      "Kept the existing CI workflow .github/workflows/wastech-mdlint.yml",
+    );
+    expect(summary).toContain("init never overwrites it");
+    expect(summary).not.toContain("Wrote CI workflow");
+  });
+
+  it("explains a CI workflow skipped because the config path is unrepresentable", () => {
+    const summary = formatWriteSummary({
+      action: "fresh",
+      result: buildResult(),
+      configPath: CONFIG_FILE,
+      commentsDropped: false,
+      ciWorkflow: {
+        kind: "unsafe-config-path",
+        path: ".github/workflows/wastech-mdlint.yml",
+      },
+    });
+
+    expect(summary).toContain(
+      "Skipped the CI workflow .github/workflows/wastech-mdlint.yml",
+    );
+    expect(summary).toContain("line terminator");
+    expect(summary).toContain("The config above was still written");
+  });
+
+  // Audit L-8: the merge presents itself as non-destructive, so the one thing it does destroy has to
+  // be said out loud.
+  it("reports dropped JSONC comments on a merge", () => {
+    const summary = formatWriteSummary({
+      action: "merge",
+      result: buildResult({ addedRuleCount: 1, totalRuleCount: 3 }),
+      configPath: CONFIG_FILE,
+      commentsDropped: true,
+    });
+
+    expect(summary).toContain(
+      "Note: merge rebuilds the config from its parsed values, so the JSONC comments in the " +
+        "existing file are not preserved.",
+    );
+  });
+
+  it("says nothing about comments when the previous config had none", () => {
+    const summary = formatWriteSummary({
+      action: "merge",
+      result: buildResult(),
+      configPath: CONFIG_FILE,
+      commentsDropped: false,
+    });
+
+    expect(summary).not.toContain("JSONC comments");
+  });
+
+  // Audit L-9: a config that lints zero files is a legitimate outcome, but an unannounced one looks
+  // exactly like a broken install the first time `lint` reports nothing.
+  it("flags an empty include so a zero-file config is not a silent surprise", () => {
+    const summary = formatWriteSummary({
+      action: "fresh",
+      result: buildResult({ wroteEmptyInclude: true }),
+      configPath: CONFIG_FILE,
+      commentsDropped: false,
+    });
+
+    expect(summary).toContain(
+      '"include" was written as an empty list, because no doc cluster was selected',
+    );
+    expect(summary).toContain("no files will be linted");
+  });
+
+  it("does not flag include when a real one was written", () => {
+    const summary = formatWriteSummary({
+      action: "fresh",
+      result: buildResult(),
+      configPath: CONFIG_FILE,
+      commentsDropped: false,
+    });
+
+    expect(summary).not.toContain("empty list");
+  });
+
+  it("names the npx fallback as the reason for a project-local schema, not custom rules", () => {
+    const summary = formatWriteSummary({
+      action: "fresh",
+      result: buildResult({ schemaRef: "./schema.json" }),
+      configPath: CONFIG_FILE,
+      commentsDropped: false,
+      schema: {
+        kind: "written",
+        path: "schema.json",
+        reason: "no-installed-package",
+      },
+    });
+
+    expect(summary).toContain(
+      "Wrote project-local schema schema.json (no installed package schema to point at).",
+    );
+    expect(summary).not.toContain("custom rules present");
   });
 });
 
@@ -1866,6 +2443,7 @@ describe("resolveSchemaWriteOutcome", () => {
         existingSchemaText: undefined,
         existingSchemaUnreadable: false,
         generatedSchemaText,
+        reason: "custom-rules",
       }),
     ).toEqual({ shouldWrite: true, kind: "written" });
     expect(
@@ -1874,6 +2452,7 @@ describe("resolveSchemaWriteOutcome", () => {
         existingSchemaText: undefined,
         existingSchemaUnreadable: false,
         generatedSchemaText,
+        reason: "no-installed-package",
       }),
     ).toEqual({ shouldWrite: true, kind: "written" });
   });
@@ -1885,6 +2464,7 @@ describe("resolveSchemaWriteOutcome", () => {
         existingSchemaText: generatedSchemaText,
         existingSchemaUnreadable: false,
         generatedSchemaText,
+        reason: "custom-rules",
       }),
     ).toEqual({ shouldWrite: false, kind: "unchanged" });
     expect(
@@ -1893,6 +2473,7 @@ describe("resolveSchemaWriteOutcome", () => {
         existingSchemaText: generatedSchemaText,
         existingSchemaUnreadable: false,
         generatedSchemaText,
+        reason: "custom-rules",
       }),
     ).toEqual({ shouldWrite: false, kind: "unchanged" });
   });
@@ -1904,8 +2485,25 @@ describe("resolveSchemaWriteOutcome", () => {
         existingSchemaText: '{"hand-written":true}\n',
         existingSchemaUnreadable: false,
         generatedSchemaText,
+        reason: "custom-rules",
       }),
     ).toEqual({ shouldWrite: true, kind: "overwritten" });
+  });
+
+  // The guard on the one destructive outcome: `--on-existing overwrite` says what to do with the
+  // *config*. Only the custom-rules reason ties the schema's contents to that config; the npx
+  // fallback just needs a resolvable target, so an unrelated `schema.json` — a name that collides
+  // easily — is kept even here.
+  it("keeps a differing schema.json under overwrite when the project schema is only the npx fallback", () => {
+    expect(
+      resolveSchemaWriteOutcome({
+        existingConfigAction: "overwrite",
+        existingSchemaText: '{"openapi":"3.1.0"}\n',
+        existingSchemaUnreadable: false,
+        generatedSchemaText,
+        reason: "no-installed-package",
+      }),
+    ).toEqual({ shouldWrite: false, kind: "kept" });
   });
 
   it("keeps a differing existing schema.json on a merge", () => {
@@ -1915,6 +2513,7 @@ describe("resolveSchemaWriteOutcome", () => {
         existingSchemaText: '{"hand-written":true}\n',
         existingSchemaUnreadable: false,
         generatedSchemaText,
+        reason: "custom-rules",
       }),
     ).toEqual({ shouldWrite: false, kind: "kept" });
   });
@@ -1926,6 +2525,7 @@ describe("resolveSchemaWriteOutcome", () => {
         existingSchemaText: '{"hand-written":true}\n',
         existingSchemaUnreadable: false,
         generatedSchemaText,
+        reason: "custom-rules",
       }),
     ).toEqual({ shouldWrite: false, kind: "kept" });
   });
@@ -1940,14 +2540,17 @@ describe("resolveSchemaWriteOutcome", () => {
       "merge",
       "none",
     ] as const) {
-      expect(
-        resolveSchemaWriteOutcome({
-          existingConfigAction,
-          existingSchemaText: undefined,
-          existingSchemaUnreadable: true,
-          generatedSchemaText,
-        }),
-      ).toEqual({ shouldWrite: false, kind: "unreadable" });
+      for (const reason of ["custom-rules", "no-installed-package"] as const) {
+        expect(
+          resolveSchemaWriteOutcome({
+            existingConfigAction,
+            existingSchemaText: undefined,
+            existingSchemaUnreadable: true,
+            generatedSchemaText,
+            reason,
+          }),
+        ).toEqual({ shouldWrite: false, kind: "unreadable" });
+      }
     }
   });
 });
@@ -2003,98 +2606,83 @@ describe("formatNotWrittenSummary", () => {
   });
 });
 
-describe("readExistingRuleIds", () => {
+// The production read path (audit L-11 retired `readExistingRuleIds`, an exported wrapper with no
+// caller): `readExistingConfigDocument` parses the file once and `extractExistingRuleIds` derives
+// the merge identity from that snapshot. These are the two functions `runInitCommand` actually
+// calls, so the coverage below follows them rather than a parallel convenience wrapper.
+describe("readExistingConfigDocument + extractExistingRuleIds", () => {
+  async function readIds(cwd: string, fileName: string) {
+    const document = await readExistingConfigDocument(
+      cwd,
+      path.join(cwd, fileName),
+    );
+    const { ruleIds, mergeable } = extractExistingRuleIds(document.raw);
+    // `parsed` here means "readable AND additively mergeable" — the single signal the merge path
+    // gates on, which is what the retired wrapper used to return.
+    return { ruleIds, parsed: document.parsed && mergeable };
+  }
+
   it("returns parsed: false and no ids rather than throwing on a malformed config", async () => {
     const cwd = await fixtureRepo({ "broken.json": "{ not json" });
-    const result = await readExistingRuleIds(
-      cwd,
-      path.join(cwd, "broken.json"),
-    );
-    expect(result).toEqual({ ruleIds: [], parsed: false });
+    expect(await readIds(cwd, "broken.json")).toEqual({
+      ruleIds: [],
+      parsed: false,
+    });
   });
 
   it("returns parsed: false for a missing file rather than throwing", async () => {
     const cwd = await fixtureRepo({});
-    const result = await readExistingRuleIds(
-      cwd,
-      path.join(cwd, "does-not-exist.json"),
-    );
-    expect(result).toEqual({ ruleIds: [], parsed: false });
+    expect(await readIds(cwd, "does-not-exist.json")).toEqual({
+      ruleIds: [],
+      parsed: false,
+    });
   });
 
   it("returns parsed: true with [] for a validly-parsed config with no rules[]", async () => {
     const cwd = await fixtureRepo({
-      "wastech-mdlint.config.json": JSON.stringify({ include: ["**/*.md"] }),
+      [CONFIG_FILE]: JSON.stringify({ include: ["**/*.md"] }),
     });
-    const result = await readExistingRuleIds(
-      cwd,
-      path.join(cwd, "wastech-mdlint.config.json"),
-    );
-    expect(result).toEqual({ ruleIds: [], parsed: true });
+    expect(await readIds(cwd, CONFIG_FILE)).toEqual({
+      ruleIds: [],
+      parsed: true,
+    });
   });
 
   it("returns parsed: false for a JSONC-valid config whose rules key isn't an array", async () => {
-    const cwd = await fixtureRepo({
-      "wastech-mdlint.config.json": JSON.stringify({ rules: {} }),
-    });
-    const result = await readExistingRuleIds(
-      cwd,
-      path.join(cwd, "wastech-mdlint.config.json"),
-    );
-    expect(result).toEqual({ ruleIds: [], parsed: false });
-  });
-
-  it("returns parsed: false when rules is a scalar rather than an array", async () => {
-    const cwd = await fixtureRepo({
-      "wastech-mdlint.config.json": JSON.stringify({ rules: "REF-001" }),
-    });
-    const result = await readExistingRuleIds(
-      cwd,
-      path.join(cwd, "wastech-mdlint.config.json"),
-    );
-    expect(result).toEqual({ ruleIds: [], parsed: false });
-  });
-
-  it("returns parsed: false when a rules[] entry is a bare string (not identifiable for the diff)", async () => {
-    // `["REF-001"]` looks array-shaped but the element carries no `{ rule }` to canonically diff, so
-    // a merge could not prove it a duplicate — the whole config is non-mergeable, not silently kept.
-    const cwd = await fixtureRepo({
-      "wastech-mdlint.config.json": JSON.stringify({ rules: ["REF-001"] }),
-    });
-    const result = await readExistingRuleIds(
-      cwd,
-      path.join(cwd, "wastech-mdlint.config.json"),
-    );
-    expect(result).toEqual({ ruleIds: [], parsed: false });
-  });
-
-  it("returns parsed: false when a rules[] entry has a non-string rule value", async () => {
-    const cwd = await fixtureRepo({
-      "wastech-mdlint.config.json": JSON.stringify({ rules: [{ rule: 1 }] }),
-    });
-    const result = await readExistingRuleIds(
-      cwd,
-      path.join(cwd, "wastech-mdlint.config.json"),
-    );
-    expect(result).toEqual({ ruleIds: [], parsed: false });
-  });
-
-  it("returns parsed: false for a custom entry with a missing or non-string id", async () => {
-    for (const rules of [[{ rule: "custom" }], [{ rule: "custom", id: 1 }]]) {
+    for (const rules of [{}, "REF-001"]) {
       const cwd = await fixtureRepo({
-        "wastech-mdlint.config.json": JSON.stringify({ rules }),
+        [CONFIG_FILE]: JSON.stringify({ rules }),
       });
-      const result = await readExistingRuleIds(
-        cwd,
-        path.join(cwd, "wastech-mdlint.config.json"),
-      );
-      expect(result).toEqual({ ruleIds: [], parsed: false });
+      expect(await readIds(cwd, CONFIG_FILE)).toEqual({
+        ruleIds: [],
+        parsed: false,
+      });
+    }
+  });
+
+  it("returns parsed: false for a rules[] entry the merge cannot identify", async () => {
+    // A bare string looks array-shaped but carries no `{ rule }` to canonically diff, so a merge
+    // could not prove it a duplicate; a non-string `rule` and a custom entry with a missing or
+    // non-string `id` fail the same way. Non-mergeable, not silently kept.
+    for (const rules of [
+      ["REF-001"],
+      [{ rule: 1 }],
+      [{ rule: "custom" }],
+      [{ rule: "custom", id: 1 }],
+    ]) {
+      const cwd = await fixtureRepo({
+        [CONFIG_FILE]: JSON.stringify({ rules }),
+      });
+      expect(await readIds(cwd, CONFIG_FILE)).toEqual({
+        ruleIds: [],
+        parsed: false,
+      });
     }
   });
 
   it('identifies a custom entry by its canonical id, not the literal "custom"', async () => {
     const cwd = await fixtureRepo({
-      "wastech-mdlint.config.json": JSON.stringify({
+      [CONFIG_FILE]: JSON.stringify({
         rules: [
           {
             rule: "custom",
@@ -2104,16 +2692,15 @@ describe("readExistingRuleIds", () => {
         ],
       }),
     });
-    const result = await readExistingRuleIds(
-      cwd,
-      path.join(cwd, "wastech-mdlint.config.json"),
-    );
-    expect(result).toEqual({ ruleIds: ["REQ-100"], parsed: true });
+    expect(await readIds(cwd, CONFIG_FILE)).toEqual({
+      ruleIds: ["REQ-100"],
+      parsed: true,
+    });
   });
 
   it("parses JSONC (comments + trailing commas), canonicalizing every rule id", async () => {
     const cwd = await fixtureRepo({
-      "wastech-mdlint.config.json": [
+      [CONFIG_FILE]: [
         "{",
         "  // rationale: link integrity",
         '  "rules": [',
@@ -2124,11 +2711,42 @@ describe("readExistingRuleIds", () => {
       ].join("\n"),
     });
 
-    const result = await readExistingRuleIds(
-      cwd,
-      path.join(cwd, "wastech-mdlint.config.json"),
-    );
-    expect(result).toEqual({ ruleIds: ["REF-001", "TBL-002"], parsed: true });
+    expect(await readIds(cwd, CONFIG_FILE)).toEqual({
+      ruleIds: ["REF-001", "TBL-002"],
+      parsed: true,
+    });
+  });
+
+  // Audit L-8: the merge rebuilds the file, so this flag is what lets the summaries admit the loss.
+  it("reports whether the file on disk carries JSONC comments", async () => {
+    const withComments = await fixtureRepo({
+      [CONFIG_FILE]: '{\n  // link integrity\n  "rules": []\n}\n',
+    });
+    await expect(
+      readExistingConfigDocument(
+        withComments,
+        path.join(withComments, CONFIG_FILE),
+      ),
+    ).resolves.toMatchObject({ parsed: true, hasComments: true });
+
+    const withoutComments = await fixtureRepo({
+      [CONFIG_FILE]: JSON.stringify({ rules: [], include: ["docs/**/*.md"] }),
+    });
+    await expect(
+      readExistingConfigDocument(
+        withoutComments,
+        path.join(withoutComments, CONFIG_FILE),
+      ),
+    ).resolves.toMatchObject({ parsed: true, hasComments: false });
+  });
+
+  it("reports no comments for a file it could not parse", async () => {
+    // Nothing is known to be lost when the file cannot be read, and that case aborts the merge
+    // anyway — claiming comment loss there would be a second, misleading warning.
+    const cwd = await fixtureRepo({ "broken.json": "{ // c\n not json" });
+    await expect(
+      readExistingConfigDocument(cwd, path.join(cwd, "broken.json")),
+    ).resolves.toEqual({ raw: undefined, parsed: false, hasComments: false });
   });
 });
 
@@ -2196,8 +2814,12 @@ describe("init command · clean fixture lints clean (P6.05)", () => {
 
 describe("init command · custom layout (specs/, adr/) (P6.05)", () => {
   it("--yes produces a deterministic draft covering both clusters with a local $schema and no remote URL", async () => {
-    const cwdOne = await fixtureRepo(CUSTOM_LAYOUT_FIXTURE);
-    const cwdTwo = await fixtureRepo(CUSTOM_LAYOUT_FIXTURE);
+    const cwdOne = await fixtureRepo(
+      withInstalledSchema(CUSTOM_LAYOUT_FIXTURE),
+    );
+    const cwdTwo = await fixtureRepo(
+      withInstalledSchema(CUSTOM_LAYOUT_FIXTURE),
+    );
 
     const first = await run(["init", cwdOne, "--yes"], cwdOne);
     const second = await run(["init", cwdTwo, "--yes"], cwdTwo);
@@ -2278,7 +2900,12 @@ describe("init command · package-manager detection e2e (P6.05)", () => {
   }
 
   it('reports "not detected" when no lockfile is present', async () => {
-    const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+    // The `.git` marker bounds the ancestor walk to the fixture (audit L-11): without it, "no
+    // lockfile" would be a claim about every directory above the temp dir on the host.
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      ".git/HEAD": "ref: refs/heads/main\n",
+    });
 
     const result = await run(["init", cwd, "--yes"], cwd);
 

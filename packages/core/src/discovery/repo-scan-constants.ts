@@ -17,6 +17,25 @@ export const DEFAULT_NOISE_DIR_NAMES: readonly string[] = [
   "target",
 ];
 
+/**
+ * True when a directory basename must be skipped by every repo-scan walk: an explicit noise name,
+ * or any dot-prefixed directory.
+ *
+ * Hidden directories are pruned by shape rather than by name (audit L-7) because the noise list can
+ * never enumerate them: `.github`, `.venv`, `.husky`, `.changeset` and friends hold tooling
+ * Markdown that `init` would otherwise propose as a doc cluster. The written config mirrors this
+ * with a hidden-directory exclude glob (see `HIDDEN_DIR_EXCLUDE_GLOB` in config-writer.ts), so the
+ * scan's view and the linted corpus agree.
+ *
+ * `.` and `..` never reach this (`readdir` does not emit them), so the plain prefix test is safe.
+ */
+export function isPrunedDirName(
+  name: string,
+  noiseDirNames: readonly string[],
+): boolean {
+  return name.startsWith(".") || noiseDirNames.includes(name);
+}
+
 // Directory basenames that qualify as a doc cluster with as little as one Markdown file (the
 // scoring bonus in the cluster heuristic), matched case-insensitively.
 export const DEFAULT_KNOWN_CLUSTER_NAMES: readonly string[] = [

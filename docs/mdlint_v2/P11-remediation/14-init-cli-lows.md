@@ -1,7 +1,7 @@
 # P11.14 · `init`-scan honesty + CLI-plumbing micro-fixes
 
 > Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** ·
-> Status **Not started**. Findings **L-7 … L-11**
+> Status **Done**. Findings **L-7 … L-11**
 > ([post-P9 audit](../audit-2026-07-25-post-p9.md)). Depends on
 > [P11.08](08-init-exclude-anchoring.md) (same config-writer / `init` surface).
 
@@ -61,9 +61,99 @@ that landed. Each L-11 item is small and independently testable; none require re
 
 ## Exit criteria
 
-- [ ] `init` does not propose or lint hidden/gitignored trees (`.github`, `.venv`, `generated-docs`).
-- [ ] A `merge` over a comment-bearing config reports that comments were not preserved.
-- [ ] Deselecting all clusters does not silently lint the whole repo; the case is tested.
-- [ ] The written `$schema` resolves to an existing file in the `npx` scenario, asserted by a test.
-- [ ] The L-11 micro-fixes are addressed, each with a focused test where behavior changed.
-- [ ] `npm run typecheck && npm run lint && npm run format && npm test && npm run build` green.
+- [x] `init` does not propose or lint hidden/gitignored trees (`.github`, `.venv`, `generated-docs`).
+- [x] A `merge` over a comment-bearing config reports that comments were not preserved.
+- [x] Deselecting all clusters does not silently lint the whole repo; the case is tested.
+- [x] The written `$schema` resolves to an existing file in the `npx` scenario, asserted by a test.
+- [x] The L-11 micro-fixes are addressed, each with a focused test where behavior changed.
+- [x] `npm run typecheck && npm run lint && npm run format && npm test && npm run build` green.
+
+## Implementation notes
+
+**L-7 — two causes, both fixed at the scan and mirrored in the write.** `.github`/`.venv` are
+_hidden_; `generated-docs` is _gitignored_. `collectMarkdownFiles` now prunes via the new shared
+`isPrunedDirName` (dot-prefixed OR in the noise list) and threads gitignore layers, and
+`collectPackageJsonDirs` uses the same predicate so workspace detection cannot disagree with the
+Markdown walk. The gitignore matcher was **extracted, not re-implemented**: `IgnoreLayer` /
+`readIgnoreLayer` / `isGitIgnored` moved verbatim out of `markdown/load-documents.ts` into
+`discovery/gitignore-layers.ts`, so the lint corpus and the pre-config scan share one
+implementation. The fresh write mirrors both prunes — a hidden-directory `exclude` glob alongside
+the existing noise globs, plus an explicit `respectGitignore: true`.
+
+> **Divergence from [C8](../requirements/01-configuration.md).** C8 locks `respectGitignore`'s
+> default to `false`, and this task asks `init` to make it `true`. Not a conflict: the **loader**
+> default is untouched — `init` writes an explicit `true` into the file it generates, where it stays
+> visible and editable. A config whose scan skipped gitignored trees but whose lint reads them is
+> the defect; the requirement is about zero-config behavior, which is unchanged.
+
+**L-8.** `parseExistingConfigFile` now reports `hasComments`, via a new core
+`containsJsoncComments` built on `jsonc-parser`'s scanner with trivia enabled (token-based, so a
+`//` inside a string value is not a false positive). One shared `COMMENT_LOSS_NOTE` is rendered
+twice: in `formatDraftSummary`'s merge line **before** `confirmDraft` — the point being that the
+user can still decline — and again in `formatWriteSummary`.
+
+**L-9 — `include` is three-valued.** `undefined` omits the key (tool default), `[]` is written
+literally (lints nothing). The CLI decides with `clustersWereOffered`: deselecting offered clusters
+is a choice, finding none is not. `GeneratedInitConfig.wroteEmptyInclude` (required, not optional)
+forces the host to decide whether to surface it; both summaries distinguish the two empty cases.
+
+**L-10.** `packageSchemaRef` became `string | undefined`, and the CLI passes `undefined` when
+`findInstalledSchemaDir` finds nothing instead of falling back to the repo root. The writer then
+generates a project-local `./schema.json` — the built-in schema when there are no custom rules —
+and points at it, so the ref always names a file that exists. `ProjectSchemaReason`
+(`custom-rules` | `no-installed-package`) rides along on `projectSchema` and on the CLI's
+`SchemaWriteOutcome`, because the summary's old hardcoded "(custom rules present)" parenthetical
+would otherwise be false in the new case.
+
+The reason is a **guard**, not just a label. Generating the project schema on the ordinary `npx`
+path makes `resolveSchemaWriteOutcome`'s `overwritten` branch reachable in every repository for the
+first time, and `schema.json` is a name other tools already use (an OpenAPI document, a product
+schema). `--on-existing overwrite` is a disposition for the _config_ — the user never named
+`schema.json` — so that branch is now restricted to `reason === "custom-rules"`, where the file's
+contents are determined by the config being written. Under `no-installed-package` a differing
+existing file always degrades to `kept`, and the summary states the honest consequence: `$schema`
+points at a file `init` did not generate, so repoint it or move that file aside.
+
+> **Extends [C9](../requirements/01-configuration.md).** C9 describes the project-local schema as
+> the custom-rules case. It now also covers "no installed package schema to point at". Recorded
+> here and in the glossary rather than edited into the locked requirement.
+
+**L-11.**
+
+- `SchemaCommand` gained a required `cwd`; `handleSchema` resolves a relative `--out` against it,
+  mirroring `handleCompile`. `--out` is still echoed back as typed (the documented exception in
+  [`docs/guide/cli.md`](../../guide/cli.md) §Exit codes).
+- `extractWorkspaceGlobsFromPnpmYaml` `continue`s on blank lines and full-line comments instead of
+  breaking; the top-level-key check remains the real terminator.
+- `detectPackageManager` walks up from `cwd` to the nearest lockfile, stopping after the first
+  directory containing a `.git` and never reaching `$HOME`. This changed one existing expectation:
+  `init docs` inside a repo with a root `package-lock.json` now reports `Package manager: npm.`
+  rather than `not detected` — the old assertion's "Deliberate" comment was rationalizing the bug.
+- `readExistingRuleIds` was **removed, not wired**: its logic already lives in
+  `extractExistingRuleIds`, which is on the production path. That is now exported, and the 11 tests
+  were re-targeted onto it plus `readExistingConfigDocument`.
+- `CiWorkflowOutcome` gained `kept` and `unsafe-config-path`, so the two paths that returned a bare
+  `undefined` now render a line. Neither is a failure, so `writeFailed` still keys on `"failed"`
+  alone.
+- The bin wraps its guarded body in `try`/`catch`. This is an exit-code bug, not cosmetics:
+  `runCli`'s own `try` starts after `readPackageVersion()`, so a rejection from there escaped the
+  top-level `await` and Node exited **1** — the code reserved for findings, re-opening M-6 at the
+  process boundary. It now reports through `formatOperationalError` and exits `2`, covered by a real
+  spawn in `bin.e2e.test.ts`.
+
+**Accepted consequences.**
+
+- In the `npx` scenario the project schema is staged and committed before the config (P11.09's
+  deliberate schema-first ordering), so a config write that fails after it leaves a `schema.json`
+  behind. The partial-write summary names it, which is the contract.
+- The two prunes are shared to different depths on purpose. `isPrunedDirName` is used by both the
+  Markdown walk and workspace-package detection, so a hidden tree cannot be visible to one and not
+  the other; the gitignore layers are threaded only through the Markdown walk. A gitignored
+  workspace package is therefore still detected and still produces a scan scope — an empty one, with
+  no Markdown to cluster, so it proposes nothing. Left as-is rather than widened: the asymmetry is
+  invisible in the draft, and workspace detection reads `package.json` files, which `.gitignore`
+  rarely speaks about deliberately.
+- The draft the user confirms still does not name the project-local `schema.json` the `npx` path now
+  writes; only the write summary does, after the fact. That is a gap against the same
+  warn-before-confirming discipline L-8 established for comment loss, and is deferred rather than
+  fixed here.

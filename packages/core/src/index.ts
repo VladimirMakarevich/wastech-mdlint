@@ -69,6 +69,7 @@ export type {
 export {
   buildCiWorkflowYaml,
   CI_WORKFLOW_YAML,
+  containsJsoncComments,
   generateInitConfig,
   identifyExistingRule,
   PACKAGE_SCHEMA_SEGMENTS,
@@ -80,6 +81,7 @@ export type {
   GeneratedInitConfig,
   GenerateInitConfigParams,
   InitConfigAction,
+  ProjectSchemaReason,
 } from "./discovery/config-writer.js";
 
 // Graph

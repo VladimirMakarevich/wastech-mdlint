@@ -32,6 +32,7 @@ NOISE = { node_modules, .git, dist, build, out, coverage, vendor, .next, .cache,
 N_MIN = 3   // "enough Markdown files" to count as a cluster
 
 1. Collect all *.md / *.mdx under the repo, skipping NOISE dirs.
+   (superseded by P11.14: also skips every dot-prefixed dir and anything .gitignore excludes)
 2. For each directory that (directly or transitively) contains Markdown, compute:
      subtreeCount = # Markdown files in this dir's subtree
      score = subtreeCount
@@ -92,7 +93,10 @@ at the repo root; tag each returned cluster with its owning package (if any).
   documented trade-off of proposing the tool's real default rather than a scan-specific one.
 - `detectPackageManager`'s lockfile check uses `stat().isFile()`, not `access()` — `access()`
   only proves a path is reachable, so a directory (or a symlink to one) named `bun.lock` etc.
-  would otherwise be misreported as that package manager.
+  would otherwise be misreported as that package manager. **Superseded by
+  [P11.14](../P11-remediation/14-init-cli-lows.md):** the check is no longer root-only. It walks up
+  from the scanned directory to the nearest lockfile, stopping after the first `.git` directory and
+  never reaching `$HOME`, so a monorepo member no longer reports "not detected".
 
 ## Exit criteria
 

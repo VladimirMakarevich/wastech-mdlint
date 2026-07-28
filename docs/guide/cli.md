@@ -30,7 +30,12 @@ Every command uses the same taxonomy:
 `--help` and `--version` always exit `0`.
 
 Only `1` means "the linter found problems", so a CI job can tell a failing document from a broken
-step. Paths in an error message use `/` separators and are named relative to the directory the
+step. That reservation holds all the way out to the process boundary: a failure during start-up —
+before any command runs, such as unreadable package metadata — is reported as an
+`Operational error:` line and exits `2` as well, rather than letting the runtime's own default
+crash code (`1`) masquerade as findings.
+
+Paths in an error message use `/` separators and are named relative to the directory the
 command works in — its cwd, or the `[path]`/`--cwd` you gave it — rather than as absolute host
 paths; that holds even when you passed the argument absolutely, so a bad `[path]`/`--cwd` is
 reported relative either way. Two limits on it. `schema --out` is echoed back exactly as you typed
@@ -138,26 +143,59 @@ Scans the repo for doc clusters, infers a rule set with rationale, and — on co
   default, not the first listed option.
 - A `merge` whose existing config is unreadable or wouldn't load aborts the write rather than risk
   a lossy result.
+- **A `merge` does not preserve JSONC comments.** It rebuilds the file from its parsed values, so
+  every `//` comment in the existing config is lost. When the file has comments, `init` says so in
+  the draft — before you confirm — and again in the write summary. Back the file up first if you
+  need them; the rule entries, their severities and options, and every other top-level key are
+  preserved exactly.
 - **Ctrl+C** during any prompt exits `0`.
-- A fresh write includes an `exclude` list of the noise directories the scan itself skipped
-  (`node_modules`, `.git`, `dist`, …), written as **depth-agnostic** `**/<name>/**` globs. The scan
-  skips those directories by name wherever they appear, so anchoring the globs to the repository
-  root would have left a monorepo's `packages/*/dist` and `packages/*/node_modules` in the lint
-  corpus — exactly what the list exists to prevent. The tradeoff is deliberate: hand-written docs
-  living under a nested directory literally named `build`, `out`, `vendor`, … are pruned too, and
+- **The scan skips what the written config skips.** Noise directories (`node_modules`, `.git`,
+  `dist`, …), every dot-prefixed directory (`.github`, `.venv`, `.husky`), and anything a
+  `.gitignore` excludes (root or nested, negations honored) are invisible to the scan, so `init`
+  never proposes them as doc clusters. The fresh write mirrors that: the noise names and hidden
+  directories go into `exclude`, and `respectGitignore` is written as an explicit `true` — which
+  is _not_ the loader's own default (`false`), but is what makes the config lint exactly the tree
+  the draft you approved was built from. Edit or drop either if you want them back.
+- A fresh write includes an `exclude` list of the noise directories the scan itself skipped,
+  written as **depth-agnostic** `**/<name>/**` globs. The scan skips those directories by name
+  wherever they appear, so anchoring the globs to the repository root would have left a monorepo's
+  `packages/*/dist` and `packages/*/node_modules` in the lint corpus — exactly what the list exists
+  to prevent. The tradeoff is deliberate: hand-written docs living under a nested directory
+  literally named `build`, `out`, `vendor`, … are pruned too, and
   [`exclude` wins over `include`](configuration.md#top-level-shape). `init` could never have
   proposed such files in the first place (its scan skips them by the same name), and the written
   config is a starting point you are expected to edit — drop the offending glob if you need those
-  files linted. A `merge` never rewrites an existing `exclude`.
-- When custom rules are present, `init` also generates a project-local `schema.json` and points
-  `$schema` at it. No remote URL is ever emitted. `init` never replaces an existing `schema.json`
-  — that filename collides easily (it is also `schema`'s own default `--out`), so an unguarded
-  write could destroy a hand-written file. The write summary reports whether the existing file
-  already matches what `init` would generate or differs from it; regenerating a differing one
-  means removing or renaming it and re-running `init` with `--on-existing merge`, which is the
-  only action that produces a project-local schema at all. An existing `schema.json` that exists
-  but cannot be **read** is kept too, and reported as such: `init` will not replace a file it
-  cannot compare against.
+  files linted. A `merge` never rewrites an existing `exclude`, and never adds `respectGitignore`
+  to a config that did not already have it.
+- **Deselecting every offered cluster writes an empty `include`, not a repo-wide one.** `include`
+  defaults to `**/*.md` only when the key is _absent_, so turning down every cluster and omitting
+  the key would lint the entire repository — the opposite of the choice. `init` writes a literal
+  `"include": []` instead (lints nothing) and says so in both the draft and the write summary. When
+  the scan finds no cluster to offer at all, the key is omitted and the `**/*.md` default applies.
+- The written `$schema` always points at a file that exists. With `@wastech-mdlint/cli` installed,
+  it is a relative path to that package's `schema.json`, computed from the config's own directory
+  (so a config under `docs/` gets `../node_modules/…`). With nothing installed — the ordinary
+  `npx` case — `init` generates a project-local `schema.json` next to the config and points at
+  that instead; the write summary names which of the two reasons applies. Custom rules force that
+  same project-local schema regardless, since the built-in one cannot describe them. No remote URL
+  is ever emitted.
+- **`init` never replaces an existing `schema.json`.** That filename collides easily (it is also
+  `schema`'s own default `--out`, and plenty of repos already keep an unrelated one), so an
+  unguarded write could destroy a hand-written file. The write summary reports whether the existing
+  file already matches what `init` would generate or differs from it, and which of the two reasons
+  put it there. A file that exists but cannot be **read** is kept too, and reported as such: `init`
+  will not replace a file it cannot compare against.
+  - When the reason is **custom rules**, the kept file is a stale version of `init`'s own schema:
+    regenerate it by removing or renaming it and re-running `init` with `--on-existing merge`.
+    `merge` is the only action that can produce that schema at all — `--on-existing overwrite`
+    discards the very custom entries it is generated from.
+  - When the reason is **no installed package schema** (the `npx` case), the kept file is almost
+    certainly not `init`'s at all — and the config it just wrote points `$schema` at it anyway, so
+    the config is validated against whatever that document describes. The summary says so; repoint
+    `$schema` by hand, or move that file aside and re-run `init` to generate one.
+    `--on-existing overwrite` does **not** replace it either: that flag is a disposition for the
+    _config_, and the fallback schema is only a resolvable target, so nothing you asked for depends
+    on clobbering an unrelated file.
 - **Writes are atomic and reported even when they fail.** Each file is written to a temp file beside
   its target and then renamed into place, so no failure can leave a truncated config behind. Every
   temp is staged before any rename happens, so a failure while staging leaves the repository
@@ -170,6 +208,10 @@ Scans the repo for doc clusters, infers a rule set with rationale, and — on co
   — is not a failure and still exits `0`. The opt-in CI workflow is written last and is never
   offered after a failed config write; if only the workflow fails, the summary says so and the exit
   code is still `2`.
+- `init` never overwrites an existing `.github/workflows/wastech-mdlint.yml`. When one is already
+  there, the summary reports it as kept (check that it still points at the config just written)
+  rather than staying silent, which would read the same as never having offered a workflow at all.
+  The exit code is unaffected: nothing failed.
 - The `--with-ci-workflow` template is **npm-universal by design**: even when `init` detects and
   reports a bun/pnpm/yarn project, the generated workflow still installs and runs the CLI via
   `npm install --no-save @wastech-mdlint/cli` + `npx`. That step only fetches the external CLI
@@ -199,3 +241,8 @@ Writes the config JSON schema to a local file (never a remote URL).
 ```bash
 wastech-mdlint schema --out wastech-mdlint.schema.json
 ```
+
+A relative `--out` is resolved against the directory the command runs in, the same way `compile`
+resolves `--outdir`. Missing parent directories are created. The success line and any write error
+echo `--out` back exactly as you typed it (see [Exit codes](#exit-codes)), so an absolute argument
+is reported absolutely even though a relative one lands under the working directory.

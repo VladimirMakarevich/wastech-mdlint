@@ -272,15 +272,34 @@ describe("schema command", () => {
     );
   });
 
+  // Audit L-11: a relative `--out` used to resolve against the real `process.cwd()`, so a run with
+  // an injected cwd wrote the schema into whatever directory the process happened to start in —
+  // the class of bug `handleCompile` already fixed for `--outdir`.
+  it("resolves a relative --out against the run's cwd, not process.cwd()", async () => {
+    const cwd = await fixtureRepo({});
+
+    const result = await run(["schema", "--out", "generated/schema.json"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    // Echoed as typed (the documented `--out` contract), but written under the injected cwd.
+    expect(result.stdout).toContain("schema written to generated/schema.json");
+    await expect(
+      readFile(path.join(cwd, "generated", "schema.json"), "utf8"),
+    ).resolves.toContain("wastech-mdlint configuration");
+    // Nothing landed beside the process's own working directory.
+    await expect(
+      readFile(path.resolve("generated/schema.json"), "utf8"),
+    ).rejects.toThrow();
+  });
+
   // Root ignores directory permissions and Windows has no equivalent model, so the fault this relies
   // on only exists for an unprivileged POSIX user (same precondition as init's staging-failure test).
   it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
     "exits 2 echoing --out as typed when the write fails",
     async () => {
       const cwd = await fixtureRepo({});
-      // Absolute because `schema` resolves `--out` against the real `process.cwd()`, not this run's
-      // injected cwd (L-11, deferred to P11.14) — a relative argument would target the repo instead
-      // of the fixture.
+      // Absolute here so the assertion below can pin the exact string `--out` echoes back; the
+      // relative form is covered by its own test above.
       const outPath = path.join(cwd, "schema.json");
       // `r-x`: the directory is readable, but no new file can be created in it, so the atomic write's
       // temp file fails. That is an operational failure (exit 2), not a crash.

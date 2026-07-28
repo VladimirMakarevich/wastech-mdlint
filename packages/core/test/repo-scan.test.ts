@@ -378,10 +378,13 @@ describe("scanRepository", () => {
   });
 
   it("returns an empty result for a non-existent cwd without throwing", async () => {
-    const missing = path.join(
-      os.tmpdir(),
-      "wastech-mdlint-scan-does-not-exist-xyz",
-    );
+    // Nested under a fixture root that carries a `.git` marker rather than sitting directly in
+    // `os.tmpdir()`: the package-manager probe walks ancestors, so an unbounded path would make
+    // `packageManager: undefined` an assertion about the host's directory tree, not the fixture.
+    const root = await createFixtureTree({
+      ".git/HEAD": "ref: refs/heads/main\n",
+    });
+    const missing = path.join(root, "wastech-mdlint-scan-does-not-exist-xyz");
     const result = await scanRepository({ cwd: missing });
 
     expect(result).toEqual({
@@ -404,5 +407,110 @@ describe("scanRepository", () => {
     const second = await scanRepository({ cwd: root });
 
     expect(first).toEqual(second);
+  });
+});
+
+// Audit L-7: `init` proposed `.github/**`, `.venv/**` and `generated-docs/**` as doc clusters, and
+// the config it wrote then linted them. The scan is the first half of that fix.
+describe("scanRepository · hidden and gitignored trees", () => {
+  it("does not propose a hidden directory as a cluster, at the root or nested", async () => {
+    const root = await createFixtureTree({
+      "docs/one.md": "# One\n",
+      ".github/PULL_REQUEST_TEMPLATE.md": "# PR\n",
+      ".github/ISSUE_TEMPLATE/bug.md": "# Bug\n",
+      ".venv/lib/site-packages/pkg/README.md": "# Vendored\n",
+      "packages/app/.husky/NOTES.md": "# Hooks\n",
+    });
+
+    const result = await scanRepository({ cwd: root });
+    const paths = result.clusters.map((cluster) => cluster.path);
+
+    expect(paths).toEqual(["docs"]);
+    // Not merely unproposed as a cluster — invisible to sampling too, so rule inference never
+    // sniffs a file the written config excludes.
+    for (const cluster of result.clusters) {
+      expect(cluster.sampleFiles.every((file) => !file.includes("/."))).toBe(
+        true,
+      );
+    }
+  });
+
+  it("skips gitignored trees, honoring nested .gitignore files and negations", async () => {
+    const root = await createFixtureTree({
+      ".gitignore": "generated-docs/\n",
+      "docs/one.md": "# One\n",
+      "generated-docs/api/a.md": "# A\n",
+      "generated-docs/api/b.md": "# B\n",
+      "generated-docs/api/c.md": "# C\n",
+      // A nested ignore file governs only its own subtree, and its `!` negation re-includes one file.
+      "notes/.gitignore": "*.md\n!keep.md\n",
+      "notes/drop.md": "# Drop\n",
+      "notes/keep.md": "# Keep\n",
+    });
+
+    const result = await scanRepository({ cwd: root });
+    const paths = result.clusters.map((cluster) => cluster.path);
+
+    expect(paths).not.toContain("generated-docs");
+    expect(paths).not.toContain("generated-docs/api");
+    expect(paths).toContain("docs");
+
+    // `notes` has one surviving file, so it does not clear minClusterSize — but that surviving file
+    // must be the negated one, proving the layer's negation was applied rather than the whole
+    // directory being dropped.
+    const sampled = result.clusters.flatMap((cluster) => cluster.sampleFiles);
+    expect(sampled).not.toContain("notes/drop.md");
+    expect(sampled).not.toContain("generated-docs/api/a.md");
+  });
+
+  it("prunes a noise-named directory even when a gitignore negation re-includes it", async () => {
+    const root = await createFixtureTree({
+      ".gitignore": "build/\n!build/docs/\n",
+      "build/artifact.md": "# Artifact\n",
+      "build/docs/one.md": "# One\n",
+      "docs/two.md": "# Two\n",
+    });
+
+    const result = await scanRepository({ cwd: root });
+    const paths = result.clusters.map((cluster) => cluster.path);
+
+    // `build` is a DEFAULT_NOISE_DIR_NAMES entry, so it stays pruned regardless of the negation —
+    // the name prune runs first and is not gitignore's to override. (Git would not re-include
+    // `build/docs/` here either, since its parent is excluded; the negation below is the shape
+    // that actually re-includes a subtree.)
+    expect(paths).toEqual(["docs"]);
+  });
+
+  it("proposes a cluster a gitignore negation re-includes from an excluded parent", async () => {
+    const root = await createFixtureTree({
+      // The only shape that re-includes a subtree in git's own semantics: exclude the *contents*
+      // of `artifacts/` (not the directory itself, which could never be descended into again),
+      // then negate the one child that is real documentation.
+      ".gitignore": "artifacts/*\n!artifacts/docs/\n",
+      "artifacts/scratch.md": "# Scratch\n",
+      "artifacts/docs/one.md": "# One\n",
+      "artifacts/docs/two.md": "# Two\n",
+    });
+
+    const result = await scanRepository({ cwd: root });
+
+    expect(result.clusters.map((cluster) => cluster.path)).toEqual([
+      "artifacts/docs",
+    ]);
+    const sampled = result.clusters.flatMap((cluster) => cluster.sampleFiles);
+    expect(sampled).toEqual(["artifacts/docs/one.md", "artifacts/docs/two.md"]);
+  });
+
+  it("still proposes a dot-free tree that no .gitignore mentions", async () => {
+    // Guard against over-pruning: the two new filters must not touch an ordinary cluster.
+    const root = await createFixtureTree({
+      ".gitignore": "coverage/\n",
+      "specs/a.md": "# A\n",
+      "specs/b.md": "# B\n",
+    });
+
+    const result = await scanRepository({ cwd: root });
+
+    expect(result.clusters.map((cluster) => cluster.path)).toEqual(["specs"]);
   });
 });
