@@ -15,7 +15,7 @@ import { query } from "../graph/query.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
 import { canonicalizeRuleId } from "../rule-id.js";
 import { describeRules } from "./describe-rules.js";
-import { extractDocProfile } from "./doc-profile.js";
+import { extractDocProfiles } from "./doc-profile.js";
 import { analyzeGraph, DEFAULT_HUB_MIN_IN_DEGREE } from "./graph-analysis.js";
 import {
   synthesize,
@@ -206,13 +206,17 @@ export async function compileContext(
   const analysis = analyzeGraph(graph, { hubMinInDegree });
 
   const documentPaths = [...documents.keys()].sort(compareStrings);
-  const profiles = new Map(
-    documentPaths.map((documentPath) => [
-      documentPath,
-      extractDocProfile(documents.get(documentPath)!, graph, {
-        hubMinInDegree,
-      }),
-    ]),
+  // One batch, so the corpus-wide graph index (roles + edge partition) is built once. Calling
+  // `extractDocProfile` per document reclassified every node and rescanned `graph.edges` N times
+  // — O(N² + N·E) in corpus size (audit L-5). Sorted the same way as `documentPaths` so the
+  // returned Map's order matches the render order, even though `synthesize` only ever looks
+  // profiles up by path.
+  const profiles = extractDocProfiles(
+    [...documents.values()].sort((left, right) =>
+      compareStrings(left.path, right.path),
+    ),
+    graph,
+    { hubMinInDegree },
   );
 
   const configuredRules = config.config.rules ?? [];

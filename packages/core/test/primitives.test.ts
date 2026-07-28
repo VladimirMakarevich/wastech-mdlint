@@ -224,6 +224,17 @@ describe("content & checklist primitives", () => {
     expect(findings[0]?.line).toBe(2);
   });
 
+  it("contentNotMatch anchors every match, including two on one line and one past a CRLF", () => {
+    // The line index is built once per call now; two matches sharing a line and a match after a
+    // `\r\n` are where a shared-index off-by-one would show up first.
+    const findings = contentNotMatch(
+      doc("secret=a and secret=b\nplain\r\nsecret=c\n"),
+      { pattern: "secret=" },
+    );
+
+    expect(findings.map((finding) => finding.line)).toEqual([1, 1, 3]);
+  });
+
   it("noPlaceholders flags empty and placeholder-only sections but not prose mentions", () => {
     const content = [
       "## Empty",
