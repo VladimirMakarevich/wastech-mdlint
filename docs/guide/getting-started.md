@@ -65,6 +65,11 @@ Create `wastech-mdlint.config.json`:
 }
 ```
 
+That `$schema` assumes the CLI is a local dependency. If you only ever run it through `npx`, there is
+no `node_modules` path to point at — generate a local copy with
+[`wastech-mdlint schema`](cli.md#schema) and reference that instead. (`init` handles this for you: it
+writes a project-local `schema.json` whenever there is nothing installed to point at.)
+
 Then:
 
 ```bash

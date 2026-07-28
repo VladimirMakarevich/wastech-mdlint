@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, statSync, symlinkSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -192,6 +192,67 @@ describe("installed-bin shape via symlink/junction (H-1 regression guard)", () =
     const before = process.exitCode;
     await import(pathToFileURL(cliDistIndex).href);
     expect(process.exitCode).toBe(before);
+  }, 30_000);
+});
+
+// P11.14 / audit L-11, and an exit-code contract (M-6) at the process boundary. `runCli`'s own
+// try/catch does not start until after `readPackageVersion()` has already run, so a rejection from
+// there escapes the bin's top-level `await`. Node terminates an unhandled rejection with exit 1 —
+// the code reserved for lint findings — so CI could not tell "found problems" from "could not
+// start". Only a real spawn can observe that: in-process tests call `runCli` directly and never
+// execute src/index.ts's top level at all.
+describe("top-level rejection handling in the bin", () => {
+  it("reports an operational error and exits 2 when runCli rejects before its own try", async () => {
+    const root = await mkdtemp(
+      path.join(os.tmpdir(), "wastech-mdlint-bin-reject-"),
+    );
+    tempDirs.push(root);
+
+    const packageDir = path.join(root, "cli");
+    await cp(path.dirname(cliDistIndex), path.join(packageDir, "dist"), {
+      recursive: true,
+    });
+
+    // `readPackageVersion` reads `<dist>/../package.json`. A *directory* at that path fails the read
+    // with EISDIR on every platform — unlike chmod, which root ignores and Windows does not model.
+    // Node's own package.json lookup skips a non-file entry and keeps walking up, which is why the
+    // ESM marker below still applies to dist/index.js (verified: with `"type": "commonjs"` there,
+    // the compiled ESM entrypoint fails to parse).
+    await mkdir(path.join(packageDir, "package.json"));
+    await writeFile(
+      path.join(root, "package.json"),
+      JSON.stringify({ type: "module" }),
+      "utf8",
+    );
+
+    // The copied dist still imports `@wastech-mdlint/core`; Node resolves it by walking up from the
+    // entrypoint, so one link to the repo's installed tree is enough. A junction on Windows, where
+    // symlinking needs elevation (same reasoning as the installed-bin block above).
+    symlinkSync(
+      path.join(repoRoot, "node_modules"),
+      path.join(root, "node_modules"),
+      process.platform === "win32" ? "junction" : "dir",
+    );
+
+    const result = run(
+      process.execPath,
+      [path.join(packageDir, "dist", "index.js"), "--version"],
+      root,
+    );
+
+    // Not 1: that is EXIT_CODE_FINDINGS, which is what a bare unhandled rejection would have
+    // produced and what this handler exists to prevent.
+    expectExitCode(result, EXIT_CODE_USAGE_ERROR);
+    expect(result.status).not.toBe(EXIT_CODE_FINDINGS);
+    expect(result.stderr).toContain("Operational error:");
+    expect(result.stderr).toContain("EISDIR");
+    // Node's own unhandled-rejection banner must be absent — the failure was handled, not escaped.
+    expect(result.stderr).not.toContain("UnhandledPromiseRejection");
+    expect(result.stderr).not.toContain("ERR_UNHANDLED_REJECTION");
+    // Exactly one diagnostic line, not a stack trace dump.
+    expect(
+      result.stderr.split("\n").filter((line) => line.trim().length > 0),
+    ).toHaveLength(1);
   }, 30_000);
 });
 

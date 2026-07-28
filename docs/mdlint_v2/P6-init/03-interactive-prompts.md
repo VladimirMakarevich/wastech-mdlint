@@ -49,9 +49,12 @@ config before writing.
   subdirectory of a repo whose config lives at an ancestor directory, the whole flow — scan,
   inference, existing-rule diffing, and the config path in the printed summary — re-roots to that
   config's own directory rather than the originally-passed path. Without this, the preview would
-  show a `../`-relative config path, miss a lockfile that only exists at the real root, and infer
-  include globs/rule scopes relative to the wrong directory even though the config being
-  overwritten/merged governs the whole repo. **P11.04** narrows this: when `[path]` **is** given
+  show a `../`-relative config path and infer include globs/rule scopes relative to the wrong
+  directory even though the config being overwritten/merged governs the whole repo. (A third
+  justification — that a lockfile living only at the real root would otherwise be missed — no longer
+  holds: **superseded by [P11.14](../P11-remediation/14-init-cli-lows.md)**, whose
+  `detectPackageManager` walks ancestors, so the manager is detected with or without re-rooting.)
+  **P11.04** narrows this: when `[path]` **is** given
   explicitly, only a config found exactly at that directory counts as existing, so an explicit
   target is never silently re-rooted onto an ancestor's config — see
   [P11.04](../P11-remediation/04-findconfig-boundary.md).
@@ -70,10 +73,14 @@ config before writing.
   merge is additive/existing-wins and must never touch `include`/`exclude`/`settings` (see
   Deliverables #3 above), so showing scanned clusters there would incorrectly imply `include` is
   part of the change. The preview instead states those keys are left unchanged.
-- `readExistingRuleIds` treats an existing config's `rules` key as three distinct cases: absent
-  (a known fact — zero existing rules, `parsed: true`), present but not an array (structurally
-  invalid, `parsed: false`), and unreadable/unparsable (`parsed: false`). Collapsing the first two
-  would let a merge preview present a diff against a malformed config as if it were verified.
+- `readExistingConfigDocument` + `extractExistingRuleIds` treat an existing config's `rules` key as
+  three distinct cases: absent (a known fact — zero existing rules, `mergeable: true`), present but
+  not an array (structurally invalid, `mergeable: false`), and unreadable/unparsable
+  (`parsed: false`). Collapsing the first two would let a merge preview present a diff against a
+  malformed config as if it were verified. (**Superseded by
+  [P11.14](../P11-remediation/14-init-cli-lows.md):** these two carry that behavior now — the
+  single-purpose `readExistingRuleIds` wrapper this note originally named was removed once the
+  write path's own read covered the same three cases.)
 - `createInquirerPrompter` renders every prompt — not only the final confirmation — through the
   CLI's own injected `stdout`, wrapped in a `node:stream` `Writable`: `@inquirer/prompts`' context
   argument wants a full `NodeJS.WritableStream`, while the CLI's own IO seam is deliberately

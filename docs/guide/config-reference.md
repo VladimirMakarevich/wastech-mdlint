@@ -14,8 +14,10 @@ generated schema (`wastech-mdlint schema`).
 ```jsonc
 {
   // Local path to the JSON schema for editor completion. NEVER a remote URL.
-  // `init` points this at ./node_modules/@wastech-mdlint/cli/schema.json, or at a project-local
-  // ./schema.json when custom rules are present.
+  // `init` points this at ./node_modules/@wastech-mdlint/cli/schema.json when the CLI is installed
+  // locally, or at a project-local ./schema.json when custom rules are present or nothing is
+  // installed to point at (the `npx` case). It generates that file unless one is already there —
+  // an existing schema.json is never replaced, so check the write summary if you had one.
   "$schema": "./node_modules/@wastech-mdlint/cli/schema.json",
 
   // Files to lint (globs). Default when omitted: ["**/*.md"].
@@ -24,7 +26,8 @@ generated schema (`wastech-mdlint schema`).
   // Globs to remove from the set. `exclude` WINS over `include`.
   "exclude": ["node_modules/**", "dist/**", ".git/**"],
 
-  // When true, also skip files ignored by .gitignore. Default: false.
+  // When true, also skip files ignored by .gitignore. Default: false — but a fresh `init` write
+  // sets an explicit true, matching the trees its own scan skipped (a `merge` never adds it).
   "respectGitignore": false,
 
   // Shared settings inherited by the rules that understand them.

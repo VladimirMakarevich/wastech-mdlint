@@ -6,6 +6,11 @@ Configuration is **JSONC** (JSON with `//` comments and trailing commas) in a fi
 `wastech-mdlint.config.json`. There is no runtime `.ts`/`.cjs`/`.mjs` config and no code
 execution — config is data only.
 
+> Your comments are yours: nothing in the tool reads or rewrites this file except
+> [`init`](cli.md#init). One caveat — `init --on-existing merge` rebuilds the file from its parsed
+> values, so it **does not preserve comments**. It warns before writing when the existing file has
+> any.
+
 ## Zero-config default
 
 With **no config file**, the CLI lints every `**/*.md` with an **empty ruleset** — always a clean
@@ -51,15 +56,15 @@ single config loader; there is no per-host search order.
 Unknown top-level keys are rejected. Validation is two-stage: the root shape first, then each
 rule's own options schema.
 
-| Key                | Type     | Default       | Purpose                                                                        |
-| ------------------ | -------- | ------------- | ------------------------------------------------------------------------------ |
-| `$schema`          | string   | —             | **Local** path to the JSON schema (for editor completion). Never a remote URL. |
-| `include`          | string[] | `["**/*.md"]` | Globs of files to lint.                                                        |
-| `exclude`          | string[] | —             | Globs to remove; **`exclude` wins over `include`**.                            |
-| `respectGitignore` | boolean  | `false`       | When `true`, also skip `.gitignore`d files.                                    |
-| `settings`         | object   | —             | Shared settings (`siteRouter`, `idRef`) inherited by rules.                    |
-| `rules`            | array    | `[]`          | The rules to run (see below).                                                  |
-| `compile`          | object   | —             | Config for [`compile`](compile.md); required by that command.                  |
+| Key                | Type     | Default       | Purpose                                                                                                            |
+| ------------------ | -------- | ------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `$schema`          | string   | —             | **Local** path to the JSON schema (for editor completion). Never a remote URL.                                     |
+| `include`          | string[] | `["**/*.md"]` | Globs of files to lint.                                                                                            |
+| `exclude`          | string[] | —             | Globs to remove; **`exclude` wins over `include`**.                                                                |
+| `respectGitignore` | boolean  | `false`       | When `true`, also skip `.gitignore`d files. A fresh `init` write sets an explicit `true`; a `merge` never adds it. |
+| `settings`         | object   | —             | Shared settings (`siteRouter`, `idRef`) inherited by rules.                                                        |
+| `rules`            | array    | `[]`          | The rules to run (see below).                                                                                      |
+| `compile`          | object   | —             | Config for [`compile`](compile.md); required by that command.                                                      |
 
 ## Rule entries
 

@@ -294,7 +294,11 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
 - **`include` / `exclude`** — Glob corpora. A path is in-scope if it matches `include`
   **and not** `exclude` — `exclude` wins. Decision [C1](requirements/01-configuration.md).
 - **`respectGitignore`** — Opt-in flag (default `false`) to skip `.gitignore`d files without
-  hand-listing them in `exclude`. Decision [C8](requirements/01-configuration.md).
+  hand-listing them in `exclude`. Decision [C8](requirements/01-configuration.md). The loader
+  default stays `false`; a **fresh** `init` write sets it to `true` explicitly, because the repo
+  scan behind that config already skipped gitignored trees
+  ([P11.14](P11-remediation/14-init-cli-lows.md)). A `merge` never adds the key to a config that
+  did not have it.
 - **`rules`** — The array of rule entries: `{ rule, severity?, options? }` (or the `custom`
   shape). Canonical or lenient IDs; per-entry `severity` override including `"off"`.
 - **`settings`** — Shared, rule-inheritable config. Currently `siteRouter` and `idRef`.
@@ -456,7 +460,18 @@ underlying scan/inference.
   use, returning a `RepoScanResult`. Runs the cluster heuristic per **scope** (the repo root
   minus workspace-package files, plus one scope per detected workspace package) so a
   package's own `docs/` groups with that package rather than the root. Decision
-  [I2](requirements/06-installation.md).
+  [I2](requirements/06-installation.md). The walk always skips noise directories, every
+  dot-prefixed directory, and anything a root or nested `.gitignore` excludes
+  ([P11.14](P11-remediation/14-init-cli-lows.md)) — never behind a flag, since the config `init`
+  writes from this scan pins the same two rules.
+- **`isPrunedDirName`** — The shared "skip this directory" predicate behind every repo-scan walk:
+  true for a dot-prefixed basename or one in `noiseDirNames`. Used by both the Markdown walk and
+  workspace-package detection so a hidden tree can never be visible to one and not the other.
+- **`IgnoreLayer` / `readIgnoreLayer` / `isGitIgnored`** — The shared `.gitignore` matcher
+  (`discovery/gitignore-layers.ts`), one layer per `.gitignore` keyed by the repo-relative
+  directory that owns it, so within-file negations (`!keep.md`) resolve correctly. Used by both
+  `loadDocuments` (the lint corpus) and `scanRepository` (the pre-config scan) — a single
+  implementation, so the proposed corpus and the linted corpus cannot drift.
 - **`DocCluster` / `DocClusterKind`** — A proposed `include` candidate: `path`, `score`,
   `subtreeCount`, `includeGlob`, sorted `sampleFiles`, and an optional `workspacePackage` tag.
   Three kinds, ranked in this order regardless of score: `cluster` (a directory that qualifies
@@ -464,9 +479,14 @@ underlying scan/inference.
   is a known doc-directory name), `root` (scattered root-level files, always low-priority), and
   `fallback` (the global `**/*.md` safety net, used only when nothing else qualified anywhere
   but Markdown exists).
-- **`DetectedPackageManager`** — `bun | pnpm | yarn | npm | undefined`, detected from a
-  lockfile at the repo root (priority bun > pnpm > yarn > npm). `undefined` means no lockfile
-  was found; core does not default-guess `"npm"` — that UX call belongs to the interactive
+- **`DetectedPackageManager`** — `bun | pnpm | yarn | npm | undefined`, detected from the nearest
+  lockfile at or above the scanned directory (priority bun > pnpm > yarn > npm within one
+  directory; the nearest directory holding any lockfile wins outright). The upward walk stops after
+  the first directory containing a `.git` and never reaches `$HOME`, mirroring `findConfig`'s
+  ancestor discipline — so a monorepo member reports its repo's manager, but an unrelated
+  ancestor's lockfile is never attributed to it
+  ([P11.14](P11-remediation/14-init-cli-lows.md); it was root-only before). `undefined` means no
+  lockfile was found; core does not default-guess `"npm"` — that UX call belongs to the interactive
   `init` layer (P6.03).
 - **`WorkspacePackage`** — `{ path, name? }` for a detected workspace package (repo-relative
   POSIX `path`; root itself is never a `WorkspacePackage`). Detected from
@@ -501,12 +521,28 @@ underlying scan/inference.
   confirmed draft into the `wastech-mdlint.config.json` bytes (a hand-rolled JSONC serializer, so
   each newly-inferred rule can carry its rationale as a trailing `//` comment) and wires the local
   `$schema` — the CLI passes a `packageSchemaRef` computed relative to the config's _own_ directory
-  and anchored on the actual installed schema (walked up on disk), falling back to the repository
-  root, so a subdirectory config points up at the hoisted node_modules (`../node_modules/...`) rather
-  than a fixed root literal. `"fresh"` writes `$schema` + `include` (omitted when empty) + `exclude`
-  (the scanner's pruned noise dirs as depth-agnostic `**/<name>/**` globs, mirroring the scanner's
-  basename pruning at every depth, so a written config never re-scans `node_modules`/`.git`/… at any
-  depth — C1) + inferred `rules`; `"merge"` is additive/existing-wins — it round-trips every existing
+  and anchored on the actual installed schema (walked up on disk), so a subdirectory config points
+  up at the hoisted node_modules (`../node_modules/...`) rather than a fixed root literal. When
+  nothing is installed — the ordinary `npx` case — the CLI passes `undefined` and the writer
+  generates a project-local `./schema.json` instead, so the written ref always names a file that
+  exists ([P11.14](P11-remediation/14-init-cli-lows.md); the previous repo-root fallback emitted a
+  dangling `./node_modules/@wastech-mdlint/cli/schema.json`). `ProjectSchemaReason`
+  (`custom-rules` | `no-installed-package`) records which of the two triggered it, so the CLI's
+  write summary can say why — and so its `resolveSchemaWriteOutcome` guard can refuse to replace a
+  differing existing `schema.json` under `no-installed-package`, where the file is only a
+  resolvable target and the name is one other tools use too. `"fresh"` writes `$schema` + `include` + `exclude`
+  (the scanner's pruned noise dirs as depth-agnostic `**/<name>/**` globs plus a hidden-directory
+  glob, mirroring the scanner's basename pruning at every depth, so a written config never re-scans
+  `node_modules`/`.git`/`.github`/… at any depth — C1) + an explicit `respectGitignore: true` +
+  inferred `rules`. `include` is three-valued: `undefined` omits the key (the tool's `**/*.md`
+  default), a non-empty array is written as-is, and `[]` is written literally so that deselecting
+  every offered cluster lints nothing instead of inverting to the repo-wide default —
+  `GeneratedInitConfig.wroteEmptyInclude` reports that case so the host can say so.
+  `containsJsoncComments(text)` is the writer's companion detector (token-based, via
+  `jsonc-parser`'s scanner, so a `//` inside a string is not a false positive): a `merge` rebuilds
+  the file from parsed values and therefore drops its comments, and the CLI warns about that in
+  both the draft and the write summary rather than letting it pass unmentioned.
+  `"merge"` is additive/existing-wins — it round-trips every existing
   top-level key verbatim, keeps every existing `rules[]` entry (canonicalizing its id per C3), and
   only appends rules whose canonical id is absent. `identifyExistingRule` keys a built-in by its
   canonical `rule` and a custom rule by its canonical `id` (never the literal `"custom"`); a `merge`
@@ -580,11 +616,19 @@ underlying scan/inference.
   every prompt (for CI / the `-init` skill) and defaults `--on-existing` to `skip` when omitted —
   interactive mode always prompts for it, and every prompt's own unchosen-Enter default matches
   the same `--yes` defaults. With no existing config, both flags are ignored. Ctrl+C during any
-  prompt exits `0`. On confirmation it **writes** `wastech-mdlint.config.json` and wires its local
-  `$schema` (a project-local `schema.json` when custom rules are present, never overwritten if one
-  already exists — the write summary reports whether it already matches, differs, or could not be
-  read at all, and a differing file is only regenerated by removing or renaming it before the next
-  `merge`); a `merge` whose existing config is unreadable or would not load (unknown
+  prompt exits `0`. The scan skips noise, hidden, and gitignored trees, and a **fresh** write
+  mirrors that with a hidden-directory `exclude` glob plus an explicit `respectGitignore: true`
+  (a `merge` adds neither); deselecting every offered cluster writes a literal `"include": []`
+  rather than inverting to the repo-wide default, and a `merge` over a comment-bearing config warns
+  — in the draft and again in the write summary — that the rebuild drops its JSONC comments
+  ([P11.14](P11-remediation/14-init-cli-lows.md)). On confirmation it
+  **writes** `wastech-mdlint.config.json` and wires its local
+  `$schema` (a project-local `schema.json` when custom rules are present **or** when nothing is
+  installed to point at, never overwritten if one already exists — not even under
+  `--on-existing overwrite`, which is a disposition for the config, not for a `schema.json` the
+  user never named; the write summary reports whether it already matches, differs, or could not be
+  read at all, and says when `$schema` ends up pointing at a file `init` did not generate); a
+  `merge` whose existing config is unreadable or would not load (unknown
   key/rule/options) aborts the write rather than produce an invalid or lossy result. The config and
   schema are committed as one **atomic write** batch, schema first so a failed schema write leaves
   the old config and its `$schema` intact; a failed write still prints its written/not-written

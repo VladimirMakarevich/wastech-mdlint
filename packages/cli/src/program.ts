@@ -225,6 +225,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
     .action(async (options: { out: string }) => {
       executionResult = await executeCommand({
         kind: "schema",
+        cwd,
         out: options.out,
       });
     });

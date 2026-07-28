@@ -25,6 +25,10 @@ Write the final config and wire it to the **local** schema, optionally dropping 
    default `$schema` to the local package path; if custom rules exist, call the frozen
    `generateConfigSchema({ customRules })` ([P2.06 frozen API](../P2-rule-engine/06-schema-generation.md),
    audit 4.1) to write a project-local schema and point `$schema` there. **No remote URL.**
+   (**Superseded by [P11.14](../P11-remediation/14-init-cli-lows.md):** the project-local schema is
+   also written when no package schema is installed to point at, and an existing `schema.json` is
+   never replaced — not even under `--on-existing overwrite` when that fallback is the only reason
+   for it.)
 3. Optional ([I6](../requirements/06-installation.md)): offer to drop
    `.github/workflows/wastech-mdlint.yml` — ask first, don't write silently. **Shipped as a
    self-contained workflow** (`npm install --no-save @wastech-mdlint/cli` +
@@ -47,7 +51,9 @@ Write the final config and wire it to the **local** schema, optionally dropping 
 ## Exit criteria
 
 - [x] Valid config written with canonical IDs + local `$schema`; no remote URL.
-- [x] Project schema generated when custom rules are present.
+- [x] Project schema generated when custom rules are present. **Superseded by
+      [P11.14](../P11-remediation/14-init-cli-lows.md):** it is also generated when there is no
+      installed package schema to point at (the `npx` case), so the written `$schema` never dangles.
 - [x] CI workflow offered (opt-in), not written silently.
 
 ## Implementation notes
@@ -55,12 +61,16 @@ Write the final config and wire it to the **local** schema, optionally dropping 
 Decisions that are load-bearing but not obvious from the code:
 
 - **Core generates text, the CLI writes files.** `generateInitConfig` (core) is pure and fs-free —
-  it returns the config bytes, the resolved `$schema`, and (when custom rules are present) the
-  project schema; `init-command.ts` performs the actual `writeFile`s. Same split as `compile`/`schema`.
+  it returns the config bytes, the resolved `$schema`, and (whenever `$schema` names it — see the
+  P11.14 notes above) the project schema; `init-command.ts` performs the actual `writeFile`s, and
+  owns the guard on replacing an existing one. Same split as `compile`/`schema`.
 - **Fresh writes always emit `exclude`.** The scanner deliberately prunes noise directories
   (`node_modules`, `.git`, `dist`, …), so the written config carries them as an `exclude` list —
   otherwise a config whose `include` falls back to `**/*.md` would re-scan exactly the trees init
-  ignored (C1). `merge` never touches an existing `exclude`.
+  ignored (C1). `merge` never touches an existing `exclude`. **Extended by
+  [P11.14](../P11-remediation/14-init-cli-lows.md):** the scan also prunes hidden and gitignored
+  trees, so a fresh write adds a hidden-directory glob to `exclude` and an explicit
+  `respectGitignore: true` (a `merge` adds neither).
 - **Merge is validated through the real loader before writing.** Additive merge preserves the
   existing content verbatim, so the result is only valid if the existing config already loads. The
   merge path runs `loadConfiguration` on the existing file and aborts (writes nothing) on an unknown
@@ -72,8 +82,12 @@ Decisions that are load-bearing but not obvious from the code:
   `rule`, or a `custom` entry with a missing/non-string/non-schemaable `id` — because an
   unidentifiable entry can't be diffed against the inferred set without risking a silent duplicate.
 - **`$schema` and workflow anchor on discovered roots, not fixed literals.** `$schema` is computed
-  relative to the config's own directory (anchored on the actual installed `schema.json`, else the
-  repo root), so a subdirectory config points up at the hoisted `node_modules` (`../node_modules/…`).
+  relative to the config's own directory (anchored on the actual installed `schema.json`), so a
+  subdirectory config points up at the hoisted `node_modules` (`../node_modules/…`).
+  **Superseded by [P11.14](../P11-remediation/14-init-cli-lows.md):** there is no repo-root
+  fallback any more — with nothing installed the CLI passes `undefined` and the writer generates a
+  project-local `./schema.json`, because the old fallback anchored on a `node_modules` path that
+  did not exist.
   The workflow anchors at the `.git` root when one exists (a nested workspace package still anchors
   at the real repo root, not `packages/foo`), falling back to the nearest `package.json`/`node_modules`
   outside git.

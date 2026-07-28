@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { detectPackageManager } from "../src/discovery/package-manager.js";
 
@@ -16,11 +16,18 @@ afterEach(async () => {
   );
 });
 
+/**
+ * A fixture tree that is its own repository root: the `.git` marker bounds `detectPackageManager`'s
+ * ancestor walk to the fixture. Without it the walk climbs out of `os.tmpdir()` to the filesystem
+ * root, which would make every negative assertion here depend on host state rather than on the
+ * fixture. Tests that need the walk to cross a boundary build their own nested roots below.
+ */
 async function createFixtureTree(
   files: Record<string, string>,
 ): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-pm-"));
   tempDirs.push(root);
+  await mkdir(path.join(root, ".git"));
 
   for (const [relativePath, content] of Object.entries(files)) {
     const absolutePath = path.join(root, relativePath);
@@ -91,5 +98,71 @@ describe("detectPackageManager", () => {
 
     await rm(path.join(root, "yarn.lock"));
     expect(await detectPackageManager(root)).toBe("npm");
+  });
+});
+
+// Audit L-11: the old check looked only at `cwd`, so a monorepo member — which by construction has
+// no lockfile of its own — reported "not detected" and made `init` prompt for something it could
+// have read off disk.
+describe("detectPackageManager · ancestor walk", () => {
+  it("finds a lockfile at an ancestor of the scanned directory", async () => {
+    const root = await createFixtureTree({
+      "pnpm-lock.yaml": "",
+      "packages/foo/package.json": "{}",
+    });
+
+    expect(await detectPackageManager(path.join(root, "packages", "foo"))).toBe(
+      "pnpm",
+    );
+  });
+
+  it("prefers the nearest lockfile over a more distant ancestor's", async () => {
+    // A nested project with its own lockfile is its own project, whatever the outer repo uses.
+    const root = await createFixtureTree({
+      "pnpm-lock.yaml": "",
+      "examples/standalone/yarn.lock": "",
+    });
+
+    expect(
+      await detectPackageManager(path.join(root, "examples", "standalone")),
+    ).toBe("yarn");
+  });
+
+  it("stops at a repository root that has no lockfile", async () => {
+    const root = await createFixtureTree({
+      "outer/package-lock.json": "",
+      "outer/repo/docs/guide.md": "# Guide\n",
+    });
+    await mkdir(path.join(root, "outer", "repo", ".git"));
+
+    // `outer/`'s lockfile belongs to a different project: the walk must not climb past the `.git`
+    // boundary to reach it.
+    expect(
+      await detectPackageManager(path.join(root, "outer", "repo", "docs")),
+    ).toBeUndefined();
+    // The boundary is not a blanket refusal — a lockfile at the repo root itself is still found.
+    await writeFile(path.join(root, "outer", "repo", "bun.lock"), "", "utf8");
+    expect(
+      await detectPackageManager(path.join(root, "outer", "repo", "docs")),
+    ).toBe("bun");
+  });
+
+  it("never attributes a lockfile at or above the home directory to the scanned project", async () => {
+    const root = await createFixtureTree({
+      "yarn.lock": "",
+      "project/package.json": "{}",
+    });
+    const homedirSpy = vi.spyOn(os, "homedir").mockReturnValue(root);
+
+    try {
+      expect(
+        await detectPackageManager(path.join(root, "project")),
+      ).toBeUndefined();
+      // The boundary only rejects strict ancestors: a project rooted exactly at `$HOME` still
+      // reports its own lockfile, matching findConfig's start-directory rule.
+      expect(await detectPackageManager(root)).toBe("yarn");
+    } finally {
+      homedirSpy.mockRestore();
+    }
   });
 });

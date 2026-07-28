@@ -4,6 +4,8 @@ import { realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { EXIT_CODE_USAGE_ERROR } from "./commands.js";
+import { formatOperationalError } from "./operational-errors.js";
 import { runCli } from "./program.js";
 
 const invokedPath = process.argv[1];
@@ -36,6 +38,18 @@ if (
   invokedPath !== undefined &&
   realOrSelf(path.resolve(invokedPath)) === realOrSelf(modulePath)
 ) {
-  const exitCode = await runCli(process.argv.slice(2));
-  process.exitCode = exitCode;
+  // `runCli` catches everything its own `try` covers, but that block does not start until after
+  // `readPackageVersion()` has already run. A rejection from there (or from anything else outside
+  // it) escapes this top-level `await`, and Node terminates an unhandled rejection with exit **1** —
+  // the code reserved exclusively for lint findings, so CI could not tell "the linter found
+  // problems" from "the CLI could not start" (M-6, reopened at the process boundary). Re-report it
+  // through the same formatter and the same exit code the in-process backstop uses (program.ts).
+  try {
+    process.exitCode = await runCli(process.argv.slice(2));
+  } catch (error) {
+    process.stderr.write(
+      `Operational error: ${formatOperationalError(error, process.cwd())}\n`,
+    );
+    process.exitCode = EXIT_CODE_USAGE_ERROR;
+  }
 }

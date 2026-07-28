@@ -219,4 +219,54 @@ describe("detectWorkspacePackages", () => {
       { path: "packages/foo", name: "foo" },
     ]);
   });
+
+  // Audit L-11: the reader stopped at the first blank line, silently truncating a grouped
+  // `packages:` block to whatever preceded it.
+  it("reads the whole packages block across blank lines and full-line comments", async () => {
+    const root = await createFixtureTree({
+      "package.json": JSON.stringify({ name: "root" }),
+      "pnpm-workspace.yaml":
+        "packages:\n  - 'packages/*'\n\n  # applications\n  - 'apps/*'\n",
+      "packages/foo/package.json": JSON.stringify({ name: "foo" }),
+      "apps/web/package.json": JSON.stringify({ name: "web" }),
+    });
+
+    expect(await detectWorkspacePackages(root)).toEqual([
+      { path: "apps/web", name: "web" },
+      { path: "packages/foo", name: "foo" },
+    ]);
+  });
+
+  it("still ends the packages block at a top-level key that follows a blank line", async () => {
+    // The blank-line fix must not swallow the rest of the document: a genuine sibling key is still
+    // the terminator, and its own indented values must not be read as package globs.
+    const root = await createFixtureTree({
+      "package.json": JSON.stringify({ name: "root" }),
+      "pnpm-workspace.yaml":
+        "packages:\n  - 'packages/*'\n\ncatalog:\n  - 'apps/*'\n",
+      "packages/foo/package.json": JSON.stringify({ name: "foo" }),
+      "apps/web/package.json": JSON.stringify({ name: "web" }),
+    });
+
+    expect(await detectWorkspacePackages(root)).toEqual([
+      { path: "packages/foo", name: "foo" },
+    ]);
+  });
+
+  it("prunes a package.json nested inside a hidden directory", async () => {
+    // Same hidden-directory prune as the Markdown walk (audit L-7): tooling scaffolding under
+    // `.config/` is not a workspace package, even when a sibling-fallback glob would match it.
+    const root = await createFixtureTree({
+      "package.json": JSON.stringify({ name: "root" }),
+      "packages/foo/package.json": JSON.stringify({ name: "foo" }),
+      "packages/bar/package.json": JSON.stringify({ name: "bar" }),
+      ".config/packages/hidden-a/package.json": JSON.stringify({ name: "a" }),
+      ".config/packages/hidden-b/package.json": JSON.stringify({ name: "b" }),
+    });
+
+    expect(await detectWorkspacePackages(root)).toEqual([
+      { path: "packages/bar", name: "bar" },
+      { path: "packages/foo", name: "foo" },
+    ]);
+  });
 });

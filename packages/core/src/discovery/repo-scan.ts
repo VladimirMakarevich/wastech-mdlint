@@ -7,10 +7,16 @@ import {
   type DetectedPackageManager,
 } from "./package-manager.js";
 import {
+  isGitIgnored,
+  readIgnoreLayer,
+  type IgnoreLayer,
+} from "./gitignore-layers.js";
+import {
   DEFAULT_KNOWN_CLUSTER_NAMES,
   DEFAULT_MIN_CLUSTER_SIZE,
   DEFAULT_NOISE_DIR_NAMES,
   DEFAULT_SAMPLE_SIZE,
+  isPrunedDirName,
 } from "./repo-scan-constants.js";
 import {
   detectWorkspacePackagesWithNoise,
@@ -104,6 +110,11 @@ function isOwnedByPackageScope(
 // following): this is a heuristic pre-config scan, not the authoritative lint corpus, so
 // `Dirent.isDirectory()`/`isFile()` both returning false for a symlink entry (the simplest
 // "skip anything that isn't a plain dir/file" behavior) is an acceptable simplification.
+//
+// Hidden and gitignored trees are skipped (audit L-7): `init` must not propose an `include` for a
+// tree the config it writes then refuses to lint, and a generated `generated-docs/**` cluster is
+// noise the user has already declared uninteresting. The gitignore layering reuses the loader's own
+// helpers (gitignore-layers.ts), so the two walks can never drift on negation or nesting semantics.
 async function collectMarkdownFiles(
   cwd: string,
   noiseDirNames: readonly string[],
@@ -113,7 +124,12 @@ async function collectMarkdownFiles(
   async function walk(
     directoryPath: string,
     relDirectory: string,
+    parentLayers: IgnoreLayer[],
   ): Promise<void> {
+    const localLayer = await readIgnoreLayer(directoryPath, relDirectory);
+    const layers =
+      localLayer === undefined ? parentLayers : [...parentLayers, localLayer];
+
     const entries = await readdir(directoryPath, { withFileTypes: true }).catch(
       () => [],
     );
@@ -123,20 +139,27 @@ async function collectMarkdownFiles(
         relDirectory === "" ? entry.name : `${relDirectory}/${entry.name}`;
 
       if (entry.isDirectory()) {
-        if (noiseDirNames.includes(entry.name)) {
+        if (
+          isPrunedDirName(entry.name, noiseDirNames) ||
+          isGitIgnored(relPath, true, layers)
+        ) {
           continue;
         }
-        await walk(path.join(directoryPath, entry.name), relPath);
+        await walk(path.join(directoryPath, entry.name), relPath, layers);
         continue;
       }
 
-      if (entry.isFile() && isMarkdownFile(entry.name)) {
+      if (
+        entry.isFile() &&
+        isMarkdownFile(entry.name) &&
+        !isGitIgnored(relPath, false, layers)
+      ) {
         results.push(relPath);
       }
     }
   }
 
-  await walk(cwd, "");
+  await walk(cwd, "", []);
   return results;
 }
 
@@ -276,6 +299,12 @@ const CLUSTER_KIND_RANK: Record<DocClusterKind, number> = {
  * Scans a repository for Markdown doc clusters and the package manager in use (P6.01), so
  * `init` (P6.03/04) can propose defaults instead of hardcoding `docs/`. Pure and read-only;
  * does not write anything.
+ *
+ * The walk skips noise directories, every dot-prefixed directory, and anything matched by a
+ * `.gitignore` (root or nested) — always, not behind a flag (P11.14 / audit L-7). The scan exists
+ * to propose a config, and the config `init` writes pins `respectGitignore: true` plus a hidden-
+ * directory `exclude`, so a cluster the scan could only see by ignoring those rules would be a
+ * proposal the resulting config immediately contradicts.
  */
 export async function scanRepository(
   options: ScanRepositoryOptions,

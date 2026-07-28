@@ -5,7 +5,10 @@ import micromatch from "micromatch";
 
 import { compareStrings } from "../deterministic-sort.js";
 import { normalizeRelativePath } from "./globs.js";
-import { DEFAULT_NOISE_DIR_NAMES } from "./repo-scan-constants.js";
+import {
+  DEFAULT_NOISE_DIR_NAMES,
+  isPrunedDirName,
+} from "./repo-scan-constants.js";
 
 export type WorkspacePackage = { path: string; name?: string };
 
@@ -79,11 +82,25 @@ function extractWorkspaceGlobsFromPnpmYaml(
   for (let index = packagesLineIndex + 1; index < lines.length; index += 1) {
     const line = lines[index];
 
-    if (line === undefined || line.trim().length === 0) {
+    if (line === undefined) {
       break;
     }
 
+    // A blank line inside a block sequence is legal YAML formatting (a grouping/comment separator),
+    // not the end of the sequence. Breaking here truncated every entry after the first blank line
+    // and silently under-detected the monorepo (audit L-11); the real terminator is the top-level
+    // key check below.
+    if (line.trim().length === 0) {
+      continue;
+    }
+
     const trimmed = line.trimStart();
+
+    // A full-line comment (`# note`) between entries is skipped for the same reason — it is neither
+    // an item nor a new top-level key, so it must not terminate the sequence.
+    if (trimmed.startsWith("#")) {
+      continue;
+    }
 
     // A block-sequence item may be indented (`  - glob`) or unindented (`- glob` — valid YAML
     // when the sequence is written at the same level as its `packages:` key). Stop only at a
@@ -137,7 +154,9 @@ async function collectPackageJsonDirs(
     }
 
     for (const entry of entries) {
-      if (entry.isDirectory() && !noiseDirNames.includes(entry.name)) {
+      // Same prune as the Markdown walk (isPrunedDirName): a `package.json` buried in a hidden
+      // directory is tooling scaffolding, never a workspace package worth scoping doc clusters to.
+      if (entry.isDirectory() && !isPrunedDirName(entry.name, noiseDirNames)) {
         const childRel =
           relDirectory === "" ? entry.name : `${relDirectory}/${entry.name}`;
         await walk(path.join(directoryPath, entry.name), childRel);

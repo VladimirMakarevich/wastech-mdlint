@@ -123,14 +123,24 @@ wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-
   confirmation — writes `wastech-mdlint.config.json` with a **local** `$schema` (canonical
   rule IDs, optional per-rule rationale comments, and an `exclude` list of the build/vendor
   directories the scan skips — matched at any depth, so a monorepo's
-  `packages/*/dist` and `packages/*/node_modules` stay out of the lint corpus too). When custom
-  rules are present it also
-  generates a project-local `schema.json` and points `$schema` at it; no remote URL is ever
+  `packages/*/dist` and `packages/*/node_modules` stay out of the lint corpus too). The scan
+  skips hidden directories (`.github`, `.venv`, …) and anything a root or nested `.gitignore`
+  excludes, and a fresh write mirrors both — a hidden-directory `exclude` glob plus an
+  explicit `respectGitignore: true` — so it lints exactly the tree the draft was built from.
+  Deselecting every offered cluster writes a literal `"include": []` (lints nothing) instead of
+  silently inverting to the repo-wide `**/*.md` default. A `merge` preserves every existing key,
+  rule, severity, and option, but rebuilds the file from parsed values, so it does **not** preserve
+  JSONC comments — it warns about that before writing. With the CLI installed, `$schema` is a
+  relative path to the installed package schema; with nothing installed (the ordinary `npx` case),
+  or whenever custom rules are present, `init` generates a project-local `schema.json` beside the
+  config and points at that, so the ref never dangles. No remote URL is ever
   emitted. `init` never replaces an existing `schema.json` — that filename is common enough (and
   is `wastech-mdlint schema`'s own default output) that a hand-written one could otherwise be
-  silently destroyed — so the write summary instead reports whether the file already matches what
-  `init` would generate or differs from it. Regenerating a differing one means removing or
-  renaming it and re-running `init` with `--on-existing merge`. `--on-existing merge` is
+  silently destroyed, and `--on-existing overwrite` does not change that: it is a disposition for
+  the config, not for a file you never named. The write summary instead reports whether the
+  existing file already matches what `init` would generate or differs from it, and — in the `npx`
+  case, where the kept file is probably not `init`'s at all — that `$schema` now points at a file
+  `init` did not generate, so you can repoint it or move that file aside. `--on-existing merge` is
   additive/existing-wins — it keeps every
   existing rule and appends only new ones; a merge whose existing config is unreadable or would
   not load (unknown key, unknown rule, invalid options) aborts the write rather than risk an
