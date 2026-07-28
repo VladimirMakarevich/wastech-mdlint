@@ -94,6 +94,13 @@ Notes on individual fields:
   merely mentions one.
 - Every assertion object is closed: an unknown key inside `assert` is a config error, not a
   silently ignored typo.
+- `linkResolves`/`imageResolves` are the one place where **two different `exclude` keys meet**, and
+  they mean different things: `options.exclude` chooses which _documents_ this instance scans,
+  while `assert.exclude` lists _link/image targets_ to skip inside whatever it scans (mirroring
+  [REF-001](REF-001.md)/[REF-003](REF-003.md), whose `exclude` is target-only). They are
+  independent filters and compose — set both to say "check only `docs/**`, and there ignore links
+  into `generated/**`". The nesting is the tell: an `exclude` under `assert` follows the
+  assertion's target, one under `options` follows the file scope.
 
 ## Examples
 

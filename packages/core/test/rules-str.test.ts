@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { ConfiguredRule } from "../src/config/load-config.js";
 import { lintFiles } from "../src/engine/lint-files.js";
+import { RuleResolutionError } from "../src/engine/registry.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
 
 const tempDirs: string[] = [];
@@ -135,5 +136,27 @@ describe("STR-001 required files", () => {
       expect(result.messages).toHaveLength(1);
       expect(result.messages[0]?.message).toMatch(/escapes the analyzed root/);
     }
+  });
+
+  // STR-001 is the one rule whose `files` is *not* the shared file-scope shape: it is the set of
+  // files that must exist, so there is nothing for an `exclude` to subtract. Pinned as a rejection
+  // rather than left implicit, so P12.01's "every family has an exclude test" is honest about the
+  // family that has no such option (audit L-4).
+  it("rejects `exclude`, because its `files` is a required-file set and not file scope", () => {
+    let thrown: unknown;
+    try {
+      ruleRegistry.resolveRule("STR-001", {
+        files: ["README.md"],
+        exclude: ["drafts/**"],
+      });
+    } catch (error: unknown) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(RuleResolutionError);
+    expect((thrown as RuleResolutionError).code).toBe("INVALID_OPTIONS");
+    expect(JSON.stringify((thrown as RuleResolutionError).issues)).toContain(
+      "exclude",
+    );
   });
 });

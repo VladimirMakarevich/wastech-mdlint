@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { ConfiguredRule } from "../src/config/load-config.js";
+import { compareStrings } from "../src/deterministic-sort.js";
 import { applyFixes } from "../src/engine/fix.js";
 import { lintFiles } from "../src/engine/lint-files.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
@@ -260,6 +261,86 @@ describe("SEC-003 template conformance", () => {
         data: { section: "Decision", template: "templates/template.md" },
       }),
     ]);
+  });
+});
+
+// Audit L-4, the SEC half of P12.01's `exclude` matrix. One fixture serves all three cases: both
+// documents violate every case, while `templates/t.md` satisfies SEC-001/SEC-002 (it has `Summary`,
+// and neither `Overview` nor `Usage`, which `sectionOrder` skips) and is self-skipped by SEC-003.
+const SECTION_DOC = "# Title\n\n## Usage\n\n## Overview\n";
+const SECTION_TEMPLATE = "# T\n\n## Context\n\n## Summary\n";
+
+const SEC_SCOPE_CASES: readonly { id: string; options: object }[] = [
+  { id: "SEC-001", options: { sections: ["Summary"] } },
+  { id: "SEC-002", options: { order: ["Overview", "Usage"] } },
+  { id: "SEC-003", options: { template: "templates/t.md", level: 2 } },
+];
+
+describe("SEC file scope (exclude)", () => {
+  // Distinct paths, not the raw message list: SEC-003 reports once per missing template heading.
+  async function reportedFiles(
+    cwd: string,
+    configured: ConfiguredRule,
+  ): Promise<string[]> {
+    const result = await lint(cwd, [configured]);
+    return [
+      ...new Set(result.messages.map((message) => message.filePath)),
+    ].sort(compareStrings);
+  }
+
+  it.each(SEC_SCOPE_CASES)(
+    "$id drops an excluded document, with and without `files`",
+    async ({ id, options }) => {
+      const cwd = await fixtureRepo({
+        "docs/a.md": SECTION_DOC,
+        "drafts/b.md": SECTION_DOC,
+        "templates/t.md": SECTION_TEMPLATE,
+      });
+
+      expect(await reportedFiles(cwd, rule(id, options))).toEqual([
+        "docs/a.md",
+        "drafts/b.md",
+      ]);
+      // The M-2 shape — `exclude` with no `files` beside it to carry the filtering.
+      expect(
+        await reportedFiles(
+          cwd,
+          rule(id, { ...options, exclude: ["drafts/**"] }),
+        ),
+      ).toEqual(["docs/a.md"]);
+      expect(
+        await reportedFiles(
+          cwd,
+          rule(id, { ...options, files: ["**/*.md"], exclude: ["drafts/**"] }),
+        ),
+      ).toEqual(["docs/a.md"]);
+    },
+  );
+
+  // SEC-001's fix hook re-applies the gate itself because `applyFixes` has none — the pattern
+  // TBL-002's hook was missing until P12.01. Without it, `--fix` scaffolds into files `check` skipped.
+  it("SEC-001 --fix scaffolds only the in-scope document", async () => {
+    const cwd = await fixtureRepo({
+      "docs/a.md": SECTION_DOC,
+      "drafts/b.md": SECTION_DOC,
+    });
+
+    const written = await applyFixes({
+      cwd,
+      config: { rules: [] },
+      rules: [
+        rule("SEC-001", { sections: ["Summary"], exclude: ["drafts/**"] }),
+      ],
+      settings: {},
+    });
+    expect(written.fixedFiles).toEqual(["docs/a.md"]);
+
+    await expect(
+      readFile(path.join(cwd, "docs", "a.md"), "utf8"),
+    ).resolves.toContain("## Summary");
+    await expect(
+      readFile(path.join(cwd, "drafts", "b.md"), "utf8"),
+    ).resolves.toBe(SECTION_DOC);
   });
 });
 

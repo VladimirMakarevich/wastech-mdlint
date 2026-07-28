@@ -161,6 +161,8 @@ generated schema (`wastech-mdlint schema`).
     {
       "rule": "REF-001",
       "options": {
+        // NOT file scope: these globs match the link *target* being probed, so this skips links
+        // *to* any CHANGELOG.md, from anywhere. REF-001 has no `files`/`exclude` file scope.
         "exclude": ["**/CHANGELOG.md"],
         "siteRouter": {
           "preset": "starlight",
@@ -178,7 +180,8 @@ generated schema (`wastech-mdlint schema`).
         "exclude": [],
       },
     },
-    // REF-003: image targets resolve to a file.
+    // REF-003: image targets resolve to a file. As on REF-001, `exclude` matches the image
+    // *target* (here: badge images produced elsewhere), not the document holding the image.
     { "rule": "REF-003", "options": { "exclude": ["**/badges/**"] } },
     // REF-004: cross-zone links are declared in the zone's Dependencies section.
     {
@@ -356,4 +359,8 @@ generated schema (`wastech-mdlint schema`).
   `settings.siteRouter` for that rule; most projects set it once under `settings`. The graph rules
   read it only through the shared graph, so they take no `siteRouter` of their own.
 - Rules that operate over the whole corpus (identity/graph rules) may intentionally omit
-  `files`/`exclude` — see each rule's page for its exact option set.
+  `files`/`exclude` — see each rule's page for its exact option set. Two of them spell one of the
+  names with a different meaning, which is why the comments above call it out inline: `STR-001.files`
+  is the required-file set, and `REF-001`/`REF-003`'s `exclude` filters link/image targets.
+- On the rules that do take file scope, it also bounds `--fix` (SEC-001, TBL-002): an excluded file
+  is never rewritten, not just never reported.

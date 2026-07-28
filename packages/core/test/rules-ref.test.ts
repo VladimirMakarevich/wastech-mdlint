@@ -5,7 +5,9 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { ConfiguredRule } from "../src/config/load-config.js";
+import { compareStrings } from "../src/deterministic-sort.js";
 import { lintFiles } from "../src/engine/lint-files.js";
+import { RuleResolutionError } from "../src/engine/registry.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
 
 const tempDirs: string[] = [];
@@ -61,6 +63,147 @@ describe("REF-003 images", () => {
     expect(result.messages.map((message) => message.data?.target)).toEqual([
       "missing.png",
     ]);
+  });
+});
+
+// Audit L-4, the REF half of P12.01's `exclude` matrix. REF-002 is the only REF rule that mixes in
+// the shared file-scope shape; REF-001/REF-003 spell `exclude` too but mean something else, which is
+// pinned separately below.
+describe("REF-002 file scope (exclude)", () => {
+  const ANCHOR_DOC = "## Intro\n\n[bad](#nope)\n";
+
+  async function reportedFiles(
+    cwd: string,
+    configured: ConfiguredRule,
+  ): Promise<string[]> {
+    const result = await lint(cwd, [configured]);
+    return [
+      ...new Set(result.messages.map((message) => message.filePath)),
+    ].sort(compareStrings);
+  }
+
+  it("drops an excluded document, with and without `files`", async () => {
+    const cwd = await fixtureRepo({
+      "docs/a.md": ANCHOR_DOC,
+      "drafts/b.md": ANCHOR_DOC,
+    });
+
+    expect(await reportedFiles(cwd, rule("REF-002"))).toEqual([
+      "docs/a.md",
+      "drafts/b.md",
+    ]);
+    // The M-2 shape — `exclude` with no `files` beside it to carry the filtering.
+    expect(
+      await reportedFiles(cwd, rule("REF-002", { exclude: ["drafts/**"] })),
+    ).toEqual(["docs/a.md"]);
+    expect(
+      await reportedFiles(
+        cwd,
+        rule("REF-002", { files: ["**/*.md"], exclude: ["drafts/**"] }),
+      ),
+    ).toEqual(["docs/a.md"]);
+  });
+});
+
+// Same key, opposite subject: REF-001/REF-003 filter the *target* they are about to probe
+// (`primitives/reference.ts`), not the document being scanned. A reader who assumes file scope here
+// would expect the second half of each pair to fall silent — it must not.
+describe("REF-001 / REF-003 exclude is a link-target filter, not file scope", () => {
+  it("REF-001 silences a link pointing into the excluded directory, not links written there", async () => {
+    const cwd = await fixtureRepo({
+      // Target `drafts/x.md` — matched by the exclude.
+      "docs/a.md": "[into drafts](../drafts/x.md)\n",
+      // Target `docs/missing.md` — outside the exclude, though the *source* is in `drafts/`.
+      "drafts/b.md": "[out of drafts](../docs/missing.md)\n",
+    });
+
+    const unfiltered = await lint(cwd, [rule("REF-001")]);
+    expect(
+      unfiltered.messages
+        .map((message) => message.filePath)
+        .sort(compareStrings),
+    ).toEqual(["docs/a.md", "drafts/b.md"]);
+
+    const filtered = await lint(cwd, [
+      rule("REF-001", { exclude: ["drafts/**"] }),
+    ]);
+    expect(filtered.messages.map((message) => message.filePath)).toEqual([
+      "drafts/b.md",
+    ]);
+  });
+
+  it("REF-003 silences an image pointing into the excluded directory, not images written there", async () => {
+    const cwd = await fixtureRepo({
+      "docs/a.md": "![into drafts](../drafts/x.png)\n",
+      "drafts/b.md": "![out of drafts](../docs/missing.png)\n",
+    });
+
+    const unfiltered = await lint(cwd, [rule("REF-003")]);
+    expect(
+      unfiltered.messages
+        .map((message) => message.filePath)
+        .sort(compareStrings),
+    ).toEqual(["docs/a.md", "drafts/b.md"]);
+
+    const filtered = await lint(cwd, [
+      rule("REF-003", { exclude: ["drafts/**"] }),
+    ]);
+    expect(filtered.messages.map((message) => message.filePath)).toEqual([
+      "drafts/b.md",
+    ]);
+  });
+});
+
+describe("REF option schemas (file scope inventory)", () => {
+  function resolutionError(id: string, options: unknown): RuleResolutionError {
+    let thrown: unknown;
+    try {
+      ruleRegistry.resolveRule(id, options);
+    } catch (error: unknown) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(RuleResolutionError);
+    return thrown as RuleResolutionError;
+  }
+
+  // Every REF rule except REF-002 is whole-corpus or identity-based by design, so `files` is not a
+  // silently ignored key — it fails resolution. This is what makes the pairing above unambiguous.
+  it.each([
+    ["REF-001", {}],
+    ["REF-003", {}],
+    ["REF-004", { zonesDir: "zones" }],
+    [
+      "REF-005",
+      {
+        definitions: ["a.md"],
+        references: ["b.md"],
+        idColumn: "ID",
+        idPattern: "^R-\\d+$",
+      },
+    ],
+    [
+      "REF-006",
+      {
+        stabilityColumn: "Stability",
+        stabilityOrder: ["experimental", "stable"],
+        definitions: ["a.md"],
+        references: ["b.md"],
+        idColumn: "ID",
+      },
+    ],
+  ])("rejects `files` on %s", (id, base) => {
+    const error = resolutionError(id, { ...base, files: ["docs/**"] });
+    expect(error.code).toBe("INVALID_OPTIONS");
+    expect(JSON.stringify(error.issues)).toContain("files");
+  });
+
+  it("accepts `files` and `exclude` on REF-002, the one file-scoped REF rule", () => {
+    expect(
+      ruleRegistry.resolveRule("REF-002", {
+        files: ["docs/**"],
+        exclude: ["docs/drafts/**"],
+      }).id,
+    ).toBe("REF-002");
   });
 });
 
