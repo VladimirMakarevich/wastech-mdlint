@@ -281,11 +281,17 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
   - **link/image** — `linkResolves`, `imageResolves`.
 - **`custom` rule** — The declarative rule that composes the primitive vocabulary from
   config — no code, no rebuild, pure JSONC, safe to run inside the MCP server. Requires a
-  namespaced `id` that must not shadow a built-in prefix, a `target`
-  (`table | section | content | checklist | link`), and an `assert`. Decision
-  [R9](requirements/02-rules-engine.md); see [`engine/rules/custom.ts`](../../packages/core/src/engine/rules/custom.ts).
+  namespaced `id` that must not shadow a built-in prefix and an `options.assert`; the schema's
+  required keys are exactly `rule`, `id`, and `options`. `description`, `severity`,
+  `options.files`/`options.exclude`, and `target` are optional; scope (`columnUnique` ⇒
+  `project`, else `document`) and default severity (`error`) derive from the assert `kind`, not
+  from config. Decision [R9](requirements/02-rules-engine.md); see
+  [`engine/rules/custom.ts`](../../packages/core/src/engine/rules/custom.ts).
 - **Target** — Which parsed construct a custom assertion runs against
-  (`table | section | content | checklist | link`). No `heading` target exists — the
+  (`checklist | content | link | section | table`). **Optional and redundant**: the effective
+  target comes from the assert `kind` (`ASSERTION_TARGETS`); a declared `target` that disagrees is
+  a config error, and omitting it is normal
+  ([P12.02](P12-consistency/02-glossary-custom-target.md)). No `heading` target exists — the
   `sectionPresent`/`sectionOrder` primitives cover heading-scoped checks under `section`
   (decision P9.05, [audit M-2](audit-2026-07-23-p0-p8.md)).
 - **Code-plugins (Tier 2)** — User-authored rule code (`plugins: [...]`). **Deferred from

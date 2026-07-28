@@ -314,9 +314,9 @@ generated schema (`wastech-mdlint schema`).
     {
       "rule": "custom",
       "id": "REQ-OWNER", // required, namespaced
-      "description": "Each requirement row must have an Owner", // required
+      "description": "Each requirement row must have an Owner", // optional (defaults to the id)
       "severity": "error", // optional (default error)
-      "target": "table", // checklist | content | link | section | table
+      "target": "table", // optional; must match the kind's target: checklist | content | link | section | table
       "options": {
         "files": ["docs/requirements/**/*.md"],
         "exclude": [],
