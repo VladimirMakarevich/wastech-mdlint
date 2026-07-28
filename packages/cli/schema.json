@@ -229,35 +229,7 @@
               },
               "options": {
                 "type": "object",
-                "properties": {
-                  "siteRouter": {
-                    "type": "object",
-                    "properties": {
-                      "preset": {
-                        "type": "string"
-                      },
-                      "contentDir": {
-                        "type": "string"
-                      },
-                      "defaultLocale": {
-                        "type": "string"
-                      }
-                    },
-                    "additionalProperties": false
-                  },
-                  "files": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "exclude": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
+                "properties": {},
                 "additionalProperties": false
               }
             },
@@ -287,21 +259,6 @@
                     "items": {
                       "type": "string"
                     }
-                  },
-                  "siteRouter": {
-                    "type": "object",
-                    "properties": {
-                      "preset": {
-                        "type": "string"
-                      },
-                      "contentDir": {
-                        "type": "string"
-                      },
-                      "defaultLocale": {
-                        "type": "string"
-                      }
-                    },
-                    "additionalProperties": false
                   },
                   "files": {
                     "type": "array",

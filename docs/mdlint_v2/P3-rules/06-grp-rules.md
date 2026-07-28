@@ -23,8 +23,8 @@ change to this rule code (audit 2.2).
 
 | ID      | Scope   | Severity | Checks                                              | Key options                                              |
 | ------- | ------- | -------- | --------------------------------------------------- | -------------------------------------------------------- |
-| GRP-001 | project | error    | no circular references                              | `files?`, `exclude?`, `siteRouter?`                      |
-| GRP-002 | project | warning  | every doc has ≥1 incoming ref (except entry points) | `files?`, `entryPoints?`, `siteRouter?`                  |
+| GRP-001 | project | error    | no circular references                              | _(none)_                                                 |
+| GRP-002 | project | warning  | every doc has ≥1 incoming ref (except entry points) | `files?`, `exclude?`, `entryPoints?`                     |
 | GRP-003 | project | warning  | ID chain across stages (stage N IDs appear at N+1)  | `chain[{stage,files,idColumn?,refColumn}]`, `idPattern?` |
 
 ## Deliverables / steps
@@ -32,6 +32,10 @@ change to this rule code (audit 2.2).
 1. GRP-001 cycle detection (DFS color-marking / reuse the existing Tarjan SCC); canonicalize cycles to
    avoid duplicate reports; attribute to the first arc.
 2. GRP-002 incoming-reference count with `entryPoints` allowlist + site-router resolution.
+   **Superseded in part by [P11.13](../P11-remediation/13-grp-size-hygiene.md):** the key-options
+   column above dropped the keys both rules accepted but ignored — GRP-001 now takes no options at
+   all, and neither rule takes a per-rule `siteRouter` (the shared graph resolves routes from
+   `settings.siteRouter`). GRP-002's `files`/`exclude` survive as reporting scope.
 3. GRP-003 chain traversal across stage files by ID/ref columns.
 4. **Graph source (decided 2026-07-02, audit 2.2):** GRP-001 reads the graph's explicit cycle
    list and GRP-002 reads node `inDegree` from `RuleContext.graph` — **no local adjacency in

@@ -55,7 +55,7 @@ describe("REF-001 (proof rule) through the engine", () => {
 });
 
 describe("SIZE-001 (proof rule) through the engine", () => {
-  it("emits per-metric warn and error findings independently", async () => {
+  it("emits one finding per metric, from the highest crossed threshold", async () => {
     const cwd = await fixtureRepo({ "big.md": `${"x".repeat(100)}\n` });
 
     const result = await lintFiles({
@@ -65,14 +65,13 @@ describe("SIZE-001 (proof rule) through the engine", () => {
       settings: {},
     });
 
-    // 101 bytes crosses both warn (10) and error (50): both findings appear (P3.07).
-    expect(result.messages.map((message) => message.severity).sort()).toEqual([
-      "error",
-      "warning",
-    ]);
-    expect(
-      result.messages.every((message) => message.data?.metric === "bytes"),
-    ).toBe(true);
+    // 101 bytes crosses both warn (10) and error (50): the error breach supersedes the warn one, so
+    // a single finding is reported (P11.13, superseding P3.07's independent firing).
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]).toMatchObject({
+      severity: "error",
+      data: { metric: "bytes", warnAt: 10, errorAt: 50 },
+    });
   });
 
   it("applies glob overrides with per-metric fallback to top-level thresholds", async () => {

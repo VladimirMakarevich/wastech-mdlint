@@ -49,9 +49,14 @@ Threshold semantics:
 - A file crossing `warn` but not `error` → `severity: "warning"` finding — printed to console,
   does **not** trigger `--fail-on error` exit.
 - A file crossing `error` → `severity: "error"` finding — exits non-zero under `--fail-on error`.
+  **Superseded in part by [P11.13](../P11-remediation/13-grp-size-hygiene.md):** when a file crosses
+  both thresholds of one metric, only this error finding is emitted — the warn finding it supersedes
+  carried the same `data` (`warnAt` is still there), and emitting both let a `severity` override
+  render two same-severity messages for one metric.
 - The C2 `severity` rule override acts as a **ceiling clamp**: `"severity": "warning"` downgrades
   even error-threshold crossings to warnings; `"severity": "error"` upgrades warn-threshold findings;
-  `"severity": "off"` suppresses all SIZE-001 output (R1).
+  `"severity": "off"` suppresses all SIZE-001 output (R1). After P11.13 the clamp always applies to
+  a single per-metric finding, so it can no longer collapse a warn/error pair into duplicates.
 - Each `overrides` entry supplies independent per-metric thresholds; unspecified metrics fall back to
   the top-level `bytes`/`lines`/`tokens` options.
 
@@ -85,8 +90,10 @@ import-classification design first.
    - **Two-tier thresholds:** each metric (`bytes`, `lines`, `tokens`) may declare an optional
      `warn` threshold and/or an optional `error` threshold independently. A finding is emitted at
      `"warning"` severity when only the `warn` threshold is crossed; at `"error"` severity when the
-     `error` threshold is crossed. Both may fire for the same metric if both thresholds are set and
-     the file exceeds them (only the `error` one matters for CI, but both appear in the report).
+     `error` threshold is crossed. **Superseded in part by
+     [P11.13](../P11-remediation/13-grp-size-hygiene.md):** a metric reports at most **one** finding
+     — the highest crossed threshold wins, so a file over both thresholds no longer produces a
+     warn/error pair for that metric (metrics remain independent of each other).
    - **C2 clamp:** see threshold semantics above (R1).
    - **Glob overrides:** each entry in `overrides` supplies independent `bytes`/`lines`/`tokens`
      thresholds for a pattern, falling back to top-level options for unspecified metrics.

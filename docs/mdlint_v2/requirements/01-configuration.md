@@ -12,7 +12,7 @@
 | **C2** | Per-rule `severity` override (`error`/`warning`/`off`)    | ✅ Accepted | Severity resolved at orchestration, not baked into the rule (see [Phase 2 / rule engine](02-rules-engine.md)).                                                     |
 | **C3** | Single canonical rule ID (`REF-001`) in config and output | ✅ Accepted | Accept case-insensitive, dash-optional input; emit canonical.                                                                                                      |
 | **C4** | JSONC (comments + trailing commas), file stays `.json`    | ✅ Accepted | Tolerant parser (e.g. `jsonc-parser`). No code execution → still honors D2 (JSON-only).                                                                            |
-| **C5** | Top-level `settings.siteRouter` inherited by rules        | ✅ Accepted | Per-rule override allowed. DRY for SSG routing.                                                                                                                    |
+| **C5** | Top-level `settings.siteRouter` inherited by rules        | ✅ Accepted | Per-rule override allowed (shipped on `REF-001`/`REF-002` only — see C5 below). DRY for SSG routing.                                                               |
 | **C6** | Presets / `extends`                                       | ⛔ Deferred | Revisit if `init` + manual config benefit from a shared preset source.                                                                                             |
 | **C7** | Rich config diagnostics (did-you-mean, option path)       | ✅ Accepted | Cheap DX win.                                                                                                                                                      |
 | **C8** | `respectGitignore` flag                                   | ✅ Accepted | Default `false`; opt-in to skip vendored/generated docs.                                                                                                           |
@@ -88,6 +88,10 @@
   across `REF-001`/`GRP-001`/`GRP-002`. v2 lifts it to `settings.siteRouter`,
   inherited via `RuleContext`, with per-rule override. Single source of truth for
   SSG routing. → requires `RuleContext` to carry resolved `settings` (Phase 2).
+  As shipped, the per-rule override exists on `REF-001`/`REF-002` only: the graph
+  rules never read a router themselves, they read the shared graph, whose edges the
+  builder already resolved from `settings.siteRouter` — so their own key was a no-op
+  and was removed ([P11.13](../P11-remediation/13-grp-size-hygiene.md)).
 
 - **C7 — diagnostics.** Unknown rule → `did you mean REF-001?`; bad options → exact
   path (`rules[3].options.idPattern: expected valid RegExp`). Turns the spec's

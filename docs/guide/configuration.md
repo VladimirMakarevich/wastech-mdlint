@@ -89,8 +89,10 @@ See the [rules index](rules/README.md) for every rule's options.
 ### `settings.siteRouter`
 
 Teaches reference rules how a docs-site framework maps URLs to files (e.g. Astro Starlight).
-Reference rules ([REF-001](rules/REF-001.md), [REF-002](rules/REF-002.md), graph rules) inherit it
-and may override it per rule.
+[REF-001](rules/REF-001.md) and [REF-002](rules/REF-002.md) inherit it and may override it per rule.
+The graph rules ([GRP-001](rules/GRP-001.md), [GRP-002](rules/GRP-002.md)) pick it up through the
+shared [context graph](context-graph.md), which resolves its edges with this setting — they have no
+per-rule override of their own.
 
 ```jsonc
 "settings": {
