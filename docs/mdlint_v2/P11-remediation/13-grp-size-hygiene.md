@@ -1,7 +1,7 @@
 # P11.13 · Retire dead `GRP` options; collapse duplicate `SIZE-001`
 
 > Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** ·
-> Status **Not started**. Findings **SC-1** and **SC-2**
+> Status **Done**. Findings **SC-1** and **SC-2**
 > ([`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md), Low, confirmed).
 
 ## Goal
@@ -45,7 +45,57 @@ per-rule graph re-scoping for `GRP` — out of scope unless a maintainer chooses
 
 ## Exit criteria
 
-- [ ] `GRP-001`/`GRP-002` no longer accept options they ignore (removed), or the options are honored (wired) — decided and recorded.
-- [ ] `SIZE-001` does not emit two same-severity findings for one metric under a `severity` override.
-- [ ] Regression tests cover the chosen `GRP` behavior and the `SIZE-001` override case.
-- [ ] `npm run typecheck && npm run lint && npm run format && npm test && npm run build` green.
+- [x] `GRP-001`/`GRP-002` no longer accept options they ignore (removed), or the options are honored (wired) — decided and recorded.
+- [x] `SIZE-001` does not emit two same-severity findings for one metric under a `severity` override.
+- [x] Regression tests cover the chosen `GRP` behavior and the `SIZE-001` override case.
+- [x] `npm run typecheck && npm run lint && npm run format && npm test && npm run build` green.
+
+## Implementation notes
+
+- **`GRP` direction: removed, not wired** (the task's stated preference). `GRP-001`'s options schema
+  is now `z.object({}).strict()` — it dropped `siteRouter` **and** the shared `files`/`exclude`
+  shape — and `GRP-002` dropped `siteRouter` while keeping `entryPoints`/`files`/`exclude`, which it
+  genuinely honors as _reporting_ scope. The decisive argument against wiring: rule options are
+  validated and closed over before the orchestrator builds the graph
+  ([P4.06](../P4-graph/06-grp-refactor-coverage.md) records the same constraint for `settings.idRef`
+  vs `REF-005`), so no per-rule key can reach `buildContextGraph` at all. The keys were
+  _unwireable_, not merely unwired; per-rule graph scoping is a graph-scoping design, not a schema
+  key. Rejected alternative: reinterpreting `GRP-001.files`/`exclude` as report scoping the way
+  `GRP-002` does — cheap, but the semantics for a cycle spanning in-scope and out-of-scope members
+  are ambiguous, and [P12.01](../P12-consistency/01-exclude-coverage.md) requires `exclude`
+  coverage for `GRP-002` only, so removal leaves no downstream gap. Corpus narrowing stays with the
+  top-level `include`/`exclude`.
+- **This is a deliberate breaking config change.** A config carrying `GRP-001.files` (or either
+  rule's `siteRouter`) now fails the whole run with `CONFIG_INVALID` naming the offending key,
+  instead of being silently ignored. That is the point of SC-1 — strict validation should not
+  advertise a no-op — and it lands pre-`P-release`.
+- **`SIZE-001` went broader than the override case, on purpose.** Deliverable 2 offered an
+  override-aware suppression _or_ a doc-only note, but exit criterion 2 ("does not emit two
+  same-severity findings … under a `severity` override") rules the doc-only branch out, and the
+  override-aware branch is not implementable where it belongs: `severityOverride` lives on
+  `ResolvedRule` and is applied by the runner (`engine/run-rules.ts`), so `RuleContext` would have
+  to expose it — a public contract change that lets rules branch on configured severity, which is
+  exactly what [R1](../requirements/02-rules-engine.md) (severity resolved by the orchestrator, not
+  baked into the rule) exists to prevent. An engine-level dedup was already rejected by
+  [P11.11](11-llm-dedup.md). So the rule now emits **one finding per metric** — the error breach
+  supersedes the warn breach — which covers the override case and the no-override case with one
+  branch and no contract change. Suppression is lossless: both reports always shared one `data`
+  object, so the surviving finding still carries `warnAt` and `errorAt`. Metrics remain independent
+  of one another.
+- **Cost, recorded explicitly:** this supersedes P3.07's documented "both may fire for the same
+  metric" behavior ([P3-rules/07](../P3-rules/07-llm-rules.md) now carries the supersession note).
+  Warning counts drop where a file crossed both thresholds; exit codes cannot regress, since the
+  surviving finding is the more severe one and trips any `--fail-on` threshold the warning would
+  have.
+- **Requirement rows reconciled, following [P10.06](../P10-consistency/06-requirement-reconciliation.md).**
+  [C5](../requirements/01-configuration.md) listed `GRP-001`/`GRP-002` among the rules whose
+  `siteRouter` `settings.siteRouter` replaces "with per-rule override", [R7](../requirements/02-rules-engine.md)
+  omitted `GRP-001` from its list of rules that skip `files`/`exclude`, and
+  [R5](../requirements/02-rules-engine.md) still described `buildContextGraph` as extended with
+  `exclude`/`entryPoints`/`siteRouter`. Each row now states the shipped surface instead: per-rule
+  `siteRouter` on `REF-001`/`REF-002` only, and a builder whose only options are
+  `siteRouter`/`idRef` — the R5 fields were dropped from `BuildContextGraphOptions` back at P4.06
+  because the graph is corpus-wide by design. The requirement text is reconciled, not overruled:
+  the _intent_ (one router setting, one graph) is unchanged; only the rule list was stale.
+  The `[P4]` deferral in [`p1-p3-execution-notes.md`](../p1-p3-execution-notes.md) is likewise
+  marked closed-by-removal, since it recorded per-rule graph re-scoping as pending work.

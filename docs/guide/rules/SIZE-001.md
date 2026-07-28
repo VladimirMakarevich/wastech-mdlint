@@ -70,8 +70,8 @@ beta
 gamma
 ```
 
-→ Two newlines and ~15 characters (~4 estimated tokens). This trips the `tokens` warn budget
-(4 > 2) but stays under both line thresholds — see below for how each metric fires on its own.
+→ Three newlines and 17 characters (5 estimated tokens). This trips the `tokens` warn budget
+(5 > 2) but stays under both line thresholds — see below for how each metric fires on its own.
 
 ### Fails
 
@@ -89,17 +89,21 @@ ten
 eleven
 ```
 
-→ SIZE-001 reports at line 0 that the file **exceeds the lines error budget** (11 lines > 10)
-_and_ separately that it **exceeds the tokens warn budget**. The `lines` metric emits an `error`
-finding because the `error` threshold was crossed; `tokens` emits a `warning`.
+→ Exactly **two** findings at line 0: the file **exceeds the lines error budget** (11 lines > 10)
+and, separately, **exceeds the tokens warn budget**. The `lines` metric emits a single `error`
+finding — 11 lines is also over the `warn` threshold of 5, but the error breach supersedes it (see
+below) — while `tokens` emits a `warning`.
 
-### Per-metric, per-severity firing
+### One finding per metric; metrics stay independent
 
-Warn and error fire independently within a metric, and metrics are evaluated independently of one
-another. A file that is over both the `warn` and the `error` line thresholds produces **two**
-findings for the line metric — one `warning` and one `error` — because each threshold is checked
-on its own. This is why the finding's severity comes from _which threshold was crossed_, not from
-the rule's default severity.
+Each metric is evaluated on its own, so a file can produce a `lines` finding and a `tokens` finding
+at once. Within a single metric, though, only the **highest crossed threshold** is reported: a file
+over both the `warn` and the `error` line budget yields **one** `error` finding, not a warning and
+an error for the same metric. The surviving finding's `data` still names both thresholds
+(`warnAt`, `errorAt`), so nothing is lost.
+
+This is why the finding's severity comes from _which threshold was crossed_, not from the rule's
+default severity.
 
 ### Different budgets for specific files
 
@@ -125,9 +129,10 @@ no override use the top-level budgets unchanged.
 ## Notes
 
 - **Scope:** `document` — evaluated per file, independent of other files.
-- **Severity is per finding.** The `warning`/`error` split comes from which threshold was crossed,
-  not from the rule's default severity. A configuration `severity` override still clamps the
-  emitted severity through the runner.
+- **Severity is per finding.** The `warning`/`error` split comes from the highest threshold crossed
+  for that metric, not from the rule's default severity. A configuration `severity` override still
+  clamps the emitted severity through the runner — and because a metric emits at most one finding,
+  the clamp can never turn one over-budget metric into two same-severity messages.
 - **Metrics are opt-in.** A metric with no configured thresholds is never measured, so an empty
   `options` object reports nothing.
 - **Overrides are first-match.** Only the first `overrides` entry that matches a file applies; it

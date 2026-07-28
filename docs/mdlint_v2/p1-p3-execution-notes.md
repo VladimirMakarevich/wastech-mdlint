@@ -117,6 +117,9 @@
 - [P4.07] Богатый `graph`/`slice`/`impact` CLI (сейчас `graph` выводит ContextGraph JSON как
   временную замену), `--format mermaid|dot` (G9), query-слой (G2), coverage-сигнал (G5).
 - [P4] GRP-001 files?/exclude?/siteRouter? — ре-скоуп общего графа per-rule (сейчас не влияют).
+  **Закрыто в [P11.13](P11-remediation/13-grp-size-hygiene.md): ключи удалены, а не подключены** —
+  опции правила запечатываются до сборки графа, поэтому per-rule ре-скоуп требует отдельного
+  дизайна графа, а не схемного ключа.
 - [P3/P8] Fix для SEC-002 (reorder) и SEC-003 (project template scaffold) — сейчас `fixable:false`
   (небезопасно/не document-scope). --fix движок пока только document-scope.
 - [P5] `describeRules` из метаданных (источник готов — `ruleRegistry.getAllMetadata()`),

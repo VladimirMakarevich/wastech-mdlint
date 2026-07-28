@@ -9,17 +9,12 @@ import { fileScopeShape, matchesFileScope } from "./scope.js";
 // Graph-integrity rules (P3.06). GRP-001/002 read the injected ContextGraph (audit 2.2) — no local
 // adjacency. GRP-003 is graph-independent (walks chain columns).
 
-const siteRouterOptionSchema = z
-  .object({
-    preset: z.string().optional(),
-    contentDir: z.string().optional(),
-    defaultLocale: z.string().optional(),
-  })
-  .strict();
-
-// GRP-001 — no circular references. Reads the graph's explicit cycle list (G6). `files`/`exclude`/
-// `siteRouter` are accepted for forward-compat but do not re-scope the shared corpus-wide graph in
-// P3 (journal [P3.06]).
+// GRP-001 — no circular references. Reads the graph's explicit cycle list (G6). It takes no options:
+// the graph is corpus-wide by construction, and a resolved rule's options are closed over before the
+// orchestrator builds the graph ([P4.06]), so no per-rule key can reach `buildContextGraph`. The
+// `files`/`exclude`/`siteRouter` keys this schema used to accept were therefore unwireable, not
+// merely unwired — per-rule graph scoping needs a graph-scoping design, not a schema key, so they
+// were removed rather than left validating into a no-op ([P11.13]).
 export const grp001: RuleDefinition = defineRule({
   metadata: {
     id: "GRP-001",
@@ -29,12 +24,7 @@ export const grp001: RuleDefinition = defineRule({
     scope: "project",
     fixable: false,
   },
-  optionsSchema: z
-    .object({
-      siteRouter: siteRouterOptionSchema.optional(),
-      ...fileScopeShape,
-    })
-    .strict(),
+  optionsSchema: z.object({}).strict(),
   check: () => (context) => {
     const graph = context.graph;
     if (graph === undefined) {
@@ -57,7 +47,10 @@ export const grp001: RuleDefinition = defineRule({
   },
 });
 
-// GRP-002 — every document has ≥1 incoming reference, except declared entry points.
+// GRP-002 — every document has ≥1 incoming reference, except declared entry points. `files`/`exclude`
+// are honored below as *reporting* scope (an out-of-scope file still contributes its outgoing edges);
+// `siteRouter` was removed with GRP-001's dead keys ([P11.13]) since the shared graph already resolves
+// routes from `settings.siteRouter`.
 export const grp002: RuleDefinition = defineRule({
   metadata: {
     id: "GRP-002",
@@ -71,7 +64,6 @@ export const grp002: RuleDefinition = defineRule({
   optionsSchema: z
     .object({
       entryPoints: z.array(z.string()).optional(),
-      siteRouter: siteRouterOptionSchema.optional(),
       ...fileScopeShape,
     })
     .strict(),

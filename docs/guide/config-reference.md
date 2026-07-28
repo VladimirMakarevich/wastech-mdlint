@@ -240,22 +240,15 @@ generated schema (`wastech-mdlint schema`).
     },
 
     // ── GRP — graph integrity (all project scope) ───────────────────────────────────────────
-    // GRP-001: no circular references between documents.
-    {
-      "rule": "GRP-001",
-      "options": {
-        "siteRouter": { "preset": "starlight" },
-        "files": [],
-        "exclude": [],
-      },
-    },
+    // GRP-001: no circular references between documents. Takes no options — the graph is corpus-wide
+    // (narrow it with the top-level include/exclude); any options key is a config error.
+    { "rule": "GRP-001" },
     // GRP-002: documents have at least one incoming reference (except entry points).
     {
       "rule": "GRP-002",
       "options": {
         "entryPoints": ["README.md", "docs/index.md"], // roots exempt from the orphan check
-        "siteRouter": { "preset": "starlight" },
-        "files": [],
+        "files": [], // scopes reporting only; the graph stays corpus-wide
         "exclude": [],
       },
     },
@@ -283,7 +276,8 @@ generated schema (`wastech-mdlint schema`).
     },
 
     // ── SIZE / LLM — context hygiene ────────────────────────────────────────────────────────
-    // SIZE-001: file stays within byte/line/token budgets. Each metric has independent warn/error.
+    // SIZE-001: file stays within byte/line/token budgets. Metrics are independent; within one
+    // metric the highest crossed threshold is reported (one finding per metric).
     {
       "rule": "SIZE-001",
       "options": {
@@ -355,7 +349,8 @@ generated schema (`wastech-mdlint schema`).
   assertion kinds (`requiredColumns`, `columnNotEmpty`, `columnInSet`, `columnMatches`,
   `columnUnique`, `crossColumn`, `sectionPresent`, `sectionOrder`, `contentNotMatch`,
   `noPlaceholders`, `allChecked`, `linkResolves`, `imageResolves`).
-- `siteRouter` shown on individual REF/GRP rules **overrides** `settings.siteRouter` for that rule;
-  most projects set it once under `settings`.
+- `siteRouter` shown on individual REF rules (REF-001/REF-002 only) **overrides**
+  `settings.siteRouter` for that rule; most projects set it once under `settings`. The graph rules
+  read it only through the shared graph, so they take no `siteRouter` of their own.
 - Rules that operate over the whole corpus (identity/graph rules) may intentionally omit
   `files`/`exclude` — see each rule's page for its exact option set.

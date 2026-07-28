@@ -211,7 +211,9 @@ The engine ships **24 registered built-ins across 8 categories** plus the declar
 - **GRP (graph integrity, 3)** — `GRP-001` no cycles _(project)_ · `GRP-002` no orphan docs
   _(project)_ · `GRP-003` ID chain across stages _(project)_.
 - **SIZE (`SIZE-001`, 1)** — File within byte / line / token budgets (per-metric warn/error
-  thresholds). A preserved LLM-hygiene rule. Decision [D3](index.md).
+  thresholds). Metrics are independent, but a metric emits **one** finding, from the highest
+  crossed threshold ([P11.13](P11-remediation/13-grp-size-hygiene.md)). A preserved LLM-hygiene
+  rule. Decision [D3](index.md).
 - **LLM (`LLM-001`, 1)** — Eager-import context within a per-entrypoint token budget. A
   preserved LLM-hygiene rule. Decision [D3](index.md).
 
@@ -226,7 +228,9 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
   (Decision [R7](requirements/02-rules-engine.md), type `FileScope`): a rule that opts in runs
   on a file when it matches the rule's `files` and not its `exclude` (`exclude` wins, the
   per-rule form of C1). Identity/whole-corpus rules (REF-001/003/004/005, LLM-001) intentionally
-  omit it; the P3 task tables are authoritative on which rules take it. Glob semantics are
+  omit it, as does `GRP-001`, whose graph is corpus-wide and unreachable from rule options
+  ([P11.13](P11-remediation/13-grp-size-hygiene.md)); `GRP-002` keeps it as _reporting_ scope only.
+  The P3 task tables are authoritative on which rules take it. Glob semantics are
   picomatch with `{ dot: true }`, so dotfiles such as `.claude/…` match.
 - **Zone / Dependencies section (REF-004)** — A **zone** is a top-level docs area: the first
   directory segment under the configured `zonesDir` (a file lives at `<zonesDir>/<zone>/…`). A
@@ -297,7 +301,9 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
   Decision [C5](requirements/01-configuration.md).
 - **`settings.siteRouter`** — SSG routing config (`preset` e.g. `starlight`, `contentDir`,
   `defaultLocale`) inherited by reference rules so root-relative links resolve the way the
-  site serves them; per-rule override allowed.
+  site serves them; per-rule override allowed on `REF-001`/`REF-002` only — the graph rules
+  read it through the shared graph, which the builder resolves from this setting
+  ([P11.13](P11-remediation/13-grp-size-hygiene.md)).
 - **`settings.idRef`** — `{ idPattern, definitions, idColumn }`, feeds the shared context
   graph's `id-ref` edges. Mirrors `REF-005`'s options but is configured separately because a
   resolved rule cannot expose its options back to the graph builder — a project wanting both
