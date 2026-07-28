@@ -224,15 +224,18 @@ function sumPatterns(patterns: DetectedPatterns[]): DetectedPatterns {
 type SampleCycle = string[];
 
 // Cross-cluster cycle heuristic (global, not per-cluster): a small bounded DFS over the combined
-// sample-file map (N is at most a few clusters * sample size, so no explicit bound is needed) that
-// stops at the first back-edge and returns the full path from that edge's target back to the
-// current node. This is an explicit approximation over samples only, used solely to make the
-// GRP-001 rationale concrete — the real GRP-001 check still runs later over the full corpus via
-// buildContextGraph. Edge resolution must share the real pipeline's semantics
-// (`resolveTargetCandidates`, the same helper REF-001/002 and the graph builder use) or this
-// heuristic can fabricate an edge — e.g. misresolving a root-relative link as source-relative, or
-// treating a broken anchor as a same-target edge — that the shared graph would never actually
+// sample-file map (N is at most a few clusters * sample size, so neither an explicit iteration bound
+// nor a stack-depth guard is needed) that stops at the first back-edge and returns the full path
+// from that edge's target back to the current node. This is an explicit approximation over samples
+// only, used solely to make the GRP-001 rationale concrete — the real GRP-001 check still runs later
+// over the full corpus via buildContextGraph. Edge resolution must share the real pipeline's
+// semantics (`resolveTargetCandidates`, the same helper REF-001/002 and the graph builder use) or
+// this heuristic can fabricate an edge — e.g. misresolving a root-relative link as source-relative,
+// or treating a broken anchor as a same-target edge — that the shared graph would never actually
 // create.
+//
+// `visit` below recurses, but only ever over sampled files, so the corpus-wide depth bound
+// documented on `detectCycles` (P12.05, finding SC-3) cannot be reached from here.
 function findSampleCycle(
   sampleDocs: Map<string, ParsedDocument>,
 ): SampleCycle | undefined {

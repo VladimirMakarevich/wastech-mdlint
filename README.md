@@ -335,6 +335,10 @@ node packages/cli/dist/index.js lint . --fail-on warning   # fail CI on warnings
 - No external HTTP link checking or link caching.
 - No runtime `.ts`/`.cjs`/`.mjs` config or user-code plugins (custom rules are data-only).
 - The context graph is rebuilt each run (no incremental cache yet).
+- Cycle detection is recursive, so a single connected component of many thousands of documents
+  can exhaust the call stack — a densely cross-linked component descends about as deep as a long
+  chain would. Many small components are fine at any corpus size; see
+  [context graph limitations](docs/guide/context-graph.md#limitations).
 - Dangling reference-style links (`[text][missing]` with no matching `[missing]: url`
   definition) are parsed as literal text, not a link, so `REF-001` never sees them — this
   matches GitHub's own rendering and is intentional, not a gap. See

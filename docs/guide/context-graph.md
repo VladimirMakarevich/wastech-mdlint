@@ -91,3 +91,12 @@ GRP-001/GRP-002.
 - The graph is rebuilt each run (no incremental cache yet).
 - `id-ref` edges are scanned from raw content, so an ID inside a code fence can still create an
   edge (a tracked limitation; see the roadmap's post-audit remediation).
+- Cycle detection walks the graph recursively, so its depth is the longest simple path the traversal
+  takes inside one **connected component**. In a densely cross-linked component that depth
+  approaches the component's document count, with no long authored chain involved — so the
+  assumption is that no single connected component runs to many thousands of documents. Many small
+  components are fine
+  however large the corpus is — the traversal restarts, and the stack unwinds, at each one. As an
+  order of magnitude, a linear chain overflowed at roughly 4,750 documents on one machine; the exact
+  figure depends on platform and stack size. Chains of 1,000 are covered by tests; far past the limit
+  the run fails with a stack-overflow error rather than a normal report.

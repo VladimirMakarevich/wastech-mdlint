@@ -259,6 +259,20 @@ export function buildContextGraph(
 // component and canonicalized (rotated to its lexicographically smallest start) for stable, deduped
 // output. Multiplicity-insensitive: parallel edges between the same pair collapse to one adjacency
 // entry below, so retaining edge multiplicity (P4.01) does not change cycle detection.
+//
+// DEPTH BOUND (P12.05, audit finding SC-3): `strongConnect` recurses once per node along the current
+// DFS path, so its stack depth is the longest *simple DFS path inside one connected component* —
+// bounded by that component's node count, not by the length of any authored chain. A densely
+// cross-linked component descends about as deep as a linear chain of the same size, so the assumption
+// v2 documents is "no single connected component of many thousands of documents". Total corpus size
+// is not itself the limit: the loop below restarts at each unvisited root, so the stack unwinds fully
+// between components. Order of magnitude only — a linear-chain probe overflowed at ~4,750 nodes on a
+// cold Node 24 main thread (higher once JIT-warmed, and stack size varies by platform);
+// `build-context-graph.test.ts` pins a 1,000-deep chain as the depth v2 promises. Past the limit the
+// run raises `RangeError: Maximum call stack size exceeded` instead of a structured diagnostic —
+// accepted for v2. Rewriting this as an explicit worklist is deliberately deferred: `cyclePath`'s
+// `walk` recurses to SCC size and would preserve the same bound, so the change would buy
+// Tarjan-regression risk without changing the guarantee.
 function detectCycles(
   nodePaths: string[],
   edges: readonly ContextGraphEdge[],
@@ -335,6 +349,11 @@ function detectCycles(
 
 // Find a concrete cycle through an SCC starting at its smallest node, returned as a closed path
 // (start repeated at the end).
+//
+// `walk` backtracks over simple paths inside a single SCC, so its stack depth is bounded by that
+// SCC's member count — a strictly smaller bound than `strongConnect`'s above, since reaching it needs
+// thousands of documents *mutually reachable* in one component, not merely one long cycle. Same
+// accepted v2 limitation (P12.05); see the note on `detectCycles`.
 function cyclePath(
   component: string[],
   adjacency: Map<string, string[]>,

@@ -51,6 +51,14 @@ type EntrypointTraversal = {
 
 // Depth-first traversal of eager imports from one entrypoint, collecting reachable files, missing
 // imports, and cycles (dedup per entrypoint).
+//
+// `visit` recurses once per hop along the current DFS path through the eager-import graph, so its
+// stack depth is bounded by how many files one entrypoint transitively imports — not by any single
+// authored chain, since `visited` is never unwound and a branching import tree descends just as far.
+// Both are single digits in practice: `@path` imports are hand-authored, not a corpus-wide link
+// graph. `visited`/`stack` already stop a cycle from recursing forever. The same accepted "no explicit
+// depth guard" bound as the graph traversals applies (P12.05, finding SC-3), but this is the least
+// exposed of the four sites.
 function traverse(
   entrypoint: string,
   documents: Map<string, ParsedDocument>,
