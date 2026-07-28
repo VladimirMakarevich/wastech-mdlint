@@ -41,6 +41,14 @@ against explicit rules _without_ touching the filesystem (the `lint` tool takes 
 
 The agent fills in `Usage` and replaces the `TODO` before saving.
 
+An entry can also be a declarative [`custom`](../rules/custom.md) rule
+(`{ "rule": "custom", "id": "REQ-OWNER", "options": { "assert": … } }`), so the agent can check a
+project invariant on a draft even when no such rule is in the config yet — it is pure data, so
+nothing is loaded or executed to run it. Two things follow from `lint` taking literal content: the
+document is a single synthetic file named `content.md`, so an `options.files` glob aimed at a real
+directory matches nothing, and a corpus-wide assert like `columnUnique` can only see duplicates
+inside the submitted content. Use `lint-files` when the check has to span the repo.
+
 **Step 2 — lint the whole project after editing.** Uses the resolved config (or the zero-config
 `**/*.md` default):
 

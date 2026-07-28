@@ -55,6 +55,9 @@
   matches the reference); no HTTP/SSE. The server executes **declarative custom rules**
   (pure data) but **never loads Tier-2 code-plugins** — an explicit security boundary from
   [R9](02-rules-engine.md), since the server runs inside an agent context.
+  Both lint paths honor declarative custom rules: `lint-files` picks them up from the loaded
+  config, and ad-hoc `lint` accepts one as a `rules` entry
+  ([P12.04](../P12-consistency/04-mcp-custom-rules.md)). Neither path loads code.
 
 ## Deferred (backlog, next version)
 

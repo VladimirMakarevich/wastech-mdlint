@@ -34,7 +34,7 @@ Readiness is announced on stderr; stdout carries only the protocol.
 
 | Tool              | What it does                                                                                                                                                            | Structured output    |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| `lint`            | Lint ad-hoc Markdown content against an explicit set of rules; it does not load project config.                                                                         | yes                  |
+| `lint`            | Lint ad-hoc Markdown content against an explicit set of built-in or declarative `custom` rules; it does not load project config.                                        | yes                  |
 | `lint-files`      | Lint the project's Markdown files using the resolved config (or the zero-config `**/*.md` default).                                                                     | yes                  |
 | `context-graph`   | Build the project's context graph; `format: "json"` (default) returns raw nodes/edges/cycles, `format: "summary"` returns nodes/edges/components/reading order.         | yes                  |
 | `context-slice`   | Files reachable within `depth` hops of a resolved query (exact match against IDs, heading/anchor slugs, file paths — no fuzzy/keyword/LLM matching).                    | yes                  |
@@ -50,6 +50,14 @@ MCP errors use a structured `{ code, message, hint }` contract, with sanitized `
 messages. The CLI maps the same core error taxonomy to stderr + exit codes, so both hosts behave
 consistently — they are thin adapters over one pipeline, not separate implementations.
 
+One limit is worth knowing: the contract covers failures the tool itself detects. An argument shape
+that the tool's advertised `inputSchema` rejects outright — a misspelled `assert.kind`, an unknown
+key, a bad `severity` value — is refused by the MCP protocol layer before the tool runs, so it comes
+back as the protocol's own validation text without a `{ code, message, hint }` payload. That
+message still names the offending path and the values it expected, and the mistakes that need
+guiding advice (an incomplete `custom` entry, an unknown rule ID, invalid rule options) are
+deliberately let through to the tool so they can carry it.
+
 ## Boundaries
 
 - **stdio only**, **read-only**, **local** — no network, no external HTTP link checking.
@@ -59,3 +67,8 @@ consistently — they are thin adapters over one pipeline, not separate implemen
   absolute path or a `..`-escaping relative path is rejected rather than followed. The tool takes
   its whole `rules` array from the caller, so this containment is what keeps a read-only linter from
   becoming a host file-read primitive for a caller acting on untrusted input.
+- A `rules` entry is either a built-in rule id or a full declarative
+  [custom rule](rules/custom.md) — `{ "rule": "custom", "id": …, "options": { "assert": … } }`. Those
+  are pure data; no code plugin is ever loaded. The content is linted as one synthetic document named
+  `content.md`, so an `options.files`/`exclude` glob that does not match that path selects nothing,
+  and a project-scope assert such as `columnUnique` only sees duplicates inside that one document.

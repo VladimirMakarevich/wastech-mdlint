@@ -63,7 +63,11 @@ Changing what a valid `custom` entry accepts, or the `target` optionality questi
   rejects it later via `resolveRule` as a structured `INVALID_INPUT` tool error — a different, already
   MCP-tested contract that [P12.04](../P12-consistency/04-mcp-custom-rules.md) decides whether to
   change. Narrowing `ruleEntrySchema` itself would have silently turned that MCP path into an
-  SDK-level input-validation failure instead. A `z.discriminatedUnion` was considered and rejected
+  SDK-level input-validation failure instead. **Superseded in part by
+  [P12.04](../P12-consistency/04-mcp-custom-rules.md)**: the tool's wire schema is now
+  `z.union([customRuleEntrySchema, ruleEntrySchema])` and a valid custom entry runs there, but this
+  reasoning stands unchanged — `ruleEntrySchema` stays permissive as that union's built-in branch so
+  a malformed custom entry still reaches the handler as `INVALID_INPUT`. A `z.discriminatedUnion` was considered and rejected
   for the union: `ruleEntrySchema.rule` is an open `z.string()` standing in for dozens of
   runtime-registered built-in IDs, not a compile-time literal enum, so zod's discriminated-union
   constructor would reject it.

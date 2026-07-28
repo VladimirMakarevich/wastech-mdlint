@@ -188,7 +188,7 @@ Add it to any stdio-based MCP host (Claude Code's `.mcp.json`, Claude Desktop's
 <!-- prettier-ignore -->
 | Tool | Description | Read-only | Structured output |
 | --- | --- | --- | --- |
-| `lint` | Lint ad-hoc Markdown content against an explicit set of rules. Does not load project config; file-resolving rules such as REF-001/REF-003, SEC-003 and STR-001 may probe or read paths inside the server's working directory; an absolute path or a `..`-escaping relative path is rejected rather than followed. | yes | yes |
+| `lint` | Lint ad-hoc Markdown content against an explicit set of rules. Does not load project config; file-resolving rules such as REF-001/REF-003, SEC-003 and STR-001 may probe or read paths inside the server's working directory; an absolute path or a `..`-escaping relative path is rejected rather than followed. Each entry is either a built-in rule id or a declarative `custom` rule (`rule: "custom"` plus `id` and `options.assert`); code plugins are never loaded. Rules see one synthetic document path, `content.md`, so an `options.files` or `options.exclude` glob that does not match that path selects nothing. | yes | yes |
 | `lint-files` | Lint the project's Markdown files using the resolved config (or the zero-config `**/*.md` default). Read-only. | yes | yes |
 | `context-graph` | Build the project's context graph. `format: "json"` (default) returns the raw graph (nodes, edges, cycles); `format: "summary"` returns nodes, edges, connected components, and topological reading order. Read-only. | yes | yes |
 | `context-slice` | Files reachable within `depth` hops of a resolved query, following graph edges forward. Resolves the query by exact match against defined IDs, heading/anchor slugs, and file paths — no fuzzy, substring, keyword, or LLM matching. Read-only. | yes | yes |
@@ -300,8 +300,8 @@ edit it by hand.
 
 <!-- END GENERATED RULES -->
 
-`custom` (not shown above) is resolved from config, so its id and behavior are
-project-defined.
+`custom` (not shown above) is resolved from config — or, for a one-off check, from a `rules`
+entry in an MCP `lint` request — so its id and behavior are project-defined.
 
 ## Inline suppression
 

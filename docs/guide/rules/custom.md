@@ -11,11 +11,14 @@ Each `custom` entry names one **assertion** from a closed, built-in vocabulary a
 target in your Markdown (a table, a section, content, a checklist, or links). The rule then reports
 findings exactly the way the matching built-in rule would.
 
-It is **data-only**: a `custom` rule is described entirely by JSON in your config. There is no code
-execution, no plugin loading, and no runtime `.ts`/`.cjs`/`.mjs` module — every assertion `kind`
-maps to a shared primitive that ships with the tool. This is why `custom` rules are safe to run
-inside the read-only MCP server, and why adding or changing one is **rebuild-free**: you edit
-config, not source.
+It is **data-only**: a `custom` rule is described entirely by JSON — there is no code execution, no
+plugin loading, and no runtime `.ts`/`.cjs`/`.mjs` module, because every assertion `kind` maps to a
+shared primitive that ships with the tool. That is what makes adding or changing one
+**rebuild-free** (you edit config, not source) and what makes `custom` rules safe to run inside the
+read-only [MCP server](../mcp-server.md): both MCP lint tools execute them — `lint-files` from the
+loaded config, and the ad-hoc `lint` tool from an entry passed inline in the request, so an agent
+can assert an invariant on a draft before that rule exists in config. The CLI runs them from config
+the same way.
 
 Use `custom` when a built-in rule does the right check but you want to run it under your own rule
 ID, with your own description and severity, scoped to a specific document family via `files` /
@@ -24,8 +27,9 @@ ID, with your own description and severity, scoped to a specific document family
 
 ## Required fields
 
-A `custom` entry is a config `rules[]` object. Unlike built-in rules (which are keyed by their ID
-in the `rule` field), a `custom` entry sets `rule: "custom"` and supplies its identity separately.
+A `custom` entry is a `rules[]` object — in your config, or inline in an MCP
+[`lint`](../mcp-server.md) request. Unlike built-in rules (which are keyed by their ID in the `rule`
+field), a `custom` entry sets `rule: "custom"` and supplies its identity separately.
 
 | Field             | Type                                                         | Required | Description                                                                                                                   |
 | ----------------- | ------------------------------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -185,7 +189,12 @@ placeholders plus `DRAFT`/`???` (same check as `CTX-001`, as a warning).
   being accepted as an ordinary rule entry named "custom". Forgetting `id` is the likeliest typo
   here, so it is worth the strictness — the entry can never silently degrade into something else.
   The diagnostic reports the whole entry's shape, not just the first missing field, because both
-  `id` and `options.assert` are needed before the rule can be resolved at all.
+  `id` and `options.assert` are needed before the rule can be resolved at all. The MCP ad-hoc
+  `lint` tool holds the same line, with wording of its own: an entry that commits to
+  `rule: "custom"` and then omits `id` comes back as an `INVALID_INPUT` tool error naming both
+  required keys. Shape errors deeper inside the entry (a misspelled `assert.kind`, say) are caught
+  a step earlier, by the tool's argument validation — see
+  [Error contract](../mcp-server.md#error-contract).
 
 ## See also
 

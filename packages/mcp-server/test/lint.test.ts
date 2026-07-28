@@ -76,16 +76,130 @@ describe("handleLint", () => {
     expect(structured(result).code).toBe("INVALID_INPUT");
   });
 
-  it("rejects a `custom` rule request as INVALID_INPUT", () => {
-    // Pins the deliberate non-support: no registry entry is id'd "custom"; the declarative
-    // custom-rule path (resolveCustomRule) is intentionally not reachable from ad-hoc lint.
+  it("runs a declarative document-scope custom rule (M8)", () => {
+    // P12.04 direction (A): a `custom` entry is pure data, so ad-hoc lint executes it exactly as
+    // `lint-files` would from config — no code plugin is ever loaded.
+    const result = handleLint({
+      content: "| ID | Owner |\n| --- | --- |\n| REQ-1 |  |\n",
+      rules: [
+        {
+          rule: "custom",
+          id: "REQ-OWNER",
+          options: { assert: { kind: "columnNotEmpty", column: "Owner" } },
+        },
+      ],
+    });
+
+    expect(result.isError).toBeFalsy();
+    const output = structured(result);
+    const messages = output.messages as LintMessage[];
+    expect(messages).toHaveLength(1);
+    // `error` is the default resolveCustomRule derives for a custom rule (it asserts an invariant).
+    expect(messages[0]).toMatchObject({
+      ruleId: "REQ-OWNER",
+      severity: "error",
+    });
+    expect(output.errorCount).toBe(1);
+  });
+
+  it("applies a `severity` override to a custom rule request", () => {
+    const result = handleLint({
+      content: "| ID | Owner |\n| --- | --- |\n| REQ-1 |  |\n",
+      rules: [
+        {
+          rule: "custom",
+          id: "REQ-OWNER",
+          severity: "warning",
+          options: { assert: { kind: "columnNotEmpty", column: "Owner" } },
+        },
+      ],
+    });
+
+    expect(result.isError).toBeFalsy();
+    const output = structured(result);
+    expect((output.messages as LintMessage[])[0]!.severity).toBe("warning");
+    expect(output.warningCount).toBe(1);
+  });
+
+  it("runs a project-scope custom assert (columnUnique) without tripping R4", () => {
+    // `columnUnique` is the one project-scope assert; the tool's corpus-of-one satisfies R4's
+    // fail-fast, so it must report intra-document duplicates instead of degrading to INTERNAL_ERROR.
+    // A corpus of one can only ever see duplicates *within* `content` — cross-file uniqueness needs
+    // `lint-files`.
+    const result = handleLint({
+      content: "| ID |\n| --- |\n| X-1 |\n| X-1 |\n",
+      rules: [
+        {
+          rule: "custom",
+          id: "UNIQUE-ID",
+          options: { assert: { kind: "columnUnique", column: "ID" } },
+        },
+      ],
+    });
+
+    expect(result.isError).toBeFalsy();
+    const messages = structured(result).messages as LintMessage[];
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({ ruleId: "UNIQUE-ID" });
+    expect(messages[0]!.message).toMatch(/Duplicate value "X-1"/);
+  });
+
+  it("maps a malformed `custom` entry to a guided INVALID_INPUT, not a schema crash", () => {
+    // The wire schema keeps a permissive branch precisely so this shape reaches the handler: the SDK
+    // validates input before the handler runs, so a wire rejection would surface as a bare protocol
+    // error with none of the M6 guidance. Also the boundary guard for P11.07's
+    // canonicalizeRuleId(undefined) crash, since `handleLint` is called directly here.
     const result = handleLint({
       content: "# Title\n",
       rules: [{ rule: "custom" }],
     });
 
     expect(result.isError).toBe(true);
-    expect(structured(result).code).toBe("INVALID_INPUT");
+    const output = structured(result);
+    expect(output.code).toBe("INVALID_INPUT");
+    expect(output.message).toMatch(/"id" and "options\.assert"/);
+    expect(output.hint).toContain("id");
+  });
+
+  it("rejects a custom id under a reserved built-in prefix (C7)", () => {
+    // resolveCustomRule's own RuleResolutionError must translate through the existing
+    // toToolInputError path rather than escaping as a sanitized INTERNAL_ERROR.
+    const result = handleLint({
+      content: "# Title\n",
+      rules: [
+        {
+          rule: "custom",
+          id: "REF-999",
+          options: { assert: { kind: "allChecked" } },
+        },
+      ],
+    });
+
+    expect(result.isError).toBe(true);
+    const output = structured(result);
+    expect(output.code).toBe("INVALID_INPUT");
+    expect(output.hint).toMatch(/reserved built-in prefix/);
+  });
+
+  it("selects nothing when a custom rule's `files` glob misses the synthetic path", () => {
+    // The document is always `content.md`, so a caller-supplied glob scoped to a directory silently
+    // matches no file — the foot-gun the tool description now discloses.
+    const result = handleLint({
+      content: "| ID | Owner |\n| --- | --- |\n| REQ-1 |  |\n",
+      rules: [
+        {
+          rule: "custom",
+          id: "REQ-OWNER",
+          options: {
+            files: ["docs/**/*.md"],
+            assert: { kind: "columnNotEmpty", column: "Owner" },
+          },
+        },
+      ],
+    });
+
+    expect(result.isError).toBeFalsy();
+    expect(structured(result).messages as LintMessage[]).toHaveLength(0);
   });
 
   it("returns a normal REF-001 finding (not INTERNAL_ERROR) for an unresolved link", () => {

@@ -52,7 +52,10 @@ Expose ad-hoc text lint and project file lint as MCP tools over core.
   finding, never a crash.
 - **Rule requests reuse core's `ruleEntrySchema`, so `severity` (including `"off"`) is honored.**
   This is a deliberate superset of "resolve via `resolveRule`": exposing the schema without
-  honoring the field it carries would be the worse foot-gun. `RuleResolutionError` is translated to
+  honoring the field it carries would be the worse foot-gun. (Superseded by
+  [P12.04](../P12-consistency/04-mcp-custom-rules.md): the wire schema is now
+  `z.union([customRuleEntrySchema, ruleEntrySchema])`, so a declarative `custom` entry runs here
+  too; `severity` handling is unchanged, both branches carry it.) `RuleResolutionError` is translated to
   the `INVALID_INPUT` taxonomy code at the MCP boundary (unknown rule / bad options), because those
   resolution codes are a different enum than `ToolErrorCode` and would otherwise degrade to a
   sanitized `INTERNAL_ERROR`, losing the "did you mean" hint.
