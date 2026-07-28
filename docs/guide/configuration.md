@@ -83,7 +83,13 @@ Each entry names a `rule` and may set `severity` and `options`:
 - The **same rule can appear multiple times** with different `files`/`exclude`/options — e.g. one
   [TBL-001](rules/TBL-001.md) column set for `docs/requirements/**` and another elsewhere.
 - Most document-scope rules accept `files` and `exclude` to narrow which files that instance
-  applies to. Some project/identity rules intentionally omit them (see the rule's page).
+  applies to. Some project/identity rules intentionally omit them (see the rule's page). Where a
+  rule takes both, `exclude` wins over `files`, mirroring the top-level pair — and the scope also
+  bounds `--fix`, so an excluded file is never rewritten either.
+- **Two rules reuse these names for something else**, so read the rule's page before assuming file
+  scope: [STR-001](rules/STR-001.md)'s `files` is the _required-file set_ it looks for (the point of
+  the rule, not a filter), and [REF-001](rules/REF-001.md)/[REF-003](rules/REF-003.md)'s `exclude`
+  skips link/image _targets_, not source documents. Neither rule takes file scope at all.
 
 See the [rules index](rules/README.md) for every rule's options.
 

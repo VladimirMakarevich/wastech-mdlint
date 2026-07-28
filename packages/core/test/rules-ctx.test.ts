@@ -1,10 +1,11 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { ConfiguredRule } from "../src/config/load-config.js";
+import { compareStrings } from "../src/deterministic-sort.js";
 import { lintFiles } from "../src/engine/lint-files.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
 
@@ -20,7 +21,11 @@ async function fixtureRepo(files: Record<string, string>): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-ctx-"));
   tempDirs.push(root);
   for (const [relativePath, content] of Object.entries(files)) {
-    await writeFile(path.join(root, relativePath), content, "utf8");
+    const absolutePath = path.join(root, relativePath);
+    // Nested fixtures are needed to exercise directory globs such as `drafts/**`; without this the
+    // write ENOENTs. Same upgrade the TBL/SEC/REF helpers already carry.
+    await mkdir(path.dirname(absolutePath), { recursive: true });
+    await writeFile(absolutePath, content, "utf8");
   }
   return root;
 }
@@ -155,4 +160,64 @@ describe("CTX-003 glossary aliases", () => {
     ]);
     expect(result.messages).toEqual([]);
   });
+});
+
+// Audit L-4, the CTX half of P12.01's `exclude` matrix. Both documents trip all three rules at once
+// (an empty section, an unchecked box, an alias); `glossary.md` has no headings and no checklist, so
+// it stays clean under CTX-001/CTX-002 and is self-skipped by CTX-003.
+const CONTENT_DOC = "## Empty\n\n## Tasks\n\n- [ ] wire gql\n";
+const GLOSSARY = "| Term | Aliases |\n| --- | --- |\n| GraphQL | gql |\n";
+
+const CTX_SCOPE_CASES: readonly { id: string; options: object }[] = [
+  { id: "CTX-001", options: {} },
+  { id: "CTX-002", options: {} },
+  {
+    id: "CTX-003",
+    options: {
+      glossary: "glossary.md",
+      termColumn: "Term",
+      aliasColumn: "Aliases",
+    },
+  },
+];
+
+describe("CTX file scope (exclude)", () => {
+  async function reportedFiles(
+    cwd: string,
+    configured: ConfiguredRule,
+  ): Promise<string[]> {
+    const result = await lint(cwd, [configured]);
+    return [
+      ...new Set(result.messages.map((message) => message.filePath)),
+    ].sort(compareStrings);
+  }
+
+  it.each(CTX_SCOPE_CASES)(
+    "$id drops an excluded document, with and without `files`",
+    async ({ id, options }) => {
+      const cwd = await fixtureRepo({
+        "glossary.md": GLOSSARY,
+        "docs/a.md": CONTENT_DOC,
+        "drafts/b.md": CONTENT_DOC,
+      });
+
+      expect(await reportedFiles(cwd, rule(id, options))).toEqual([
+        "docs/a.md",
+        "drafts/b.md",
+      ]);
+      // The M-2 shape — `exclude` with no `files` beside it to carry the filtering.
+      expect(
+        await reportedFiles(
+          cwd,
+          rule(id, { ...options, exclude: ["drafts/**"] }),
+        ),
+      ).toEqual(["docs/a.md"]);
+      expect(
+        await reportedFiles(
+          cwd,
+          rule(id, { ...options, files: ["**/*.md"], exclude: ["drafts/**"] }),
+        ),
+      ).toEqual(["docs/a.md"]);
+    },
+  );
 });

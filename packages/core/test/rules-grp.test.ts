@@ -133,6 +133,18 @@ describe("GRP-002 orphans", () => {
     ]);
     // draft.md silenced; a.md still non-orphan because the excluded file's edge survives.
     expect(withExclude.messages).toEqual([]);
+
+    // Same outcome with a `files` list beside it — `exclude` wins over `files` (C1), so the pairing
+    // cannot be what makes the filtering work (audit L-4: the exclude-only path above is the one M-2
+    // proved could rot untested).
+    const withBoth = await lint(await fixtureRepo(files), [
+      rule("GRP-002", {
+        entryPoints: ["index.md"],
+        files: ["**/*.md"],
+        exclude: ["draft.md"],
+      }),
+    ]);
+    expect(withBoth.messages).toEqual([]);
   });
 
   it("counts an anchor edge as an incoming reference, not just a plain link", async () => {

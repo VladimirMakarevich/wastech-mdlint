@@ -47,7 +47,11 @@ async function fixtureRepo(files: Record<string, string>): Promise<string> {
   );
   tempDirs.push(root);
   for (const [relativePath, content] of Object.entries(files)) {
-    await writeFile(path.join(root, relativePath), content, "utf8");
+    const absolutePath = path.join(root, relativePath);
+    // Nested fixtures let a scenario exercise directory globs such as `drafts/**`; without this the
+    // write ENOENTs.
+    await mkdir(path.dirname(absolutePath), { recursive: true });
+    await writeFile(absolutePath, content, "utf8");
   }
   return root;
 }
@@ -108,6 +112,32 @@ describe("lint command", () => {
     const result = await run(["lint", cwd], cwd);
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
     expect(result.stdout).toContain("No problems found.");
+  });
+
+  // Audit L-4: the per-rule `exclude` had no coverage past the engine. This proves it survives the
+  // whole path — JSONC parse → `resolveRule` → `lintFiles` → report — rather than being dropped at
+  // the config boundary, where a silent loss would look exactly like a clean repository.
+  it("honors a per-rule exclude written in the config file", async () => {
+    const table = ["| ID | Owner |", "| --- | --- |", "| REQ-1 |  |"].join(
+      "\n",
+    );
+    const cwd = await fixtureRepo({
+      "docs/a.md": table.replace("| REQ-1 |  |", "| REQ-1 | Ann |"),
+      "drafts/b.md": table,
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [
+          {
+            rule: "TBL-002",
+            options: { columns: ["Owner"], exclude: ["drafts/**"] },
+          },
+        ],
+      }),
+    });
+
+    const result = await run(["lint", cwd], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain("No problems found.");
+    expect(result.stdout).not.toContain("drafts");
   });
 
   it("emits structured JSON with --format json", async () => {

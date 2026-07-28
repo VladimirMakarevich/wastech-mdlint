@@ -67,6 +67,13 @@ wastech-mdlint lint . --fail-on warning     # fail CI on warnings too
 wastech-mdlint lint . --fix
 ```
 
+`--fix` writes only inside the scope of the rule instance that produced the fix: if a
+[SEC-001](rules/SEC-001.md) or [TBL-002](rules/TBL-002.md) entry sets `files`/`exclude`, files
+outside that scope are left byte-unchanged. The two surfaces are separate passes over the corpus,
+so "reported" and "rewritten" could in principle drift apart — they are held together
+deliberately, since a `--fix` that edited files the report never mentions would be the worst kind
+of surprise.
+
 See [Output](output.md) for the report shapes and [Suppression](suppression.md) for inline
 disables.
 

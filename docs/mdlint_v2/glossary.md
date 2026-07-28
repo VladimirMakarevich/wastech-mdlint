@@ -227,11 +227,19 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
   `rules/scope.ts`) available to every rule, but mixed in per-rule rather than universal
   (Decision [R7](requirements/02-rules-engine.md), type `FileScope`): a rule that opts in runs
   on a file when it matches the rule's `files` and not its `exclude` (`exclude` wins, the
-  per-rule form of C1). Identity/whole-corpus rules (REF-001/003/004/005, LLM-001) intentionally
-  omit it, as does `GRP-001`, whose graph is corpus-wide and unreachable from rule options
+  per-rule form of C1). Identity/whole-corpus rules (REF-001/003/004/005/006, LLM-001)
+  intentionally omit it, as do `GRP-001`, whose graph is corpus-wide and unreachable from rule
+  options, and `GRP-003`, which walks its own declared `chain` columns
   ([P11.13](P11-remediation/13-grp-size-hygiene.md)); `GRP-002` keeps it as _reporting_ scope only.
-  The P3 task tables are authoritative on which rules take it. Glob semantics are
-  picomatch with `{ dot: true }`, so dotfiles such as `.claude/…` match.
+  Two rules spell one of the keys without meaning file scope: `STR-001`'s `files` is the
+  _required-file set_ it checks for (above), and `REF-001`/`REF-003`'s `exclude` filters the
+  **link/image target** about to be probed, not the source document (neither rule takes file scope
+  at all). A declarative `custom` rule is where both meanings meet — `options.exclude` chooses the
+  documents scanned, `assert.exclude` the link targets skipped inside them — and they compose
+  independently. The P3 task tables are authoritative on which rules take the shared shape; the
+  pinned inventory lives in `packages/core/test/registry-inventory.test.ts`
+  ([P12.01](P12-consistency/01-exclude-coverage.md)). Glob semantics are picomatch with
+  `{ dot: true }`, so dotfiles such as `.claude/…` match.
 - **Zone / Dependencies section (REF-004)** — A **zone** is a top-level docs area: the first
   directory segment under the configured `zonesDir` (a file lives at `<zonesDir>/<zone>/…`). A
   **cross-zone link** points from one zone into another and must be declared in the source

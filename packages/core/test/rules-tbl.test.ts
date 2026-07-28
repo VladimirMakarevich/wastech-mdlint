@@ -13,6 +13,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { ConfiguredRule } from "../src/config/load-config.js";
+import { compareStrings } from "../src/deterministic-sort.js";
 import { applyEdits, applyFixes, FixWriteError } from "../src/engine/fix.js";
 import { lintFiles } from "../src/engine/lint-files.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
@@ -149,6 +150,80 @@ describe("TBL rules", () => {
     ]);
     expect(result.messages).toHaveLength(0);
   });
+
+  it("TBL-006 honors the same exclude alongside an explicit files list", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "| ID |\n| --- |\n| REQ-1 |\n",
+      "archive/old.md": "| ID |\n| --- |\n| REQ-1 |\n",
+    });
+    const result = await lint(cwd, [
+      rule("TBL-006", {
+        column: "ID",
+        files: ["**/*.md"],
+        exclude: ["archive/**"],
+      }),
+    ]);
+    expect(result.messages).toHaveLength(0);
+  });
+});
+
+// Audit L-4: the shared `files`/`exclude` shape had no end-to-end coverage on any document-scope
+// rule, which is how M-2 shipped. Both fixture documents violate every case below, so the only
+// variable across the three runs is the scope the rule was given.
+const FILE_SCOPE_CASES: readonly { id: string; options: object }[] = [
+  { id: "TBL-001", options: { requiredColumns: ["ID", "Priority"] } },
+  { id: "TBL-002", options: { columns: ["Owner"] } },
+  { id: "TBL-003", options: { column: "Status", values: ["open", "done"] } },
+  { id: "TBL-004", options: { column: "ID", pattern: "^BUG-" } },
+  {
+    id: "TBL-005",
+    options: {
+      when: { column: "Status", equals: "bogus" },
+      then: { column: "Owner", notEmpty: true },
+    },
+  },
+];
+
+describe("TBL file scope (exclude)", () => {
+  // Distinct paths rather than the raw message list: these runs ask *which documents the rule
+  // looked at*, and TBL-004 reports twice per file.
+  async function reportedFiles(
+    cwd: string,
+    configured: ConfiguredRule,
+  ): Promise<string[]> {
+    const result = await lint(cwd, [configured]);
+    return [
+      ...new Set(result.messages.map((message) => message.filePath)),
+    ].sort(compareStrings);
+  }
+
+  it.each(FILE_SCOPE_CASES)(
+    "$id drops an excluded document, with and without `files`",
+    async ({ id, options }) => {
+      const cwd = await fixtureRepo({
+        "docs/a.md": TABLE,
+        "drafts/b.md": TABLE,
+      });
+
+      expect(await reportedFiles(cwd, rule(id, options))).toEqual([
+        "docs/a.md",
+        "drafts/b.md",
+      ]);
+      // The M-2 shape — `exclude` with no `files` beside it to carry the filtering.
+      expect(
+        await reportedFiles(
+          cwd,
+          rule(id, { ...options, exclude: ["drafts/**"] }),
+        ),
+      ).toEqual(["docs/a.md"]);
+      expect(
+        await reportedFiles(
+          cwd,
+          rule(id, { ...options, files: ["**/*.md"], exclude: ["drafts/**"] }),
+        ),
+      ).toEqual(["docs/a.md"]);
+    },
+  );
 });
 
 describe("TBL-002 --fix", () => {
@@ -170,6 +245,32 @@ describe("TBL-002 --fix", () => {
 
     const after = await lint(cwd, [rule("TBL-002", { columns: ["Owner"] })]);
     expect(after.messages).toEqual([]);
+  });
+
+  // The fix path has its own scope gate because `applyFixes` has none: it walks every loaded
+  // document and calls each hook, so a hook that ignores `exclude` rewrites files the rule's own
+  // `check` never looked at. Found while writing P12.01's `exclude` matrix.
+  it("leaves an excluded file byte-unchanged on the --fix path", async () => {
+    const cwd = await fixtureRepo({ "docs/a.md": TABLE, "drafts/b.md": TABLE });
+    const scoped = rule("TBL-002", {
+      columns: ["Owner"],
+      exclude: ["drafts/**"],
+    });
+
+    const written = await applyFixes({
+      cwd,
+      config: { rules: [] },
+      rules: [scoped],
+      settings: {},
+    });
+    expect(written.fixedFiles).toEqual(["docs/a.md"]);
+
+    await expect(
+      readFile(path.join(cwd, "docs", "a.md"), "utf8"),
+    ).resolves.toContain("| REQ-2 | TODO | bogus |");
+    await expect(
+      readFile(path.join(cwd, "drafts", "b.md"), "utf8"),
+    ).resolves.toBe(TABLE);
   });
 
   // `emptyCellEdits` only ever edits *between* a row's pipes, so its offsets were already CRLF-safe
