@@ -30,6 +30,37 @@ Vitest-based test suite. For the meaning of the terms used here — fixtures, ru
 - Compile and init flows, including deterministic output and local `$schema` wiring.
 - Generated docs/schema sync checks where the roadmap requires generated metadata.
 
+## Process-Boundary Guards
+
+The [post-P9 audit](../../docs/mdlint_v2/audit-2026-07-25-post-p9.md) traced its missed HIGH
+findings to one systemic cause: **nothing tested the process boundary**. An entrypoint guard with 0%
+coverage, a shared option with no end-to-end test, and a write path never exercised against a
+failure all shipped broken while the in-process suite stayed green.
+
+These four categories are the standing answer. Each names a class of defect that in-process tests
+structurally cannot see, so a subsystem missing one is missing it visibly rather than silently.
+
+| Category              | What a guard in it must prove                                                                                                                                                                                                | Current guard(s)                                                                           |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `installed-bin-spawn` | The built entrypoint actually runs when spawned through an npm-style link, not just by its real path. Only a real process populates `process.argv[1]`, which is what the entrypoint guard compares against `import.meta.url` | `packages/cli/test/bin.e2e.test.ts`, `packages/mcp-server/test/bin-entrypoint.test.ts`     |
+| `write-failure`       | A write that fails partway leaves no temp file and no half-written target, and the command reports it and exits non-zero instead of claiming success                                                                         | `packages/core/test/atomic-write.test.ts`, `packages/cli/test/init.e2e.test.ts`            |
+| `shared-exclude`      | The shared `files`/`exclude` scope stays covered as rules and assert kinds are added, rather than a new one shipping unscoped                                                                                                | `packages/core/test/registry-inventory.test.ts`, `packages/core/test/rules-custom.test.ts` |
+| `determinism`         | Output does not depend on evaluation order or on state carried between calls — a `g`-flagged `RegExp`'s `lastIndex` being the case that shipped                                                                              | `packages/core/test/primitives.test.ts`                                                    |
+
+Rules for keeping this honest:
+
+- Each guard carries a `@boundary-guard <category>` comment at the guard itself.
+  `packages/core/test/boundary-guards.test.ts` asserts every category still has its tagged
+  guard, so deleting one fails the suite while renaming a test does not.
+- Adding a category here means adding it to that inventory too, and vice versa. Be aware which
+  half of that pairing a test can hold: the inventory pins its own category set, so growing it
+  fails until the author updates that list — which points back at this table — but the inventory
+  does not parse this file, so a row added here alone fails nothing. Keeping this table honest is
+  discipline, not enforcement, and it is the direction in which the table could start claiming
+  coverage the tree no longer has.
+- Behaviors a task decides to accept rather than guard belong in the
+  [accepted behaviors register](../../docs/mdlint_v2/accepted-behaviors.md), not in an untested gap.
+
 ## Cross-Platform Expectations
 
 - Treat Windows, macOS, and Linux support as a product requirement for `core`, `cli`, and
@@ -52,6 +83,21 @@ npm run build
 ```
 
 Run `npm run lint` and `npm run format` when the task or touched scope makes them relevant.
+
+Three facts about these gates that are easy to learn the hard way:
+
+- **Build before test.** The `installed-bin-spawn` suites spawn `dist/`, so run `npm run typecheck`
+  (which is `tsc -b`, and emits) or `npm run build` _first_. A bare `vitest run` on a checkout whose
+  source changed since the last build spawns a stale artifact; both suites `assertBuilt()` and fail
+  with that message rather than a confusing behavioral diff.
+- **Test files are never type-checked.** No tsconfig includes `test/**` — the packages are
+  `include: ["src/**/*.ts", …]` for their emit contract — so `npm run typecheck` does not read
+  them. A coverage guard written as a `satisfies` constraint in a test file therefore never runs;
+  write it as a runtime assertion instead.
+- **The format gate reaches documentation too.** `npm run format` is `prettier --check .`, which
+  covers every tracked Markdown file including `docs/`, so it must be run before committing a docs
+  deliverable, not only a code one. See the note in `AGENTS.md`'s Repository Hygiene for the remedy
+  and for what is deliberately outside the gate.
 
 ## Change Discipline
 

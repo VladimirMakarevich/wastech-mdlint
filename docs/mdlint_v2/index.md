@@ -185,7 +185,9 @@ with an explicit prev/next/depends/blocks chain). Effort is a rough T-shirt size
 [P-release Release](P-release/index.md)
 
 **Reference:** [Glossary](glossary.md) — the canonical vocabulary (public types, config
-keys, CLI/MCP surfaces, rule IDs, and this planning taxonomy) used across these docs.
+keys, CLI/MCP surfaces, rule IDs, and this planning taxonomy) used across these docs ·
+[Accepted behaviors](accepted-behaviors.md) — the register of behaviors deliberately documented
+rather than fixed, and the residuals recorded rather than closed.
 
 ### Phase 0 — Workspace & foundations · `M` · depends on: D1, D5
 

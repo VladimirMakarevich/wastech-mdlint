@@ -30,6 +30,11 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm run typecheck
+      # lint and format match the CI `verify` job's gate (P12.06): without them a red style gate
+      # could reach a `v*` tag through a direct push, since this workflow triggers on the tag rather
+      # than on the PR that CI gates.
+      - run: npm run lint
+      - run: npm run format
       - run: npm test
       - run: npm run build
       # --workspaces packs every publishable package (core, cli, mcp-server) in dry-run mode.

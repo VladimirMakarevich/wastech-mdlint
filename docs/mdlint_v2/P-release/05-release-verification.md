@@ -17,9 +17,12 @@ Prove the whole release works end-to-end across all three channels before taggin
 ## Deliverables / steps
 
 1. Full workspace gate green: run the existing root `release:check` script (`npm run typecheck
-&& npm test && npm run build && npm pack --dry-run`); it currently omits `lint` and the
-   schema-sync/skill-frontmatter checks, so either extend the script or also run `npm run lint`
-   and those tests explicitly on the pinned Node 24 line.
+&& npm test && npm run build && npm pack --dry-run`); it currently omits `lint`, `format`, and
+   the schema-sync/skill-frontmatter checks, so either extend the script or also run
+   `npm run lint`, `npm run format`, and those tests explicitly on the pinned Node 24 line.
+   (`publish.yml`'s `publish-readiness` job runs `lint` and `format` as of
+   [P12.06](../P12-consistency/06-process-boundary-tests.md), but `release:check` still does not —
+   so a local pre-tag run has to add them by hand.)
 2. **End-to-end smoke** across the three channels:
    - CLI: install the packed `cli`, run `init` → `lint` → `graph`/`slice`/`impact` → `compile`;
    - MCP: boot `wastech-mdlint-mcp`, call each of the 6 tools;
@@ -28,7 +31,15 @@ Prove the whole release works end-to-end across all three channels before taggin
    existing `.github/workflows/publish.yml` `publish-readiness` job already runs the gate +
    `npm pack --dry-run --workspaces` on `v*` tags; PR.02 upgrades it to real publishing, so verify
    against that job rather than reinventing the dry-run.
-4. Tick the Phase P-release [exit criteria](index.md); confirm **Milestone M4 (launch)**.
+4. Walk the two registers P12.06 established, since neither is enforced by the gate above: the
+   [process-boundary guard checklist](../../../.agents/rules/testing.md) (confirm each of the four
+   categories still has a guard — `packages/core/test/boundary-guards.test.ts` proves the tags
+   survive, but only a reader can confirm a _new_ subsystem did not ship without one), and the
+   [accepted-behaviors register](../accepted-behaviors.md) (confirm every user-reachable row still
+   has its `README.md` / `docs/guide/` home, and that no row was silently fixed without being
+   removed). Both are launch-facing: they are what a first-time user's surprise gets checked
+   against.
+5. Tick the Phase P-release [exit criteria](index.md); confirm **Milestone M4 (launch)**.
 
 ## Decisions applied
 

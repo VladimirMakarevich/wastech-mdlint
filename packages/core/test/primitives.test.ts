@@ -118,6 +118,12 @@ describe("table primitives", () => {
     ).toHaveLength(2);
   });
 
+  // @boundary-guard determinism
+  //
+  // P11.05. A `RegExp` carrying `g`/`y` keeps `lastIndex` between `.test()` calls, so a shared
+  // instance makes findings depend on evaluation order — the determinism invariant's failure mode
+  // that no amount of in-process rule testing surfaces unless a case deliberately alternates
+  // matching and non-matching rows, as this one does.
   it('columnMatches is order-independent under a stateful "g" flag', () => {
     const table = [
       "| ID |",

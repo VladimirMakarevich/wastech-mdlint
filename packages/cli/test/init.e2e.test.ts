@@ -1101,6 +1101,8 @@ describe("init command · writing the config (P6.04)", () => {
     expect(result.stdout).not.toContain("Write failed");
   });
 
+  // @boundary-guard write-failure
+  //
   // P11.09 (audit M-5). A directory sitting where the config file belongs is the one write fault
   // reachable on every platform: `findConfig` uses `stat`, so the directory counts as an existing
   // config, staging succeeds, and only the rename fails.
