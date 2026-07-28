@@ -158,6 +158,38 @@ describe("mcp-server over stdio", () => {
     );
   });
 
+  it("lint: runs a declarative custom rule and keeps the M6 payload for a malformed one", async () => {
+    // P12.04 at the wire: a `{ rule: "custom" }` entry must survive the SDK's pre-handler input
+    // validation in both directions. Valid — it lints. Malformed — the failure still arrives as the
+    // M6 `{ code, message, hint }` payload (what `expectToolError` checks) rather than an `McpError`
+    // protocol error, which is what a narrower wire schema would have produced.
+    const ok = await client.callTool({
+      name: "lint",
+      arguments: {
+        content: "| ID | Owner |\n| --- | --- |\n| REQ-1 |  |\n",
+        rules: [
+          {
+            rule: "custom",
+            id: "REQ-OWNER",
+            options: { assert: { kind: "columnNotEmpty", column: "Owner" } },
+          },
+        ],
+      },
+    });
+    expect(ok.isError).toBeFalsy();
+    const output = structuredOf(ok);
+    expect(output.errorCount).toBe(1);
+    expect((output.messages as Array<{ ruleId: string }>)[0]!.ruleId).toBe(
+      "REQ-OWNER",
+    );
+
+    await expectToolError(
+      "lint",
+      { content: "# Title\n", rules: [{ rule: "custom" }] },
+      "INVALID_INPUT",
+    );
+  });
+
   it("lint-files: reports REF-001 from a fixture and CONFIG_INVALID on malformed config", async () => {
     const ok = await client.callTool({
       name: "lint-files",

@@ -280,7 +280,8 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
   - **checklist** — `allChecked`;
   - **link/image** — `linkResolves`, `imageResolves`.
 - **`custom` rule** — The declarative rule that composes the primitive vocabulary from
-  config — no code, no rebuild, pure JSONC, safe to run inside the MCP server. Requires a
+  config or from an MCP `lint` request — no code, no rebuild, pure JSONC, safe to run inside
+  the MCP server ([P12.04](P12-consistency/04-mcp-custom-rules.md)). Requires a
   namespaced `id` that must not shadow a built-in prefix and an `options.assert`; the schema's
   required keys are exactly `rule`, `id`, and `options`. `description`, `severity`,
   `options.files`/`options.exclude`, and `target` are optional; scope (`columnUnique` ⇒
@@ -674,7 +675,9 @@ underlying scan/inference.
 - **The six tools** — `lint`, `lint-files`, `context-graph`, `context-slice`,
   `impact-analysis`, `compile-context`. Each is a thin wrapper over core with a Zod input
   schema. The tool inventory is generated from registration so docs cannot drift ("5 vs 6").
-  Decision [M3](requirements/05-mcp-server.md).
+  Decision [M3](requirements/05-mcp-server.md). A `lint` `rules` entry is either a built-in rule
+  id or a declarative `custom` rule; code-plugins are still never loaded
+  ([P12.04](P12-consistency/04-mcp-custom-rules.md)).
 - **`structuredContent` / `outputSchema`** — Typed tool output (derived from core types)
   alongside a short human-readable text summary, so hosts need not re-parse text. Decision
   [M1](requirements/05-mcp-server.md). M1 scopes this to the five tools it names (`lint`,
@@ -696,7 +699,12 @@ underlying scan/inference.
   present `structuredContent` against the tool's advertised `outputSchema` — including on `isError`
   results — so an error that did not conform to the schema would be rejected before the caller saw
   the code. The type shipped in P7.01; tool call-sites that map errors to codes landed in
-  P7.02–04. Decision [M6](requirements/05-mcp-server.md).
+  P7.02–04. It only covers failures a tool handler reaches: the SDK validates arguments against
+  the advertised `inputSchema` _before_ the handler runs and turns a mismatch into a bare
+  `InvalidParams` protocol error with no `structuredContent`, so a tool's wire schema has to accept
+  every shape it wants to reject with a `{ code, message, hint }` message
+  ([P12.04](P12-consistency/04-mcp-custom-rules.md)). Decision
+  [M6](requirements/05-mcp-server.md).
 
 ## Agent Skills & distribution
 

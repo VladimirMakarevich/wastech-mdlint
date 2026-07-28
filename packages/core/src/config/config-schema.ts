@@ -72,11 +72,13 @@ export const compileConfigSchema = z
 export type CompileConfig = z.infer<typeof compileConfigSchema>;
 
 // A standard rule entry (built-in rules). Options are validated per-rule by resolveRule (two-stage).
-// This schema is also the MCP `lint` tool's public wire schema (packages/mcp-server/src/tools/lint.ts,
-// z.array(ruleEntrySchema)), which deliberately still accepts a `custom`-looking `rule` there and
-// rejects it later via `resolveRule` as a structured INVALID_INPUT tool error (P12.04 decides whether
-// that changes) — so it must keep accepting `rule: "custom"` here. The config-only exclusion of
-// "custom" lives on `standardRuleEntrySchema` below instead of narrowing this shared schema.
+// This schema is also the built-in branch of the MCP `lint` tool's public wire schema, which P12.04
+// widened to z.union([customRuleEntrySchema, ruleEntrySchema]) (packages/mcp-server/src/tools/lint.ts).
+// It must stay permissive about `rule: "custom"` there: the MCP SDK validates tool input *before* the
+// handler runs, so a malformed custom entry rejected at the wire would come back as raw
+// InvalidParams text with no structuredContent instead of the M6 { code, message, hint } payload —
+// it has to reach the handler to fail as INVALID_INPUT. The config-only exclusion of "custom" lives on `standardRuleEntrySchema` below
+// instead of narrowing this shared schema, keeping config load fail-closed on the same shape.
 export const ruleEntrySchema = z
   .object({
     rule: z.string().min(1),
