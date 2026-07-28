@@ -9,6 +9,7 @@ import { loadConfiguration } from "../src/config/load-config.js";
 import { compareStrings } from "../src/deterministic-sort.js";
 import { lintFiles } from "../src/engine/lint-files.js";
 import type { Assertion } from "../src/engine/primitives/assert.js";
+import { ASSERTION_TARGETS } from "../src/engine/primitives/assert.js";
 
 const tempDirs: string[] = [];
 
@@ -273,8 +274,14 @@ type CustomScopeCase = {
 const BOTH = ["docs/a.md", "drafts/b.md"];
 const IN_SCOPE_ONLY = ["docs/a.md"];
 
-// `satisfies Record<Assertion["kind"], …>` is the coverage guard: a 14th assert kind fails
-// `npm run typecheck` here rather than silently shipping without an `exclude` test (audit L-4).
+// @boundary-guard shared-exclude
+//
+// The `satisfies Record<Assertion["kind"], …>` below documents the intended coverage contract, but
+// it is NOT what enforces it: no tsconfig in this repo includes `test/**` (`packages/core/
+// tsconfig.json` is `include: ["src/**/*.ts", …]`), so `npm run typecheck` never reads this file and
+// a 14th assert kind would not fail it — the claim an earlier revision of this comment made
+// (P12.06). The enforcement is the runtime key-set assertion in the describe block below; keep it
+// there, and prefer runtime assertions for any future coverage guard written in a test file.
 const CUSTOM_SCOPE_CASES = {
   requiredColumns: {
     assert: { kind: "requiredColumns", columns: ["Priority"] },
@@ -353,6 +360,16 @@ const CUSTOM_SCOPE_CASES = {
 // `columnUnique` has its own, threaded into the primitive as a `fileMatches` predicate — which is
 // why the project kind is not redundant with TBL-006's coverage.
 describe("custom rule file scope (exclude)", () => {
+  // The real coverage guard (see the note on CUSTOM_SCOPE_CASES): a new assert kind added to
+  // ASSERTION_TARGETS without an `exclude` case here fails this test, which — unlike the `satisfies`
+  // — actually runs. Compared against ASSERTION_TARGETS rather than a hand-copied list so there is
+  // one place to add a kind, and sorted on both sides so map-insertion order cannot affect it.
+  it("covers every assert kind declared in ASSERTION_TARGETS", () => {
+    expect(Object.keys(CUSTOM_SCOPE_CASES).sort(compareStrings)).toEqual(
+      Object.keys(ASSERTION_TARGETS).sort(compareStrings),
+    );
+  });
+
   async function reportedFiles(
     assert: Assertion,
     scope: { files?: string[]; exclude?: string[] },

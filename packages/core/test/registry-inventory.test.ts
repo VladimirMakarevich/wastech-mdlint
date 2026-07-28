@@ -110,6 +110,8 @@ const FILE_SCOPED = [
 // meanings cannot be conflated by a future reader — or silently merged by a schema edit.
 const LINK_TARGET_EXCLUDE = ["REF-001", "REF-003"].sort(compareStrings);
 
+// @boundary-guard shared-exclude
+//
 // Audit L-4: `exclude` shipped with zero end-to-end coverage, which is how M-2 (`columnUnique`
 // ignoring it) survived. This inventory is the drift guard — a new rule that mixes in
 // `fileScopeShape` fails here until its family test file gains an `exclude` case.

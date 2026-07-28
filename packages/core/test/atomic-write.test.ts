@@ -17,6 +17,12 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { writeFileAtomic, writeFilesAtomic } from "../src/atomic-write.js";
 
+// @boundary-guard write-failure
+//
+// P11.09 (audit M-5). The unit half of the write-failure category: a partially-failed batch must
+// leave no temp file behind and no half-written target. The end-to-end half — a real `init` run
+// whose config write fails — lives in packages/cli/test/init.e2e.test.ts.
+
 const tempDirs: string[] = [];
 
 afterEach(async () => {

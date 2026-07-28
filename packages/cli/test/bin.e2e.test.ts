@@ -13,6 +13,8 @@ import {
   EXIT_CODE_USAGE_ERROR,
 } from "../src/commands.js";
 
+// @boundary-guard installed-bin-spawn
+//
 // The only suite in this package that crosses a real OS process boundary (mirrors
 // packages/mcp-server/test/stdio-integration.test.ts). Every other CLI test calls runCli()
 // in-process, which can never exercise src/index.ts's entrypoint guard (H-1): that guard only does

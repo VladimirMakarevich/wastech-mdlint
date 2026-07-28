@@ -127,6 +127,11 @@ npm run build
 Use `npm run lint` and `npm run format` when the touched scope or task requires style
 verification.
 
+Keep the four process-boundary guard categories intact — spawning the installed bin, a write
+failure, shared `exclude` scope, and determinism. They are the standing answer to the post-P9
+audit's systemic cause, and the checklist plus its enforcing test live in
+`.agents/rules/testing.md` under "Process-Boundary Guards".
+
 ## Repository Hygiene
 
 - Do not rewrite or revert existing user changes unless explicitly requested.
@@ -142,3 +147,14 @@ verification.
   code. This is part of "bring the affected docs in line," not optional polish.
 - If a task is documentation-only, do not change product code, public interfaces, package
   metadata, or dependencies unless the user explicitly expands scope.
+- Run `npm run format` before committing **any** deliverable, including a documentation-only or
+  audit one. `prettier --check .` covers every tracked Markdown file, so a docs change can turn the
+  gate red exactly as a code change can — which is how a red gate reached a branch once already
+  (post-P9 audit §1: three separate runs skipped the gate P9.06 had added to CI). The remedy is a
+  targeted `npx prettier --write <paths>` on the files you touched, never a repo-wide rewrite.
+  CI runs the same check on ubuntu, windows, and macOS; `.gitattributes` (`* text=auto eol=lf`) is
+  what keeps it from failing on line endings alone. Deliberately outside the gate: `tasks/` (see
+  `docs/mdlint_v2/P12-consistency/06-process-boundary-tests.md` for why).
+- When a change accepts a behavior instead of fixing it, record it in
+  `docs/mdlint_v2/accepted-behaviors.md` in the same change, so the decision is stated rather than
+  latent in a task file.

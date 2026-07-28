@@ -763,6 +763,14 @@ underlying scan/inference.
 - **Fixture** — A small, scenario-focused test input under a package's test tree. Preferred
   over linting the repo's real docs so a failure points to one behavior. See
   [testing rules](../../.agents/rules/testing.md).
+- **Process-boundary guard** — A test that crosses a real OS process boundary, or otherwise
+  covers a defect class the in-process suite structurally cannot see. Four named categories:
+  `installed-bin-spawn`, `write-failure`, `shared-exclude`, `determinism`. Each guard carries an
+  `@boundary-guard <category>` comment and the inventory in
+  `packages/core/test/boundary-guards.test.ts` fails if a category loses its guard. The standing
+  answer to the post-P9 audit's systemic cause. See
+  [testing rules](../../.agents/rules/testing.md) and
+  [P12.06](P12-consistency/06-process-boundary-tests.md).
 - **Zod** — The runtime validation library used for config, rule options, the primitive
   vocabulary, and skill frontmatter.
 - **ESM / NodeNext** — The module system: ES modules with `NodeNext` resolution, so relative
@@ -786,6 +794,11 @@ underlying scan/inference.
 - **Task file** — A numbered file inside a phase folder with a `Previous` / `Next` /
   `Depends on` / `Blocks` chain and exit criteria; the most specific source of truth for the
   work it describes.
+- **Accepted-behaviors register** — [`accepted-behaviors.md`](accepted-behaviors.md): the one
+  index of behaviors a task deliberately documented rather than fixed, plus residuals recorded
+  rather than closed. It links where each is already explained instead of restating it; a
+  user-reachable row must have a `README.md` or `docs/guide/` home. Established by
+  [P12.06](P12-consistency/06-process-boundary-tests.md).
 - **Decision codes** — Lettered decision logs, each family living in one doc; cite the code
   rather than restating the resolution:
   - **D1–D7** — pivotal roadmap decisions ([index.md](index.md) §5);
