@@ -77,6 +77,12 @@
   cycles. v2 surfaces cycles as data via SCC/DFS (reusing the current Tarjan
   implementation) and shares it with `GRP-001` ([R5](02-rules-engine.md)). Honest reading
   order + cycle list.
+  The reused Tarjan walk is recursive, so v2 states a **documented depth bound** rather than
+  guarding it. Depth is the longest simple DFS path within one connected component, which a
+  densely cross-linked component reaches without any authored chain, so the assumption is: no
+  single connected component of many thousands of documents (a linear-chain probe overflowed
+  around ~4,750; 1,000 is pinned by test). Many small components are fine at any corpus size
+  ([P12.05](../P12-consistency/05-recursion-depth.md)).
 
 - **G9 — diagram export.** `graph --format mermaid|dot` in addition to JSON. PLAN.md
   intended the graph "for later visualization"; emitting Mermaid/DOT gives a paste-ready

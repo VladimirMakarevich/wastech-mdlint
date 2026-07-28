@@ -386,3 +386,73 @@ describe("buildContextGraph · node identity matches loadDocuments() output dire
     ]);
   });
 });
+
+// P12.05 (finding SC-3): `detectCycles`/`cyclePath` recurse once per node along the current DFS path,
+// so the supported depth — the longest simple path inside one connected component — is bounded by the
+// JS call stack rather than by anything in the code. A linear chain is the simplest shape that reaches
+// full depth, so these two tests use it to pin the documented bound empirically: DEPTH is the depth we
+// promise works, chosen with a ~4x margin under the measured overflow point (~4,750 in a cold Node
+// main thread) so the assertion stays stable across platforms and JIT warmup states instead of sitting
+// near the cliff. Deliberately *no* test asserts a crash at some larger depth — the exact limit is
+// stack-size dependent and would be flaky. Raising DEPTH means re-measuring the limit first.
+const DEPTH = 1000;
+
+// `dNNN….md` zero-padded to a width derived from DEPTH so lexicographic order equals chain order at
+// any depth (a fixed width would silently break that the moment DEPTH crossed its next power of ten).
+// Order equality makes both the node sort and `cyclePath`'s canonical rotation (smallest node first)
+// exactly predictable, which is what lets the cyclic case assert the full path shape rather than just
+// its length.
+const CHAIN_NAME_WIDTH = String(DEPTH - 1).length;
+
+function chainName(index: number): string {
+  return `d${String(index).padStart(CHAIN_NAME_WIDTH, "0")}.md`;
+}
+
+// A linear chain `d0000 -> d0001 -> ... -> d(DEPTH-1)`; `cyclic` adds the back edge that closes it.
+function deepChain(cyclic: boolean): Map<string, ParsedDocument> {
+  const entries: Record<string, string> = {};
+  for (let index = 0; index < DEPTH; index += 1) {
+    const next = index + 1 < DEPTH ? index + 1 : cyclic ? 0 : undefined;
+    entries[chainName(index)] =
+      next === undefined ? "# End\n" : `[next](${chainName(next)})\n`;
+  }
+  return docs(entries);
+}
+
+describe("buildContextGraph · deep reference chains (P12.05 documented depth bound)", () => {
+  it(`builds a ${DEPTH}-deep acyclic chain without exhausting the stack`, () => {
+    const graph = buildContextGraph(deepChain(false));
+
+    expect(graph.nodes).toHaveLength(DEPTH);
+    expect(graph.edges).toHaveLength(DEPTH - 1);
+    expect(graph.cycles).toEqual([]);
+    // Every node but the last one links onward, and every node but the first is linked to.
+    expect(graph.nodes[0]).toEqual({
+      path: chainName(0),
+      inDegree: 0,
+      outDegree: 1,
+    });
+    expect(graph.nodes.at(-1)).toEqual({
+      path: chainName(DEPTH - 1),
+      inDegree: 1,
+      outDegree: 0,
+    });
+  });
+
+  it(`reports one canonical cycle for a ${DEPTH}-deep chain closed by a back edge`, () => {
+    const graph = buildContextGraph(deepChain(true));
+
+    expect(graph.edges).toHaveLength(DEPTH);
+    expect(graph.cycles).toHaveLength(1);
+
+    // Closed path: the whole chain plus the start repeated at the end, rotated to the
+    // lexicographically smallest node.
+    const cycle = graph.cycles[0]!;
+    expect(cycle).toHaveLength(DEPTH + 1);
+    expect(cycle[0]).toBe(chainName(0));
+    expect(cycle.at(-1)).toBe(chainName(0));
+    expect(cycle.slice(0, DEPTH)).toEqual(
+      Array.from({ length: DEPTH }, (_unused, index) => chainName(index)),
+    );
+  });
+});

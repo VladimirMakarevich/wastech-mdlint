@@ -398,7 +398,10 @@ the [rules requirements](requirements/02-rules-engine.md) and each rule's source
   (see cycles), not silently truncated.
 - **Cycle / SCC** — A circular reference chain. `ContextGraph.cycles` is the explicit list
   (computed via the reused Tarjan SCC), read directly by `GRP-001`. Decision
-  [G6](requirements/03-context-graph.md).
+  [G6](requirements/03-context-graph.md). The Tarjan walk is recursive, and its depth is the
+  longest simple DFS path inside one connected component, so v2 assumes no single component of
+  many thousands of documents — a documented bound, not a guarded one
+  ([P12.05](P12-consistency/05-recursion-depth.md)).
 - **`getComponents`** — Connected components (clusters) of the graph.
 - **`computeGraphCoverage` / coverage signal** — Diagnostic when on-disk Markdown under the
   repo is linked-to but excluded from `include`, so impact/orphan results are not silently
