@@ -532,8 +532,16 @@ underlying scan/inference.
 
 - **commander / `@inquirer/prompts`** — The CLI framework (`commander`) and the interactive
   prompt library (used by `init`). Decision [D5](index.md).
-- **`lint`** — The default command; running `wastech-mdlint` with no subcommand lints the
-  cwd. Flags: `--config`, `--format text|json`, `--fail-on error|warning|off`, `--fix`.
+- **`lint`** — The default command; running `wastech-mdlint` with **no subcommand** lints the
+  cwd. Flags: `--config`, `--format text|json`, `--fail-on error|warning|off`, `--fix`. Default
+  only in that no-subcommand sense: the name is prepended to argv rather than registered as
+  commander's `isDefault`, so an unrecognized operand is an unknown-command error instead of
+  becoming a `[path]` — which also means a bare path (`wastech-mdlint docs`) needs its
+  subcommand. [P11.10](P11-remediation/10-cli-exit-contract.md).
+- **Target path validation** — `[path]` (`lint`, `graph`, `init`) and `compile --cwd` are
+  resolved against the CLI's own cwd and must be existing directories; a missing one or a file
+  exits `2` naming the path POSIX-separated and relative to that cwd, rather than globbing an
+  empty corpus and reporting a clean pass. [P11.10](P11-remediation/10-cli-exit-contract.md).
 - **`scan`** — A **hidden, deprecated alias** of `lint`, kept for one minor version. Decision
   [D4](index.md).
 - **`graph`** — Prints the context graph: `human` (clusters, hubs, reading order, coverage),
@@ -579,8 +587,15 @@ underlying scan/inference.
   [I1–I3, I6](requirements/06-installation.md), [C3/C4/C9](requirements/01-configuration.md),
   [D5](index.md) inquirer, [P11.09](P11-remediation/09-atomic-writes.md).
 - **Exit codes** — `0` pass · `1` findings at the `--fail-on` threshold · `2` operational
-  error (including a file `lint --fix` or `init` could not write). A cross-cutting contract
-  (roadmap §8).
+  error. A cross-cutting contract (roadmap §8). `1` is reserved **exclusively** for findings, so
+  CI can tell a failing document from a broken step; every other failure — unknown subcommand,
+  bad flag, nonexistent target path, unreadable config, an unwritable file — is `2`, reported on
+  stderr with POSIX-separated paths relative to the directory the command works in (its cwd, or
+  the `[path]`/`--cwd`/analyzed directory it was given). Not relative in two cases the guide
+  states: a path the user passed themselves (`schema --out`) is echoed back as typed, and a path
+  outside that directory has only a `../` form — none at all across Windows drives. In code:
+  `EXIT_CODE_FINDINGS` / `EXIT_CODE_USAGE_ERROR` in `packages/cli/src/commands.ts`.
+  [P11.10](P11-remediation/10-cli-exit-contract.md).
 
 ## MCP server
 

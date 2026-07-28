@@ -29,11 +29,18 @@ operating systems (no timestamps, no host-dependent ordering).
 
 ## Exit codes
 
-| Code | Meaning                                                                                                                                          |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `0`  | Clean — no findings at or above the `--fail-on` threshold.                                                                                       |
-| `1`  | Findings at or above `--fail-on` (default `error`).                                                                                              |
-| `2`  | Operational/usage error (bad flag, missing config section, target outside the corpus, unreadable config, a file `--fix`/`init` could not write). |
+| Code | Meaning                                                                                                                                                                      |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`  | Clean — no findings at or above the `--fail-on` threshold.                                                                                                                   |
+| `1`  | Findings at or above `--fail-on` (default `error`). Reserved exclusively for findings.                                                                                       |
+| `2`  | Operational/usage error (unknown subcommand, bad flag, a nonexistent target path, missing config section, target outside the corpus, unreadable config, an unwritable file). |
+
+An operational error goes to stderr, naming its path `/`-separated and relative to the directory the
+command works in (see [the CLI reference](cli.md#exit-codes) for the two cases that cannot be), so
+`1` always means "the linter found problems" and never "the command could not run". The one
+exception to the stream is `init`: a file it could not write is listed in its own report on stdout,
+alongside the files it did write, since a partial init is more useful read as one summary — the
+exit code is still `2`.
 
 Control what fails CI with `--fail-on`:
 

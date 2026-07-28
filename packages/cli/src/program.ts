@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises";
 import path from "node:path";
 
 import {
@@ -14,7 +15,6 @@ import {
 
 import {
   CliUsageError,
-  EXIT_CODE_RUNTIME_ERROR,
   EXIT_CODE_SUCCESS,
   EXIT_CODE_USAGE_ERROR,
   executeCommand,
@@ -26,6 +26,10 @@ import {
 } from "./commands.js";
 import type { ExistingConfigAction, InitPrompter } from "./init-command.js";
 import { createInquirerPrompter } from "./init-prompter.js";
+import {
+  formatOperationalError,
+  toRepoRelativePosix,
+} from "./operational-errors.js";
 
 export type CliIo = {
   cwd?: string;
@@ -62,6 +66,75 @@ function parseDepth(value: string): number {
   return parsed;
 }
 
+// Program-level flags, which must keep being parsed by the program itself: prefixing `lint` to
+// `["--help"]` would render *lint's* help instead of the command list.
+const PROGRAM_LEVEL_FLAGS = new Set(["-h", "--help", "-v", "--version"]);
+
+/**
+ * Route the no-subcommand default (`lint`, D4) in argv instead of via commander's
+ * `command(…, { isDefault: true })`.
+ *
+ * Commander's `_parseCommand` dispatches to a default command *before* it can reach
+ * `unknownCommand()`, so with `isDefault` no operand is ever rejected: `wastech-mdlint bogus-command`
+ * became lint's `[path]`, linted an empty corpus, and exited `0` — a typo'd CI step passing green
+ * (M-7). Prepending the name here leaves commander's own unknown-command error (and its
+ * did-you-mean suggestion) intact.
+ *
+ * The trade-off is deliberate: a bare path with no subcommand (`wastech-mdlint ./docs`) is now
+ * `error: unknown command './docs'`. Rejecting unknown operands and accepting arbitrary operands as
+ * paths are mutually exclusive, and only "no subcommand lints the cwd" was ever documented.
+ */
+function routeDefaultCommand(argv: string[]): string[] {
+  const first = argv[0];
+  if (first !== undefined && !first.startsWith("-")) {
+    return argv;
+  }
+  if (first !== undefined && PROGRAM_LEVEL_FLAGS.has(first)) {
+    return argv;
+  }
+  return ["lint", ...argv];
+}
+
+/**
+ * Validate a directory-typed argument (`[path]`, `compile --cwd`) at the CLI boundary, where argument
+ * validation belongs, and return it resolved.
+ *
+ * Two defects in one helper. Without the existence check a nonexistent target simply globs an empty
+ * corpus and reports `0 "No problems found."` — indistinguishable from a clean repository (M-7).
+ * Without resolving against *this run's* `cwd` first the check would disagree with what core actually
+ * reads: `loadConfiguration`/`lintFiles` resolve a relative argument against the real
+ * `process.cwd()`, which is not the injected `cwd`.
+ */
+async function resolveDirectoryArgument(
+  cwd: string,
+  label: string,
+  typed: string,
+): Promise<string> {
+  const resolved = path.resolve(cwd, typed);
+  const relative = toRepoRelativePosix(cwd, resolved);
+
+  const stats = await stat(resolved).catch((error: unknown) => {
+    // Exactly two errnos mean "no usable directory here": ENOENT for a missing path, ENOTDIR when a
+    // parent segment is a file. Anything else (EACCES, ELOOP, …) is a *different* operational failure
+    // and must not be misreported as a bad argument, so it falls through to the backstop in runCli.
+    const code =
+      error instanceof Error && "code" in error ? error.code : undefined;
+    if (code === "ENOENT") {
+      throw new CliUsageError(`${label} does not exist: ${relative}`);
+    }
+    if (code === "ENOTDIR") {
+      throw new CliUsageError(`${label} is not a directory: ${relative}`);
+    }
+    throw error;
+  });
+
+  if (!stats.isDirectory()) {
+    throw new CliUsageError(`${label} is not a directory: ${relative}`);
+  }
+
+  return resolved;
+}
+
 export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
   const stdout = io.stdout ?? process.stdout;
   const stderr = io.stderr ?? process.stderr;
@@ -71,14 +144,20 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
 
   const program = new Command()
     .name("wastech-mdlint")
-    // exitOverride() + configureOutput() must run before .command() creates subcommands: commander
-    // only copies output/exit settings onto a subcommand at the moment it's created, so subcommands
-    // built beforehand would keep writing to the real process streams / calling process.exit.
+    // exitOverride() + configureOutput() + showHelpAfterError() must run before .command() creates
+    // subcommands: commander only copies output/exit/help settings onto a subcommand at the moment
+    // it's created, so subcommands built beforehand would keep writing to the real process streams /
+    // calling process.exit, and would not print the pointer below after their own usage errors.
     .exitOverride()
     .configureOutput({
       writeOut: (text) => stdout.write(text),
       writeErr: (text) => stderr.write(text),
-    });
+    })
+    // A string (not `true`): the full help body after every usage error would bury commander's own
+    // one-line diagnostic, and an unknown subcommand already gets a did-you-mean suggestion.
+    .showHelpAfterError(
+      "(run `wastech-mdlint --help` for the list of commands)",
+    );
 
   program.version(await readPackageVersion(), "-v, --version");
 
@@ -93,7 +172,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
   ): Promise<void> => {
     executionResult = await executeCommand({
       kind: "lint",
-      path: targetPath,
+      path: await resolveDirectoryArgument(cwd, "Target path", targetPath),
       config: options.config,
       format: options.format,
       failOn: options.failOn,
@@ -102,13 +181,9 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
   };
 
   // Register the shared lint options on a command (used by both `lint` and its hidden `scan` alias).
-  const addLintCommand = (
-    name: string,
-    hidden: boolean,
-    isDefault: boolean,
-  ): void => {
+  const addLintCommand = (name: string, hidden: boolean): void => {
     program
-      .command(name, { hidden, isDefault })
+      .command(name, { hidden })
       .description("Lint Markdown files with the rule engine.")
       .argument("[path]", "directory to lint", cwd)
       .addOption(new Option("--config <file>", "path to a config file"))
@@ -134,9 +209,10 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
       .action(lintAction);
   };
 
-  // `lint` is the default command (D4); `scan` is a hidden, deprecated alias for one minor version.
-  addLintCommand("lint", false, true);
-  addLintCommand("scan", true, false);
+  // `lint` is the default command (D4) — routed in argv by `routeDefaultCommand`, not registered as
+  // commander's `isDefault`; `scan` is a hidden, deprecated alias for one minor version.
+  addLintCommand("lint", false);
+  addLintCommand("scan", true);
 
   program
     .command("schema")
@@ -172,7 +248,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
       ) => {
         executionResult = await executeCommand({
           kind: "graph",
-          path: targetPath,
+          path: await resolveDirectoryArgument(cwd, "Target path", targetPath),
           config: options.config,
           format: options.format,
         });
@@ -266,7 +342,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
       }) => {
         executionResult = await executeCommand({
           kind: "compile",
-          cwd: options.cwd,
+          cwd: await resolveDirectoryArgument(cwd, "--cwd", options.cwd),
           config: options.config,
           outdir: options.outdir,
           dryRun: options.dryRun ?? false,
@@ -327,9 +403,15 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
 
         // `targetPath` may be a relative argument like "." or "docs", or omitted entirely; resolve
         // it against this run's own `cwd` (the injected `io.cwd`, when set) rather than letting
-        // `findConfig`/`scanRepository` fall back to the real `process.cwd()` inside core.
+        // `findConfig`/`scanRepository` fall back to the real `process.cwd()` inside core. A
+        // nonexistent target is rejected here rather than reaching the write and surfacing as an
+        // ENOENT partial-write summary, which reported the cause as a write failure (P11.10).
         const pathWasExplicit = targetPath !== undefined;
-        const resolvedCwd = path.resolve(cwd, targetPath ?? ".");
+        const resolvedCwd = await resolveDirectoryArgument(
+          cwd,
+          "Target path",
+          targetPath ?? ".",
+        );
 
         // Construct the real prompter here (not inside commands.ts) so its `confirmDraft` writes
         // through this run's own `stdout` seam instead of the real `process.stdout` — the same
@@ -350,7 +432,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
     );
 
   try {
-    await program.parseAsync(argv, { from: "user" });
+    await program.parseAsync(routeDefaultCommand(argv), { from: "user" });
   } catch (error) {
     // Ctrl+C during any inquirer prompt (matched on `.name`, not `instanceof` a specific imported
     // class — @inquirer/prompts' own docs recommend this as the version-stable detection) exits
@@ -373,9 +455,14 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
       return EXIT_CODE_USAGE_ERROR;
     }
 
-    const message = error instanceof Error ? error.message : String(error);
-    stderr.write(`Unexpected error: ${message}\n`);
-    return EXIT_CODE_RUNTIME_ERROR;
+    // The backstop for a failure no handler converted into a CliUsageError. It is still an
+    // *operational* failure, so it exits 2, not 1: exit 1 is reserved exclusively for findings at or
+    // above --fail-on, and conflating the two leaves CI unable to tell "the linter found problems"
+    // from "the command could not run" (M-6). It renders through formatOperationalError rather than
+    // writing `error.message` directly because an fs error that names a path embeds that path
+    // absolutely; every other message is passed through, since here it is the only diagnosis there is.
+    stderr.write(`Operational error: ${formatOperationalError(error, cwd)}\n`);
+    return EXIT_CODE_USAGE_ERROR;
   }
 
   if (executionResult === undefined) {

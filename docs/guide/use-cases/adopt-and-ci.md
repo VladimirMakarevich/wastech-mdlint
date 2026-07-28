@@ -17,6 +17,10 @@ wastech-mdlint lint .                 # exit 1 on errors → fails the job
 wastech-mdlint lint . --fail-on warning
 ```
 
+Exit `1` means findings and nothing else, so a red job is a real documentation problem. A broken
+step — a typo'd subcommand, a `[path]` that does not exist in the checkout, a config the runner
+cannot read — exits `2` instead of quietly passing as "no problems found".
+
 **You get:** a `wastech-mdlint.config.json` with a local `$schema` and rationale comments, plus a
 CI-ready lint step. The dropped workflow installs and runs the CLI via npm regardless of the
 project's package manager — it only fetches the external tool, never your repo's dependencies, so
