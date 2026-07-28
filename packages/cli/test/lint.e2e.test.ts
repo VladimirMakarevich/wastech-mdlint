@@ -92,6 +92,24 @@ describe("lint command", () => {
     expect(result.stdout).toContain("No problems found.");
   });
 
+  it("passes when a required non-Markdown file is present on disk (audit BL-1)", async () => {
+    // The user-visible symptom: a repository that really ships a `LICENSE` used to exit 1, because
+    // STR-001 could only see the Markdown corpus.
+    const cwd = await fixtureRepo({
+      "README.md": "# Readme\n",
+      LICENSE: "MIT\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [
+          { rule: "STR-001", options: { files: ["README.md", "LICENSE"] } },
+        ],
+      }),
+    });
+
+    const result = await run(["lint", cwd], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain("No problems found.");
+  });
+
   it("emits structured JSON with --format json", async () => {
     const cwd = await fixtureRepo({
       "a.md": "[broken](missing.md)\n",

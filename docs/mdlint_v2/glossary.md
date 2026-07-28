@@ -199,7 +199,10 @@ The engine ships **24 registered built-ins across 8 categories** plus the declar
   (when → then) · `TBL-006` unique IDs across files _(project)_.
 - **SEC (sections, 3)** — `SEC-001` required sections _(fixable)_ · `SEC-002` section order ·
   `SEC-003` template conformance _(project)_.
-- **STR (structure, 1)** — `STR-001` required files exist _(project)_.
+- **STR (structure, 1)** — `STR-001` required files exist _(project)_. Its `files` is the
+  _required set_, not file scope (below): a literal entry resolves against the corpus **or** the
+  filesystem under the analyzed root (root-pinned, so it can require a non-Markdown `LICENSE`),
+  while a glob entry matches the Markdown corpus only ([P11.12](P11-remediation/12-str001-reach.md)).
 - **REF (references, 6)** — `REF-001` relative links resolve · `REF-002` anchor/heading
   slugs · `REF-003` images resolve · `REF-004` cross-zone link declaration · `REF-005` ID
   traceability _(project)_ · `REF-006` stability consistency _(project)_.

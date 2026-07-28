@@ -50,6 +50,8 @@ describe("mcp-server", () => {
     const lint = tools.find((tool) => tool.name === "lint");
     expect(lint?.description).toContain("Does not load project config");
     expect(lint?.description).toContain("REF-001/REF-003");
+    // P11.12: STR-001 joined the filesystem-probing rules, so the description must name it too.
+    expect(lint?.description).toContain("STR-001");
     expect(lint?.description).toContain("server's working directory");
     expect(lint?.description).not.toContain("Reads no filesystem");
 
