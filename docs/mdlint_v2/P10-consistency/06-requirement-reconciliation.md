@@ -1,33 +1,22 @@
 # P10.06 · Reconcile requirement/plan text
 
-> Phase: [P10 — Post-audit consistency](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** ·
-> Status **Done**. Audit findings **L-8**, **L-9**, **L-10** ([report](../audit-2026-07-23-p0-p8.md)).
+> Phase: [P10 — Post-audit consistency](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Done**. Audit findings **L-8**, **L-9**, **L-10** ([report](../audit-2026-07-23-p0-p8.md)).
 
 ## Goal
 
-Align a few requirement/plan sentences with the shipped code, so the higher-precedence task files
-and the requirement text no longer disagree. Documentation-only.
+Align a few requirement/plan sentences with the shipped code, so the higher-precedence task files and the requirement text no longer disagree. Documentation-only.
 
 ## Problem (from the audit)
 
-- **L-8** `requirements/02-rules-engine.md` R7 ("uniform `files`/`exclude` base for _every_ rule")
-  is literally contradicted: `fileScopeShape` (`rules/scope.ts:10`) is omitted by REF-001/003/004/
-  005, LLM-001, SIZE-001 (SIZE uses `overrides[].pattern`). The P3 task tables (higher precedence)
-  don't promise `files?` on those, so the code matches the _specific_ plan — R7's general text
-  needs a one-line reconciliation.
-- **L-9** `requirements/05-mcp-server.md:13` (M1 table) shorthand says "graph/slice/impact/lint",
-  omitting `lint-files`; the detail paragraph (24-28) is correct. Doc shorthand only.
-- **L-10** P5.04 (step 5) says to define the skill frontmatter schema "here" (in `synthesize.ts`),
-  but it lives in `compile/skill-frontmatter.ts` (still core/compile). Single-source is preserved;
-  only the task wording is stale.
+- **L-8** `requirements/02-rules-engine.md` R7 ("uniform `files`/`exclude` base for _every_ rule") is literally contradicted: `fileScopeShape` (`rules/scope.ts:10`) is omitted by REF-001/003/004/ 005, LLM-001, SIZE-001 (SIZE uses `overrides[].pattern`). The P3 task tables (higher precedence) don't promise `files?` on those, so the code matches the _specific_ plan — R7's general text needs a one-line reconciliation.
+- **L-9** `requirements/05-mcp-server.md:13` (M1 table) shorthand says "graph/slice/impact/lint", omitting `lint-files`; the detail paragraph (24-28) is correct. Doc shorthand only.
+- **L-10** P5.04 (step 5) says to define the skill frontmatter schema "here" (in `synthesize.ts`), but it lives in `compile/skill-frontmatter.ts` (still core/compile). Single-source is preserved; only the task wording is stale.
 
 ## Deliverables / steps
 
-1. R7: add a sentence noting scoping shape is per-rule (identity/project rules that operate over
-   the whole corpus intentionally omit `files?`), deferring to the P3 task tables as authoritative.
+1. R7: add a sentence noting scoping shape is per-rule (identity/project rules that operate over the whole corpus intentionally omit `files?`), deferring to the P3 task tables as authoritative.
 2. Fix the M1 table cell to list all five structured tools (or say "5 structured tools + compile").
-3. Correct P5.04's wording to point at `compile/skill-frontmatter.ts` (couple with
-   [P9.05](../P9-remediation/05-custom-heading-target.md) if regenerating docs).
+3. Correct P5.04's wording to point at `compile/skill-frontmatter.ts` (couple with [P9.05](../P9-remediation/05-custom-heading-target.md) if regenerating docs).
 
 ## Exit criteria
 
@@ -39,12 +28,7 @@ and the requirement text no longer disagree. Documentation-only.
 
 Documentation-only change; no product code touched.
 
-- `requirements/02-rules-engine.md` R7 notes deferred to the P3 task tables as
-  authoritative, and names the rules that intentionally omit `fileScopeShape`
-  (REF-001/003/004/005, LLM-001, SIZE-001's own `overrides[].pattern`).
-- `requirements/05-mcp-server.md` M1 table cell now lists the 5 structured tools by name and
-  notes `compile-context` stays text-only, matching the detail paragraph below it.
-- `P5-compile/04-synthesize.md` step 5 now points at `compile/skill-frontmatter.ts` instead of
-  "here" (`synthesize.ts`).
-- Ran `npx prettier --write` on the two requirement files to re-align the Markdown tables after
-  editing their cells.
+- `requirements/02-rules-engine.md` R7 notes deferred to the P3 task tables as authoritative, and names the rules that intentionally omit `fileScopeShape` (REF-001/003/004/005, LLM-001, SIZE-001's own `overrides[].pattern`).
+- `requirements/05-mcp-server.md` M1 table cell now lists the 5 structured tools by name and notes `compile-context` stays text-only, matching the detail paragraph below it.
+- `P5-compile/04-synthesize.md` step 5 now points at `compile/skill-frontmatter.ts` instead of "here" (`synthesize.ts`).
+- Ran `npx prettier --write` on the two requirement files to re-align the Markdown tables after editing their cells.

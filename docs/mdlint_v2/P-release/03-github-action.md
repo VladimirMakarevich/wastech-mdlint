@@ -4,13 +4,9 @@
 
 ## Goal
 
-Ship a publishable/reusable GitHub Action so consumers run `wastech-mdlint` in CI in one
-step — a major adoption lever ([I6](../requirements/06-installation.md)).
+Ship a publishable/reusable GitHub Action so consumers run `wastech-mdlint` in CI in one step — a major adoption lever ([I6](../requirements/06-installation.md)).
 
-> **Baseline already exists.** `.github/workflows/ci.yml` (verify on the pinned Node 24 line via
-> `.node-version`; a `pack` job matrixed over the three packages) and `.github/workflows/publish.yml`
-> shipped in [P0.07](../P0-foundations/07-ci-packaging-baseline.md). This task adds the _consumer-facing,
-> reusable composite Action_ on top — it does not create CI from scratch.
+> **Baseline already exists.** `.github/workflows/ci.yml` (verify on the pinned Node 24 line via `.node-version`; a `pack` job matrixed over the three packages) and `.github/workflows/publish.yml` shipped in [P0.07](../P0-foundations/07-ci-packaging-baseline.md). This task adds the _consumer-facing, reusable composite Action_ on top — it does not create CI from scratch.
 
 ## Sequence
 
@@ -20,20 +16,13 @@ step — a major adoption lever ([I6](../requirements/06-installation.md)).
 
 ## Deliverables / steps
 
-1. A reusable composite Action (`wastech-mdlint`) that installs and runs `lint` with
-   configurable `--fail-on`/`--config`/`--format`, surfacing findings in CI.
-2. A documented workflow snippet (`.github/workflows/wastech-mdlint.yml`) that the
-   [`init` P6.04](../P6-init/04-config-writer-schema.md) optionally drops into a repo. **Until this
-   task lands, P6.04 ships a self-contained `npm install` + `npx wastech-mdlint lint` workflow**
-   (the Action does not exist before P-release); part of this task is swapping that template
-   (`buildCiWorkflowYaml` in `config-writer.ts`) to reference the composite Action via `uses:`.
-3. (Optional) SARIF output mapping from structured findings
-   ([R3](../requirements/02-rules-engine.md)) so results appear in GitHub code scanning.
+1. A reusable composite Action (`wastech-mdlint`) that installs and runs `lint` with configurable `--fail-on`/`--config`/`--format`, surfacing findings in CI.
+2. A documented workflow snippet (`.github/workflows/wastech-mdlint.yml`) that the [`init` P6.04](../P6-init/04-config-writer-schema.md) optionally drops into a repo. **Until this task lands, P6.04 ships a self-contained `npm install` + `npx wastech-mdlint lint` workflow** (the Action does not exist before P-release); part of this task is swapping that template (`buildCiWorkflowYaml` in `config-writer.ts`) to reference the composite Action via `uses:`.
+3. (Optional) SARIF output mapping from structured findings ([R3](../requirements/02-rules-engine.md)) so results appear in GitHub code scanning.
 
 ## Decisions applied
 
-- [I6](../requirements/06-installation.md) first-class Action · [R3](../requirements/02-rules-engine.md)
-  structured findings → SARIF.
+- [I6](../requirements/06-installation.md) first-class Action · [R3](../requirements/02-rules-engine.md) structured findings → SARIF.
 
 ## Exit criteria
 

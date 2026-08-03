@@ -2,8 +2,7 @@
 
 > [Guide](../README.md) · [Use cases](README.md) · [Rules](../rules/README.md)
 
-**Goal:** no empty/placeholder sections, all acceptance-criteria checklists completed, and prose
-uses canonical glossary terms.
+**Goal:** no empty/placeholder sections, all acceptance-criteria checklists completed, and prose uses canonical glossary terms.
 
 ```jsonc
 {
@@ -26,7 +25,4 @@ uses canonical glossary terms.
 wastech-mdlint lint . --fail-on warning
 ```
 
-**You get:** placeholder/empty sections ([CTX-001](../rules/CTX-001.md)), unchecked checklist items
-([CTX-002](../rules/CTX-002.md)), and alias-instead-of-canonical-term usage
-([CTX-003](../rules/CTX-003.md)). Extend the placeholder set with `options.placeholders` (it adds to
-the defaults `TBD/TODO/WIP/FIXME/N/A`).
+**You get:** placeholder/empty sections ([CTX-001](../rules/CTX-001.md)), unchecked checklist items ([CTX-002](../rules/CTX-002.md)), and alias-instead-of-canonical-term usage ([CTX-003](../rules/CTX-003.md)). Extend the placeholder set with `options.placeholders` (it adds to the defaults `TBD/TODO/WIP/FIXME/N/A`).

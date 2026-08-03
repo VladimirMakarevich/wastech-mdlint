@@ -5,10 +5,7 @@
 ## Requirements
 
 - **Node.js `>=24.17.0`** (the pinned 24 LTS line; see `.node-version`).
-- The tool ships as an npm-workspaces monorepo: [`@wastech-mdlint/core`](../../packages/core)
-  owns the pipeline, [`@wastech-mdlint/cli`](../../packages/cli) is the `wastech-mdlint` binary,
-  and [`@wastech-mdlint/mcp-server`](../../packages/mcp-server) is the `wastech-mdlint-mcp` stdio
-  server.
+- The tool ships as an npm-workspaces monorepo: [`@wastech-mdlint/core`](../../packages/core) owns the pipeline, [`@wastech-mdlint/cli`](../../packages/cli) is the `wastech-mdlint` binary, and [`@wastech-mdlint/mcp-server`](../../packages/mcp-server) is the `wastech-mdlint-mcp` stdio server.
 
 ## Install & build from source
 
@@ -17,13 +14,11 @@ npm ci            # lockfile-based install
 npm run build     # tsc -b → each package's dist/
 ```
 
-`npm install` writes **no files** into your checkout — there is no `postinstall` config creation.
-Configuration is created explicitly with [`init`](cli.md#init), never as an install side effect.
+`npm install` writes **no files** into your checkout — there is no `postinstall` config creation. Configuration is created explicitly with [`init`](cli.md#init), never as an install side effect.
 
 ## Your first lint
 
-With no config file present, the CLI lints every `**/*.md` with an **empty ruleset** — a clean
-pass. Rules only run once you add a config.
+With no config file present, the CLI lints every `**/*.md` with an **empty ruleset** — a clean pass. Rules only run once you add a config.
 
 ```bash
 node packages/cli/dist/index.js lint .              # text output, exit 0 on a clean repo
@@ -39,16 +34,14 @@ wastech-mdlint lint .
 
 ## Bootstrap a config
 
-`init` scans the repo, infers a starter rule set with rationale, and writes
-`wastech-mdlint.config.json` with a **local** `$schema`:
+`init` scans the repo, infers a starter rule set with rationale, and writes `wastech-mdlint.config.json` with a **local** `$schema`:
 
 ```bash
 wastech-mdlint init            # interactive
 wastech-mdlint init --yes      # accept the inferred draft (CI-friendly, no prompts)
 ```
 
-See [Configuration](configuration.md) for what it writes and [CLI reference](cli.md#init) for all
-flags.
+See [Configuration](configuration.md) for what it writes and [CLI reference](cli.md#init) for all flags.
 
 ## Enable a rule manually
 
@@ -65,10 +58,7 @@ Create `wastech-mdlint.config.json`:
 }
 ```
 
-That `$schema` assumes the CLI is a local dependency. If you only ever run it through `npx`, there is
-no `node_modules` path to point at — generate a local copy with
-[`wastech-mdlint schema`](cli.md#schema) and reference that instead. (`init` handles this for you: it
-writes a project-local `schema.json` whenever there is nothing installed to point at.)
+That `$schema` assumes the CLI is a local dependency. If you only ever run it through `npx`, there is no `node_modules` path to point at — generate a local copy with [`wastech-mdlint schema`](cli.md#schema) and reference that instead. (`init` handles this for you: it writes a project-local `schema.json` whenever there is nothing installed to point at.)
 
 Then:
 

@@ -4,23 +4,20 @@
 
 ## Goal
 
-Preserve the current implementation's LLM context-hygiene features ([D3](../index.md)) as first-class rules in
-the new engine, so the original PLAN.md mission rides on top of the doc-integrity rules.
+Preserve the current implementation's LLM context-hygiene features ([D3](../index.md)) as first-class rules in the new engine, so the original PLAN.md mission rides on top of the doc-integrity rules.
 
 ## Sequence
 
-- **Previous:** [P2.07 — First rules + `lint`](../P2-rule-engine/07-first-rules-lint-command.md)
-  already introduced SIZE-001 as the engine proof; this task finishes it and adds LLM-001.
+- **Previous:** [P2.07 — First rules + `lint`](../P2-rule-engine/07-first-rules-lint-command.md) already introduced SIZE-001 as the engine proof; this task finishes it and adds LLM-001.
 - **Next:** [P3.08 — custom rule](08-custom-rule.md), [P3.09 — cutover](09-rule-tests-and-cutover.md).
-- **Depends on:** P2.07 + the relocated current `llm/{imports,budget}` ([P0.04](../P0-foundations/04-relocate-current-source-into-core.md)) ·
-  **Parallel with:** P3.02–P3.06 · **Blocks:** P3.09.
+- **Depends on:** P2.07 + the relocated current `llm/{imports,budget}` ([P0.04](../P0-foundations/04-relocate-current-source-into-core.md)) · **Parallel with:** P3.02–P3.06 · **Blocks:** P3.09.
 
 ## Rules
 
-| ID       | Scope    | Severity     | Checks                                        | Key options                                                                                                              |
-| -------- | -------- | ------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| SIZE-001 | document | configurable | file over byte / line / token budget          | `bytes?:{warn?,error?}`, `lines?:{warn?,error?}`, `tokens?:{warn?,error?}`, `overrides[{pattern,bytes?,lines?,tokens?}]` |
-| LLM-001  | project  | configurable | eager-import budget per entrypoint over limit | `entrypoints`, `maxTokensPerEntrypoint`                                                                                  |
+| ID | Scope | Severity | Checks | Key options |
+| --- | --- | --- | --- | --- |
+| SIZE-001 | document | configurable | file over byte / line / token budget | `bytes?:{warn?,error?}`, `lines?:{warn?,error?}`, `tokens?:{warn?,error?}`, `overrides[{pattern,bytes?,lines?,tokens?}]` |
+| LLM-001 | project | configurable | eager-import budget per entrypoint over limit | `entrypoints`, `maxTokensPerEntrypoint` |
 
 ## SIZE-001 — Configuration schema
 
@@ -46,24 +43,14 @@ Each metric is optional; omitting it disables that check entirely.
 
 Threshold semantics:
 
-- A file crossing `warn` but not `error` → `severity: "warning"` finding — printed to console,
-  does **not** trigger `--fail-on error` exit.
-- A file crossing `error` → `severity: "error"` finding — exits non-zero under `--fail-on error`.
-  **Superseded in part by [P11.13](../P11-remediation/13-grp-size-hygiene.md):** when a file crosses
-  both thresholds of one metric, only this error finding is emitted — the warn finding it supersedes
-  carried the same `data` (`warnAt` is still there), and emitting both let a `severity` override
-  render two same-severity messages for one metric.
-- The C2 `severity` rule override acts as a **ceiling clamp**: `"severity": "warning"` downgrades
-  even error-threshold crossings to warnings; `"severity": "error"` upgrades warn-threshold findings;
-  `"severity": "off"` suppresses all SIZE-001 output (R1). After P11.13 the clamp always applies to
-  a single per-metric finding, so it can no longer collapse a warn/error pair into duplicates.
-- Each `overrides` entry supplies independent per-metric thresholds; unspecified metrics fall back to
-  the top-level `bytes`/`lines`/`tokens` options.
+- A file crossing `warn` but not `error` → `severity: "warning"` finding — printed to console, does **not** trigger `--fail-on error` exit.
+- A file crossing `error` → `severity: "error"` finding — exits non-zero under `--fail-on error`. **Superseded in part by [P11.13](../P11-remediation/13-grp-size-hygiene.md):** when a file crosses both thresholds of one metric, only this error finding is emitted — the warn finding it supersedes carried the same `data` (`warnAt` is still there), and emitting both let a `severity` override render two same-severity messages for one metric.
+- The C2 `severity` rule override acts as a **ceiling clamp**: `"severity": "warning"` downgrades even error-threshold crossings to warnings; `"severity": "error"` upgrades warn-threshold findings; `"severity": "off"` suppresses all SIZE-001 output (R1). After P11.13 the clamp always applies to a single per-metric finding, so it can no longer collapse a warn/error pair into duplicates.
+- Each `overrides` entry supplies independent per-metric thresholds; unspecified metrics fall back to the top-level `bytes`/`lines`/`tokens` options.
 
 ## LLM-001 — Configuration schema
 
-**Single total budget per entrypoint (locked 2026-07-02, audit 3.2)** — parity with the current
-`llm/budget` (`maxTokensPerEntrypoint: number`, one `overLimit` per entrypoint):
+**Single total budget per entrypoint (locked 2026-07-02, audit 3.2)** — parity with the current `llm/budget` (`maxTokensPerEntrypoint: number`, one `overLimit` per entrypoint):
 
 ```jsonc
 {
@@ -75,40 +62,23 @@ Threshold semantics:
 }
 ```
 
-**Per-type limits are out of scope for v2** (backlog). There is no per-import "type"
-classification in the model, D3 only requires preserving the current single-budget behavior, and
-adding category budgets would be a premature extension point. If ever wanted, it needs a separate
-import-classification design first.
+**Per-type limits are out of scope for v2** (backlog). There is no per-import "type" classification in the model, D3 only requires preserving the current single-budget behavior, and adding category budgets would be a premature extension point. If ever wanted, it needs a separate import-classification design first.
 
 ## Deliverables / steps
 
 1. SIZE-001: per-file **byte / line / token** check.
-   - **Line count:** count `\n` occurrences in the raw source (or `ParsedDocument` line metadata if
-     available).
-   - **Token estimate:** reuse the current `estimateTokens = ceil(len/4)`, kept behind one function so a
-     real tokenizer can replace it later.
-   - **Two-tier thresholds:** each metric (`bytes`, `lines`, `tokens`) may declare an optional
-     `warn` threshold and/or an optional `error` threshold independently. A finding is emitted at
-     `"warning"` severity when only the `warn` threshold is crossed; at `"error"` severity when the
-     `error` threshold is crossed. **Superseded in part by
-     [P11.13](../P11-remediation/13-grp-size-hygiene.md):** a metric reports at most **one** finding
-     — the highest crossed threshold wins, so a file over both thresholds no longer produces a
-     warn/error pair for that metric (metrics remain independent of each other).
+   - **Line count:** count `\n` occurrences in the raw source (or `ParsedDocument` line metadata if available).
+   - **Token estimate:** reuse the current `estimateTokens = ceil(len/4)`, kept behind one function so a real tokenizer can replace it later.
+   - **Two-tier thresholds:** each metric (`bytes`, `lines`, `tokens`) may declare an optional `warn` threshold and/or an optional `error` threshold independently. A finding is emitted at `"warning"` severity when only the `warn` threshold is crossed; at `"error"` severity when the `error` threshold is crossed. **Superseded in part by [P11.13](../P11-remediation/13-grp-size-hygiene.md):** a metric reports at most **one** finding — the highest crossed threshold wins, so a file over both thresholds no longer produces a warn/error pair for that metric (metrics remain independent of each other).
    - **C2 clamp:** see threshold semantics above (R1).
-   - **Glob overrides:** each entry in `overrides` supplies independent `bytes`/`lines`/`tokens`
-     thresholds for a pattern, falling back to top-level options for unspecified metrics.
-   - **Structured finding data (R3):** `data: { metric, actual, warnAt?, errorAt? }` on every
-     SIZE-001 `LintMessage`.
-2. LLM-001: build the eager-import tree from `ParsedDocument.imports`
-   ([P1.03](../P1-parsed-document/03-references-extraction.md)), sum own+imported tokens per
-   entrypoint, compare against the single `maxTokensPerEntrypoint` and report over-limit with
-   percentage; surface cycles/missing imports as the current implementation did.
+   - **Glob overrides:** each entry in `overrides` supplies independent `bytes`/`lines`/`tokens` thresholds for a pattern, falling back to top-level options for unspecified metrics.
+   - **Structured finding data (R3):** `data: { metric, actual, warnAt?, errorAt? }` on every SIZE-001 `LintMessage`.
+2. LLM-001: build the eager-import tree from `ParsedDocument.imports` ([P1.03](../P1-parsed-document/03-references-extraction.md)), sum own+imported tokens per entrypoint, compare against the single `maxTokensPerEntrypoint` and report over-limit with percentage; surface cycles/missing imports as the current implementation did.
 3. Express both through the engine (metadata + options schema), not as bespoke pipeline steps.
 
 ## Decisions applied
 
-- [D3](../index.md) preserve LLM features as rules · isolated token estimator (swappable) ·
-  [R3](../requirements/02-rules-engine.md) structured findings (token totals, % over).
+- [D3](../index.md) preserve LLM features as rules · isolated token estimator (swappable) · [R3](../requirements/02-rules-engine.md) structured findings (token totals, % over).
 
 ## Exit criteria
 
@@ -117,5 +87,4 @@ import-classification design first.
 
 ## Hand-off to next
 
-These rules also feed the compiled skill's context-budget summary
-([S6](../requirements/04-skills-compile.md), P5) and the import edges in the graph (G1, P4).
+These rules also feed the compiled skill's context-budget summary ([S6](../requirements/04-skills-compile.md), P5) and the import edges in the graph (G1, P4).
