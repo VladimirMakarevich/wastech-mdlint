@@ -177,4 +177,122 @@ describe("LLM-001 eager-import budget", () => {
       targetPath: "src/content/docs/missing.md.md",
     });
   });
+
+  // Import targets resolve relative to the *source* file's directory, so files inside `shared/`
+  // import their siblings by bare name.
+  const SHARED_SUBTREE = {
+    "shared/hub.md": "# Hub\n@missing.md\n@loop.md\n",
+    "shared/loop.md": "# Loop\n@hub.md\n",
+  };
+
+  // Findings rendered as `path:line message` so a dedup assertion can pin count, identity, and
+  // order in one `toEqual` instead of counting matches of a substring.
+  function renderMessages(
+    messages: { filePath: string; line: number; message: string }[],
+  ): string[] {
+    return messages.map(
+      (message) => `${message.filePath}:${message.line} ${message.message}`,
+    );
+  }
+
+  it("reports a diagnostic in a shared import subtree once per identity, not once per entrypoint", async () => {
+    // Regression fixture for the dedup contract (audit L-3): both entrypoints reach `shared/hub.md`,
+    // so each traversal re-derives the same missing import and the same cycle.
+    const cwd = await fixtureRepo({
+      "one.md": "# One\n@shared/hub.md\n",
+      "two.md": "# Two\n@shared/hub.md\n",
+      ...SHARED_SUBTREE,
+    });
+
+    const result = await lint(cwd, [
+      rule("LLM-001", {
+        entrypoints: ["one.md", "two.md"],
+        maxTokensPerEntrypoint: 100000,
+      }),
+    ]);
+
+    // The whole list, not a filtered count — this pins emission count *and* order together.
+    expect(renderMessages(result.messages)).toEqual([
+      "shared/hub.md:2 Missing eager import @missing.md; resolved to shared/missing.md.",
+      "shared/loop.md:2 Eager import cycle detected: shared/hub.md -> shared/loop.md -> shared/hub.md.",
+    ]);
+  });
+
+  it("emits the same findings regardless of which entrypoint reaches the subtree first", async () => {
+    // `shared/hub.md` is both an entrypoint and a node inside the other entrypoint's closure, so
+    // renaming the root flips sorted traversal order around it. Identical output either way is what
+    // makes "the retained finding does not depend on entrypoint order" observable.
+    const runs = await Promise.all(
+      ["a-entry.md", "z-entry.md"].map(async (rootName) => {
+        const cwd = await fixtureRepo({
+          [rootName]: "# Root\n@shared/hub.md\n",
+          ...SHARED_SUBTREE,
+        });
+        const result = await lint(cwd, [
+          rule("LLM-001", {
+            entrypoints: [rootName, "shared/hub.md"],
+            maxTokensPerEntrypoint: 100000,
+          }),
+        ]);
+        return renderMessages(result.messages);
+      }),
+    );
+
+    const expected = [
+      "shared/hub.md:2 Missing eager import @missing.md; resolved to shared/missing.md.",
+      "shared/loop.md:2 Eager import cycle detected: shared/hub.md -> shared/loop.md -> shared/hub.md.",
+    ];
+    expect(runs).toEqual([expected, expected]);
+  });
+
+  it("keeps one budget finding per entrypoint when entrypoints share an imported file", async () => {
+    // Over-dedup guard: budget findings are per entrypoint by definition, so routing them through
+    // the same identity map must stay a no-op even when the closures are identical.
+    const cwd = await fixtureRepo({
+      "one.md": "# One\n@shared/big.md\n",
+      "two.md": "# Two\n@shared/big.md\n",
+      "shared/big.md": `${"x".repeat(400)}\n`,
+    });
+
+    const result = await lint(cwd, [
+      rule("LLM-001", {
+        entrypoints: ["one.md", "two.md"],
+        maxTokensPerEntrypoint: 50,
+      }),
+    ]);
+
+    expect(
+      result.messages.every((message) =>
+        message.message.includes("over context budget"),
+      ),
+    ).toBe(true);
+    expect(result.messages.map((message) => message.filePath)).toEqual([
+      "one.md",
+      "two.md",
+    ]);
+  });
+
+  it("keeps a cycle closed at a different import edge as its own finding", async () => {
+    // The same two-file loop entered from `a.md` vs `b.md` closes on a different import edge, so it
+    // is a different file and line the user has to fix. Dedup is by location + message precisely so
+    // these two are not collapsed into one report that names only half the loop.
+    const cwd = await fixtureRepo({
+      "one.md": "# One\n@a.md\n",
+      "two.md": "# Two\n@b.md\n",
+      "a.md": "# A\n@b.md\n",
+      "b.md": "# B\n@a.md\n",
+    });
+
+    const result = await lint(cwd, [
+      rule("LLM-001", {
+        entrypoints: ["one.md", "two.md"],
+        maxTokensPerEntrypoint: 100000,
+      }),
+    ]);
+
+    expect(renderMessages(result.messages)).toEqual([
+      "a.md:2 Eager import cycle detected: b.md -> a.md -> b.md.",
+      "b.md:2 Eager import cycle detected: a.md -> b.md -> a.md.",
+    ]);
+  });
 });

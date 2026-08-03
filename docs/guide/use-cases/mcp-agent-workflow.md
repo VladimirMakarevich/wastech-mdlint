@@ -2,8 +2,7 @@
 
 > [Guide](../README.md) · [Use cases](README.md) · [MCP server](../mcp-server.md)
 
-**Goal:** an AI coding agent, connected to the [MCP server](../mcp-server.md), safely reviews and
-edits the repo's docs using the same deterministic analysis the CLI runs — read-only, over stdio.
+**Goal:** an AI coding agent, connected to the [MCP server](../mcp-server.md), safely reviews and edits the repo's docs using the same deterministic analysis the CLI runs — read-only, over stdio.
 
 First register the server in the host (once):
 
@@ -19,12 +18,9 @@ First register the server in the host (once):
 }
 ```
 
-Then the agent works through a task. Tool calls below show the exact arguments each tool accepts;
-all 6 tools are read-only. Optional `cwd`/`configPath` default to the process cwd and discovered
-config.
+Then the agent works through a task. Tool calls below show the exact arguments each tool accepts; all 6 tools are read-only. Optional `cwd`/`configPath` default to the process cwd and discovered config.
 
-**Step 1 — lint a draft before writing it to disk.** The agent drafted a section and checks it
-against explicit rules _without_ touching the filesystem (the `lint` tool takes literal content):
+**Step 1 — lint a draft before writing it to disk.** The agent drafted a section and checks it against explicit rules _without_ touching the filesystem (the `lint` tool takes literal content):
 
 ```jsonc
 // tool: lint
@@ -41,8 +37,9 @@ against explicit rules _without_ touching the filesystem (the `lint` tool takes 
 
 The agent fills in `Usage` and replaces the `TODO` before saving.
 
-**Step 2 — lint the whole project after editing.** Uses the resolved config (or the zero-config
-`**/*.md` default):
+An entry can also be a declarative [`custom`](../rules/custom.md) rule (`{ "rule": "custom", "id": "REQ-OWNER", "options": { "assert": … } }`), so the agent can check a project invariant on a draft even when no such rule is in the config yet — it is pure data, so nothing is loaded or executed to run it. Two things follow from `lint` taking literal content: the document is a single synthetic file named `content.md`, so an `options.files` glob aimed at a real directory matches nothing, and a corpus-wide assert like `columnUnique` can only see duplicates inside the submitted content. Use `lint-files` when the check has to span the repo.
+
+**Step 2 — lint the whole project after editing.** Uses the resolved config (or the zero-config `**/*.md` default):
 
 ```jsonc
 // tool: lint-files
@@ -50,8 +47,7 @@ The agent fills in `Usage` and replaces the `TODO` before saving.
 // → { messages: [...], files: ["docs/..."], errorCount: 0, warningCount: 2 }
 ```
 
-**Step 3 — check the blast radius before a risky change.** The agent is asked to rewrite
-`docs/requirements/auth.md` and first learns what depends on it:
+**Step 3 — check the blast radius before a risky change.** The agent is asked to rewrite `docs/requirements/auth.md` and first learns what depends on it:
 
 ```jsonc
 // tool: impact-analysis
@@ -61,8 +57,7 @@ The agent fills in `Usage` and replaces the `TODO` before saving.
 //     readingOrder: [...], excluded: [] }
 ```
 
-Now the agent knows to update `login.md`/`session.md` too. (A file outside the corpus returns an
-actionable error rather than empty output.)
+Now the agent knows to update `login.md`/`session.md` too. (A file outside the corpus returns an actionable error rather than empty output.)
 
 **Step 4 — understand structure and reading order.** For a summary view of clusters and order:
 
@@ -81,8 +76,7 @@ Or a focused forward slice from an entry point or ID (exact match only — ID, `
 //     visited:[ {path:"docs/setup.md", depth:1, via:"docs/index.md"} ] }
 ```
 
-**Step 5 — load compact project context.** The agent pulls a deterministic `SKILL.md` summary of
-the docs (requires a `compile` section in config):
+**Step 5 — load compact project context.** The agent pulls a deterministic `SKILL.md` summary of the docs (requires a `compile` section in config):
 
 ```jsonc
 // tool: compile-context
@@ -90,9 +84,4 @@ the docs (requires a `compile` section in config):
 // → two text blocks: the SKILL.md content + a Documents/Rules/Components metadata line
 ```
 
-**You get:** an agent that lints drafts and files, reasons about change impact and structure, and
-loads accurate context — all through 6 read-only stdio tools that reuse the exact core pipeline the
-CLI uses, so results match `wastech-mdlint` on the command line. Errors come back as a structured
-`{ code, message, hint }`. For a fully guided workflow, install the hand-authored
-[`-init`/`-fix`/`-impact` skills](../skills.md), which orchestrate these tools. See the
-[MCP server reference](../mcp-server.md) for the full tool list and contracts.
+**You get:** an agent that lints drafts and files, reasons about change impact and structure, and loads accurate context — all through 6 read-only stdio tools that reuse the exact core pipeline the CLI uses, so results match `wastech-mdlint` on the command line. Errors come back as a structured `{ code, message, hint }`. For a fully guided workflow, install the hand-authored [`-init`/`-fix`/`-impact` skills](../skills.md), which orchestrate these tools. See the [MCP server reference](../mcp-server.md) for the full tool list and contracts.

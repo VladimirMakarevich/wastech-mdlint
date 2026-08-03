@@ -1,5 +1,7 @@
 import path from "node:path";
 
+import { createScanner, SyntaxKind } from "jsonc-parser";
+
 import { compareStrings } from "../deterministic-sort.js";
 import { canonicalizeRuleId } from "../rule-id.js";
 import {
@@ -30,27 +32,51 @@ export type GenerateInitConfigParams = {
   // Present only for "merge" — its every top-level key except `rules`/`$schema` is round-tripped
   // verbatim so nothing the user authored is silently dropped.
   existing?: ExistingConfigDocument;
-  // From `buildConfigPreview`. Only written for "fresh"; ignored for "merge" (merge is additive and
-  // must never touch an existing `include`).
-  include: string[];
+  // From `buildConfigPreview`, and three-valued for "fresh" (audit L-9). `undefined` omits the key
+  // so the tool's own `**/*.md` default applies; a non-empty array is written as-is; `[]` is written
+  // literally, which lints nothing. The empty array is reserved for the one case where that is a
+  // real user choice — clusters were offered and the user deselected every one — because silently
+  // omitting the key there inverts "lint none of these" into "lint the entire repository". Ignored
+  // for "merge" (merge is additive and must never touch an existing `include`).
+  include: string[] | undefined;
   // The full inferred set for "fresh"; the already-diffed new-only set for "merge" (the CLI does the
   // canonical-id diff before calling in). Each entry's rationale becomes its trailing `//` comment.
   newRules: InferredRule[];
   // The default `$schema` value (C9): a local, relative path from the config being written to the
   // installed package schema. Computed by the CLI relative to the config's *own* directory — never a
-  // fixed `./node_modules/...` literal — so a subdirectory config gets `../node_modules/...`. When
-  // custom rules are present this is overridden with the project-local `./schema.json` instead.
-  packageSchemaRef: string;
+  // fixed `./node_modules/...` literal — so a subdirectory config gets `../node_modules/...`.
+  // `undefined` when the CLI found no installed package schema on disk (the ordinary `npx` case):
+  // emitting a path to a file that does not exist would leave every editor reporting an unresolvable
+  // `$schema`, so the project-local `./schema.json` is generated and pointed at instead (audit L-10).
+  // Custom rules force that same project-local schema regardless.
+  packageSchemaRef: string | undefined;
 };
+
+/**
+ * Why a project-local `schema.json` had to be generated. Both reasons produce the same file, but
+ * they mean different things to the user, so the host's write summary reports which it is: custom
+ * rules make the local schema *necessary* (C9), while the `npx` fallback (audit L-10) makes it the
+ * only resolvable target — an installed package schema would have been preferred.
+ */
+export type ProjectSchemaReason = "custom-rules" | "no-installed-package";
 
 export type GeneratedInitConfig = {
   configText: string;
   schemaRef: string;
-  // Present iff the final `rules[]` contains a `rule: "custom"` entry — a project-local schema that
-  // also validates those ids (C9), which `schemaRef` then points at instead of the package schema.
-  projectSchema?: { fileName: string; text: string };
+  // Present iff `schemaRef` points at the project-local schema. The caller must write this file,
+  // otherwise `schemaRef` dangles — which is the whole defect the `no-installed-package` reason
+  // exists to close.
+  projectSchema?: {
+    fileName: string;
+    text: string;
+    reason: ProjectSchemaReason;
+  };
   addedRuleCount: number;
   totalRuleCount: number;
+  // True when a literal `"include": []` was written — the "user deselected every cluster" outcome.
+  // Required, not optional, so the caller has to decide whether to surface it: a config that lints
+  // zero files is a legitimate but surprising result the write summary must state out loud.
+  wroteEmptyInclude: boolean;
 };
 
 const PROJECT_SCHEMA_FILE_NAME = "schema.json";
@@ -88,14 +114,36 @@ export function resolvePackageSchemaRef(
   return relative.startsWith("../") ? relative : `./${relative}`;
 }
 
+// Mirrors the scan's `isPrunedDirName` hidden-directory prune (audit L-7): `.github`, `.venv`,
+// `.husky` and friends hold tooling Markdown `init` never proposed, so leaving them lintable made
+// the written config disagree with the draft the user approved. Named rather than inlined below
+// because the pattern is unreadable without this explanation: it matches a dot-prefixed directory
+// at any depth and only ever matches its *contents*, so a dotfile at the repo root (`.README.md`)
+// stays in the corpus.
+const HIDDEN_DIR_EXCLUDE_GLOB = "**/.*/**";
+
 // The fresh-write `exclude` (C1 / deliverable 1): the scanner's own pruned noise directories as
-// globs, so a written config never re-scans the `node_modules`/`.git`/`dist`/… trees that `init`
-// deliberately ignored — including when `include` falls back to the implicit `**/*.md`. Sorted for a
-// deterministic, set-like array (order is not meaningful here). A `merge` never touches an existing
-// `exclude`; this is only for the fresh/overwrite path.
-const DEFAULT_EXCLUDE_GLOBS = [...DEFAULT_NOISE_DIR_NAMES]
-  .map((name) => `${name}/**`)
-  .sort(compareStrings);
+// globs, plus the hidden-directory glob above, so a written config never re-scans the
+// `node_modules`/`.git`/`dist`/`.github`/… trees that `init` deliberately ignored — including when
+// `include` falls back to the implicit `**/*.md`.
+//
+// The `**/` prefix is load-bearing: `collectMarkdownFiles` prunes these by *basename at every depth*
+// (`repo-scan.ts`), so only a depth-agnostic glob faithfully mirrors what the scan skipped. The
+// earlier root-anchored `<name>/**` form silently under-delivered on this same promise in a monorepo
+// — `packages/foo/dist/**` was still linted (audit M-4). A leading `**/` matches zero leading
+// segments in picomatch, so root-level `node_modules/` stays pruned too.
+//
+// Accepted tradeoff: hand-written docs under a nested directory literally named `build`/`out`/
+// `vendor`/… are now pruned as well, and `exclude` wins over `include` (C1). `init` could never have
+// proposed such files anyway (same basename prune), and the written config is a starting point the
+// user is expected to edit.
+//
+// Sorted for a deterministic, set-like array (order is not meaningful here). A `merge` never touches
+// an existing `exclude`; this is only for the fresh/overwrite path.
+const DEFAULT_EXCLUDE_GLOBS = [
+  ...DEFAULT_NOISE_DIR_NAMES.map((name) => `**/${name}/**`),
+  HIDDEN_DIR_EXCLUDE_GLOB,
+].sort(compareStrings);
 
 // Canonical top-level key order, applied on every write rather than preserving an existing file's
 // original order — simpler and fully deterministic, at only the cosmetic cost of reordering a merged
@@ -181,6 +229,32 @@ ${lintStep}
 
 // The repo-root default (no `config:` input): the shape `init` drops when bootstrapping the root.
 export const CI_WORKFLOW_YAML = buildCiWorkflowYaml();
+
+/**
+ * True when `text` contains at least one JSONC comment. Used by the CLI to warn that a `merge` over
+ * a comment-bearing config drops its comments (audit L-8): the merge is a parse-and-rebuild, so
+ * every line and block comment the user wrote is lost, and the configuration guide advertises
+ * comments as a feature — silence there is a data-loss surprise.
+ *
+ * Token-based (jsonc-parser's own scanner with trivia enabled) rather than a regex, so a `//` inside
+ * a string value — a URL in `$schema`, a glob in `include` — is not a false positive.
+ */
+export function containsJsoncComments(text: string): boolean {
+  const scanner = createScanner(text, false);
+
+  for (;;) {
+    const token = scanner.scan();
+    if (token === SyntaxKind.EOF) {
+      return false;
+    }
+    if (
+      token === SyntaxKind.LineCommentTrivia ||
+      token === SyntaxKind.BlockCommentTrivia
+    ) {
+      return true;
+    }
+  }
+}
 
 // One rule entry plus the rationale that becomes its trailing `// comment` (absent for a preserved
 // existing entry — merge keeps those verbatim without inventing a comment).
@@ -326,11 +400,14 @@ function collectCustomRules(entries: unknown[]): CustomRuleDefinition[] {
 
 /**
  * Generates the final `wastech-mdlint.config.json` bytes and resolves its `$schema`. Deterministic:
- * identical params produce byte-identical output (no time/random). "fresh" writes `$schema`, an
- * `include` (only when non-empty — an explicit `"include": []` would lint zero files, since
- * `lintFiles` only defaults `include` when the key is *absent*), and the inferred `rules`. "merge"
- * round-trips every existing top-level key verbatim except `rules` (existing entries kept, new ones
- * appended) and `$schema` (always rewired — wiring it is this task's whole point).
+ * identical params produce byte-identical output (no time/random).
+ *
+ * "fresh" writes `$schema`, an `include` (see the three-valued `include` param), an `exclude`, an
+ * explicit `respectGitignore: true`, and the inferred `rules`. "merge" round-trips every existing
+ * top-level key verbatim except `rules` (existing entries kept, new ones appended) and `$schema`
+ * (always rewired — wiring it is this task's whole point). Because the merge round-trip goes through
+ * `JSON.stringify`, the original file's comments do not survive it; the CLI warns about that using
+ * {@link containsJsoncComments} rather than letting the loss pass unmentioned (audit L-8).
  */
 export function generateInitConfig(
   params: GenerateInitConfigParams,
@@ -355,12 +432,18 @@ export function generateInitConfig(
   const customRules = collectCustomRules(finalEntries);
 
   // Custom rules always live next to the config (`./schema.json`, written into the same dir), so the
-  // project-schema ref is dir-independent; the package-schema default is the CLI-computed relative path.
-  const schemaRef =
-    customRules.length > 0 ? PROJECT_SCHEMA_REF : packageSchemaRef;
+  // project-schema ref is dir-independent. Falling back to it when `packageSchemaRef` is undefined
+  // is what keeps the written `$schema` resolvable under `npx`, where nothing is installed locally
+  // for a relative path to reach (audit L-10) — a `$schema` that points at a nonexistent file is
+  // worse than none, since every editor then silently drops config validation.
+  const useProjectSchema =
+    customRules.length > 0 || packageSchemaRef === undefined;
+  const schemaRef = useProjectSchema ? PROJECT_SCHEMA_REF : packageSchemaRef;
 
   const values = new Map<string, string>();
   values.set("$schema", JSON.stringify(schemaRef));
+
+  let wroteEmptyInclude = false;
 
   if (action === "merge" && existing !== undefined) {
     for (const [key, value] of Object.entries(existing.raw)) {
@@ -370,16 +453,24 @@ export function generateInitConfig(
       values.set(key, indentValue(JSON.stringify(value, null, 2)));
     }
   } else {
-    // Fresh write. `include` only when non-empty — an explicit `"include": []` would lint zero files
-    // (lintFiles defaults `include` only when the key is *absent*). `exclude` is always written so a
-    // fallback/root config never re-scans the noise trees the scanner pruned (deliverable 1 / C1).
-    if (include.length > 0) {
+    // Fresh write. `include` is written whenever the caller supplied one — including a literal `[]`,
+    // which lints zero files: `lintFiles` defaults `include` only when the key is *absent*, so
+    // omitting it for a deliberate empty selection would invert "lint nothing" into "lint the whole
+    // repo" (audit L-9). `undefined` is the caller's way to ask for that default on purpose.
+    if (include !== undefined) {
       values.set("include", indentValue(JSON.stringify(include, null, 2)));
+      wroteEmptyInclude = include.length === 0;
     }
+    // Always written so a fallback/root config never re-scans the noise trees the scanner pruned
+    // (deliverable 1 / C1), and `respectGitignore` is pinned explicitly to `true` rather than left
+    // at the loader's `false` default (C8): the scan already skipped gitignored trees, so a config
+    // that lints them would contradict the draft the user approved (audit L-7). Explicit in the file
+    // — not a changed loader default — so it stays a visible, editable decision.
     values.set(
       "exclude",
       indentValue(JSON.stringify(DEFAULT_EXCLUDE_GLOBS, null, 2)),
     );
+    values.set("respectGitignore", "true");
   }
 
   values.set("rules", renderRulesValue(ruleItems));
@@ -406,15 +497,26 @@ export function generateInitConfig(
   return {
     configText,
     schemaRef,
-    ...(customRules.length > 0
+    // Emitted whenever `schemaRef` names it, so the two can never disagree: with no custom rules the
+    // generated schema is simply the built-in one, which is exactly what the `npx` fallback needs.
+    // Custom rules win the reported reason when both hold — that is the one that constrains the
+    // file's *contents*, not just its location.
+    ...(useProjectSchema
       ? {
           projectSchema: {
             fileName: PROJECT_SCHEMA_FILE_NAME,
-            text: generateConfigSchema({ customRules }),
+            text: generateConfigSchema(
+              customRules.length > 0 ? { customRules } : undefined,
+            ),
+            reason:
+              customRules.length > 0
+                ? ("custom-rules" as const)
+                : ("no-installed-package" as const),
           },
         }
       : {}),
     addedRuleCount: newItems.length,
     totalRuleCount: ruleItems.length,
+    wroteEmptyInclude,
   };
 }

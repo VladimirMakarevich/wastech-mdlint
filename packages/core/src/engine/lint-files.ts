@@ -96,9 +96,11 @@ export async function lintFiles(input: LintFilesInput): Promise<LintResult> {
 
   // Build + inject one shared ContextGraph (R5 / audit 2.2). P4.01 wires siteRouter so graph edges
   // resolve root-relative links identically to the REF rules; P4.06 adds idRef so id-ref edges
-  // materialize whenever the shared setting is configured (`exclude`/`entryPoints` remain unwired —
-  // they don't re-scope the corpus-wide graph, per GRP-001/002's forward-compat comments). Callers
-  // may pass a graph to override (e.g. tests).
+  // materialize whenever the shared setting is configured. Those two settings are the builder's
+  // whole input: R5's proposed `exclude`/`entryPoints` were dropped from its options at P4.06
+  // because the graph is corpus-wide, so every rule reasons over the same relationships — GRP-001
+  // accordingly takes no options at all, and GRP-002's `files`/`exclude`/`entryPoints` filter its
+  // *reporting* rather than the graph ([P11.13]). Callers may pass a graph to override (e.g. tests).
   const graph =
     input.graph ??
     buildContextGraph(documents, {

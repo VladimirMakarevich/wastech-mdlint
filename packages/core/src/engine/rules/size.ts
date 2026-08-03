@@ -5,8 +5,10 @@ import { defineRule, type RuleDefinition } from "../registry.js";
 import { estimateTokens } from "../tokens.js";
 
 // SIZE-001 — per-file byte / line / token budget (D3, P3.07). Each metric is independently
-// optional; omitting it disables that check. Severity is per-finding (warn vs error threshold); the
-// config `severity` override clamps via the runner (C2).
+// optional; omitting it disables that check. Metrics stay independent of each other, but the two
+// severities within one metric no longer are: a metric emits at most one finding, from the highest
+// crossed threshold ([P11.13]). Severity is per-finding (which threshold was crossed); the config
+// `severity` override clamps via the runner (C2).
 
 const METRICS = ["bytes", "lines", "tokens"] as const;
 type Metric = (typeof METRICS)[number];
@@ -91,25 +93,35 @@ export const size001: RuleDefinition = defineRule({
         errorAt: thresholds.error,
       };
 
-      // Independent firing (P3.07): both a warning and an error finding can appear for one metric.
-      if (thresholds.warn !== undefined && actual > thresholds.warn) {
-        context.report({
-          severity: "warning",
-          message: `File exceeds ${metric} warn budget: ${actual} ${METRIC_UNIT[metric]} > ${thresholds.warn}.`,
-          line: 0,
-          data,
-          helpUri: "SIZE-001",
-        });
+      // One finding per metric ([P11.13] / SC-2, superseding P3.07's independent firing): the error
+      // breach supersedes the warn breach. Both reports carried the same `data`, so the survivor
+      // loses nothing — and a config `severity` override (applied by the runner, invisible here) can
+      // no longer render the pair as two same-severity messages for one metric.
+      const breach =
+        thresholds.error !== undefined && actual > thresholds.error
+          ? {
+              severity: "error" as const,
+              budget: "error",
+              limit: thresholds.error,
+            }
+          : thresholds.warn !== undefined && actual > thresholds.warn
+            ? {
+                severity: "warning" as const,
+                budget: "warn",
+                limit: thresholds.warn,
+              }
+            : undefined;
+      if (breach === undefined) {
+        continue;
       }
-      if (thresholds.error !== undefined && actual > thresholds.error) {
-        context.report({
-          severity: "error",
-          message: `File exceeds ${metric} error budget: ${actual} ${METRIC_UNIT[metric]} > ${thresholds.error}.`,
-          line: 0,
-          data,
-          helpUri: "SIZE-001",
-        });
-      }
+
+      context.report({
+        severity: breach.severity,
+        message: `File exceeds ${metric} ${breach.budget} budget: ${actual} ${METRIC_UNIT[metric]} > ${breach.limit}.`,
+        line: 0,
+        data,
+        helpUri: "SIZE-001",
+      });
     }
   },
 });

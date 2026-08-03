@@ -4,8 +4,13 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { ConfiguredRule } from "../src/config/load-config.js";
+import { ConfigError } from "../src/config/config-error.js";
+import {
+  loadConfiguration,
+  type ConfiguredRule,
+} from "../src/config/load-config.js";
 import { lintFiles } from "../src/engine/lint-files.js";
+import { RuleResolutionError } from "../src/engine/registry.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
 import type { ResolvedSettings } from "../src/engine/types.js";
 
@@ -108,6 +113,40 @@ describe("GRP-002 orphans", () => {
     ]);
   });
 
+  it("prunes an excluded orphan from the report while it still contributes its outgoing edge", async () => {
+    // a.md is reachable only from draft.md, so the two halves are separable: `exclude` scopes
+    // reporting, not the corpus-wide graph — the reason the option survived P11.13's removal.
+    const files = {
+      "index.md": "# Index\n",
+      "a.md": "# A\n",
+      "draft.md": "[a](a.md)\n",
+    };
+    const withoutExclude = await lint(await fixtureRepo(files), [
+      rule("GRP-002", { entryPoints: ["index.md"] }),
+    ]);
+    expect(withoutExclude.messages.map((message) => message.filePath)).toEqual([
+      "draft.md",
+    ]);
+
+    const withExclude = await lint(await fixtureRepo(files), [
+      rule("GRP-002", { entryPoints: ["index.md"], exclude: ["draft.md"] }),
+    ]);
+    // draft.md silenced; a.md still non-orphan because the excluded file's edge survives.
+    expect(withExclude.messages).toEqual([]);
+
+    // Same outcome with a `files` list beside it — `exclude` wins over `files` (C1), so the pairing
+    // cannot be what makes the filtering work (audit L-4: the exclude-only path above is the one M-2
+    // proved could rot untested).
+    const withBoth = await lint(await fixtureRepo(files), [
+      rule("GRP-002", {
+        entryPoints: ["index.md"],
+        files: ["**/*.md"],
+        exclude: ["draft.md"],
+      }),
+    ]);
+    expect(withBoth.messages).toEqual([]);
+  });
+
   it("counts an anchor edge as an incoming reference, not just a plain link", async () => {
     const cwd = await fixtureRepo({
       "index.md": "[a](a.md)\n",
@@ -118,6 +157,70 @@ describe("GRP-002 orphans", () => {
       rule("GRP-002", { entryPoints: ["index.md"] }),
     ]);
     expect(result.messages).toEqual([]);
+  });
+});
+
+describe("GRP option schemas (P11.13 / SC-1)", () => {
+  function resolutionError(id: string, options: unknown): RuleResolutionError {
+    let thrown: unknown;
+    try {
+      ruleRegistry.resolveRule(id, options);
+    } catch (error: unknown) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(RuleResolutionError);
+    return thrown as RuleResolutionError;
+  }
+
+  it("resolves GRP-001 with no options at all", () => {
+    expect(ruleRegistry.resolveRule("GRP-001", {}).id).toBe("GRP-001");
+    expect(ruleRegistry.resolveRule("GRP-001", undefined).id).toBe("GRP-001");
+  });
+
+  // The dead keys are gone rather than silently ignored, so a config carrying one now fails loudly.
+  it.each(["siteRouter", "files", "exclude"])(
+    "rejects the removed GRP-001 option %s",
+    (key) => {
+      const error = resolutionError("GRP-001", {
+        [key]: key === "siteRouter" ? { preset: "starlight" } : ["x"],
+      });
+      expect(error.code).toBe("INVALID_OPTIONS");
+      expect(JSON.stringify(error.issues)).toContain(key);
+    },
+  );
+
+  it("rejects the removed GRP-002 siteRouter option but keeps entryPoints/files/exclude", () => {
+    expect(
+      resolutionError("GRP-002", { siteRouter: { preset: "starlight" } }).code,
+    ).toBe("INVALID_OPTIONS");
+    expect(
+      ruleRegistry.resolveRule("GRP-002", {
+        entryPoints: ["index.md"],
+        files: ["docs/**"],
+        exclude: ["docs/drafts/**"],
+      }).id,
+    ).toBe("GRP-002");
+  });
+
+  // The acceptance criterion at the config boundary: the removed key is a load-time CONFIG_INVALID
+  // (via the default real registry), not a silently ignored option.
+  it("fails config loading with CONFIG_INVALID when GRP-001 carries a removed option", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [
+          { rule: "GRP-001", options: { siteRouter: { preset: "starlight" } } },
+        ],
+      }),
+    });
+
+    const error = await loadConfiguration({ cwd }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ConfigError);
+    expect((error as ConfigError).code).toBe("CONFIG_INVALID");
+    // Zod's unrecognized-key wording is not pinned; the offending key name is.
+    expect((error as ConfigError).message).toMatch(
+      /rules\[0\]\.options:.*siteRouter/,
+    );
   });
 });
 

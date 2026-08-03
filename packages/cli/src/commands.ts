@@ -1,4 +1,4 @@
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,6 +8,7 @@ import {
   compileContext,
   CompileConfigMissingError,
   computeGraphCoverage,
+  FixWriteError,
   formatLintResultJson,
   formatLintResultText,
   generateConfigSchema,
@@ -23,6 +24,7 @@ import {
   renderContextSliceSummary,
   renderImpactSummary,
   summarizeContextGraph,
+  writeFileAtomic,
 } from "@wastech-mdlint/core";
 import type {
   CompileResult,
@@ -37,13 +39,19 @@ import {
   type ExistingConfigAction,
   type InitPrompter,
 } from "./init-command.js";
+import { formatWriteFailure } from "./operational-errors.js";
 
 // Resolution order (P5.05): an explicit `--outdir` wins, then `config.compile.outdir`, then this
 // fallback — matching the locked example path in docs/mdlint_v2/requirements/01-configuration.md.
 const DEFAULT_COMPILE_OUTDIR = ".claude/skills/wastech-mdlint/";
 
+// The whole exit-code taxonomy (roadmap §8), in one place because the distinction is load-bearing for
+// CI: `1` means *the linter found problems*, `2` means *the command could not run*. `1` is therefore
+// reserved exclusively for findings at or above `--fail-on` — an operational failure that reuses it
+// leaves a CI job unable to tell a broken step from a failing document (P11.10, audit M-6), which is
+// why the constant is named for findings rather than for a generic runtime error.
 export const EXIT_CODE_SUCCESS = 0;
-export const EXIT_CODE_RUNTIME_ERROR = 1;
+export const EXIT_CODE_FINDINGS = 1;
 export const EXIT_CODE_USAGE_ERROR = 2;
 
 export type OutputFormat = "text" | "json";
@@ -87,6 +95,11 @@ export type ImpactCommand = {
 
 export type SchemaCommand = {
   kind: "schema";
+  // The io-seam working directory a relative `--out` resolves against. Required for the same reason
+  // `compile` carries one: resolving against the real `process.cwd()` silently diverges from the
+  // injected `cwd` whenever the two differ, so `schema --out schema.json` wrote outside the target
+  // directory (audit L-11).
+  cwd: string;
   out: string;
 };
 
@@ -105,6 +118,9 @@ export type InitCommand = {
   onExisting?: ExistingConfigAction;
   isTty: boolean;
   withCiWorkflow?: boolean;
+  // Whether the CLI's `[path]` argument was actually typed (vs. omitted and defaulted to cwd) —
+  // see `InitCommandOptions.pathWasExplicit` for why this must be known this far down (H-3, P11.04).
+  pathWasExplicit: boolean;
 };
 
 export type CliCommand =
@@ -130,8 +146,8 @@ export class CliUsageError extends Error {
   }
 }
 
-// Exit codes (roadmap §8): 0 pass / 1 findings at the fail-on threshold / 2 operational (thrown as
-// ConfigError etc. and mapped in program.ts).
+// The only producer of EXIT_CODE_FINDINGS. Operational failures are thrown (as ConfigError,
+// CliUsageError, or a bare fs error) and mapped to 2 in program.ts.
 export function resolveLintExitCode(params: {
   failOn: FailOn;
   result: LintResult;
@@ -142,13 +158,11 @@ export function resolveLintExitCode(params: {
 
   if (params.failOn === "warning") {
     return params.result.errorCount + params.result.warningCount > 0
-      ? EXIT_CODE_RUNTIME_ERROR
+      ? EXIT_CODE_FINDINGS
       : EXIT_CODE_SUCCESS;
   }
 
-  return params.result.errorCount > 0
-    ? EXIT_CODE_RUNTIME_ERROR
-    : EXIT_CODE_SUCCESS;
+  return params.result.errorCount > 0 ? EXIT_CODE_FINDINGS : EXIT_CODE_SUCCESS;
 }
 
 async function handleLint(
@@ -161,12 +175,22 @@ async function handleLint(
 
   // ESLint-style --fix (audit 4.2): apply deterministic fixes in place, then re-lint the result.
   if (command.fix) {
-    await applyFixes({
-      cwd: command.path,
-      config: loaded.config,
-      rules: loaded.rules,
-      settings: loaded.settings,
-    });
+    try {
+      await applyFixes({
+        cwd: command.path,
+        config: loaded.config,
+        rules: loaded.rules,
+        settings: loaded.settings,
+      });
+    } catch (error) {
+      // FixWriteError already names the unwritable file, the files that were fixed, and that the
+      // failed one is unchanged; re-throw as CliUsageError so program.ts maps it to exit 2 (an
+      // operational failure) instead of a bare stack trace — same precedent as handleImpact/handleCompile.
+      if (error instanceof FixWriteError) {
+        throw new CliUsageError(error.message);
+      }
+      throw error;
+    }
   }
 
   const result = await lintFiles({
@@ -353,7 +377,9 @@ async function handleImpact(
 async function handleSchema(
   command: SchemaCommand,
 ): Promise<CommandExecutionResult> {
-  const outputPath = path.resolve(command.out);
+  // Resolved against the command's own `cwd`, mirroring `handleCompile`'s `--outdir` handling below:
+  // an absolute `--out` is unaffected, and a relative one now lands where the caller is standing.
+  const outputPath = path.resolve(command.cwd, command.out);
   const outputStats = await stat(outputPath).catch((error: unknown) => {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") {
       return undefined;
@@ -367,8 +393,18 @@ async function handleSchema(
     );
   }
 
-  await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, generateConfigSchema(), "utf8");
+  try {
+    await mkdir(path.dirname(outputPath), { recursive: true });
+    await writeFileAtomic(outputPath, generateConfigSchema());
+  } catch (error) {
+    // An unwritable destination is an operational failure, not a crash: convert it here so the user
+    // sees the path they typed plus the errno instead of a raw fs message carrying the staged temp
+    // file's random name (P11.10). `command.out` is echoed as typed — matching the success line and
+    // the directory guard above, and the documented exception to naming error paths relative to the
+    // working directory (docs/guide/cli.md §Exit codes): an argument the caller chose to spell
+    // absolutely is theirs, not ours to rewrite.
+    throw new CliUsageError(formatWriteFailure(command.out, error));
+  }
 
   return {
     output: `schema written to ${command.out}\n`,
@@ -415,37 +451,50 @@ async function handleCompile(
   const resolvedOutdir = path.resolve(command.cwd, outdirSetting);
   const outputPath = path.join(resolvedOutdir, "SKILL.md");
 
-  await mkdir(resolvedOutdir, { recursive: true });
-  await writeFile(outputPath, result.skillContent, "utf8");
-
   // Repository-relative POSIX path in user-visible output (invariant), not an absolute,
-  // platform-native one — normalize `\` to `/` so this reads identically on Windows.
+  // platform-native one — normalize `\` to `/` so this reads identically on Windows. Computed before
+  // the write so a failure can name the same path the success line would have (P11.10).
   const relativeOutputPath = normalizeRelativePath(
     path.relative(command.cwd, outputPath),
   );
+
+  try {
+    await mkdir(resolvedOutdir, { recursive: true });
+    await writeFileAtomic(outputPath, result.skillContent);
+  } catch (error) {
+    throw new CliUsageError(formatWriteFailure(relativeOutputPath, error));
+  }
+
   return {
     output: `SKILL.md written to ${relativeOutputPath}\n`,
     exitCode: EXIT_CODE_SUCCESS,
   };
 }
 
-// `init` (P6.04): core generates the config bytes; `runInitCommand` performs the writes. The result
-// output is always informational (draft/write/abort summary), so this handler always exits 0.
+// `init` (P6.04): core generates the config bytes; `runInitCommand` performs the writes. Its output is
+// informational on every path (draft / write / abort / partial-write summary) and always goes to
+// stdout — but a *failed* write is an operational failure, so it exits 2 rather than reporting success
+// for files that never landed (P11.09). A deliberate no-write outcome (`skip`, an unconfirmed draft,
+// the unreadable-merge abort) is not a failure and still exits 0.
 async function handleInit(
   command: InitCommand,
   prompter: InitPrompter,
 ): Promise<CommandExecutionResult> {
-  const { output } = await runInitCommand(
+  const { output, writeFailed } = await runInitCommand(
     {
       cwd: command.cwd,
       yes: command.yes,
       onExisting: command.onExisting,
       isTty: command.isTty,
       withCiWorkflow: command.withCiWorkflow,
+      pathWasExplicit: command.pathWasExplicit,
     },
     prompter,
   );
-  return { output, exitCode: EXIT_CODE_SUCCESS };
+  return {
+    output,
+    exitCode: writeFailed ? EXIT_CODE_USAGE_ERROR : EXIT_CODE_SUCCESS,
+  };
 }
 
 export async function executeCommand(

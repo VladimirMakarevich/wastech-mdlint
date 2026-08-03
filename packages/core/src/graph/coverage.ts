@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { compareStrings } from "../deterministic-sort.js";
 import {
-  escapesRoot,
+  candidateEscapesRoot,
   filePart,
   resolveTargetCandidates,
 } from "../engine/path-resolve.js";
@@ -90,7 +90,7 @@ export function computeGraphCoverage(
       )) {
         if (
           isMarkdownFile(candidate) &&
-          !escapesRoot(candidate) &&
+          !candidateEscapesRoot(candidate) &&
           !nodeSet.has(candidate) &&
           existsSync(path.resolve(options.rootDir, candidate))
         ) {

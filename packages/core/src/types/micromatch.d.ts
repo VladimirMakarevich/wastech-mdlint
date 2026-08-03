@@ -18,6 +18,10 @@ declare module "micromatch" {
       patterns: string | string[],
       options?: MicromatchOptions,
     ): boolean;
+    // Parses a pattern the same way `isMatch` does, so "is this a glob or a literal path?" is
+    // answered by the actual parser rather than a hand-rolled character check that could drift
+    // from it. Only `isGlob` is declared — `base`/`glob`/the boolean sub-flags are unused here.
+    scan(input: string, options?: MicromatchOptions): { isGlob: boolean };
   }
 
   const micromatch: Micromatch;

@@ -1,11 +1,17 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { z } from "zod";
 
-import { matchesConfigGlob } from "../../discovery/globs.js";
+import {
+  isGlobPattern,
+  matchesConfigGlob,
+  normalizeRelativePath,
+} from "../../discovery/globs.js";
 import type { ParsedDocument } from "../../markdown/document-types.js";
+import { detectNewline } from "../../markdown/newline.js";
 import { parseDocument } from "../../markdown/parse-document.js";
+import { resolvesOutsideRoot } from "../path-resolve.js";
 import { sectionOrder, sectionPresent } from "../primitives/section.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
@@ -49,9 +55,13 @@ export const sec001: RuleDefinition = defineRule({
     if (missing.length === 0) {
       return [];
     }
-    // Append a scaffold section (with a TODO body) per missing heading at end of file.
+    // Append a scaffold section (with a TODO body) per missing heading at end of file, joined with
+    // the document's own line ending so a CRLF file does not come back with mixed endings
+    // (audit L-6). `applyFixes` normalizes every edit's `newText` too; doing it here keeps this
+    // fix hook correct when it is exercised on its own.
+    const newline = detectNewline(document.content);
     const scaffold = missing
-      .map((section) => `\n## ${section}\n\nTODO\n`)
+      .map((section) => ["", `## ${section}`, "", "TODO", ""].join(newline))
       .join("");
     const edit: TextEdit = {
       start: document.content.length,
@@ -133,9 +143,27 @@ export const sec003: RuleDefinition = defineRule({
     })
     .strict(),
   check: (options) => (context) => {
+    const rootDir = context.rootDir!;
+
+    if (resolvesOutsideRoot(rootDir, options.template)) {
+      // Reject before any existsSync/readFileSync attempt: trying the read first and
+      // special-casing the failure would still leak a file-existence oracle for arbitrary host
+      // paths (audit H-2's third repro).
+      context.report({
+        message: `SEC-003 template "${options.template}" escapes the analyzed root; skipping conformance checks.`,
+        line: 0,
+        // filePath/data intentionally carry the raw (possibly absolute/Windows-separated) config
+        // value, same as the "was not found" branch below: this finding is attributed to the
+        // option itself, not a location inside the corpus, so it is not normalized.
+        filePath: options.template,
+        data: { template: options.template },
+      });
+      return;
+    }
+
     const template = loadTemplate(
       context.documents!,
-      context.rootDir!,
+      rootDir,
       options.template,
     );
 
@@ -189,6 +217,14 @@ export const sec003: RuleDefinition = defineRule({
 
 // STR-001 — required files exist in the project (project). `files` here is the *required* set (each
 // entry is a path or glob), not file scoping.
+//
+// Satisfaction has two modes (P11.12, audit BL-1). A *literal* entry is satisfied by the corpus at
+// exactly that repo-relative path, or by anything on disk there — so a required `LICENSE` or
+// `package.json`, which no `**/*.md` corpus can ever contain, stops being reported missing on a
+// repository that ships it. "Corpus or disk" is the same resolution model REF-001 already uses
+// (`primitives/reference.ts`), so the two rules agree on what "exists" means. A *glob* entry stays
+// corpus-only: expanding one against the filesystem would mean walking the tree from a synchronous
+// `check`, and `include`/`exclude` already define what the run considers.
 export const str001: RuleDefinition = defineRule({
   metadata: {
     id: "STR-001",
@@ -202,19 +238,56 @@ export const str001: RuleDefinition = defineRule({
     .object({ files: z.array(z.string().min(1)).min(1) })
     .strict(),
   check: (options) => (context) => {
+    const rootDir = context.rootDir!;
     const corpus = context.projectFiles ?? [];
+
+    const reportMissing = (required: string): void => {
+      context.report({
+        message: `Required file "${required}" is missing from the project.`,
+        line: 0,
+        // filePath/data intentionally carry the raw config value, not the normalized one: this
+        // finding is attributed to the option entry the user wrote, not to a corpus location.
+        filePath: required,
+        data: { required },
+      });
+    };
+
     for (const required of options.files) {
-      const satisfied = corpus.some((filePath) =>
-        matchesConfigGlob(filePath, [required]),
-      );
-      if (!satisfied) {
+      // Normalize once for both lookups: the corpus is keyed by repo-relative POSIX paths, and
+      // `path.resolve` accepts `/` separators on Windows too, so one value keeps the membership
+      // test and the disk probe talking about the same path. Unlike SEC-003's raw `template`, this
+      // cannot mask an escape — `..\x` normalizes to `../x`, which still fails containment below.
+      const entry = normalizeRelativePath(required);
+
+      if (isGlobPattern(entry)) {
+        // Deliberately corpus-scoped (see the note above the rule): a glob that only matches
+        // non-Markdown files on disk reports missing.
+        if (!corpus.some((filePath) => matchesConfigGlob(filePath, [entry]))) {
+          reportMissing(required);
+        }
+        continue;
+      }
+
+      if (resolvesOutsideRoot(rootDir, entry)) {
+        // Rejected before the probe, at the same severity as "missing", so a required entry cannot
+        // be used to ask whether an arbitrary host path exists (the SEC-003 / audit H-2 lesson).
         context.report({
-          message: `Required file "${required}" is missing from the project.`,
+          message: `Required file "${required}" escapes the analyzed root and cannot be verified.`,
           line: 0,
           filePath: required,
           data: { required },
         });
+        continue;
       }
+
+      // Root-pinned on purpose: a bare `README.md` means the one at the repository root, not any
+      // `README.md` anywhere (audit BL-1 — "the rule cannot pin a required file to a location").
+      // Write `**/README.md` for the old corpus-wide behavior.
+      if (corpus.includes(entry) || existsSync(path.resolve(rootDir, entry))) {
+        continue;
+      }
+
+      reportMissing(required);
     }
   },
 });

@@ -83,33 +83,69 @@ function copyEdge(edge: ContextGraphEdge): ContextGraphEdge {
   return { ...edge };
 }
 
-function getRole(
-  documentPath: string,
+// Everything a profile needs from the graph that does *not* depend on which document is being
+// profiled. Deriving it per document made `compileContext` O(N² + N·E) in corpus size: the role
+// classifier ran over every node N times and `graph.edges` was scanned twice per document
+// (audit L-5).
+type DocProfileGraphIndex = {
+  roles: Map<string, NodeRole>;
+  outgoing: Map<string, ContextGraphEdge[]>;
+  incoming: Map<string, ContextGraphEdge[]>;
+};
+
+function appendEdge(
+  bucket: Map<string, ContextGraphEdge[]>,
+  key: string,
+  edge: ContextGraphEdge,
+): void {
+  const existing = bucket.get(key);
+
+  if (existing === undefined) {
+    bucket.set(key, [edge]);
+  } else {
+    existing.push(edge);
+  }
+}
+
+function indexGraph(
   graph: ContextGraph,
   options: GraphAnalysisOptions,
-): NodeRole {
+): DocProfileGraphIndex {
   // P5.01 owns the degree classifier; profile extraction looks the role up there so P5.05 can
-  // thread `compile.hubMinInDegree` through one place instead of forked logic drifting.
-  const classification = classifyNodes(graph, options).find(
-    (entry) => entry.path === documentPath,
+  // thread `compile.hubMinInDegree` through one place instead of forked logic drifting. This
+  // caches that classifier's result — it does not reimplement it.
+  const roles = new Map(
+    classifyNodes(graph, options).map((entry) => [entry.path, entry.role]),
   );
+  const outgoing = new Map<string, ContextGraphEdge[]>();
+  const incoming = new Map<string, ContextGraphEdge[]>();
 
-  if (classification === undefined) {
+  // Appending in `graph.edges` order preserves the graph's existing deterministic edge order,
+  // which is already sorted by semantic identity and line number; re-sorting here would risk
+  // drifting from G1 semantics. A self-edge lands in both buckets, exactly as the two independent
+  // `filter` passes this replaces did.
+  for (const edge of graph.edges) {
+    appendEdge(outgoing, edge.from, edge);
+    appendEdge(incoming, edge.to, edge);
+  }
+
+  return { roles, outgoing, incoming };
+}
+
+function buildProfile(
+  document: ParsedDocument,
+  index: DocProfileGraphIndex,
+): DocumentProfile {
+  const role = index.roles.get(document.path);
+
+  if (role === undefined) {
     throw new Error(
-      `Cannot extract profile for "${documentPath}": document is not present in the graph.`,
+      `Cannot extract profile for "${document.path}": document is not present in the graph.`,
     );
   }
 
-  return classification.role;
-}
-
-export function extractDocProfile(
-  document: ParsedDocument,
-  graph: ContextGraph,
-  options: GraphAnalysisOptions = {},
-): DocumentProfile {
   return {
-    role: getRole(document.path, graph, options),
+    role,
     outline: document.headings.map((heading) => ({ ...heading })),
     tableSchemas: document.tables.map((table) => ({
       headers: [...table.headers],
@@ -117,13 +153,39 @@ export function extractDocProfile(
       line: table.line,
     })),
     idPattern: detectIdPattern(document),
-    // Filter preserves the graph's existing deterministic edge order, which is already sorted by
-    // semantic identity and line number; re-sorting here would risk drifting from G1 semantics.
-    referencesTo: graph.edges
-      .filter((edge) => edge.from === document.path)
-      .map(copyEdge),
-    referencedBy: graph.edges
-      .filter((edge) => edge.to === document.path)
-      .map(copyEdge),
+    // Fresh arrays per profile: the index's buckets are shared across a batch, so handing one out
+    // directly would alias edge lists between profiles.
+    referencesTo: (index.outgoing.get(document.path) ?? []).map(copyEdge),
+    referencedBy: (index.incoming.get(document.path) ?? []).map(copyEdge),
   };
+}
+
+/**
+ * Profile many documents against one graph, keyed by `document.path`. Callers profiling a whole
+ * corpus must use this rather than looping over `extractDocProfile`, so the graph is indexed once.
+ */
+export function extractDocProfiles(
+  documents: Iterable<ParsedDocument>,
+  graph: ContextGraph,
+  options: GraphAnalysisOptions = {},
+): Map<string, DocumentProfile> {
+  const index = indexGraph(graph, options);
+  const profiles = new Map<string, DocumentProfile>();
+
+  for (const document of documents) {
+    profiles.set(document.path, buildProfile(document, index));
+  }
+
+  return profiles;
+}
+
+// Shares `indexGraph`/`buildProfile` with the batch entry point so the single-document and corpus
+// paths cannot drift. Single-shot cost is unchanged: one classifier pass and one edge pass either
+// way.
+export function extractDocProfile(
+  document: ParsedDocument,
+  graph: ContextGraph,
+  options: GraphAnalysisOptions = {},
+): DocumentProfile {
+  return buildProfile(document, indexGraph(graph, options));
 }

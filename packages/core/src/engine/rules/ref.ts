@@ -18,7 +18,7 @@ import {
   sourceLocale,
 } from "../path-resolve.js";
 import { imageResolves, linkResolves } from "../primitives/reference.js";
-import { regexStringSchema } from "../regex.js";
+import { escapeRegExp, regexStringSchema } from "../regex.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
 import { extractSectionBody } from "../section-body.js";
 import { resolveRoutedUrl } from "../site-router.js";
@@ -217,11 +217,20 @@ export const ref004: RuleDefinition = defineRule({
     }
 
     const dependencyHeading = options.dependencySection ?? "Dependencies";
-    const allZones = new Set<string>();
+    // Compiled once per zone (guarded by `.has`), not once per file that shares that zone or per
+    // heading/document that scans it — `zone` is an arbitrary directory name, so it must be escaped
+    // before it becomes regex source (audit M-1: unescaped interpolation crashed on names like "c++"
+    // and silently mismatched on names like "node.js").
+    const zoneMentionRegexes = new Map<string, RegExp>();
     for (const relPath of context.projectFiles ?? []) {
       const zone = zoneOf(relPath, options.zonesDir);
-      if (zone !== undefined) {
-        allZones.add(zone);
+      if (zone !== undefined && !zoneMentionRegexes.has(zone)) {
+        zoneMentionRegexes.set(
+          zone,
+          new RegExp(
+            `(^|[^A-Za-z0-9_-])${escapeRegExp(zone)}([^A-Za-z0-9_-]|$)`,
+          ),
+        );
       }
     }
 
@@ -237,10 +246,8 @@ export const ref004: RuleDefinition = defineRule({
           continue;
         }
         const body = extractSectionBody(other.content, other.headings, heading);
-        for (const zone of allZones) {
-          if (
-            new RegExp(`(^|[^A-Za-z0-9_-])${zone}([^A-Za-z0-9_-]|$)`).test(body)
-          ) {
+        for (const [zone, zoneRegex] of zoneMentionRegexes) {
+          if (zoneRegex.test(body)) {
             declared.add(zone);
           }
         }

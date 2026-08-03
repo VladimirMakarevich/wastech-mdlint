@@ -32,6 +32,11 @@ export {
 } from "./discovery/globs.js";
 export { compareStrings } from "./deterministic-sort.js";
 
+// Atomic writes (P11.09) — the single write path both hosts use, so no surface re-invents
+// truncate-and-write. The newline helpers behind `--fix` stay core-internal.
+export { writeFileAtomic, writeFilesAtomic } from "./atomic-write.js";
+export type { AtomicFileWrite, AtomicWriteResult } from "./atomic-write.js";
+
 // Repo scan (P6.01)
 export {
   DEFAULT_KNOWN_CLUSTER_NAMES,
@@ -64,6 +69,7 @@ export type {
 export {
   buildCiWorkflowYaml,
   CI_WORKFLOW_YAML,
+  containsJsoncComments,
   generateInitConfig,
   identifyExistingRule,
   PACKAGE_SCHEMA_SEGMENTS,
@@ -75,6 +81,7 @@ export type {
   GeneratedInitConfig,
   GenerateInitConfigParams,
   InitConfigAction,
+  ProjectSchemaReason,
 } from "./discovery/config-writer.js";
 
 // Graph
@@ -216,7 +223,7 @@ export {
   formatLintResultText,
 } from "./engine/format-lint-result.js";
 export { estimateTokens } from "./engine/tokens.js";
-export { applyEdits, applyFixes } from "./engine/fix.js";
+export { applyEdits, applyFixes, FixWriteError } from "./engine/fix.js";
 export type { ApplyFixesResult } from "./engine/fix.js";
 export { extractColumnIds, extractDefinedIds } from "./engine/defined-ids.js";
 export type { IdOccurrence, IdRef } from "./engine/defined-ids.js";

@@ -2,8 +2,7 @@
 
 > [Guide](../README.md) · [Use cases](README.md) · [Rules](../rules/README.md)
 
-**Goal:** every `REQ-*` referenced in design docs is defined in requirements, no reference dangles,
-and IDs carry forward across pipeline stages. Also make ID references participate in graph checks.
+**Goal:** every `REQ-*` referenced in design docs is defined in requirements, no reference dangles, and IDs carry forward across pipeline stages. Also make ID references participate in graph checks.
 
 ```jsonc
 {
@@ -51,7 +50,4 @@ and IDs carry forward across pipeline stages. Also make ID references participat
 wastech-mdlint lint .
 ```
 
-**You get:** dangling references (error) and unreferenced definitions (warning) from
-[REF-005](../rules/REF-005.md), dropped IDs between stages from [GRP-003](../rules/GRP-003.md), and
-— because of [`settings.idRef`](../configuration.md#settingsidref) — ID edges that also feed
-cycle/orphan checks. See [Context graph](../context-graph.md).
+**You get:** dangling references (error) and unreferenced definitions (warning) from [REF-005](../rules/REF-005.md), dropped IDs between stages from [GRP-003](../rules/GRP-003.md), and — because of [`settings.idRef`](../configuration.md#settingsidref) — ID edges that also feed cycle/orphan checks. See [Context graph](../context-graph.md).

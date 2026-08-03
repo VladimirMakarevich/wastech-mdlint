@@ -50,8 +50,32 @@ describe("mcp-server", () => {
     const lint = tools.find((tool) => tool.name === "lint");
     expect(lint?.description).toContain("Does not load project config");
     expect(lint?.description).toContain("REF-001/REF-003");
+    // P11.12: STR-001 joined the filesystem-probing rules, so the description must name it too.
+    expect(lint?.description).toContain("STR-001");
     expect(lint?.description).toContain("server's working directory");
     expect(lint?.description).not.toContain("Reads no filesystem");
+    // P12.04/M8: ad-hoc lint runs declarative custom rules, and the `content.md` file-scope caveat
+    // that comes with them is disclosed rather than left to be discovered.
+    expect(lint?.description).toContain("code plugins are never loaded");
+    expect(lint?.description).toContain("content.md");
+
+    // The widened input schema must survive JSON Schema conversion *and* be advertised — an agent
+    // can only send a custom entry if the custom branch is visible here. Converting `assertionSchema`
+    // is the risky part (a `z.toJSONSchema` failure throws during `listTools`), so this pins the
+    // branch itself, not merely that the server still answers.
+    const ruleItems = (
+      lint?.inputSchema as {
+        properties?: { rules?: { items?: { anyOf?: unknown[] } } };
+      }
+    ).properties?.rules?.items;
+    const customBranch = ruleItems?.anyOf?.find(
+      (branch) =>
+        (branch as { properties?: { rule?: { const?: unknown } } }).properties
+          ?.rule?.const === "custom",
+    ) as
+      | { properties?: { options?: { properties?: Record<string, unknown> } } }
+      | undefined;
+    expect(customBranch?.properties?.options?.properties?.assert).toBeDefined();
 
     await client.close();
     await server.close();

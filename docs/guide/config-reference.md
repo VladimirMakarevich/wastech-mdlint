@@ -2,20 +2,17 @@
 
 > [Guide index](README.md) · [Configuration guide](configuration.md) · [Rules index](rules/README.md)
 
-This is a single `wastech-mdlint.config.json` that exercises **every** option the linter accepts,
-with a comment on each. It is a _reference_, not a recommended starting config — you would never
-enable all 24 rules at once with every option. Copy the pieces you need. For a curated starter,
-run [`wastech-mdlint init`](cli.md#init).
+This is a single `wastech-mdlint.config.json` that exercises **every** option the linter accepts, with a comment on each. It is a _reference_, not a recommended starting config — you would never enable all 24 rules at once with every option. Copy the pieces you need. For a curated starter, run [`wastech-mdlint init`](cli.md#init).
 
-Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys — top-level, in
-any rule's `options`, or under `compile` — are rejected. Every field below is drawn from the
-generated schema (`wastech-mdlint schema`).
+Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys — top-level, in any rule's `options`, or under `compile` — are rejected. Every field below is drawn from the generated schema (`wastech-mdlint schema`).
 
 ```jsonc
 {
   // Local path to the JSON schema for editor completion. NEVER a remote URL.
-  // `init` points this at ./node_modules/@wastech-mdlint/cli/schema.json, or at a project-local
-  // ./schema.json when custom rules are present.
+  // `init` points this at ./node_modules/@wastech-mdlint/cli/schema.json when the CLI is installed
+  // locally, or at a project-local ./schema.json when custom rules are present or nothing is
+  // installed to point at (the `npx` case). It generates that file unless one is already there —
+  // an existing schema.json is never replaced, so check the write summary if you had one.
   "$schema": "./node_modules/@wastech-mdlint/cli/schema.json",
 
   // Files to lint (globs). Default when omitted: ["**/*.md"].
@@ -24,7 +21,8 @@ generated schema (`wastech-mdlint schema`).
   // Globs to remove from the set. `exclude` WINS over `include`.
   "exclude": ["node_modules/**", "dist/**", ".git/**"],
 
-  // When true, also skip files ignored by .gitignore. Default: false.
+  // When true, also skip files ignored by .gitignore. Default: false — but a fresh `init` write
+  // sets an explicit true, matching the trees its own scan skipped (a `merge` never adds it).
   "respectGitignore": false,
 
   // Shared settings inherited by the rules that understand them.
@@ -135,7 +133,9 @@ generated schema (`wastech-mdlint schema`).
     {
       "rule": "SEC-003",
       "options": {
-        "template": "docs/_templates/adr.md", // required: template file
+        // required: template file — repo-relative only; an absolute or `..`-escaping
+        // path is rejected unread so a config cannot read outside the analyzed root
+        "template": "docs/_templates/adr.md",
         "level": 2, // heading level to compare (optional)
       },
     },
@@ -145,7 +145,9 @@ generated schema (`wastech-mdlint schema`).
     {
       "rule": "STR-001",
       "options": {
-        "files": ["README.md", "CONTRIBUTING.md", "docs/index.md"], // required (≥1)
+        // required: a literal entry is resolved on disk, repo-relative and root-pinned (so it
+        // can require a non-Markdown file); a glob entry only matches the Markdown corpus
+        "files": ["README.md", "LICENSE", "docs/index.md"], // required (≥1)
       },
     },
 
@@ -154,6 +156,8 @@ generated schema (`wastech-mdlint schema`).
     {
       "rule": "REF-001",
       "options": {
+        // NOT file scope: these globs match the link *target* being probed, so this skips links
+        // *to* any CHANGELOG.md, from anywhere. REF-001 has no `files`/`exclude` file scope.
         "exclude": ["**/CHANGELOG.md"],
         "siteRouter": {
           "preset": "starlight",
@@ -171,7 +175,8 @@ generated schema (`wastech-mdlint schema`).
         "exclude": [],
       },
     },
-    // REF-003: image targets resolve to a file.
+    // REF-003: image targets resolve to a file. As on REF-001, `exclude` matches the image
+    // *target* (here: badge images produced elsewhere), not the document holding the image.
     { "rule": "REF-003", "options": { "exclude": ["**/badges/**"] } },
     // REF-004: cross-zone links are declared in the zone's Dependencies section.
     {
@@ -236,22 +241,15 @@ generated schema (`wastech-mdlint schema`).
     },
 
     // ── GRP — graph integrity (all project scope) ───────────────────────────────────────────
-    // GRP-001: no circular references between documents.
-    {
-      "rule": "GRP-001",
-      "options": {
-        "siteRouter": { "preset": "starlight" },
-        "files": [],
-        "exclude": [],
-      },
-    },
+    // GRP-001: no circular references between documents. Takes no options — the graph is corpus-wide
+    // (narrow it with the top-level include/exclude); any options key is a config error.
+    { "rule": "GRP-001" },
     // GRP-002: documents have at least one incoming reference (except entry points).
     {
       "rule": "GRP-002",
       "options": {
         "entryPoints": ["README.md", "docs/index.md"], // roots exempt from the orphan check
-        "siteRouter": { "preset": "starlight" },
-        "files": [],
+        "files": [], // scopes reporting only; the graph stays corpus-wide
         "exclude": [],
       },
     },
@@ -279,7 +277,8 @@ generated schema (`wastech-mdlint schema`).
     },
 
     // ── SIZE / LLM — context hygiene ────────────────────────────────────────────────────────
-    // SIZE-001: file stays within byte/line/token budgets. Each metric has independent warn/error.
+    // SIZE-001: file stays within byte/line/token budgets. Metrics are independent; within one
+    // metric the highest crossed threshold is reported (one finding per metric).
     {
       "rule": "SIZE-001",
       "options": {
@@ -310,9 +309,9 @@ generated schema (`wastech-mdlint schema`).
     {
       "rule": "custom",
       "id": "REQ-OWNER", // required, namespaced
-      "description": "Each requirement row must have an Owner", // required
+      "description": "Each requirement row must have an Owner", // optional (defaults to the id)
       "severity": "error", // optional (default error)
-      "target": "table", // checklist | content | link | section | table
+      "target": "table", // optional; must match the kind's target: checklist | content | link | section | table
       "options": {
         "files": ["docs/requirements/**/*.md"],
         "exclude": [],
@@ -347,11 +346,7 @@ generated schema (`wastech-mdlint schema`).
 
 ## Notes
 
-- The `custom` entry shows one assertion; the [custom rule page](rules/custom.md) lists all 13
-  assertion kinds (`requiredColumns`, `columnNotEmpty`, `columnInSet`, `columnMatches`,
-  `columnUnique`, `crossColumn`, `sectionPresent`, `sectionOrder`, `contentNotMatch`,
-  `noPlaceholders`, `allChecked`, `linkResolves`, `imageResolves`).
-- `siteRouter` shown on individual REF/GRP rules **overrides** `settings.siteRouter` for that rule;
-  most projects set it once under `settings`.
-- Rules that operate over the whole corpus (identity/graph rules) may intentionally omit
-  `files`/`exclude` — see each rule's page for its exact option set.
+- The `custom` entry shows one assertion; the [custom rule page](rules/custom.md) lists all 13 assertion kinds (`requiredColumns`, `columnNotEmpty`, `columnInSet`, `columnMatches`, `columnUnique`, `crossColumn`, `sectionPresent`, `sectionOrder`, `contentNotMatch`, `noPlaceholders`, `allChecked`, `linkResolves`, `imageResolves`).
+- `siteRouter` shown on individual REF rules (REF-001/REF-002 only) **overrides** `settings.siteRouter` for that rule; most projects set it once under `settings`. The graph rules read it only through the shared graph, so they take no `siteRouter` of their own.
+- Rules that operate over the whole corpus (identity/graph rules) may intentionally omit `files`/`exclude` — see each rule's page for its exact option set. Two of them spell one of the names with a different meaning, which is why the comments above call it out inline: `STR-001.files` is the required-file set, and `REF-001`/`REF-003`'s `exclude` filters link/image targets.
+- On the rules that do take file scope, it also bounds `--fix` (SEC-001, TBL-002): an excluded file is never rewritten, not just never reported.

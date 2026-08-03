@@ -21,7 +21,4 @@ wastech-mdlint lint . --format json > lint-report.json   # machine-readable for 
 wastech-mdlint lint .                                     # exits 1 if any link/image is broken
 ```
 
-**You get:** exit code `1` on the first broken reference, with file+line. Analysis is local — no
-network, so it is fast and deterministic. See [REF-001](../rules/REF-001.md),
-[REF-002](../rules/REF-002.md), [REF-003](../rules/REF-003.md) and [Output](../output.md). For a
-docs-site framework, set [`settings.siteRouter`](../configuration.md#settingssiterouter).
+**You get:** exit code `1` on the first broken reference, with file+line. Analysis is local — no network, so it is fast and deterministic. See [REF-001](../rules/REF-001.md), [REF-002](../rules/REF-002.md), [REF-003](../rules/REF-003.md) and [Output](../output.md). For a docs-site framework, set [`settings.siteRouter`](../configuration.md#settingssiterouter).

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { ConfigError } from "../src/config/config-error.js";
@@ -336,5 +336,53 @@ describe("findConfig", () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-empty-"));
     tempDirs.push(root);
     expect(await findConfig(root)).toBeUndefined();
+  });
+
+  it("never anchors above the user's home directory (H-3)", async () => {
+    const outer = await mkdtemp(
+      path.join(os.tmpdir(), "wastech-mdlint-fakehome-outer-"),
+    );
+    tempDirs.push(outer);
+    await writeFile(
+      path.join(outer, "wastech-mdlint.config.json"),
+      JSON.stringify({ rules: [] }),
+      "utf8",
+    );
+
+    const home = path.join(outer, "home");
+    const project = path.join(home, "project");
+    await mkdir(project, { recursive: true });
+
+    const homedirSpy = vi.spyOn(os, "homedir").mockReturnValue(home);
+    try {
+      // A real config sits at `outer`, above the mocked home directory — the walk must stop at
+      // `home` and never report it.
+      expect(await findConfig(project)).toBeUndefined();
+    } finally {
+      homedirSpy.mockRestore();
+    }
+  });
+
+  it("still finds a config that sits exactly at the home directory (H-3)", async () => {
+    const home = await mkdtemp(
+      path.join(os.tmpdir(), "wastech-mdlint-fakehome-exact-"),
+    );
+    tempDirs.push(home);
+    await writeFile(
+      path.join(home, "wastech-mdlint.config.json"),
+      JSON.stringify({ rules: [] }),
+      "utf8",
+    );
+
+    const homedirSpy = vi.spyOn(os, "homedir").mockReturnValue(home);
+    try {
+      // The boundary rejects ANCESTORS at/above $HOME, not the starting directory itself — a config
+      // living directly at cwd === $HOME must still be found.
+      expect(await findConfig(home)).toBe(
+        path.join(home, "wastech-mdlint.config.json"),
+      );
+    } finally {
+      homedirSpy.mockRestore();
+    }
   });
 });

@@ -144,6 +144,10 @@ export function columnMatches(
     for (const row of table.rows) {
       const value = (row.cells[options.column] ?? "").trim();
 
+      // `g`/`y` flags make a RegExp stateful: `test()` advances `lastIndex` across calls, even
+      // across different strings. Reset before each row so one cell's match state can't skew
+      // whether the next cell passes.
+      regex.lastIndex = 0;
       if (!regex.test(value)) {
         findings.push({
           message: `Cell value "${value}" in column "${options.column}" does not match ${options.pattern}.`,
@@ -235,7 +239,8 @@ export function crossColumn(
 export type ColumnUniqueOptions = {
   column: string;
   section?: string;
-  // Project scoping (R7): which files participate; undefined = whole corpus.
+  // Retained for callers' option shape; scope is actually enforced via the `fileMatches`
+  // callback below, which also honors `exclude`.
   files?: string[];
   // Optional token validation: only cells matching this pattern are considered IDs.
   idPattern?: string;
@@ -264,7 +269,10 @@ export function columnUnique(
   );
 
   for (const document of documents) {
-    if (options.files !== undefined && !fileMatches(document.path)) {
+    // Always consult fileMatches — it applies both `files` and `exclude` (see the call sites in
+    // rules/tbl.ts and rules/custom.ts), so gating this on `options.files` being set would
+    // silently skip the exclude-only case.
+    if (!fileMatches(document.path)) {
       continue;
     }
 

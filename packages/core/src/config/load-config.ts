@@ -8,6 +8,7 @@ import {
 } from "jsonc-parser";
 import { z } from "zod";
 
+import { normalizeRelativePath } from "../discovery/globs.js";
 import { RuleResolutionError, type RuleRegistry } from "../engine/registry.js";
 import {
   resolveCustomRule,
@@ -84,7 +85,24 @@ function formatRuleResolutionError(
   );
 }
 
-function parseJsoncConfig(text: string, configPath: string): unknown {
+/**
+ * The user-visible form of a config path, for the three `ConfigError` messages below.
+ *
+ * Those messages are printed verbatim by the CLI (`program.ts`) and returned verbatim by MCP
+ * (`tool-response.ts`), so an interpolated absolute path leaks the checkout location and breaks the
+ * POSIX-relative-path invariant every other report in the product honors (P11.10, audit M-6).
+ *
+ * The anchor is `params.cwd` because that is the only one core has — deliberately *not* a repo root,
+ * which core never computes. Hosts pass the directory being analyzed (for `lint`/`graph`/`slice`/
+ * `impact` that is the `[path]` operand, not the repository root), so a root config reached from
+ * `lint docs` renders as `../wastech-mdlint.config.json`: relative and pointing at the file actually
+ * read, which is the contract, rather than repo-root-anchored.
+ */
+function displayConfigPath(cwd: string, configPath: string): string {
+  return normalizeRelativePath(path.relative(cwd, configPath));
+}
+
+function parseJsoncConfig(text: string, displayPath: string): unknown {
   const errors: ParseError[] = [];
   const value = parseJsonc(text, errors, {
     allowTrailingComma: true,
@@ -100,7 +118,7 @@ function parseJsoncConfig(text: string, configPath: string): unknown {
       .join("; ");
     throw new ConfigError(
       "CONFIG_INVALID",
-      `Failed to parse JSONC config at ${configPath}: ${details}`,
+      `Failed to parse JSONC config at ${displayPath}: ${details}`,
       details,
     );
   }
@@ -171,7 +189,7 @@ export async function loadConfiguration(params: {
   ) {
     throw new ConfigError(
       "CONFIG_NOT_FOUND",
-      `Config file not found: ${explicitConfigPath}`,
+      `Config file not found: ${displayConfigPath(params.cwd, explicitConfigPath)}`,
       "Check that configPath/cwd points to an existing wastech-mdlint.config.json, or omit it to use the zero-config default.",
     );
   }
@@ -182,15 +200,16 @@ export async function loadConfiguration(params: {
     return defaultConfiguration();
   }
 
+  const displayPath = displayConfigPath(params.cwd, configPath);
   const text = await readFile(configPath, "utf8");
-  const raw = parseJsoncConfig(text, configPath);
+  const raw = parseJsoncConfig(text, displayPath);
 
   const parsed = lintConfigSchema.safeParse(raw);
   if (!parsed.success) {
     const lines = parsed.error.issues.map(formatRootIssue);
     throw new ConfigError(
       "CONFIG_INVALID",
-      `Invalid config at ${configPath}:\n${lines.join("\n")}`,
+      `Invalid config at ${displayPath}:\n${lines.join("\n")}`,
       lines[0],
     );
   }

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -52,9 +53,27 @@ export async function startServer(): Promise<void> {
 const invokedPath = process.argv[1];
 const modulePath = fileURLToPath(import.meta.url);
 
+// Same symlink defect as the CLI entrypoint (packages/cli/src/index.ts) — see its comment for the
+// full explanation. process.argv[1] keeps the node_modules/.bin symlink path while import.meta.url
+// resolves to the realpath, so dereferencing before comparing is required for the guard to ever
+// match a symlinked invocation.
+function realOrSelf(candidate: string): string {
+  try {
+    return realpathSync(candidate);
+  } catch {
+    return candidate;
+  }
+}
+
 // Only auto-start when run as the real bin; importing this module (e.g. from a smoke test) must
-// not spin up a transport that seizes stdio, mirroring the CLI entrypoint guard.
-if (invokedPath !== undefined && path.resolve(invokedPath) === modulePath) {
+// not spin up a transport that seizes stdio, mirroring the CLI entrypoint guard. Both sides are
+// dereferenced (not just invokedPath): import.meta.url is only a realpath under Node's default
+// module resolution — under --preserve-symlinks/--preserve-symlinks-main it stays the symlink path
+// too, and an unresolved comparison there would silently reopen H-1 in that mode.
+if (
+  invokedPath !== undefined &&
+  realOrSelf(path.resolve(invokedPath)) === realOrSelf(modulePath)
+) {
   startServer().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`wastech-mdlint-mcp: failed to start: ${message}\n`);

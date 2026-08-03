@@ -74,6 +74,26 @@ describe("loadDocuments", () => {
     expect([...documents.values()].map((doc) => doc.path)).toEqual(["keep.md"]);
   });
 
+  it("prunes a `**/<name>/**` exclude at any depth and at the root", async () => {
+    const root = await createFixtureTree({
+      "keep.md": "# Keep\n",
+      "packages/foo/node_modules/lib/x.md": "# Nested dep\n",
+      "packages/foo/dist/out.md": "# Nested build\n",
+      "node_modules/root-lib/y.md": "# Root dep\n",
+    });
+
+    // The depth-agnostic form `init` writes (config-writer's DEFAULT_EXCLUDE_GLOBS). This exercises
+    // the *directory* prune, not just file matching: shouldPruneDirectory's synthetic-child probe has
+    // to match both `node_modules/...` and `packages/foo/node_modules/...` or the walk descends into
+    // the dependency tree before the file filter ever runs.
+    const documents = await loadDocuments(["**/*.md"], {
+      cwd: root,
+      exclude: ["**/node_modules/**", "**/dist/**"],
+    });
+
+    expect([...documents.values()].map((doc) => doc.path)).toEqual(["keep.md"]);
+  });
+
   it("honors .gitignore (root and nested) when respectGitignore is true", async () => {
     const root = await createFixtureTree({
       ".gitignore": "build/\n*.tmp.md\n",

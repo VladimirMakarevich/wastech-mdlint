@@ -1,11 +1,14 @@
 import {
   createSuppressionChecker,
+  customRuleEntrySchema,
   formatLintResultText,
   parseDocument,
+  resolveCustomRule,
   ruleEntrySchema,
   ruleRegistry,
   runRules,
   RuleResolutionError,
+  type CustomRuleConfigEntry,
   type LintMessage,
   type ParsedDocument,
   type ResolvedRule,
@@ -35,13 +38,26 @@ import {
 // a `.md` suffix behaves least-surprisingly against a caller-supplied glob like `**/*.md`.
 const AD_HOC_DOCUMENT_PATH = "content.md";
 
-// Reuse core's already-validated rule entry schema for each requested rule rather than a hand-rolled
+// Reuse core's already-validated rule entry schemas for each requested rule rather than a hand-rolled
 // `{ rule, options }` pair. This is a deliberate small superset of the task's literal wording: it
 // also carries `severity` (including `"off"`), and honoring the field the schema exposes is safer
 // than silently ignoring it.
+//
+// P12.04 widened this to a union so M8's "executes declarative custom rules" holds for ad-hoc `lint`
+// too. Custom-first, because the strict built-in branch would reject a custom entry's `id`/`target`
+// keys. The second branch is `ruleEntrySchema` — the permissive one — deliberately NOT the config-only
+// `ruleEntryUnionSchema`, whose standard branch refine-rejects the literal `"custom"`: the SDK
+// `safeParseAsync`s this schema *before* the handler runs and turns a failure into an
+// `InvalidParams` result carrying raw validation text and no `structuredContent`, so any shape
+// rejected here can never carry the M6 `{code,message,hint}` payload. A malformed
+// `{ "rule": "custom" }` must therefore reach `handleLint`
+// and be re-validated there (see `resolveCustomRequest`). Config load stays fail-closed on the same
+// shape; only this wire schema is permissive.
+const ruleRequestSchema = z.union([customRuleEntrySchema, ruleEntrySchema]);
+
 const lintInputShape = {
   content: z.string(),
-  rules: z.array(ruleEntrySchema),
+  rules: z.array(ruleRequestSchema),
 } as const;
 
 const lintOutputShape = {
@@ -58,7 +74,9 @@ const EMPTY_LINT_OUTPUT = {
   warningCount: 0,
 } as const;
 
-type LintToolInput = { content: string; rules: RuleConfigEntry[] };
+type LintRuleRequest = RuleConfigEntry | CustomRuleConfigEntry;
+
+type LintToolInput = { content: string; rules: LintRuleRequest[] };
 
 // Error wrapping lives on the MCP boundary (architecture split: "error wrapping" is a host concern),
 // and this is the only call site that needs it so far — so the wrapper is local, not promoted to
@@ -93,16 +111,40 @@ function toToolInputError(error: RuleResolutionError): ToolInputError {
   return new ToolInputError(error.message, hint === "" ? undefined : hint);
 }
 
+// Re-validate a `rule: "custom"` request inside the handler. The wire schema's permissive branch lets
+// a malformed custom entry through on purpose (see `ruleRequestSchema`), and `entry.rule === "custom"`
+// does not narrow `RuleConfigEntry` away — its `rule` is an open `z.string()` — so this parses rather
+// than casts. That also means `handleLint`, which tests call directly, never reaches
+// `resolveCustomRule` with an absent `id` (the crash P11.07 fixed at the config boundary).
+function resolveCustomRequest(entry: LintRuleRequest): Rule {
+  const parsed = customRuleEntrySchema.safeParse(entry);
+  if (!parsed.success) {
+    const hint = parsed.error.issues
+      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+      .join("; ");
+    throw new ToolInputError(
+      'A "custom" rule entry requires "id" and "options.assert".',
+      hint === "" ? undefined : hint,
+    );
+  }
+  return resolveCustomRule(parsed.data, ruleRegistry);
+}
+
 // Resolve requested entries to runnable rules, mirroring lintFiles' resolve-then-filter of `"off"`
 // (that helper isn't exported and is only ~6 lines — not worth a core export for one caller).
 function resolveRequestedRules(
-  entries: readonly RuleConfigEntry[],
+  entries: readonly LintRuleRequest[],
 ): ResolvedRule[] {
   const resolved: ResolvedRule[] = [];
   for (const entry of entries) {
     let rule: Rule;
     try {
-      rule = ruleRegistry.resolveRule(entry.rule, entry.options);
+      // The `else` branch narrows to `RuleConfigEntry` (the literal-`"custom"` member drops out),
+      // keeping `entry.options` the `unknown` that per-rule validation expects.
+      rule =
+        entry.rule === "custom"
+          ? resolveCustomRequest(entry)
+          : ruleRegistry.resolveRule(entry.rule, entry.options);
     } catch (error) {
       if (error instanceof RuleResolutionError) {
         throw toToolInputError(error);
@@ -191,10 +233,17 @@ export function registerLintTool(server: McpServer): void {
     "lint",
     {
       title: "Lint Markdown content",
+      // This text ships on every `listTools` and is generated into the README inventory, so it stays
+      // terse. It must avoid `|` (would be escaped into the table) and `**` (Prettier destructively
+      // rewrites a glob-bearing code span nested in bold).
       description:
         "Lint ad-hoc Markdown content against an explicit set of rules. Does not load project config; " +
-        "file-resolving rules such as REF-001/REF-003 and SEC-003 may probe or read paths relative " +
-        "to the server's working directory.",
+        "file-resolving rules such as REF-001/REF-003, SEC-003 and STR-001 may probe or read paths " +
+        "inside the server's working directory; an absolute path or a `..`-escaping relative path is " +
+        "rejected rather than followed. Each entry is either a built-in rule id or a declarative " +
+        '`custom` rule (`rule: "custom"` plus `id` and `options.assert`); code plugins are never ' +
+        "loaded. Rules see one synthetic document path, `content.md`, so an `options.files` or " +
+        "`options.exclude` glob that does not match that path selects nothing.",
       inputSchema: lintInputShape,
       outputSchema: withErrorOutput(lintOutputShape),
       annotations: READ_ONLY_ANNOTATIONS,

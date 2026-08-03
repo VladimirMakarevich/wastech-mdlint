@@ -1,3 +1,8 @@
+# Prettier's default --ignore-path is BOTH .gitignore and .prettierignore (`prettier --help
+# ignore-path`), so an entry is only needed here for paths git actually tracks. That is why
+# `.claude/` and `.worc/` need a line below while `.worc-io/` does not — it is already gitignored.
+# The corollary is the one to remember: anything in .gitignore is silently outside the format gate,
+# which is why `tasks/` is not gated (P12.06 records why that is deliberate).
 dist
 coverage
 .vitest
@@ -11,6 +16,3 @@ packages/cli/schema.json
 # Agent/orchestrator tooling config, not product surface — out of scope for this repo's format gate.
 .worc/
 .claude/
-
-# Missing a trailing newline only; left as-is (governance doc, not touched incidentally by this change).
-AGENTS.md

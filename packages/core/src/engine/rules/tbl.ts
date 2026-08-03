@@ -153,7 +153,15 @@ export const tbl002: RuleDefinition = defineRule({
       context.report({ ...finding, fixable: true, helpUri: "TBL-002" });
     }
   },
-  fix: (options) => (context) => emptyCellEdits(context.document!, options),
+  // The gate is repeated here because `applyFixes` (engine/fix.ts) applies none of its own: it walks
+  // every loaded document and calls each hook, and a resolved rule's options are already closed over
+  // by `resolveRule`, so the runner cannot scope on the hook's behalf. Without this, `--fix` writes
+  // ` TODO ` into files `check` deliberately skipped. Same shape as SEC-001's hook in `sec.ts`; those
+  // two are the only `fixable: true` rules.
+  fix: (options) => (context) =>
+    matchesFileScope(context.filePath!, options)
+      ? emptyCellEdits(context.document!, options)
+      : [],
 });
 
 // TBL-003 — cell values within an allowed set.

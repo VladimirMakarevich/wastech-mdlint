@@ -73,6 +73,57 @@ describe("SIZE-001 pass case", () => {
   });
 });
 
+describe("SIZE-001 threshold supersession (P11.13 / SC-2)", () => {
+  it("reports one error finding, carrying both thresholds, when a metric crosses warn and error", async () => {
+    const cwd = await fixtureRepo({ "a.md": "l1\nl2\nl3\nl4\n" });
+    const result = await lint(cwd, [
+      rule("SIZE-001", { lines: { warn: 2, error: 3 } }),
+    ]);
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]).toMatchObject({
+      severity: "error",
+      message: "File exceeds lines error budget: 4 lines > 3.",
+      // The suppressed warn finding is lossless: `data` still names the crossed warn threshold.
+      data: { metric: "lines", actual: 4, warnAt: 2, errorAt: 3 },
+    });
+  });
+
+  it("reports one finding under a severity override that would collapse warn and error to the same severity", async () => {
+    const cwd = await fixtureRepo({ "a.md": "l1\nl2\nl3\nl4\n" });
+    const result = await lintFiles({
+      cwd,
+      config: { rules: [] },
+      rules: [
+        {
+          rule: ruleRegistry.resolveRule("SIZE-001", {
+            lines: { warn: 2, error: 3 },
+          }),
+          severity: "error",
+        },
+      ],
+      settings: {},
+    });
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.severity).toBe("error");
+  });
+
+  it("still evaluates each metric independently", async () => {
+    const cwd = await fixtureRepo({ "a.md": `${"x".repeat(40)}\nl2\n` });
+    const result = await lint(cwd, [
+      rule("SIZE-001", { lines: { error: 1 }, tokens: { warn: 5 } }),
+    ]);
+    expect(
+      result.messages.map((message) => [
+        message.data?.metric,
+        message.severity,
+      ]),
+    ).toEqual([
+      ["lines", "error"],
+      ["tokens", "warning"],
+    ]);
+  });
+});
+
 describe("SIZE-001 overrides", () => {
   it("uses the first matching override in list order when multiple patterns match", async () => {
     const cwd = await fixtureRepo({ "special/a.md": `${"x".repeat(100)}\n` });

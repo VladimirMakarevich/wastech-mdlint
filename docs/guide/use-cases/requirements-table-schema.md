@@ -2,8 +2,7 @@
 
 > [Guide](../README.md) · [Use cases](README.md) · [Rules](../rules/README.md)
 
-**Goal:** every requirements table must have `ID`, `Owner`, `Status`; IDs look like `REQ-123` and
-are unique across files; `Status` is from a fixed set; a `done` row must have an `Owner`.
+**Goal:** every requirements table must have `ID`, `Owner`, `Status`; IDs look like `REQ-123` and are unique across files; `Status` is from a fixed set; a `done` row must have an `Owner`.
 
 ```jsonc
 {
@@ -39,6 +38,4 @@ wastech-mdlint lint docs/requirements
 wastech-mdlint lint docs/requirements --fix   # TBL-002 fills empty ID/Status cells with ` TODO `
 ```
 
-**You get:** a report of tables missing columns, malformed IDs, duplicate IDs across files,
-out-of-set statuses, and `done`-without-owner rows. See
-[TBL-001](../rules/TBL-001.md)…[TBL-006](../rules/TBL-006.md).
+**You get:** a report of tables missing columns, malformed IDs, duplicate IDs across files, out-of-set statuses, and `done`-without-owner rows. See [TBL-001](../rules/TBL-001.md)…[TBL-006](../rules/TBL-006.md).
