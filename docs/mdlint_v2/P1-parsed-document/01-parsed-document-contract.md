@@ -1,34 +1,25 @@
 # P1.01 · Define the `ParsedDocument` contract (types)
 
-> Phase: [P1 — ParsedDocument & parser upgrade](index.md) · Roadmap: [v2 Index](../index.md) ·
-> Size **S** · Status **Done** · Design/types task.
+> Phase: [P1 — ParsedDocument & parser upgrade](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Done** · Design/types task.
 
 ## Goal
 
-Define the full `ParsedDocument` TypeScript contract in `@wastech-mdlint/core` — the single
-shape every later consumer reads. No extraction logic yet; this fixes the interface so
-P1.02–P1.05 just fill it.
+Define the full `ParsedDocument` TypeScript contract in `@wastech-mdlint/core` — the single shape every later consumer reads. No extraction logic yet; this fixes the interface so P1.02–P1.05 just fill it.
 
 ## Sequence
 
-- **Previous:** [P0.08 — Phase exit verification](../P0-foundations/08-exit-verification.md)
-  delivered a clean monorepo with the current implementation parser/types relocated into `core`.
-- **Next:** [P1.02 — Block structure](02-block-structure.md) implements the headings/sections/
-  tables/checklist part of this contract.
+- **Previous:** [P0.08 — Phase exit verification](../P0-foundations/08-exit-verification.md) delivered a clean monorepo with the current implementation parser/types relocated into `core`.
+- **Next:** [P1.02 — Block structure](02-block-structure.md) implements the headings/sections/ tables/checklist part of this contract.
 - **Depends on:** P0 complete · **Blocks:** all of P1.02–P1.06.
 
 ## Inputs (from previous work)
 
 - current `types.ts` (`MarkdownFile`, `MarkdownLink`, `AnchorIndex`, …) now in `core`.
-- The four consumer requirements this contract must satisfy:
-  [R8](../requirements/02-rules-engine.md), [R9](../requirements/02-rules-engine.md),
-  [G1](../requirements/03-context-graph.md)/[G3](../requirements/03-context-graph.md),
-  [D3](../index.md).
+- The four consumer requirements this contract must satisfy: [R8](../requirements/02-rules-engine.md), [R9](../requirements/02-rules-engine.md), [G1](../requirements/03-context-graph.md)/[G3](../requirements/03-context-graph.md), [D3](../index.md).
 
 ## Deliverables / steps
 
-Define (and export) `ParsedDocument` with — at minimum — these fields, each carrying line
-positions where applicable:
+Define (and export) `ParsedDocument` with — at minimum — these fields, each carrying line positions where applicable:
 
 - `headings: { text, depth, slug, line }[]` — GitHub-style `slug` for anchor resolution.
 - `sections: string[]` — heading texts for fast section checks.
@@ -42,20 +33,11 @@ positions where applicable:
 
 Document which field feeds which consumer (rule primitive / graph edge / directive / import).
 
-**Defined IDs are intentionally _not_ a field** (decided 2026-07-02, audit 2.1). Table-cell /
-heading identifiers are _derived_ from the already-parsed `tables` and `headings` by a shared
-`extractDefinedIds(doc, idRef)` helper in `core` (where `idRef = { idPattern, definitions,
-idColumn }`), consumed by both the graph builder ([P4.01](../P4-graph/01-context-graph-model.md)
-id-ref edges) and `REF-005`. Discovery is **column-based** (definitions come from the declared
-columns; `idPattern` validates the token within them — audit 5.5), not a scan of arbitrary
-cells. This keeps the parser config-light (`idPattern` is config, not a parse input) and
-avoids duplicating the `tables` data. P4 therefore does **not** re-parse Markdown — it re-scans
-the parsed `tables`/`headings` via that one helper.
+**Defined IDs are intentionally _not_ a field** (decided 2026-07-02, audit 2.1). Table-cell / heading identifiers are _derived_ from the already-parsed `tables` and `headings` by a shared `extractDefinedIds(doc, idRef)` helper in `core` (where `idRef = { idPattern, definitions, idColumn }`), consumed by both the graph builder ([P4.01](../P4-graph/01-context-graph-model.md) id-ref edges) and `REF-005`. Discovery is **column-based** (definitions come from the declared columns; `idPattern` validates the token within them — audit 5.5), not a scan of arbitrary cells. This keeps the parser config-light (`idPattern` is config, not a parse input) and avoids duplicating the `tables` data. P4 therefore does **not** re-parse Markdown — it re-scans the parsed `tables`/`headings` via that one helper.
 
 ## Decisions applied
 
-- [R9](../requirements/02-rules-engine.md) primitives · [G1](../requirements/03-context-graph.md)/[G3](../requirements/03-context-graph.md)
-  edges · [R8](../requirements/02-rules-engine.md) directives · [D3](../index.md) imports.
+- [R9](../requirements/02-rules-engine.md) primitives · [G1](../requirements/03-context-graph.md)/[G3](../requirements/03-context-graph.md) edges · [R8](../requirements/02-rules-engine.md) directives · [D3](../index.md) imports.
 
 ## Exit criteria
 
@@ -65,5 +47,4 @@ the parsed `tables`/`headings` via that one helper.
 
 ## Hand-off to next
 
-P1.02 implements the structural extractors against a frozen contract — no field will move
-under it.
+P1.02 implements the structural extractors against a frozen contract — no field will move under it.

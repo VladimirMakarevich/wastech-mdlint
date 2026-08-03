@@ -9,7 +9,7 @@ import type { ParsedDocument } from "../../markdown/document-types.js";
 import { resolveTargetCandidates } from "../path-resolve.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
 import { estimateTokens } from "../tokens.js";
-import type { RuleContext, SiteRouterSettings } from "../types.js";
+import type { ReportInput, SiteRouterSettings } from "../types.js";
 
 // LLM-001 — eager-import context budget per entrypoint (D3, P3.07). Single total budget
 // (maxTokensPerEntrypoint) — parity with the legacy llm/budget; per-type limits are out of scope
@@ -51,6 +51,14 @@ type EntrypointTraversal = {
 
 // Depth-first traversal of eager imports from one entrypoint, collecting reachable files, missing
 // imports, and cycles (dedup per entrypoint).
+//
+// `visit` recurses once per hop along the current DFS path through the eager-import graph, so its
+// stack depth is bounded by how many files one entrypoint transitively imports — not by any single
+// authored chain, since `visited` is never unwound and a branching import tree descends just as far.
+// Both are single digits in practice: `@path` imports are hand-authored, not a corpus-wide link
+// graph. `visited`/`stack` already stop a cycle from recursing forever. The same accepted "no explicit
+// depth guard" bound as the graph traversals applies (P12.05, finding SC-3), but this is the least
+// exposed of the four sites.
 function traverse(
   entrypoint: string,
   documents: Map<string, ParsedDocument>,
@@ -118,18 +126,51 @@ function traverse(
   return { importedPaths, missing, cycles };
 }
 
-function reportEntrypoint(
-  context: RuleContext,
+// Collected instead of reported inline so the rule can suppress cross-entrypoint duplicates (audit
+// L-3): entrypoints with overlapping import closures re-derive the same missing-import/cycle
+// diagnostic once per traversal. `filePath` is required — LLM-001 is a project rule, so every
+// finding self-attributes to the file it is about rather than inheriting a current document.
+type PendingFinding = ReportInput & { filePath: string };
+
+// Stable identity of a diagnostic: its location plus its rendered message. Every LLM-001 `data`
+// payload is derived 1:1 from the message it accompanies (raw/resolved target, cycle path), so equal
+// keys carry equal payloads and dropping a duplicate cannot lose information. A looser key (file +
+// line only) would collapse genuinely different diagnostics that share a position.
+function findingKey(finding: PendingFinding): string {
+  // NUL-joined because both paths and messages contain spaces: a space-separated key is not
+  // injective and could fuse two distinct findings into one.
+  return [
+    finding.filePath,
+    finding.line,
+    finding.column ?? "",
+    finding.message,
+  ].join("\u0000");
+}
+
+function comparePendingFindings(
+  left: PendingFinding,
+  right: PendingFinding,
+): number {
+  return (
+    compareStrings(left.filePath, right.filePath) ||
+    left.line - right.line ||
+    (left.column ?? 0) - (right.column ?? 0) ||
+    compareStrings(left.message, right.message)
+  );
+}
+
+// Pure per-entrypoint collection (parsed inputs in, structured findings out): it takes the
+// `siteRouter` setting rather than the whole `RuleContext`, so it cannot report and the caller owns
+// the reporting boundary where dedup happens.
+function collectEntrypointFindings(
   entrypoint: string,
   entrypointDoc: ParsedDocument,
   documents: Map<string, ParsedDocument>,
   maxTokens: number,
-): void {
-  const traversal = traverse(
-    entrypoint,
-    documents,
-    context.settings.siteRouter,
-  );
+  siteRouter: SiteRouterSettings | undefined,
+): PendingFinding[] {
+  const findings: PendingFinding[] = [];
+  const traversal = traverse(entrypoint, documents, siteRouter);
 
   let totalTokens = estimateTokens(entrypointDoc.content);
   for (const importedPath of traversal.importedPaths) {
@@ -140,7 +181,7 @@ function reportEntrypoint(
     const percentOver = (((totalTokens - maxTokens) / maxTokens) * 100).toFixed(
       1,
     );
-    context.report({
+    findings.push({
       message: `Entrypoint ${entrypoint} is over context budget: ${totalTokens} estimated tokens exceeds ${maxTokens} (${percentOver}% over).`,
       line: 0,
       filePath: entrypoint,
@@ -154,7 +195,7 @@ function reportEntrypoint(
   }
 
   for (const missing of traversal.missing) {
-    context.report({
+    findings.push({
       message: `Missing eager import ${missing.rawTarget}; resolved to ${missing.targetPath}.`,
       line: missing.line,
       column: missing.column,
@@ -165,7 +206,7 @@ function reportEntrypoint(
   }
 
   for (const cycle of traversal.cycles) {
-    context.report({
+    findings.push({
       message: `Eager import cycle detected: ${cycle.paths.join(" -> ")}.`,
       line: cycle.line,
       filePath: cycle.sourcePath,
@@ -173,6 +214,8 @@ function reportEntrypoint(
       helpUri: "LLM-001",
     });
   }
+
+  return findings;
 }
 
 export const llm001: RuleDefinition = defineRule({
@@ -197,14 +240,31 @@ export const llm001: RuleDefinition = defineRule({
       .filter((filePath) => matchesConfigGlob(filePath, options.entrypoints))
       .sort(compareStrings);
 
+    // First writer wins per identity. Entrypoints are traversed in sorted order and equal keys carry
+    // equal payloads, so the retained finding never depends on which entrypoint reached the
+    // diagnostic first. A cycle is *not* rotation-normalized: entering the same loop at a different
+    // node closes it on a different import edge, which is a different file and line the user still
+    // has to fix, so those stay separate findings.
+    const findings = new Map<string, PendingFinding>();
     for (const entrypoint of entrypoints) {
-      reportEntrypoint(
-        context,
+      for (const finding of collectEntrypointFindings(
         entrypoint,
         documents.get(entrypoint)!,
         documents,
         options.maxTokensPerEntrypoint,
-      );
+        context.settings.siteRouter,
+      )) {
+        const key = findingKey(finding);
+        if (!findings.has(key)) {
+          findings.set(key, finding);
+        }
+      }
+    }
+
+    // Sorted here rather than relying on the runner's own sort, so emission order is a property of
+    // the rule instead of Map insertion (i.e. entrypoint iteration) order.
+    for (const finding of [...findings.values()].sort(comparePendingFindings)) {
+      context.report(finding);
     }
   },
 });

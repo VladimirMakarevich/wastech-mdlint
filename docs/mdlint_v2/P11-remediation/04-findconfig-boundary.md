@@ -1,59 +1,55 @@
 # P11.04 · Bound `findConfig` walk-up + honest prompt path
 
-> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** ·
-> Status **Not started**. Audit finding **H-3** (data loss outside the project,
-> [post-P9 audit](../audit-2026-07-25-post-p9.md)).
+> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Done**. Audit finding **H-3** (data loss outside the project, [post-P9 audit](../audit-2026-07-25-post-p9.md)).
 
 ## Goal
 
-`init` must not reach outside the project to decide which config to overwrite, and it must show the
-user the honest path of a config it found.
+`init` must not reach outside the project to decide which config to overwrite, and it must show the user the honest path of a config it found.
 
 ## Problem (from the audit)
 
-`packages/core/src/config/find-config.ts:21-37` walks up to the **filesystem root** with no boundary.
-Its consumer `packages/cli/src/init-command.ts:604-619` then re-points `cwd` at
-`path.dirname(existingConfigPath)`. Reproduced: `init .` inside a fresh empty sub-project overwrote
-the **parent directory's** config (destroying `"include":["parent-only.md"]`) and wrote nothing to
-the target.
+`packages/core/src/config/find-config.ts:21-37` walks up to the **filesystem root** with no boundary. Its consumer `packages/cli/src/init-command.ts:604-619` then re-points `cwd` at `path.dirname(existingConfigPath)`. Reproduced: `init .` inside a fresh empty sub-project overwrote the **parent directory's** config (destroying `"include":["parent-only.md"]`) and wrote nothing to the target.
 
 Two aggravating details:
 
-1. **Inconsistent boundary.** `findRepositoryRoot` (`init-command.ts:419-450`) and
-   `findInstalledSchemaDir` (`:459-467`) already stop at `os.homedir()` with a comment about exactly
-   this danger. The one walk that decides **which file to clobber** is unbounded.
-2. **Dishonest prompt.** `relativeConfigPath` (`init-command.ts:616-619`) is computed as
-   `path.relative(cwd, existingConfigPath)` **after** `cwd` was re-pointed at that config's own
-   directory, so `../../wastech-mdlint.config.json` can never render. The prompt
-   (`init-prompter.ts:44`) says "An existing config was found at `wastech-mdlint.config.json`" even
-   when it is three directories up.
+1. **Inconsistent boundary.** `findRepositoryRoot` (`init-command.ts:419-450`) and `findInstalledSchemaDir` (`:459-467`) already stop at `os.homedir()` with a comment about exactly this danger. The one walk that decides **which file to clobber** is unbounded.
+2. **Dishonest prompt.** `relativeConfigPath` (`init-command.ts:616-619`) is computed as `path.relative(cwd, existingConfigPath)` **after** `cwd` was re-pointed at that config's own directory, so `../../wastech-mdlint.config.json` can never render. The prompt (`init-prompter.ts:44`) says "An existing config was found at `wastech-mdlint.config.json`" even when it is three directories up.
 
-Additionally, an explicit `[path]` argument is silently ignored when any ancestor has a config:
-`init packages/foo --yes --on-existing overwrite` overwrote the repo-root config and created nothing
-under `packages/foo`. [`docs/guide/cli.md`](../../guide/cli.md) documents `[path]` as "Directory to
-scan" and says nothing about root override.
+Additionally, an explicit `[path]` argument is silently ignored when any ancestor has a config: `init packages/foo --yes --on-existing overwrite` overwrote the repo-root config and created nothing under `packages/foo`. [`docs/guide/cli.md`](../../guide/cli.md) documents `[path]` as "Directory to scan" and says nothing about root override.
 
 ## Deliverables / steps
 
-1. Bound the `findConfig` walk-up at the repository root (or `os.homedir()`, matching its siblings in
-   `init-command.ts`). Keep `--config` override behavior unchanged.
-2. Compute the user-facing path relative to the **original** `cwd`, before any re-pointing, so a
-   config found in an ancestor renders as `../…`. Align the prompt text (`init-prompter.ts:44`).
-3. When `[path]` is given explicitly, do not re-root onto a discovered ancestor config — honor the
-   target directory. Reconcile [`docs/guide/cli.md`](../../guide/cli.md) with the final behavior.
-4. Tests: `init .` in a sub-project with a parent config does not touch the parent; the prompt shows
-   the true relative path; explicit `[path]` writes to that path and leaves ancestors untouched.
+1. Bound the `findConfig` walk-up at the repository root (or `os.homedir()`, matching its siblings in `init-command.ts`). Keep `--config` override behavior unchanged.
+2. Compute the user-facing path relative to the **original** `cwd`, before any re-pointing, so a config found in an ancestor renders as `../…`. Align the prompt text (`init-prompter.ts:44`).
+3. When `[path]` is given explicitly, do not re-root onto a discovered ancestor config — honor the target directory. Reconcile [`docs/guide/cli.md`](../../guide/cli.md) with the final behavior.
+4. Tests: `init .` in a sub-project with a parent config does not touch the parent; the prompt shows the true relative path; explicit `[path]` writes to that path and leaves ancestors untouched.
 
 ## Out of scope
 
-Changing `findConfig`'s role in the normal `lint` load path beyond adding the boundary. This task
-constrains the walk and fixes the `init` consumer; it does not redesign config discovery.
+Changing `findConfig`'s role in the normal `lint` load path beyond adding the boundary. This task constrains the walk and fixes the `init` consumer; it does not redesign config discovery.
 
 ## Exit criteria
 
-- [ ] `findConfig` stops at the repository root / home boundary, consistent with `init-command.ts`.
-- [ ] `init .` in a nested empty project never overwrites an ancestor's config.
-- [ ] The existing-config prompt shows the path relative to the original `cwd` (e.g. `../../…`).
-- [ ] An explicit `[path]` is honored, not overridden by a discovered ancestor config.
-- [ ] Regression tests cover the nested-project and explicit-`[path]` cases.
-- [ ] `npm run typecheck && npm run lint && npm run format && npm test && npm run build` green.
+- [x] `findConfig` stops at the repository root / home boundary, consistent with `init-command.ts`.
+- [x] `init .` in a nested empty project never overwrites an ancestor's config.
+- [x] The existing-config prompt shows the path relative to the original `cwd` (e.g. `../../…`).
+- [x] An explicit `[path]` is honored, not overridden by a discovered ancestor config.
+- [x] Regression tests cover the nested-project and explicit-`[path]` cases.
+- [x] `npm run typecheck && npm run lint && npm run format && npm test && npm run build` green.
+
+## Implementation notes
+
+- **`findConfig` (`packages/core/src/config/find-config.ts`) gained an `os.homedir()` boundary** applied to strict ancestors only — the starting directory is always checked for a candidate first, even when it equals `$HOME` (see "Review-round fixes" below for why this diverges from `findAncestor`'s siblings in `init-command.ts`, which reject an exact `startDir === $HOME` match too). This is a **core** change, not duplicated per-host: `findConfig` backs the shared `loadConfiguration` path both `cli` and `mcp-server` consume. No signature change, so `loadConfiguration`'s `findConfig(params.cwd)` call site and the `--config` override path (which never calls `findConfig` at all) are both unaffected.
+- **`init` now threads a new `pathWasExplicit: boolean`** from `program.ts`'s commander layer (the only place "was `[path]` typed" is knowable) down through `InitCommand` (`commands.ts`) and into `InitCommandOptions` (`init-command.ts`). `init`'s `[path]` argument lost its default value (`.argument("[path]", "directory to scan")`, no longer defaulted to `cwd`) so the action callback can tell "omitted" (`undefined`) apart from "typed, and happens to equal cwd"; `lint`/`graph`'s identical-looking `[path]` arguments were left untouched (out of scope — only `init`'s consumer needed the fix).
+- **`runInitCommand`'s existing-config resolution** now computes `discoveredConfigPath` via `findConfig` and a `targetDir` from the original (un-re-pointed) `options.cwd`, then only treats `discoveredConfigPath` as this run's `existingConfigPath` when either `pathWasExplicit` is false (a bare/default invocation — the original re-root behavior, unchanged) or the discovered config sits exactly at `targetDir` (not a strict ancestor). The re-root (`cwd = path.dirname(...)`, scan/inference/write all following it) still only happens when `existingConfigPath` is defined. `relativeConfigPath` is now computed as `path.relative(targetDir, existingConfigPath)` — against the **original** target directory, before any re-pointing — so an ancestor config renders honestly as `../…` instead of the bare filename the previous re-pointed computation always produced. No change was needed in `init-prompter.ts`: `buildExistingConfigActionPromptConfig` already interpolates whatever `configPath` string it's given; fixing the _value_ passed in was the entire "align the prompt text" fix.
+- **No new "ancestor config ignored" info message.** When an explicit target has nothing of its own but an ancestor does, the draft says "Existing config: none found." — honest about the target, silent about the ignored ancestor. Left out to avoid scope creep beyond what the deliverables and exit criteria ask for.
+- **Tests**: `packages/core/test/config-v2.test.ts` gained a `findConfig` home-boundary regression (mocks `os.homedir()`, asserts a real config sitting above the mocked home is never found). `packages/cli/test/init.e2e.test.ts`'s `describe("[path] targets a subdirectory of a repo with a root config", …)` — which had encoded the pre-fix re-root-on-explicit-path behavior as a passing test — was rewritten as `describe("explicit [path] vs. an ancestor's config found while walking up (H-3)", …)` with four cases: an explicit `[path]` under `--on-existing overwrite` and under `--on-existing merge` (both report "none found" and write fresh, since nothing exists at the exact target — the root's `package-lock.json` and config are correctly out of view); the literal H-3 repro (`init .` from inside a nested `sub-project/` with a distinguishing parent `include: ["parent-only.md"]` — a config is written under `sub-project/` and the parent's config is asserted byte-identical afterward); and a bare invocation (no `[path]` token, `io.cwd` set two levels under the config's directory) proving the pre-existing re-root still works and the prompt receives exactly `../../wastech-mdlint.config.json`.
+- **Docs updated alongside the fix**, per `AGENTS.md`'s hygiene rule: `docs/guide/cli.md` (`## init`), `README.md` (`init` paragraph), `docs/mdlint_v2/glossary.md` (`findConfig`/ `loadConfiguration`/`ConfigError` and `init` bullets), and `docs/mdlint_v2/P6-init/03-interactive-prompts.md`'s implementation note (narrowed to state the re-root only applies when `[path]` is not given explicitly) all now describe the bounded walk and the explicit-vs-omitted `[path]` distinction instead of the old unconditional/unbounded re-root.
+
+### Review-round fixes
+
+- **`findConfig`'s home boundary was checking the wrong directory set.** The first pass rejected `directory === homeDir` before ever testing that directory's candidate — including on the very first loop iteration — so a config sitting exactly at `cwd === $HOME` was never found (`lint`/MCP in `~` would silently ignore `~/wastech-mdlint.config.json`; `init` in `~` would see `existingConfigPath === undefined`, skip the prompt/skip gate entirely, and overwrite an existing home-directory config unconditionally — the same H-3 data-loss class this task removes). Fixed by checking the **starting** directory unconditionally (it is never treated as "walking above" the boundary — there is no walk yet) and applying the home-directory rejection only to strict ancestors reached by ascending. Added `"still finds a config that sits exactly at the home directory (H-3)"` next to the existing above-home regression test in `packages/core/test/config-v2.test.ts`.
+- **Confirmed: a bare/default `init` invocation (no `[path]` token at all) still re-roots onto a discovered ancestor config.** E.g. `cd sub-project && wastech-mdlint init --yes --on-existing overwrite` behaves like P6's original design, not like the explicit-`[path]` fix above — this is deliberate, not an oversight left over from the fix. The task's deliverable 3 and the "explicit `[path]` is honored" acceptance criterion both scope the honor-the-target behavior to a _typed_ `[path]`; `docs/mdlint_v2/P6-init/03-interactive-prompts.md` already documents the bare-invocation re-root as intended, unchanged P6 behavior; and the "prompt shows path relative to original cwd (e.g. `../../…`)" acceptance criterion needs a reachable case to prove it against — which only exists because the bare-invocation re-root still runs (see the plan's "hardest/most uncertain part" section and the `"a bare invocation (no [path]) still re-roots …"` test). A caller who wants the exact-target guarantee can always pass an explicit `[path]` (even `.`), which is exactly what the audit's own `init .` repro did.
+- **`notWrittenPath`'s two branches used different path bases for the same file.** The unreadable-merge abort message computed its path as `toRepoRelative(existingConfigPath)` (repo-root-relative) while the draft summary shown immediately above it used `relativeConfigPath` (target-directory-relative, can read `../…`) — for an ancestor config found during a bare invocation, these can disagree for the same file. Fixed by reusing `relativeConfigPath` directly (already computed, already correct, and `formatNotWrittenSummary` already accepts `string | undefined`); updated that function's doc comment to stop claiming the path is always repo-root-relative.
+- **Skill docs narrowed for accuracy**, not because the skill's own behavior changed (it only ever invokes `init` bare — never with an explicit `[path]` — so it always gets the unchanged re-root behavior): `docs/mdlint_v2/P8-skills/02-skill-init.md`'s "effective init root" bullet now states the skill invokes bare and cross-links here, and `skills/wastech-mdlint-init/SKILL.md` step 1's manual walk-up instruction now states the home-directory stopping point, so an agent following it can't report a config `init` would never use (or fail to find one sitting exactly at `$HOME`).
+- **Strengthened the H-3 repro test's target-side assertion** in `packages/cli/test/init.e2e.test.ts` from "a file exists" to "the written sub-project config's `include` does not contain the parent's distinguishing `parent-only.md` entry" — proving the config was actually inferred for the sub-project, not copied from the parent.

@@ -2,8 +2,7 @@
 
 > [Guide](../README.md) · [Use cases](README.md) · [Rules](../rules/README.md)
 
-**Goal:** `CLAUDE.md`/`AGENTS.md` and their eager-import (`@path`) closures stay within a token
-budget, so agents don't blow their context window.
+**Goal:** `CLAUDE.md`/`AGENTS.md` and their eager-import (`@path`) closures stay within a token budget, so agents don't blow their context window.
 
 ```jsonc
 {
@@ -35,6 +34,4 @@ budget, so agents don't blow their context window.
 wastech-mdlint lint . --fail-on warning   # surface budgets before they become errors
 ```
 
-**You get:** per-file byte/line/token warnings and errors ([SIZE-001](../rules/SIZE-001.md)), and a
-per-entrypoint total that sums the whole `@import` closure ([LLM-001](../rules/LLM-001.md)). See
-also [Concepts → token estimation](../concepts.md).
+**You get:** per-file byte/line/token warnings and errors ([SIZE-001](../rules/SIZE-001.md)), and a per-entrypoint total that sums the whole `@import` closure ([LLM-001](../rules/LLM-001.md)). See also [Concepts → token estimation](../concepts.md).

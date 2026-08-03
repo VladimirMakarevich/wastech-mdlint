@@ -72,6 +72,13 @@ export const compileConfigSchema = z
 export type CompileConfig = z.infer<typeof compileConfigSchema>;
 
 // A standard rule entry (built-in rules). Options are validated per-rule by resolveRule (two-stage).
+// This schema is also the built-in branch of the MCP `lint` tool's public wire schema, which P12.04
+// widened to z.union([customRuleEntrySchema, ruleEntrySchema]) (packages/mcp-server/src/tools/lint.ts).
+// It must stay permissive about `rule: "custom"` there: the MCP SDK validates tool input *before* the
+// handler runs, so a malformed custom entry rejected at the wire would come back as raw
+// InvalidParams text with no structuredContent instead of the M6 { code, message, hint } payload —
+// it has to reach the handler to fail as INVALID_INPUT. The config-only exclusion of "custom" lives on `standardRuleEntrySchema` below
+// instead of narrowing this shared schema, keeping config load fail-closed on the same shape.
 export const ruleEntrySchema = z
   .object({
     rule: z.string().min(1),
@@ -99,11 +106,26 @@ export const customRuleEntrySchema = z
   })
   .strict();
 
+// Config-only wrapper that rejects the literal "custom" (audit M-3): without it, {"rule":"custom"}
+// (missing `id`) matched the permissive `ruleEntrySchema` instead of `customRuleEntrySchema` and
+// crashed in resolveCustomRule's canonicalizeRuleId(undefined). The refine is scoped to this wrapper
+// rather than `ruleEntrySchema` itself because that schema is shared with the MCP `lint` tool's wire
+// schema (see the comment above `ruleEntrySchema`), which must keep accepting "custom" there.
+const standardRuleEntrySchema = ruleEntrySchema.refine(
+  (entry) => entry.rule !== "custom",
+  {
+    message: 'a "custom" rule entry also requires "id" and "options.assert"',
+  },
+);
+
 // Custom entries (rule: "custom") match the custom schema; everything else is a standard entry.
 // Ordered custom-first so a custom entry's extra keys aren't rejected by the strict standard schema.
+// `standardRuleEntrySchema` also refine-rejects the literal "custom" (above), so a malformed custom
+// entry can never fall through to the permissive standard schema — it must satisfy
+// customRuleEntrySchema or the whole union fails as CONFIG_INVALID.
 export const ruleEntryUnionSchema = z.union([
   customRuleEntrySchema,
-  ruleEntrySchema,
+  standardRuleEntrySchema,
 ]);
 
 export const lintConfigSchema = z

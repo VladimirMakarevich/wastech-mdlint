@@ -118,6 +118,30 @@ describe("table primitives", () => {
     ).toHaveLength(2);
   });
 
+  // @boundary-guard determinism
+  //
+  // P11.05. A `RegExp` carrying `g`/`y` keeps `lastIndex` between `.test()` calls, so a shared
+  // instance makes findings depend on evaluation order — the determinism invariant's failure mode
+  // that no amount of in-process rule testing surfaces unless a case deliberately alternates
+  // matching and non-matching rows, as this one does.
+  it('columnMatches is order-independent under a stateful "g" flag', () => {
+    const table = [
+      "| ID |",
+      "| --- |",
+      "| REQ-1 |",
+      "| REQ-2 |",
+      "| BUG-1 |",
+    ].join("\n");
+
+    const findings = columnMatches(doc(table), {
+      column: "ID",
+      pattern: "^REQ-\\d+$",
+      flags: "g",
+    });
+
+    expect(findings.map((finding) => finding.data?.value)).toEqual(["BUG-1"]);
+  });
+
   it("crossColumn enforces a when→then conditional", () => {
     const table = [
       "| Status | Resolution |",
@@ -146,6 +170,23 @@ describe("table primitives", () => {
       filePath: "b.md",
       data: { value: "REQ-1", firstSeenIn: "a.md" },
     });
+  });
+
+  it("columnUnique honors an exclude-only fileMatches even when options.files is omitted", () => {
+    const a = doc("| ID |\n| --- |\n| REQ-1 |\n", "a.md");
+    const excluded = doc("| ID |\n| --- |\n| REQ-1 |\n", "archive/old.md");
+    const documents = new Map([
+      [a.path, a],
+      [excluded.path, excluded],
+    ]);
+
+    const findings = columnUnique(
+      { documents },
+      { column: "ID" },
+      (filePath) => !filePath.startsWith("archive/"),
+    );
+
+    expect(findings).toHaveLength(0);
   });
 });
 
@@ -187,6 +228,17 @@ describe("content & checklist primitives", () => {
     });
     expect(findings).toHaveLength(1);
     expect(findings[0]?.line).toBe(2);
+  });
+
+  it("contentNotMatch anchors every match, including two on one line and one past a CRLF", () => {
+    // The line index is built once per call now; two matches sharing a line and a match after a
+    // `\r\n` are where a shared-index off-by-one would show up first.
+    const findings = contentNotMatch(
+      doc("secret=a and secret=b\nplain\r\nsecret=c\n"),
+      { pattern: "secret=" },
+    );
+
+    expect(findings.map((finding) => finding.line)).toEqual([1, 1, 3]);
   });
 
   it("noPlaceholders flags empty and placeholder-only sections but not prose mentions", () => {
@@ -274,6 +326,61 @@ describe("reference primitives", () => {
       "missing.png",
     ]);
   });
+
+  // Audit H-2 class sweep: a relative link/image target whose leading `../` segments exactly
+  // cancel the source directory can leave a bare drive-absolute remainder (e.g. `C:/Users/...`)
+  // that `escapesRoot`'s literal `..`-prefix check would miss, and that `path.win32.resolve` then
+  // treats as absolute — ignoring `rootDir` entirely, just like SEC-003's H-2 repro. Windows-only:
+  // on POSIX the remainder is just a harmless relative segment named "C:".
+  it.runIf(process.platform === "win32")(
+    "linkResolves rejects a `..`-cancelled drive-absolute target instead of treating it as resolved",
+    async () => {
+      const outsideRoot = await mkdtemp(
+        path.join(os.tmpdir(), "wastech-mdlint-ref-escape-"),
+      );
+      tempDirs.push(outsideRoot);
+      const secretPath = path.join(outsideRoot, "secret.md");
+      await writeFile(secretPath, "# Secret\n", "utf8");
+      // One "../" exactly cancels the source's own "sub" directory below, leaving the absolute
+      // remainder untouched.
+      const rawTarget = `../${secretPath.replaceAll("\\", "/")}`;
+
+      const source = doc(`[x](${rawTarget})\n`, "sub/doc.md");
+      const findings = linkResolves(
+        source,
+        { documents: new Map(), rootDir: "/nonexistent-root", settings: {} },
+        {},
+      );
+
+      expect(findings.map((finding) => finding.data?.target)).toEqual([
+        rawTarget,
+      ]);
+    },
+  );
+
+  it.runIf(process.platform === "win32")(
+    "imageResolves rejects a `..`-cancelled drive-absolute target instead of treating it as resolved",
+    async () => {
+      const outsideRoot = await mkdtemp(
+        path.join(os.tmpdir(), "wastech-mdlint-img-escape-"),
+      );
+      tempDirs.push(outsideRoot);
+      const secretPath = path.join(outsideRoot, "secret.png");
+      await writeFile(secretPath, "x", "utf8");
+      const rawTarget = `../${secretPath.replaceAll("\\", "/")}`;
+
+      const source = doc(`![x](${rawTarget})\n`, "sub/doc.md");
+      const findings = imageResolves(
+        source,
+        { documents: new Map(), rootDir: "/nonexistent-root", settings: {} },
+        {},
+      );
+
+      expect(findings.map((finding) => finding.data?.target)).toEqual([
+        rawTarget,
+      ]);
+    },
+  );
 });
 
 describe("runAssertion dispatch", () => {

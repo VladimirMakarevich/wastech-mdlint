@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { extractDocProfile } from "../src/compile/doc-profile.js";
+import {
+  extractDocProfile,
+  extractDocProfiles,
+} from "../src/compile/doc-profile.js";
 import { buildContextGraph } from "../src/graph/build-context-graph.js";
-import type { BuildContextGraphOptions } from "../src/graph/context-graph-types.js";
+import type {
+  BuildContextGraphOptions,
+  ContextGraph,
+  ContextGraphEdge,
+} from "../src/graph/context-graph-types.js";
 import type { ParsedDocument } from "../src/markdown/document-types.js";
 import { parseDocument } from "../src/markdown/parse-document.js";
 
@@ -31,6 +38,90 @@ function getDocument(
 
   return document;
 }
+
+// Shared between the single-document and batch describes so the pinned profile literal exists in
+// exactly one place: `extractDocProfile` and `extractDocProfiles` build profiles through the same
+// helper, so asserting the batch against the single result alone would not catch a shared bug.
+const REFERENCE_ENTRIES: Record<string, string> = {
+  "consumer.md": [
+    "# Usage",
+    "See [goal](target.md#goal).",
+    "@shared.md",
+    "Blocks REQ-001.",
+    "",
+  ].join("\n"),
+  "defs.md": [
+    "# Requirements",
+    "",
+    "| ID | Summary |",
+    "| --- | --- |",
+    "| REQ-001 | Stable |",
+    "",
+  ].join("\n"),
+  "inbound.md": [
+    "[consumer section](consumer.md#usage)",
+    "@consumer.md",
+    "",
+  ].join("\n"),
+  "shared.md": "# Shared\n",
+  "target.md": "# Goal\n",
+};
+
+const REFERENCE_OPTIONS: BuildContextGraphOptions = {
+  idRef: {
+    idPattern: "^REQ-\\d+$",
+    definitions: ["defs.md"],
+    idColumn: "ID",
+  },
+};
+
+const EXPECTED_CONSUMER_PROFILE = {
+  role: "bridge",
+  outline: [{ text: "Usage", depth: 1, slug: "usage", line: 1 }],
+  tableSchemas: [],
+  idPattern: undefined,
+  referencesTo: [
+    {
+      from: "consumer.md",
+      to: "defs.md",
+      type: "id-ref",
+      line: 4,
+      rawTarget: "REQ-001",
+    },
+    {
+      from: "consumer.md",
+      to: "shared.md",
+      type: "import",
+      line: 3,
+      rawTarget: "@shared.md",
+    },
+    {
+      from: "consumer.md",
+      to: "target.md",
+      type: "anchor",
+      line: 2,
+      text: "goal",
+      rawTarget: "target.md#goal",
+    },
+  ],
+  referencedBy: [
+    {
+      from: "inbound.md",
+      to: "consumer.md",
+      type: "anchor",
+      line: 1,
+      text: "consumer section",
+      rawTarget: "consumer.md#usage",
+    },
+    {
+      from: "inbound.md",
+      to: "consumer.md",
+      type: "import",
+      line: 2,
+      rawTarget: "@consumer.md",
+    },
+  ],
+};
 
 describe("extractDocProfile", () => {
   it("projects outline and table schemas in source order and detects one table ID family", () => {
@@ -106,88 +197,13 @@ describe("extractDocProfile", () => {
 
   it("uses the semantic graph edges for outgoing and incoming references", () => {
     const { documents, graph } = contextOf(
-      {
-        "consumer.md": [
-          "# Usage",
-          "See [goal](target.md#goal).",
-          "@shared.md",
-          "Blocks REQ-001.",
-          "",
-        ].join("\n"),
-        "defs.md": [
-          "# Requirements",
-          "",
-          "| ID | Summary |",
-          "| --- | --- |",
-          "| REQ-001 | Stable |",
-          "",
-        ].join("\n"),
-        "inbound.md": [
-          "[consumer section](consumer.md#usage)",
-          "@consumer.md",
-          "",
-        ].join("\n"),
-        "shared.md": "# Shared\n",
-        "target.md": "# Goal\n",
-      },
-      {
-        idRef: {
-          idPattern: "^REQ-\\d+$",
-          definitions: ["defs.md"],
-          idColumn: "ID",
-        },
-      },
+      REFERENCE_ENTRIES,
+      REFERENCE_OPTIONS,
     );
 
     expect(
       extractDocProfile(getDocument(documents, "consumer.md"), graph),
-    ).toEqual({
-      role: "bridge",
-      outline: [{ text: "Usage", depth: 1, slug: "usage", line: 1 }],
-      tableSchemas: [],
-      idPattern: undefined,
-      referencesTo: [
-        {
-          from: "consumer.md",
-          to: "defs.md",
-          type: "id-ref",
-          line: 4,
-          rawTarget: "REQ-001",
-        },
-        {
-          from: "consumer.md",
-          to: "shared.md",
-          type: "import",
-          line: 3,
-          rawTarget: "@shared.md",
-        },
-        {
-          from: "consumer.md",
-          to: "target.md",
-          type: "anchor",
-          line: 2,
-          text: "goal",
-          rawTarget: "target.md#goal",
-        },
-      ],
-      referencedBy: [
-        {
-          from: "inbound.md",
-          to: "consumer.md",
-          type: "anchor",
-          line: 1,
-          text: "consumer section",
-          rawTarget: "consumer.md#usage",
-        },
-        {
-          from: "inbound.md",
-          to: "consumer.md",
-          type: "import",
-          line: 2,
-          rawTarget: "@consumer.md",
-        },
-      ],
-    });
+    ).toEqual(EXPECTED_CONSUMER_PROFILE);
   });
 
   it("threads the hub threshold through role lookup instead of hard-coding the default", () => {
@@ -225,6 +241,93 @@ describe("extractDocProfile", () => {
 
     expect(extractDocProfile(document, graph)).toEqual(
       extractDocProfile(document, graph),
+    );
+  });
+});
+
+// The batch entry point indexes the graph once for the whole corpus (audit L-5). These assertions
+// are the byte-identity guard for that refactor: same profiles, same edge order, same throw.
+describe("extractDocProfiles", () => {
+  it("produces the same pinned profile as the single-document path, edge order included", () => {
+    const { documents, graph } = contextOf(
+      REFERENCE_ENTRIES,
+      REFERENCE_OPTIONS,
+    );
+
+    const profiles = extractDocProfiles(documents.values(), graph);
+
+    expect(profiles.get("consumer.md")).toEqual(EXPECTED_CONSUMER_PROFILE);
+  });
+
+  it("matches a per-document extractDocProfile map across the whole corpus", () => {
+    const { documents, graph } = contextOf(
+      REFERENCE_ENTRIES,
+      REFERENCE_OPTIONS,
+    );
+
+    const batch = extractDocProfiles(documents.values(), graph);
+    const individual = new Map(
+      [...documents.values()].map((document) => [
+        document.path,
+        extractDocProfile(document, graph),
+      ]),
+    );
+
+    expect([...batch.keys()].sort()).toEqual([...individual.keys()].sort());
+    expect(batch).toEqual(individual);
+  });
+
+  it("threads the hub threshold through the batch path", () => {
+    const { documents, graph } = contextOf({
+      "a.md": "[bridge](bridge.md)\n[leaf](leaf.md)\n",
+      "b.md": "[bridge](bridge.md)\n[leaf](leaf.md)\n",
+      "bridge.md": "[sink](sink.md)\n",
+      "c.md": "[bridge](bridge.md)\n[leaf](leaf.md)\n",
+      "leaf.md": "# Leaf\n",
+      "sink.md": "# Sink\n",
+    });
+
+    expect(
+      extractDocProfiles(documents.values(), graph).get("bridge.md")?.role,
+    ).toBe("hub");
+    expect(
+      extractDocProfiles(documents.values(), graph, { hubMinInDegree: 4 }).get(
+        "bridge.md",
+      )?.role,
+    ).toBe("bridge");
+  });
+
+  it("lists a self-edge as both an outgoing and an incoming reference", () => {
+    // `buildContextGraph` never emits a self-edge, but the two `filter` passes this replaced would
+    // have counted one on both sides — a hand-built graph pins that the single pass still does.
+    const document = parseDocument({ path: "self.md", content: "# Self\n" });
+    const selfEdge: ContextGraphEdge = {
+      from: "self.md",
+      to: "self.md",
+      type: "link",
+      line: 1,
+    };
+    const graph: ContextGraph = {
+      nodes: [{ path: "self.md", inDegree: 1, outDegree: 1 }],
+      edges: [selfEdge],
+      cycles: [],
+    };
+
+    const profile = extractDocProfiles([document], graph).get("self.md");
+
+    expect(profile?.referencesTo).toEqual([selfEdge]);
+    expect(profile?.referencedBy).toEqual([selfEdge]);
+    // Buckets are shared inside the index, so each profile must receive its own copies.
+    expect(profile?.referencesTo[0]).not.toBe(selfEdge);
+    expect(profile?.referencesTo).not.toBe(profile?.referencedBy);
+  });
+
+  it("throws for a document that is absent from the graph nodes", () => {
+    const { graph } = contextOf({ "a.md": "# A\n" });
+    const absent = parseDocument({ path: "missing.md", content: "# M\n" });
+
+    expect(() => extractDocProfiles([absent], graph)).toThrow(
+      'Cannot extract profile for "missing.md": document is not present in the graph.',
     );
   });
 });

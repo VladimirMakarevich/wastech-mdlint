@@ -2,9 +2,7 @@
 
 > [Guide index](README.md) · [Configuration](configuration.md) · [Rules](rules/README.md)
 
-Suppress findings inline with HTML-comment directives. Use this for intentional exceptions — a
-deliberately broken example link, a placeholder that is expected — without turning a rule
-`"off"` project-wide.
+Suppress findings inline with HTML-comment directives. Use this for intentional exceptions — a deliberately broken example link, a placeholder that is expected — without turning a rule `"off"` project-wide.
 
 ## Directives
 
@@ -20,11 +18,11 @@ deliberately broken example link, a placeholder that is expected — without tur
 | REQ-1 | |
 ```
 
-| Directive                                | Effect                                                                       |
-| ---------------------------------------- | ---------------------------------------------------------------------------- |
-| `wastech-mdlint-disable [IDs]`           | Disable the listed rules from here until a matching `enable` or end of file. |
-| `wastech-mdlint-enable [IDs]`            | Re-enable the listed rules.                                                  |
-| `wastech-mdlint-disable-next-line [IDs]` | Disable the listed rules for the **next line only**.                         |
+| Directive | Effect |
+| --- | --- |
+| `wastech-mdlint-disable [IDs]` | Disable the listed rules from here until a matching `enable` or end of file. |
+| `wastech-mdlint-enable [IDs]` | Re-enable the listed rules. |
+| `wastech-mdlint-disable-next-line [IDs]` | Disable the listed rules for the **next line only**. |
 
 ## Rules
 
@@ -36,7 +34,4 @@ deliberately broken example link, a placeholder that is expected — without tur
 
 ## Scope note
 
-Inline suppression is line-anchored, so it naturally fits document-scope findings. Project-scope
-findings (e.g. [GRP-001](rules/GRP-001.md)) are anchored to a file/line too and can be suppressed
-where they are reported; prefer configuring the rule's options (entry points, excludes) for
-structural exceptions rather than scattering suppressions.
+Inline suppression is line-anchored, so it naturally fits document-scope findings. Project-scope findings (e.g. [GRP-001](rules/GRP-001.md)) are anchored to a file/line too and can be suppressed where they are reported; prefer configuring the rule's options (entry points, excludes) for structural exceptions rather than scattering suppressions.

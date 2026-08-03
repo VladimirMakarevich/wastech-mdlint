@@ -1,9 +1,12 @@
 import { readFile, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
-import ignore, { type Ignore } from "ignore";
-
 import { compareStrings } from "../deterministic-sort.js";
+import {
+  isGitIgnored,
+  readIgnoreLayer,
+  type IgnoreLayer,
+} from "../discovery/gitignore-layers.js";
 import {
   matchesConfigGlob,
   normalizeRelativePath,
@@ -20,11 +23,6 @@ export type LoadDocumentsOptions = {
   respectGitignore?: boolean;
 };
 
-// A `.gitignore` and the directory (repo-relative POSIX) that owns it. Each file is kept as its own
-// matcher so within-file negation (`!keep.md`) resolves correctly; git's "can't re-include under an
-// excluded parent" rule is honored naturally because ignored directories are pruned before descent.
-type IgnoreLayer = { baseRel: string; ig: Ignore };
-
 function toPosixAbsolute(absolutePath: string): string {
   return absolutePath.replaceAll("\\", "/");
 }
@@ -35,51 +33,6 @@ function isInsideRoot(candidatePath: string, rootRealPath: string): boolean {
     relative === "" ||
     (!relative.startsWith("..") && !path.isAbsolute(relative))
   );
-}
-
-// Test a repo-relative path against the active gitignore layers. Directories are queried with a
-// trailing slash so directory-only patterns (`node_modules/`) match (see the `ignore` API).
-function isGitIgnored(
-  relPath: string,
-  isDirectory: boolean,
-  layers: IgnoreLayer[],
-): boolean {
-  for (const layer of layers) {
-    let relToBase: string;
-
-    if (layer.baseRel === "") {
-      relToBase = relPath;
-    } else if (relPath.startsWith(`${layer.baseRel}/`)) {
-      relToBase = relPath.slice(layer.baseRel.length + 1);
-    } else {
-      continue;
-    }
-
-    if (relToBase.length === 0) {
-      continue;
-    }
-
-    if (layer.ig.ignores(isDirectory ? `${relToBase}/` : relToBase)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-async function readIgnoreLayer(
-  directoryPath: string,
-  relDirectory: string,
-): Promise<IgnoreLayer | undefined> {
-  try {
-    const content = await readFile(
-      path.join(directoryPath, ".gitignore"),
-      "utf8",
-    );
-    return { baseRel: relDirectory, ig: ignore().add(content) };
-  } catch {
-    return undefined;
-  }
 }
 
 function shouldPruneDirectory(

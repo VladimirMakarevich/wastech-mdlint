@@ -1,23 +1,14 @@
 # P11.01 · Fix the CLI `bin` no-op through the npm symlink
 
-> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** ·
-> Status **Not started**. Audit finding **H-1** (release-blocking,
-> [post-P9 audit](../audit-2026-07-25-post-p9.md)). Staged as
-> [`tasks/pending/p11-01-cli-bin-noop.md`](../../../tasks/pending/p11-01-cli-bin-noop.md).
+> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Done**. Audit finding **H-1** (release-blocking, [post-P9 audit](../audit-2026-07-25-post-p9.md)). Staged as [`tasks/pending/p11-01-cli-bin-noop.md`](../../../tasks/pending/p11-01-cli-bin-noop.md).
 
 ## Goal
 
-`wastech-mdlint` must actually run when invoked the way users install it — `npx`, a local
-`node_modules/.bin` shim, or a global `npm i -g`. Today it exits `0` having done nothing on
-macOS/Linux.
+`wastech-mdlint` must actually run when invoked the way users install it — `npx`, a local `node_modules/.bin` shim, or a global `npm i -g`. Today it exits `0` having done nothing on macOS/Linux.
 
 ## Problem (from the audit)
 
-`packages/cli/src/index.ts:8-16` guards the entrypoint by comparing `path.resolve(process.argv[1])`
-with `fileURLToPath(import.meta.url)`. `process.argv[1]` holds the **symlink** path; `import.meta.url`
-resolves to the **realpath**; `path.resolve` does not dereference symlinks. npm/pnpm/yarn install a
-`bin` as a symlink on POSIX, so the condition is never true and the process exits `0` without parsing
-argv. Reproduced on the built `dist`:
+`packages/cli/src/index.ts:8-16` guards the entrypoint by comparing `path.resolve(process.argv[1])` with `fileURLToPath(import.meta.url)`. `process.argv[1]` holds the **symlink** path; `import.meta.url` resolves to the **realpath**; `path.resolve` does not dereference symlinks. npm/pnpm/yarn install a `bin` as a symlink on POSIX, so the condition is never true and the process exits `0` without parsing argv. Reproduced on the built `dist`:
 
 ```
 $ ./node_modules/.bin/wastech-mdlint --version   → (no output)  exit=0
@@ -25,38 +16,33 @@ $ npx wastech-mdlint --version                    → (no output)  exit=0
 $ node packages/cli/dist/index.js --version       → 0.0.0        exit=0
 ```
 
-Blast radius: the CI workflow that `init` emits
-(`packages/core/src/discovery/config-writer.ts:177` → `npx wastech-mdlint lint --fail-on error`)
-passes green forever regardless of findings. Windows `.cmd` shims pass a real relative path and
-likely work — a cross-platform divergence in a repo whose invariants mandate parity.
-`packages/mcp-server/src/index.ts:52-57` has the same pattern. Root cause of it shipping: **no test
-spawns the binary** — every test calls `runCli()` directly, so `src/index.ts` has 0% coverage while
-130/130 CLI tests are green.
+Blast radius: the CI workflow that `init` emits (`packages/core/src/discovery/config-writer.ts:177` → `npx wastech-mdlint lint --fail-on error`) passes green forever regardless of findings. Windows `.cmd` shims pass a real relative path and likely work — a cross-platform divergence in a repo whose invariants mandate parity. `packages/mcp-server/src/index.ts:52-57` has the same pattern. Root cause of it shipping: **no test spawns the binary** — every test calls `runCli()` directly, so `src/index.ts` has 0% coverage while 130/130 CLI tests are green.
 
 ## Deliverables / steps
 
-1. Fix the guard in `packages/cli/src/index.ts` to compare **realpaths** (e.g.
-   `fs.realpathSync(invokedPath)`), keeping the `undefined`-argv guard and handling an
-   `invokedPath` that does not exist on disk without throwing.
+1. Fix the guard in `packages/cli/src/index.ts` to compare **realpaths** (e.g. `fs.realpathSync(invokedPath)`), keeping the `undefined`-argv guard and handling an `invokedPath` that does not exist on disk without throwing.
 2. Apply the same fix to `packages/mcp-server/src/index.ts:52-57`, or document why it is unaffected.
-3. Add the repository's **first process-level test**: spawn the installed bin through
-   `node_modules/.bin/` (and the `.cmd` shim where the platform provides it) and assert real stdout
-   and exit code for `--version` and a `lint` run with a known finding count. This is the regression
-   guard — the fix without it re-opens the hole on the next refactor.
-4. Confirm the still-correct behavior the guard exists for: importing `index.js` from a test must not
-   execute the CLI as a side effect.
+3. Add the repository's **first process-level test**: spawn the installed bin through `node_modules/.bin/` (and the `.cmd` shim where the platform provides it) and assert real stdout and exit code for `--version` and a `lint` run with a known finding count. This is the regression guard — the fix without it re-opens the hole on the next refactor.
+4. Confirm the still-correct behavior the guard exists for: importing `index.js` from a test must not execute the CLI as a side effect.
+5. Confirm the generated CI workflow actually fails on findings once the bin works — a smoke check that `npx wastech-mdlint lint --fail-on error` returns a non-zero exit on a fixture with an error-severity finding.
 
 ## Out of scope
 
-Restructuring `program.ts` or the command surface. This task changes only the two entrypoint files
-plus the new test, and adds no runtime dependency.
+Restructuring `program.ts` or the command surface. This task changes only the two entrypoint files plus the new test, and adds no runtime dependency.
 
 ## Exit criteria
 
-- [ ] `./node_modules/.bin/wastech-mdlint --version` prints the version and exits `0`.
-- [ ] `npx wastech-mdlint lint <fixture-with-error>` exits non-zero and prints findings.
-- [ ] `node packages/cli/dist/index.js --version` still works (no direct-path regression).
-- [ ] Importing `packages/cli/dist/index.js` from a test does not run the CLI.
-- [ ] A spawning test exists and fails if the guard regresses; it runs on `ubuntu`/`windows`/`macos`.
-- [ ] `packages/mcp-server/src/index.ts` is fixed the same way or documented as unaffected.
-- [ ] `npm run typecheck && npm run lint && npm run format && npm test && npm run build` green.
+- [x] `./node_modules/.bin/wastech-mdlint --version` prints the version and exits `0` — verified through the equivalent symlink/junction spawn in `packages/cli/test/bin.e2e.test.ts` and, on POSIX, through a real `node_modules/.bin` symlink driven by real `npx`. The literal ambient workspace link is deliberately not what the test asserts against; see the implementation notes for why it is absent on a clean checkout.
+- [x] `npx wastech-mdlint lint <fixture-with-error>` exits non-zero and prints findings (POSIX; the Windows shim path is covered by the junction spawns instead — see the notes).
+- [x] `node packages/cli/dist/index.js --version` still works (no direct-path regression).
+- [x] Importing `packages/cli/dist/index.js` from a test does not run the CLI.
+- [x] A spawning test exists and fails if the guard regresses; it runs on `ubuntu`/`windows`/`macos`.
+- [x] `packages/mcp-server/src/index.ts` is fixed the same way or documented as unaffected.
+- [x] `npm run typecheck && npm run lint && npm run format && npm test && npm run build` green.
+
+## Implementation notes
+
+- **Realpath dereference with a non-throwing fallback, dereferenced on _both_ sides, in both entrypoints.** Both `packages/cli/src/index.ts` and `packages/mcp-server/src/index.ts` had the identical `path.resolve(invokedPath) === modulePath` guard, so `mcp-server` was confirmed affected, not documented as unaffected. Each file gained a small `realOrSelf` helper that calls `fs.realpathSync` and falls back to the unresolved candidate on failure (e.g. an already-deleted `argv[1]`) — the fallback can never equal the other, dereferenced side, so the "importing must not execute" guarantee for that case is unchanged. The comparison dereferences `modulePath` too (`realOrSelf(path.resolve(invokedPath)) === realOrSelf(modulePath)`), not just `invokedPath`: `import.meta.url` is only a realpath under Node's _default_ module resolution, and a review pass caught that `--preserve-symlinks`/`--preserve-symlinks-main` keeps it as the symlink path too, which would have silently reopened H-1 in that mode with a one-sided fix. The helper is duplicated rather than shared: the two files already duplicated the guard independently, and this is process-bootstrap logic, not part of the pipeline `core` owns.
+- **`packages/cli/test/bin.e2e.test.ts` — the repository's first process-spawn test — manufactures the install shape itself rather than depending on the ambient `node_modules/.bin` link.** A review pass found the first draft's reliance on the real, npm-linked `node_modules/.bin/wastech-mdlint` would fail on a clean CI run: this repo's own `.github/workflows/ci.yml` runs `npm ci` _before_ `npm run typecheck`/`build` ever produces `dist/`, and reading npm's own bundled `bin-links` package (`link-gently.js`, `shim-bin.js`) confirms both the POSIX symlink and the Windows `.cmd`/`.ps1` shim are skipped entirely when the bin's target file doesn't exist yet at install time — confirmed live in this repo, where a fresh `tsc -b` always emits `dist/index.js` at mode `644`, so even a pre-existing ambient symlink hits `EACCES` on direct invocation. The primary "H-1 regression guard" tests now build a POSIX symlink (or, on Windows, a directory junction — the shape a workspace/global-linked install actually produces there, needing no elevated privileges, unlike a file symlink) in an isolated temp dir pointing at the built `dist/index.js`, then invoke it via `process.execPath` directly. This reproduces the exact `argv[1]`-vs-`import.meta.url` mismatch without depending on npm's bin-linking timing or the target's executable bit. Reverting the guard fix fails the two symlink/junction tests in that block (plus the `npx` check), while the direct-dist and import-safety tests keep passing — as they must: the direct path worked even with the bug, so they pin the behavior the guard protects rather than the defect. That asymmetry is the point: only the symlink-path assertions are the actual regression guard. Every spawning `it()` carries an explicit `30_000`ms timeout rather than vitest's 5s default: each does a cold `process.execPath`/`npx` start that ESM-loads `commander`, `@wastech-mdlint/core` (remark/unified), and `@inquirer/prompts`, which is tight against 5s on `windows-latest`. The `lint`-fixture assertions pin the deterministic summary line (`1 problem (1 error, 0 warnings)`), not just the rule ID, so the test actually checks a known finding _count_. `assertBuilt()` also fails on a stale (not just missing) `dist/index.js` by comparing its mtime against `src/index.ts`'s, matching what the header comment already claimed.
+- **The `npx` smoke check (deliverable 5) manufactures its own local-bin fixture and actually runs on `ubuntu`/`macos`, rather than depending on — and, in the reviewed draft, silently skipping against — the ambient `node_modules/.bin` link.** The first draft claimed "npx's own upward lookup can't be redirected into a temp dir" and skipped itself whenever the ambient link wasn't present and executable, which is exactly the state a fresh CI checkout leaves it in before `dist/` is built — so the check never ran anywhere, and the two exit-criteria boxes it was meant to back were checked off unverified. Reading `@npmcli/config` and `libnpmexec` (npm's own bundled sources) shows the claim was wrong: `npx` resolves its local bin by walking up from its own `cwd` for the nearest `package.json`/`node_modules`, so pointing `cwd` at a manufactured directory with a `package.json` and a `node_modules/.bin/wastech-mdlint` symlink (chmod'd `0o755`, mirroring `bin-links`' own `fixBin` side effect on the target) does redirect the lookup there — confirmed by spawning real `npx --no-install wastech-mdlint --version` against exactly that shape, with no network access. **The `cwd` is the whole no-network guarantee.** The `--no-install` flag the spawn also passes should not be read as a second line of defense: it is an npx-v6 spelling that npm 7+ has no matching config for, so it parses as an unknown CLI config and would not stop `npm exec` from reaching the registry if local resolution ever failed. (A bare `--no` is worse still — it mis-parses and prints npm's _own_ version instead of forwarding to the CLI.) The flag is harmless where it sits but load-bearing nowhere; dropping it, or replacing it with a spelling the pinned npm actually honours, is a follow-up cleanup for a code pass. This check still skips on Windows, but for a real, narrower reason: making the manufactured bin actually resolve through `cmd.exe`'s `PATHEXT` machinery the way the real, ambient install does would mean hand-rolling npm's own `cmd-shim` templating, which is out of scope here — the guard fix itself is already verified on Windows by the junction-based spawns in the primary "installed-bin" describe block above, so this check only adds POSIX confidence for the real `npx` binary specifically. One knowingly accepted side effect: the check `chmod`s the built `dist/index.js` to `0o755` and does not restore the mode, because `npx` execs the symlink's _target_ and npm's own `fixBin` sets the same bit at install time. It mutates a git-ignored build artifact into the state a real install would produce anyway, so restoring it would make the fixture less faithful, not more.
+- **No new mcp-server spawn test.** The task's spawn-test deliverable is CLI-shaped (`--version` stdout, a `lint` run); three existing mcp-server tests already import `../src/index.js` directly and continue to exercise "importing must not auto-start" unchanged by the fix.

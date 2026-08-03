@@ -4,16 +4,13 @@
 
 ## Context
 
-Three packages need to lint files: `cli`, `mcp-server`, and a future `lsp-server`. Each
-could implement its own glob → read → parse → run-rules → format pipeline, but:
+Three packages need to lint files: `cli`, `mcp-server`, and a future `lsp-server`. Each could implement its own glob → read → parse → run-rules → format pipeline, but:
 
 - bug fixes in the pipeline would need synchronized changes across packages;
 - output formatting (human / JSON) drift between hosts is a UX hazard;
-- config-loading rules (precedence, defaults, walk-up search) are tricky enough to deserve a
-  single owner.
+- config-loading rules (precedence, defaults, walk-up search) are tricky enough to deserve a single owner.
 
-Duplication of `lintFiles` and of `findConfig`/`loadConfig` across hosts was hit during early
-development and consolidated into core.
+Duplication of `lintFiles` and of `findConfig`/`loadConfig` across hosts was hit during early development and consolidated into core.
 
 ## Decision
 
@@ -23,18 +20,14 @@ development and consolidated into core.
 - config loading (`findConfig`, `loadConfig`);
 - result formatting (`formatFileResults`, `formatContentResults`, …).
 
-Hosts (`cli`, `mcp-server`, and any future `lsp-server`) import from core and assemble
-user-facing layers on top. They never re-implement these.
+Hosts (`cli`, `mcp-server`, and any future `lsp-server`) import from core and assemble user-facing layers on top. They never re-implement these.
 
-`lintFiles` is intentionally **synchronous** (`globSync` + `readFileSync`). Do not introduce
-an async variant — that would split the pipeline.
+`lintFiles` is intentionally **synchronous** (`globSync` + `readFileSync`). Do not introduce an async variant — that would split the pipeline.
 
 ## Consequences
 
 - **+** Single bug-fix surface for the lint pipeline.
 - **+** Consistent output across CLI, MCP, and future hosts.
 - **+** New hosts (e.g. a GitHub Action wrapper) start from a vetted base.
-- **−** Anyone touching the pipeline affects every host; CI catches breakage, but reviewers
-  should ack the cross-package impact.
-- **−** Synchronous-only may bite if a future host needs async (e.g. streaming over a network
-  protocol). Revisit only if it actually happens.
+- **−** Anyone touching the pipeline affects every host; CI catches breakage, but reviewers should ack the cross-package impact.
+- **−** Synchronous-only may bite if a future host needs async (e.g. streaming over a network protocol). Revisit only if it actually happens.

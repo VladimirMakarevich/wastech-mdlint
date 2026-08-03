@@ -3,21 +3,25 @@ import { parse as parseJsonc, type ParseError } from "jsonc-parser";
 
 import {
   buildCiWorkflowYaml,
+  containsJsoncComments,
   generateInitConfig,
   identifyExistingRule,
   resolvePackageSchemaRef,
   type GenerateInitConfigParams,
 } from "../src/discovery/config-writer.js";
 import { compareStrings } from "../src/deterministic-sort.js";
+import { matchesConfigGlob } from "../src/discovery/globs.js";
 import { generateConfigSchema } from "../src/engine/schema.js";
 import { DEFAULT_NOISE_DIR_NAMES } from "../src/discovery/repo-scan-constants.js";
 import type { InferredRule } from "../src/discovery/rule-inference.js";
 
-// The fresh-write `exclude` mirrors the scanner's pruned noise directories as globs, sorted by the
-// same host-independent comparator as production.
-const EXPECTED_EXCLUDE = [...DEFAULT_NOISE_DIR_NAMES]
-  .map((name) => `${name}/**`)
-  .sort(compareStrings);
+// The fresh-write `exclude` mirrors the scanner's pruned noise directories as depth-agnostic globs
+// (the scan prunes by basename at any depth) plus the hidden-directory prune (audit L-7), sorted by
+// the same host-independent comparator as production.
+const EXPECTED_EXCLUDE = [
+  ...DEFAULT_NOISE_DIR_NAMES.map((name) => `**/${name}/**`),
+  "**/.*/**",
+].sort(compareStrings);
 
 function buildRule(
   overrides: Partial<InferredRule> & { rule: string },
@@ -70,18 +74,22 @@ describe("generateInitConfig · fresh", () => {
     expect(config.include).toEqual(["docs/**/*.md"]);
     // Deliverable 1 / C1: a fresh write carries the scanner's pruned noise dirs as `exclude`.
     expect(config.exclude).toEqual(EXPECTED_EXCLUDE);
+    // Audit L-7: pinned explicitly rather than left at the loader's `false` default, so the written
+    // config lints exactly the trees the scan proposed from.
+    expect(config.respectGitignore).toBe(true);
     expect(config.rules).toEqual([{ rule: "REF-001" }, { rule: "TBL-002" }]);
     expect(result.addedRuleCount).toBe(2);
     expect(result.totalRuleCount).toBe(2);
+    expect(result.wroteEmptyInclude).toBe(false);
     // C9: no remote URL anywhere, asserted on the raw bytes, not just by construction.
     expect(result.configText).not.toMatch(/https?:\/\//);
     expect(result.projectSchema).toBeUndefined();
   });
 
-  it("omits include for a fallback/root config but still writes the noise excludes", () => {
+  it("omits include when the caller passes undefined but still writes the noise excludes", () => {
     const result = generateInitConfig({
       action: "fresh",
-      include: [],
+      include: undefined,
       newRules: [buildRule({ rule: "REF-001" })],
       packageSchemaRef: PACKAGE_SCHEMA_REF,
     });
@@ -89,9 +97,77 @@ describe("generateInitConfig · fresh", () => {
     // No `include` key means lintFiles falls back to `**/*.md`; `exclude` must still prune the noise
     // trees so init never broadens the scanned corpus back to node_modules/.git/dist/…
     expect("include" in config).toBe(false);
+    expect(result.wroteEmptyInclude).toBe(false);
     expect(config.exclude).toEqual(EXPECTED_EXCLUDE);
-    expect(config.exclude).toContain("node_modules/**");
-    expect(config.exclude).toContain(".git/**");
+
+    // Asserted semantically (what the globs *match*), not by literal presence: the anchoring is the
+    // actual contract, and literals passed while nested noise was still being linted (audit M-4).
+    const exclude = config.exclude as string[];
+    for (const excluded of [
+      // The two M-4 repros: noise nested under a monorepo package.
+      "packages/foo/node_modules/somelib/README.md",
+      "packages/foo/dist/OUT.md",
+      // Root-level regression guard — this is what makes the leading `**/` matching zero segments a
+      // contract rather than an assumption about picomatch.
+      "node_modules/somelib/README.md",
+      // `dot: true` still applies through the new prefix.
+      ".git/config.md",
+      // Audit L-7: the hidden-directory glob must prune through BOTH matcher entry points — the
+      // plain file test and `shouldPruneDirectory`'s synthetic `__directory_probe__` child (which
+      // is what makes loadDocuments skip the directory instead of walking it).
+      ".github/PULL_REQUEST_TEMPLATE.md",
+      ".github/__directory_probe__",
+      ".venv/lib/site-packages/README.md",
+      "packages/foo/.husky/NOTES.md",
+    ]) {
+      expect(matchesConfigGlob(excluded, exclude)).toBe(true);
+    }
+
+    // No over-exclusion: a real cluster's docs stay in the corpus at the root and under a package,
+    // and a dot in a *file* or directory name (rather than a leading dot) is not a hidden directory.
+    for (const kept of [
+      "docs/guide.md",
+      "packages/foo/docs/guide.md",
+      "docs/a.b/c.md",
+      "docs/release.notes.md",
+    ]) {
+      expect(matchesConfigGlob(kept, exclude)).toBe(false);
+    }
+  });
+
+  it('writes a literal "include": [] when the caller passes an empty array', () => {
+    // Audit L-9: an empty selection is an explicit "lint nothing", and omitting the key would invert
+    // it into `lintFiles`'s `**/*.md` default — the exact opposite of what the user asked for.
+    const result = generateInitConfig({
+      action: "fresh",
+      include: [],
+      newRules: [buildRule({ rule: "REF-001" })],
+      packageSchemaRef: PACKAGE_SCHEMA_REF,
+    });
+    const config = parse(result.configText);
+
+    expect("include" in config).toBe(true);
+    expect(config.include).toEqual([]);
+    expect(result.wroteEmptyInclude).toBe(true);
+  });
+
+  it("falls back to a project-local schema when no package schema ref is available", () => {
+    // Audit L-10: under `npx` there is no local install for a relative path to reach, so pointing at
+    // `./node_modules/@wastech-mdlint/cli/schema.json` dangles. Generate the schema instead.
+    const result = generateInitConfig({
+      action: "fresh",
+      include: ["docs/**/*.md"],
+      newRules: [buildRule({ rule: "REF-001" })],
+      packageSchemaRef: undefined,
+    });
+
+    expect(result.schemaRef).toBe("./schema.json");
+    expect(parse(result.configText).$schema).toBe("./schema.json");
+    expect(result.projectSchema?.fileName).toBe("schema.json");
+    expect(result.projectSchema?.reason).toBe("no-installed-package");
+    // With no custom rules the fallback schema is exactly the built-in one — no custom-id branches
+    // invented for a config that has none.
+    expect(result.projectSchema?.text).toBe(generateConfigSchema());
   });
 
   it("appends each new rule's rationale as a trailing // comment while staying valid JSONC", () => {
@@ -115,7 +191,7 @@ describe("generateInitConfig · fresh", () => {
   it("wires exactly the package schema ref it is given (e.g. a subdirectory-relative `../` path)", () => {
     const result = generateInitConfig({
       action: "fresh",
-      include: [],
+      include: undefined,
       newRules: [buildRule({ rule: "REF-001" })],
       packageSchemaRef: "../node_modules/@wastech-mdlint/cli/schema.json",
     });
@@ -164,6 +240,10 @@ describe("generateInitConfig · merge", () => {
     expect(result.addedRuleCount).toBe(1);
     expect(result.totalRuleCount).toBe(2);
     expect(result.projectSchema).toBeUndefined();
+    // A merge round-trips existing keys only: it must not inject the fresh-write defaults
+    // (`respectGitignore`, the noise `exclude`) into a config that never opted into them.
+    expect("respectGitignore" in config).toBe(false);
+    expect(result.wroteEmptyInclude).toBe(false);
   });
 
   it("preserves an existing custom rule and generates a matching project-local schema", () => {
@@ -281,7 +361,7 @@ describe("generateInitConfig · rationale comment safety", () => {
   it("keeps a newline-bearing rationale on a single comment line, preserving valid JSONC", () => {
     const result = generateInitConfig({
       action: "fresh",
-      include: [],
+      include: undefined,
       // A repo-derived rationale with an embedded CR/LF (an unusual but valid path edge) must not
       // terminate the `//` comment early.
       newRules: [
@@ -345,6 +425,35 @@ describe("buildCiWorkflowYaml", () => {
       expect(yaml).toContain("npm install --no-save @wastech-mdlint/cli");
       expect(yaml).not.toMatch(/\b(pnpm|bunx?|yarn)\b/);
     }
+  });
+});
+
+describe("containsJsoncComments", () => {
+  it("detects line and block comments anywhere in the document", () => {
+    for (const text of [
+      '// leading\n{ "include": [] }\n',
+      '{\n  "include": [] // trailing\n}\n',
+      '{\n  /* block */ "include": []\n}\n',
+      '{ "include": [] }\n// after the root object\n',
+    ]) {
+      expect(containsJsoncComments(text)).toBe(true);
+    }
+  });
+
+  it("does not report comment-like text inside a string value", () => {
+    // The whole reason this is token-based: a regex over the raw bytes calls both of these
+    // comment-bearing, which would make `init` warn about comment loss on a config that has none.
+    for (const text of [
+      '{ "include": ["docs/**/*.md"], "$schema": "https://example.test/s.json" }\n',
+      '{ "exclude": ["**/a//b/**"], "settings": { "note": "/* not a comment */" } }\n',
+    ]) {
+      expect(containsJsoncComments(text)).toBe(false);
+    }
+  });
+
+  it("reports no comments for plain JSON and for an empty document", () => {
+    expect(containsJsoncComments('{\n  "rules": []\n}\n')).toBe(false);
+    expect(containsJsoncComments("")).toBe(false);
   });
 });
 

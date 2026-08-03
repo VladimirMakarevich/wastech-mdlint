@@ -1,51 +1,38 @@
 # P11.13 · Retire dead `GRP` options; collapse duplicate `SIZE-001`
 
-> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** ·
-> Status **Not started**. Findings **SC-1** and **SC-2**
-> ([`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md), Low, confirmed).
+> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Done**. Findings **SC-1** and **SC-2** ([`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md), Low, confirmed).
 
 ## Goal
 
-Stop the schema from advertising options that do nothing, and stop `SIZE-001` from emitting two
-same-severity findings for one condition.
+Stop the schema from advertising options that do nothing, and stop `SIZE-001` from emitting two same-severity findings for one condition.
 
 ## Problem (from the audit)
 
-**SC-1 — `GRP-001`/`GRP-002` accept options that are silently ignored.** `GRP-001`'s schema declares
-`siteRouter` plus the shared `files`/`exclude` shape (`rules/grp.ts:34-35`), but its `check` takes no
-options — `check: () => (context) => {…}` (`grp.ts:38`) — and reads only the shared corpus-wide graph.
-So `files`/`exclude`/`siteRouter` validate but do nothing. `GRP-002` likewise declares an unused
-`siteRouter` (`grp.ts:74`). The code even admits it (`grp.ts:21`: "accepted for forward-compat but do
-not re-scope the shared corpus-wide graph in P3"). A key that passes strict validation yet has no
-effect is a footgun — strict validation actively signals the option is supported.
+**SC-1 — `GRP-001`/`GRP-002` accept options that are silently ignored.** `GRP-001`'s schema declares `siteRouter` plus the shared `files`/`exclude` shape (`rules/grp.ts:34-35`), but its `check` takes no options — `check: () => (context) => {…}` (`grp.ts:38`) — and reads only the shared corpus-wide graph. So `files`/`exclude`/`siteRouter` validate but do nothing. `GRP-002` likewise declares an unused `siteRouter` (`grp.ts:74`). The code even admits it (`grp.ts:21`: "accepted for forward-compat but do not re-scope the shared corpus-wide graph in P3"). A key that passes strict validation yet has no effect is a footgun — strict validation actively signals the option is supported.
 
-**SC-2 — `SIZE-001` can emit duplicate same-severity findings.** `SIZE-001` fires the warn-budget and
-error-budget findings independently for one metric (`rules/size.ts:94` + the two `context.report`
-blocks). Severity resolution lets a config override win — `severity: severityOverride ?? … `
-(`run-rules.ts:42`) — so a file over both thresholds with a `severity:"error"` override renders **both**
-findings as `error`: two near-duplicate messages for one metric on one file.
+**SC-2 — `SIZE-001` can emit duplicate same-severity findings.** `SIZE-001` fires the warn-budget and error-budget findings independently for one metric (`rules/size.ts:94` + the two `context.report` blocks). Severity resolution lets a config override win — `severity: severityOverride ?? … ` (`run-rules.ts:42`) — so a file over both thresholds with a `severity:"error"` override renders **both** findings as `error`: two near-duplicate messages for one metric on one file.
 
 ## Deliverables / steps
 
-1. **SC-1:** prefer **removing** the dead options from the `GRP-001`/`GRP-002` schemas (YAGNI until a
-   phase needs per-rule graph scoping) so validation stops advertising a no-op. If a maintainer wants
-   them wired instead, that is a larger graph-scoping task — record the decision either way and update
-   the code comment at `grp.ts:21`.
-2. **SC-2:** suppress the redundant lower-threshold `SIZE-001` finding when a `severity` override
-   collapses the two severities to the same value (emit one), or, if the independent firing is kept,
-   document the interaction in the [`SIZE-001` guide](../../guide/rules/SIZE-001.md).
-3. Tests: a `GRP-001` config with a now-removed option is a `CONFIG_INVALID` (or, if kept, is
-   honored); a `SIZE-001` file over both thresholds with a `severity:"error"` override reports one
-   finding for the metric.
+1. **SC-1:** prefer **removing** the dead options from the `GRP-001`/`GRP-002` schemas (YAGNI until a phase needs per-rule graph scoping) so validation stops advertising a no-op. If a maintainer wants them wired instead, that is a larger graph-scoping task — record the decision either way and update the code comment at `grp.ts:21`.
+2. **SC-2:** suppress the redundant lower-threshold `SIZE-001` finding when a `severity` override collapses the two severities to the same value (emit one), or, if the independent firing is kept, document the interaction in the [`SIZE-001` guide](../../guide/rules/SIZE-001.md).
+3. Tests: a `GRP-001` config with a now-removed option is a `CONFIG_INVALID` (or, if kept, is honored); a `SIZE-001` file over both thresholds with a `severity:"error"` override reports one finding for the metric.
 
 ## Out of scope
 
-`LLM-001`'s cross-entrypoint duplicates (L-3) — that is [P11.11](11-llm-dedup.md). Building real
-per-rule graph re-scoping for `GRP` — out of scope unless a maintainer chooses to wire the options.
+`LLM-001`'s cross-entrypoint duplicates (L-3) — that is [P11.11](11-llm-dedup.md). Building real per-rule graph re-scoping for `GRP` — out of scope unless a maintainer chooses to wire the options.
 
 ## Exit criteria
 
-- [ ] `GRP-001`/`GRP-002` no longer accept options they ignore (removed), or the options are honored (wired) — decided and recorded.
-- [ ] `SIZE-001` does not emit two same-severity findings for one metric under a `severity` override.
-- [ ] Regression tests cover the chosen `GRP` behavior and the `SIZE-001` override case.
-- [ ] `npm run typecheck && npm run lint && npm run format && npm test && npm run build` green.
+- [x] `GRP-001`/`GRP-002` no longer accept options they ignore (removed), or the options are honored (wired) — decided and recorded.
+- [x] `SIZE-001` does not emit two same-severity findings for one metric under a `severity` override.
+- [x] Regression tests cover the chosen `GRP` behavior and the `SIZE-001` override case.
+- [x] `npm run typecheck && npm run lint && npm run format && npm test && npm run build` green.
+
+## Implementation notes
+
+- **`GRP` direction: removed, not wired** (the task's stated preference). `GRP-001`'s options schema is now `z.object({}).strict()` — it dropped `siteRouter` **and** the shared `files`/`exclude` shape — and `GRP-002` dropped `siteRouter` while keeping `entryPoints`/`files`/`exclude`, which it genuinely honors as _reporting_ scope. The decisive argument against wiring: rule options are validated and closed over before the orchestrator builds the graph ([P4.06](../P4-graph/06-grp-refactor-coverage.md) records the same constraint for `settings.idRef` vs `REF-005`), so no per-rule key can reach `buildContextGraph` at all. The keys were _unwireable_, not merely unwired; per-rule graph scoping is a graph-scoping design, not a schema key. Rejected alternative: reinterpreting `GRP-001.files`/`exclude` as report scoping the way `GRP-002` does — cheap, but the semantics for a cycle spanning in-scope and out-of-scope members are ambiguous, and [P12.01](../P12-consistency/01-exclude-coverage.md) requires `exclude` coverage for `GRP-002` only, so removal leaves no downstream gap. Corpus narrowing stays with the top-level `include`/`exclude`.
+- **This is a deliberate breaking config change.** A config carrying `GRP-001.files` (or either rule's `siteRouter`) now fails the whole run with `CONFIG_INVALID` naming the offending key, instead of being silently ignored. That is the point of SC-1 — strict validation should not advertise a no-op — and it lands pre-`P-release`.
+- **`SIZE-001` went broader than the override case, on purpose.** Deliverable 2 offered an override-aware suppression _or_ a doc-only note, but exit criterion 2 ("does not emit two same-severity findings … under a `severity` override") rules the doc-only branch out, and the override-aware branch is not implementable where it belongs: `severityOverride` lives on `ResolvedRule` and is applied by the runner (`engine/run-rules.ts`), so `RuleContext` would have to expose it — a public contract change that lets rules branch on configured severity, which is exactly what [R1](../requirements/02-rules-engine.md) (severity resolved by the orchestrator, not baked into the rule) exists to prevent. An engine-level dedup was already rejected by [P11.11](11-llm-dedup.md). So the rule now emits **one finding per metric** — the error breach supersedes the warn breach — which covers the override case and the no-override case with one branch and no contract change. Suppression is lossless: both reports always shared one `data` object, so the surviving finding still carries `warnAt` and `errorAt`. Metrics remain independent of one another.
+- **Cost, recorded explicitly:** this supersedes P3.07's documented "both may fire for the same metric" behavior ([P3-rules/07](../P3-rules/07-llm-rules.md) now carries the supersession note). Warning counts drop where a file crossed both thresholds; exit codes cannot regress, since the surviving finding is the more severe one and trips any `--fail-on` threshold the warning would have.
+- **Requirement rows reconciled, following [P10.06](../P10-consistency/06-requirement-reconciliation.md).** [C5](../requirements/01-configuration.md) listed `GRP-001`/`GRP-002` among the rules whose `siteRouter` `settings.siteRouter` replaces "with per-rule override", [R7](../requirements/02-rules-engine.md) omitted `GRP-001` from its list of rules that skip `files`/`exclude`, and [R5](../requirements/02-rules-engine.md) still described `buildContextGraph` as extended with `exclude`/`entryPoints`/`siteRouter`. Each row now states the shipped surface instead: per-rule `siteRouter` on `REF-001`/`REF-002` only, and a builder whose only options are `siteRouter`/`idRef` — the R5 fields were dropped from `BuildContextGraphOptions` back at P4.06 because the graph is corpus-wide by design. The requirement text is reconciled, not overruled: the _intent_ (one router setting, one graph) is unchanged; only the rule list was stale. The `[P4]` deferral in [`p1-p3-execution-notes.md`](../p1-p3-execution-notes.md) is likewise marked closed-by-removal, since it recorded per-rule graph re-scoping as pending work.

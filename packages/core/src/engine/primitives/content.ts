@@ -1,7 +1,7 @@
 import type { ParsedDocument } from "../../markdown/document-types.js";
 import { compileRegex } from "../regex.js";
 import { extractSectionBody } from "../section-body.js";
-import { findLineNumber } from "../text-position.js";
+import { createLineNumberLookup } from "../text-position.js";
 import type { PrimitiveFinding } from "./types.js";
 
 export type ContentNotMatchOptions = { pattern: string; flags?: string };
@@ -18,11 +18,14 @@ export function contentNotMatch(
   const regex = compileRegex(options.pattern, flags);
 
   const findings: PrimitiveFinding[] = [];
+  // Index the content once: resolving each match with a fresh scan from offset zero made this
+  // O(matches · content length) on the documents with the most findings (audit L-5).
+  const lineAt = createLineNumberLookup(document.content);
 
   for (const match of document.content.matchAll(regex)) {
     findings.push({
       message: `Content matches disallowed pattern ${options.pattern}: "${match[0]}".`,
-      line: findLineNumber(document.content, match.index ?? 0),
+      line: lineAt(match.index ?? 0),
       data: { pattern: options.pattern, match: match[0] },
     });
   }

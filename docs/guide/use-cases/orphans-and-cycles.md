@@ -22,6 +22,4 @@ wastech-mdlint graph . --format human    # clusters, hubs, reading order, covera
 wastech-mdlint graph . --format mermaid  # a diagram to paste into docs
 ```
 
-**You get:** cycle and orphan findings ([GRP-001](../rules/GRP-001.md),
-[GRP-002](../rules/GRP-002.md)) plus a navigable overview from the [`graph`](../context-graph.md)
-command.
+**You get:** cycle and orphan findings ([GRP-001](../rules/GRP-001.md), [GRP-002](../rules/GRP-002.md)) plus a navigable overview from the [`graph`](../context-graph.md) command.

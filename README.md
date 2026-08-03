@@ -1,38 +1,22 @@
 # wastech-mdlint
 
-`wastech-mdlint` is a TypeScript CLI and library for linting Markdown context in
-repositories. It targets Node.js `24.17.0` LTS and focuses on **deterministic, local**
-checks for docs and agent-facing context files such as `README.md`, `CLAUDE.md`,
-`AGENTS.md`, and `skills/**/SKILL.md`.
+`wastech-mdlint` is a TypeScript CLI and library for linting Markdown context in repositories. It targets Node.js `24.17.0` LTS and focuses on **deterministic, local** checks for docs and agent-facing context files such as `README.md`, `CLAUDE.md`, `AGENTS.md`, and `skills/**/SKILL.md`.
 
 It runs a registry-driven **rule engine** over a single Markdown parse pass:
 
-- 22 built-in rules across `TBL` (tables), `SEC`/`STR` (sections & structure),
-  `REF` (references), `CTX` (content quality), and `GRP` (graph integrity);
-- the preserved LLM context-hygiene rules `SIZE-001` (byte/line/token budgets) and
-  `LLM-001` (eager-import budget);
-- a declarative `custom` rule that composes a closed primitive vocabulary from config —
-  no rebuild, no code execution;
-- inline-disable directives, per-rule severity, `--fix` for deterministic fixes, and
-  text or JSON output with CI-friendly exit codes.
+- 22 built-in rules across `TBL` (tables), `SEC`/`STR` (sections & structure), `REF` (references), `CTX` (content quality), and `GRP` (graph integrity);
+- the preserved LLM context-hygiene rules `SIZE-001` (byte/line/token budgets) and `LLM-001` (eager-import budget);
+- a declarative `custom` rule that composes a closed primitive vocabulary from config — no rebuild, no code execution;
+- inline-disable directives, per-rule severity, `--fix` for deterministic fixes, and text or JSON output with CI-friendly exit codes.
 
-External HTTP link checking is intentionally out of scope; all analysis is local and
-deterministic.
+External HTTP link checking is intentionally out of scope; all analysis is local and deterministic.
 
 ## Documentation
 
-The full user guide — capabilities grouped by area, a page per rule with examples, a
-configuration guide, and an annotated config with every option — lives in
-[docs/guide/](docs/guide/README.md):
+The full user guide — capabilities grouped by area, a page per rule with examples, a configuration guide, and an annotated config with every option — lives in [docs/guide/](docs/guide/README.md):
 
-- [Getting started](docs/guide/getting-started.md) · [Use cases](docs/guide/use-cases/README.md) ·
-  [CLI reference](docs/guide/cli.md) · [Configuration](docs/guide/configuration.md) ·
-  [Annotated config reference](docs/guide/config-reference.md)
-- [Rules index](docs/guide/rules/README.md) (one page per rule) ·
-  [Context graph](docs/guide/context-graph.md) · [Compile](docs/guide/compile.md) ·
-  [MCP server](docs/guide/mcp-server.md) · [Skills](docs/guide/skills.md) ·
-  [Suppression](docs/guide/suppression.md) · [Output](docs/guide/output.md) ·
-  [Concepts](docs/guide/concepts.md)
+- [Getting started](docs/guide/getting-started.md) · [Use cases](docs/guide/use-cases/README.md) · [CLI reference](docs/guide/cli.md) · [Configuration](docs/guide/configuration.md) · [Annotated config reference](docs/guide/config-reference.md)
+- [Rules index](docs/guide/rules/README.md) (one page per rule) · [Context graph](docs/guide/context-graph.md) · [Compile](docs/guide/compile.md) · [MCP server](docs/guide/mcp-server.md) · [Skills](docs/guide/skills.md) · [Suppression](docs/guide/suppression.md) · [Output](docs/guide/output.md) · [Concepts](docs/guide/concepts.md)
 
 ## Runtime
 
@@ -41,13 +25,12 @@ configuration guide, and an annotated config with every option — lives in
 
 ## Workspace layout
 
-`wastech-mdlint` is an npm-workspaces monorepo. `@wastech-mdlint/core` owns the entire
-pipeline; the CLI and MCP server are thin hosts over it.
+`wastech-mdlint` is an npm-workspaces monorepo. `@wastech-mdlint/core` owns the entire pipeline; the CLI and MCP server are thin hosts over it.
 
-| Package                                             | Role                                                                                                                                       | Bin                  |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------- |
-| [`@wastech-mdlint/core`](packages/core)             | Parsing, config, rule engine, graph, and formatting — the whole pipeline.                                                                  | —                    |
-| [`@wastech-mdlint/cli`](packages/cli)               | commander CLI host: argument parsing, command dispatch, exit codes.                                                                        | `wastech-mdlint`     |
+| Package | Role | Bin |
+| --- | --- | --- |
+| [`@wastech-mdlint/core`](packages/core) | Parsing, config, rule engine, graph, and formatting — the whole pipeline. | — |
+| [`@wastech-mdlint/cli`](packages/cli) | commander CLI host: argument parsing, command dispatch, exit codes. | `wastech-mdlint` |
 | [`@wastech-mdlint/mcp-server`](packages/mcp-server) | stdio MCP host; `lint`/`lint-files` ship in P7.02, `context-graph`/`context-slice`/`impact-analysis` in P7.03, `compile-context` in P7.04. | `wastech-mdlint-mcp` |
 
 Build and test the whole workspace from the repo root:
@@ -71,9 +54,7 @@ node packages/cli/dist/index.js lint . --format json
 node packages/cli/dist/index.js lint . --fix      # apply deterministic fixes, then re-report
 ```
 
-`npm install` writes no files into your checkout. Configuration is optional — with no
-config file present the CLI lints every `**/*.md` file with an empty ruleset (a clean
-pass); create a config to enable rules.
+`npm install` writes no files into your checkout. Configuration is optional — with no config file present the CLI lints every `**/*.md` file with an empty ruleset (a clean pass); create a config to enable rules.
 
 ## CLI
 
@@ -87,66 +68,27 @@ wastech-mdlint compile [--config <file>] [--outdir <dir>] [--dry-run] [--cwd <di
 wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-ci-workflow]
 ```
 
-- `lint` is the default command (running `wastech-mdlint` with no subcommand lints the
-  cwd). `scan` is a hidden, deprecated alias of `lint`.
-- Exit codes: `0` pass · `1` findings at the `--fail-on` threshold · `2` operational error.
-- `graph` prints the context graph to stdout: clusters, hubs, reading order, and the
-  coverage signal as `human` text (default); the deterministic
-  `{ nodes, edges, components, readingOrder }` shape as `json`; or a `mermaid`/`dot`
-  diagram for rendering elsewhere.
-- `slice <query> --depth <n>` (default depth `2`) resolves `query` by **exact match
-  only** — a defined ID, a heading/anchor slug (`#slug`), or a file path, never
-  fuzzy/substring/keyword/LLM matching — then prints the files reachable within that
-  many hops. A query that matches nothing is an honest empty result (`matchKind: null`
-  in `--format json`), not an error.
-- `impact <file>` classifies the blast radius of changing `file` and lints the affected
-  subgraph: linting still runs against the whole corpus (so project-scope rules like
-  `GRP-001` see every document), but the reported `lint` messages/files are narrowed to
-  `file` plus everything directly or transitively affected by it.
-- `slice`/`impact` always scan the current working directory — unlike `graph`, they take
-  no `[path]` argument.
-- `graph`/`slice`/`impact` are read-only reports and exit `0` on success; `impact` exits
-  `2` (with a hint) if `file` is outside the analyzed corpus.
+- `lint` is the default command (running `wastech-mdlint` with no subcommand lints the cwd). `scan` is a hidden, deprecated alias of `lint`. Default only in that sense: an unrecognized subcommand is an error, not a path, so a typo'd CI step fails loudly — which also means a bare path needs its subcommand (`wastech-mdlint lint docs`).
+- Exit codes: `0` pass · `1` findings at the `--fail-on` threshold · `2` operational error. `1` is reserved exclusively for findings — a nonexistent `[path]`, an unknown subcommand, or an unwritable file is `2` — so CI can tell a failing document from a broken step.
+- `graph` prints the context graph to stdout: clusters, hubs, reading order, and the coverage signal as `human` text (default); the deterministic `{ nodes, edges, components, readingOrder }` shape as `json`; or a `mermaid`/`dot` diagram for rendering elsewhere.
+- `slice <query> --depth <n>` (default depth `2`) resolves `query` by **exact match only** — a defined ID, a heading/anchor slug (`#slug`), or a file path, never fuzzy/substring/keyword/LLM matching — then prints the files reachable within that many hops. A query that matches nothing is an honest empty result (`matchKind: null` in `--format json`), not an error.
+- `impact <file>` classifies the blast radius of changing `file` and lints the affected subgraph: linting still runs against the whole corpus (so project-scope rules like `GRP-001` see every document), but the reported `lint` messages/files are narrowed to `file` plus everything directly or transitively affected by it.
+- `slice`/`impact` always scan the current working directory — unlike `graph`, they take no `[path]` argument.
+- `graph`/`slice`/`impact` are read-only reports and exit `0` on success; `impact` exits `2` (with a hint) if `file` is outside the analyzed corpus.
 - `schema` writes the config JSON schema to a local file (never a remote URL).
-- `compile` generates a deterministic `SKILL.md` from the document graph, rule
-  descriptions, and config, then writes it to the resolved outdir (`--outdir` →
-  `config.compile.outdir` → `.claude/skills/wastech-mdlint/`) as `SKILL.md`; `--dry-run`
-  prints the same content to stdout instead of writing it. Requires a `compile` section
-  in config; a missing one exits `2` with guidance instead of a bare stack trace. Unlike
-  every other command, `compile` takes `--cwd` instead of a `[path]` argument, and
-  resolves a relative `--config`/`--outdir` against it (not the process's own cwd).
-- `init` scans the repo for doc clusters, infers a rule set with rationale, and — on
-  confirmation — writes `wastech-mdlint.config.json` with a **local** `$schema` (canonical
-  rule IDs, optional per-rule rationale comments, and an `exclude` list of the build/vendor
-  directories the scan skips so lint never re-scans them). When custom rules are present it also
-  generates a project-local `schema.json` and points `$schema` at it; no remote URL is ever
-  emitted. `--on-existing merge` is additive/existing-wins — it keeps every existing rule and
-  appends only new ones; a merge whose existing config is unreadable or would not load (unknown
-  key, unknown rule, invalid options) aborts the write rather than risk an invalid or lossy
-  result. `--yes` skips every prompt (for CI) and defaults `--on-existing`
-  to `skip` when omitted; interactive mode always prompts, and pressing Enter without choosing
-  lands on that same safe default rather than the first listed option. `--with-ci-workflow`
-  (under `--yes` only) also drops a `.github/workflows/wastech-mdlint.yml`; interactive runs
-  offer it with a default of no. That workflow always installs and runs the CLI via npm
-  (`npm install --no-save` + `npx`), regardless of the bun/pnpm/yarn/npm package manager `init`
-  detects and reports — it only fetches the external CLI tool, never the repo's own dependencies,
-  so it never needs that repo's lockfile. If `[path]` is below a repo's existing config, `init`
-  works from the config's own directory instead. Without `--yes`, `init` requires an interactive
-  terminal. Ctrl+C during any prompt exits `0`.
+- `compile` generates a deterministic `SKILL.md` from the document graph, rule descriptions, and config, then writes it to the resolved outdir (`--outdir` → `config.compile.outdir` → `.claude/skills/wastech-mdlint/`) as `SKILL.md`; `--dry-run` prints the same content to stdout instead of writing it. Requires a `compile` section in config; a missing one exits `2` with guidance instead of a bare stack trace. Unlike every other command, `compile` takes `--cwd` instead of a `[path]` argument, and resolves a relative `--config`/`--outdir` against it (not the process's own cwd).
+- `init` scans the repo for doc clusters, infers a rule set with rationale, and — on confirmation — writes `wastech-mdlint.config.json` with a **local** `$schema` (canonical rule IDs, optional per-rule rationale comments, and an `exclude` list of the build/vendor directories the scan skips — matched at any depth, so a monorepo's `packages/*/dist` and `packages/*/node_modules` stay out of the lint corpus too). The scan skips hidden directories (`.github`, `.venv`, …) and anything a root or nested `.gitignore` excludes, and a fresh write mirrors both — a hidden-directory `exclude` glob plus an explicit `respectGitignore: true` — so it lints exactly the tree the draft was built from. Deselecting every offered cluster writes a literal `"include": []` (lints nothing) instead of silently inverting to the repo-wide `**/*.md` default. A `merge` preserves every existing key, rule, severity, and option, but rebuilds the file from parsed values, so it does **not** preserve JSONC comments — it warns about that before writing. With the CLI installed, `$schema` is a relative path to the installed package schema; with nothing installed (the ordinary `npx` case), or whenever custom rules are present, `init` generates a project-local `schema.json` beside the config and points at that, so the ref never dangles. No remote URL is ever emitted. `init` never replaces an existing `schema.json` — that filename is common enough (and is `wastech-mdlint schema`'s own default output) that a hand-written one could otherwise be silently destroyed, and `--on-existing overwrite` does not change that: it is a disposition for the config, not for a file you never named. The write summary instead reports whether the existing file already matches what `init` would generate or differs from it, and — in the `npx` case, where the kept file is probably not `init`'s at all — that `$schema` now points at a file `init` did not generate, so you can repoint it or move that file aside. `--on-existing merge` is additive/existing-wins — it keeps every existing rule and appends only new ones; a merge whose existing config is unreadable or would not load (unknown key, unknown rule, invalid options) aborts the write rather than risk an invalid or lossy result. `--yes` skips every prompt (for CI) and defaults `--on-existing` to `skip` when omitted; interactive mode always prompts, and pressing Enter without choosing lands on that same safe default rather than the first listed option. `--with-ci-workflow` (under `--yes` only) also drops a `.github/workflows/wastech-mdlint.yml`; interactive runs offer it with a default of no. That workflow always installs and runs the CLI via npm (`npm install --no-save` + `npx`), regardless of the bun/pnpm/yarn/npm package manager `init` detects and reports — it only fetches the external CLI tool, never the repo's own dependencies, so it never needs that repo's lockfile. Existing-config discovery never walks above the user's home directory. When `[path]` is omitted, a config found at an ancestor directory governs the whole run and `init` works from that config's own directory instead, reporting its path relative to the original working directory (e.g. `../../wastech-mdlint.config.json`); when `[path]` is given explicitly, only a config found exactly at that directory counts, so an ancestor's config is left untouched. Without `--yes`, `init` requires an interactive terminal. Ctrl+C during any prompt exits `0`.
 
 ## MCP server
 
-`@wastech-mdlint/mcp-server` is a stdio-only Model Context Protocol host over the same core
-pipeline the CLI uses: 6 read-only tools, no HTTP/SSE, no code-plugin execution. A `fix`/`schema`
-pair is planned for a later release — v2 ships exactly these 6.
+`@wastech-mdlint/mcp-server` is a stdio-only Model Context Protocol host over the same core pipeline the CLI uses: 6 read-only tools, no HTTP/SSE, no code-plugin execution. A `fix`/`schema` pair is planned for a later release — v2 ships exactly these 6.
 
 ```bash
 npx @wastech-mdlint/mcp-server        # run directly, no install
 npm i -D @wastech-mdlint/mcp-server   # or install the wastech-mdlint-mcp bin
 ```
 
-Add it to any stdio-based MCP host (Claude Code's `.mcp.json`, Claude Desktop's
-`claude_desktop_config.json`, etc.):
+Add it to any stdio-based MCP host (Claude Code's `.mcp.json`, Claude Desktop's `claude_desktop_config.json`, etc.):
 
 ```jsonc
 {
@@ -163,7 +105,7 @@ Add it to any stdio-based MCP host (Claude Code's `.mcp.json`, Claude Desktop's
 <!-- prettier-ignore -->
 | Tool | Description | Read-only | Structured output |
 | --- | --- | --- | --- |
-| `lint` | Lint ad-hoc Markdown content against an explicit set of rules. Does not load project config; file-resolving rules such as REF-001/REF-003 and SEC-003 may probe or read paths relative to the server's working directory. | yes | yes |
+| `lint` | Lint ad-hoc Markdown content against an explicit set of rules. Does not load project config; file-resolving rules such as REF-001/REF-003, SEC-003 and STR-001 may probe or read paths inside the server's working directory; an absolute path or a `..`-escaping relative path is rejected rather than followed. Each entry is either a built-in rule id or a declarative `custom` rule (`rule: "custom"` plus `id` and `options.assert`); code plugins are never loaded. Rules see one synthetic document path, `content.md`, so an `options.files` or `options.exclude` glob that does not match that path selects nothing. | yes | yes |
 | `lint-files` | Lint the project's Markdown files using the resolved config (or the zero-config `**/*.md` default). Read-only. | yes | yes |
 | `context-graph` | Build the project's context graph. `format: "json"` (default) returns the raw graph (nodes, edges, cycles); `format: "summary"` returns nodes, edges, connected components, and topological reading order. Read-only. | yes | yes |
 | `context-slice` | Files reachable within `depth` hops of a resolved query, following graph edges forward. Resolves the query by exact match against defined IDs, heading/anchor slugs, and file paths — no fuzzy, substring, keyword, or LLM matching. Read-only. | yes | yes |
@@ -172,10 +114,7 @@ Add it to any stdio-based MCP host (Claude Code's `.mcp.json`, Claude Desktop's
 
 <!-- END GENERATED MCP TOOLS -->
 
-All 6 tools carry a `readOnlyHint` annotation; five return `structuredContent` + `outputSchema`
-(`compile-context` returns two plain-text content blocks instead). MCP errors use the structured
-`{ code, message, hint }` contract; the CLI maps the same core error taxonomy to stderr + exit
-codes.
+All 6 tools carry a `readOnlyHint` annotation; five return `structuredContent` + `outputSchema` (`compile-context` returns two plain-text content blocks instead). MCP errors use the structured `{ code, message, hint }` contract; the CLI maps the same core error taxonomy to stderr + exit codes.
 
 ## Config
 
@@ -217,32 +156,15 @@ Configuration is JSONC (comments + trailing commas) in `wastech-mdlint.config.js
 ```
 
 - `exclude` wins over `include`; `respectGitignore` opts into honoring `.gitignore`.
-- Each rule entry may set `severity` to `"error" | "warning" | "off"`; `"off"` documents
-  but disables a rule. Rule IDs are case-insensitive and dash-optional (`ref-001` →
-  `REF-001`).
+- Each rule entry may set `severity` to `"error" | "warning" | "off"`; `"off"` documents but disables a rule. Rule IDs are case-insensitive and dash-optional (`ref-001` → `REF-001`).
 - `settings.siteRouter` is inherited by reference rules and may be overridden per rule.
-- `settings.idRef` (`{ idPattern, definitions, idColumn }`) feeds the shared context graph's
-  `id-ref` edges, so ID references also count toward `GRP-001` cycles and `GRP-002` incoming
-  references. It mirrors REF-005's own options shape but is configured separately — REF-005
-  cannot expose its resolved options back to the graph builder, so a project that wants both ID
-  traceability (REF-005) and ID-aware graph analysis configures the same shape in both places.
-- The `custom` rule composes the closed assertion vocabulary
-  (`requiredColumns`, `columnNotEmpty`, `columnInSet`, `columnMatches`, `columnUnique`,
-  `crossColumn`, `sectionPresent`, `sectionOrder`, `contentNotMatch`, `noPlaceholders`,
-  `allChecked`, `linkResolves`, `imageResolves`). Its `id` must be namespaced and must not
-  shadow a built-in prefix.
-- `compile` configures the `compile` command. `skill.name`/`skill.description` are
-  required (non-empty); `sections.{architecture,rules,dependencies,workflow}` (all
-  default `true`) gate which `SKILL.md` sections render; `commandPreset` (`"claude"` |
-  `"generic"` | `"none"`, default `"generic"`) selects the wording of the generated
-  "Working with dependencies" block; `hubMinInDegree` (default `3`) is the in-degree
-  threshold used to classify a document as a hub. Unknown `compile.*` keys are rejected
-  like any other unknown config key.
+- `settings.idRef` (`{ idPattern, definitions, idColumn }`) feeds the shared context graph's `id-ref` edges, so ID references also count toward `GRP-001` cycles and `GRP-002` incoming references. It mirrors REF-005's own options shape but is configured separately — REF-005 cannot expose its resolved options back to the graph builder, so a project that wants both ID traceability (REF-005) and ID-aware graph analysis configures the same shape in both places.
+- The `custom` rule composes the closed assertion vocabulary (`requiredColumns`, `columnNotEmpty`, `columnInSet`, `columnMatches`, `columnUnique`, `crossColumn`, `sectionPresent`, `sectionOrder`, `contentNotMatch`, `noPlaceholders`, `allChecked`, `linkResolves`, `imageResolves`). Its `id` must be namespaced and must not shadow a built-in prefix.
+- `compile` configures the `compile` command. `skill.name`/`skill.description` are required (non-empty); `sections.{architecture,rules,dependencies,workflow}` (all default `true`) gate which `SKILL.md` sections render; `commandPreset` (`"claude"` | `"generic"` | `"none"`, default `"generic"`) selects the wording of the generated "Working with dependencies" block; `hubMinInDegree` (default `3`) is the in-degree threshold used to classify a document as a hub. Unknown `compile.*` keys are rejected like any other unknown config key.
 
 ## Rules
 
-The following table is generated from the rule metadata (`npm run generate:docs`); do not
-edit it by hand.
+The following table is generated from the rule metadata (`npm run generate:docs`); do not edit it by hand.
 
 <!-- BEGIN GENERATED RULES -->
 <!-- prettier-ignore -->
@@ -275,8 +197,7 @@ edit it by hand.
 
 <!-- END GENERATED RULES -->
 
-`custom` (not shown above) is resolved from config, so its id and behavior are
-project-defined.
+`custom` (not shown above) is resolved from config — or, for a one-off check, from a `rules` entry in an MCP `lint` request — so its id and behavior are project-defined.
 
 ## Inline suppression
 
@@ -292,13 +213,11 @@ project-defined.
 | REQ-1 | |
 ```
 
-A directive with no rule IDs applies to all rules. `disable` runs until a matching
-`enable` or end of file; `disable-next-line` covers only the next line.
+A directive with no rule IDs applies to all rules. `disable` runs until a matching `enable` or end of file; `disable-next-line` covers only the next line.
 
 ## Output
 
-Text output groups findings by file; JSON output (`--format json`) is a structured
-`{ summary, messages, files }` document suitable for machine consumption.
+Text output groups findings by file; JSON output (`--format json`) is a structured `{ summary, messages, files }` document suitable for machine consumption.
 
 ```bash
 node packages/cli/dist/index.js lint . --format json > report.json
@@ -310,10 +229,8 @@ node packages/cli/dist/index.js lint . --fail-on warning   # fail CI on warnings
 - No external HTTP link checking or link caching.
 - No runtime `.ts`/`.cjs`/`.mjs` config or user-code plugins (custom rules are data-only).
 - The context graph is rebuilt each run (no incremental cache yet).
-- Dangling reference-style links (`[text][missing]` with no matching `[missing]: url`
-  definition) are parsed as literal text, not a link, so `REF-001` never sees them — this
-  matches GitHub's own rendering and is intentional, not a gap. See
-  [REF-001](docs/guide/rules/REF-001.md#notes).
+- Cycle detection is recursive, so a single connected component of many thousands of documents can exhaust the call stack — a densely cross-linked component descends about as deep as a long chain would. Many small components are fine at any corpus size; see [context graph limitations](docs/guide/context-graph.md#limitations).
+- Dangling reference-style links (`[text][missing]` with no matching `[missing]: url` definition) are parsed as literal text, not a link, so `REF-001` never sees them — this matches GitHub's own rendering and is intentional, not a gap. See [REF-001](docs/guide/rules/REF-001.md#notes).
 
 ## Planning docs
 
