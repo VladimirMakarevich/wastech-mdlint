@@ -2,14 +2,9 @@
 
 > [Guide index](README.md) · [Configuration guide](configuration.md) · [Rules index](rules/README.md)
 
-This is a single `wastech-mdlint.config.json` that exercises **every** option the linter accepts,
-with a comment on each. It is a _reference_, not a recommended starting config — you would never
-enable all 24 rules at once with every option. Copy the pieces you need. For a curated starter,
-run [`wastech-mdlint init`](cli.md#init).
+This is a single `wastech-mdlint.config.json` that exercises **every** option the linter accepts, with a comment on each. It is a _reference_, not a recommended starting config — you would never enable all 24 rules at once with every option. Copy the pieces you need. For a curated starter, run [`wastech-mdlint init`](cli.md#init).
 
-Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys — top-level, in
-any rule's `options`, or under `compile` — are rejected. Every field below is drawn from the
-generated schema (`wastech-mdlint schema`).
+Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys — top-level, in any rule's `options`, or under `compile` — are rejected. Every field below is drawn from the generated schema (`wastech-mdlint schema`).
 
 ```jsonc
 {
@@ -351,16 +346,7 @@ generated schema (`wastech-mdlint schema`).
 
 ## Notes
 
-- The `custom` entry shows one assertion; the [custom rule page](rules/custom.md) lists all 13
-  assertion kinds (`requiredColumns`, `columnNotEmpty`, `columnInSet`, `columnMatches`,
-  `columnUnique`, `crossColumn`, `sectionPresent`, `sectionOrder`, `contentNotMatch`,
-  `noPlaceholders`, `allChecked`, `linkResolves`, `imageResolves`).
-- `siteRouter` shown on individual REF rules (REF-001/REF-002 only) **overrides**
-  `settings.siteRouter` for that rule; most projects set it once under `settings`. The graph rules
-  read it only through the shared graph, so they take no `siteRouter` of their own.
-- Rules that operate over the whole corpus (identity/graph rules) may intentionally omit
-  `files`/`exclude` — see each rule's page for its exact option set. Two of them spell one of the
-  names with a different meaning, which is why the comments above call it out inline: `STR-001.files`
-  is the required-file set, and `REF-001`/`REF-003`'s `exclude` filters link/image targets.
-- On the rules that do take file scope, it also bounds `--fix` (SEC-001, TBL-002): an excluded file
-  is never rewritten, not just never reported.
+- The `custom` entry shows one assertion; the [custom rule page](rules/custom.md) lists all 13 assertion kinds (`requiredColumns`, `columnNotEmpty`, `columnInSet`, `columnMatches`, `columnUnique`, `crossColumn`, `sectionPresent`, `sectionOrder`, `contentNotMatch`, `noPlaceholders`, `allChecked`, `linkResolves`, `imageResolves`).
+- `siteRouter` shown on individual REF rules (REF-001/REF-002 only) **overrides** `settings.siteRouter` for that rule; most projects set it once under `settings`. The graph rules read it only through the shared graph, so they take no `siteRouter` of their own.
+- Rules that operate over the whole corpus (identity/graph rules) may intentionally omit `files`/`exclude` — see each rule's page for its exact option set. Two of them spell one of the names with a different meaning, which is why the comments above call it out inline: `STR-001.files` is the required-file set, and `REF-001`/`REF-003`'s `exclude` filters link/image targets.
+- On the rules that do take file scope, it also bounds `--fix` (SEC-001, TBL-002): an excluded file is never rewritten, not just never reported.

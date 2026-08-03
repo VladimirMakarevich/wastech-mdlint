@@ -1,138 +1,44 @@
 # P11.12 · `STR-001` filesystem reach vs corpus-only (+ guide)
 
-> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** ·
-> Status **Done**. Finding **BL-1**
-> ([`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md), Medium, confirmed).
+> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Done**. Finding **BL-1** ([`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md), Medium, confirmed).
 
 ## Goal
 
-`STR-001` ("required files exist") and its guide must agree. Today the rule can only see the Markdown
-corpus, so a present non-`.md` required file — the guide's own `LICENSE` example — is reported
-missing on a compliant repository.
+`STR-001` ("required files exist") and its guide must agree. Today the rule can only see the Markdown corpus, so a present non-`.md` required file — the guide's own `LICENSE` example — is reported missing on a compliant repository.
 
 ## Problem (from the audit)
 
-`STR-001` decides satisfaction by scanning `context.projectFiles`
-(`packages/core/src/engine/rules/sec.ts:204-205`), which `lint-files.ts:87` populates as
-`[...documents.keys()]` from `loadDocuments(include ?? ["**/*.md"], …)` (`lint-files.ts:75`). So the
-satisfaction set is the `include`-matched **Markdown corpus — never the filesystem.** A required entry
-that is not Markdown within `include` (the guide's `LICENSE`, or `package.json`) is reported _missing
-even when it exists on disk_. The membership test compounds it: `matchesConfigGlob` rewrites a bare
-`README.md` to `**/README.md` (`discovery/globs.ts:7`), so a required root file is satisfied by any
-`docs/**/README.md` anywhere — the rule cannot pin a required file to a location.
+`STR-001` decides satisfaction by scanning `context.projectFiles` (`packages/core/src/engine/rules/sec.ts:204-205`), which `lint-files.ts:87` populates as `[...documents.keys()]` from `loadDocuments(include ?? ["**/*.md"], …)` (`lint-files.ts:75`). So the satisfaction set is the `include`-matched **Markdown corpus — never the filesystem.** A required entry that is not Markdown within `include` (the guide's `LICENSE`, or `package.json`) is reported _missing even when it exists on disk_. The membership test compounds it: `matchesConfigGlob` rewrites a bare `README.md` to `**/README.md` (`discovery/globs.ts:7`), so a required root file is satisfied by any `docs/**/README.md` anywhere — the rule cannot pin a required file to a location.
 
-The guide overstates this: it claims `STR-001` "scans the analyzed file corpus"
-([`STR-001.md:8`](../../guide/rules/STR-001.md)) yet motivates it with "every project must ship a
-`README.md`, a `CONTRIBUTING.md`, a `LICENSE`" (`:11`) and "literal paths must match exactly" (`:66`)
-— both falsified. The one test never exercises the failure: it requires `LICENSE.md` and only asserts
-genuinely-absent names (`rules-str.test.ts:54`).
+The guide overstates this: it claims `STR-001` "scans the analyzed file corpus" ([`STR-001.md:8`](../../guide/rules/STR-001.md)) yet motivates it with "every project must ship a `README.md`, a `CONTRIBUTING.md`, a `LICENSE`" (`:11`) and "literal paths must match exactly" (`:66`) — both falsified. The one test never exercises the failure: it requires `LICENSE.md` and only asserts genuinely-absent names (`rules-str.test.ts:54`).
 
 ## Deliverables / steps
 
-Pick one direction (a maintainer decision the audit leaves open) and make code, guide, requirement,
-and test agree:
+Pick one direction (a maintainer decision the audit leaves open) and make code, guide, requirement, and test agree:
 
-- **(A) Filesystem resolution** — resolve each required path against the filesystem via a **bounded**
-  `existsSync`-style probe from the analyzed root (reusing the containment helper from
-  [P11.02](02-sec003-path-escape.md) so the probe cannot escape the root). Restores the guide's
-  `LICENSE`/"match exactly" promise; widens the rule's reach beyond the parsed corpus — document that.
-- **(B) Corpus-only, honestly** — narrow the guide and the requirement to "required **Markdown** files
-  within `include`", drop the `LICENSE` example and the "literal paths must match exactly" claim, and
-  document that bare names are corpus-wide globs.
+- **(A) Filesystem resolution** — resolve each required path against the filesystem via a **bounded** `existsSync`-style probe from the analyzed root (reusing the containment helper from [P11.02](02-sec003-path-escape.md) so the probe cannot escape the root). Restores the guide's `LICENSE`/"match exactly" promise; widens the rule's reach beyond the parsed corpus — document that.
+- **(B) Corpus-only, honestly** — narrow the guide and the requirement to "required **Markdown** files within `include`", drop the `LICENSE` example and the "literal paths must match exactly" claim, and document that bare names are corpus-wide globs.
 
-Either way, add a regression fixture with a **present non-`.md` required file** so the false-missing
-case is covered (it is untested today).
+Either way, add a regression fixture with a **present non-`.md` required file** so the false-missing case is covered (it is untested today).
 
 ## Exit criteria
 
 - [x] `STR-001`, its guide (`STR-001.md`), the relevant requirement, and the test tell one story.
 - [x] A present non-`.md` required file is either satisfied (A) or explicitly out of scope (B), with a fixture.
 - [x] If (A): the filesystem probe cannot read/resolve outside the analyzed root.
-- [ ] ~~If (B): the `LICENSE` example and "literal paths must match exactly" claim are removed.~~
-      Not applicable — direction **(A)** was chosen, so both claims became true and were kept.
+- [ ] ~~If (B): the `LICENSE` example and "literal paths must match exactly" claim are removed.~~ Not applicable — direction **(A)** was chosen, so both claims became true and were kept.
 - [x] `npm run typecheck && npm run lint && npm run format && npm test && npm run build` green.
 
 ## Implementation notes
 
-- **Direction (A), filesystem resolution — chosen over (B).** BL-1 is the audit's only user-visible
-  _false result on a compliant repository_, and "corpus or disk" is already this repo's established
-  resolution model: `targetResolves` in
-  [`primitives/reference.ts`](../../../packages/core/src/engine/primitives/reference.ts) resolves a
-  REF-001 target as `documents.has(rel) || existsSync(resolve(rootDir, rel))`, documented in
-  [`REF-001.md`](../../guide/rules/REF-001.md). Direction (B) would have left STR-001 unable to see
-  a file REF-001 can, and would have retired a genuinely useful capability (require a `LICENSE`, a
-  `package.json`, a `.gitignore`) to make the docs true. Cost of (A): one `existsSync` per literal
-  entry, no new dependency, no `optionsSchema` change.
-- **Two satisfaction modes, split by entry shape.** A **literal** entry (`LICENSE`, `README.md`,
-  `docs/index.md`) is satisfied by an exact corpus hit at that repo-relative path _or_ by
-  `existsSync` under the analyzed root. A **glob** entry (`docs/adr/*.md`, `**/README.md`) keeps the
-  old corpus-only `matchesConfigGlob` behavior. Globs are not expanded against the filesystem
-  because that means walking the tree from a _synchronous_ `check`
-  (`Rule.check` is sync, `engine/types.ts`), and `include`/`exclude` already define what a run
-  considers. Both limits are commented at the call site and documented in the guide's new
-  "How an entry is satisfied" section, so the corpus-only glob is a stated contract rather than an
-  accident. A glob keeps `normalizeConfigGlob`'s slash-free rewrite too (`*.md` → `**/*.md`), so
-  only the literal branch pins a location — the other half of BL-1's "cannot pin a required file to
-  a location" is unfixed by design and instead written down in the guide, since changing glob
-  anchoring would silently break every existing `files` entry rather than the narrow bare-literal
-  case below.
-- **Classification uses the real parser, not a character check.** New `isGlobPattern`
-  (`discovery/globs.ts`) delegates to `micromatch.scan(...).isGlob`, so "is this a glob?" cannot
-  drift from how `matchesConfigGlob` parses the same string. It normalizes backslashes through the
-  module-private `normalizePathValue` first — picomatch reads `\` as an escape, so an unnormalized
-  `docs\README.md` would parse as a glob and never be probed on disk. `micromatch.scan` needed a
-  one-line addition to the hand-written ambient declaration (`types/micromatch.d.ts`), declaring
-  only `isGlob`, matching that file's declare-only-what-we-use style. Not re-exported from
-  `core/src/index.ts` — no host needs it.
-- **Behavior change, intentional: a bare name is now root-pinned.** `matchesConfigGlob` rewrites a
-  bare `README.md` to `**/README.md` (`normalizeConfigGlob`), so before this change any
-  `docs/x/README.md` anywhere satisfied a required root `README.md` — the audit's "the rule cannot
-  pin a required file to a location". A literal entry now means exactly that path. Migration for
-  anyone relying on the old reach is one config character: write `**/README.md`, which stays a glob
-  and still matches the root-level file. Covered by the "pins a literal entry to the repository
-  root" test, which asserts both halves.
-- **Containment reuses `resolvesOutsideRoot`** (`engine/path-resolve.ts`), per the task constraint —
-  no second boundary check. An absolute or `..`-escaping entry is rejected **before** the probe with
-  `"… escapes the analyzed root and cannot be verified."`, at the same severity as "missing", so the
-  required-file list cannot be used as a host file-existence oracle (the H-2 / P11.02 lesson applied
-  to a new filesystem-reaching option). Containment is lexical only: a symlink inside the root that
-  points outside it is still probed — the same residual P11.02 recorded, stated in the guide.
-- **Normalize-first, unlike SEC-003.** `sec003` hands `resolvesOutsideRoot` the raw `template`;
-  `str001` normalizes each entry once (`normalizeRelativePath`) and uses that value for both the
-  corpus lookup and the disk probe, because the corpus is keyed by repo-relative POSIX paths while
-  `path.resolve` accepts `/` on Windows too — one value keeps the two lookups talking about the same
-  path. It cannot mask an escape (`..\x` → `../x` still fails containment); a win32-style case is in
-  the tests. Findings still carry the **raw** configured string in `message`/`filePath`/`data`, since
-  they are attributed to the option the user wrote, not to a corpus location.
-- **Known residual — an exotic literal containing glob metacharacters.** `micromatch.scan` classifies
-  a path like `LICENSE(1)` or `docs[x]/a.md` as a glob, so it routes to the corpus branch and a
-  non-Markdown file at that path would still report missing. This is unchanged pre-existing behavior
-  (every entry took the corpus branch before), it needs a filename that is itself glob syntax, and
-  the fix would be an escaping vocabulary the option does not have. Recorded, not fixed.
-- **Tests.** `rule-utils.test.ts` — an `isGlobPattern` block pinning every shape the rule cares about
-  (literal, wildcard, globstar, brace, extglob, Windows-separator), written first, since a
-  misclassification silently re-opens BL-1 for that entry. `rules-str.test.ts` — the BL-1 regression
-  (`README.md` + a real `LICENSE` + `package.json` → no findings; fails before the fix), root-pinning
-  plus the `**/` migration, glob-stays-corpus-scoped (`assets/*.png` with the file on disk still
-  missing), a directory satisfying a literal, and both containment forms (absolute, and `../` plus
-  `..\` relative). `lint.e2e.test.ts` — the exact user-visible symptom: a repo shipping `README.md`
-  and `LICENSE` exits `EXIT_CODE_SUCCESS`. `mcp-server/test/lint.test.ts` — the absolute-entry
-  rejection at the MCP attack surface (`handleLint` hard-codes `rootDir: process.cwd()`) and an
-  in-root `package.json` satisfied via the probe.
-- **Docs kept in one story with the code.** `guide/rules/STR-001.md` gained the "How an entry is
-  satisfied" section (literal/glob table, root-pinning + migration, the corpus-only glob limit, and
-  that a literal is satisfied by anything at that path including a directory) and a path-containment
-  note modelled on SEC-003's; its `## What it checks` no longer claims to scan the corpus, and the
-  `LICENSE` motivation plus "literal paths must match exactly" now hold — the latter qualified with
-  "relative to the repository root". `SEC-003.md`'s "the one rule option that reaches the filesystem"
-  became false and now cross-links STR-001. `config-reference.md` annotates `files` where it is
-  written. `guide/mcp-server.md` and the MCP `lint` tool description add STR-001 to the probing-rule
-  list (which required regenerating the README's MCP tool table via `npm run generate:docs`).
-  [`P3.03`](../P3-rules/03-sec-str-rules.md) step 2 ("check `projectFiles` for required paths") got a
-  supersession note — it is the closest thing to a requirement of record, as STR-001 has no
-  `requirements/*.md` entry.
-- **No schema or rule-metadata change.** `optionsSchema`, `metadata.description`, the missing-file
-  message and its `data: { required }` are byte-identical, so `packages/cli/schema.json`,
-  `schema-generation.test.ts` and core's `docs-sync.test.ts` are unaffected; only the README's
-  generated MCP-tool row moved, and only because the tool description changed.
+- **Direction (A), filesystem resolution — chosen over (B).** BL-1 is the audit's only user-visible _false result on a compliant repository_, and "corpus or disk" is already this repo's established resolution model: `targetResolves` in [`primitives/reference.ts`](../../../packages/core/src/engine/primitives/reference.ts) resolves a REF-001 target as `documents.has(rel) || existsSync(resolve(rootDir, rel))`, documented in [`REF-001.md`](../../guide/rules/REF-001.md). Direction (B) would have left STR-001 unable to see a file REF-001 can, and would have retired a genuinely useful capability (require a `LICENSE`, a `package.json`, a `.gitignore`) to make the docs true. Cost of (A): one `existsSync` per literal entry, no new dependency, no `optionsSchema` change.
+- **Two satisfaction modes, split by entry shape.** A **literal** entry (`LICENSE`, `README.md`, `docs/index.md`) is satisfied by an exact corpus hit at that repo-relative path _or_ by `existsSync` under the analyzed root. A **glob** entry (`docs/adr/*.md`, `**/README.md`) keeps the old corpus-only `matchesConfigGlob` behavior. Globs are not expanded against the filesystem because that means walking the tree from a _synchronous_ `check` (`Rule.check` is sync, `engine/types.ts`), and `include`/`exclude` already define what a run considers. Both limits are commented at the call site and documented in the guide's new "How an entry is satisfied" section, so the corpus-only glob is a stated contract rather than an accident. A glob keeps `normalizeConfigGlob`'s slash-free rewrite too (`*.md` → `**/*.md`), so only the literal branch pins a location — the other half of BL-1's "cannot pin a required file to a location" is unfixed by design and instead written down in the guide, since changing glob anchoring would silently break every existing `files` entry rather than the narrow bare-literal case below.
+- **Classification uses the real parser, not a character check.** New `isGlobPattern` (`discovery/globs.ts`) delegates to `micromatch.scan(...).isGlob`, so "is this a glob?" cannot drift from how `matchesConfigGlob` parses the same string. It normalizes backslashes through the module-private `normalizePathValue` first — picomatch reads `\` as an escape, so an unnormalized `docs\README.md` would parse as a glob and never be probed on disk. `micromatch.scan` needed a one-line addition to the hand-written ambient declaration (`types/micromatch.d.ts`), declaring only `isGlob`, matching that file's declare-only-what-we-use style. Not re-exported from `core/src/index.ts` — no host needs it.
+- **Behavior change, intentional: a bare name is now root-pinned.** `matchesConfigGlob` rewrites a bare `README.md` to `**/README.md` (`normalizeConfigGlob`), so before this change any `docs/x/README.md` anywhere satisfied a required root `README.md` — the audit's "the rule cannot pin a required file to a location". A literal entry now means exactly that path. Migration for anyone relying on the old reach is one config character: write `**/README.md`, which stays a glob and still matches the root-level file. Covered by the "pins a literal entry to the repository root" test, which asserts both halves.
+- **Containment reuses `resolvesOutsideRoot`** (`engine/path-resolve.ts`), per the task constraint — no second boundary check. An absolute or `..`-escaping entry is rejected **before** the probe with `"… escapes the analyzed root and cannot be verified."`, at the same severity as "missing", so the required-file list cannot be used as a host file-existence oracle (the H-2 / P11.02 lesson applied to a new filesystem-reaching option). Containment is lexical only: a symlink inside the root that points outside it is still probed — the same residual P11.02 recorded, stated in the guide.
+- **Normalize-first, unlike SEC-003.** `sec003` hands `resolvesOutsideRoot` the raw `template`; `str001` normalizes each entry once (`normalizeRelativePath`) and uses that value for both the corpus lookup and the disk probe, because the corpus is keyed by repo-relative POSIX paths while `path.resolve` accepts `/` on Windows too — one value keeps the two lookups talking about the same path. It cannot mask an escape (`..\x` → `../x` still fails containment); a win32-style case is in the tests. Findings still carry the **raw** configured string in `message`/`filePath`/`data`, since they are attributed to the option the user wrote, not to a corpus location.
+- **Known residual — an exotic literal containing glob metacharacters.** `micromatch.scan` classifies a path like `LICENSE(1)` or `docs[x]/a.md` as a glob, so it routes to the corpus branch and a non-Markdown file at that path would still report missing. This is unchanged pre-existing behavior (every entry took the corpus branch before), it needs a filename that is itself glob syntax, and the fix would be an escaping vocabulary the option does not have. Recorded, not fixed.
+- **Tests.** `rule-utils.test.ts` — an `isGlobPattern` block pinning every shape the rule cares about (literal, wildcard, globstar, brace, extglob, Windows-separator), written first, since a misclassification silently re-opens BL-1 for that entry. `rules-str.test.ts` — the BL-1 regression (`README.md` + a real `LICENSE` + `package.json` → no findings; fails before the fix), root-pinning plus the `**/` migration, glob-stays-corpus-scoped (`assets/*.png` with the file on disk still missing), a directory satisfying a literal, and both containment forms (absolute, and `../` plus `..\` relative). `lint.e2e.test.ts` — the exact user-visible symptom: a repo shipping `README.md` and `LICENSE` exits `EXIT_CODE_SUCCESS`. `mcp-server/test/lint.test.ts` — the absolute-entry rejection at the MCP attack surface (`handleLint` hard-codes `rootDir: process.cwd()`) and an in-root `package.json` satisfied via the probe.
+- **Docs kept in one story with the code.** `guide/rules/STR-001.md` gained the "How an entry is satisfied" section (literal/glob table, root-pinning + migration, the corpus-only glob limit, and that a literal is satisfied by anything at that path including a directory) and a path-containment note modelled on SEC-003's; its `## What it checks` no longer claims to scan the corpus, and the `LICENSE` motivation plus "literal paths must match exactly" now hold — the latter qualified with "relative to the repository root". `SEC-003.md`'s "the one rule option that reaches the filesystem" became false and now cross-links STR-001. `config-reference.md` annotates `files` where it is written. `guide/mcp-server.md` and the MCP `lint` tool description add STR-001 to the probing-rule list (which required regenerating the README's MCP tool table via `npm run generate:docs`). [`P3.03`](../P3-rules/03-sec-str-rules.md) step 2 ("check `projectFiles` for required paths") got a supersession note — it is the closest thing to a requirement of record, as STR-001 has no `requirements/*.md` entry.
+- **No schema or rule-metadata change.** `optionsSchema`, `metadata.description`, the missing-file message and its `data: { required }` are byte-identical, so `packages/cli/schema.json`, `schema-generation.test.ts` and core's `docs-sync.test.ts` are unaffected; only the README's generated MCP-tool row moved, and only because the tool description changed.
 - **No CLI source change.** `packages/cli` calls core's `lintFiles` unchanged; the fix propagates.

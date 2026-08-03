@@ -2,10 +2,7 @@
 
 > [Guide index](README.md) · [CLI reference](cli.md#compile) · [Configuration](configuration.md)
 
-`compile` generates a **deterministic** `SKILL.md` — a project-specific agent skill — from the
-[context graph](context-graph.md), the active rule descriptions, and the `compile` config. It lets
-an AI host load a compact, accurate description of _this_ repository's docs structure and
-conventions.
+`compile` generates a **deterministic** `SKILL.md` — a project-specific agent skill — from the [context graph](context-graph.md), the active rule descriptions, and the `compile` config. It lets an AI host load a compact, accurate description of _this_ repository's docs structure and conventions.
 
 ## Usage
 
@@ -16,18 +13,13 @@ wastech-mdlint compile --outdir build/skill
 wastech-mdlint compile --cwd packages/docs
 ```
 
-- Output path precedence: `--outdir` → `config.compile.outdir` → `.claude/skills/wastech-mdlint/`.
-  The file is always named `SKILL.md`.
-- Unlike other commands, `compile` takes `--cwd` (not `[path]`), and resolves a relative
-  `--config`/`--outdir` against it.
+- Output path precedence: `--outdir` → `config.compile.outdir` → `.claude/skills/wastech-mdlint/`. The file is always named `SKILL.md`.
+- Unlike other commands, `compile` takes `--cwd` (not `[path]`), and resolves a relative `--config`/`--outdir` against it.
 - Requires a `compile` section in config; a missing one exits `2` with guidance, not a stack trace.
 
 ## What goes into `SKILL.md`
 
-The compiler analyzes the graph (classifying nodes as entry/hub/leaf/isolated/bridge), extracts a
-document profile (outline, table schemas, detected ID patterns, references in/out), describes the
-active rules, and synthesizes a skill document. Output is **byte-deterministic**: sorted, POSIX
-paths, a content hash, no timestamps — so re-running on the same inputs produces identical bytes.
+The compiler analyzes the graph (classifying nodes as entry/hub/leaf/isolated/bridge), extracts a document profile (outline, table schemas, detected ID patterns, references in/out), describes the active rules, and synthesizes a skill document. Output is **byte-deterministic**: sorted, POSIX paths, a content hash, no timestamps — so re-running on the same inputs produces identical bytes.
 
 ## Config
 
@@ -57,11 +49,8 @@ paths, a content hash, no timestamps — so re-running on the same inputs produc
 
 ## Compile vs. static skills
 
-`compile` produces a **generated, project-specific** skill. The three **hand-authored** skills
-(`-init`, `-fix`, `-impact`) are separate and shipped as-is — see [Skills](skills.md). Both share
-one frontmatter schema in core.
+`compile` produces a **generated, project-specific** skill. The three **hand-authored** skills (`-init`, `-fix`, `-impact`) are separate and shipped as-is — see [Skills](skills.md). Both share one frontmatter schema in core.
 
 ## Via MCP
 
-The [`compile-context`](mcp-server.md) MCP tool produces the same deterministic output as this
-command (as two plain-text blocks). It also requires `config.compile`.
+The [`compile-context`](mcp-server.md) MCP tool produces the same deterministic output as this command (as two plain-text blocks). It also requires `config.compile`.

@@ -4,8 +4,7 @@
 
 ## Goal
 
-Provide the core graph algorithms, with **explicit cycle data** instead of silently truncated
-topo order.
+Provide the core graph algorithms, with **explicit cycle data** instead of silently truncated topo order.
 
 ## Sequence
 
@@ -16,17 +15,8 @@ topo order.
 ## Deliverables / steps
 
 1. `topologicalSort(graph)` — Kahn's algorithm with a sorted zero-in-degree queue.
-2. `getComponents(graph)` — undirected BFS connected components, sorted **by size descending,
-   then by the component's lexicographically-smallest node path (repo-relative POSIX) ascending**
-   (audit — P4 component-sort gap) — deterministic across filesystems.
-3. **Explicit cycles** ([G6](../requirements/03-context-graph.md)): the cycle list is returned as
-   data — not just a shorter topo array — from the Tarjan pass P4.01 implements in
-   `buildContextGraph`; this task reuses it by reading `graph.cycles`, not by re-running SCC.
-   Shared with GRP-001 (P4.06). **Edge multiplicity & cycles (audit — P4 edge-dedup
-   gap):** duplicate edges do not multiply cycles — SCC is defined over node reachability, so
-   several `A→B` edges plus a `B→A` form **one** cycle (the SCC `{A,B}`), reported once (GRP-001
-   canonicalizes). Edge multiplicity is retained only for `references`/degree counts; collapsing
-   duplicates is [G7 backlog](../requirements/03-context-graph.md).
+2. `getComponents(graph)` — undirected BFS connected components, sorted **by size descending, then by the component's lexicographically-smallest node path (repo-relative POSIX) ascending** (audit — P4 component-sort gap) — deterministic across filesystems.
+3. **Explicit cycles** ([G6](../requirements/03-context-graph.md)): the cycle list is returned as data — not just a shorter topo array — from the Tarjan pass P4.01 implements in `buildContextGraph`; this task reuses it by reading `graph.cycles`, not by re-running SCC. Shared with GRP-001 (P4.06). **Edge multiplicity & cycles (audit — P4 edge-dedup gap):** duplicate edges do not multiply cycles — SCC is defined over node reachability, so several `A→B` edges plus a `B→A` form **one** cycle (the SCC `{A,B}`), reported once (GRP-001 canonicalizes). Edge multiplicity is retained only for `references`/degree counts; collapsing duplicates is [G7 backlog](../requirements/03-context-graph.md).
 4. `formatContextGraphSummary(graph)` — counts, entry points (`inDegree === 0`), top hubs.
 
 ## Decisions applied
@@ -35,25 +25,9 @@ topo order.
 
 ## Implementation notes
 
-- **Tarjan lives in P4.01's builder; this task reuses it via `graph.cycles`.** There is no separate
-  "existing" Tarjan to relocate — legacy `src/` was removed in P0, so `detectCycles` was written
-  fresh in `buildContextGraph` (P4.01), which stores the canonicalized, deduped cycle list on the
-  graph (G6). `topologicalSort`/`formatContextGraphSummary` consume that field directly instead of
-  re-running SCC or extracting a standalone `getCycles` out of the builder — moving a frozen,
-  already-correct algorithm would be pure churn. Downstream consumers (P4.03, P4.06, GRP-001) should
-  keep reading `graph.cycles` rather than expecting a separate cycle accessor from this module.
-- **In-degree is deduped before Kahn's runs, degree fields are not.** `ContextGraphNode.inDegree`
-  intentionally retains edge multiplicity (P4.01 constraint — two `A→B` links are two references).
-  Feeding that raw count into Kahn's would strand a node behind a duplicated edge at a permanent
-  in-degree ≥ 1, misreporting it as cycle-excluded. The algorithms build a private deduped
-  adjacency/in-degree view for reachability purposes only; `formatContextGraphSummary`'s entry-point
-  and hub numbers still use the retained-multiplicity fields, since those are display counts, not
-  reachability tests. Collapsing multiplicity globally stays G7 backlog.
-- **`excluded` is deliberately broader than "the cycle members."** It is every node
-  `topologicalSort` never emits — a cycle's own nodes plus anything reachable only through them.
-  This is the G6 honesty fix the task calls for: the prior behavior silently truncated the topo
-  array with no record of what was dropped or why. Pair `excluded` with `graph.cycles` to explain
-  _which_ cycle caused a given exclusion.
+- **Tarjan lives in P4.01's builder; this task reuses it via `graph.cycles`.** There is no separate "existing" Tarjan to relocate — legacy `src/` was removed in P0, so `detectCycles` was written fresh in `buildContextGraph` (P4.01), which stores the canonicalized, deduped cycle list on the graph (G6). `topologicalSort`/`formatContextGraphSummary` consume that field directly instead of re-running SCC or extracting a standalone `getCycles` out of the builder — moving a frozen, already-correct algorithm would be pure churn. Downstream consumers (P4.03, P4.06, GRP-001) should keep reading `graph.cycles` rather than expecting a separate cycle accessor from this module.
+- **In-degree is deduped before Kahn's runs, degree fields are not.** `ContextGraphNode.inDegree` intentionally retains edge multiplicity (P4.01 constraint — two `A→B` links are two references). Feeding that raw count into Kahn's would strand a node behind a duplicated edge at a permanent in-degree ≥ 1, misreporting it as cycle-excluded. The algorithms build a private deduped adjacency/in-degree view for reachability purposes only; `formatContextGraphSummary`'s entry-point and hub numbers still use the retained-multiplicity fields, since those are display counts, not reachability tests. Collapsing multiplicity globally stays G7 backlog.
+- **`excluded` is deliberately broader than "the cycle members."** It is every node `topologicalSort` never emits — a cycle's own nodes plus anything reachable only through them. This is the G6 honesty fix the task calls for: the prior behavior silently truncated the topo array with no record of what was dropped or why. Pair `excluded` with `graph.cycles` to explain _which_ cycle caused a given exclusion.
 
 ## Exit criteria
 

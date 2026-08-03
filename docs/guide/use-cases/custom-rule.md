@@ -2,8 +2,7 @@
 
 > [Guide](../README.md) · [Use cases](README.md) · [Rules](../rules/README.md)
 
-**Goal:** a rule the built-ins don't cover — "every row in the ownership table must name an Owner"
-— expressed declaratively.
+**Goal:** a rule the built-ins don't cover — "every row in the ownership table must name an Owner" — expressed declaratively.
 
 ```jsonc
 {
@@ -27,7 +26,4 @@
 wastech-mdlint lint docs/ownership
 ```
 
-**You get:** a named finding (`OWN-REQUIRED`) with no rebuild and no code execution — the
-[`custom`](../rules/custom.md) rule composes a closed assertion vocabulary (13 kinds covering
-tables, sections, content, checklists, links). The `id` must be namespaced and must not shadow a
-built-in prefix.
+**You get:** a named finding (`OWN-REQUIRED`) with no rebuild and no code execution — the [`custom`](../rules/custom.md) rule composes a closed assertion vocabulary (13 kinds covering tables, sections, content, checklists, links). The `id` must be namespaced and must not shadow a built-in prefix.
