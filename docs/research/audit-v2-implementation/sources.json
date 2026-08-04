@@ -1,0 +1,3336 @@
+{
+  "sources": [
+    {
+      "id": "agents-invariants",
+      "claim": "AGENTS.md states the eight architecture invariants the audit checks the code against; the first is core's sole ownership of the pipeline.",
+      "path": "AGENTS.md",
+      "line": 53,
+      "snippet": "is the single owner of parsing, config loading, lint orchestration, graph construction, compile logic, and result formatting"
+    },
+    {
+      "id": "agents-plan-md-claim",
+      "claim": "F5: AGENTS.md asserts that PLAN.md and docs/plan/ remain in the repository; neither path exists.",
+      "path": "AGENTS.md",
+      "line": 39,
+      "snippet": "Historical v1 planning remains in `PLAN.md` and `docs/plan/`"
+    },
+    {
+      "id": "agents-accepted-behaviors-rule",
+      "claim": "F10/F20: AGENTS.md requires an accepted behavior to be recorded in the register in the same change, not left in a task file.",
+      "path": "AGENTS.md",
+      "line": 110,
+      "snippet": "record it in `docs/mdlint_v2/accepted-behaviors.md` in the same change"
+    },
+    {
+      "id": "rules-architecture-mcp-validation",
+      "claim": "F3: the architecture rules assign input validation to the MCP boundary.",
+      "path": ".agents/rules/architecture.md",
+      "line": 28,
+      "snippet": "MCP: tool registration, input validation, structured output, error wrapping"
+    },
+    {
+      "id": "rules-security-argv",
+      "claim": "F28: the security rules require explicit argv lists rather than shell interpolation for child processes.",
+      "path": ".agents/rules/security.md",
+      "line": 40,
+      "snippet": "use explicit argv lists rather than shell interpolation"
+    },
+    {
+      "id": "rules-testing-build-first",
+      "claim": "F14: the testing rules instruct running npm run typecheck or npm run build before the spawn suites; both are the same incremental command.",
+      "path": ".agents/rules/testing.md",
+      "line": 68,
+      "snippet": "run `npm run typecheck` (which is `tsc -b`, and emits) or `npm run build` _first_"
+    },
+    {
+      "id": "globs-ismatch",
+      "claim": "F1: the single shared config matcher calls micromatch.isMatch with the whole pattern array, which is a first-truthy OR.",
+      "path": "packages/core/src/discovery/globs.ts",
+      "line": 37,
+      "snippet": "micromatch.isMatch("
+    },
+    {
+      "id": "globs-widening",
+      "claim": "F1/F25: any slash-free pattern is rewritten to a depth-agnostic glob, which also turns a bare negation into a literal filename pattern.",
+      "path": "packages/core/src/discovery/globs.ts",
+      "line": 14,
+      "snippet": "return `**/${normalizedPattern}`;"
+    },
+    {
+      "id": "globs-backslash-normalize",
+      "claim": "Invariant 3: config globs normalize Windows backslashes to POSIX separators.",
+      "path": "packages/core/src/discovery/globs.ts",
+      "line": 4,
+      "snippet": "return value.replaceAll(\"\\\\\", \"/\");"
+    },
+    {
+      "id": "workspace-negation-rationale",
+      "claim": "F1: the repository already diagnosed the OR-versus-negation hazard in writing, for workspace globs.",
+      "path": "packages/core/src/discovery/workspace-packages.ts",
+      "line": 249,
+      "snippet": "never actually excludes anything"
+    },
+    {
+      "id": "workspace-negation-fix",
+      "claim": "F1: the fix — matching the whole list at once — exists and is applied to workspace globs only.",
+      "path": "packages/core/src/discovery/workspace-packages.ts",
+      "line": 254,
+      "snippet": "micromatch(packageJsonDirs, resolvedGlobs, { dot: true })"
+    },
+    {
+      "id": "micromatch-dts-note",
+      "claim": "F1: the ambient declaration records the list-versus-isMatch semantics the load-bearing matcher does not use.",
+      "path": "packages/core/src/types/micromatch.d.ts",
+      "line": 8,
+      "snippet": "unlike per-item `isMatch()`"
+    },
+    {
+      "id": "rule-utils-test-describe",
+      "claim": "F1: the dedicated test file for the shared file-scope matcher has no ordered-negation case.",
+      "path": "packages/core/test/rule-utils.test.ts",
+      "line": 14,
+      "snippet": "describe(\"matchesFileScope (glob-match, R7)\""
+    },
+    {
+      "id": "workspace-negation-test",
+      "claim": "F1: two passing tests pin the negation behavior for workspace globs.",
+      "path": "packages/core/test/workspace-packages.test.ts",
+      "line": 195,
+      "snippet": "honors an ordered negated glob from package.json#workspaces"
+    },
+    {
+      "id": "load-documents-include-only-filter",
+      "claim": "F1: the include pattern list is the only file filter in the corpus walk; there is no extension gate.",
+      "path": "packages/core/src/markdown/load-documents.ts",
+      "line": 109,
+      "snippet": "!matchesConfigGlob(relPath, params.patterns)"
+    },
+    {
+      "id": "load-documents-empty-root",
+      "claim": "F3: a root that does not stat as a directory yields an empty document map rather than an error.",
+      "path": "packages/core/src/markdown/load-documents.ts",
+      "line": 134,
+      "snippet": "if (rootStats === undefined || !rootStats.isDirectory()) {"
+    },
+    {
+      "id": "load-documents-empty-map-return",
+      "claim": "F3: the terminating behavior for a nonexistent root is an empty Map.",
+      "path": "packages/core/src/markdown/load-documents.ts",
+      "line": 135,
+      "snippet": "return new Map();"
+    },
+    {
+      "id": "load-documents-readdir-unguarded",
+      "claim": "F19: the corpus walk's readdir has no error handling.",
+      "path": "packages/core/src/markdown/load-documents.ts",
+      "line": 63,
+      "snippet": "const entries = await readdir(params.directoryPath, { withFileTypes: true });"
+    },
+    {
+      "id": "load-documents-test-empty-root",
+      "claim": "F3: core pins the empty-map behavior as intended, which is what puts the guard at each host boundary.",
+      "path": "packages/core/test/load-documents.test.ts",
+      "line": 128,
+      "snippet": "returns an empty map when the root does not exist"
+    },
+    {
+      "id": "reference-router-branch",
+      "claim": "F4: REF-001 splits resolution into a router branch and a non-router branch.",
+      "path": "packages/core/src/engine/primitives/reference.ts",
+      "line": 70,
+      "snippet": "if (isRootRelative && router !== undefined) {"
+    },
+    {
+      "id": "reference-exclude-applied",
+      "claim": "F4: options.exclude is consulted only on the non-router branch.",
+      "path": "packages/core/src/engine/primitives/reference.ts",
+      "line": 88,
+      "snippet": "matchesConfigGlob(relTarget, options.exclude)"
+    },
+    {
+      "id": "reference-image-router-blind",
+      "claim": "F15: REF-003's image resolution strips the leading slash and is router-blind.",
+      "path": "packages/core/src/engine/primitives/reference.ts",
+      "line": 129,
+      "snippet": "const relTarget = target.startsWith(\"/\")"
+    },
+    {
+      "id": "site-router-schema-optional",
+      "claim": "F4: every siteRouter field is optional, so a bare empty object validates.",
+      "path": "packages/core/src/config/config-schema.ts",
+      "line": 11,
+      "snippet": "const siteRouterSchema = z"
+    },
+    {
+      "id": "site-router-no-preset",
+      "claim": "F4: with no known preset the router returns the stripped path, behaviorally identical to the no-router branch except that exclude stops applying.",
+      "path": "packages/core/src/engine/site-router.ts",
+      "line": 46,
+      "snippet": "if (router.preset !== \"starlight\") {"
+    },
+    {
+      "id": "coverage-extensions",
+      "claim": "F8: the coverage signal's Markdown extension set is .md and .markdown.",
+      "path": "packages/core/src/graph/coverage.ts",
+      "line": 32,
+      "snippet": "const MARKDOWN_EXTENSIONS = [\".md\", \".markdown\"];"
+    },
+    {
+      "id": "repo-scan-extensions",
+      "claim": "F8: init's scanner uses a different Markdown extension set, .md and .mdx.",
+      "path": "packages/core/src/discovery/repo-scan.ts",
+      "line": 55,
+      "snippet": "const MARKDOWN_EXTENSIONS = new Set([\".md\", \".mdx\"]);"
+    },
+    {
+      "id": "lint-files-default-include",
+      "claim": "F8: the default include everywhere else is the .md glob only.",
+      "path": "packages/core/src/engine/lint-files.ts",
+      "line": 75,
+      "snippet": "const loaded = await loadDocuments(input.config.include ?? [\"**/*.md\"], {"
+    },
+    {
+      "id": "coverage-stale-comment-core-only",
+      "claim": "F26: the coverage docstring still says the signal is core-only with no CLI consumer.",
+      "path": "packages/core/src/graph/coverage.ts",
+      "line": 73,
+      "snippet": "Core-only for P4.06"
+    },
+    {
+      "id": "coverage-stale-comment-no-consumer",
+      "claim": "F26: the same comment says no CLI or lint-output consumer exists yet.",
+      "path": "packages/core/src/graph/coverage.ts",
+      "line": 74,
+      "snippet": "no CLI/lint-output consumer yet"
+    },
+    {
+      "id": "coverage-image-router-aware",
+      "claim": "F15: the coverage signal resolves targets router-aware.",
+      "path": "packages/core/src/graph/coverage.ts",
+      "line": 86,
+      "snippet": "for (const candidate of resolveTargetCandidates("
+    },
+    {
+      "id": "graph-image-router-aware",
+      "claim": "F15: the graph builder resolves image edges router-aware.",
+      "path": "packages/core/src/graph/build-context-graph.ts",
+      "line": 20,
+      "snippet": "mirroring REF-001/002 resolution"
+    },
+    {
+      "id": "rule-inference-image-mirror",
+      "claim": "F15: init's REF-003 evidence tally mirrors the router-blind resolver.",
+      "path": "packages/core/src/discovery/rule-inference.ts",
+      "line": 114,
+      "snippet": "Mirrors imageResolves"
+    },
+    {
+      "id": "cli-coverage-intent",
+      "claim": "F11: the CLI comment states that JSON consumers including MCP must see the coverage signal.",
+      "path": "packages/cli/src/commands.ts",
+      "line": 228,
+      "snippet": "The G5 coverage signal is shared by the JSON and human formats"
+    },
+    {
+      "id": "cli-coverage-mcp-named",
+      "claim": "F11: the same comment names MCP among the consumers that must see filesOutsideCorpus.",
+      "path": "packages/cli/src/commands.ts",
+      "line": 229,
+      "snippet": "must see `filesOutsideCorpus` too"
+    },
+    {
+      "id": "cli-coverage-call",
+      "claim": "F11/F26: the CLI graph command calls computeGraphCoverage, closing the P4.06 seam a core comment still calls open.",
+      "path": "packages/cli/src/commands.ts",
+      "line": 232,
+      "snippet": "computeGraphCoverage(documents, graph, {"
+    },
+    {
+      "id": "cli-graph-json-with-coverage",
+      "claim": "F11: the CLI's graph JSON passes coverage into the summary, producing a fifth key.",
+      "path": "packages/cli/src/commands.ts",
+      "line": 239,
+      "snippet": "summarizeContextGraph(graph, coverage())"
+    },
+    {
+      "id": "graph-render-coverage-optional",
+      "claim": "F11: summarizeContextGraph takes coverage as an optional argument and adds it as a fifth key.",
+      "path": "packages/core/src/graph/graph-render.ts",
+      "line": 48,
+      "snippet": "export function summarizeContextGraph("
+    },
+    {
+      "id": "mcp-graph-cwd-unvalidated",
+      "claim": "F3: the MCP context-graph tool accepts cwd as a raw optional string.",
+      "path": "packages/mcp-server/src/tools/context-graph.ts",
+      "line": 46,
+      "snippet": "cwd: z.string().optional(),"
+    },
+    {
+      "id": "mcp-lint-files-cwd-input",
+      "claim": "F3: the MCP lint-files tool accepts cwd as a raw optional string.",
+      "path": "packages/mcp-server/src/tools/lint-files.ts",
+      "line": 34,
+      "snippet": "cwd: z.string().optional(),"
+    },
+    {
+      "id": "mcp-lint-files-cwd-passthrough",
+      "claim": "F3: the tool passes cwd straight through to core with no existence check.",
+      "path": "packages/mcp-server/src/tools/lint-files.ts",
+      "line": 61,
+      "snippet": "const cwd = input.cwd ?? process.cwd();"
+    },
+    {
+      "id": "cli-m7-rationale",
+      "claim": "F3: the CLI states the M-7 defect verbatim as the reason it validates directory arguments.",
+      "path": "packages/cli/src/program.ts",
+      "line": 103,
+      "snippet": "indistinguishable from a clean repository (M-7)"
+    },
+    {
+      "id": "cli-usage-error-enoent",
+      "claim": "F3: the CLI raises a usage error for a nonexistent target, which maps to exit 2.",
+      "path": "packages/cli/src/program.ts",
+      "line": 123,
+      "snippet": "throw new CliUsageError(`${label} does not exist: ${relative}`);"
+    },
+    {
+      "id": "cli-scan-hidden",
+      "claim": "Cross-unit: the scan alias is registered hidden on the shared lint command factory.",
+      "path": "packages/cli/src/program.ts",
+      "line": 184,
+      "snippet": "const addLintCommand = (name: string, hidden: boolean): void => {"
+    },
+    {
+      "id": "cli-entrypoint-guard",
+      "claim": "Invariant 1/P11: the entrypoint guard dereferences both sides so an npm symlink invocation still runs the CLI.",
+      "path": "packages/cli/src/index.ts",
+      "line": 39,
+      "snippet": "realOrSelf(path.resolve(invokedPath)) === realOrSelf(modulePath)"
+    },
+    {
+      "id": "core-barrel-host-audience",
+      "claim": "F24: the barrel states that the CLI and MCP hosts import through it exclusively, which is the framing the uncalled exports are judged against.",
+      "path": "packages/core/src/index.ts",
+      "line": 4,
+      "snippet": "exclusively through this module"
+    },
+    {
+      "id": "core-barrel-slice-export",
+      "claim": "F24: slice is re-exported from the barrel.",
+      "path": "packages/core/src/index.ts",
+      "line": 107,
+      "snippet": "export { impact, query, slice } from \"./graph/query.js\";"
+    },
+    {
+      "id": "query-slice-declared",
+      "claim": "F24: slice is declared in the query layer and has no production caller.",
+      "path": "packages/core/src/graph/query.ts",
+      "line": 125,
+      "snippet": "export function slice("
+    },
+    {
+      "id": "impact-getimpactset-declared",
+      "claim": "F24: getImpactSet is exported and has no production caller.",
+      "path": "packages/core/src/graph/impact-analysis.ts",
+      "line": 54,
+      "snippet": "export function getImpactSet(graph: ContextGraph, file: string): QueryVisit[] {"
+    },
+    {
+      "id": "doc-profile-single-declared",
+      "claim": "F24: the single-document extractDocProfile is exported and has no production caller.",
+      "path": "packages/core/src/compile/doc-profile.ts",
+      "line": 185,
+      "snippet": "export function extractDocProfile("
+    },
+    {
+      "id": "assert-filematches-hook",
+      "claim": "F24: RunAssertionOptions declares a fileMatches hook that its only caller never passes.",
+      "path": "packages/core/src/engine/primitives/assert.ts",
+      "line": 162,
+      "snippet": "fileMatches?: (filePath: string) => boolean;"
+    },
+    {
+      "id": "custom-runassertion-call",
+      "claim": "F24: the sole runAssertion call site passes four fields and not fileMatches.",
+      "path": "packages/core/src/engine/rules/custom.ts",
+      "line": 119,
+      "snippet": "for (const finding of runAssertion(assert, {"
+    },
+    {
+      "id": "table-columnunique-files-retained",
+      "claim": "F24: ColumnUniqueOptions.files is retained for the caller's option shape and never read.",
+      "path": "packages/core/src/engine/primitives/table.ts",
+      "line": 242,
+      "snippet": "Retained for callers' option shape"
+    },
+    {
+      "id": "table-casesensitive-default",
+      "claim": "F12/F27: the columnInSet primitive defaults caseSensitive to true.",
+      "path": "packages/core/src/engine/primitives/table.ts",
+      "line": 98,
+      "snippet": "const caseSensitive = options.caseSensitive ?? true;"
+    },
+    {
+      "id": "describe-rules-casesensitive",
+      "claim": "F12/F27: the SKILL.md renderer appends the case-sensitive annotation only when the option is explicitly true.",
+      "path": "packages/core/src/compile/describe-rules.ts",
+      "line": 118,
+      "snippet": "assertion.caseSensitive === true ? \" (case-sensitive)\" : \"\""
+    },
+    {
+      "id": "assertion-targets-authority",
+      "claim": "F30: ASSERTION_TARGETS is the typed authority for the custom-rule target vocabulary.",
+      "path": "packages/core/src/engine/primitives/assert.ts",
+      "line": 139,
+      "snippet": "export const ASSERTION_TARGETS = {"
+    },
+    {
+      "id": "schema-target-enum-1",
+      "claim": "F30: the generated schema hardcodes the target vocabulary (first of two sites).",
+      "path": "packages/core/src/engine/schema.ts",
+      "line": 88,
+      "snippet": "target: { enum: [\"checklist\", \"content\", \"link\", \"section\", \"table\"] },"
+    },
+    {
+      "id": "schema-target-enum-2",
+      "claim": "F30: the generated schema hardcodes the target vocabulary (second of two sites).",
+      "path": "packages/core/src/engine/schema.ts",
+      "line": 104,
+      "snippet": "target: { enum: [\"checklist\", \"content\", \"link\", \"section\", \"table\"] },"
+    },
+    {
+      "id": "config-schema-target-loose",
+      "claim": "F30: the config loader accepts any string for target, which is looser than the generated schema.",
+      "path": "packages/core/src/config/config-schema.ts",
+      "line": 98,
+      "snippet": "target: z.string().optional(),"
+    },
+    {
+      "id": "config-schema-custom-entry",
+      "claim": "F13: custom rule entries are validated by their own strict schema inside a union.",
+      "path": "packages/core/src/config/config-schema.ts",
+      "line": 92,
+      "snippet": "export const customRuleEntrySchema = z"
+    },
+    {
+      "id": "config-schema-union",
+      "claim": "F13: the rule-entry union is what collapses an inner custom failure into a generic issue.",
+      "path": "packages/core/src/config/config-schema.ts",
+      "line": 126,
+      "snippet": "export const ruleEntryUnionSchema = z.union(["
+    },
+    {
+      "id": "load-config-root-issue-format",
+      "claim": "F13: root issues render with a dotted config path, which is what a custom-rule failure gets.",
+      "path": "packages/core/src/config/load-config.ts",
+      "line": 60,
+      "snippet": "issue.path.length === 0 ? \"config\" : `config.${issue.path.join(\".\")}`;"
+    },
+    {
+      "id": "load-config-rule-issue-format",
+      "claim": "F13: rule-resolution issues render with the C7 indexed-options path, which built-in rules get.",
+      "path": "packages/core/src/config/load-config.ts",
+      "line": 82,
+      "snippet": ": `rules[${index}].${issue.path.join(\".\")}`;"
+    },
+    {
+      "id": "load-config-explicit-path-resolve",
+      "claim": "F10: an explicit config path is resolved against the process cwd, ignoring the caller's cwd.",
+      "path": "packages/core/src/config/load-config.ts",
+      "line": 183,
+      "snippet": "? path.resolve(params.explicitConfigPath)"
+    },
+    {
+      "id": "commands-lint-loadconfig",
+      "claim": "F10: the lint handler is one of four that resolve --config against the process cwd.",
+      "path": "packages/cli/src/commands.ts",
+      "line": 171,
+      "snippet": "loadConfiguration("
+    },
+    {
+      "id": "commands-compile-loadconfig",
+      "claim": "F10: the compile handler resolves --config against the command's own cwd, with the hazard written down.",
+      "path": "packages/cli/src/commands.ts",
+      "line": 422,
+      "snippet": "resolves `explicitConfigPath` against `process.cwd()`"
+    },
+    {
+      "id": "commands-core-import",
+      "claim": "Invariant 1: every host entry into the pipeline is an import from the core barrel.",
+      "path": "packages/cli/src/commands.ts",
+      "line": 10,
+      "snippet": "computeGraphCoverage,"
+    },
+    {
+      "id": "registry-docsurl-declared",
+      "claim": "F22: docsUrl is declared in the rule metadata type.",
+      "path": "packages/core/src/engine/registry.ts",
+      "line": 24,
+      "snippet": "docsUrl?: string;"
+    },
+    {
+      "id": "registry-messages-declared",
+      "claim": "F22: messages is declared once and never set or read.",
+      "path": "packages/core/src/engine/registry.ts",
+      "line": 26,
+      "snippet": "messages?: Record<string, string>;"
+    },
+    {
+      "id": "registry-docsurl-copied",
+      "claim": "F22: docsUrl is copied into the resolved rule, the second of only three occurrences.",
+      "path": "packages/core/src/engine/registry.ts",
+      "line": 216,
+      "snippet": "docsUrl: definition.metadata.docsUrl,"
+    },
+    {
+      "id": "types-docsurl-redeclared",
+      "claim": "F22: docsUrl is re-declared on the Rule type, the third and last occurrence.",
+      "path": "packages/core/src/engine/types.ts",
+      "line": 129,
+      "snippet": "docsUrl?: string;"
+    },
+    {
+      "id": "types-helpuri-field",
+      "claim": "F18: LintMessage carries helpUri among the structured R3 fields.",
+      "path": "packages/core/src/engine/types.ts",
+      "line": 93,
+      "snippet": "helpUri?: string;"
+    },
+    {
+      "id": "types-rule-category-custom",
+      "claim": "F35: custom is a RuleCategory in code, which is why the roadmap sentence's own enumeration totals nine categories.",
+      "path": "packages/core/src/engine/types.ts",
+      "line": 33,
+      "snippet": "| \"custom\";"
+    },
+    {
+      "id": "format-lint-result-shared-claim",
+      "claim": "F17: core asserts that the JSON shape is the structured contract MCP reuses.",
+      "path": "packages/core/src/engine/format-lint-result.ts",
+      "line": 5,
+      "snippet": "the JSON shape is the structured contract MCP reuses (P7)"
+    },
+    {
+      "id": "format-lint-result-json",
+      "claim": "F17/F32: the real JSON formatter is formatLintResultJson.",
+      "path": "packages/core/src/engine/format-lint-result.ts",
+      "line": 46,
+      "snippet": "export function formatLintResultJson(result: LintResult): string {"
+    },
+    {
+      "id": "format-lint-result-text",
+      "claim": "F32: the real text formatter is formatLintResultText, not the name the decision record uses.",
+      "path": "packages/core/src/engine/format-lint-result.ts",
+      "line": 17,
+      "snippet": "export function formatLintResultText(result: LintResult): string {"
+    },
+    {
+      "id": "format-lint-result-summary-keys",
+      "claim": "F17: the emitted summary has exactly files, errors, and warnings — no pass/fail field.",
+      "path": "packages/core/src/engine/format-lint-result.ts",
+      "line": 49,
+      "snippet": "files: result.files.length,"
+    },
+    {
+      "id": "mcp-lint-message-schema-helpuri",
+      "claim": "F18: helpUri crosses the MCP wire schema as well.",
+      "path": "packages/mcp-server/src/shared/lint-message-schema.ts",
+      "line": 18,
+      "snippet": "helpUri: z.string().optional(),"
+    },
+    {
+      "id": "tool-response-sdk-attribution",
+      "claim": "F29: the rationale comment attributes to the SDK server a validation only its client performs.",
+      "path": "packages/mcp-server/src/shared/tool-response.ts",
+      "line": 80,
+      "snippet": "The pinned MCP SDK (1.29) validates any present"
+    },
+    {
+      "id": "errors-structured-allowlist",
+      "claim": "F19: isStructuredError deliberately refuses to duck-type filesystem errors into the coded taxonomy.",
+      "path": "packages/core/src/errors.ts",
+      "line": 35,
+      "snippet": "export function isStructuredError("
+    },
+    {
+      "id": "gitignore-first-layer-wins",
+      "claim": "F9: the gitignore matcher returns true at the first layer that ignores, so root patterns win over deeper negations.",
+      "path": "packages/core/src/discovery/gitignore-layers.ts",
+      "line": 42,
+      "snippet": "if (layer.ig.ignores(isDirectory ? `${relToBase}/` : relToBase)) {"
+    },
+    {
+      "id": "gitignore-shared-matcher",
+      "claim": "F9: one matcher backs both the lint corpus and init's pre-config scan.",
+      "path": "packages/core/src/discovery/gitignore-layers.ts",
+      "line": 6,
+      "snippet": "Shared `.gitignore` matching for every directory walk in core."
+    },
+    {
+      "id": "gitignore-unreadable-rationale",
+      "claim": "F19: a sibling walk states that an unreadable ignore file must never be a scan failure — the opposite choice from the corpus loader.",
+      "path": "packages/core/src/discovery/gitignore-layers.ts",
+      "line": 52,
+      "snippet": "an unreadable ignore file means \"no rules here\", never a scan failure"
+    },
+    {
+      "id": "config-writer-stale-p903",
+      "claim": "F16: shipped core runtime names the composite Action as P9.03, which is a Done CI-matrix task.",
+      "path": "packages/core/src/discovery/config-writer.ts",
+      "line": 170,
+      "snippet": "the first-class composite Action (P9.03)"
+    },
+    {
+      "id": "config-writer-schema-segments",
+      "claim": "F37: the installed-schema path constant places schema.json under the cli package, not the repository root.",
+      "path": "packages/core/src/discovery/config-writer.ts",
+      "line": 88,
+      "snippet": "PACKAGE_SCHEMA_SEGMENTS"
+    },
+    {
+      "id": "init-e2e-stale-p903",
+      "claim": "F16: a CLI test comment repeats the stale P9.03 attribution.",
+      "path": "packages/cli/test/init.e2e.test.ts",
+      "line": 1249,
+      "snippet": "P9.03's composite Action"
+    },
+    {
+      "id": "tokens-heuristic",
+      "claim": "F31: the token heuristic counts characters, not UTF-8 bytes.",
+      "path": "packages/core/src/engine/tokens.ts",
+      "line": 5,
+      "snippet": "return Math.ceil(text.length / 4);"
+    },
+    {
+      "id": "size-bytes-metric",
+      "claim": "F31: SIZE-001 computes UTF-8 byte length as a separate metric from tokens, so the two units are deliberately distinct.",
+      "path": "packages/core/src/engine/rules/size.ts",
+      "line": 71,
+      "snippet": "bytes: Buffer.byteLength(document.content, \"utf8\"),"
+    },
+    {
+      "id": "parse-document-single-visit",
+      "claim": "Invariant 4: one visit pass produces every ParsedDocument field.",
+      "path": "packages/core/src/markdown/parse-document.ts",
+      "line": 285,
+      "snippet": "visit(tree, (node) => {"
+    },
+    {
+      "id": "atomic-write-temp-name",
+      "claim": "Invariant 7: the only nondeterminism in core is temp-file naming, which never reaches output.",
+      "path": "packages/core/src/atomic-write.ts",
+      "line": 98,
+      "snippet": "randomBytes(6).toString(\"hex\")"
+    },
+    {
+      "id": "lint-files-sorted-output",
+      "claim": "Invariant 7: public collections are sorted before return.",
+      "path": "packages/core/src/engine/lint-files.ts",
+      "line": 87,
+      "snippet": "const projectFiles = [...documents.keys()].sort(compareStrings);"
+    },
+    {
+      "id": "boundary-guards-category-set",
+      "claim": "Coverage: the boundary-guard inventory pins the four category names literally.",
+      "path": "packages/core/test/boundary-guards.test.ts",
+      "line": 76,
+      "snippet": "expect(categories).toEqual(["
+    },
+    {
+      "id": "primitives-determinism-tag",
+      "claim": "Coverage: the seventh @boundary-guard tag, which the upstream inventory list omitted.",
+      "path": "packages/core/test/primitives.test.ts",
+      "line": 121,
+      "snippet": "@boundary-guard determinism"
+    },
+    {
+      "id": "path-resolve-windows-gate",
+      "claim": "F38: the skipped tests are gated on the win32 platform.",
+      "path": "packages/core/test/path-resolve.test.ts",
+      "line": 31,
+      "snippet": "it.runIf(process.platform === \"win32\")("
+    },
+    {
+      "id": "bin-e2e-assertbuilt",
+      "claim": "F14: the spawn suite's guard function is assertBuilt.",
+      "path": "packages/cli/test/bin.e2e.test.ts",
+      "line": 49,
+      "snippet": "function assertBuilt(): void {"
+    },
+    {
+      "id": "bin-e2e-mtime-compare",
+      "claim": "F14: the guard compares mtimes, which an incremental tsc -b does not refresh.",
+      "path": "packages/cli/test/bin.e2e.test.ts",
+      "line": 56,
+      "snippet": "if (statSync(cliSrcIndex).mtimeMs > statSync(cliDistIndex).mtimeMs) {"
+    },
+    {
+      "id": "root-build-script",
+      "claim": "F14: npm run build is tsc -b.",
+      "path": "package.json",
+      "line": 31,
+      "snippet": "\"build\": \"tsc -b\","
+    },
+    {
+      "id": "root-typecheck-script",
+      "claim": "F14: npm run typecheck is the same command as build.",
+      "path": "package.json",
+      "line": 34,
+      "snippet": "\"typecheck\": \"tsc -b\","
+    },
+    {
+      "id": "root-private",
+      "claim": "F21/F23: the root manifest is private with no files field, so packing it exercises no allowlist.",
+      "path": "package.json",
+      "line": 23,
+      "snippet": "\"private\": true,"
+    },
+    {
+      "id": "root-release-check",
+      "claim": "F21/F23: release:check packs the root with no workspace flag.",
+      "path": "package.json",
+      "line": 38,
+      "snippet": "\"release:check\": \"npm run typecheck && npm test && npm run build && npm pack --dry-run\""
+    },
+    {
+      "id": "cli-files-allowlist",
+      "claim": "F21/F23/F37: the CLI package's files allowlist ships dist and schema.json.",
+      "path": "packages/cli/package.json",
+      "line": 13,
+      "snippet": "\"files\": ["
+    },
+    {
+      "id": "core-files-allowlist",
+      "claim": "F21/F23: the core package's files allowlist that release:check never exercises.",
+      "path": "packages/core/package.json",
+      "line": 16,
+      "snippet": "\"files\": ["
+    },
+    {
+      "id": "mcp-files-allowlist",
+      "claim": "F21/F23: the mcp-server package's files allowlist that release:check never exercises.",
+      "path": "packages/mcp-server/package.json",
+      "line": 13,
+      "snippet": "\"files\": ["
+    },
+    {
+      "id": "tsconfig-declarationmap",
+      "claim": "F23: declarationMap is on, so .d.ts.map files are emitted into dist.",
+      "path": "tsconfig.base.json",
+      "line": 9,
+      "snippet": "\"declarationMap\": true,"
+    },
+    {
+      "id": "tsconfig-sourcemap",
+      "claim": "F23: sourceMap is on, so .js.map files are emitted into dist and shipped by the files allowlist.",
+      "path": "tsconfig.base.json",
+      "line": 10,
+      "snippet": "\"sourceMap\": true,"
+    },
+    {
+      "id": "ci-pack-workspace",
+      "claim": "F21/F23: CI packs each workspace package correctly, unlike the local script.",
+      "path": ".github/workflows/ci.yml",
+      "line": 63,
+      "snippet": "npm pack --dry-run -w ${{ matrix.package }}"
+    },
+    {
+      "id": "ci-build-before-pack",
+      "claim": "F23: CI builds before packing and states why — every package's files allowlist is dist.",
+      "path": ".github/workflows/ci.yml",
+      "line": 61,
+      "snippet": "dist/ must exist before packing"
+    },
+    {
+      "id": "ci-stale-p9",
+      "claim": "F16: CI still says publishing is wired in P9.",
+      "path": ".github/workflows/ci.yml",
+      "line": 44,
+      "snippet": "is wired in P9 (I4)"
+    },
+    {
+      "id": "publish-stale-p9-1",
+      "claim": "F16: the publish workflow says real releases are wired in P9.",
+      "path": ".github/workflows/publish.yml",
+      "line": 5,
+      "snippet": "Real releases are wired in P9 (roadmap I4)"
+    },
+    {
+      "id": "publish-stale-p9-2",
+      "claim": "F16: the publish workflow says 'Until P9 lands' — P9 landed.",
+      "path": ".github/workflows/publish.yml",
+      "line": 7,
+      "snippet": "Until P9 lands"
+    },
+    {
+      "id": "publish-stale-p9-3",
+      "claim": "F16: a tenth stale site the upstream passes did not list.",
+      "path": ".github/workflows/publish.yml",
+      "line": 19,
+      "snippet": "once P9 turns on publishing"
+    },
+    {
+      "id": "publish-stale-p9-4",
+      "claim": "F16: a user-visible CI log line still names P9.",
+      "path": ".github/workflows/publish.yml",
+      "line": 43,
+      "snippet": "lands in P9 (I4)."
+    },
+    {
+      "id": "publish-no-npm-publish",
+      "claim": "P-release: the publish workflow deliberately does not run npm publish.",
+      "path": ".github/workflows/publish.yml",
+      "line": 9,
+      "snippet": "`npm publish`."
+    },
+    {
+      "id": "skill-init-compatibility",
+      "claim": "F16: published skill frontmatter still promises a P9 single-tag release.",
+      "path": "skills/wastech-mdlint-init/SKILL.md",
+      "line": 5,
+      "snippet": "both ship from one P9 single-tag release"
+    },
+    {
+      "id": "skill-fix-compatibility",
+      "claim": "F16: the same stale compatibility line in the fix skill.",
+      "path": "skills/wastech-mdlint-fix/SKILL.md",
+      "line": 5,
+      "snippet": "both ship from one P9 single-tag release"
+    },
+    {
+      "id": "skill-impact-compatibility",
+      "claim": "F16: the same stale compatibility line in the impact skill.",
+      "path": "skills/wastech-mdlint-impact/SKILL.md",
+      "line": 5,
+      "snippet": "both ship from one P9 single-tag release"
+    },
+    {
+      "id": "wsl-wrapper-args",
+      "claim": "F28: the WSL wrapper flattens the argument vector into a single string.",
+      "path": "scripts/run-npm-windows.sh",
+      "line": 17,
+      "snippet": "npm_args=\"$*\""
+    },
+    {
+      "id": "wsl-wrapper-exec",
+      "claim": "F28: the wrapper interpolates that string and the repo path into a cmd.exe command line and disables the engines gate.",
+      "path": "scripts/run-npm-windows.sh",
+      "line": 19,
+      "snippet": "exec cmd.exe /d /s /c \"cd /d $repo_root_win && npm --engine-strict=false $npm_args\""
+    },
+    {
+      "id": "prettierrc-prosewrap",
+      "claim": "F34: proseWrap never is why the format gate passes on the corrupted line.",
+      "path": ".prettierrc.json",
+      "line": 3,
+      "snippet": "\"proseWrap\": \"never\""
+    },
+    {
+      "id": "gitignore-tasks",
+      "claim": "F6: tasks/ is gitignored, so four plan links point outside the repository.",
+      "path": ".gitignore",
+      "line": 20,
+      "snippet": "tasks/"
+    },
+    {
+      "id": "roadmap-dead-docsplan-link",
+      "claim": "F5/F6: the roadmap links to docs/plan/, which was never tracked.",
+      "path": "docs/mdlint_v2/index.md",
+      "line": 5,
+      "snippet": "[docs/plan/](../plan/00-meta-plan.md)"
+    },
+    {
+      "id": "roadmap-dead-planmd-link",
+      "claim": "F5/F6: the roadmap links to PLAN.md, which was deleted.",
+      "path": "docs/mdlint_v2/index.md",
+      "line": 11,
+      "snippet": "[PLAN.md](../PLAN.md)"
+    },
+    {
+      "id": "roadmap-rule-count",
+      "claim": "F35: the roadmap sentence enumerates 25 items and 9 categories before asserting 24 across 8.",
+      "path": "docs/mdlint_v2/index.md",
+      "line": 15,
+      "snippet": "24 registered built-ins across 8 categories"
+    },
+    {
+      "id": "roadmap-cli-six-commands",
+      "claim": "F36: the roadmap lists six CLI commands; seven ship.",
+      "path": "docs/mdlint_v2/index.md",
+      "line": 17,
+      "snippet": "with `lint` (default) · `init` · `graph` · `slice` · `impact` · `compile`"
+    },
+    {
+      "id": "roadmap-tree-schema-root",
+      "claim": "F37: the roadmap's target tree places schema.json at the repository root.",
+      "path": "docs/mdlint_v2/index.md",
+      "line": 87,
+      "snippet": "schema.json                   ← JSON Schema mirror of the config"
+    },
+    {
+      "id": "roadmap-scan-clock",
+      "claim": "Cross-unit: decision D4 records the one-minor-version clock for the hidden scan alias.",
+      "path": "docs/mdlint_v2/index.md",
+      "line": 104,
+      "snippet": "for one minor version, then deprecate."
+    },
+    {
+      "id": "roadmap-p9-09-dead-link",
+      "claim": "F6: the roadmap links to the deleted p9-09 report.",
+      "path": "docs/mdlint_v2/index.md",
+      "line": 238,
+      "snippet": "../research/p9-09-full-solution-deep-audit/report.md"
+    },
+    {
+      "id": "p11-index-status-not-started",
+      "claim": "F2: the P11 index reads Not started while all fourteen of its task files read Done.",
+      "path": "docs/mdlint_v2/P11-remediation/index.md",
+      "line": 3,
+      "snippet": "Status **Not started**"
+    },
+    {
+      "id": "p11-index-tasks-pending-link",
+      "claim": "F6: the P11 index links into gitignored tasks/pending/.",
+      "path": "docs/mdlint_v2/P11-remediation/index.md",
+      "line": 50,
+      "snippet": "tasks/pending/p11-01-cli-bin-noop.md"
+    },
+    {
+      "id": "p11-index-p9-09-link",
+      "claim": "F6: the P11 index cites the deleted p9-09 report.",
+      "path": "docs/mdlint_v2/P11-remediation/index.md",
+      "line": 5,
+      "snippet": "research/p9-09-full-solution-deep-audit/report.md"
+    },
+    {
+      "id": "p11-01-done",
+      "claim": "F2: P11.01 reads Done under an index that says the phase never began.",
+      "path": "docs/mdlint_v2/P11-remediation/01-cli-bin-noop.md",
+      "line": 3,
+      "snippet": "Status **Done**"
+    },
+    {
+      "id": "p11-10-config-deferral",
+      "claim": "F10: the --config divergence is recorded in a task file rather than the accepted-behaviors register.",
+      "path": "docs/mdlint_v2/P11-remediation/10-cli-exit-contract.md",
+      "line": 47,
+      "snippet": "also still resolves against `process.cwd()` inside core"
+    },
+    {
+      "id": "p11-10-nonexistent-path",
+      "claim": "F3: the P11.10 deliverable states that a nonexistent explicit path should not silently succeed, without scoping the fix to the CLI.",
+      "path": "docs/mdlint_v2/P11-remediation/10-cli-exit-contract.md",
+      "line": 19,
+      "snippet": "should not silently succeed"
+    },
+    {
+      "id": "p2-05-done-with-unchecked",
+      "claim": "F2: a representative Done task file whose exit criteria are all unchecked.",
+      "path": "docs/mdlint_v2/P2-rule-engine/05-orchestration-lintfiles.md",
+      "line": 3,
+      "snippet": "Status **Done**"
+    },
+    {
+      "id": "p0-index-parity-ticked",
+      "claim": "P0 completion: the byte-parity criterion is ticked but its reference implementation was removed at the P3.09 cutover.",
+      "path": "docs/mdlint_v2/P0-foundations/index.md",
+      "line": 41,
+      "snippet": "- [x] Current behavior preserved:"
+    },
+    {
+      "id": "p0-index-pack-ticked",
+      "claim": "P0 completion: the pack-clean criterion is ticked here and simultaneously open in P-release.",
+      "path": "docs/mdlint_v2/P0-foundations/index.md",
+      "line": 43,
+      "snippet": "- [x] CI runs the workspace matrix on Node 24"
+    },
+    {
+      "id": "p0-index-task-table-last",
+      "claim": "F33: the P0 index's task table ends at P0.08, with no row for the orchestrator file numbered 09.",
+      "path": "docs/mdlint_v2/P0-foundations/index.md",
+      "line": 22,
+      "snippet": "[P0.08](08-exit-verification.md)"
+    },
+    {
+      "id": "p0-index-sequence-end",
+      "claim": "F33: the P0 sequence diagram terminates at P0.08.",
+      "path": "docs/mdlint_v2/P0-foundations/index.md",
+      "line": 28,
+      "snippet": "P0.08 ─► (Phase P1)"
+    },
+    {
+      "id": "p0-index-stale-p9",
+      "claim": "F7: the P0 index assigns the single-tag release workflow to P9.",
+      "path": "docs/mdlint_v2/P0-foundations/index.md",
+      "line": 51,
+      "snippet": "**P9** — turn the packaging baseline into the single-tag release workflow."
+    },
+    {
+      "id": "p0-08-parity-unchecked",
+      "claim": "P0 completion: the same parity criterion is unchecked at task level and is no longer verifiable.",
+      "path": "docs/mdlint_v2/P0-foundations/08-exit-verification.md",
+      "line": 34,
+      "snippet": "output parity with the current implementation confirmed"
+    },
+    {
+      "id": "p0-08-index-ticked-criterion",
+      "claim": "F2: the unchecked criterion that requires the phase index checklist to be fully ticked — while that index is fully ticked.",
+      "path": "docs/mdlint_v2/P0-foundations/08-exit-verification.md",
+      "line": 36,
+      "snippet": "exit checklist fully ticked"
+    },
+    {
+      "id": "p0-09-frontmatter",
+      "claim": "F33: the file carries orchestrator frontmatter instead of the phase-task header.",
+      "path": "docs/mdlint_v2/P0-foundations/09-audit-remediation.md",
+      "line": 2,
+      "snippet": "id: p0-09-audit-remediation"
+    },
+    {
+      "id": "p0-09-acceptance-heading",
+      "claim": "F33: the file uses Acceptance criteria instead of Exit criteria.",
+      "path": "docs/mdlint_v2/P0-foundations/09-audit-remediation.md",
+      "line": 27,
+      "snippet": "## Acceptance criteria"
+    },
+    {
+      "id": "p0-09-verify-all",
+      "claim": "F2/F33: its unchecked box asserts responsibility for verifying every other P0 criterion.",
+      "path": "docs/mdlint_v2/P0-foundations/09-audit-remediation.md",
+      "line": 31,
+      "snippet": "are genuinely met and re-verified."
+    },
+    {
+      "id": "p0-09-no-stale-root-config",
+      "claim": "F35: the nearest thing to a decision about a repository config is this P0.09 remediation clause, which requires that no *stale* pre-v2 root config survive (alongside legacy `ctxlint` naming); it records no decision about a v2 config.",
+      "path": "docs/mdlint_v2/P0-foundations/09-audit-remediation.md",
+      "line": 25,
+      "snippet": "stale root config"
+    },
+    {
+      "id": "p6-index-stale-p9",
+      "claim": "F7: the P6 index assigns the published GitHub Action to P9.",
+      "path": "docs/mdlint_v2/P6-init/index.md",
+      "line": 47,
+      "snippet": "**P9** — the optional workflow file references the published GitHub Action."
+    },
+    {
+      "id": "p7-index-stale-p9",
+      "claim": "F7: the P7 index assigns shipped P7.05 packaging work to P9.",
+      "path": "docs/mdlint_v2/P7-mcp-server/index.md",
+      "line": 45,
+      "snippet": "**P9** — the package ships with its README"
+    },
+    {
+      "id": "p7-02-prettier-corruption",
+      "claim": "F34: a live Prettier bold-plus-glob corruption inside a phase task file.",
+      "path": "docs/mdlint_v2/P7-mcp-server/02-lint-tools.md",
+      "line": 35,
+      "snippet": "fallback to core.**"
+    },
+    {
+      "id": "p9-03-real-title",
+      "claim": "F16: P9.03 is a Done CI-matrix task, not the composite Action shipped code names.",
+      "path": "docs/mdlint_v2/P9-remediation/03-cross-os-ci.md",
+      "line": 1,
+      "snippet": "P9.03 · Add Windows/macOS to the CI matrix"
+    },
+    {
+      "id": "p9-08-deferred",
+      "claim": "F2/F20: P9.08 is correctly recorded as deferred rather than dropped.",
+      "path": "docs/mdlint_v2/P9-remediation/08-idref-prose-scan.md",
+      "line": 3,
+      "snippet": "Deferred to backlog"
+    },
+    {
+      "id": "p9-08-accepted-limitation",
+      "claim": "F20: the id-ref-in-code-fence behavior is called a documented, accepted v2 limitation but has no register row.",
+      "path": "docs/mdlint_v2/P9-remediation/08-idref-prose-scan.md",
+      "line": 11,
+      "snippet": "accepted** v2 limitation"
+    },
+    {
+      "id": "p4-01-accepted-idref",
+      "claim": "F20: the same behavior was accepted at P4.01 and pinned by test.",
+      "path": "docs/mdlint_v2/P4-graph/01-context-graph-model.md",
+      "line": 51,
+      "snippet": "Accepted as honest-simple v2 behavior and pinned by test"
+    },
+    {
+      "id": "p10-08-l15-accepted",
+      "claim": "F20: L-15 was accepted and documented but never given a register row.",
+      "path": "docs/mdlint_v2/P10-consistency/08-accepted-behaviors.md",
+      "line": 11,
+      "snippet": "dangling reference-style links"
+    },
+    {
+      "id": "p10-02-criterion",
+      "claim": "F2: P10.02's own exit criterion — no glossary entry describes a shipped surface as planned — is false again.",
+      "path": "docs/mdlint_v2/P10-consistency/02-glossary-status.md",
+      "line": 29,
+      "snippet": "No glossary entry describes a shipped surface as planned"
+    },
+    {
+      "id": "p10-03-title",
+      "claim": "F16: P10.03's explicit job was cleaning stale source comments, and ten stale phase IDs survived it.",
+      "path": "docs/mdlint_v2/P10-consistency/03-stale-comments.md",
+      "line": 1,
+      "snippet": "Clean stale source comments/notes"
+    },
+    {
+      "id": "p12-06-eight-behaviors",
+      "claim": "F20: P12.06 claims each accepted behavior has a home confirmed to exist and to state it.",
+      "path": "docs/mdlint_v2/P12-consistency/06-process-boundary-tests.md",
+      "line": 72,
+      "snippet": "confirmed to exist and to state it"
+    },
+    {
+      "id": "p12-index-quadratic",
+      "claim": "Open question 4: the quadratic hot-path criterion rests on P12.03's own measurement.",
+      "path": "docs/mdlint_v2/P12-consistency/index.md",
+      "line": 39,
+      "snippet": "The quadratic hot paths are fixed or the corpus-size assumption is documented"
+    },
+    {
+      "id": "p12-index-boundary-checklist",
+      "claim": "F14: the boundary-guard criterion whose documented remedy is a no-op.",
+      "path": "docs/mdlint_v2/P12-consistency/index.md",
+      "line": 42,
+      "snippet": "tests at the process boundary"
+    },
+    {
+      "id": "p12-index-p9-09-link",
+      "claim": "F6: the P12 index cites the deleted p9-09 report.",
+      "path": "docs/mdlint_v2/P12-consistency/index.md",
+      "line": 5,
+      "snippet": "research/p9-09-full-solution-deep-audit/report.md"
+    },
+    {
+      "id": "p4-07-json-four-keys",
+      "claim": "F11: the authoritative P4.07 task file documents a four-key JSON shape.",
+      "path": "docs/mdlint_v2/P4-graph/07-cli-graph-slice-impact.md",
+      "line": 17,
+      "snippet": "JSON returns `{ nodes, edges, components, readingOrder }`"
+    },
+    {
+      "id": "p2-06-schema-command",
+      "claim": "F36: the schema command is mandated by its own phase task file, which outranks the roadmap summary.",
+      "path": "docs/mdlint_v2/P2-rule-engine/06-schema-generation.md",
+      "line": 24,
+      "snippet": "command writes a **project-local** schema"
+    },
+    {
+      "id": "prelease-pack-open",
+      "claim": "P-release: the pack-clean criterion is open here while ticked in P0.",
+      "path": "docs/mdlint_v2/P-release/index.md",
+      "line": 39,
+      "snippet": "clean per package; end-to-end smoke"
+    },
+    {
+      "id": "prelease-action-not-started",
+      "claim": "F16: the composite GitHub Action is PR.03 and Not started.",
+      "path": "docs/mdlint_v2/P-release/03-github-action.md",
+      "line": 3,
+      "snippet": "Status **Not started**"
+    },
+    {
+      "id": "glossary-shipped-planned",
+      "claim": "F2: the glossary's shipped-versus-planned roll-up repeats the stale phase state.",
+      "path": "docs/mdlint_v2/glossary.md",
+      "line": 12,
+      "snippet": "Phases **P0–P8 are shipped**"
+    },
+    {
+      "id": "glossary-phase-rollup",
+      "claim": "F2: the glossary's phase entry says P9 is in progress.",
+      "path": "docs/mdlint_v2/glossary.md",
+      "line": 248,
+      "snippet": "The roadmap epics"
+    },
+    {
+      "id": "glossary-graph-json-shape",
+      "claim": "F11: the glossary documents the graph JSON as four keys and assigns coverage to the human format only.",
+      "path": "docs/mdlint_v2/glossary.md",
+      "line": 204,
+      "snippet": "`json` (`{ nodes, edges, components, readingOrder }`)"
+    },
+    {
+      "id": "glossary-register-claim",
+      "claim": "F20: the glossary advertises the register as the one index, without the P11 scope the register itself states.",
+      "path": "docs/mdlint_v2/glossary.md",
+      "line": 251,
+      "snippet": "the one index of behaviors a task deliberately documented rather than fixed"
+    },
+    {
+      "id": "glossary-release-check",
+      "claim": "F21: the glossary says release:check validates each package's published files set.",
+      "path": "docs/mdlint_v2/glossary.md",
+      "line": 275,
+      "snippet": "validates each package's published `files` set"
+    },
+    {
+      "id": "glossary-gitignore-careful-claim",
+      "claim": "F9: the glossary carefully claims only that within-file negations resolve correctly — accurate as written.",
+      "path": "docs/mdlint_v2/glossary.md",
+      "line": 187,
+      "snippet": "within-file negations (`!keep.md`) resolve correctly"
+    },
+    {
+      "id": "accepted-one-place",
+      "claim": "F20: the register calls itself the one place accepted behaviors are stated.",
+      "path": "docs/mdlint_v2/accepted-behaviors.md",
+      "line": 7,
+      "snippet": "This register is the one place they are stated."
+    },
+    {
+      "id": "accepted-same-change",
+      "claim": "F20: the register requires a row in the same change.",
+      "path": "docs/mdlint_v2/accepted-behaviors.md",
+      "line": 11,
+      "snippet": "add the row in the same change"
+    },
+    {
+      "id": "accepted-user-home-rule",
+      "claim": "F10/F20: the register requires a user-reachable behavior to have a README or guide home.",
+      "path": "docs/mdlint_v2/accepted-behaviors.md",
+      "line": 12,
+      "snippet": "must have a home in `README.md` or `docs/guide/`"
+    },
+    {
+      "id": "accepted-schema-row-bad-pointer",
+      "claim": "F20: the row points at guide/output.md, which never mentions a schema.",
+      "path": "docs/mdlint_v2/accepted-behaviors.md",
+      "line": 24,
+      "snippet": "(partial `init` summary)"
+    },
+    {
+      "id": "accepted-init-residual",
+      "claim": "Cross-unit: the one correctly recorded open residual — the confirmed init draft does not name the project-local schema.json.",
+      "path": "docs/mdlint_v2/accepted-behaviors.md",
+      "line": 39,
+      "snippet": "does not name the project-local `schema.json` the `npx` path writes"
+    },
+    {
+      "id": "req-c7-accepted",
+      "claim": "F13: requirement C7 accepts rich config diagnostics with did-you-mean and an option path.",
+      "path": "docs/mdlint_v2/requirements/01-configuration.md",
+      "line": 17,
+      "snippet": "Rich config diagnostics (did-you-mean, option path)"
+    },
+    {
+      "id": "req-c7-detail",
+      "claim": "F13: C7 specifies an exact path for bad options.",
+      "path": "docs/mdlint_v2/requirements/01-configuration.md",
+      "line": 76,
+      "snippet": "bad options → exact path"
+    },
+    {
+      "id": "req-c9-schema-generator",
+      "claim": "F36: requirement C9 mandates the schema generator command.",
+      "path": "docs/mdlint_v2/requirements/01-configuration.md",
+      "line": 83,
+      "snippet": "provides a generator (`wastech-mdlint schema`"
+    },
+    {
+      "id": "req-r3-sarif",
+      "claim": "F18: R3 is accepted because the structured fields enable SARIF and machine action.",
+      "path": "docs/mdlint_v2/requirements/02-rules-engine.md",
+      "line": 13,
+      "snippet": "Enables SARIF + machine action"
+    },
+    {
+      "id": "req-r6-metadata",
+      "claim": "F22: R6 names docsUrl and messages among the metadata fields that drive four generated artifacts.",
+      "path": "docs/mdlint_v2/requirements/02-rules-engine.md",
+      "line": 16,
+      "snippet": "`category`, `defaultSeverity`, `fixable`, `docsUrl`, messages"
+    },
+    {
+      "id": "req-index-stale-p9",
+      "claim": "F7: the requirements index assigns installation and distribution to P6 and P9.",
+      "path": "docs/mdlint_v2/requirements/index.md",
+      "line": 14,
+      "snippet": "Installation & distribution"
+    },
+    {
+      "id": "req-06-stale-p9",
+      "claim": "F7: a locked requirements document names P9 as the release phase.",
+      "path": "docs/mdlint_v2/requirements/06-installation.md",
+      "line": 3,
+      "snippet": "Phases **P6** init, **P9** release"
+    },
+    {
+      "id": "req-06-i6-accepted",
+      "claim": "Withdrawn upstream finding: I6 is marked Accepted in the same column and format as I4, which is also unshipped by design.",
+      "path": "docs/mdlint_v2/requirements/06-installation.md",
+      "line": 16,
+      "snippet": "First-class GitHub Action / reusable CI workflow"
+    },
+    {
+      "id": "req-04-stale-p9",
+      "claim": "F7: a locked requirements document assigns shipped P8.05 CI work to P9.",
+      "path": "docs/mdlint_v2/requirements/04-skills-compile.md",
+      "line": 50,
+      "snippet": "**CI (P9):**"
+    },
+    {
+      "id": "req-05-stale-p9",
+      "claim": "F7: a locked requirements document assigns shipped P7.05 work to P9.",
+      "path": "docs/mdlint_v2/requirements/05-mcp-server.md",
+      "line": 44,
+      "snippet": "**Docs/CI (P9):**"
+    },
+    {
+      "id": "decision-status-enforced",
+      "claim": "F32: the decision record is Accepted (enforced) — precedence tier 3.",
+      "path": "docs/mdlint_v2/decisions/core-hosts-the-pipeline.md",
+      "line": 3,
+      "snippet": "Accepted (enforced)"
+    },
+    {
+      "id": "decision-loadconfig-name",
+      "claim": "F32: the record names loadConfig, which does not exist.",
+      "path": "docs/mdlint_v2/decisions/core-hosts-the-pipeline.md",
+      "line": 20,
+      "snippet": "config loading (`findConfig`, `loadConfig`)"
+    },
+    {
+      "id": "decision-formatter-names",
+      "claim": "F32: the record names two formatter functions that do not exist anywhere in the tree.",
+      "path": "docs/mdlint_v2/decisions/core-hosts-the-pipeline.md",
+      "line": 21,
+      "snippet": "`formatFileResults`, `formatContentResults`"
+    },
+    {
+      "id": "guide-output-passfail",
+      "claim": "F17: the guide documents a pass/fail summary field that the formatter does not emit.",
+      "path": "docs/guide/output.md",
+      "line": 17,
+      "snippet": "counts (errors/warnings) and pass/fail"
+    },
+    {
+      "id": "guide-output-five-fields",
+      "claim": "F18: the guide documents five message fields where eight are emitted.",
+      "path": "docs/guide/output.md",
+      "line": 18,
+      "snippet": "every finding with `ruleId`, `severity`, `message`, file, and line."
+    },
+    {
+      "id": "guide-ref001-exclude",
+      "claim": "F4: the guide states REF-001's exclude option unconditionally.",
+      "path": "docs/guide/rules/REF-001.md",
+      "line": 22,
+      "snippet": "exclude"
+    },
+    {
+      "id": "guide-tbl003-prose-default",
+      "claim": "F12: the rule page states in prose that comparison is case-sensitive by default.",
+      "path": "docs/guide/rules/TBL-003.md",
+      "line": 11,
+      "snippet": "By default comparison is **case-sensitive**"
+    },
+    {
+      "id": "guide-tbl003-table-default",
+      "claim": "F12: the rule page's options table documents the default as true.",
+      "path": "docs/guide/rules/TBL-003.md",
+      "line": 19,
+      "snippet": "| `caseSensitive` | `boolean` | no | `true` |"
+    },
+    {
+      "id": "guide-config-reference-authority",
+      "claim": "F12: the config reference presents itself as drawn from the generated schema.",
+      "path": "docs/guide/config-reference.md",
+      "line": 7,
+      "snippet": "Every field below is drawn from the generated schema"
+    },
+    {
+      "id": "guide-config-reference-wrong-default",
+      "claim": "F12: the config reference states the caseSensitive default as false; the code defaults it to true.",
+      "path": "docs/guide/config-reference.md",
+      "line": 80,
+      "snippet": "\"caseSensitive\": false, // default false"
+    },
+    {
+      "id": "guide-custom-no-default",
+      "claim": "F12: the custom-rule page lists caseSensitive with no default at all.",
+      "path": "docs/guide/rules/custom.md",
+      "line": 47,
+      "snippet": "`caseSensitive?: boolean`"
+    },
+    {
+      "id": "guide-custom-closed-assert",
+      "claim": "F13: the custom-rule page promises that an unknown key inside assert is a config error, not a silently ignored typo.",
+      "path": "docs/guide/rules/custom.md",
+      "line": 65,
+      "snippet": "an unknown key inside `assert` is a config error, not a silently ignored typo"
+    },
+    {
+      "id": "guide-str001-widening",
+      "claim": "F25: the slash-free widening rule is documented on exactly one rule page.",
+      "path": "docs/guide/rules/STR-001.md",
+      "line": 25,
+      "snippet": "A glob entry is not root-relative unless it contains a `/`"
+    },
+    {
+      "id": "guide-context-graph-coverage",
+      "claim": "F8: the guide advertises coverage as a corpus-wide signal with no extension caveat.",
+      "path": "docs/guide/context-graph.md",
+      "line": 31,
+      "snippet": "a signal of how much of the corpus the graph covers"
+    },
+    {
+      "id": "guide-context-graph-json-shape",
+      "claim": "F11: the guide documents the graph JSON as four keys.",
+      "path": "docs/guide/context-graph.md",
+      "line": 39,
+      "snippet": "{ nodes, edges, components, readingOrder }"
+    },
+    {
+      "id": "guide-context-graph-idref",
+      "claim": "F20: the id-ref code-fence limitation is stated for users here and nowhere in the register.",
+      "path": "docs/guide/context-graph.md",
+      "line": 78,
+      "snippet": "an ID inside a code fence can still create an edge"
+    },
+    {
+      "id": "guide-cli-graph-json",
+      "claim": "F11: the CLI guide documents the graph JSON as four keys.",
+      "path": "docs/guide/cli.md",
+      "line": 67,
+      "snippet": "deterministic `{ nodes, edges, components, readingOrder }` JSON"
+    },
+    {
+      "id": "guide-cli-schema-behavior",
+      "claim": "F20: the init schema-first behavior the register mis-points is actually stated here.",
+      "path": "docs/guide/cli.md",
+      "line": 127,
+      "snippet": "the schema is committed before the config"
+    },
+    {
+      "id": "guide-cli-scan-alias",
+      "claim": "Cross-unit: the hidden scan alias is disclosed as deprecated in the CLI guide.",
+      "path": "docs/guide/cli.md",
+      "line": 36,
+      "snippet": "`scan` is"
+    },
+    {
+      "id": "guide-concepts-token-unit",
+      "claim": "F31: the Concepts page states the token heuristic in bytes; the code counts characters.",
+      "path": "docs/guide/concepts.md",
+      "line": 38,
+      "snippet": "estimate tokens with a simple, isolated heuristic (`ceil(bytes / 4)`)"
+    },
+    {
+      "id": "guide-size001-token-unit",
+      "claim": "F31: the SIZE-001 page states the unit correctly and warns that bytes and tokens diverge for multi-byte content.",
+      "path": "docs/guide/rules/SIZE-001.md",
+      "line": 102,
+      "snippet": "`tokens` is derived from character length"
+    },
+    {
+      "id": "guide-configuration-exclude-wins",
+      "claim": "F1: the configuration guide promises that exclude wins over include, which a negation in include silently defeats.",
+      "path": "docs/guide/configuration.md",
+      "line": 47,
+      "snippet": "exclude"
+    },
+    {
+      "id": "guide-configuration-gitignore",
+      "claim": "F9: the configuration guide sells respectGitignore with no caveat about layer precedence.",
+      "path": "docs/guide/configuration.md",
+      "line": 48,
+      "snippet": "respectGitignore"
+    },
+    {
+      "id": "guide-usecase-tbl002-fix",
+      "claim": "Coverage: a use-case page's --fix claim, verified behaviorally in this audit.",
+      "path": "docs/guide/use-cases/requirements-table-schema.md",
+      "line": 38,
+      "snippet": "TBL-002 fills empty ID/Status cells"
+    },
+    {
+      "id": "guide-usecase-graph-human-coverage",
+      "claim": "Coverage: a use-case page's claim that graph --format human shows coverage, verified behaviorally.",
+      "path": "docs/guide/use-cases/orphans-and-cycles.md",
+      "line": 21,
+      "snippet": "clusters, hubs, reading order, coverage"
+    },
+    {
+      "id": "readme-graph-json-shape",
+      "claim": "F11: the README documents the graph JSON as four keys.",
+      "path": "README.md",
+      "line": 73,
+      "snippet": "the deterministic `{ nodes, edges, components, readingOrder }` shape as `json`"
+    },
+    {
+      "id": "readme-mcp-future-tense",
+      "claim": "F16: the README still describes the shipped MCP surface in future tense by phase.",
+      "path": "README.md",
+      "line": 34,
+      "snippet": "ship in P7.02"
+    },
+    {
+      "id": "readme-json-contract-correct",
+      "claim": "F17: the README states the JSON contract correctly, unlike the guide page.",
+      "path": "README.md",
+      "line": 220,
+      "snippet": "summary"
+    },
+    {
+      "id": "readme-l15-limitation",
+      "claim": "F20: L-15 has a user-facing home in the README's limitations list but no register row.",
+      "path": "README.md",
+      "line": 233,
+      "snippet": "Dangling reference-style links"
+    },
+    {
+      "id": "readme-scan-alias",
+      "claim": "Cross-unit: the README discloses scan as a hidden, deprecated alias.",
+      "path": "README.md",
+      "line": 71,
+      "snippet": "`scan` is a hidden, deprecated alias of `lint`"
+    },
+    {
+      "id": "ci-os-matrix",
+      "claim": "Invariant 3 / F38: the CI matrix covers all three operating systems, which is where the Windows-gated guards actually run.",
+      "path": ".github/workflows/ci.yml",
+      "line": 24,
+      "snippet": "ubuntu-latest"
+    },
+    {
+      "id": "guide-cli-config-flag",
+      "claim": "F10: the CLI guide documents --config without stating what it resolves against.",
+      "path": "docs/guide/cli.md",
+      "line": 43,
+      "snippet": "Path to a config file"
+    },
+    {
+      "id": "guide-cli-path-convention",
+      "claim": "F10: the CLI guide promises the opposite convention for paths in messages — relative to the directory the command works in.",
+      "path": "docs/guide/cli.md",
+      "line": 32,
+      "snippet": "relative to the directory the command works in"
+    },
+    {
+      "id": "guide-suppression-canonical-ids",
+      "claim": "Invariant 4: the guide promises that directive IDs are canonicalized like config, which the suppression reproduction exercised with a lowercase alias.",
+      "path": "docs/guide/suppression.md",
+      "line": 30,
+      "snippet": "IDs are canonicalized like config"
+    },
+    {
+      "id": "guide-suppression-next-line-bound",
+      "claim": "Invariant 4: disable-next-line covers only the single line that follows it — the bound the reproduction observed.",
+      "path": "docs/guide/suppression.md",
+      "line": 32,
+      "snippet": "covers only the single line that follows it"
+    },
+    {
+      "id": "guide-usecase-mcp-summary-shape",
+      "claim": "F11: the use-case page correctly documents MCP's summary shape, which is why the upstream 'sixth site' claim is withdrawn.",
+      "path": "docs/guide/use-cases/mcp-agent-workflow.md",
+      "line": 67,
+      "snippet": "components:[...], readingOrder:[...]"
+    },
+    {
+      "id": "prelease-action-criterion",
+      "claim": "Per-unit verdict: the P-release criterion whose CI half already shipped and whose published Action has not.",
+      "path": "docs/mdlint_v2/P-release/index.md",
+      "line": 37,
+      "snippet": "A reusable GitHub Action is published"
+    },
+    {
+      "id": "prelease-readme-criterion",
+      "claim": "Per-unit verdict: the P-release criterion whose two generated blocks already shipped and whose install paths have not.",
+      "path": "docs/mdlint_v2/P-release/index.md",
+      "line": 38,
+      "snippet": "README documents the three install paths"
+    },
+    {
+      "id": "p1-index-cjk-criterion",
+      "claim": "Per-unit verdict: P1's CJK and byte-stability exit criterion, met.",
+      "path": "docs/mdlint_v2/P1-parsed-document/index.md",
+      "line": 43,
+      "snippet": "CJK fixtures pass; output is byte-stable across runs"
+    },
+    {
+      "id": "p10-02-sweep-scope",
+      "claim": "F7: P10.02 records fixing bare P9 references in the glossary — the sweep that was never run on the indexes or the requirements.",
+      "path": "docs/mdlint_v2/P10-consistency/02-glossary-status.md",
+      "line": 38,
+      "snippet": "so `P9` in the glossary consistently means"
+    },
+    {
+      "id": "p10-index-glossary-criterion",
+      "claim": "Per-unit verdict / F2c: the one P10 criterion that regressed.",
+      "path": "docs/mdlint_v2/P10-consistency/index.md",
+      "line": 42,
+      "snippet": "phase-status markers reflect that P6/P7/P8 shipped"
+    },
+    {
+      "id": "p11-index-p9-09-link-2",
+      "claim": "F6: a second dead p9-09 citation in the P11 index.",
+      "path": "docs/mdlint_v2/P11-remediation/index.md",
+      "line": 32,
+      "snippet": "research/p9-09-full-solution-deep-audit/report.md"
+    },
+    {
+      "id": "p11-index-h2-criterion",
+      "claim": "Per-unit verdict: the H-2 path-containment exit criterion, traced to code rather than to the presence of a test.",
+      "path": "docs/mdlint_v2/P11-remediation/index.md",
+      "line": 55,
+      "snippet": "cannot read outside the analyzed root"
+    },
+    {
+      "id": "p12-index-p9-09-link-2",
+      "claim": "F6: a second dead p9-09 citation in the P12 index.",
+      "path": "docs/mdlint_v2/P12-consistency/index.md",
+      "line": 22,
+      "snippet": "research/p9-09-full-solution-deep-audit/report.md"
+    },
+    {
+      "id": "p3-index-cutover",
+      "claim": "Cross-unit: the P3.09 cutover criterion that removed the legacy pipeline, which is why P0's byte-parity criterion is no longer verifiable.",
+      "path": "docs/mdlint_v2/P3-rules/index.md",
+      "line": 48,
+      "snippet": "the legacy legacy pipeline is removed"
+    },
+    {
+      "id": "p8-05-title",
+      "claim": "F16: the skills-validation CI check shipped as P8.05, not as the P9 a core comment names.",
+      "path": "docs/mdlint_v2/P8-skills/05-skills-validation.md",
+      "line": 1,
+      "snippet": "Skill validation tests + host-neutrality check"
+    },
+    {
+      "id": "p8-index-gh-skill-criterion",
+      "claim": "Per-unit verdict: the P8 criterion whose gh-skill-install half is not verifiable locally.",
+      "path": "docs/mdlint_v2/P8-skills/index.md",
+      "line": 40,
+      "snippet": "Skills install via `gh skill install`"
+    },
+    {
+      "id": "accepted-symlink-lexical",
+      "claim": "H-2 bound: containment is lexical only, so a symlink inside the root pointing outside it is still probed.",
+      "path": "docs/mdlint_v2/accepted-behaviors.md",
+      "line": 27,
+      "snippet": "Path containment is **lexical only**"
+    },
+    {
+      "id": "accepted-candidate-drive-relative",
+      "claim": "H-2 bound: the candidate helper does not repeat the resolve-and-compare step for a bare drive-relative remainder.",
+      "path": "docs/mdlint_v2/accepted-behaviors.md",
+      "line": 37,
+      "snippet": "does not repeat `resolvesOutsideRoot`'s resolve-and-compare step"
+    },
+    {
+      "id": "glossary-schema-command",
+      "claim": "F36: the glossary lists the schema command the roadmap summary omits.",
+      "path": "docs/mdlint_v2/glossary.md",
+      "line": 207,
+      "snippet": "Writes the config JSON schema to a **local** file"
+    },
+    {
+      "id": "glossary-formatter-names-2",
+      "claim": "F32: the glossary names the real formatter functions the decision record gets wrong.",
+      "path": "docs/mdlint_v2/glossary.md",
+      "line": 70,
+      "snippet": "`formatLintResultText` / `formatLintResultJson`"
+    },
+    {
+      "id": "roadmap-tree-cli-commands",
+      "claim": "F36: the roadmap's target tree also lists six commands, omitting schema.",
+      "path": "docs/mdlint_v2/index.md",
+      "line": 83,
+      "snippet": "commander: lint|init|graph|slice|impact|compile"
+    },
+    {
+      "id": "req-index-deferral-list",
+      "claim": "Requirement conformance: the deferral list the 55-ID inventory was built against.",
+      "path": "docs/mdlint_v2/requirements/index.md",
+      "line": 18,
+      "snippet": "presets/`extends` (config)"
+    },
+    {
+      "id": "root-prepack",
+      "claim": "F23: the root prepack hook, which does run on a root npm pack — private blocks publishing, not packing — while no workspace package declares one.",
+      "path": "package.json",
+      "line": 37,
+      "snippet": "\"prepack\": \"npm run build\""
+    },
+    {
+      "id": "schema-casesensitive-no-default",
+      "claim": "F12: the generated schema records no default for caseSensitive, so the config reference's 'default false' was not derived from it.",
+      "path": "packages/cli/schema.json",
+      "line": 1123,
+      "snippet": "\"caseSensitive\": {"
+    },
+    {
+      "id": "cli-filter-presentation-comment",
+      "claim": "Invariant 2: the CLI documents its severity re-count as host-side presentation.",
+      "path": "packages/cli/src/commands.ts",
+      "line": 293,
+      "snippet": "This is host-side presentation"
+    },
+    {
+      "id": "cli-severity-recount",
+      "claim": "Invariant 2: the CLI re-derives errorCount that lintFiles already computes.",
+      "path": "packages/cli/src/commands.ts",
+      "line": 307,
+      "snippet": "errorCount: messages.filter"
+    },
+    {
+      "id": "bin-e2e-precondition",
+      "claim": "F14: the guard's own precondition comment frames the trigger as a source that changed since the last build.",
+      "path": "packages/cli/test/bin.e2e.test.ts",
+      "line": 37,
+      "snippet": "PRECONDITION: packages/cli's own dist must already be built"
+    },
+    {
+      "id": "skill-frontmatter-p9-ci",
+      "claim": "F16: a twelfth candidate site of the stale-phase-ID class, naming P9's CI check for what shipped as P8.05.",
+      "path": "packages/core/src/compile/skill-frontmatter.ts",
+      "line": 4,
+      "snippet": "P8.01's static skills and P9's CI"
+    },
+    {
+      "id": "config-schema-dollar-schema",
+      "claim": "Invariant 8: the config schema accepts $schema as any string, so a remote URL is not rejected (core never fetches it).",
+      "path": "packages/core/src/config/config-schema.ts",
+      "line": 133,
+      "snippet": "$schema: z.string().optional(),"
+    },
+    {
+      "id": "config-writer-stale-p903-2",
+      "claim": "F16: the second stale P9.03 line in shipped core runtime.",
+      "path": "packages/core/src/discovery/config-writer.ts",
+      "line": 171,
+      "snippet": "cannot run today. P9.03"
+    },
+    {
+      "id": "lint-files-suppression",
+      "claim": "Invariant 4: the engine applies inline-disable suppression to the messages the rules produced.",
+      "path": "packages/core/src/engine/lint-files.ts",
+      "line": 134,
+      "snippet": "Inline-disable suppression: drop each message"
+    },
+    {
+      "id": "path-resolve-resolves-outside",
+      "claim": "H-2: the containment helper for raw, filesystem-facing option paths.",
+      "path": "packages/core/src/engine/path-resolve.ts",
+      "line": 48,
+      "snippet": "export function resolvesOutsideRoot(rootDir: string, rawPath: string): boolean {"
+    },
+    {
+      "id": "grp-helpuri-site",
+      "claim": "F18: one of the 27 sites where helpUri is populated with a bare rule ID.",
+      "path": "packages/core/src/engine/rules/grp.ts",
+      "line": 44,
+      "snippet": "helpUri: \"GRP-001\","
+    },
+    {
+      "id": "ref004-comment-withdrawn",
+      "claim": "F26 withdrawal: the REF-004 comment describes the within-invocation dedup the .has guard performs, not a cross-document cache.",
+      "path": "packages/core/src/engine/rules/ref.ts",
+      "line": 220,
+      "snippet": "Compiled once per zone (guarded by `.has`)"
+    },
+    {
+      "id": "sec003-containment-call",
+      "claim": "H-2: SEC-003 rejects an escaping template before any filesystem read.",
+      "path": "packages/core/src/engine/rules/sec.ts",
+      "line": 148,
+      "snippet": "if (resolvesOutsideRoot(rootDir, options.template)) {"
+    },
+    {
+      "id": "str001-containment-call",
+      "claim": "H-2: STR-001 runs each entry through the same containment helper.",
+      "path": "packages/core/src/engine/rules/sec.ts",
+      "line": 271,
+      "snippet": "if (resolvesOutsideRoot(rootDir, entry)) {"
+    },
+    {
+      "id": "suppression-checker",
+      "claim": "Invariant 4: the per-document suppression checker the engine builds from the parsed directives.",
+      "path": "packages/core/src/engine/suppression.ts",
+      "line": 39,
+      "snippet": "return (ruleId, line) => {"
+    },
+    {
+      "id": "errors-invalid-input-code",
+      "claim": "F3: INVALID_INPUT is already inside the closed error taxonomy, so the fix needs no new code.",
+      "path": "packages/core/src/errors.ts",
+      "line": 19,
+      "snippet": "\"INVALID_INPUT\","
+    },
+    {
+      "id": "config-v2-c7-coverage",
+      "claim": "F13: the C7 coverage tests exercise the standard path only.",
+      "path": "packages/core/test/config-v2.test.ts",
+      "line": 145,
+      "snippet": "reports an unknown rule with a did-you-mean suggestion"
+    },
+    {
+      "id": "mcp-ready-stderr",
+      "claim": "Per-unit verdict P7: the readiness line goes to stderr so stdout stays protocol-clean.",
+      "path": "packages/mcp-server/src/index.ts",
+      "line": 50,
+      "snippet": "wastech-mdlint-mcp: ready (stdio)"
+    },
+    {
+      "id": "mcp-graph-two-shapes",
+      "claim": "F11: the MCP tool documents two structured shapes, neither of which is the CLI's.",
+      "path": "packages/mcp-server/src/tools/context-graph.ts",
+      "line": 50,
+      "snippet": "One tool, two structured shapes"
+    },
+    {
+      "id": "mcp-graph-json-branch",
+      "claim": "F11: on MCP, format json returns the raw graph rather than the CLI's summary projection.",
+      "path": "packages/mcp-server/src/tools/context-graph.ts",
+      "line": 83,
+      "snippet": "{ nodes: graph.nodes, edges: graph.edges, cycles: graph.cycles }"
+    },
+    {
+      "id": "mcp-lint-files-shape",
+      "claim": "F17: the MCP lint-files tool declares the raw LintResult, not the CLI's summary-wrapped JSON.",
+      "path": "packages/mcp-server/src/tools/lint-files.ts",
+      "line": 39,
+      "snippet": "const lintFilesOutputShape = {"
+    },
+    {
+      "id": "mcp-lint-severity-recount",
+      "claim": "Invariant 2: the MCP ad-hoc lint tool re-derives the same counts over a different input.",
+      "path": "packages/mcp-server/src/tools/lint.ts",
+      "line": 205,
+      "snippet": "const errorCount = messages.filter("
+    },
+    {
+      "id": "guide-usecase-orphans-coverage",
+      "claim": "Coverage: a use-case claim re-run in this pass — graph --format human prints coverage.",
+      "path": "docs/guide/use-cases/orphans-and-cycles.md",
+      "line": 21,
+      "snippet": "clusters, hubs, reading order, coverage"
+    },
+    {
+      "id": "guide-usecase-tbl002-fix-2",
+      "claim": "Coverage: a use-case claim re-run in this pass — TBL-002 --fix fills empty cells.",
+      "path": "docs/guide/use-cases/requirements-table-schema.md",
+      "line": 38,
+      "snippet": "TBL-002 fills empty ID/Status cells"
+    },
+    {
+      "id": "config-v2-c7-options-path",
+      "claim": "F13: the second C7 coverage test, also on the standard (built-in) path — no custom-rule option case exists.",
+      "path": "packages/core/test/config-v2.test.ts",
+      "line": 154,
+      "snippet": "reports bad rule options with a path-prefixed error"
+    },
+    {
+      "id": "adr-sync-clause",
+      "claim": "F32: the enforced core-ownership decision states lintFiles is synchronous (globSync + readFileSync) and prohibits an async variant.",
+      "path": "docs/mdlint_v2/decisions/core-hosts-the-pipeline.md",
+      "line": 25,
+      "snippet": "`lintFiles` is intentionally **synchronous** (`globSync` + `readFileSync`). Do not introduce an async variant "
+    },
+    {
+      "id": "adr-sync-consequence",
+      "claim": "F32: the same decision's consequences section repeats the synchronous-only constraint.",
+      "path": "docs/mdlint_v2/decisions/core-hosts-the-pipeline.md",
+      "line": 33,
+      "snippet": "- **−** Synchronous-only may bite if a future host needs async (e.g. streaming over a network protocol). Revis"
+    },
+    {
+      "id": "lint-files-async",
+      "claim": "F32: the shipped lintFiles is async and returns Promise<LintResult>, contradicting the decision that prohibits an async pipeline.",
+      "path": "packages/core/src/engine/lint-files.ts",
+      "line": 72,
+      "snippet": "export async function lintFiles(input: LintFilesInput): Promise<LintResult> {"
+    },
+    {
+      "id": "load-documents-fs-promises",
+      "claim": "F32: the corpus loader is built on node:fs/promises, not globSync/readFileSync.",
+      "path": "packages/core/src/markdown/load-documents.ts",
+      "line": 1,
+      "snippet": "import { readFile, readdir, realpath, stat } from \"node:fs/promises\";"
+    },
+    {
+      "id": "load-configuration-async",
+      "claim": "F32: loadConfiguration is async too, and is the real export name the decision record calls loadConfig.",
+      "path": "packages/core/src/config/load-config.ts",
+      "line": 176,
+      "snippet": "export async function loadConfiguration(params: {"
+    },
+    {
+      "id": "glossary-lintfiles-sync",
+      "claim": "F32: the glossary repeats the synchronous-pipeline claim verbatim and links the decision as its authority.",
+      "path": "docs/mdlint_v2/glossary.md",
+      "line": 68,
+      "snippet": "- **`lintFiles`** — The top-level, intentionally **synchronous** pipeline orchestration (`globSync` + `readFil"
+    },
+    {
+      "id": "glossary-async-conflict",
+      "claim": "F32: a fourth site states async work conflicts with the synchronous core-hosts-the-pipeline design.",
+      "path": "docs/mdlint_v2/glossary.md",
+      "line": 296,
+      "snippet": "- **Async rules / external HTTP checks** — Conflict with the synchronous core-hosts-the-pipeline design and wi"
+    },
+    {
+      "id": "p5-synthesize-async-note",
+      "claim": "F32: a tier-1 task file records that lintFiles and loadConfiguration are already async — the plan knows what the decision record denies.",
+      "path": "docs/mdlint_v2/P5-compile/04-synthesize.md",
+      "line": 86,
+      "snippet": "- `compileContext(config, cwd)` is **async** (`Promise<CompileResult>`), not the sync signature the doc text a"
+    },
+    {
+      "id": "compile-context-async-note",
+      "claim": "F32: the code states in place that lintFiles and loadConfiguration are already async.",
+      "path": "packages/core/src/compile/compile-context.ts",
+      "line": 188,
+      "snippet": "// literal: building a `CompileResult` requires `loadContext`, which is async, and every comparable"
+    },
+    {
+      "id": "compile-context-shorthand",
+      "claim": "F39: decision 4.4's illustrative compileContext signature is reconciled in code as shorthand — the model the other entries did not follow.",
+      "path": "packages/core/src/compile/compile-context.ts",
+      "line": 187,
+      "snippet": "// The doc's illustrative signature (`compileContext(config, cwd): CompileResult`) is shorthand, not"
+    },
+    {
+      "id": "rule-check-sync",
+      "claim": "F32: rules themselves are synchronous (check returns void), which is the part of the decision that is still true.",
+      "path": "packages/core/src/engine/types.ts",
+      "line": 130,
+      "snippet": "check(context: RuleContext): void;"
+    },
+    {
+      "id": "accepted-str001-sync",
+      "claim": "F32: an accepted behavior depends on Rule.check being synchronous, so the rule-level sync claim must not be swept with the pipeline-level one.",
+      "path": "docs/mdlint_v2/accepted-behaviors.md",
+      "line": 26,
+      "snippet": "| `STR-001` glob entries are satisfied only from the analyzed Markdown corpus, never expanded against the file"
+    },
+    {
+      "id": "p2-primitives-sync",
+      "claim": "F32: the primitives are specified as pure and synchronous.",
+      "path": "docs/mdlint_v2/P2-rule-engine/02-assertion-primitives.md",
+      "line": 30,
+      "snippet": "4. Keep primitives **pure** (inputs in, messages out) and synchronous."
+    },
+    {
+      "id": "decision-42-fixable",
+      "claim": "F39: decision 4.2 fixes the deterministic-fixable subset as SEC-* plus TBL-002.",
+      "path": "docs/mdlint_v2/decisions/pre-implementation-decisions.md",
+      "line": 38,
+      "snippet": "- **4.2 — `--fix` engine.** Flag on `lint`, lands in **P3** (not \"P6+\"), ESLint-style (apply → report remainin"
+    },
+    {
+      "id": "decision-43-query-reuse",
+      "claim": "F39/F24: decision 4.3 asserts query, getImpactSet, and classifyImpact are reused directly by P7.03.",
+      "path": "docs/mdlint_v2/decisions/pre-implementation-decisions.md",
+      "line": 39,
+      "snippet": "- **4.3 — P4 query layer (already satisfied).** `query` / `getImpactSet` / `classifyImpact` signatures are spe"
+    },
+    {
+      "id": "decision-57-error-taxonomy",
+      "claim": "F19: the MCP error taxonomy is a closed code set in which INTERNAL_ERROR wraps unexpected throwables.",
+      "path": "docs/mdlint_v2/decisions/pre-implementation-decisions.md",
+      "line": 57,
+      "snippet": "- **P7 MCP error taxonomy:** a closed, core-owned code set — `CONFIG_NOT_FOUND`, `CONFIG_INVALID`, `FILE_NOT_I"
+    },
+    {
+      "id": "decision-log-honesty-rule",
+      "claim": "F39: the decision log's own rule requires an entry to be updated together with the task file when a decision is revisited.",
+      "path": "docs/mdlint_v2/decisions/pre-implementation-decisions.md",
+      "line": 64,
+      "snippet": "- **−** This log must be kept honest if a decision is later revisited: update the entry here and the canonical"
+    },
+    {
+      "id": "decision-log-breadcrumbs",
+      "claim": "F39: task files cite these entries inline by their (audit N.N) breadcrumbs, so a stale entry is read as current.",
+      "path": "docs/mdlint_v2/decisions/pre-implementation-decisions.md",
+      "line": 9,
+      "snippet": "Task files reference individual entries inline as **\"(audit N.N)\"** — the IDs below are those breadcrumbs. Loa"
+    },
+    {
+      "id": "sec001-fixable",
+      "claim": "F39: SEC-001 is fixable.",
+      "path": "packages/core/src/engine/rules/sec.ts",
+      "line": 32,
+      "snippet": "fixable: true,"
+    },
+    {
+      "id": "sec002-not-fixable",
+      "claim": "F39: SEC-002 is not fixable, contradicting decision 4.2's SEC-* subset.",
+      "path": "packages/core/src/engine/rules/sec.ts",
+      "line": 83,
+      "snippet": "fixable: false,"
+    },
+    {
+      "id": "sec003-not-fixable",
+      "claim": "F39: SEC-003 is not fixable either.",
+      "path": "packages/core/src/engine/rules/sec.ts",
+      "line": 136,
+      "snippet": "fixable: false,"
+    },
+    {
+      "id": "sec002-fix-rationale",
+      "claim": "F39: the code states why SEC-002 is deliberately not auto-fixable.",
+      "path": "packages/core/src/engine/rules/sec.ts",
+      "line": 75,
+      "snippet": "// SEC-002 — sections appear in order. Reordering is a judgment call, so not auto-fixable."
+    },
+    {
+      "id": "tbl002-fixable",
+      "claim": "F39: TBL-002 is the second and last fixable rule.",
+      "path": "packages/core/src/engine/rules/tbl.ts",
+      "line": 136,
+      "snippet": "fixable: true,"
+    },
+    {
+      "id": "tbl-two-fixable-comment",
+      "claim": "F39: the code states that SEC-001 and TBL-002 are the only fixable rules.",
+      "path": "packages/core/src/engine/rules/tbl.ts",
+      "line": 160,
+      "snippet": "// two are the only `fixable: true` rules."
+    },
+    {
+      "id": "mcp-impact-imports",
+      "claim": "F39: the P7.03 tool imports classifyImpact (with relativizeImpact and renderImpactSummary), not query or getImpactSet.",
+      "path": "packages/mcp-server/src/tools/impact-analysis.ts",
+      "line": 2,
+      "snippet": "classifyImpact,"
+    },
+    {
+      "id": "mcp-impact-classify-call",
+      "claim": "F39/F24: classifyImpact is the one of decision 4.3's three functions that P7.03 actually calls.",
+      "path": "packages/mcp-server/src/tools/impact-analysis.ts",
+      "line": 64,
+      "snippet": "const classification = classifyImpact(graph, input.file);"
+    },
+    {
+      "id": "get-impact-set-test-only",
+      "claim": "F24/F39: getImpactSet's only caller in the tree is its own unit test.",
+      "path": "packages/core/test/graph-impact.test.ts",
+      "line": 24,
+      "snippet": "describe(\"getImpactSet\", () => {"
+    },
+    {
+      "id": "errors-internal-error-doc",
+      "claim": "F19: core documents INTERNAL_ERROR as the sanitized wrapper for unexpected failures, which is what an EACCES becomes.",
+      "path": "packages/core/src/errors.ts",
+      "line": 12,
+      "snippet": "// - INTERNAL_ERROR         — unexpected failure; message is sanitized and never leaks a stack trace."
+    },
+    {
+      "id": "errors-closed-set",
+      "claim": "F19: TOOL_ERROR_CODES is the closed set an operational code would have to be added to.",
+      "path": "packages/core/src/errors.ts",
+      "line": 13,
+      "snippet": "export const TOOL_ERROR_CODES = ["
+    },
+    {
+      "id": "errors-allowlist-comment",
+      "claim": "F19: the code states why duck-typing errno errors into the taxonomy is the wrong fix.",
+      "path": "packages/core/src/errors.ts",
+      "line": 32,
+      "snippet": "// Membership must be an allowlist against TOOL_ERROR_CODES, not \"has a string `.code`\": Node fs"
+    },
+    {
+      "id": "load-config-unguarded-read",
+      "claim": "F19: the config read propagates filesystem errors rather than absorbing them.",
+      "path": "packages/core/src/config/load-config.ts",
+      "line": 204,
+      "snippet": "const text = await readFile(configPath, \"utf8\");"
+    },
+    {
+      "id": "gitignore-catch",
+      "claim": "F19: a sibling reader absorbs the failure instead of propagating.",
+      "path": "packages/core/src/discovery/gitignore-layers.ts",
+      "line": 64,
+      "snippet": "} catch {"
+    },
+    {
+      "id": "repo-scan-catch",
+      "claim": "F19: init's scan absorbs a failed readdir.",
+      "path": "packages/core/src/discovery/repo-scan.ts",
+      "line": 133,
+      "snippet": "const entries = await readdir(directoryPath, { withFileTypes: true }).catch("
+    },
+    {
+      "id": "workspace-packages-catch",
+      "claim": "F19: the workspace walk absorbs a failed readdir too.",
+      "path": "packages/core/src/discovery/workspace-packages.ts",
+      "line": 140,
+      "snippet": "const entries = await readdir(directoryPath, { withFileTypes: true }).catch("
+    },
+    {
+      "id": "package-manager-catch",
+      "claim": "F19: the package-manager probe absorbs its stat failure.",
+      "path": "packages/core/src/discovery/package-manager.ts",
+      "line": 18,
+      "snippet": "} catch {"
+    },
+    {
+      "id": "tool-context-central-claim",
+      "claim": "F3/invariant 2: the shared helper claims that owning the cwd default centrally is the whole point of the helper.",
+      "path": "packages/mcp-server/src/shared/tool-context.ts",
+      "line": 20,
+      "snippet": "// The helper owns the `cwd ?? process.cwd()` default itself — a deliberate departure from the CLI's"
+    },
+    {
+      "id": "tool-context-cwd-1",
+      "claim": "F3: first of four sites where the MCP root is defaulted without validation.",
+      "path": "packages/mcp-server/src/shared/tool-context.ts",
+      "line": 27,
+      "snippet": "const cwd = input.cwd ?? process.cwd();"
+    },
+    {
+      "id": "tool-context-cwd-2",
+      "claim": "F3: second site where the MCP root is defaulted without validation.",
+      "path": "packages/mcp-server/src/shared/tool-context.ts",
+      "line": 52,
+      "snippet": "const cwd = input.cwd ?? process.cwd();"
+    },
+    {
+      "id": "lint-files-cwd-comment",
+      "claim": "F3: the lint-files tool documents that it duplicates the shared helper's cwd default.",
+      "path": "packages/mcp-server/src/tools/lint-files.ts",
+      "line": 59,
+      "snippet": "// `resolveToolConfiguration` computes this same default internally but doesn't return it, so"
+    },
+    {
+      "id": "lint-files-cwd",
+      "claim": "F3: third site — lint-files recomputes the cwd default outside the shared resolver.",
+      "path": "packages/mcp-server/src/tools/lint-files.ts",
+      "line": 61,
+      "snippet": "const cwd = input.cwd ?? process.cwd();"
+    },
+    {
+      "id": "compile-context-cwd-comment",
+      "claim": "F3: the compile-context tool documents the same duplication.",
+      "path": "packages/mcp-server/src/tools/compile-context.ts",
+      "line": 37,
+      "snippet": "// recompute `cwd` here — the same one-liner duplication lint-files.ts already documents."
+    },
+    {
+      "id": "compile-context-cwd",
+      "claim": "F3: fourth site — compile-context recomputes the cwd default too.",
+      "path": "packages/mcp-server/src/tools/compile-context.ts",
+      "line": 38,
+      "snippet": "const cwd = input.cwd ?? process.cwd();"
+    },
+    {
+      "id": "assert-link-resolves-caller",
+      "claim": "F4: the declarative custom-rule dispatcher passes a user's assert.exclude into linkResolves, inheriting the inert-exclude hole.",
+      "path": "packages/core/src/engine/primitives/assert.ts",
+      "line": 233,
+      "snippet": "case \"linkResolves\":"
+    },
+    {
+      "id": "config-ref-settings-router",
+      "claim": "F4: the annotated reference sets settings.siteRouter with the starlight preset for the whole config.",
+      "path": "docs/guide/config-reference.md",
+      "line": 32,
+      "snippet": "\"siteRouter\": {"
+    },
+    {
+      "id": "config-ref-ref001-exclude",
+      "claim": "F4: the same reference pairs REF-001's exclude with a router in one options object.",
+      "path": "docs/guide/config-reference.md",
+      "line": 161,
+      "snippet": "\"exclude\": [\"**/CHANGELOG.md\"],"
+    },
+    {
+      "id": "config-ref-ref001-router",
+      "claim": "F4: the router that makes the exclude above inert for root-relative links.",
+      "path": "docs/guide/config-reference.md",
+      "line": 162,
+      "snippet": "\"siteRouter\": {"
+    },
+    {
+      "id": "config-ref-router-once",
+      "claim": "F4: the reference tells readers most projects set the router once under settings.",
+      "path": "docs/guide/config-reference.md",
+      "line": 350,
+      "snippet": "- `siteRouter` shown on individual REF rules (REF-001/REF-002 only) **overrides** `settings.siteRouter` for th"
+    },
+    {
+      "id": "load-config-rule-formatter",
+      "claim": "F13: the second formatter, which renders the C7 indexed option path.",
+      "path": "packages/core/src/config/load-config.ts",
+      "line": 64,
+      "snippet": "function formatRuleResolutionError("
+    },
+    {
+      "id": "config-schema-standard-options",
+      "claim": "F13: the standard branch types options as unknown, so only custom entries can fail during union matching.",
+      "path": "packages/core/src/config/config-schema.ts",
+      "line": 86,
+      "snippet": "options: z.unknown().optional(),"
+    },
+    {
+      "id": "mcp-lint-third-shape",
+      "claim": "F17: the third lint-JSON shape, assembled by the ad-hoc lint tool.",
+      "path": "packages/mcp-server/src/tools/lint.ts",
+      "line": 224,
+      "snippet": "structured: { messages, errorCount, warningCount },"
+    },
+    {
+      "id": "assert-built-cli-def",
+      "claim": "F14: the CLI spawn guard defines assertBuilt.",
+      "path": "packages/cli/test/bin.e2e.test.ts",
+      "line": 49,
+      "snippet": "function assertBuilt(): void {"
+    },
+    {
+      "id": "assert-built-cli-call",
+      "claim": "F14: and invokes it at module load.",
+      "path": "packages/cli/test/bin.e2e.test.ts",
+      "line": 64,
+      "snippet": "assertBuilt();"
+    },
+    {
+      "id": "assert-built-mcp-def",
+      "claim": "F14: the MCP spawn guard carries its own copy of assertBuilt.",
+      "path": "packages/mcp-server/test/bin-entrypoint.test.ts",
+      "line": 39,
+      "snippet": "function assertBuilt(): void {"
+    },
+    {
+      "id": "assert-built-mcp-call",
+      "claim": "F14: and invokes it too — two sites, no third.",
+      "path": "packages/mcp-server/test/bin-entrypoint.test.ts",
+      "line": 54,
+      "snippet": "assertBuilt();"
+    },
+    {
+      "id": "mcp-sdk-comment-lint",
+      "claim": "F29: one of the other two SDK comments, which is accurate about wire-schema ordering.",
+      "path": "packages/mcp-server/src/tools/lint.ts",
+      "line": 49,
+      "snippet": "// `ruleEntryUnionSchema`, whose standard branch refine-rejects the literal `\"custom\"`: the SDK"
+    },
+    {
+      "id": "mcp-sdk-comment-response",
+      "claim": "F29: the other SDK comment, accurate about the structured-output contract.",
+      "path": "packages/mcp-server/src/shared/tool-response.ts",
+      "line": 21,
+      "snippet": "// the SDK) plus a human-readable text summary (M1)."
+    },
+    {
+      "id": "win-gate-path-resolve-2",
+      "claim": "F38: second of six Windows-only tests.",
+      "path": "packages/core/test/path-resolve.test.ts",
+      "line": 43,
+      "snippet": "it.runIf(process.platform === \"win32\")("
+    },
+    {
+      "id": "win-gate-path-resolve-3",
+      "claim": "F38: third of six Windows-only tests.",
+      "path": "packages/core/test/path-resolve.test.ts",
+      "line": 76,
+      "snippet": "it.runIf(process.platform === \"win32\")("
+    },
+    {
+      "id": "win-gate-primitives-1",
+      "claim": "F38: fourth of six Windows-only tests.",
+      "path": "packages/core/test/primitives.test.ts",
+      "line": 335,
+      "snippet": "it.runIf(process.platform === \"win32\")("
+    },
+    {
+      "id": "win-gate-primitives-2",
+      "claim": "F38: fifth of six Windows-only tests.",
+      "path": "packages/core/test/primitives.test.ts",
+      "line": 361,
+      "snippet": "it.runIf(process.platform === \"win32\")("
+    },
+    {
+      "id": "win-gate-graph-coverage",
+      "claim": "F38: sixth of six Windows-only tests.",
+      "path": "packages/core/test/graph-coverage.test.ts",
+      "line": 118,
+      "snippet": "it.runIf(process.platform === \"win32\")("
+    },
+    {
+      "id": "posix-gate-bin",
+      "claim": "F38: the mirror class — a POSIX-only test skipped on the Windows leg.",
+      "path": "packages/cli/test/bin.e2e.test.ts",
+      "line": 282,
+      "snippet": "it.skipIf(process.platform === \"win32\")("
+    },
+    {
+      "id": "posix-gate-init-1",
+      "claim": "F38: a second POSIX-only gate.",
+      "path": "packages/cli/test/init.e2e.test.ts",
+      "line": 1146,
+      "snippet": "it.skipIf(process.platform === \"win32\" || process.getuid?.() === 0)("
+    },
+    {
+      "id": "posix-gate-init-2",
+      "claim": "F38: a third POSIX-only gate.",
+      "path": "packages/cli/test/init.e2e.test.ts",
+      "line": 1184,
+      "snippet": "it.skipIf(process.platform === \"win32\" || process.getuid?.() === 0)("
+    },
+    {
+      "id": "posix-gate-lint",
+      "claim": "F38: a fourth POSIX-only gate.",
+      "path": "packages/cli/test/lint.e2e.test.ts",
+      "line": 327,
+      "snippet": "it.skipIf(process.platform === \"win32\" || process.getuid?.() === 0)("
+    },
+    {
+      "id": "posix-gate-atomic-1",
+      "claim": "F38: a fifth POSIX-only gate.",
+      "path": "packages/core/test/atomic-write.test.ts",
+      "line": 161,
+      "snippet": "it.skipIf(process.platform === \"win32\")("
+    },
+    {
+      "id": "posix-gate-atomic-2",
+      "claim": "F38: a sixth POSIX-only gate.",
+      "path": "packages/core/test/atomic-write.test.ts",
+      "line": 176,
+      "snippet": "it.skipIf(process.platform === \"win32\")("
+    },
+    {
+      "id": "posix-gate-tbl",
+      "claim": "F38: a seventh POSIX-only gate, at describe level.",
+      "path": "packages/core/test/rules-tbl.test.ts",
+      "line": 305,
+      "snippet": "describe.skipIf(process.platform === \"win32\" || process.getuid?.() === 0)("
+    },
+    {
+      "id": "ci-windows-leg",
+      "claim": "F38/invariant 3: the Windows leg of the CI matrix, where the six gated tests do run.",
+      "path": ".github/workflows/ci.yml",
+      "line": 25,
+      "snippet": "- windows-latest"
+    },
+    {
+      "id": "p0-parity-task-level",
+      "claim": "P0: the byte-parity criterion is unchecked at task level while ticked at index level.",
+      "path": "docs/mdlint_v2/P0-foundations/08-exit-verification.md",
+      "line": 34,
+      "snippet": "- [ ] `scan`/`graph` output parity with the current implementation confirmed."
+    },
+    {
+      "id": "getting-started-no-postinstall",
+      "claim": "P0: the no-postinstall guarantee stated for users (I1).",
+      "path": "docs/guide/getting-started.md",
+      "line": 17,
+      "snippet": "`npm install` writes **no files** into your checkout — there is no `postinstall` config creation. Configuratio"
+    },
+    {
+      "id": "cli-bin-declaration",
+      "claim": "P0: the declared bin, traced to the emit target and the spawn reproduction.",
+      "path": "packages/cli/package.json",
+      "line": 8,
+      "snippet": "\"wastech-mdlint\": \"./dist/index.js\""
+    },
+    {
+      "id": "p1-criterion-fields",
+      "claim": "P1: the criterion requiring every ParsedDocument field with line positions.",
+      "path": "docs/mdlint_v2/P1-parsed-document/index.md",
+      "line": 41,
+      "snippet": "- [x] `ParsedDocument` exposes tables (keyed rows + line + section), headings (+ slug), sections, links (+ lab"
+    },
+    {
+      "id": "parse-heading-test",
+      "claim": "P1: the assertion for heading text, depth, slug, and line.",
+      "path": "packages/core/test/parse-document.test.ts",
+      "line": 10,
+      "snippet": "it(\"captures heading text, depth, github slug, and line\", () => {"
+    },
+    {
+      "id": "parse-table-test",
+      "claim": "P1: the assertion for keyed cells with section and line.",
+      "path": "packages/core/test/parse-document.test.ts",
+      "line": 46,
+      "snippet": "it(\"keys cells by header and records section + line\", () => {"
+    },
+    {
+      "id": "parse-checkitems-test",
+      "claim": "P1: the assertion for checklist items.",
+      "path": "packages/core/test/parse-document.test.ts",
+      "line": 94,
+      "snippet": "it(\"reports checked state, text, section, and line\", () => {"
+    },
+    {
+      "id": "parse-links-test",
+      "claim": "P1: the assertion for link label, anchor, kind, and position.",
+      "path": "packages/core/test/parse-document.test.ts",
+      "line": 113,
+      "snippet": "it(\"keeps label text, anchor, kind, and position for local links\", () => {"
+    },
+    {
+      "id": "parse-images-test",
+      "claim": "P1: the assertion for images.",
+      "path": "packages/core/test/parse-document.test.ts",
+      "line": 162,
+      "snippet": "it(\"extracts every image target with its line (classification deferred to REF-003)\", () => {"
+    },
+    {
+      "id": "parse-imports-test",
+      "claim": "P1/P9: the assertion for per-import line and column in a multi-line block (audit M-1).",
+      "path": "packages/core/test/parse-document.test.ts",
+      "line": 226,
+      "snippet": "it(\"gives each import in a multi-line block its own line and column (audit M-1)\", () => {"
+    },
+    {
+      "id": "parse-directives-test",
+      "claim": "P1: the assertion for inline-disable directives.",
+      "path": "packages/core/test/parse-document.test.ts",
+      "line": 296,
+      "snippet": "it(\"extracts disable / enable / disable-next-line with kind, ids, and line\", () => {"
+    },
+    {
+      "id": "parse-cjk-test",
+      "claim": "P1: the CJK heading and slug assertion.",
+      "path": "packages/core/test/parse-document.test.ts",
+      "line": 30,
+      "snippet": "it(\"preserves CJK / Unicode heading text and slugs verbatim\", () => {"
+    },
+    {
+      "id": "parse-determinism-test",
+      "claim": "P1: the byte-stability suite.",
+      "path": "packages/core/test/parse-document.test.ts",
+      "line": 337,
+      "snippet": "describe(\"parseDocument · determinism\", () => {"
+    },
+    {
+      "id": "load-documents-sorted-test",
+      "claim": "P1: the deterministic sorted POSIX-normalized map assertion.",
+      "path": "packages/core/test/load-documents.test.ts",
+      "line": 35,
+      "snippet": "it(\"returns parsed documents keyed by sorted, POSIX-normalized absolute paths\", async () => {"
+    },
+    {
+      "id": "config-v2-didyoumean",
+      "claim": "P2/F13: the did-you-mean diagnostic test — the standard path C7 covers.",
+      "path": "packages/core/test/config-v2.test.ts",
+      "line": 145,
+      "snippet": "it(\"reports an unknown rule with a did-you-mean suggestion\", async () => {"
+    },
+    {
+      "id": "config-v2-option-path",
+      "claim": "P2/F13: the path-prefixed option error test, also standard-path only.",
+      "path": "packages/core/test/config-v2.test.ts",
+      "line": 154,
+      "snippet": "it(\"reports bad rule options with a path-prefixed error\", async () => {"
+    },
+    {
+      "id": "registry-metadata-type",
+      "claim": "P2: the single rule-metadata source the registry criterion names.",
+      "path": "packages/core/src/engine/registry.ts",
+      "line": 17,
+      "snippet": "export type RuleMetadata = {"
+    },
+    {
+      "id": "lint-e2e-local-schema",
+      "claim": "P2: the local-schema criterion, asserted with no remote URL.",
+      "path": "packages/cli/test/lint.e2e.test.ts",
+      "line": 290,
+      "snippet": "it(\"writes a local schema file with no remote URL\", async () => {"
+    },
+    {
+      "id": "lint-e2e-missing-path-exit2",
+      "claim": "P11: a nonexistent path exits 2 rather than reporting a clean corpus (M-7).",
+      "path": "packages/cli/test/lint.e2e.test.ts",
+      "line": 218,
+      "snippet": "it(\"exits 2 for a nonexistent [path] instead of reporting a clean corpus\", async () => {"
+    },
+    {
+      "id": "lint-files-severity-test",
+      "claim": "P2: per-rule severity override and off filtering (R1/C2).",
+      "path": "packages/core/test/lint-files.test.ts",
+      "line": 105,
+      "snippet": "it(\"applies per-rule severity overrides and drops off rules (R1/C2)\", async () => {"
+    },
+    {
+      "id": "lint-files-suppression-test",
+      "claim": "P2: inline-disable suppression, block and next-line.",
+      "path": "packages/core/test/lint-files.test.ts",
+      "line": 125,
+      "snippet": "it(\"suppresses findings via inline-disable directives (block + next-line)\", async () => {"
+    },
+    {
+      "id": "lint-files-r4-test",
+      "claim": "P2: fail-fast when a project rule runs without a corpus (R4).",
+      "path": "packages/core/test/lint-files.test.ts",
+      "line": 188,
+      "snippet": "it(\"throws when a project rule runs without a documents corpus (R4)\", () => {"
+    },
+    {
+      "id": "registry-24-ids-test",
+      "claim": "P3/P10: the test pinning exactly the documented 24 rule ids.",
+      "path": "packages/core/test/registry-inventory.test.ts",
+      "line": 51,
+      "snippet": "it(\"ships exactly the documented 24 rule ids\", () => {"
+    },
+    {
+      "id": "registry-scope-inventory-test",
+      "claim": "R7/F1: the test pinning which rules mix in the shared files+exclude shape — the inventory, not the matcher.",
+      "path": "packages/core/test/registry-inventory.test.ts",
+      "line": 136,
+      "snippet": "it(\"mixes the shared files+exclude shape into exactly the documented rules\", () => {"
+    },
+    {
+      "id": "rules-custom-from-config-test",
+      "claim": "P3: a document-scope custom rule runs from config with no rebuild.",
+      "path": "packages/core/test/rules-custom.test.ts",
+      "line": 44,
+      "snippet": "it(\"runs a document-scope custom rule from config (no rebuild)\", async () => {"
+    },
+    {
+      "id": "rules-custom-scope-cases",
+      "claim": "P12: the custom family's shared-exclude coverage cases.",
+      "path": "packages/core/test/rules-custom.test.ts",
+      "line": 396,
+      "snippet": "it.each(Object.entries(CUSTOM_SCOPE_CASES))("
+    },
+    {
+      "id": "docs-sync-registry-test",
+      "claim": "P3: the README rule table stays in sync with rule metadata (R6).",
+      "path": "packages/core/test/docs-sync.test.ts",
+      "line": 29,
+      "snippet": "it(\"stays in sync with the rule metadata (R6)\", () => {"
+    },
+    {
+      "id": "p4-slice-criterion",
+      "claim": "P4: the criterion requiring slice to resolve a real index with honest --help semantics.",
+      "path": "docs/mdlint_v2/P4-graph/index.md",
+      "line": 40,
+      "snippet": "- [x] `slice` resolves a real ID/anchor/heading/path index (G4); semantics honest in `--help`."
+    },
+    {
+      "id": "p4-query-layer-criterion",
+      "claim": "P4: the criterion requiring one query layer for slice, impact, and GRP rules.",
+      "path": "docs/mdlint_v2/P4-graph/index.md",
+      "line": 39,
+      "snippet": "- [x] One query layer powers `slice` and `impact`; GRP rules use the same graph (R5)."
+    },
+    {
+      "id": "slice-description-const",
+      "claim": "P4: the honest slice description core owns.",
+      "path": "packages/core/src/graph/search-index.ts",
+      "line": 35,
+      "snippet": "export const SLICE_RESOLUTION_DESCRIPTION ="
+    },
+    {
+      "id": "slice-help-composition",
+      "claim": "P4: the CLI help composing that description verbatim.",
+      "path": "packages/cli/src/program.ts",
+      "line": 262,
+      "snippet": "`Print the files reachable from a query within --depth hops. ${SLICE_RESOLUTION_DESCRIPTION}`,"
+    },
+    {
+      "id": "slice-description-test",
+      "claim": "P4: the test pinning the slice description.",
+      "path": "packages/core/test/search-index-slice.test.ts",
+      "line": 276,
+      "snippet": "describe(\"SLICE_RESOLUTION_DESCRIPTION\", () => {"
+    },
+    {
+      "id": "grp-injected-graph-test",
+      "claim": "P4: GRP-001 reading the injected graph rather than a local adjacency.",
+      "path": "packages/core/test/rules-grp.test.ts",
+      "line": 46,
+      "snippet": "describe(\"GRP-001 cycles (reads the injected graph)\", () => {"
+    },
+    {
+      "id": "p5-determinism-criterion",
+      "claim": "P5: the deterministic compile-pipeline criterion.",
+      "path": "docs/mdlint_v2/P5-compile/index.md",
+      "line": 35,
+      "snippet": "- [x] `compileContext` runs load→graph→analyze→profile→describe→synthesize deterministically."
+    },
+    {
+      "id": "p5-exit2-criterion",
+      "claim": "P5: the criterion that a missing config.compile exits 2.",
+      "path": "docs/mdlint_v2/P5-compile/index.md",
+      "line": 37,
+      "snippet": "- [x] CLI `compile` with `--outdir`/`--dry-run`, default `.claude/skills/wastech-mdlint/`; missing `config.com"
+    },
+    {
+      "id": "compile-determinism-test",
+      "claim": "P5: the determinism assertion for repeated compiles.",
+      "path": "packages/core/test/compile-synthesize.test.ts",
+      "line": 84,
+      "snippet": "it(\"is deterministic across repeated calls\", () => {"
+    },
+    {
+      "id": "compile-missing-config-test",
+      "claim": "P5: the typed missing-compile-config error.",
+      "path": "packages/core/test/compile-context.test.ts",
+      "line": 42,
+      "snippet": "it(\"throws CompileConfigMissingError when config.compile is absent\", async () => {"
+    },
+    {
+      "id": "p6-loads-clean-criterion",
+      "claim": "P6: the criterion that the produced config loads and a clean fixture lints to exit 0.",
+      "path": "docs/mdlint_v2/P6-init/index.md",
+      "line": 42,
+      "snippet": "- [x] The produced config is structurally valid and loads without a `ConfigError` (canonical IDs, local `$sche"
+    },
+    {
+      "id": "p6-local-schema-criterion",
+      "claim": "P6: the criterion for a valid config with a local $schema and a project schema for custom rules.",
+      "path": "docs/mdlint_v2/P6-init/index.md",
+      "line": 41,
+      "snippet": "- [x] Writes a valid `wastech-mdlint.config.json` (canonical IDs, optional rationale comments) with a **local*"
+    },
+    {
+      "id": "init-clean-fixture-test",
+      "claim": "P6: init --yes then lint on a clean fixture reports no problems and exits 0.",
+      "path": "packages/cli/test/init.e2e.test.ts",
+      "line": 2789,
+      "snippet": "it(\"plain docs/ clean fixture: init --yes then lint reports no problems and exits 0\", async () => {"
+    },
+    {
+      "id": "init-schema-resolves-test",
+      "claim": "P6: the written $schema resolves to a file that exists.",
+      "path": "packages/cli/test/init.e2e.test.ts",
+      "line": 814,
+      "snippet": "describe(\"the written $schema resolves to a file that exists\", () => {"
+    },
+    {
+      "id": "p6-exact-string-rationale",
+      "claim": "P6: why that test asserts the exact zero-messages string rather than exit 0 alone.",
+      "path": "docs/mdlint_v2/P6-init/05-init-tests.md",
+      "line": 37,
+      "snippet": "- **\"Lints clean\" is asserted as the exact zero-messages string, not just exit 0.** `TBL-002` and `CTX-002` de"
+    },
+    {
+      "id": "p7-six-tools-criterion",
+      "claim": "P7: the six-tools criterion with the structured-output split.",
+      "path": "docs/mdlint_v2/P7-mcp-server/index.md",
+      "line": 35,
+      "snippet": "- [x] 6 tools registered, each a thin wrapper over core. Five carry **structured output** + a text summary; `c"
+    },
+    {
+      "id": "p7-error-contract-criterion",
+      "claim": "P7/F19: the M6 error-contract criterion, met as specified.",
+      "path": "docs/mdlint_v2/P7-mcp-server/index.md",
+      "line": 38,
+      "snippet": "- [x] Error contract `{ code, message, hint }` (M6, carried in `structuredContent`; each schema-carrying tool "
+    },
+    {
+      "id": "stdio-six-tools-test",
+      "claim": "P7: the assertion that exactly six read-only tools are advertised.",
+      "path": "packages/mcp-server/test/stdio-integration.test.ts",
+      "line": 119,
+      "snippet": "it(\"advertises exactly the six read-only tools with the locked structured-output split\", async () => {"
+    },
+    {
+      "id": "mcp-readiness-stderr",
+      "claim": "P7: the readiness line goes to stderr so stdout stays protocol-clean.",
+      "path": "packages/mcp-server/src/index.ts",
+      "line": 50,
+      "snippet": "process.stderr.write(\"wastech-mdlint-mcp: ready (stdio)\\n\");"
+    },
+    {
+      "id": "tool-response-error-test",
+      "claim": "P7: the structured error code/message/hint passthrough.",
+      "path": "packages/mcp-server/test/tool-response.test.ts",
+      "line": 25,
+      "snippet": "it(\"passes a structured error's code/message/hint through verbatim in structuredContent\", () => {"
+    },
+    {
+      "id": "p8-skills-criterion",
+      "claim": "P8: the criterion requiring the three skills with valid frontmatter.",
+      "path": "docs/mdlint_v2/P8-skills/index.md",
+      "line": 37,
+      "snippet": "- [x] `skills/wastech-mdlint-{init,fix,impact}/SKILL.md` exist with valid frontmatter (schema-checked, S1) and"
+    },
+    {
+      "id": "skills-surface-cli-test",
+      "claim": "P8: the test matching documented CLI invocations against the real surface.",
+      "path": "packages/cli/test/skills-surface.e2e.test.ts",
+      "line": 148,
+      "snippet": "it(\"COMMANDS matches the CLI invocations documented in the skills\", () => {"
+    },
+    {
+      "id": "skills-surface-mcp-test",
+      "claim": "P8: the test matching the impact skill's MCP tools against live schemas.",
+      "path": "packages/mcp-server/test/skills-surface.test.ts",
+      "line": 79,
+      "snippet": "it(\"every MCP tool the impact skill documents matches the live input/output schema\", async () => {"
+    },
+    {
+      "id": "skills-three-test",
+      "claim": "P8: exactly three skills ship.",
+      "path": "packages/core/test/skills-validation.test.ts",
+      "line": 28,
+      "snippet": "it(\"ships exactly the three P8 skills\", () => {"
+    },
+    {
+      "id": "skills-host-neutral-test",
+      "claim": "P8: host-neutrality asserted per skill (S7).",
+      "path": "packages/core/test/skills-validation.test.ts",
+      "line": 51,
+      "snippet": "describe.each(skillIds)(\"host-neutrality of %s (S7)\", (id) => {"
+    },
+    {
+      "id": "adr-skills-layout",
+      "claim": "P8 decision verdict: the mandated skills/<name>/SKILL.md layout, which shipped.",
+      "path": "docs/mdlint_v2/decisions/vendor-neutral-skill-distribution.md",
+      "line": 15,
+      "snippet": "Ship Agent Skills under `skills/<skill-name>/SKILL.md` in the `wastech-mdlint` repo, following the agentskills"
+    },
+    {
+      "id": "adr-skills-install",
+      "claim": "P8 decision verdict: the install command with the real owner/repo, which shipped.",
+      "path": "docs/mdlint_v2/decisions/vendor-neutral-skill-distribution.md",
+      "line": 18,
+      "snippet": "- Users install with `gh skill install VladimirMakarevich/wastech-mdlint <skill> [--pin vX.Y.Z]`."
+    },
+    {
+      "id": "adr-skills-single-tag",
+      "claim": "P8 decision verdict: the single-tag release coupling, which is open under P-release.",
+      "path": "docs/mdlint_v2/decisions/vendor-neutral-skill-distribution.md",
+      "line": 19,
+      "snippet": "- Skills coordinate releases with the npm packages: a single `vX.Y.Z` git tag drives both."
+    },
+    {
+      "id": "adr-skills-host-neutral",
+      "claim": "P8 decision verdict: the host-neutrality clause, pinned by tests.",
+      "path": "docs/mdlint_v2/decisions/vendor-neutral-skill-distribution.md",
+      "line": 20,
+      "snippet": "- Avoid Claude-Code-specific syntax inside `SKILL.md` (e.g. dynamic command injection) so skills stay portable"
+    },
+    {
+      "id": "skill-install-command",
+      "claim": "P8: the shipped install line using the real slug.",
+      "path": "skills/wastech-mdlint-init/SKILL.md",
+      "line": 110,
+      "snippet": "- Install this bootstrap skill (pin to a release so the skill and CLI stay on one tag): `gh skill install Vlad"
+    },
+    {
+      "id": "p9-import-criterion",
+      "claim": "P9: the multi-line @import position criterion, met in code but unchecked.",
+      "path": "docs/mdlint_v2/P9-remediation/index.md",
+      "line": 41,
+      "snippet": "- [ ] Multi-line `@import` blocks report correct `line`/`column` per import, with a regression test."
+    },
+    {
+      "id": "ci-format-step",
+      "claim": "P9: the format gate enforced in CI.",
+      "path": ".github/workflows/ci.yml",
+      "line": 38,
+      "snippet": "- run: npm run format"
+    },
+    {
+      "id": "ci-node-version-file",
+      "claim": "P-release: the pinned Node line CI already uses.",
+      "path": ".github/workflows/ci.yml",
+      "line": 31,
+      "snippet": "node-version-file: \".node-version\""
+    },
+    {
+      "id": "p10-registry-criterion",
+      "claim": "P10: the criterion requiring one test to pin the registry inventory.",
+      "path": "docs/mdlint_v2/P10-consistency/index.md",
+      "line": 44,
+      "snippet": "- [ ] A single test pins the shipped registry to the documented 24 rule IDs / 8 categories."
+    },
+    {
+      "id": "p11-h1-criterion",
+      "claim": "P11: the H-1 criterion requiring a process-level spawn of the installed bin.",
+      "path": "docs/mdlint_v2/P11-remediation/index.md",
+      "line": 54,
+      "snippet": "- [ ] `./node_modules/.bin/wastech-mdlint` and `npx wastech-mdlint` run and set correct exit codes; a process-"
+    },
+    {
+      "id": "bin-e2e-h1-guard",
+      "claim": "P11: the H-1 regression guard spawning through a real symlink/junction.",
+      "path": "packages/cli/test/bin.e2e.test.ts",
+      "line": 124,
+      "snippet": "describe(\"installed-bin shape via symlink/junction (H-1 regression guard)\", () => {"
+    },
+    {
+      "id": "mcp-bin-h1-guard",
+      "claim": "P11: the MCP half of the same guard.",
+      "path": "packages/mcp-server/test/bin-entrypoint.test.ts",
+      "line": 67,
+      "snippet": "describe(\"installed-entrypoint shape via symlink/junction (H-1 regression guard)\", () => {"
+    },
+    {
+      "id": "rules-sec-scope-cases",
+      "claim": "P12: the SEC family's shared-exclude coverage cases.",
+      "path": "packages/core/test/rules-sec.test.ts",
+      "line": 291,
+      "snippet": "it.each(SEC_SCOPE_CASES)("
+    },
+    {
+      "id": "boundary-guard-categories",
+      "claim": "P12: the literal category set the boundary-guard inventory pins.",
+      "path": "packages/core/test/boundary-guards.test.ts",
+      "line": 76,
+      "snippet": "expect(categories).toEqual(["
+    },
+    {
+      "id": "readme-mcp-tool-table",
+      "claim": "P-release: the generated MCP tool list already shipped in P7.05.",
+      "path": "README.md",
+      "line": 106,
+      "snippet": "| Tool | Description | Read-only | Structured output |"
+    },
+    {
+      "id": "p3-r7-applied",
+      "claim": "R7/F1: P3 is the phase that applies the shared file-scope requirement.",
+      "path": "docs/mdlint_v2/P3-rules/index.md",
+      "line": 40,
+      "snippet": "- [R9](../requirements/02-rules-engine.md) built-ins-as-presets + custom rule · [R7](../requirements/02-rules-"
+    },
+    {
+      "id": "mcp-lint-files-errorcount",
+      "claim": "F17: the second lint-JSON shape names errorCount where the CLI's names summary.errors.",
+      "path": "packages/mcp-server/src/tools/lint-files.ts",
+      "line": 42,
+      "snippet": "errorCount: z.number().int(),"
+    },
+    {
+      "id": "load-config-root-formatter",
+      "claim": "F13: the first of exactly two config diagnostic formatters — the root formatter with dotted paths.",
+      "path": "packages/core/src/config/load-config.ts",
+      "line": 58,
+      "snippet": "function formatRootIssue(issue: z.core.$ZodIssue): string {"
+    },
+    {
+      "id": "p0-crit-packages",
+      "claim": "P0: the criterion on package names, bins, and publishConfig.",
+      "path": "docs/mdlint_v2/P0-foundations/index.md",
+      "line": 40,
+      "snippet": "- [x] `packages/{core,cli,mcp-server}` exist with correct names, bins, and `publishConfig`."
+    },
+    {
+      "id": "p0-crit-postinstall",
+      "claim": "P0: the criterion removing postinstall auto-config (I1).",
+      "path": "docs/mdlint_v2/P0-foundations/index.md",
+      "line": 42,
+      "snippet": "- [x] The current `postinstall` auto-config is removed (I1)."
+    },
+    {
+      "id": "p1-crit-map",
+      "claim": "P1: the deterministic sorted POSIX-normalized document map criterion.",
+      "path": "docs/mdlint_v2/P1-parsed-document/index.md",
+      "line": 42,
+      "snippet": "- [x] `loadDocuments(patterns, …)` returns a deterministic `Map<absPath, ParsedDocument>` (sorted, POSIX-norma"
+    },
+    {
+      "id": "p1-crit-no-rule-logic",
+      "claim": "P1: the criterion that no rule or graph logic lands in the parse phase.",
+      "path": "docs/mdlint_v2/P1-parsed-document/index.md",
+      "line": 44,
+      "snippet": "- [x] No rule/graph logic added here — this phase only produces parsed data."
+    },
+    {
+      "id": "p2-crit-types",
+      "claim": "P2: the criterion on Rule/RuleContext/LintMessage and runRules — the closest P2 criterion to file scoping, and it is about types.",
+      "path": "docs/mdlint_v2/P2-rule-engine/index.md",
+      "line": 38,
+      "snippet": "- [x] `Rule`/`RuleContext`/`LintMessage` (with structured fields) + `runRules` implemented."
+    },
+    {
+      "id": "p2-crit-registry",
+      "claim": "P2: the registry and single-metadata-source criterion F22 qualifies.",
+      "path": "docs/mdlint_v2/P2-rule-engine/index.md",
+      "line": 40,
+      "snippet": "- [x] Registry + single metadata source; rule IDs canonical ([C3](../requirements/01-configuration.md))."
+    },
+    {
+      "id": "p2-crit-config",
+      "claim": "P2: the two-stage validation and rich-diagnostics criterion F13 qualifies.",
+      "path": "docs/mdlint_v2/P2-rule-engine/index.md",
+      "line": 41,
+      "snippet": "- [x] New config `{ $schema?, include?, exclude?, respectGitignore?, settings?, rules:[{rule,severity?,options"
+    },
+    {
+      "id": "p2-crit-lintfiles",
+      "claim": "P2: the severity/inline-disable/fail-fast criterion.",
+      "path": "docs/mdlint_v2/P2-rule-engine/index.md",
+      "line": 42,
+      "snippet": "- [x] `lintFiles()` resolves severity (incl. `\"off\"`), applies inline-disable, fails fast on missing `document"
+    },
+    {
+      "id": "p2-crit-schema",
+      "claim": "P2: the generated-schema and local-$schema criterion F30 qualifies.",
+      "path": "docs/mdlint_v2/P2-rule-engine/index.md",
+      "line": 43,
+      "snippet": "- [x] `schema.json` generated from metadata + sync test; `wastech-mdlint schema` writes a local schema; `$sche"
+    },
+    {
+      "id": "p3-crit-builtins",
+      "claim": "P3: the criterion on built-in rules with options schemas and fixtures.",
+      "path": "docs/mdlint_v2/P3-rules/index.md",
+      "line": 44,
+      "snippet": "- [x] All 22 built-in rules implemented as presets, each with options schema + fixtures + tests."
+    },
+    {
+      "id": "p3-crit-custom",
+      "claim": "P3: the criterion that custom works from config with no rebuild.",
+      "path": "docs/mdlint_v2/P3-rules/index.md",
+      "line": 46,
+      "snippet": "- [x] `custom` rule works from config over the primitive vocabulary (no rebuild)."
+    },
+    {
+      "id": "p3-crit-generated",
+      "claim": "P3: the criterion that the README table and schema.json are generated and in sync.",
+      "path": "docs/mdlint_v2/P3-rules/index.md",
+      "line": 47,
+      "snippet": "- [x] README rule table + `schema.json` are generated and in sync ([R6](../requirements/02-rules-engine.md))."
+    },
+    {
+      "id": "p4-crit-coverage",
+      "claim": "P4/F11: the criterion that names a coverage signal without naming a surface.",
+      "path": "docs/mdlint_v2/P4-graph/index.md",
+      "line": 42,
+      "snippet": "- [x] Explicit cycle list (G6) and coverage signal (G5) surfaced."
+    },
+    {
+      "id": "p8-crit-host-neutral",
+      "claim": "P8: the host-neutrality and real-slug criterion.",
+      "path": "docs/mdlint_v2/P8-skills/index.md",
+      "line": 38,
+      "snippet": "- [x] Content is host-neutral (no Claude-specific syntax, the vendor-neutral skill distribution decision); pla"
+    },
+    {
+      "id": "p9-crit-cross-os",
+      "claim": "P9: the cross-OS CI criterion, met by the matrix.",
+      "path": "docs/mdlint_v2/P9-remediation/index.md",
+      "line": 43,
+      "snippet": "- [ ] CI runs the full gate on `windows-latest` (and ideally `macos-latest`), exercising POSIX-path normalizat"
+    },
+    {
+      "id": "p9-crit-format-gate",
+      "claim": "P9: the format-gate criterion, met by the CI step.",
+      "path": "docs/mdlint_v2/P9-remediation/index.md",
+      "line": 46,
+      "snippet": "- [ ] `npm run format` is green and enforced in CI (or the gate is explicitly retired in the rules)."
+    },
+    {
+      "id": "p10-crit-stale-ids",
+      "claim": "P10: the stale-identifier criterion, verified clean for its own class while F16's sibling class survived.",
+      "path": "docs/mdlint_v2/P10-consistency/index.md",
+      "line": 43,
+      "snippet": "- [ ] No stale `CHK-*` reference or \"not yet config-driven — P2 wires\" comment remains in source."
+    },
+    {
+      "id": "p11-crit-exit-codes",
+      "claim": "P11: the criterion that operational and usage failures exit 2 and no missing path exits 0 — CLI-scoped, which is why F3 escapes it.",
+      "path": "docs/mdlint_v2/P11-remediation/index.md",
+      "line": 58,
+      "snippet": "- [ ] Operational/usage failures exit `2`, print repo-relative paths, and an unknown subcommand or a missing p"
+    },
+    {
+      "id": "p12-crit-exclude",
+      "claim": "P12: the shared-exclude coverage criterion, verified family by family.",
+      "path": "docs/mdlint_v2/P12-consistency/index.md",
+      "line": 37,
+      "snippet": "- [ ] The shared `exclude` option has end-to-end coverage on every rule family that accepts it — the root-caus"
+    },
+    {
+      "id": "pr-crit-packaging",
+      "claim": "P-release: the packaging criterion already satisfied by P0.07, and the one F23's payload would be inspected under.",
+      "path": "docs/mdlint_v2/P-release/index.md",
+      "line": 35,
+      "snippet": "- [ ] Each package has correct bins/exports/`files`/`engines`/`publishConfig` + provenance (I5)."
+    },
+    {
+      "id": "schema-frozen-api",
+      "claim": "F39: decision 4.1's frozen schema-generator API holds, and the code names the decision.",
+      "path": "packages/core/src/engine/schema.ts",
+      "line": 114,
+      "snippet": "* project-local schema that also validates those custom rules' ids (P6.04). Frozen API (audit 4.1)."
+    },
+    {
+      "id": "schema-generator-signature",
+      "claim": "F39: the frozen generateConfigSchema signature as specified.",
+      "path": "packages/core/src/engine/schema.ts",
+      "line": 116,
+      "snippet": "export function generateConfigSchema(opts?: {"
+    },
+    {
+      "id": "compile-result-type",
+      "claim": "F39: decision 4.4's CompileResult exists as a real exported interface.",
+      "path": "packages/core/src/compile/synthesize.ts",
+      "line": 45,
+      "snippet": "export interface CompileResult {"
+    },
+    {
+      "id": "compile-missing-config-code",
+      "claim": "F39: the missing-compile-config failure is core-owned and typed with the COMPILE_CONFIG_MISSING code, as 4.4 specifies.",
+      "path": "packages/core/src/compile/compile-context.ts",
+      "line": 37,
+      "snippet": "readonly code: ToolErrorCode = \"COMPILE_CONFIG_MISSING\";"
+    },
+    {
+      "id": "i8-repo-config-presumed",
+      "claim": "F35: requirement I8 (precedence tier 2) presumes this repository carries its own config in the v2 shape; none exists outside test fixtures.",
+      "path": "docs/mdlint_v2/requirements/06-installation.md",
+      "line": 38,
+      "snippet": "the repo's own config is simply rewritten in the new shape"
+    },
+    {
+      "id": "glossary-i8-repo-config",
+      "claim": "F35: the glossary repeats I8's clause verbatim, so two plan documents presume a repository config that does not exist.",
+      "path": "docs/mdlint_v2/glossary.md",
+      "line": 305,
+      "snippet": "the repo's own config is simply rewritten in the new shape rather than migrated"
+    },
+    {
+      "id": "ci-typecheck-step",
+      "claim": "F35: the CI gate runs typecheck, lint, format, test, build, and pack — and never runs the product on this repository's own Markdown.",
+      "path": ".github/workflows/ci.yml",
+      "line": 36,
+      "snippet": "- run: npm run typecheck"
+    },
+    {
+      "id": "ci-lint-is-eslint",
+      "claim": "F6/F35: CI's lint step is ESLint (the root `lint` script), not this product, so no CI step could catch a dead link in the plan.",
+      "path": ".github/workflows/ci.yml",
+      "line": 37,
+      "snippet": "- run: npm run lint"
+    },
+    {
+      "id": "p9-09-header-p11-05",
+      "claim": "F6: a Status Done task header whose sole citation for the defect it fixed is the deleted p9-09 report.",
+      "path": "docs/mdlint_v2/P11-remediation/05-table-primitive-scope.md",
+      "line": 3,
+      "snippet": "> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Done**. Findings **M-2** ([post-P9 audit](../audit-2026-07-25-post-p9.md)) and **TP-1** ([`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md))."
+    },
+    {
+      "id": "p9-09-header-p11-12",
+      "claim": "F6: a Status Done task header citing only the deleted p9-09 report for finding BL-1.",
+      "path": "docs/mdlint_v2/P11-remediation/12-str001-reach.md",
+      "line": 3,
+      "snippet": "> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Done**. Finding **BL-1** ([`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md), Medium, confirmed)."
+    },
+    {
+      "id": "p9-09-header-p11-13",
+      "claim": "F6: a Status Done task header citing only the deleted p9-09 report for findings SC-1 and SC-2.",
+      "path": "docs/mdlint_v2/P11-remediation/13-grp-size-hygiene.md",
+      "line": 3,
+      "snippet": "> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Done**. Findings **SC-1** and **SC-2** ([`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md), Low, confirmed)."
+    },
+    {
+      "id": "p9-09-header-p12-04",
+      "claim": "F6: a Status Done task header citing only the deleted p9-09 report for finding OG-1.",
+      "path": "docs/mdlint_v2/P12-consistency/04-mcp-custom-rules.md",
+      "line": 3,
+      "snippet": "> Phase: [P12 — Post-P9 consistency](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Done**. Finding **OG-1** ([`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md), Low, needs confirmation → maintainer decision)."
+    },
+    {
+      "id": "p9-09-header-p12-05",
+      "claim": "F6: a Status Done task header citing only the deleted p9-09 report for finding SC-3.",
+      "path": "docs/mdlint_v2/P12-consistency/05-recursion-depth.md",
+      "line": 3,
+      "snippet": "> Phase: [P12 — Post-P9 consistency](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Done**. Finding **SC-3** ([`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md), Low, needs confirmation)."
+    },
+    {
+      "id": "p9-09-audit-evidence-row",
+      "claim": "F6: the surviving audit's own evidence table links the deleted p9-09 report — one of the six non-task-header sites.",
+      "path": "docs/mdlint_v2/audit-2026-07-25-post-p9.md",
+      "line": 31,
+      "snippet": "`docs/research/p9-09-full-solution-deep-audit/report.md`"
+    },
+    {
+      "id": "audit-p0-p8-russian-title",
+      "claim": "F41: the P0-P8 audit — the origin of phases P9 and P10 — is written in Russian.",
+      "path": "docs/mdlint_v2/audit-2026-07-23-p0-p8.md",
+      "line": 1,
+      "snippet": "Аудит проделанной работы P0–P8"
+    },
+    {
+      "id": "audit-post-p9-russian-title",
+      "claim": "F41: the post-P9 audit — the origin of phases P11 and P12 — is written in Russian.",
+      "path": "docs/mdlint_v2/audit-2026-07-25-post-p9.md",
+      "line": 1,
+      "snippet": "Аудит после P9/P10"
+    },
+    {
+      "id": "audit-post-p9-h1-definition",
+      "claim": "F41: H-1, cited as a release blocker by P11's index, is defined only here.",
+      "path": "docs/mdlint_v2/audit-2026-07-25-post-p9.md",
+      "line": 53,
+      "snippet": "H-1. Опубликованный `bin`"
+    },
+    {
+      "id": "audit-post-p9-h2-definition",
+      "claim": "F41: H-2, the second release blocker P11's index cites, is defined only here.",
+      "path": "docs/mdlint_v2/audit-2026-07-25-post-p9.md",
+      "line": 68,
+      "snippet": "H-2. `SEC-003` читает произвольные файлы вне корня анализа"
+    },
+    {
+      "id": "agents-phases-from-audits",
+      "claim": "F41: AGENTS.md derives four roadmap phases from the two audit reports by name.",
+      "path": "AGENTS.md",
+      "line": 47,
+      "snippet": "P11 and P12 are the second remediation/consistency round from the [post-P9 audit]"
+    },
+    {
+      "id": "testing-rules-boundary-basis",
+      "claim": "F41: the four standing boundary-guard categories rest on the post-P9 audit's systemic-cause finding.",
+      "path": ".agents/rules/testing.md",
+      "line": 29,
+      "snippet": "traced its missed HIGH findings to one systemic cause"
+    },
+    {
+      "id": "p11-crit-init-clobber",
+      "claim": "P11 exit criterion H-3/H-4: init must never overwrite an out-of-target config or an existing schema.json without a guard and an explicit summary line.",
+      "path": "docs/mdlint_v2/P11-remediation/index.md",
+      "line": 56,
+      "snippet": "`init` never overwrites an out-of-target config or an existing `schema.json` without a guard and an explicit summary line (H-3, H-4)"
+    },
+    {
+      "id": "init-h3-rationale",
+      "claim": "P11:56 (H-3): the rationale for refusing to re-root an explicit target onto an ancestor's config.",
+      "path": "packages/cli/src/init-command.ts",
+      "line": 886,
+      "snippet": "strict ancestor of that directory does not govern it, and must not be silently re-rooted onto"
+    },
+    {
+      "id": "init-h3-guard",
+      "claim": "P11:56 (H-3): the guard itself — a discovered config outside the explicit target directory is discarded.",
+      "path": "packages/cli/src/init-command.ts",
+      "line": 889,
+      "snippet": "const existingConfigPath ="
+    },
+    {
+      "id": "init-schema-outcome-fn",
+      "claim": "P11:56 (H-4): the existing-schema.json write decision is a single pure function.",
+      "path": "packages/cli/src/init-command.ts",
+      "line": 637,
+      "snippet": "export function resolveSchemaWriteOutcome(params: {"
+    },
+    {
+      "id": "init-schema-unreadable-refusal",
+      "claim": "P11:56 (H-4): an unreadable existing schema.json refuses the write outright, taking precedence over every other check.",
+      "path": "packages/cli/src/init-command.ts",
+      "line": 651,
+      "snippet": "if (existingSchemaUnreadable) {"
+    },
+    {
+      "id": "init-schema-kept-default",
+      "claim": "P11:56 (H-4): the default outcome for a differing existing schema.json is to keep it.",
+      "path": "packages/cli/src/init-command.ts",
+      "line": 663,
+      "snippet": "return { shouldWrite: false, kind: \"kept\" };"
+    },
+    {
+      "id": "init-schema-summary-line",
+      "claim": "P11:56 (H-4): every schema outcome is named in an explicit summary line.",
+      "path": "packages/cli/src/init-command.ts",
+      "line": 690,
+      "snippet": "function formatSchemaWriteLine(schema: SchemaWriteOutcome): string {"
+    },
+    {
+      "id": "init-prompter-nondestructive-default",
+      "claim": "Coverage (packages/cli/src): the interactive default mirrors the --yes fallback so plain Enter can never resolve to the destructive action.",
+      "path": "packages/cli/src/init-prompter.ts",
+      "line": 36,
+      "snippet": "the destructive `\"overwrite\"`"
+    },
+    {
+      "id": "cli-operational-path-normalize",
+      "claim": "Invariant 3 / F19: host operational errors render paths relative and POSIX-separated so the same failure reads identically on all three systems.",
+      "path": "packages/cli/src/operational-errors.ts",
+      "line": 30,
+      "snippet": "export function toRepoRelativePosix(cwd: string, absolutePath: string): string {"
+    },
+    {
+      "id": "cli-operational-leak-rationale",
+      "claim": "Invariant 3 / F19: the reason a Node fs message is replaced by errno plus a normalized path — the raw message leaks the checkout location.",
+      "path": "packages/cli/src/operational-errors.ts",
+      "line": 13,
+      "snippet": "message is replaced by the errno `code` plus a path normalized here"
+    },
+    {
+      "id": "init-h3-test",
+      "claim": "P11:56 (H-3): the test suite for an explicit path against an ancestor's config.",
+      "path": "packages/cli/test/init.e2e.test.ts",
+      "line": 681,
+      "snippet": "explicit [path] vs. an ancestor's config found while walking up (H-3)"
+    },
+    {
+      "id": "init-schema-outcome-test",
+      "claim": "P11:56 (H-4): the outcome table for the existing-schema decision is unit-tested.",
+      "path": "packages/cli/test/init.e2e.test.ts",
+      "line": 2438,
+      "snippet": "describe(\"resolveSchemaWriteOutcome\", () => {"
+    },
+    {
+      "id": "init-kept-schema-e2e",
+      "claim": "P11:56 (H-4): an end-to-end assertion that a differing existing schema.json is kept and named in the summary.",
+      "path": "packages/cli/test/init.e2e.test.ts",
+      "line": 1035,
+      "snippet": "Kept existing schema.json at schema.json"
+    },
+    {
+      "id": "generate-docs-built-imports",
+      "claim": "Coverage (packaging): the docs generator imports the built packages so the bytes it writes are the bytes the sync tests regenerate.",
+      "path": "scripts/generate-docs.mjs",
+      "line": 6,
+      "snippet": "Imports the built @wastech-mdlint/core"
+    },
+    {
+      "id": "generate-docs-schema-write",
+      "claim": "Coverage (packaging): the shipped schema is written from the core generator.",
+      "path": "scripts/generate-docs.mjs",
+      "line": 28,
+      "snippet": "writeFileSync(schemaPath, generateConfigSchema(), \"utf8\");"
+    },
+    {
+      "id": "generate-docs-rules-replacement",
+      "claim": "F40: the generated rule table is interpolated into a regex replacement string, where $ is a metacharacter.",
+      "path": "scripts/generate-docs.mjs",
+      "line": 38,
+      "snippet": "`$1\\n<!-- prettier-ignore -->\\n${generateRuleDocs()}\\n\\n$2`,"
+    },
+    {
+      "id": "generate-docs-tools-replacement",
+      "claim": "F40: the second site — the generated MCP tool inventory, same replacement-string shape.",
+      "path": "scripts/generate-docs.mjs",
+      "line": 42,
+      "snippet": "`$1\\n<!-- prettier-ignore -->\\n${await generateToolInventory()}\\n\\n$2`,"
+    },
+    {
+      "id": "repo-scan-replacer-function",
+      "claim": "F40: product code already uses a replacer function for exactly this reason, in the glob-escaping helper.",
+      "path": "packages/core/src/discovery/repo-scan.ts",
+      "line": 82,
+      "snippet": "return value.replace(GLOB_SPECIAL_CHARS, (char) =>"
+    },
+    {
+      "id": "p11-06-substitution-class",
+      "claim": "F40: P11.06 named and closed the 'unescaped/unsafe regex substitution' class inside the rules; the replacement-string half was not swept.",
+      "path": "docs/mdlint_v2/P11-remediation/06-regex-substitution-safety.md",
+      "line": 7,
+      "snippet": "unescaped/unsafe regex substitution"
+    },
+    {
+      "id": "skill-model-shared-frontmatter",
+      "claim": "Coverage (core/skills): static and generated skills share one frontmatter schema by import, not by a parallel definition.",
+      "path": "packages/core/src/skills/skill-model.ts",
+      "line": 38,
+      "snippet": "frontmatter: skillFrontmatterSchema,"
+    },
+    {
+      "id": "skill-model-path-refine",
+      "claim": "Coverage (core/skills): a Skill.path that is not already repository-relative POSIX is rejected rather than normalized.",
+      "path": "packages/core/src/skills/skill-model.ts",
+      "line": 35,
+      "snippet": "path: z.string().min(1).refine(isRepoRelativePosixPath, {"
+    },
+    {
+      "id": "synthesize-frontmatter-validate",
+      "claim": "Coverage (core/skills): the compiler validates its generated frontmatter against the same schema the static model embeds.",
+      "path": "packages/core/src/compile/synthesize.ts",
+      "line": 389,
+      "snippet": "skillFrontmatterSchema.parse({"
+    },
+    {
+      "id": "parse-static-skill-issue-routing",
+      "claim": "Coverage (core/skills): every failure in the static-skill reader becomes a validation issue instead of an exception, so one bad skill cannot abort the pass.",
+      "path": "packages/core/src/skills/parse-static-skill.ts",
+      "line": 16,
+      "snippet": "Every failure path routes into `SkillValidationResult.issues` instead of throwing"
+    },
+    {
+      "id": "skill-model-both-kinds-test",
+      "claim": "Coverage (core/skills): the test that pins static and generated skills to one accepted shape.",
+      "path": "packages/core/test/skill-model.test.ts",
+      "line": 22,
+      "snippet": "accepts a minimal skill for both kinds identically"
+    },
+    {
+      "id": "skill-model-posix-path-test",
+      "claim": "Coverage (core/skills): the test that pins the path rejection.",
+      "path": "packages/core/test/skill-model.test.ts",
+      "line": 104,
+      "snippet": "rejects paths that are not repository-relative POSIX"
+    },
+    {
+      "id": "micromatch-dts-callable-form",
+      "claim": "Coverage (core/types) and F1: the repository's own ambient declaration documents that the callable form honors an ordered negation.",
+      "path": "packages/core/src/types/micromatch.d.ts",
+      "line": 6,
+      "snippet": "The callable form (`micromatch(list, patterns, options)`) matches the whole list against"
+    },
+    {
+      "id": "mcp-lint-parse-step",
+      "claim": "Invariant 2: the ad-hoc MCP lint handler parses the caller's content itself.",
+      "path": "packages/mcp-server/src/tools/lint.ts",
+      "line": 165,
+      "snippet": "const document = parseDocument({"
+    },
+    {
+      "id": "mcp-lint-no-graph-rationale",
+      "claim": "Invariant 2: the handler documents why it builds no ContextGraph, which is what makes the assembly a deliberate scope boundary rather than an omission.",
+      "path": "packages/mcp-server/src/tools/lint.ts",
+      "line": 180,
+      "snippet": "`graph` is left undefined deliberately"
+    },
+    {
+      "id": "mcp-lint-corpus-of-one",
+      "claim": "Invariant 2: the handler builds a synthetic one-document corpus.",
+      "path": "packages/mcp-server/src/tools/lint.ts",
+      "line": 184,
+      "snippet": "const documents = new Map<string, ParsedDocument>(["
+    },
+    {
+      "id": "mcp-lint-runrules-step",
+      "claim": "Invariant 2: the handler calls core's rule runner directly rather than lintFiles.",
+      "path": "packages/mcp-server/src/tools/lint.ts",
+      "line": 187,
+      "snippet": "const rawMessages: LintMessage[] = runRules(resolved, {"
+    },
+    {
+      "id": "mcp-lint-suppression-step",
+      "claim": "Invariant 2: the handler applies inline-disable suppression itself, matching lintFiles.",
+      "path": "packages/mcp-server/src/tools/lint.ts",
+      "line": 200,
+      "snippet": "const isSuppressed = createSuppressionChecker(document.directives);"
+    },
+    {
+      "id": "mcp-lint-format-step",
+      "claim": "Invariant 2: the handler reuses core's text formatter over a placeholder LintResult.",
+      "path": "packages/mcp-server/src/tools/lint.ts",
+      "line": 215,
+      "snippet": "const summary = formatLintResultText({"
+    },
+    {
+      "id": "mcp-lint-suppression-test",
+      "claim": "Invariant 2: the suppression step has its own test; no test compares the handler's result against lintFiles on the same content.",
+      "path": "packages/mcp-server/test/lint.test.ts",
+      "line": 218,
+      "snippet": "applies inline-disable suppression (R8) to ad-hoc content"
+    },
+    {
+      "id": "guide-output-operational-cli-only",
+      "claim": "F19: the guide describes operational failures in CLI terms only (stderr, relative path, exit 2), never for the MCP host.",
+      "path": "docs/guide/output.md",
+      "line": 35,
+      "snippet": "An operational error goes to stderr, naming its path `/`-separated and relative to the directory the command works in"
+    },
+    {
+      "id": "build-context-graph-constant-replace",
+      "claim": "F40: the other two .replace call sites in product code are safe — this one replaces with a constant empty string.",
+      "path": "packages/core/src/graph/build-context-graph.ts",
+      "line": 95,
+      "snippet": "const token = match[0].replace(PROSE_TOKEN_TRIM_PATTERN, \"\");"
+    },
+    {
+      "id": "atomic-write-mid-sequence-failure-test",
+      "claim": "Coverage (core root modules): the write-failure boundary guard proves an earlier file is untouched when a later staging step fails.",
+      "path": "packages/core/test/atomic-write.test.ts",
+      "line": 71,
+      "snippet": "writes nothing when staging a later file fails, so the earlier file is untouched"
+    }
+  ]
+}
