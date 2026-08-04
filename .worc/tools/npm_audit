@@ -1,0 +1,312 @@
+#!/usr/bin/env python3
+"""npm_audit — npm-native dependency and supply-chain evidence for the security_audit flow.
+
+**Why this exists.** The core-owned `dependency_scan` checker runs a fixed scanner set
+(`pip-audit`, `osv-scanner`) that a flow cannot extend, and a scanner that is not installed
+contributes no findings *and does not fail* — so on this npm workspace repository that node reports
+an empty, confident result. This tool is the npm-ecosystem half the core set does not cover.
+
+**Why a `tool` node and not a prompt.** A `tool` node runs as an orchestrator child process, outside
+the agent sandbox. An analysis *agent* node here is `read-only`, and under `read-only` the Claude
+adapter has no shell at all — so `npm audit` simply cannot be run from a role prompt on the primary
+provider. Putting the scan here makes it provider-independent and deterministic.
+
+**Evidence, not a gate.** `outcome` is always `pass` (exit 0) so the graph never routes on it,
+mirroring `dependency_scan`. Downstream nodes read the findings through `{npm_audit_path}` and decide
+what matters; the reachability judgement belongs to the analysis and verification nodes, not here —
+an advisory against a package whose vulnerable path this product never calls is not a vulnerability.
+
+Self-contained: standard library only, no third-party imports, so it stays portable. POSIX runs it
+via the shebang + `+x` bit; Windows runs the sibling `npm_audit.cmd` wrapper.
+
+What it collects:
+
+1. `npm audit --json` — advisories per package, one finding each, severity mapped to the
+   orchestrator's high/medium/low.
+2. `npm audit signatures` — registry provenance / integrity attestation for the installed tree.
+3. The lockfile: presence and `lockfileVersion`. A missing lockfile is a finding on its own — an
+   unpinned install resolves differently on every machine and in CI.
+4. Lifecycle scripts (`preinstall`, `install`, `postinstall`, `prepare`, `prepack`,
+   `prepublishOnly`) declared by this repository's own manifests, as data — they run on `npm ci` and
+   on publish, so they are the repo's own install-time execution surface.
+5. GitHub Actions `uses:` references that are not pinned to a full 40-hex commit SHA — a movable tag
+   is a supply-chain hole in CI, and CI here has repository write access.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+# npm's own audit severities, mapped onto the orchestrator's three-level Finding scale.
+_SEVERITY_MAP = {
+    "critical": "high",
+    "high": "high",
+    "moderate": "medium",
+    "medium": "medium",
+    "low": "low",
+    "info": "low",
+}
+
+_LIFECYCLE_KEYS = (
+    "preinstall",
+    "install",
+    "postinstall",
+    "prepare",
+    "prepack",
+    "prepublishOnly",
+)
+
+# `uses: owner/repo@ref` in a workflow. A pinned ref is exactly 40 hex chars; anything else (a tag
+# like `v4`, a branch, a short sha) can be moved to a different commit by whoever owns the action.
+_USES_RE = re.compile(r"^\s*-?\s*uses:\s*([^\s#]+)")
+_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+
+# Each npm invocation gets its own ceiling well under the tool node's own timeout, so one hung
+# registry call cannot consume the whole node budget and park the task.
+_NPM_TIMEOUT_S = 300
+
+
+def _npm_argv() -> list[str] | None:
+    """The npm launcher for this host, or None when npm is not on PATH.
+
+    On Windows npm is a `.cmd` shim, which `shutil.which` finds only with the suffix; resolving it to
+    an absolute path keeps the call an argv list with no shell.
+    """
+    for candidate in ("npm", "npm.cmd"):
+        found = shutil.which(candidate)
+        if found:
+            return [found]
+    return None
+
+
+def _run_npm(npm: list[str], args: list[str], cwd: Path) -> tuple[int | None, str, str]:
+    """Run one npm subcommand, returning (exit_code, stdout, stderr).
+
+    A missing binary or a timeout is reported as `exit_code=None` rather than raised: this tool is
+    evidence, and "the scan could not run" is itself a result the report must show instead of a
+    silent empty pass.
+    """
+    try:
+        proc = subprocess.run(  # noqa: S603 - argv list, no shell, resolved absolute launcher
+            [*npm, *args],
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            timeout=_NPM_TIMEOUT_S,
+            check=False,
+            env={**os.environ, "NO_COLOR": "1", "npm_config_fund": "false"},
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None, "", "npm invocation failed"
+    return proc.returncode, proc.stdout, proc.stderr
+
+
+def _advisory_findings(audit_json: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Findings + a severity tally from `npm audit --json` (npm 7+ `vulnerabilities` shape)."""
+    findings: list[dict[str, Any]] = []
+    tally: dict[str, int] = {}
+    vulns = audit_json.get("vulnerabilities")
+    if not isinstance(vulns, dict):
+        return findings, {"totals": tally, "shape": "unrecognised"}
+
+    for name, entry in sorted(vulns.items()):
+        if not isinstance(entry, dict):
+            continue
+        severity = str(entry.get("severity") or "low").lower()
+        tally[severity] = tally.get(severity, 0) + 1
+        via = entry.get("via")
+        titles: list[str] = []
+        urls: list[str] = []
+        if isinstance(via, list):
+            for item in via:
+                if isinstance(item, dict):
+                    if item.get("title"):
+                        titles.append(str(item["title"]))
+                    if item.get("url"):
+                        urls.append(str(item["url"]))
+                elif isinstance(item, str):
+                    titles.append(item)
+        detail = "; ".join(dict.fromkeys(titles)) or "no advisory title reported"
+        fix = entry.get("fixAvailable")
+        fix_note = (
+            "fix available"
+            if fix is True
+            else ("no fix available" if fix is False else "fix requires a major upgrade")
+        )
+        findings.append(
+            {
+                "severity": _SEVERITY_MAP.get(severity, "low"),
+                "reason": (
+                    f"npm advisory ({severity}) for '{name}': {detail} [{fix_note}]"
+                    + (f" — {urls[0]}" if urls else "")
+                ),
+                "paths": ["package-lock.json"],
+            }
+        )
+    return findings, {"totals": tally, "shape": "vulnerabilities"}
+
+
+def _lockfile_evidence(repo: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Lockfile presence + version. Absence is a finding: installs are then unreproducible."""
+    lock = repo / "package-lock.json"
+    if not lock.is_file():
+        return (
+            [
+                {
+                    "severity": "high",
+                    "reason": (
+                        "no package-lock.json — dependency resolution is not pinned, so a build "
+                        "can silently install a different (possibly compromised) version than the "
+                        "one audited"
+                    ),
+                    "paths": ["package.json"],
+                }
+            ],
+            {"present": False},
+        )
+    try:
+        version = json.loads(lock.read_text(encoding="utf-8")).get("lockfileVersion")
+    except (OSError, ValueError):
+        version = None
+    return [], {"present": True, "lockfileVersion": version}
+
+
+def _lifecycle_scripts(repo: Path) -> dict[str, Any]:
+    """This repository's own install/publish-time execution surface, as data."""
+    surface: dict[str, Any] = {}
+    manifests = [repo / "package.json", *sorted(repo.glob("packages/*/package.json"))]
+    for manifest in manifests:
+        try:
+            scripts = json.loads(manifest.read_text(encoding="utf-8")).get("scripts") or {}
+        except (OSError, ValueError):
+            continue
+        hooks = {k: v for k, v in scripts.items() if k in _LIFECYCLE_KEYS}
+        if hooks:
+            surface[manifest.relative_to(repo).as_posix()] = hooks
+    return surface
+
+
+def _unpinned_actions(repo: Path) -> tuple[list[dict[str, Any]], list[str]]:
+    """Workflow `uses:` refs not pinned to a 40-hex SHA (a movable tag in a write-capable CI)."""
+    findings: list[dict[str, Any]] = []
+    seen: list[str] = []
+    workflows = sorted((repo / ".github" / "workflows").glob("*.y*ml"))
+    for wf in workflows:
+        try:
+            lines = wf.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        rel = wf.relative_to(repo).as_posix()
+        for number, line in enumerate(lines, start=1):
+            match = _USES_RE.match(line)
+            if match is None:
+                continue
+            ref = match.group(1).strip().strip("\"'")
+            seen.append(ref)
+            if ref.startswith("./") or ref.startswith("docker://"):
+                continue  # a local composite action / image digest is not a movable action tag
+            _, _, version = ref.partition("@")
+            if version and _SHA_RE.match(version):
+                continue
+            findings.append(
+                {
+                    "severity": "medium",
+                    "reason": (
+                        f"GitHub Action '{ref}' is not pinned to a full commit SHA, so the tag can "
+                        f"be repointed at different code by whoever owns the action"
+                    ),
+                    "paths": [f"{rel}:{number}"],
+                }
+            )
+    return findings, seen
+
+
+def main() -> int:
+    try:
+        payload = json.loads(sys.stdin.read() or "{}")
+    except (json.JSONDecodeError, ValueError) as exc:
+        print(json.dumps({"outcome": "fail", "data": {"error": f"invalid stdin JSON: {exc}"}}))
+        return 1
+
+    paths = payload.get("paths") or {}
+    repo = Path(str(paths.get("repo") or "."))
+
+    findings: list[dict[str, Any]] = []
+    data: dict[str, Any] = {"repo": repo.as_posix()}
+
+    npm = _npm_argv()
+    if npm is None:
+        data["npm"] = {"available": False}
+        findings.append(
+            {
+                "severity": "medium",
+                "reason": (
+                    "npm is not on PATH for the orchestrator, so no npm advisory data was "
+                    "collected — treat the dependency surface as UNAUDITED, not as clean"
+                ),
+                "paths": ["package.json"],
+            }
+        )
+    else:
+        code, out, err = _run_npm(npm, ["audit", "--json"], repo)
+        try:
+            audit_json = json.loads(out) if out.strip() else {}
+        except ValueError:
+            audit_json = {}
+        if audit_json:
+            advisory_findings, tally = _advisory_findings(audit_json)
+            findings.extend(advisory_findings)
+            data["audit"] = {"exit_code": code, **tally}
+        else:
+            data["audit"] = {"exit_code": code, "error": (err or out or "no JSON output")[:2000]}
+            findings.append(
+                {
+                    "severity": "medium",
+                    "reason": (
+                        "npm audit produced no parseable JSON (offline, registry error, or an "
+                        "unexpected shape) — the dependency surface is UNAUDITED, not clean"
+                    ),
+                    "paths": ["package-lock.json"],
+                }
+            )
+
+        sig_code, sig_out, sig_err = _run_npm(npm, ["audit", "signatures"], repo)
+        data["signatures"] = {
+            "exit_code": sig_code,
+            "output": (sig_out or sig_err or "")[:2000],
+        }
+        if sig_code not in (0, None):
+            findings.append(
+                {
+                    "severity": "high",
+                    "reason": (
+                        "npm audit signatures did not pass — one or more installed packages lack a "
+                        "verifiable registry signature or provenance attestation"
+                    ),
+                    "paths": ["package-lock.json"],
+                }
+            )
+
+    lock_findings, lock_data = _lockfile_evidence(repo)
+    findings.extend(lock_findings)
+    data["lockfile"] = lock_data
+    data["lifecycle_scripts"] = _lifecycle_scripts(repo)
+
+    action_findings, actions_seen = _unpinned_actions(repo)
+    findings.extend(action_findings)
+    data["workflow_actions"] = {"seen": actions_seen, "unpinned": len(action_findings)}
+
+    # Always `pass`: this node is evidence. Reachability and severity are judged downstream.
+    print(json.dumps({"outcome": "pass", "findings": findings, "data": data}, ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,117 +1,208 @@
-# Packaged built-in flow: security_audit.
-# Canonical version.
+# Operator flow: security_audit — adapted for wastech-mdlint (npm workspaces; a local-first Markdown
+# analysis library, a CLI, and a stdio MCP server).
 #
 # ----------------------------------------------------------------------------------------------------
-# Per-node tuning (ALL fields below are OPTIONAL — omit one to inherit the default). Every
-# agent/evaluator node carries the provider/model/reasoning slots commented out so the full
-# configuration surface is visible; uncomment and edit to pin a single node.
-#   agent + evaluator nodes:
-#     provider:  codex | claude            which agent runs the node (∈ agents.allowed); default: global primary
-#     model:     <model id>                overrides agents.providers.<provider>.model for THIS node
-#     reasoning: minimal|low|medium|high|xhigh|max  default: agents.providers.<provider>.reasoning
-#     network_access: true | false         per-node network grant/deny; default: flow network_policy (advisories)
-#   agent nodes also: timeout_seconds, extra_args, best_effort, permission_profile (≤ flow ceiling), when
-#   evaluator nodes also: blocking, max_rework_per_stage
-#   Disabling a node is PER-TASK: set `nodes.<id>.enabled: false` in the task file.
-#   Full reference: docs/configuration.md → "Per-node overrides in flows".
+# WHY THIS DIVERGES FROM THE PACKAGED DEFAULT
+#
+# 1. The single `repository_analysis` node is split into FOUR passes over disjoint attack surfaces.
+#    One node asked to walk a whole repository self-triages: it goes deep on what it recognises and
+#    labels the rest "no findings". The packaged deep_research flow was rebuilt for exactly this
+#    reason (measured there: 18% of the in-scope files opened, 93% of the turn budget unused). A
+#    narrow mandatory remit is what forces even depth — a pass that may only report on the MCP
+#    boundary cannot spend its budget re-reading the rule engine.
+#
+# 2. A `coverage_gate` is added. The packaged security_audit has no way to notice a shallow audit:
+#    `finding_verification` judges whether findings are RIGHT, never whether the declared surface was
+#    actually EXAMINED. The gate re-derives each surface's file set from the repository and grades the
+#    passes against it, so an unexamined subsystem becomes a finding instead of a silent gap.
+#
+# 3. An `npm_audit` tool node is added. The core-owned `dependency_scan` checker runs a fixed scanner
+#    set (`pip-audit`, `osv-scanner`) that a flow cannot extend, and an uninstalled scanner
+#    contributes no findings AND does not fail — so on this repository that node reports a confident
+#    empty result. Neither scanner is installed here today, which makes `dependency_scan` inert; it is
+#    kept because it costs nothing and starts producing OSV evidence the moment `osv-scanner` exists
+#    on PATH (`brew install osv-scanner`). `npm_audit` is the npm-ecosystem half the core set does not
+#    cover: advisories, registry provenance (`npm audit signatures`), lockfile pinning, and GitHub
+#    Actions not pinned to a commit SHA.
+#
+#    It is a `tool` node rather than prompt text for a hard engine reason: a `tool` runs as an
+#    orchestrator child process OUTSIDE the agent sandbox, whereas every analysis node here is
+#    `read-only` — and under `read-only` the Claude adapter has no shell at all. `npm audit` cannot be
+#    run from a role prompt on the primary provider. Scanning belongs in a node that can execute.
+#
+# 4. `git_evidence: true` on the three passes where delivery history is prime evidence (a guard that
+#    was removed, a hardening commit that did less than it claimed). Honored only while the operator's
+#    `security.allow_git_evidence` is on — it is on for this repository.
+#
+# 5. `permission_ceiling` is tightened from `workspace-write` to `read-only`. No node in this flow
+#    writes: the report node returns structured output and the ORCHESTRATOR writes the file. The
+#    ceiling should state that, so a future edit cannot quietly add a writing node.
+#
+# THREAT MODEL THIS FLOW IS SHAPED AROUND. mdlint has no HTTP server, no database, no authentication,
+# no session, no PII and no cloud surface, so the web/cloud OWASP checklist does not transfer — its
+# categories would come back "N/A" and a page of N/A reads as a clean audit. What this product
+# actually is: a developer tool that parses UNTRUSTED CONTENT (Markdown, JSONC config, and
+# config-supplied regex and globs) and exposes it through a CLI and a stdio MCP server whose consumer
+# is an LLM agent. The real surfaces are therefore algorithmic complexity (ReDoS in config-supplied
+# patterns), filesystem escape (glob/symlink/traversal, atomic writes), untrusted-input parsing, MCP
+# output flowing back into an agent's context as if it were instructions, and the npm supply chain.
+#
+# Because `docs/mdlint_v2/` declares this product local-first with no network and no code execution,
+# the mere PRESENCE of a network call or dynamic code evaluation in product code is a finding in
+# itself, not a hardening gap. Verified at authoring time: no `child_process`, no `eval`, no
+# `new Function`, no dynamic `import()` and no `fetch` anywhere under `packages/*/src`.
+#
+# ----------------------------------------------------------------------------------------------------
+# Per-node tuning: see .worc/guide/flows/reference.md for every available field. Only the fields this
+# flow actually sets are written out below — anything unset inherits (provider and model come from
+# config.yaml, where claude is primary at claude-opus-5).
 # ----------------------------------------------------------------------------------------------------
 flow:
   name: security_audit
   task_type: security_audit
-  permission_ceiling: workspace-write
+  permission_ceiling: read-only
   output_policy: private_control_workspace_report
   publishing: none
   network_policy: advisories
 
   defaults:
-    evaluator: { session_scope: fresh_disposable, permission_profile: read-only }
+    # gate_severity: medium — both evaluators here are judgement lenses ("was this surface really
+    # examined", "is this threat actually reachable") with no natural way to emit `high`; at the
+    # built-in default a substantive `medium` finding would be recorded and then dropped. Both are
+    # `blocking: false`, so the worst case is the rework budget, then accept + a ⚠️ warning.
+    evaluator:
+      { session_scope: fresh_disposable, permission_profile: read-only, gate_severity: medium }
 
   nodes:
+    # ---- Scoping --------------------------------------------------------------------------------
     - id: scope
       kind: agent
       role_file: security_audit/scope.md
       session_scope: fresh_disposable
       permission_profile: read-only
       network_access: false
+      reasoning: high
       hitl: { allow_question: true, allow_approval: false }
-      # optional overrides (uncomment to pin this node):
-      # provider: claude
-      # model: claude-opus-5
-      # reasoning: high
-      # timeout_seconds: 7200
-      # network_access: false
-      # extra_args: []
-    - id: repository_analysis
+
+    # ---- Four analysis passes over disjoint attack surfaces --------------------------------------
+    # Sequential, each with a fresh context window and a mandatory narrow remit. Ordered so the
+    # surface every other one depends on (what counts as untrusted input) is established first.
+    # For a narrow audit disable a pass PER TASK (`nodes.analysis_interfaces.enabled: false`) rather
+    # than editing this graph.
+    - id: analysis_untrusted_input
       kind: agent
-      role_file: security_audit/repository_analysis.md
+      role_file: security_audit/analysis_untrusted_input.md
       session_scope: fresh_disposable
       permission_profile: read-only
       network_access: false
-      # optional overrides (uncomment to pin this node):
-      # provider: claude
-      # model: claude-opus-5
-      # reasoning: high
-      # timeout_seconds: 7200
-      # network_access: false
-      # extra_args: []
+      # Regex hardening lives in a dedicated module; whether a past fix reached every call site is a
+      # history question, so this pass asks for the read-only git verbs.
+      git_evidence: true
+      reasoning: xhigh
+
+    - id: analysis_filesystem_config
+      kind: agent
+      role_file: security_audit/analysis_filesystem_config.md
+      session_scope: fresh_disposable
+      permission_profile: read-only
+      network_access: false
+      git_evidence: true
+      reasoning: xhigh
+
+    - id: analysis_interfaces
+      kind: agent
+      role_file: security_audit/analysis_interfaces.md
+      session_scope: fresh_disposable
+      permission_profile: read-only
+      network_access: false
+      reasoning: xhigh
+
+    # ---- Dependency + supply-chain evidence, then the pass that reads it -------------------------
+    # Both evidence nodes run BEFORE the supply-chain analysis so it reads their output instead of
+    # guessing: the tool through `{npm_audit_path}`, the checker through `{checks_path}`.
+    - id: npm_audit
+      kind: tool
+      tool: npm_audit
+      # Two registry round trips (`audit`, `audit signatures`); the script caps each at 300s itself,
+      # so this is the outer bound, not the expected duration.
+      timeout_seconds: 900
+
     - id: dependency_scan
       kind: checks
       checker: dependency_scan
+
+    - id: analysis_supply_chain
+      kind: agent
+      role_file: security_audit/analysis_supply_chain.md
+      session_scope: fresh_disposable
+      permission_profile: read-only
+      # Network stays on (inherited from `network_policy: advisories`) so an advisory id can be
+      # resolved to its real affected range and fixed version.
+      git_evidence: true
+      reasoning: xhigh
+
+    # ---- Did the audit actually cover what it declared? ------------------------------------------
+    - id: coverage_gate
+      kind: evaluator
+      role: verifier
+      role_file: security_audit/coverage.md
+      network_access: false
+      blocking: false
+      max_rework_per_stage: 2
+      reasoning: high
+
+    # ---- Synthesis and verification -------------------------------------------------------------
     - id: threat_analysis
       kind: agent
       role_file: security_audit/threat_analysis.md
       session_scope: fresh_disposable
       permission_profile: read-only
-      network_access: true
-      # optional overrides (uncomment to pin this node):
-      # provider: claude
-      # model: claude-opus-5
-      # reasoning: xhigh
-      # timeout_seconds: 7200
-      # network_access: true
-      # extra_args: []
+      reasoning: xhigh
+
     - id: finding_verification
       kind: evaluator
       role: verifier
       role_file: security_audit/verifier.md
-      session_scope: fresh_disposable
-      permission_profile: read-only
-      network_access: true
       blocking: false
       max_rework_per_stage: 2
-      # optional overrides (uncomment to pin this evaluator):
-      # provider: claude
-      # model: claude-opus-5
-      # reasoning: high
-      # network_access: true
+      # The exploitability gate decides what reaches the report, and a wrong verdict here is the most
+      # expensive error in the flow — it either ships a false positive or drops a real vulnerability.
+      reasoning: xhigh
+
     - id: report
       kind: agent
       role_file: security_audit/report.md
       session_scope: fresh_disposable
-      # Read-only (WRI-001): the agent no longer writes report.md. It returns the report as its
-      # structured output and the orchestrator captures it into the private report dir via the
-      # `report` output_artifact slot — no agent-writable path remains in either root.
       permission_profile: read-only
-      output_artifact: report
       network_access: false
-      # optional overrides (uncomment to pin this node):
-      # provider: claude
-      # model: claude-opus-5
-      # reasoning: medium
-      # timeout_seconds: 7200
-      # extra_args: []
+      # The orchestrator captures this node's structured output into
+      # .worc/security-reports/<task_id>/report.md — the node writes nothing itself, and the report
+      # never enters git (fail-closed at staging, commit and publish).
+      output_artifact: report
+      reasoning: high
+
     - id: private_storage
       kind: publish
       policy: private_control_workspace_report
 
   edges:
-    - { from: scope, to: repository_analysis }
-    - { from: repository_analysis, to: dependency_scan }
-    - { from: dependency_scan, to: threat_analysis, outcome: pass }
+    - { from: scope, to: analysis_untrusted_input }
+    - { from: analysis_untrusted_input, to: analysis_filesystem_config }
+    - { from: analysis_filesystem_config, to: analysis_interfaces }
+    - { from: analysis_interfaces, to: npm_audit }
+    # Both evidence nodes always report `pass` by design, so neither needs a `fail` route — a genuine
+    # crash in either parks the task loudly instead of routing.
+    - { from: npm_audit, to: dependency_scan, outcome: pass }
+    - { from: dependency_scan, to: analysis_supply_chain, outcome: pass }
+    - { from: analysis_supply_chain, to: coverage_gate }
+    - { from: coverage_gate, to: threat_analysis, outcome: accept }
+    # A coverage hole sends the analysis round back to the first pass, which re-runs the chain with
+    # the gate's findings in hand (`{review_path}`); bounded to 2 rounds.
+    - { from: coverage_gate, to: analysis_untrusted_input, outcome: rework, budget: 2 }
     - { from: threat_analysis, to: finding_verification }
     - { from: finding_verification, to: report, outcome: accept }
     - { from: finding_verification, to: threat_analysis, outcome: rework, budget: 2 }
     - { from: report, to: private_storage }
 
   budgets:
-    global_fix_iterations: 8
+    global_fix_iterations: 10

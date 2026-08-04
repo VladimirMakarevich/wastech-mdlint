@@ -1,52 +1,29 @@
-Implement the assigned task in the working tree{?plan_path} by following the plan{/plan_path}. Make the smallest focused change that satisfies it — do not refactor unrelated code, widen scope, or add abstractions the task does not require. If a `human_input` context file records a denied dangerous change, remove or safely rework that change before you finish.
+Implement the assigned task in the working tree{?plan_path} by following the plan{/plan_path}. Make the smallest focused change that satisfies it — do not refactor unrelated code, widen scope, or add abstractions the task does not require. Match the existing style and idioms of the module you touch; do not reformat or re-idiom surrounding code you were not asked to change. If a `human_input` context file records a denied dangerous change, remove or safely rework that change before you finish.
 
 ## Rules Of Record
 
-**Read the repository's own instruction files first** — `AGENTS.md`/`CLAUDE.md` and the mandatory rules they import under `.agents/rules/` (architecture, coding-style, security, testing). They govern this change and override anything below on conflict. When the phase task file, locked requirements, and these rules disagree on load-bearing behavior, follow the more specific source and surface the contradiction explicitly instead of guessing.
-
-## TypeScript Style
-
-- Match the existing style of the module you touch; do not reformat or re-idiom surrounding code.
-- ESM / `NodeNext`: relative imports carry explicit `.js` extensions.
-- `strict` types throughout — no `any` escape hatches and no non-null assertions used to silence the checker.
-
-## Hard Invariants
-
-- **Determinism**: sort path-keyed and set-like output arrays before returning or rendering them, and never depend on filesystem or map-iteration order — **but do not sort an array whose order is itself meaningful** (a topological order, a reading order, a ranked/scored order). Sorting is for arrays whose order is incidental; preserve a computed sequence exactly and rely on the upstream algorithm for its determinism.
-- **Paths**: public data and reports use repository-relative POSIX paths — normalize `\` to `/`.
-- **Severities**: use only the two severities `error` and `warning`.
-- **No exit in library code**: `core` and `mcp-server` never call `process.exit`; only the CLI entrypoint resolves an exit code.
-- **Isolated token estimator**: keep the heuristic behind its single function so it can be replaced later without touching callers.
-- **Dependencies**: do not add any runtime or dev dependency without explicit approval.
+**Read the repository's own instruction files first** if it ships any — a `CLAUDE.md`/`AGENTS.md` (and anything they import, e.g. a rules directory such as `.agents/rules/`), or a `CONTRIBUTING` doc. They document its conventions for AI agents and contributors, they govern this change, and they override anything below on conflict. When the task file, its acceptance criteria, and those conventions disagree on load-bearing behavior, follow the more specific source and surface the contradiction explicitly instead of guessing.
 
 ## Tests
 
-Add or extend tests alongside the change, scaled to its risk:
+Add or extend tests alongside the change, scaled to its risk, following the project's existing test conventions and locations:
 
-- A unit test for the rule or algorithm, co-located in the touched package's `test/` directory (for example `packages/core/test/`).
-- A focused fixture when the behavior is user-visible, following the per-scenario pattern under `packages/cli/test/fixtures/<scenario>/`.
-- Keep fixtures small, local, and network-free so a failure points at one behavior rather than a whole repo snapshot.
+- A test for the behavior or algorithm you added or changed.
+- A focused test for the scenario when the behavior is user-visible.
+- Keep tests small, local, and deterministic so a failure points at one behavior rather than a whole snapshot.
 
 ## Verify
 
-Before finishing, run the checks that apply to the touched scope and confirm they pass:
-
-```bash
-npm run typecheck
-npm test
-npm run build
-```
-
-Use `npm run lint` and `npm run format` when the touched scope requires style verification.
+Before finishing, run whatever check commands this project defines for the code you touched (build, type-check, lint, test) and confirm they pass — catching a failure now saves a full review/fix round trip later.
 
 ## Authoring And Documentation Deliverables
 
-Some tasks ship prose, not code — a `SKILL.md`, a README section, a doc page — and its correctness is whether every claim it makes about THIS product is true. The checks above (`typecheck`/`test`/`build`) do not read prose: they pass while the text is wrong, so they are not verification for this class of work.
+Some tasks ship prose, not code — a skill/agent doc, a README section, a doc page — and its correctness is whether every claim it makes about THIS product is true. Build/type/test checks do not read prose: they pass while the text is wrong, so they are not verification for this class of work.
 
-- Treat every command, flag, option value, output field, and path the document asserts as a claim to verify against the authoritative source before you write it — the CLI command wiring (`packages/cli/src/program.ts` and the command modules), the core contracts (types, schemas, result shapes), and the MCP tool/`inputSchema` definitions. Quote the source; do not recall it.
-- Bind each flag or option to the command that owns it — a flag on one command is not evidence another accepts it (`lint --config` does not make `init --config` exist).
-- Describe behavior at its real edges (no-detection / no-write / rerun / nested-target / non-LF / duplicate-input), not the happy path alone; keep it host-neutral and portable exactly as the task requires.
-- Verify the deliverable the way its consumer will: parse frontmatter through the real validator, resolve every referenced surface against the current tree. If a claim cannot be verified against source, do not make it.
+- Treat every command, flag, option value, output field, and path the document asserts as a claim to verify against the authoritative source before you write it — the actual CLI wiring, the public API/types/contracts, and any protocol or tool definitions the project exposes. Quote the source; do not recall it.
+- Bind each flag or option to the command that owns it — a flag on one command is not evidence another accepts it.
+- Describe behavior at its real edges, not the happy path alone; keep it host-neutral and portable exactly as the task requires.
+- Verify the deliverable the way its consumer will: parse it through the real validator/loader when one exists, resolve every referenced surface against the current tree. If a claim cannot be verified against source, do not make it.
 
 ## Comments And Rationale
 
@@ -54,7 +31,7 @@ Some tasks ship prose, not code — a `SKILL.md`, a README section, a doc page �
 - Follow the rule `why, not what`: write comments to explain why the code exists, why a constraint matters, or why a specific shape was chosen.
 - Prefer rationale, invariants, tradeoffs, cross-platform notes, and bug-prevention context over narrating what the syntax already says.
 - Do not add comments that merely restate names, types, assignments, loops, or conditionals.
-- When behavior is non-obvious, surprising, or roadmap-constrained, capture that reason next to the relevant code path.
+- When behavior is non-obvious or surprising, capture that reason next to the relevant code path.
 - If a block is hard to justify with a short why-comment, simplify or restructure it until the intent and rationale are clear.{?memory_path}
 
 ## Repository Memory

@@ -1,24 +1,12 @@
-Gather **external** evidence that bears on the research question about **wastech-mdlint** — only when
-the question genuinely turns on how an upstream contract, spec, or library actually behaves. This is an
-internal codebase whose plan of record is `{repo}/docs/mdlint_v2/`; do not restate that plan here, and
-do not go looking for external sources when the answer is fully determined by the repository itself.
+Gather **external** evidence that bears on the research question — but only when the question genuinely turns on how an upstream contract, spec, or library actually behaves. If the answer is fully determined by the repository itself (an internal design question, a plan the project's own docs already state), do not go looking for external sources — restate nothing external research would add.
 
-{?refinement_path}Use the refined brief at {refinement_path} to decide whether any sub-question needs
-external grounding.{/refinement_path}{?repository_analysis_path} The repository analysis at
-{repository_analysis_path} lists the assumptions the code makes — validate the load-bearing ones against
-their authoritative source.{/repository_analysis_path}
+{?refinement_path}Use the refined brief at {refinement_path} to decide whether any sub-question needs external grounding.{/refinement_path} The analysis passes upstream list the assumptions the code makes — validate the load-bearing ones against their authoritative source:
 
-Authoritative sources that matter for this product, when relevant:
+{?analysis_core_path}- core (central logic, rules and invariants, configuration, internal wiring): {analysis_core_path}
+{/analysis_core_path}{?analysis_surfaces_path}- entry points and adapters (command line, APIs, packaging, integrations, generated schemas): {analysis_surfaces_path}
+{/analysis_surfaces_path}{?analysis_docs_tests_path}- plan of record and the test suite: {analysis_docs_tests_path}
+{/analysis_docs_tests_path}
 
-- **CommonMark** and **GitHub Flavored Markdown** specs — for parsing, tables, task-list items, and
-  slug/heading behavior the rules and `ParsedDocument` rely on.
-- **remark / unified / micromark** and **github-slugger** — the parsing stack the plan says to reuse.
-- **Model Context Protocol** spec — for the stdio transport and tool contract the MCP server implements.
-- **Zod**, **commander**, **npm workspaces**, and the **Node.js `24.17.0`** runtime — for config
-  validation, CLI framework, package layout, and platform APIs.
-- **JSONC** and JSON Schema `$schema` resolution — for the local-schema config model.
+Prioritize primary, authoritative sources for whatever the code actually depends on — the specs of protocols and file formats it implements, the docs of the libraries/frameworks it relies on, and the runtime whose APIs it uses — over blog posts or secondary summaries.
 
-Use only the network access the flow grants; if network is unavailable, say so and fall back to what the
-repository documents. Record each source with a stable reference (URL or precise citation) and a one-line
-note on what it establishes and whether the implementation matches it. Read only; do not edit code or
-write files. Return the typed structured result required by the output schema.
+Use only the network access the flow grants; if network is unavailable, say so and fall back to what the repository documents. Record each source with a stable reference (URL or precise citation) and a one-line note on what it establishes and whether the implementation matches it. Read only; do not edit code or write files. Return the typed structured result required by the output schema.

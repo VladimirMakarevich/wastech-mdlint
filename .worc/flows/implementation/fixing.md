@@ -10,30 +10,13 @@ Address the failing checks and/or blocking review findings recorded in the conte
 
 Resolve every reported finding — but each finding names one instance of a mistake that is usually repeated in the same artifact. Fixing only the exact line the reviewer cited sends the change back for another full review round to surface the next instance: slow and expensive.
 
-- Fix each finding at its cited location, treating the `fix:` hint as a lead, not ground truth. When the finding concerns a factual claim about this product — a CLI command/flag/option value, a core contract or result shape, an MCP tool or its schema — re-open the authoritative source and confirm the corrected claim there rather than trusting the finding's wording.
-- Then re-check the rest of the same artifact for other instances of the same defect class the finding exposed: every other command/flag reference, every other output-field or path claim, the same edge case (CRLF, duplicate keys, nested target) elsewhere. Fix those in this same round.
+- Fix each finding at its cited location, treating the `fix:` hint as a lead, not ground truth. When the finding concerns a factual claim about this product — a CLI command/flag/option value, a public API's contract or result shape, a config key — re-open the authoritative source and confirm the corrected claim there rather than trusting the finding's wording.
+- Then re-check the rest of the same artifact for other instances of the same defect class the finding exposed: every other command/flag reference, every other output-field or path claim, the same edge case elsewhere. Fix those in this same round.
 - This is deliberately broader than the single cited line, but it is not the scope-widening forbidden above: stay within the task's files and the categories the review already raised, and resolve each class exhaustively instead of one occurrence at a time.
 
 ## Quality Gate
 
-The project's gate is:
-
-```bash
-npm run typecheck
-npm run lint
-npm test
-npm run build
-```
-
-Work one failure at a time: reproduce it with the matching command, fix it minimally, then re-run that same command to confirm it passes before moving on.
-
-Keep the project's invariants intact while fixing:
-
-- sorted output arrays and repository-relative POSIX paths (normalize `\` to `/`)
-- ESM / `NodeNext` imports with explicit `.js` specifiers, and `strict` types with no `any`
-- the mandatory rules in `.agents/rules/` (architecture, coding-style, security, testing)
-
-`npm` may warn that the host Node is older than the project's `engines` range (`>=24.17.0`); that warning is not itself a failure to chase.{?memory_path}
+Work one failure at a time: reproduce it with the project's own check command for that failure (build, type-check, lint, or test), fix it minimally, then re-run that same command to confirm it passes before moving on. Keep the project's own invariants and conventions intact while fixing — including anything it documents for its own AI agents or contributors (a `CLAUDE.md`/`AGENTS.md`, or a rules directory such as `.agents/rules/`), if it ships one.{?memory_path}
 
 ## Repository Memory
 

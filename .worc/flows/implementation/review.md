@@ -12,44 +12,41 @@ Your findings are consumed by a downstream LLM agent that will do the rework, no
 - Make each finding self-contained and actionable enough to fix without re-reading the whole diff — and no more detail than that.
 - One finding per issue; do not repeat the same point across entries.
 - No findings means the diff is clean — return an empty `findings` array, not prose.
-- The diff you see is captured **before** the documentation step runs, so do not block on a phase doc not yet flipped to Done or missing "Implementation notes" — that is the documentation step's job, not a defect in this change.
+- The diff may be cumulative — on a shared branch it can include files committed by earlier tasks. Judge only what this task's plan changed; do not flag prior-task code as scope drift. Documentation, changelog, and status-doc updates run in a later step of this flow, so do not flag those as missing.
 
 ## Requirements And Correctness
 
 - Confirm the change actually satisfies the task's business requirements{?plan_path} and the plan's acceptance criteria{/plan_path} — not just that it compiles.
 - Check the edges the task implies: empty input, missing/duplicate/circular data, unusual paths, and error handling.
-- When the diff is an authoring/documentation deliverable (a `SKILL.md`, README, or doc asserting facts about this product), enumerate every product-surface reference it makes — each command, flag, option value, output field, MCP tool — and verify each against current source in this one pass, so the whole set of skill-vs-product drift surfaces now rather than one instance per later round.
-- Confirm behavior matches the phase task file and the locked decisions under `docs/mdlint_v2/`; flag any silent divergence.
-- The diff may be cumulative: on a shared branch it can include files committed by earlier tasks. Judge only the changes that belong to **this task's plan** — do not flag prior-task code as scope drift.
+- When the diff is an authoring/documentation deliverable (a skill/agent doc, README, or doc asserting facts about this product), enumerate every product-surface reference it makes — each command, flag, option value, output field, public API — and verify each against current source in this one pass, so the whole set of doc-vs-product drift surfaces now rather than one instance per later round.
+- If the project maintains its own specs, requirements, or design-decision docs, confirm behavior matches them and flag any silent divergence.
 
 ## Blocking Invariant Violations
 
 Treat each of these as blocking:
 
-- **Nondeterminism**: an unsorted _incidental_ output array (path-keyed or set-like), or absolute / `\`-separated paths in data and reports (public paths must be repository-relative POSIX). Do **not** flag — and treat as a bug if the diff does it — sorting an array whose order is itself meaningful (topological, reading, or ranked/scored order): a `.sort()` layered onto such a sequence silently overwrites it and is the defect, not the fix.
-- **Zero test coverage for new core user-visible behavior** — a new/changed rule or algorithm that a user relies on ships with **no** unit test **and no** fixture test at all. Coverage _completeness_ (which kind, edge cases, having both a unit and a fixture test) is **advisory**, not blocking — see `## Test Coverage` below; do not block on coverage polish.
-- **A new undeclared runtime or dev dependency**.
-- **An `info` severity** (only `error` and `warning` exist) or a **`process.exit` in library (non-entrypoint) code** — only the CLI entrypoint resolves an exit code.
-- **Core-ownership violation**: pipeline logic (parsing, config, lint orchestration, graph, compile, formatting) placed in the `cli`/`mcp-server` adapters, or a forked/parallel reimplementation of core behavior.
-- **Scope drift beyond the task's phase**: adding structure or behavior for a later roadmap phase the task does not belong to, or leaving in place legacy behavior a v2 phase was meant to replace.
+- **A violation of an invariant or architecture rule the project documents for itself** (e.g. in a `CLAUDE.md`/`AGENTS.md` or an `.agents/rules/`-style directory) — deterministic output where the project promises it, a specific path/format convention, or a layering boundary between core logic and a thin adapter.
+- **Zero test coverage for new, user-visible core behavior** — new or changed behavior a user relies on ships with no test at all. Coverage completeness (which kind, edge cases) is advisory, not blocking — see `## Test Coverage` below.
+- **A new undeclared runtime or dev dependency** the task did not call for.
+- **Scope drift** — structure or behavior added for later, unrequested work, or legacy behavior left in place that the task was meant to replace.
 
 ## Code Quality
 
-Assess the change against the repository's idioms in `.agents/rules/` (architecture, coding-style, security, testing) and these principles:
+Assess the change against the repository's own idioms and conventions (if documented — e.g. `.agents/rules/`) and these principles:
 
-- **YAGNI**: flag speculative abstractions, config knobs, or extension points with no current caller. The rules explicitly forbid building for hypothetical future needs.
+- **YAGNI**: flag speculative abstractions, config knobs, or extension points with no current caller.
 - **KISS**: prefer the simplest shape that works; flag needless indirection, cleverness, or control-flow that is hard to justify with a short why-comment.
-- **SOLID, pragmatically for this codebase**: modules should be small and single-purpose; rule/algorithm logic should stay pure (parsed inputs in, structured findings/edits out); the dependency direction must point from adapters to core, never the reverse.
-- **DRY**: reuse existing primitives (parser, graph builder, discovery, token estimator) instead of duplicating them — but do not abstract two incidental similarities into a shared unit prematurely.
+- **SOLID, pragmatically**: modules should be small and single-purpose; the dependency direction should point from adapters/UI toward core logic, never the reverse.
+- **DRY**: reuse existing primitives instead of duplicating them — but do not abstract two incidental similarities into a shared unit prematurely.
 - **Comments**: new non-obvious code carries a `why, not what` rationale where it is introduced.
 
 ## Test Coverage
 
 Advisory (raise these, but do **not** block on them unless a real correctness risk is untested — the only blocking test rule is the "zero coverage for new core behavior" invariant above):
 
-- A unit test per new/changed rule or algorithm, and a focused per-scenario fixture when the behavior is user-visible.
+- A test per new/changed behavior, and a focused scenario test when the behavior is user-visible.
 - Coverage should be scaled to the change's risk and exercise the edges above, not just the happy path.
-- Tests must stay deterministic and local (no network); fixtures small enough that a failure points at one behavior.{?memory_path}
+- Tests must stay deterministic and, unless the task requires it, local (no network); keep them small enough that a failure points at one behavior.{?memory_path}
 
 ## Repository Memory
 

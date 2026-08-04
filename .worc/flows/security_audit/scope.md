@@ -1,54 +1,39 @@
-Establish the scope of the security audit for the **wastech-mdlint** repository at `{repo}` before
-any investigation begins: which components and trust boundaries are in scope, which classes of issue
-to look for, and which surfaces are out of scope by design.
+Establish the scope of the security audit for the repository at `{repo}` before any investigation begins: which components and trust boundaries are in scope, which classes of issue to look for in each, and which surfaces are out of scope by design.
 
-## Project grounding
+## Ground It In The Project, Not In A Generic Checklist
 
-wastech-mdlint is a deterministic, **local-first** Markdown analysis tool being re-platformed into a
-v2 npm-workspaces monorepo. Shipped code lives under `{repo}/packages/`:
+Read how this project declares its own security posture and trust model first — `AGENTS.md`, the rules under `.agents/rules/` (`security.md` in particular), and the security boundary the plan of record draws in `docs/mdlint_v2/`. The audit's job is to check that the code actually holds that line, not to score the product against a checklist written for a different kind of software.
 
-- `{repo}/packages/core/` — `@wastech-mdlint/core`, the single owner of parsing, config loading, lint
-  orchestration, the context graph, compile, and formatting.
-- `{repo}/packages/cli/` — `@wastech-mdlint/cli`, a thin host over core.
-- `{repo}/packages/mcp-server/` — `@wastech-mdlint/mcp-server`, the stdio MCP host over core.
+**This matters more here than usual.** A generic application-security checklist assumes a server: authentication, sessions, an HTTP request boundary, a database, stored user data, cloud infrastructure. Establish early which of those this product actually has. Where it has none, say so once, plainly, and do **not** carry the category forward — a report padded with "N/A: no authentication layer" hides the findings that matter and reads as a clean audit. Judge the product that exists.
 
-If any legacy single-package code is still present in `{repo}/src/` or `{repo}/test/`, treat it as in
-scope alongside the packages. The plan of record is `{repo}/docs/mdlint_v2/`; the canonical vocabulary
-is `{repo}/docs/mdlint_v2/glossary.md` — use its exact terms, do not coin synonyms. The security model
-this audit measures against is stated in `{repo}/.agents/rules/security.md`: read it first, because the
-audit's job is to check that the code actually holds that line.
+Then state what the product **is**, in trust terms, from the code in the working tree: what it accepts that it did not author, who supplies it, what it does with it, and what it hands back to whom.
 
-## The trust boundary (what is in scope)
+## The Trust Boundary — Where To Look
 
-The declared posture is a deterministic, local-first analyzer with **no network, no code execution, and
-no install-time side effects**. The audit surface is exactly the places where that posture could be
-violated:
+Derive the audit surface from what the product actually does. A starting frame, to be confirmed or corrected against the tree:
 
-- **Config loading** — the JSONC `wastech-mdlint.config.json` parsed and Zod-validated
-  (`loadConfiguration` / `findConfig` / the schemas in `config/`), resolving a **local** `$schema` only.
-- **MCP server** — `@wastech-mdlint/mcp-server`: whatever tool registration, transport, and
-  input-handling code is present, plus the shape of its structured output and errors.
-- **Filesystem & parsing** — document discovery (`loadDocuments`, glob handling), path normalization
-  (`normalizeRelativePath`), and Markdown/rule parsing (remark/GFM, the assertion primitives).
-- **Child-process execution** — any place `core`, `cli`, or a `.worc/tools/` executable spawns a process.
-- **Install & packaging** — each package's `package.json` scripts and any `postinstall`-style hook.
-- **Diagnostics & reports** — anything that renders errors, findings, or generated docs.
+- **Untrusted content.** The documents this tool parses are written by someone else. So are the patterns and options its configuration supplies to the rule engine. Identify where content and configuration enter, and what bounds their cost — for a tool with no attacker session, **unbounded CPU or memory driven by supplied input is the dominant risk class**, not memory corruption.
+- **The filesystem boundary.** Which directory tree the tool is confined to when reading, and which single path it is confined to when writing. Symlinks, `..`, absolute paths in config, and case/Unicode path equivalence are the ways such a boundary usually fails, and the project is required to hold it on Windows, macOS and Linux alike.
+- **The exposed interfaces.** A CLI and a stdio MCP server. For the MCP server note the inversion that makes it the most interesting surface here: **its caller is an autonomous agent and its output re-enters that agent's context**, so content from an analysed file can reach the agent as something that reads like an instruction. Treat tool responses as a data-to-instruction channel, not only as a data format.
+- **Install-time and release-time execution.** Lifecycle scripts, CI workflows, and how a published artifact is produced and by whom.
+- **Dependencies.** What is installed, how it is pinned, and whether the vulnerable paths in it are ones this product reaches.
+- **Diagnostics.** Whether errors, logs, reports, or generated documents can leak absolute paths, environment values, or local details.
 
-Anything the security rules put **out of v2 scope** — remote `$schema` URLs, runtime `.ts`/`.cjs`/`.mjs`
-config, user-code plugins (Tier-2 code-plugins), external HTTP link checking, mutating or HTTP/SSE MCP
-surfaces, install-time file writes — is not a feature to harden but a **boundary whose mere presence in
-the code is itself a finding**. Record which of these you will treat that way.
+## Declared-Out-Of-Scope Is A Finding Class, Not An Exemption
 
-## Your job
+This project declares itself local-first: no network access, no runtime code loading, deterministic local analysis. When a project draws that line, the mere **presence** of code that crosses it is a finding in itself — not a surface to harden. A network call, a dynamic `import()`, an `eval`, a `new Function`, or a spawned child process in product code contradicts the declared model, and the finding is "this exists at all", reported against the document that says it should not.
 
-State the scope precisely: the components and trust boundaries above that apply to the code actually in
-the working tree, the classes of issue to look for in each, and what a complete audit must cover. Do not
-widen scope beyond a security audit of this repository, and do not invent surfaces the roadmap excludes
-— there is no HTTP server, no auth layer, and no secret store here; say so rather than inventing one to
-audit.
+Record explicitly which declared boundaries you are treating this way, so the analysis passes look for presence rather than for hardening.
 
-This is a read-only scoping pass. Do not edit code or write files anywhere — you only return the typed
-structured result required by the output schema. Set `human_input` **only** for a genuine scoping
-decision that cannot be made safely from repository evidence (e.g. whether not-yet-shipped MCP code in
-the tree is in scope, or whether a legacy `src/` tree is included alongside `packages/`); if a
-`human_input` context file is already present, apply that answer and do not repeat the question.
+## Your Job
+
+State the scope precisely:
+
+- The surfaces above that apply to the code actually in the working tree, mapped to concrete paths so a later gate can re-derive each file set.
+- For each surface, the classes of issue worth looking for **in this product** — and where a standard class does not apply, say so once here rather than leaving it for four passes to rediscover.
+- The declared boundaries whose violation is a presence finding.
+- What a complete audit must cover for the result to be trustworthy, and the trust model each surface should be judged under: content committed by a third party, a config the operator wrote themselves, a path chosen by an LLM, and a fork's pull request are four different attackers with four different reach, and severity depends on which one applies.
+
+Do not widen scope beyond a security audit of this repository, and do not invent surfaces the project does not have — if there is no HTTP server, no auth layer, and no secret store here, say so rather than inventing one to audit.
+
+This is a read-only scoping pass. Do not edit code or write files anywhere — you only return the typed structured result required by the output schema. Set `human_input` **only** for a genuine scoping decision that cannot be made safely from repository evidence; if a `human_input` context file is already present, apply that answer and do not repeat the question.
