@@ -1,24 +1,33 @@
 # Packaged built-in flow: implementation — the executable default flow the engine drives.
 #
-# The pipeline expressed as data: planning -> implementation -> testing(checks) ->
+# The pipeline expressed as data: refinement -> planning -> implementation -> testing(checks) ->
 # review(evaluator) -> documentation -> publish, with the two fix loops (through fixing) and
 # decomposition. After review accepts the code, `documentation` updates the target project's docs to
-# match the change just shipped (workspace-write, resuming the implementation editing lineage), and
-# its edits join the same diff the orchestrator commits. Refinement is removed from this flow
-# entirely (this operator drives already-refined task files); any node can still be disabled per task
-# via `nodes.<id>.enabled: false` (driven by node id, not a `when` fact — the bounded per-task
-# exception, PRE.3).
+# match the change just shipped (workspace-write, in its own fresh session), and
+# its edits join the same diff the orchestrator commits. Refinement is skipped deterministically
+# (`when: derived.needs_refinement`); any other node can be disabled per task via
+# `nodes.<id>.enabled: false` — the one place a task may name a node id instead of stating a `when`
+# fact, deliberately bounded to this on/off switch.
 #
-# Layered on across P2: durable sessions (P2.2 `editing_lineage`), review-as-evaluator (P2.3), and
-# the core-owned commit-candidate mutation guard on `checks` (P2.4 — active whenever a `checks` node
-# is present, not declared here). An optional non-blocking `testing_quality` evaluator (the shared
+# LOCAL DEVIATION from the packaged default: every editing node (`implementation`, `fixing`,
+# `documentation`) is pinned to `fresh_disposable` instead of the shipped `editing_lineage`, so no
+# stage carries a stale in-session view of the tree across a checks/review round trip. That also
+# means `lineage_affinity` is absent by design — it is only valid against an `editing_lineage` owner
+# and the flow validator rejects it otherwise. Revert both together if you ever want durable
+# sessions back.
+#
+# Two behaviors here are not visible in the YAML: `review` is an evaluator (findings gate the graph,
+# they are not advisory), and the core enforces the commit-candidate mutation guard whenever a
+# `checks` node is present — it is not declared here. An optional non-blocking `testing_quality`
+# evaluator (the shared
 # evaluator runner already supports its self-cap) is NOT shipped in this default flow: it is a pure
 # graph-shape choice — an operator who wants it adds the node to their own flow YAML.
 #
-# NOTE: the supervisor is NOT a graph node. It is a constant orchestrator layer ABOVE any flow
+# NOTE: the supervisor is NOT a graph node. It is an orchestrator layer ABOVE any flow
 # (summary + per-step advisory oversight, configured in config.yaml: supervisor). There is NO
-# `summary` node here: the constant supervisor layer writes the summary at whole-task close (before
-# publish) and observes every completed step.
+# `summary` node here: the whole-task summary is written at close, before publish — by the
+# supervisor layer at the cadence config.yaml sets, and deterministically from the run's own
+# recorded facts when that layer is switched off (`supervisor.enabled: false`).
 #
 # ----------------------------------------------------------------------------------------------------
 # Per-node tuning (ALL fields below are OPTIONAL — omit one to inherit the default). Every
@@ -31,9 +40,11 @@
 #     network_access: true | false         per-node network grant/deny; default: flow network_policy
 #   agent nodes also: timeout_seconds, extra_args (extra CLI flags), best_effort,
 #                     permission_profile (≤ flow permission_ceiling), when
-#   evaluator nodes also: blocking (failing verdict blocks vs advisory), max_rework_per_stage
+#   evaluator nodes also: blocking (failing verdict blocks vs advisory), max_rework_per_stage,
+#                     gate_severity (min finding severity that gates: high|medium|low|critical|blocking; default high)
+#     (a non-blocking evaluator that spends max_rework_per_stage with a finding still open accepts +
+#      continues — never manual — and warns you via a console warning + a ⚠️ telegram trace)
 #   Disabling a node is PER-TASK, not here: set `nodes.<id>.enabled: false` in the task file.
-#   Full reference: docs/configuration.md → "Per-node overrides in flows".
 # ----------------------------------------------------------------------------------------------------
 flow:
   name: implementation
@@ -43,6 +54,21 @@ flow:
   publishing: pull_request
 
   nodes:
+    - id: refinement
+      kind: agent
+      role_file: implementation/refinement.md
+      session_scope: fresh_disposable
+      permission_profile: read-only
+      output_artifact: enriched_spec
+      hitl: { allow_question: true, allow_approval: false }
+      when: { fact: derived.needs_refinement }
+      # optional overrides (uncomment to pin this node):
+      # provider: claude
+      # model: claude-opus-5
+      # reasoning: high
+      # timeout_seconds: 7200
+      # network_access: false
+      # extra_args: []
     - id: planning
       kind: agent
       role_file: implementation/planning.md
@@ -50,8 +76,9 @@ flow:
       permission_profile: read-only
       output_artifact: plan
       hitl: { allow_question: true, allow_approval: true }
-      provider: claude
-      model: claude-opus-5
+      # Operator pin: planning sets the shape the rest of the flow executes, so it gets the deepest
+      # reasoning tier rather than the flow-wide default. Provider/model are deliberately NOT pinned
+      # — they come from config.yaml (claude is primary at claude-opus-5).
       reasoning: xhigh
       # timeout_seconds: 7200
       # network_access: false
@@ -59,10 +86,12 @@ flow:
     - id: implementation
       kind: agent
       role_file: implementation/implementation.md
+      # Operator choice: every editing node in this flow runs as a fresh disposable session rather
+      # than the packaged `editing_lineage`, so each stage re-reads the tree instead of trusting a
+      # carried-over view of it. `lineage_affinity` is therefore dropped from `fixing` /
+      # `documentation` below — it is only valid against an `editing_lineage` owner.
       session_scope: fresh_disposable
       permission_profile: workspace-write
-      provider: claude
-      model: claude-opus-5
       reasoning: xhigh
       # timeout_seconds: 7200
       # network_access: false
@@ -77,39 +106,57 @@ flow:
       role_file: implementation/review.md
       session_scope: fresh_disposable
       permission_profile: read-only
-      provider: claude
-      model: claude-opus-5
-      reasoning: high
+      # optional overrides (uncomment to pin this evaluator):
+      # provider: claude
+      # model: claude-opus-5
+      # reasoning: high
       # network_access: false
       # blocking: true
-      # max_rework_per_stage: 1
+      # gate_severity: high  # min finding severity that gates (high|medium|low|critical|blocking).
+      #   Default high = block on high/critical/blocking; lower it (e.g. medium) to gate on nits too.
+      # NOTE: `max_rework_per_stage` is a NON-blocking-only knob (e.g. test_quality) — it has no
+      # effect on this blocking review node. To cap the review->fixing loop deterministically, lower
+      # `budgets.review_fix` below; exhausting it parks the task to `manual`.
     - id: fixing
       kind: agent
       role_file: implementation/fixing.md
       session_scope: fresh_disposable
       permission_profile: workspace-write
-      provider: claude
-      model: claude-opus-5
       reasoning: xhigh
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []
+    # Whole-task docs update after the code is accepted: an ordinary workspace-write agent that
+    # mirrors `fixing` (no output_artifact, no hitl/when). Like the other editing nodes it runs
+    # fresh-disposable here, so it reads the shipped diff off the tree rather than inheriting the
+    # implementation session's view of it. It is deliberately kept OUT of decomposition.sub_flow so
+    # it runs once per task (after the last subtask), not once per subtask.
     - id: documentation
       kind: agent
       role_file: implementation/documentation.md
       session_scope: fresh_disposable
       permission_profile: workspace-write
-      provider: claude
-      model: claude-opus-5
+      # Documentation is a mechanical write-up of what already shipped, so it runs at medium
+      # reasoning regardless of the flow-wide default — no quality loss, less wall-time on the tail.
       reasoning: medium
+      # Explicit offline stance: doc-writing needs no network, and pinning it here keeps the node
+      # offline even if this flow later gains a flow-wide network_policy. This is a hard guarantee
+      # only under Codex (OS-sandbox blocks Bash network); under Claude it only disables
+      # WebFetch/WebSearch, so it is defense-in-depth (the role prompt also forbids installs/builds)
+      # — pin `provider: codex` on this node when you need the hard "no dependency installs"
+      # guarantee.
+      network_access: false
+      # other optional overrides (uncomment to pin this node):
+      # provider: claude
+      # model: claude-opus-5
       # timeout_seconds: 7200
-      # network_access: false
       # extra_args: []
     - id: publish
       kind: publish
       policy: pull_request
 
   edges:
+    - { from: refinement, to: planning }
     - { from: planning, to: implementation }
     - { from: implementation, to: testing }
     - { from: testing, to: review, outcome: pass }
@@ -124,15 +171,22 @@ flow:
     test_fix: 15
     review_fix: 15
 
-  # Flow-local supervisor prompts + the tech-debt/follow-ups opt-in (prompt-and-supervisor ADR). The
+  # Flow-local supervisor prompts + the tech-debt/follow-ups opt-in. The
   # supervisor is a constant layer above the flow, not a node; this block only reshapes ITS wording
   # (the structured-output schemas stay in code). `role_file` overrides the global observe lens;
   # `finalize_role_file` is the final-summary emphasis; `emit_follow_ups` opts the finalize turn into
   # the evidence-gated `follow_ups` array (a code-oriented capability — research/prose flows omit it).
+  # `observe.mode: events` is stated here rather than inherited so this flow's cadence is visible where
+  # its prompts are: `emit_follow_ups: true` means the finalize turn's follow-ups and the memory delta
+  # are worth grounding in observed deviations, so `none` would starve them — but a note on every
+  # ordinary step bought nothing. `events` observes only a rework loop, a failed step, or a provider
+  # fallback, which is exactly what a reviewer of a long implementation run needs flagged.
   supervisor:
     role_file: implementation/supervisor.md
     finalize_role_file: implementation/summary.md
     emit_follow_ups: true
+    observe:
+      mode: events
 
   decomposition:
     proposed_by: planning

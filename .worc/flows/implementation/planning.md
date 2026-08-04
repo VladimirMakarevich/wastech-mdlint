@@ -11,11 +11,11 @@ Produce a full, implementation-ready plan from the task and its enriched spec. D
 
 Ground the plan in the code as it exists today, not an idealized version of it:
 
-- Read the repository's own root instruction files first — `AGENTS.md`/`CLAUDE.md` and the rules they import under `.agents/rules/`; they carry the conventions and invariants this change must follow and override defaults on conflict.
+- Read the repository's own root instruction files first if present — `AGENTS.md`/`CLAUDE.md` (and anything they import, e.g. `.agents/rules/`); they carry the conventions and invariants this change must follow and override defaults on conflict.
 - Read the files named in the task and the enriched spec first, then follow them into the modules they touch.
-- Find the conventions and patterns this change must follow, and name a similar existing feature to model the work on rather than inventing a new shape.
-- Trace the relevant code paths end to end — real call sites, types, and package boundaries — so the plan never assumes an interface that isn't there. Verify every path you cite against the current tree.
-- When you enumerate a product surface a downstream author will reference (CLI commands, flags, option values, output fields, MCP tools), bind each item to the specific command or type that owns it and cite the source line. A flat list of names lets the implementer attach a flag to the wrong command.
+- Find the conventions and patterns this change must follow, and name a similar existing feature to model the work on rather than inventing a new shape. Reuse existing primitives instead of rewriting them; do not fork a parallel implementation of something the codebase already owns.
+- Trace the relevant code paths end to end — real call sites, types, and module boundaries — so the plan never assumes an interface that isn't there. Verify every path you cite against the current tree.
+- When you enumerate a product surface a downstream author will reference (CLI commands, flags, option values, output fields, public API surfaces), bind each item to the specific command or type that owns it and cite the source line. A flat list of names lets the implementer attach a flag to the wrong command.
 - If the plan departs from an existing pattern, say so and justify the departure instead of quietly diverging.
 
 ## Clarification And Approval
@@ -28,24 +28,10 @@ Ground the plan in the code as it exists today, not an idealized version of it:
 - If decomposition is enabled and the task is large, return ordered subtasks with explicit dependencies.
 - If the task already supplies operator-authored subtasks, that split is fixed: produce only the shared implementation plan and do not propose your own subtasks.
 
-## Roadmap And Architecture
+## Testing To Plan For
 
-Plan within the v2 roadmap (`docs/mdlint_v2/`) and honor `AGENTS.md` precedence and phase boundaries. On conflict, follow the more specific source (phase task file > locked requirements > decision > roadmap summary) and surface the contradiction instead of guessing. Do not preserve legacy single-package behavior that a v2 phase explicitly replaces.
-
-The workspace is a three-package monorepo. `@wastech-mdlint/core` owns the pipeline (parsing, config loading, lint orchestration, graph construction, compile, and result formatting); `cli` and `mcp-server` are thin adapters. Do not plan pipeline logic into the host packages or fork parallel implementations of it.
-
-Reuse the existing core primitives rather than rewriting them (confirm each path against the current tree before you rely on it — the module layout evolves):
-
-- remark-based parser — `packages/core/src/markdown/parse-document.ts` (`parseDocument`)
-- context-graph builder — `packages/core/src/graph/build-context-graph.ts` (`buildContextGraph`)
-- discovery — `packages/core/src/discovery/`
-- isolated token estimator — `packages/core/src/engine/tokens.ts` (`estimateTokens`)
-
-## Testing And Invariants To Plan For
-
-- A unit test per rule/algorithm, co-located in the touched package's `test/` directory (for example `packages/core/test/`).
-- A focused per-scenario e2e fixture under `packages/cli/test/fixtures/<scenario>/` when the behavior is user-visible.
-- Determinism invariants: sorted output arrays and repository-relative POSIX paths.{?memory_path}
+- A test per new or changed behavior, following the project's existing test conventions and locations.
+- A focused scenario test when the behavior is user-visible.{?memory_path}
 
 ## Repository Memory
 
