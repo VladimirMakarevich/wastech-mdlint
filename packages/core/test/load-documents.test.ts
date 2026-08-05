@@ -125,6 +125,53 @@ describe("loadDocuments", () => {
     ]);
   });
 
+  it("lets a nested .gitignore negation re-include a file a root pattern ignored", async () => {
+    // W-11: layers are ranked by depth, so `docs/.gitignore` overrides the root's `docs/*.md` — the
+    // corpus now matches what `git` keeps. Kept in the loader's own suite so the behavior stays
+    // covered here with no `git` on PATH; `gitignore-layers.test.ts` is the against-real-git oracle.
+    const root = await createFixtureTree({
+      ".gitignore": "docs/*.md\n",
+      "docs/.gitignore": "!keep.md\n",
+      "docs/keep.md": "# Keep\n",
+      "docs/other.md": "# Other\n",
+    });
+
+    const documents = await loadDocuments(["**/*.md"], {
+      cwd: root,
+      respectGitignore: true,
+    });
+
+    expect([...documents.values()].map((doc) => doc.path)).toEqual([
+      "docs/keep.md",
+    ]);
+  });
+
+  it("keeps a subtree a nested .gitignore re-includes from an excluded parent directory", async () => {
+    // The walk-level shape of the same rule, and the one that used to be self-contradictory: the
+    // root excludes the *directory* `artifacts/docs` (`artifacts/*` never matches the file itself),
+    // `artifacts/.gitignore` re-includes it, so the walk descended — and then dropped every file
+    // inside, because the file verdict re-applied the root's exclusion of a parent the deeper layer
+    // had already rescued. `git` keeps these files; the oracle for that lives in
+    // `gitignore-layers.test.ts`, and this case keeps the corpus covered with no `git` on PATH.
+    const root = await createFixtureTree({
+      ".gitignore": "artifacts/*\n",
+      "artifacts/.gitignore": "!docs/\n",
+      "artifacts/docs/one.md": "# One\n",
+      "artifacts/docs/deep/two.md": "# Two\n",
+      "artifacts/scratch.md": "# Scratch\n",
+    });
+
+    const documents = await loadDocuments(["**/*.md"], {
+      cwd: root,
+      respectGitignore: true,
+    });
+
+    expect([...documents.values()].map((doc) => doc.path)).toEqual([
+      "artifacts/docs/deep/two.md",
+      "artifacts/docs/one.md",
+    ]);
+  });
+
   it("returns an empty map when the root does not exist", async () => {
     const documents = await loadDocuments(["**/*.md"], {
       cwd: path.join(os.tmpdir(), "wastech-mdlint-does-not-exist-xyz"),

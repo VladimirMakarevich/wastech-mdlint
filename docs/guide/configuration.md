@@ -45,10 +45,12 @@ Unknown top-level keys are rejected. Validation is two-stage: the root shape fir
 | `$schema` | string | — | **Local** path to the JSON schema (for editor completion). Never a remote URL. |
 | `include` | string[] | `["**/*.md"]` | Globs of files to lint. |
 | `exclude` | string[] | — | Globs to remove; **`exclude` wins over `include`**. |
-| `respectGitignore` | boolean | `false` | When `true`, also skip `.gitignore`d files. A fresh `init` write sets an explicit `true`; a `merge` never adds it. |
+| `respectGitignore` | boolean | `false` | When `true`, also skip `.gitignore`d files — root and nested alike, with git's own precedence: the **deepest** `.gitignore` that has a pattern for a path decides, so a nested `!keep.md` re-includes a file a root pattern ignored. An excluded **directory** takes its whole subtree with it, and that exclusion is resolved the same way — a nested `!generated/` re-includes the directory, and the files inside are then judged on the patterns that match them directly. A fresh `init` write sets an explicit `true`; a `merge` never adds it. |
 | `settings` | object | — | Shared settings (`siteRouter`, `idRef`) inherited by rules. |
 | `rules` | array | `[]` | The rules to run (see below). |
 | `compile` | object | — | Config for [`compile`](compile.md); required by that command. |
+
+Two caveats remain on `respectGitignore`, both narrower than the precedence rule above. Matching is **pattern-only**: `wastech-mdlint` reads `.gitignore` files — not `.git/info/exclude`, not a global `core.excludesFile`, and not git's index — so a file that is already **tracked** but matches an ignore pattern is skipped here even though `git` keeps it (a `.gitignore` does not un-track anything). And patterns match **case-insensitively** on every platform, so a `README.md` pattern also skips `readme.md` — which `git` would keep on a case-sensitive filesystem. In both cases the linter skips a file `git` tracks; if you need such a file linted, list it in `include` and leave `respectGitignore` off, or drop the pattern.
 
 ## Rule entries
 

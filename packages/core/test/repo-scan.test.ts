@@ -463,6 +463,25 @@ describe("scanRepository · hidden and gitignored trees", () => {
     expect(sampled).not.toContain("generated-docs/api/a.md");
   });
 
+  it("samples a file a nested .gitignore re-includes across layers, not just within one", async () => {
+    // The case above puts both the ignore and its negation in the *same* file, so it never exercised
+    // precedence between layers. W-11 was the cross-layer shape: the root ignores, the nested file
+    // negates, and the deeper layer has to win or `init` proposes a corpus the linter then drops.
+    const root = await createFixtureTree({
+      ".gitignore": "notes/*.md\n",
+      "notes/.gitignore": "!keep.md\n",
+      "notes/drop.md": "# Drop\n",
+      "notes/keep.md": "# Keep\n",
+      "docs/one.md": "# One\n",
+    });
+
+    const result = await scanRepository({ cwd: root, minClusterSize: 1 });
+    const sampled = result.clusters.flatMap((cluster) => cluster.sampleFiles);
+
+    expect(sampled).toContain("notes/keep.md");
+    expect(sampled).not.toContain("notes/drop.md");
+  });
+
   it("prunes a noise-named directory even when a gitignore negation re-includes it", async () => {
     const root = await createFixtureTree({
       ".gitignore": "build/\n!build/docs/\n",
