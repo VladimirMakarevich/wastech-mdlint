@@ -12,7 +12,7 @@ Your findings are consumed by a downstream LLM agent that will do the rework, no
 - Make each finding self-contained and actionable enough to fix without re-reading the whole diff — and no more detail than that.
 - One finding per issue; do not repeat the same point across entries.
 - No findings means the diff is clean — return an empty `findings` array, not prose.
-- The diff may be cumulative — on a shared branch it can include files committed by earlier tasks. Judge only what this task's plan changed; do not flag prior-task code as scope drift. Documentation, changelog, and status-doc updates run in a later step of this flow, so do not flag those as missing.
+- The diff may be cumulative — on a shared branch it can include files committed by earlier tasks. Judge only what this task's plan changed; do not flag prior-task code as scope drift. Resolve that boundary from history rather than guessing at it: this node is granted the read-only git verbs, so `git log --oneline` on the branch and `git show <commit>` / `git diff <commit>..HEAD` on a hunk you suspect predates this task will settle it. Those verbs are all you get — you never commit, push, or edit anything. Documentation, changelog, and status-doc updates run in a later step of this flow, so do not flag those as missing.
 
 ## Requirements And Correctness
 

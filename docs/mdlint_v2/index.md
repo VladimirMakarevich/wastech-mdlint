@@ -302,7 +302,7 @@ Each phase is an epic detailed in its own folder (meta `index.md` + numbered tas
 - **The highest-leverage item in the backlog:** this repository has no configuration of its own, so nothing runs the product on its own corpus. The 17 dead links below were all found by `REF-001` in one run, once a config was supplied from outside the repo — and adding one closes a plan expectation (I8) rather than reversing a decision.
 - Precedence-tier defects first: the one "Accepted (enforced)" ADR names three APIs that do not exist and prohibits the async pipeline that shipped, with the glossary repeating the load-bearing half; two dependency-register entries claim more than the code delivers.
 - Completion surface: 92 unchecked criteria across 30 `Done` task files while their indexes are ticked, and 33 unchecked index criteria across five phases whose task files all read Done — one of those boxes being permanently unverifiable.
-- Sweeps: 17 dead links, `PLAN.md`/`docs/plan/` referenced but absent, 18 stale release-sense `P9` lines including three in published skill frontmatter, and the register's own three contract breaches.
+- Sweeps: 17 dead links, `PLAN.md`/`docs/plan/` referenced but absent, 19 stale release-sense `P9` lines (7 in the plan, 11 in shipped artifacts and CI — three of them published skill frontmatter — plus `README.md:34`), and the register's own three contract breaches.
 - **Maps to:** backlog batches B12–B13 (W-41 – W-53).
 - **Exit:** CI fails on a dead link in `docs/`; every precedence tier describes the shipped code; the completion-surface question is decided, not just actioned.
 

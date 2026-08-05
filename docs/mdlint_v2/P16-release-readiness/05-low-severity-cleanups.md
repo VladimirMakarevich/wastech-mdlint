@@ -16,7 +16,7 @@ Clear the four smallest code and scope items, two of which are one-line fixes an
 
 **W-40 — four uncalled barrel exports.** `slice`, the single-document `extractDocProfile`, the `fileMatches` hook on assertion options, and the retained `files` option on the column-unique primitive have no host caller, against a barrel whose own comment frames hosts as the audience and a coding rule against extension points built ahead of need.
 
-**Genuinely a judgment call:** `core` is a published package, so "no internal caller" is not automatically a defect, and no document names an expected consumer for these four. `getImpactSet` is **not** in this item — a tier-3 decision names it as consumed, which makes it a documented expectation the code does not meet, and it lives in [P17.03](../P17-plan-of-record/03-adr-and-dependency-register.md).
+**Genuinely a judgment call:** `core` is a published package, so "no internal caller" is not automatically a defect, and no document names an expected consumer for these four. `getImpactSet` and `query` are **not** in this item — a tier-3 decision names both as consumed, which makes them a documented expectation the code does not meet rather than an open call, and they live in [P17.03](../P17-plan-of-record/03-adr-and-dependency-register.md).
 
 ## Deliverables / steps
 
@@ -24,12 +24,12 @@ Clear the four smallest code and scope items, two of which are one-line fixes an
 2. **W-38:** delete the stale clause, keep the P4.07 pointer or drop the whole comment — either is fine, as long as no sentence claims an open seam that closed.
 3. **W-39 — decide:** widen [`packages/core/src/discovery/rule-inference.ts`](../../../packages/core/src/discovery/rule-inference.ts) (the two concretely reachable candidates are `SIZE-001` from the sampled file sizes and `LLM-001` from detected `@` imports), **or** record the scope choice with its reason. If it is recorded rather than widened, say where a user is expected to learn about `SIZE-001`/`LLM-001` instead, since the README leading with them and `init` never proposing them is the actual gap.
 4. **W-40 — decide:** keep the four as library surface and say so (a sentence in the barrel comment naming the intended audience is enough), or remove them. Do not leave the barrel's own framing contradicting its contents.
-5. **W-40 — check [P17.03](../P17-plan-of-record/03-adr-and-dependency-register.md) first.** If that task narrows decision 4.3 rather than adopting `query`/`getImpactSet` as intended surface, then `query` joins this item's list and the decision here should cover it too.
+5. **W-40 — `query` and `getImpactSet` are not this task's to decide.** Both are named by decision entry 4.3 as "reused directly by P7.03", so they are a documented expectation rather than an open judgment call, and [P17.03](../P17-plan-of-record/03-adr-and-dependency-register.md) owns them — including the option of recording them as intended library surface. P16 runs **before** P17, so this task cannot wait on that outcome and must not pre-empt it: scope the decision to the four exports above, and state in the change that the two register-named exports are settled in P17.03. If P17.03 later adopts them as surface, it extends whatever sentence this task writes in the barrel rather than reopening it.
 6. **Glossary.** The **Target** entry already states that `target` is optional and derived; W-37 does not change that contract, only its derivation. If W-39 widens inference, the `init`/`scanRepository` entries change.
 
 ## Out of scope
 
-`getImpactSet` — settled by a decision record, so it belongs to [P17.03](../P17-plan-of-record/03-adr-and-dependency-register.md). Adding new assert kinds or new inferable rules beyond the two named candidates.
+`getImpactSet` and `query` — both settled by a decision record, so they belong to [P17.03](../P17-plan-of-record/03-adr-and-dependency-register.md). Adding new assert kinds or new inferable rules beyond the two named candidates.
 
 ## Exit criteria
 
@@ -37,5 +37,5 @@ Clear the four smallest code and scope items, two of which are one-line fixes an
 - [ ] No comment in `coverage.ts` claims the P4.06 seam is open.
 - [ ] `init`'s inference vocabulary is widened, or the scope choice is recorded together with where a user is expected to learn about `SIZE-001`/`LLM-001`.
 - [ ] The four uncalled exports are removed, or the barrel states that they are intended library surface.
-- [ ] The `query` question is resolved consistently with [P17.03](../P17-plan-of-record/03-adr-and-dependency-register.md), not twice.
+- [ ] The change states that `query`/`getImpactSet` are deliberately left to [P17.03](../P17-plan-of-record/03-adr-and-dependency-register.md) — decided there once, not here as well.
 - [ ] Gates green.

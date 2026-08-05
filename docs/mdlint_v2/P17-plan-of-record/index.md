@@ -21,9 +21,9 @@ Two of these sit in the **precedence tiers a contributor is told to obey** rathe
 | [P17.03](03-adr-and-dependency-register.md) | The enforced ADR and the dependency register | W-41, W-47 | High | S | P16 |
 | [P17.04](04-completion-surface.md) | The completion surface | W-42, W-50 | High | M | P17.03 |
 | [P17.05](05-p-release-rename-sweep.md) | The `P-release` rename sweep | W-45, W-46 | Medium | S–M | P16 |
-| [P17.06](06-register-and-roadmap.md) | Register contract and roadmap accuracy | W-48, W-49, W-51, W-52 | Low | S–M | P17.04 |
+| [P17.06](06-register-and-roadmap.md) | Register contract and roadmap accuracy | W-48, W-49, W-51, W-52, W-51a, W-52a | Low | S–M | P17.04 |
 
-> **Backlog key.** `W-NN` are the work items in the [consolidated remediation backlog](../remediation-backlog-2026-08-05.md), which names each item's source finding IDs so the original evidence stays reachable.
+> **Backlog key.** `W-NN` are the work items in the [consolidated remediation backlog](../remediation-backlog-2026-08-05.md), which names each item's source finding IDs so the original evidence stays reachable. `W-51a` and `W-52a` come from that document's [pre-implementation addendum](../remediation-backlog-2026-08-05.md#addendum--pre-implementation-audit-of-p13p17): drift that landed after the backlog was written, in the same class as items this phase already owns.
 
 ## Sequence
 
@@ -41,13 +41,14 @@ Two of these sit in the **precedence tiers a contributor is told to obey** rathe
 
 - [ ] The 11 citations of the deleted report are repointed and the four `tasks/pending/` links dropped or re-targeted; `PLAN.md`/`docs/plan/` references are gone (W-43, W-44).
 - [ ] CI fails on a dead link inside `docs/`, run by the product's own `REF-001` against a repository configuration that exists (W-53).
-- [ ] The enforced ADR's three nonexistent API names are corrected and its synchronicity clause replaced with the real constraint; [`glossary.md`](../glossary.md) `:68` is fixed in the same change (W-41).
+- [ ] The enforced ADR's three nonexistent API names are corrected and its synchronicity clause replaced with the real constraint; the glossary's **`lintFiles`**, **LSP server** and **Async rules** entries are fixed in the same change (W-41).
 - [ ] Decision entries 4.2 and 4.3 are narrowed to what shipped, or the two unconsumed exports are recorded as intended surface (W-47).
 - [ ] No phase index reads `Not started` above task files that are all Done; the permanently unverifiable P0 parity criterion is retired or registered; the per-task checkbox question is **decided**, not just actioned (W-42).
 - [ ] The orchestrator task file is listed in its index or moved out of the phase directory (W-50).
 - [ ] Every stale release-sense `P9` is swept from the requirements, the phase indexes, and the shipped artifacts — **without** touching the correct `P9.04/06/07` references (W-45, W-46).
 - [ ] The accepted-behaviors register satisfies its own three rules, including the row it flags against itself (W-48).
 - [ ] The live Prettier corruption is retyped; the roadmap lists seven CLI commands and diagrams `schema.json` where it lives; the frozen audits' language is stated (W-49, W-51, W-52).
+- [ ] The glossary's **Milestone** entry names P13–P17, its `Status` header and **Maintenance rule** are back, and `CLAUDE.md`'s pointer to that rule resolves (W-51a, W-52a).
 - [ ] `npm run format` green — this phase is almost entirely Markdown, so the format gate is the gate that matters.
 
 ## What P17 unblocks

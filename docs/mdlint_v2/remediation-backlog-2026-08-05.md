@@ -21,7 +21,9 @@
 > | [P14 — Host boundary](P14-host-boundary/index.md) | silent successes and dropped diagnostics at the CLI/MCP edge | B6–B7 | W-13 – W-21 |
 > | [P15 — Output contracts](P15-output-contracts/index.md) | one format name, one shape; renderers at real scale | B8–B9, part of B11 | W-22 – W-28, W-34 – W-36 |
 > | [P16 — Release readiness](P16-release-readiness/index.md) | the test debt that let this ship, then a publishable payload | B10, B14, B15, rest of B11 | W-29 – W-33, W-37 – W-40, W-54 – W-58 |
-> | [P17 — Plan of record](P17-plan-of-record/index.md) | precedence tiers, the completion surface, and self-linting | B12–B13 | W-41 – W-53 |
+> | [P17 — Plan of record](P17-plan-of-record/index.md) | precedence tiers, the completion surface, and self-linting | B12–B13 | W-41 – W-53, plus W-51a/W-52a |
+>
+> **Before implementing, read the [pre-implementation addendum](#addendum--pre-implementation-audit-of-p13p17).** An audit of the 25 task files found the coverage complete, and found that six line-number anchors into `glossary.md`/`AGENTS.md` — including two this document relies on — were invalidated by this document's own commit. It also adds the two items above and corrects W-42's box counts and W-45's enumeration.
 
 ## Corrections applied while merging
 
@@ -654,6 +656,36 @@ Not backlog items. Recorded so they are not re-triaged.
 | P12.03's quadratic-hot-path conclusion | Neither the audit nor its verification re-benchmarked it. No performance claim is made here in either direction |
 | report F23's missing per-package lifecycle hook | The report filed the shipped-payload half as F23 (**W-31**) and explicitly **corrected and parked** this half: `private: true` blocks publishing, not packing, so a root `npm pack` does run `prepack` → `npm run build`, while `npm pack -w <pkg>` runs no lifecycle script at all. A workspace pack of an unbuilt tree would therefore ship no `dist`; CI compensates by building first and says why (`.github/workflows/ci.yml:61`). Packaging lifecycle hooks are `P-release/index.md:35` and `:39`, which has not started, so this is pending phase work rather than a defect. **Relevant to W-30:** its fix adds `--workspaces` to `release:check`, i.e. the pack path that runs no build — the script already chains `npm run build` first, and it must keep doing so. The end state was never reproduced (producing a `dist`-less tarball would have destroyed the build the audit depended on) |
 | requirement I6's unqualified acceptance | `requirements/06-installation.md:16` marks I6 "✅ Accepted" for a publishable Action that is `PR.03`, Not started, while the glossary marks it planned. The report judged this a readability complaint rather than a false claim, because that column records requirement _acceptance_, not delivery. **W-45** sweeps the same file — fold a qualifier in there if it is cheap; do not open a task for it |
+
+## Addendum — pre-implementation audit of P13–P17
+
+A pass over the 25 task files before implementation started, checking each item's requirements and goals against this document and against the tree. Coverage came out complete — all 58 items land in exactly one task, and the code citations spot-checked (~50 line references across `packages/`, `scripts/`, `.github/`, `README.md`, `docs/guide/`) were accurate. Four things did not survive contact with the current tree, and they are recorded here rather than folded silently into the tasks.
+
+**Line-number anchors into `glossary.md` and `AGENTS.md` are stale.** Every one was correct at `d96b64c` and was invalidated by `add1ee5` — this document's own commit, which also edited both files. Corrections, and the reason the task files now cite entries by **name** instead of by line:
+
+| Cited here | Where it actually is |
+| --- | --- |
+| `glossary.md:68` (W-41) | the **`lintFiles`** entry |
+| `glossary.md:204` (W-22) | the **`graph`** entry |
+| `glossary.md:275` (W-30) | the **`release:check` / `npm pack --dry-run`** entry |
+| `glossary.md:305` (W-53) | the **`migrate` command (I8)** entry |
+| `glossary.md:12` and `:248` (W-42) | **one** roll-up survives, the **Phase** entry; the `:12` "Shipped vs planned" bullet was deleted in `add1ee5` |
+| `AGENTS.md:47` (W-52) | **deleted** in `add1ee5` — see W-52a |
+
+**W-41's scope is one glossary site wider than stated.** Besides the `lintFiles` entry, the **LSP server** and **Async rules / external HTTP checks** entries restate the synchronous-pipeline framing. The second is partly true (rules are synchronous), so both need classifying rather than deleting, or the corrected ADR still has the glossary contradicting it. Folded into [P17.03](P17-plan-of-record/03-adr-and-dependency-register.md).
+
+**W-45's enumeration was six sites for a count of seven.** The seventh is `requirements/index.md:14`, which assigns requirements document 06 to "P6, P9". Also worth naming as a do-not-touch neighbour: `requirements/06-installation.md:30` ("audit P9 engines gap") is the correct remediation sense **in a file this sweep does edit at `:3`**. Folded into [P17.05](P17-plan-of-record/05-p-release-rename-sweep.md).
+
+**W-42's box counts describe the pre-P13 plan, not the tree.** 148 unchecked / 255 checked is exact for everything outside `P13-correctness/` … `P17-plan-of-record/`; those five directories added **223** unchecked boxes of their own, so the tree carries 371 today. By the time [P17.04](P17-plan-of-record/04-completion-surface.md) runs, P13–P16 will read `Status **Done**` with roughly 180 open boxes beneath them — the same defect one round later — so that task's decision has to cover its own phases. Recorded there.
+
+### Two items with no source finding
+
+Both are drift created **after** the four assessments, so no `F`-number defines them. They are the same classes this backlog already carries, which is why they belong in [P17.06](P17-plan-of-record/06-register-and-roadmap.md) rather than in a new phase.
+
+| ID | Sev | Type | Item |
+| --- | --- | --- | --- |
+| W-51a | Low | docs | The glossary's **Milestone (M1–M4)** entry omits P13–P17 from M4 while the roadmap's §7 list includes them — W-51's class, introduced by the change that created these phases |
+| W-52a | Medium | docs | **It also left the format gate red at `HEAD`:** the deletion stranded a double blank line under the glossary's `# ` heading, so `prettier --check .` failed on a committed file until the audit fixed that one line. `add1ee5` deleted `AGENTS.md`'s `## Delivery Order` section and the whole glossary preamble — its `Status` header, "How to use", the "Shipped vs planned" roll-up, and the **Maintenance rule** that `CLAUDE.md`, `AGENTS.md` and `.agents/rules/coding-style.md` all point at. `CLAUDE.md`'s "see the glossary's maintenance rule" is now a pointer to deleted text. This is **W-44's mechanism** — a load-bearing document removed as a side effect of an unrelated commit — and it is absent from this backlog because the deletion shipped in the same commit as the backlog |
 
 ## Coverage this backlog does not claim
 

@@ -14,7 +14,7 @@ Add or extend tests alongside the change, scaled to its risk, following the proj
 
 ## Verify
 
-Before finishing, run whatever check commands this project defines for the code you touched (build, type-check, lint, test) and confirm they pass — catching a failure now saves a full review/fix round trip later.
+Before finishing, run whatever check commands this project defines for the code you touched (build, type-check, lint, test) and confirm they pass — catching a failure now saves a full review/fix round trip later. Include the project's **format** check in that set, not just the code ones: it covers every tracked Markdown file here, so a doc or comment you touched can fail the gate on its own. Repair what it flags with a targeted write on the files you touched rather than a repo-wide rewrite.
 
 ## Authoring And Documentation Deliverables
 

@@ -10,7 +10,7 @@ Make `--format json` denote one document, make the graph's best diagnostic reach
 
 **W-22 — three problems in one output.**
 
-1. **`coverage` is a shipped fifth key documented on none of five surfaces**, all of which say four: `README.md:73`, `docs/guide/cli.md:67`, `docs/guide/context-graph.md:39`, [`glossary.md`](../glossary.md) `:204` (which assigns coverage to the human format only), and the authoritative task file `P4-graph/07-cli-graph-slice-impact.md:17`. Under the stated precedence the task file outranks the rest, so it is the primary site.
+1. **`coverage` is a shipped fifth key documented on none of five surfaces**, all of which say four: `README.md:73`, `docs/guide/cli.md:67`, `docs/guide/context-graph.md:39`, the **`graph`** entry in [`glossary.md`](../glossary.md) (which assigns coverage to the human format only — the backlog cites it as `:204`, correct at the audited commit and since shifted, so find it by entry name), and the authoritative task file `P4-graph/07-cli-graph-slice-impact.md:17`. Under the stated precedence the task file outranks the rest, so it is the primary site.
 2. **It is unreachable from MCP in either format**, though the CLI states in place that JSON consumers "must see `filesOutsideCorpus` too" ([`packages/cli/src/commands.ts`](../../../packages/cli/src/commands.ts) around `:228`). The field test called `coverage.filesOutsideCorpus` the single best diagnostic in the graph report — and it is exactly [P14.03](../P14-host-boundary/03-init-disclosure.md)'s evidence, listing 12 linked-but-unlinted files.
 3. **`format: "json"` denotes different documents on the two hosts.** Reproduced byte-identically by both assessments:
 
@@ -36,7 +36,8 @@ Make `--format json` denote one document, make the graph's best diagnostic reach
 4. **W-23 — expose the excluded set in JSON**, matching `impact-analysis`'s existing `excluded` field name and shape rather than inventing a second one. Ideally state **why** a node is excluded; if that is more than a small change, expose the set now and record the "why" as follow-up rather than shipping neither.
 5. **W-23 — assert parity by test**, not by inspection: a test that reads both formats from one graph and compares the sets is what stops the next divergence.
 6. **W-25 — decide:** accept both words on both commands, or rename one, in [`packages/cli/src/program.ts`](../../../packages/cli/src/program.ts). If the split stays, say in the guide that it is deliberate — `README.md` already documents it faithfully, so only the intent is missing.
-7. **Glossary.** The graph-summary and coverage entries are the ones to update, in this change.
+7. **Reuse [P15.01](01-renderers-at-scale.md)'s large fixture** rather than building a second one. The parity assertions in steps 4–5 want a graph big enough to have an excluded set, which is the same fixture P15.01 generates and [P16.01](../P16-release-readiness/01-test-debt.md) adopts; whichever of the two tasks lands first owns building it.
+8. **Glossary.** The graph-summary and coverage entries are the ones to update, in this change.
 
 ## Out of scope
 
@@ -47,6 +48,6 @@ The human format's line shape — that is [P15.01](01-renderers-at-scale.md), wh
 - [ ] `coverage` is reachable from MCP in the documented format(s) and appears in that tool's output schema.
 - [ ] One format name denotes one shape across CLI and MCP; the source comment at `context-graph.ts:50-54` describes what ships.
 - [ ] All five surfaces document the fifth key, including the authoritative `P4-graph/07-cli-graph-slice-impact.md` and the glossary.
-- [ ] Both graph formats carry the excluded set, using `impact-analysis`'s existing field name, with parity asserted by a test.
+- [ ] Both graph formats carry the excluded set, using `impact-analysis`'s existing field name, with parity asserted by a test — on [P15.01](01-renderers-at-scale.md)'s fixture, not a duplicate of it.
 - [ ] One word means "plain text for a human" across the CLI, or the split is documented as deliberate.
 - [ ] Gates green.

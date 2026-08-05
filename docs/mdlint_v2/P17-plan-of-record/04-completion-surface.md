@@ -8,10 +8,12 @@ Make the plan's completion state readable in both directions — and **decide** 
 
 ## Problem
 
-**W-42 — no reliable completion surface, in either direction.** Counted over the plan files (148 unchecked / 255 checked boxes total, re-verified in the current tree):
+**W-42 — no reliable completion surface, in either direction.** Counted over the plan files that existed when the backlog was written — **148 unchecked / 255 checked**, re-verified in the current tree against everything outside `P13-correctness/` … `P17-plan-of-record/`:
 
 - **92 exit criteria across 30 `Status **Done**` task files are unchecked** while their phase indexes are fully ticked. Two of those boxes are self-referential audits of exactly this.
-- **33 phase-index criteria are unchecked across five phases**, four of which read `Status **Not started**` while every task file beneath them reads Done: P9 (7 of 8 done), P10 (8 of 8), P11 (14 of 14), P12 (6 of 6), and `P-release` (0 of 5 — the one honest row). The glossary repeats the stale state at `:12` and `:248`.
+- **33 phase-index criteria are unchecked across five phases**, four of which read `Status **Not started**` while every task file beneath them reads Done: P9 (7 of 8 done), P10 (8 of 8), P11 (14 of 14), P12 (6 of 6), and `P-release` (0 of 5 — the one honest row). The glossary repeats the stale state in its **Phase (P0–P8, …)** entry — "P9 … is in progress; P10 …, P13–P17 … are pending". The backlog cites two roll-ups, at `glossary.md:12` and `:248`; **only one survives.** The `:12` "Shipped vs planned" bullet was deleted along with the rest of the glossary's preamble in `add1ee5`, the same commit that added the backlog — which is itself an instance of this phase's class and is picked up by [P17.06](06-register-and-roadmap.md).
+
+**This phase's own files are inside the count now.** P13–P17 added **223 unchecked boxes** of their own (371 unchecked in the tree today), and by the time this task runs, P13–P16 will read `Status **Done**` with roughly 180 of those boxes still open — the exact shape the finding describes, one round later. So the decision in step 1 governs P13–P16's boxes too, not only the 92 historical ones, and the five indexes in step 2 become nine.
 
 **Delivery-history evidence:** `git show 827bce8` shows the merge that landed P11 and P12 **rewriting** the Status line and all seven criteria lines of those indexes — reflowed for the prose-wrap setting — and preserving `Not started` and every empty box verbatim. So this is not neglect; it is a surface nothing maintains.
 
@@ -25,8 +27,8 @@ Make the plan's completion state readable in both directions — and **decide** 
 
 ## Deliverables / steps
 
-1. **Decide first, edit second.** Are per-task checkboxes load-bearing? If they are not, **delete them** rather than shipping 92 that read as open work. If they are, name who ticks them and when. Ticking them without that decision recreates the problem next phase — which is the whole finding.
-2. **Flip the five indexes' Status lines and criteria** to match the work beneath them, and fix the two glossary roll-ups at `:12` and `:248` in the same change.
+1. **Decide first, edit second.** Are per-task checkboxes load-bearing? If they are not, **delete them** rather than shipping 92 — plus P13–P16's own ~180 — that read as open work. If they are, name who ticks them and when. Ticking them without that decision recreates the problem next phase, which is the whole finding; and the decision has to cover P13–P17's files, or the round that fixed this leaves the largest instance of it behind.
+2. **Flip the Status lines and criteria** of every index whose task files are all Done — the five the backlog counted, plus P13, P14, P15 and P16, which will be Done by the time this runs — and fix the glossary's surviving **Phase** roll-up in the same change.
 3. **Dispose of the unverifiable parity criterion explicitly:** retire it at both sites (the migration it guarded is three phases behind and its subject no longer exists), **or** keep the text and give it a row in [`accepted-behaviors.md`](../accepted-behaviors.md) recording that it is closed-by-obsolescence rather than verified. Do not leave it as a ticked box with nothing behind it — that is the exact failure this task exists to end.
 4. **Fix the pack-clean pair.** `P0-foundations/index.md:43` ticked versus `P-release/index.md:39` open is the second instance of a criterion ticked at one level and open at another. Its substance belongs to [P16.03](../P16-release-readiness/03-published-payload.md); the **surface** belongs here, so reconcile the two boxes once that task has settled what is actually true.
 5. **W-50:** either list `09-audit-remediation.md` in its index with a `Status` line and matching heading structure, or move it out of the phase directory. If it stays, its six criteria join the count this task is reconciling.
@@ -38,9 +40,9 @@ Verifying the 92 task-level criteria individually. They were counted, not traced
 
 ## Exit criteria
 
-- [ ] The per-task-checkbox question is **decided**, with the decision written down, before any box is edited.
-- [ ] No phase index reads `Not started` above task files that are all Done.
-- [ ] The glossary's two phase-status roll-ups agree with the indexes.
+- [ ] The per-task-checkbox question is **decided**, with the decision written down, before any box is edited, and the decision explicitly covers P13–P17's own task files.
+- [ ] No phase index reads `Not started` above task files that are all Done — including P13–P16.
+- [ ] The glossary's surviving **Phase** roll-up agrees with the indexes.
 - [ ] The permanently unverifiable P0 parity criterion is retired at both sites or registered as closed-by-obsolescence.
 - [ ] No criterion remains ticked at index level and open at task level for the same subject.
 - [ ] `09-audit-remediation.md` is listed in its index with a `Status` line, or moved out of the phase directory.

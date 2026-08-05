@@ -26,7 +26,7 @@ The failure direction is **under-reporting** — the linter silently drops a fil
 
 ## Out of scope
 
-Making `respectGitignore` default to `true` — that decision belongs to [P13.02](02-default-exclude.md), which owns the defaults. Supporting `.git/info/exclude` or a global core.excludesFile: neither is claimed anywhere, and adding them would widen the contract this task exists to make honest.
+Making `respectGitignore` default to `true` — that decision belongs to [P13.02](02-default-exclude.md), which owns the defaults. Note the dependency runs the other way for that half: P13.02 must not flip the default on until this task has landed, or the precedence bug reaches the zero-config path. Supporting `.git/info/exclude` or a global core.excludesFile: neither is claimed anywhere, and adding them would widen the contract this task exists to make honest.
 
 ## Exit criteria
 
