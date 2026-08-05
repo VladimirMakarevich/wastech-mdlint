@@ -38,16 +38,6 @@ If a contradiction changes implementation behavior, surface it explicitly instea
 
 Historical v1 planning remains in `PLAN.md` and `docs/plan/`, but it is background context only when it conflicts with `docs/mdlint_v2/`.
 
-## Delivery Order
-
-Unless the user explicitly asks for a different slice, follow the v2 phase order and task dependency chains:
-
-`P0 Foundations -> P1 ParsedDocument -> P2 Rule engine -> P3 Rules -> P4 Graph -> P5 Compile -> P6 Init -> P7 MCP server -> P8 Skills -> P9 Remediation -> P10 Consistency -> P11 Post-P9 Remediation -> P12 Post-P9 Consistency -> P-release Release`
-
-(P9 and P10 are the post-audit remediation/consistency phases from the [P0–P8 audit](docs/mdlint_v2/audit-2026-07-23-p0-p8.md); P11 and P12 are the second remediation/consistency round from the [post-P9 audit](docs/mdlint_v2/audit-2026-07-25-post-p9.md); the release phase is the terminal `P-release`.)
-
-For implementation sequencing, respect each task file's `Previous`, `Next`, `Depends on`, and `Blocks` links.
-
 ## Architecture Invariants
 
 - `@wastech-mdlint/core` is the single owner of parsing, config loading, lint orchestration, graph construction, compile logic, and result formatting.

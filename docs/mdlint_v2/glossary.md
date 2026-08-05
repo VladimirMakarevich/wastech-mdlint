@@ -1,28 +1,5 @@
 # wastech-mdlint — Glossary
 
-> **Status:** Living reference · Part of the [v2 roadmap](index.md).
->
-> This is the canonical vocabulary for `wastech-mdlint`: product concepts, public types, config keys, CLI/MCP surfaces, and the planning taxonomy used across `docs/mdlint_v2/`. It covers what ships today **and** what is planned, deferred, or explicitly out of scope, so a reader can look up a term whether or not the feature exists yet. When a term is ambiguous elsewhere, this glossary defines what it means; when a term has authoritative detail in a requirements or decision doc, the entry links there rather than duplicating it.
-
-## How to use this glossary
-
-- **Definitions, not specs.** Each entry is a short gloss plus a link to the authoritative source (a requirements doc, a decision, the README, or the code). Volatile detail — full rule descriptions, per-decision content — lives at its source so it does not drift here.
-- **Concepts, not every symbol.** Options structs, `*Schema` Zod validators, `render*` / `format*` formatters, and glob/path helpers are covered by the concept they serve rather than given individual entries. The exhaustive, always-current list of public symbols is the core barrel [`packages/core/src/index.ts`](../../packages/core/src/index.ts).
-- **Cross-links** use repo-relative POSIX paths, the same convention as the rest of the product.
-- **Shipped vs planned.** Phases **P0–P8 are shipped**; **P9/P10** (post-audit remediation and consistency), **P11/P12** (post-P9 remediation and consistency), and **P-release** are pending. Terms for unshipped surfaces are marked _(planned, PN)_ so the glossary stays honest about the current state (roadmap §8, "honesty in docs"). Update these markers as phases land.
-- **Not-yet and never.** Concepts that are deferred, backlog, or explicitly out of v2 scope are catalogued in the **Deferred, backlog & out of scope** section near the end — named so planned and deliberately-excluded work is discoverable, not just what ships today.
-
-## Maintenance rule
-
-Keep this glossary current **as part of the change that introduces the term**, not as a later cleanup pass — the same discipline the repo applies to code comments ([coding-style rules](../../.agents/rules/coding-style.md)). Add, rename, or retire an entry whenever you:
-
-- add or rename a load-bearing public type, config key, CLI flag, MCP tool, rule ID, or assertion primitive;
-- change what an existing term means or its shipped/planned status;
-- introduce a new domain concept a future reader would have to reverse-engineer from code.
-
-The documentation step of the implementation flow ([`.worc/flows/implementation/documentation.md`](../../.worc/flows/implementation/documentation.md)) treats this as part of "bring the affected docs in line."
-
----
 
 ## Product & architecture
 
@@ -245,7 +222,8 @@ Core-only groundwork for `init`'s situational awareness, plus the CLI `init` com
 ## Planning taxonomy
 
 - **Sources of truth / precedence** — When docs disagree: (1) the specific phase task file, (2) the relevant locked requirement, (3) the relevant decision, (4) the roadmap summary. See [AGENTS.md](../../AGENTS.md).
-- **Phase (P0–P8, P9/P10, P11/P12, P-release)** — The roadmap epics: `P0` Foundations · `P1` ParsedDocument · `P2` Rule engine · `P3` Rules · `P4` Graph · `P5` Compile · `P6` init · `P7` MCP server · `P8` Skills · `P9` Remediation · `P10` Consistency · `P11` Post-P9 Remediation · `P12` Post-P9 Consistency · `P-release` Release. Each has a folder (meta `index.md` + numbered task files). **P0–P8 are Done; P9 (post-audit remediation) is in progress; P10 (consistency), P11/P12 (post-P9 remediation/consistency), and P-release are pending.**
+- **Phase (P0–P8, P9/P10, P11/P12, P13–P17, P-release)** — The roadmap epics: `P0` Foundations · `P1` ParsedDocument · `P2` Rule engine · `P3` Rules · `P4` Graph · `P5` Compile · `P6` init · `P7` MCP server · `P8` Skills · `P9` Remediation · `P10` Consistency · `P11` Post-P9 Remediation · `P12` Post-P9 Consistency · `P13` Correctness · `P14` Host boundary · `P15` Output contracts · `P16` Release readiness · `P17` Plan of record · `P-release` Release. Each has a folder (meta `index.md` + numbered task files). **P0–P8 are Done; P9 (post-audit remediation) is in progress; P10 (consistency), P11/P12 (post-P9 remediation/consistency), P13–P17 (the third post-audit round), and P-release are pending.** Three remediation rounds exist because three assessments found three distinct classes: the [P0–P8 audit](audit-2026-07-23-p0-p8.md) → P9/P10, the [post-P9 audit](audit-2026-07-25-post-p9.md) → P11/P12, and the [2026-08-05 backlog](remediation-backlog-2026-08-05.md) → P13–P17.
+- **Work item (`W-NN`)** — A deduplicated unit of remediation in the [consolidated remediation backlog](remediation-backlog-2026-08-05.md) (`W-01` – `W-58`), each naming the source finding IDs it merges and each closed by exactly one `P13`–`P17` task. The layer between a finding and a task: findings are per-assessment and overlap, work items are deduplicated, tasks are sized for one sitting. Its severity is a **triage rank for sequencing**, not a copy of a source grade — the backlog's Master index preamble lists the nine items re-graded beyond either source scale.
 - **Milestone (M1–M4)** — Delivery groupings: **M1** "Engine" (P0–P2), **M2** "Lint parity+" (P3), **M3** "Graph & agents" (P4–P5 + P7), **M4** "Launch" (P6, P8, then P9/P10 and P11/P12, then P-release). See roadmap §6.
 - **Task file** — A numbered file inside a phase folder with a `Previous` / `Next` / `Depends on` / `Blocks` chain and exit criteria; the most specific source of truth for the work it describes.
 - **Accepted-behaviors register** — [`accepted-behaviors.md`](accepted-behaviors.md): the one index of behaviors a task deliberately documented rather than fixed, plus residuals recorded rather than closed. It links where each is already explained instead of restating it; a user-reachable row must have a `README.md` or `docs/guide/` home. Established by [P12.06](P12-consistency/06-process-boundary-tests.md).
