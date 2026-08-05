@@ -116,7 +116,7 @@ A point-by-point requirements pass (2026-06-21) locked the v2 improvements. Thes
 
 Each phase is an epic detailed in its own folder (meta `index.md` + numbered task files, each with an explicit prev/next/depends/blocks chain). Effort is a rough T-shirt size (S < 2d, M ≈ 2–5d, L > 5d). "Reuse" = how much current implementation code carries over.
 
-**Detailed task plans:** [P0 Foundations](P0-foundations/index.md) · [P1 ParsedDocument](P1-parsed-document/index.md) · [P2 Rule engine](P2-rule-engine/index.md) · [P3 Rules](P3-rules/index.md) · [P4 Graph](P4-graph/index.md) · [P5 Compile](P5-compile/index.md) · [P6 init](P6-init/index.md) · [P7 MCP server](P7-mcp-server/index.md) · [P8 Skills](P8-skills/index.md) · [P9 Remediation](P9-remediation/index.md) · [P10 Consistency](P10-consistency/index.md) · [P11 Post-P9 Remediation](P11-remediation/index.md) · [P12 Post-P9 Consistency](P12-consistency/index.md) · [P-release Release](P-release/index.md)
+**Detailed task plans:** [P0 Foundations](P0-foundations/index.md) · [P1 ParsedDocument](P1-parsed-document/index.md) · [P2 Rule engine](P2-rule-engine/index.md) · [P3 Rules](P3-rules/index.md) · [P4 Graph](P4-graph/index.md) · [P5 Compile](P5-compile/index.md) · [P6 init](P6-init/index.md) · [P7 MCP server](P7-mcp-server/index.md) · [P8 Skills](P8-skills/index.md) · [P9 Remediation](P9-remediation/index.md) · [P10 Consistency](P10-consistency/index.md) · [P11 Post-P9 Remediation](P11-remediation/index.md) · [P12 Post-P9 Consistency](P12-consistency/index.md) · [P13 Correctness](P13-correctness/index.md) · [P14 Host boundary](P14-host-boundary/index.md) · [P15 Output contracts](P15-output-contracts/index.md) · [P16 Release readiness](P16-release-readiness/index.md) · [P17 Plan of record](P17-plan-of-record/index.md) · [P-release Release](P-release/index.md)
 
 **Reference:** [Glossary](glossary.md) — the canonical vocabulary (public types, config keys, CLI/MCP surfaces, rule IDs, and this planning taxonomy) used across these docs · [Accepted behaviors](accepted-behaviors.md) — the register of behaviors deliberately documented rather than fixed, and the residuals recorded rather than closed.
 
@@ -253,7 +253,60 @@ Each phase is an epic detailed in its own folder (meta `index.md` + numbered tas
 - **Maps to:** [post-P9 audit](audit-2026-07-25-post-p9.md) test-depth/perf LOWs; `p9-09` OG-1/SC-3.
 - **Exit:** `exclude` e2e everywhere it applies; boundary-test checklist in place; docs/decisions reconciled.
 
-### Phase P-release — Distribution, CI & release · `M` · depends on: all (incl. P9–P12) · reuse: Medium
+### Phase 13 — Corpus & correctness remediation · `M–L` · depends on: P12 · reuse: n/a
+
+**Goal:** close every defect where the product gives a **wrong answer about the repository with no signal that it did**, from the [2026-08-05 assessments](remediation-backlog-2026-08-05.md) (a deep plan-conformance audit, its QA pass, and a field test of the packed CLI against an external monorepo). See [P13 tasks](P13-correctness/index.md).
+
+- Two blockers first: a `!` in any glob list widens or empties scope instead of subtracting; there is no lint-time default `exclude`, so the zero-config first run lints every `node_modules` tree (3063 files instead of 323, silently).
+- Rule options that disable or misfire: `SIZE-001` enabled into inertness, `GRP-002` flagging the repo's own entry points, an unrecorded `TBL-003` default with three consumers, `GRP-001` at `error` on a normal documentation shape.
+- Resolution correctness: `REF-001.exclude` inert whenever any `siteRouter` is set; three incompatible definitions of "a Markdown file"; `.gitignore` layer precedence dropping a file real `git` keeps.
+- Config diagnostics: a union collapse that hides the key and the enum on **every** rule family.
+- **Maps to:** backlog batches B1–B5 (W-01 – W-12).
+- **Exit:** no silent wrong answer about corpus membership or rule execution; every fix has a test that fails before it.
+
+### Phase 14 — Host boundary remediation · `M` · depends on: P13 · reuse: n/a
+
+**Goal:** close every defect where a host turns a real failure into an apparent success, or drops the actionable half of a diagnostic. See [P14 tasks](P14-host-boundary/index.md).
+
+- A nonexistent MCP `cwd` silently succeeds on all five file-based tools — the class the CLI guards and names in its own rationale.
+- `init --on-existing merge` refuses to write and exits `0`; an out-of-repo `--outdir` renders as `../../../../..`.
+- `init` never discloses the Markdown its hidden-directory exclude drops (63 files, 31% of a real corpus), and whether that exclude belongs in a lint-time config is undecided.
+- `--config` resolves against two different bases across six handlers; the MCP text block drops the `hint`; schema-level rejections bypass the `{code, message, hint}` contract; the closed error set has no operational code.
+- **Maps to:** backlog batches B6–B7 (W-13 – W-21).
+- **Exit:** every host rejects what it should and discloses what it knows; three decisions recorded.
+
+### Phase 15 — Output contracts & rendering at real scale · `M` · depends on: P14 · reuse: n/a
+
+**Goal:** one format name denotes one shape, every documented output contract matches what ships, and the human renderers are usable on a corpus nobody designed for. See [P15 tasks](P15-output-contracts/index.md).
+
+- Scale defects no in-repo fixture can produce: `graph --format human` emitting 3.5–3.9 KB single lines; a generated `SKILL.md` that is 89.7% edge list and 0.4% workflow, with one 17 530-character line; a node-role vocabulary where two of five roles hold 83% of nodes.
+- Contract defects: `coverage` shipped but documented on none of five surfaces and unreachable from MCP; `format: "json"` denoting different documents on the two hosts; `excluded from reading order` only in the human format; a source comment asserting two hosts share one lint shape when three ship.
+- Documentation accuracy: five documented message keys against eight emitted; `helpUri` holding a bare rule ID at 27 sites; the token heuristic stated in bytes where the code counts characters, and its calibration disclosed nowhere a reader of the number will look.
+- **Maps to:** backlog batches B8–B9 plus the documentation half of B11 (W-22 – W-28, W-34 – W-36).
+- **Exit:** stated bounds at a stated corpus size; one format name, one shape; every documented contract true.
+
+### Phase 16 — Release readiness, tooling & test debt · `M` · depends on: P15 · reuse: Medium
+
+**Goal:** close the test debt that let P13–P15 ship green, then make the published artifact something a stranger can install, read, and trust. See [P16 tasks](P16-release-readiness/index.md).
+
+- The preventive half, first: no fixture is at real scale, on the zero-config path, or in a dot-directory — the single cause behind the four findings that change a user's first ten minutes.
+- Publish metadata: no package ships a README or LICENSE and none declares `repository`, so publishing produces three blank npm pages; 204 source maps point at a `../src` no tarball ships; `release:check` validates none of the three `files` allowlists while the glossary says it validates all of them.
+- Dev tooling: the WSL wrapper interpolates argv into a `cmd.exe` line against an explicit security rule; the docs generator passes generated content as a regex replacement string.
+- **Maps to:** backlog batches B10, B14, B15 plus B11's low-severity residue (W-29 – W-33, W-37 – W-40, W-54 – W-58).
+- **Exit:** every P13–P15 fix has a guard that fails before it; each tarball is publishable; four decisions recorded.
+
+### Phase 17 — Plan of record & self-linting · `S–M` · depends on: P16 · reuse: n/a
+
+**Goal:** make the plan describe the product that shipped, and make this repository run its own linter on its own documentation so the next round of drift is a build failure. See [P17 tasks](P17-plan-of-record/index.md).
+
+- **The highest-leverage item in the backlog:** this repository has no configuration of its own, so nothing runs the product on its own corpus. The 17 dead links below were all found by `REF-001` in one run, once a config was supplied from outside the repo — and adding one closes a plan expectation (I8) rather than reversing a decision.
+- Precedence-tier defects first: the one "Accepted (enforced)" ADR names three APIs that do not exist and prohibits the async pipeline that shipped, with the glossary repeating the load-bearing half; two dependency-register entries claim more than the code delivers.
+- Completion surface: 92 unchecked criteria across 30 `Done` task files while their indexes are ticked, and 33 unchecked index criteria across five phases whose task files all read Done — one of those boxes being permanently unverifiable.
+- Sweeps: 17 dead links, `PLAN.md`/`docs/plan/` referenced but absent, 18 stale release-sense `P9` lines including three in published skill frontmatter, and the register's own three contract breaches.
+- **Maps to:** backlog batches B12–B13 (W-41 – W-53).
+- **Exit:** CI fails on a dead link in `docs/`; every precedence tier describes the shipped code; the completion-surface question is decided, not just actioned.
+
+### Phase P-release — Distribution, CI & release · `M` · depends on: all (incl. P9–P17) · reuse: Medium
 
 **Goal:** production packaging.
 
@@ -272,12 +325,18 @@ Each phase is an epic detailed in its own folder (meta `index.md` + numbered tas
 P0 ─► P1 ─► P2 ─► P3
             │
             └► P4 ─► P5 ─┐
-            └► P6        ├─► P7 ─► P8 ─► P9 ─► P10 ─► P11 ─► P12 ─► P-release
+            └► P6        ├─► P7 ─► P8 ─► P9 ─► P10 ─► P11 ─► P12
+                                                              │
+              ┌───────────────────────────────────────────────┘
+              └► P13 ─► P14 ─► P15 ─► P16 ─► P17 ─► P-release
 
 Critical path: P0 → P1 → P2 → P3 (rules) and P0 → P1 → P4 → P5 (graph/compile)
 run largely in parallel after P2. P7 (MCP) needs P2+P4+P5. P8 (skills) needs the
 CLI/MCP surface stable. P9/P10 close the first (P0–P8) audit; P11 (post-P9 code
-remediation) and P12 (post-P9 consistency/coverage) close the second audit; P-release ships it.
+remediation) and P12 (post-P9 consistency/coverage) close the second audit.
+P13–P17 close the third round — the 2026-08-05 audit + field test — in order of
+depth: corpus correctness, host boundary, output contracts, release readiness
+and test debt, then the plan of record. P-release ships it.
 ```
 
 Recommended milestones:
@@ -285,7 +344,7 @@ Recommended milestones:
 - **M1 "Engine":** P0–P2 — workspace + new config + rule engine + first rules runnable.
 - **M2 "Lint parity+":** P3 — all 22 built-in rules + current LLM rules; this is a usable linter.
 - **M3 "Graph & agents":** P4–P5 + P7 — slice/impact/compile + MCP.
-- **M4 "Launch":** P6, P8, then P9/P10 and P11/P12 (two post-audit remediation rounds), then P-release — init, skills, audit fixes, packaging, release.
+- **M4 "Launch":** P6, P8, then P9/P10, P11/P12 and P13–P17 (three post-audit remediation rounds), then P-release — init, skills, audit fixes, packaging, release.
 
 ---
 
@@ -338,3 +397,8 @@ Recommended milestones:
 | Post-audit consistency (docs/tests) | P10 ([audit](audit-2026-07-23-p0-p8.md)) |
 | Post-P9 remediation (code) | P11 ([audit](audit-2026-07-25-post-p9.md)) |
 | Post-P9 consistency (tests/docs) | P12 ([audit](audit-2026-07-25-post-p9.md)) |
+| Corpus & correctness remediation | P13 ([backlog](remediation-backlog-2026-08-05.md)) |
+| Host boundary remediation | P14 ([backlog](remediation-backlog-2026-08-05.md)) |
+| Output contracts & rendering at scale | P15 ([backlog](remediation-backlog-2026-08-05.md)) |
+| Release readiness, tooling & test debt | P16 ([backlog](remediation-backlog-2026-08-05.md)) |
+| Plan of record & self-linting | P17 ([backlog](remediation-backlog-2026-08-05.md)) |
