@@ -12,6 +12,9 @@ yarn-error.log
 # Git won't descend into a fully-excluded dir, so `.worc/` would make any !.worc/flows a no-op.
 .worc/*
 !.worc/flows/
+# the operator config is reviewed like the flows (no secrets inside — only the NAMES of the env
+# vars, whose values live in the still-ignored .worc/.env)
+!.worc/config.yaml
 # sibling exchange root (agent read-isolation I/O, WRI-001) — must also never be committed
 .worc-io/
 
