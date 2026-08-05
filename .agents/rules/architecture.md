@@ -48,7 +48,8 @@ This is enforced by the accepted decision in `docs/mdlint_v2/decisions/core-host
 
 ## Phase Discipline
 
-- Follow the roadmap order `P0` → … → `P8`, then the post-audit phases `P9` (code remediation) and `P10` (docs/tests consistency), then the second post-audit round `P11` (post-P9 code remediation) and `P12` (post-P9 consistency/coverage), then the terminal `P-release`, unless the user asks for a different slice.
+- Follow the roadmap order `P0` → … → `P8`, then the post-audit phases `P9` (code remediation) and `P10` (docs/tests consistency), then the second post-audit round `P11` (post-P9 code remediation) and `P12` (post-P9 consistency/coverage), then the third round `P13` (corpus/correctness) → `P14` (host boundary) → `P15` (output contracts) → `P16` (release readiness and test debt) → `P17` (plan of record and self-linting), then the terminal `P-release`, unless the user asks for a different slice.
+- `P13`–`P17` are driven by the [consolidated remediation backlog](../../docs/mdlint_v2/remediation-backlog-2026-08-05.md), not by a frozen audit report: each task names the `W-NN` items it closes and the backlog names their source findings. Two of its items change glob semantics and introduce lint-time defaults, so **anything that depends on what `include`/`exclude` mean must land after `P13`** — including a repository configuration of our own (`P17.02`).
 - Within a phase, respect each task file's `Previous`, `Next`, `Depends on`, and `Blocks` chain.
 - If the roadmap and a task file disagree on a load-bearing detail, use the more specific task file and surface the inconsistency.
 - Known roadmap drift around built-in rule count should be treated explicitly: current phase files include `SEC-003`, so built-in rule work must account for it.
