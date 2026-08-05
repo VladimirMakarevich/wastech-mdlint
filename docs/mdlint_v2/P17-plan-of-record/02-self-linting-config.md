@@ -1,0 +1,39 @@
+# P17.02 · Self-linting configuration and CI
+
+> Phase: [P17 — Plan of record](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Not started**. Backlog: [W-53](../remediation-backlog-2026-08-05.md) (High — audit F35 graded it LOW; **raised on leverage**, which the audit's own recommendation section argues for). Depends on [P17.01](01-dead-links.md), [P13](../P13-correctness/index.md).
+
+## Goal
+
+Give this repository a configuration of its own and a CI step that runs it, so the drift class this whole phase exists to clean up becomes a build failure instead of an audit finding. **This is the highest-leverage change in the backlog.**
+
+## Problem
+
+`wastech-mdlint.config.json` does not exist at the root, and no v2-shaped config exists anywhere outside four test fixtures. CI runs ESLint, Prettier, Vitest, `tsc -b`, and `npm pack --dry-run` — **and nothing runs the product.** This is a Markdown analyzer whose own 132+ plan files, 51 guide pages, and README are never analyzed.
+
+**The demonstration is [P17.01](01-dead-links.md).** Its seventeen dead links were all found by `REF-001` in a **single run**, once a configuration was supplied from outside the repository — a run this repository cannot perform on itself. Every finding in that task was reachable by the tool this repository ships.
+
+**Adding one closes a plan expectation rather than reversing a decision.** Requirement **I8** (precedence tier 2) states that "the repo's own config is simply rewritten in the new shape", and [`glossary.md`](../glossary.md) `:305` repeats it — both written as though the artifact already exists. Nothing records a decision against one in either direction. The audit checked this specifically: an earlier draft read `P0-foundations/09-audit-remediation.md:25` as a decision rejecting a repository configuration, re-read it, and found it is a remediation clause about removing the pre-v2 package's leftovers. So there is no decision to reverse.
+
+## Deliverables / steps
+
+1. **Add a narrow, docs-only configuration.** `include` over `docs/**` and `README.md`. Start with the reference rules that pay for themselves immediately — `REF-001`, `REF-002` — rather than enabling everything: a config that reports 461 warnings on day one gets ignored, and the field test measured exactly that shape on `CTX-002`.
+2. **Pick the config shape after [P13](../P13-correctness/index.md).** [P13.01](../P13-correctness/01-glob-semantics.md) changes what a glob means and [P13.02](../P13-correctness/02-default-exclude.md) introduces lint-time defaults, so a config written before them would encode semantics that are about to change. This is why the dependency is on the phase and not just on P17.01.
+3. **Add the CI step.** It must fail the build on a dead link in `docs/`. Run it in the existing `verify` job rather than a new workflow, so it shares the build the other gates already produce.
+4. **Land it after [P17.01](01-dead-links.md) clears the existing 17.** A gate that is red the day it lands gets disabled, and then the finding recurs with a disabled gate on top of it.
+5. **Wire `$schema` locally**, per the v2 config contract — no remote URL. The repository has the CLI in-tree, so the installed-package schema path applies rather than a generated project-local copy; verify which one `init` would produce here and use that, so the repo's own config is an example of the documented behavior rather than a special case.
+6. **Decide the growth path and say it.** Once `REF-001`/`REF-002` are green, which rule joins next, and who decides? A config that never grows is a one-time fix; one that grows without a stated rule becomes noise. One sentence in the config's own comments is enough.
+7. **Update I8 and the glossary** so the tier-2 requirement and its glossary echo describe a config that now exists, rather than presuming one.
+8. **Consider what this makes measurable.** With the config in place, `graph`/`slice`/`impact` and `compile` can run on this repository's own docs — which is also the most realistic large corpus available for [P15.01](../P15-output-contracts/01-renderers-at-scale.md)'s bounds. Worth noting, not worth blocking on.
+
+## Out of scope
+
+Enabling the full rule set. Fixing whatever the new gate finds beyond `REF-001`/`REF-002` — if enabling a second rule family surfaces real findings, that is a follow-up task, not a reason to widen this one. Linting `tasks/` (gitignored and deliberately outside the gates).
+
+## Exit criteria
+
+- [ ] A root `wastech-mdlint.config.json` exists, JSONC, with a local `$schema`, scoped to `docs/**` and `README.md`.
+- [ ] CI fails on a dead link inside `docs/`, in the existing `verify` job.
+- [ ] The first CI run is **green**, verified against P17.01's stated baseline of zero.
+- [ ] The config's rule set is deliberately narrow, and the growth path is stated in the config itself.
+- [ ] Requirement I8 and the glossary describe a config that exists.
+- [ ] `npm run format` green — the new config file is inside the format gate too.
