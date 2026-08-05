@@ -17,7 +17,7 @@ The pattern repeats in the other direction too: `init` prints a correct, well-wo
 | [P14.01](01-mcp-cwd-validation.md) | A nonexistent `cwd` silently succeeds on five MCP tools | W-18 | High | M | P13 |
 | [P14.02](02-cli-exit-codes.md) | CLI exit codes and out-of-repo path rendering | W-13, W-17 | High | S–M | P13 |
 | [P14.03](03-init-disclosure.md) | `init` disclosure and the hidden-directory default | W-14, W-15 | High | M | P13.02 |
-| [P14.04](04-config-resolution-base.md) | `--config` resolves against two different bases | W-16 | Medium | S–M | P13.06 |
+| [P14.04](04-config-resolution-base.md) | `--config` resolves against two different bases | W-16 | Medium | S–M | P13.06, P14.01 (if direction A) |
 | [P14.05](05-mcp-error-contract.md) | MCP error-contract parity and the operational code | W-19, W-20, W-21 | Medium | M | P14.01 |
 
 > **Backlog key.** `W-NN` are the work items in the [consolidated remediation backlog](../remediation-backlog-2026-08-05.md), which names each item's source finding IDs so the original evidence stays reachable.
@@ -26,12 +26,13 @@ The pattern repeats in the other direction too: `init` prints a correct, well-wo
 
 ```
 (P13) ─► P14.01 (stat-and-reject at four MCP sites)
-             └─► P14.05 (error contract — shares the INVALID_INPUT path)
-        P14.02  P14.03  P14.04   (independent)
+             ├─► P14.05 (error contract — shares the INVALID_INPUT path)
+             └─► P14.04 (only if it takes direction A — same MCP resolver)
+        P14.02  P14.03   (independent)
                                    └─► (P15)
 ```
 
-> **P14.01 before P14.05**, because both land in the MCP error path and P14.01 introduces the `INVALID_INPUT` rejections whose text rendering P14.05 then has to get right. **P14.03 after [P13.02](../P13-correctness/02-default-exclude.md)**, since the question it answers — is a hidden-directory exclude the right _lint-time_ default — only has a stable answer once the lint-time defaults exist at all. P14.02 and P14.04 are independent of everything here.
+> **P14.01 before P14.05**, because both land in the MCP error path and P14.01 introduces the `INVALID_INPUT` rejections whose text rendering P14.05 then has to get right. **P14.03 after [P13.02](../P13-correctness/02-default-exclude.md)**, since the question it answers — is a hidden-directory exclude the right _lint-time_ default — only has a stable answer once the lint-time defaults exist at all. **P14.04 after P14.01 if it takes direction (A):** honoring the caller's `cwd` deletes the MCP context helper's local workaround, and that helper is one of the four `cwd` sites P14.01 refactors — landing them in the wrong order leaves the shared resolver half-refactored. Under direction (B) (register the divergence) P14.04 touches no MCP code and is independent. P14.02 is independent of everything here.
 
 ## Decisions this phase must reach
 

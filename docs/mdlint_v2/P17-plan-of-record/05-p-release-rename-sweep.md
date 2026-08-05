@@ -4,13 +4,21 @@
 
 ## Goal
 
-Finish a rename that was applied to one directory and never swept: `P9-release` became `P-release`, and eighteen lines across the plan and the **shipped artifacts** still assign release work to `P9`.
+Finish a rename that was applied to one directory and never swept: `P9-release` became `P-release`, and nineteen lines still assign release work to `P9` — **seven in the plan** (W-45), **eleven in shipped artifacts and CI** (W-46), plus `README.md:34`, which W-46's fix adds as the same class through a different mechanism. The two halves are swept differently: the plan half is prose in tiers 1 and 2, the artifact half includes published skill frontmatter and a user-visible CI log line.
 
 ## Problem
 
 The release phase was renamed from `P9-release` to `P-release` in `573d4f6`, a commit that touched nothing outside `docs/`. After the rename, `P9.03` means "Add Windows/macOS to the CI matrix" (`Status **Done**`), while the composite Action is `PR.03` (`Status **Not started**`) — so a stale `P9.03` now names a completed task instead of the pending one it meant.
 
-**W-45 — seven stale references inside the plan.** Three phase indexes still assign release work to P9, and **three of the six locked requirements documents — precedence tier 2 — assign accepted requirements to it**, two of them naming work that shipped in P7.05 and P8.05. So a tier-2 document and a tier-1 index now contradict each other about what P9 is. `P10.02` closed this class **in the glossary alone** and says so, which is why the rest survived.
+**W-45 — seven stale references inside the plan.** Enumerated in the current tree, so the sweep is not left to a grep:
+
+| Site | Tier |
+| --- | --- |
+| `P0-foundations/index.md:51`, `P6-init/index.md:47`, `P7-mcp-server/index.md:45` | phase indexes (tier 1) |
+| `requirements/04-skills-compile.md:50`, `requirements/05-mcp-server.md:44`, `requirements/06-installation.md:3` | locked requirements (tier 2) |
+| `requirements/index.md:14` | the requirements index — the seventh, and the one an enumeration of "three indexes plus three documents" loses |
+
+**Three of the six locked requirements documents — precedence tier 2 — assign accepted requirements to P9**, two of them naming work that shipped in P7.05 and P8.05. So a tier-2 document and a tier-1 index now contradict each other about what P9 is. `P10.02` closed this class **in the glossary alone** and says so, which is why the rest survived.
 
 **W-46 — eleven stale lines in shipped artifacts.** Verified in the current tree, ten of them in shipped artifacts across six files plus one test comment:
 
@@ -28,9 +36,9 @@ A twelfth candidate at `packages/core/src/compile/skill-frontmatter.ts:4` names 
 
 ## Deliverables / steps
 
-1. **Sweep the plan (W-45):** the three phase indexes and the three locked requirements documents under `docs/mdlint_v2/requirements/`. The tier-2 documents are the priority — a locked requirement contradicting an index about what a phase is called is worse than a summary doing it.
+1. **Sweep the plan (W-45):** all seven sites in the table above — the three phase indexes, the three locked requirements documents, and `requirements/index.md:14`. The tier-2 documents are the priority: a locked requirement contradicting an index about what a phase is called is worse than a summary doing it.
 2. **Edit the eleven enumerated lines (W-46)**, plus `README.md:34`, which still describes the shipped MCP surface in future tense by phase — the same class, different mechanism, and an eighth file.
-3. **Do not sweep by pattern.** The audit checked the rest of the tree and found the references to **`P9.04`, `P9.06`, and `P9.07` are all correct** — `P9` still names the post-audit remediation phase, and only the _release_ sense of it is stale. `.github/workflows/ci.yml:16` (`M-6 / P9.06`, the format gate) is a live example a blind `s/P9/P-release/` would break. Edit the enumerated lines, then re-grep and classify each remaining hit by what it refers to.
+3. **Do not sweep by pattern.** The audit checked the rest of the tree and found the references to **`P9.04`, `P9.06`, and `P9.07` are all correct** — `P9` still names the post-audit remediation phase, and only the _release_ sense of it is stale. Two live examples a blind `s/P9/P-release/` would break: `.github/workflows/ci.yml:16` (`M-6 / P9.06`, the format gate) and `requirements/06-installation.md:30` ("audit P9 engines gap"), which sits in a file this task **does** edit at `:3` — so the same file needs one line changed and one left alone. Edit the enumerated lines, then re-grep and classify each remaining hit by what it refers to.
 4. **Decide the twelfth candidate** deliberately: correct `skill-frontmatter.ts:4` to P8.05, or leave it and say why in the change. Silence here is how it becomes a thirteenth finding.
 5. **Regenerate rather than hand-edit** anything generated. The three `SKILL.md` files are published artifacts; check whether their frontmatter is generated or authored before editing, and if generated, fix the generator.
 6. **Note the shipped-runtime consequence.** `config-writer.ts:170-171` is core runtime that `init` reads when writing a CI workflow template; changing a comment there is safe, but confirm the comment is not load-bearing for the template's `uses:`-versus-inline decision, which it explains.
@@ -41,10 +49,10 @@ Renaming anything else, and re-opening the `P9-release` → `P-release` decision
 
 ## Exit criteria
 
-- [ ] The three phase indexes and three locked requirements documents no longer assign release work to `P9`.
+- [ ] All seven plan sites — three phase indexes, three locked requirements documents, and `requirements/index.md:14` — no longer assign release work to `P9`.
 - [ ] The eleven enumerated lines plus `README.md:34` are corrected.
 - [ ] Every remaining `P9` outside `docs/` either names the remediation phase correctly or is gone — verified by a re-grep with each hit classified, not by a pattern replace.
-- [ ] `.github/workflows/ci.yml:16` is **untouched**.
+- [ ] `.github/workflows/ci.yml:16` and `requirements/06-installation.md:30` are **untouched** — both name the remediation phase correctly.
 - [ ] The three published `SKILL.md` frontmatter lines are correct, via the generator if they are generated.
 - [ ] `skill-frontmatter.ts:4` is corrected or deliberately left, stated in the change.
 - [ ] Gates green, including `npm run format`.

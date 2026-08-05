@@ -12,7 +12,7 @@ Make the published payload cost what it is worth, make the local release check a
 
 **W-30 — `release:check` validates nothing.** `package.json:38` defines it as `npm run typecheck && npm test && npm run build && npm pack --dry-run` — **no workspace flag** — run from a root that is `"private": true` with no `files` field. So it exercises none of the three allowlists. CI does it correctly (`.github/workflows/ci.yml:63`, `npm pack --dry-run -w ${{ matrix.package }}`). Measured: `npm pack --dry-run` at the root packs **445 files** today (442 at the audited commit — tree drift, **not** a regression baseline), including `.github/workflows/ci.yml` and `docs/guide/cli.md`; `-w @wastech-mdlint/cli` packs 26.
 
-[`glossary.md`](../glossary.md) `:275` is the **only** document describing this script, and it states the inverse: that it "validates each package's published `files` set". A maintainer trusting it believes a gate exists that does not.
+The **`release:check` / `npm pack --dry-run`** entry in [`glossary.md`](../glossary.md) is the **only** document describing this script, and it states the inverse: that it "validates each package's published `files` set". A maintainer trusting it believes a gate exists that does not. (The backlog cites it as `glossary.md:275` — correct at the audited commit, shifted since; find it by entry name.)
 
 **W-32 — the `engines` pin is advisory.** `npm ci` prints `EBADENGINE` for the root and all three packages and exits `0`; no `.npmrc` sets `engine-strict`; nothing reads `process.version` at runtime. The whole field test then ran on **`v24.8.0` against a `>=24.17.0` floor** — so the floor is untested in practice, which is the actual finding.
 

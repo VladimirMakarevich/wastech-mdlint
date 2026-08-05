@@ -1,6 +1,5 @@
 # wastech-mdlint — Glossary
 
-
 ## Product & architecture
 
 - **wastech-mdlint** — A deterministic, local-first linter and library for the Markdown _context_ in a repository.

@@ -27,13 +27,17 @@ What these share is the failure direction: **silence**. Exit `0`, no diagnostic,
 
 ```
 (P12) ─► P13.01 (glob list form + anchoring docs)
-             └─► P13.02 (default exclude — its meaning depends on P13.01)
+             ├─► P13.02 (default exclude — its meaning depends on P13.01)
+             │      ▲
+             │      └── its `respectGitignore` default decision also needs P13.03
              └─► P13.04 (rule option defaults are globs)
         P13.03  P13.05  P13.06   (independent)
                                    └─► (P14)
 ```
 
-> **P13.01 goes first and alone.** It changes what every glob in every config means, so landing a default `exclude` (P13.02) or default `entryPoints` (P13.04) before it would pin those defaults against semantics that are about to change. P13.03, P13.05 and P13.06 touch disjoint subsystems and can run in parallel with any of the above.
+> **P13.01 goes first and alone.** It changes what every glob in every config means, so landing a default `exclude` (P13.02) or default `entryPoints` (P13.04) before it would pin those defaults against semantics that are about to change. P13.05 and P13.06 touch disjoint subsystems and can run in parallel with any of the above.
+>
+> **One ordering constraint inside the parallel set.** P13.03 is otherwise independent, but [P13.02](02-default-exclude.md) also decides whether `respectGitignore` should default to `true`. Turning that default on before P13.03 lands would put the root-first-wins precedence bug (W-11) on the zero-config path — a default that silently drops a file real `git` keeps, which is the exact failure class this phase exists to close. So P13.02 may ship its `exclude` default at any time, but a `respectGitignore: true` default lands only after P13.03.
 
 ## Phase exit criteria
 
@@ -43,7 +47,8 @@ What these share is the failure direction: **silence**. Exit `0`, no diagnostic,
 - [ ] No rule can be enabled into a silent no-op; `SIZE-001` and `GRP-002` either require their threshold or ship a default (W-04, W-05).
 - [ ] `TBL-003.caseSensitive` has one source of truth that the generated schema, the skill renderer, and every guide page read (W-06).
 - [ ] `GRP-001`'s two-node-cycle behavior is configurable or recorded in [`accepted-behaviors.md`](../accepted-behaviors.md) (W-07).
-- [ ] `REF-001.exclude` applies on the router branch; one extension constant governs coverage, the `init` scan, and the default `include` (W-08, W-09, W-10).
+- [ ] `REF-001.exclude` applies on the router branch; one extension constant governs coverage, the `init` scan, and the default `include` (W-08, W-09).
+- [ ] One image-target resolution model is claimed and implemented, or the exclusion is stated where the graph builder's invariant comment makes the claim (W-10).
 - [ ] Nested `.gitignore` negation agrees with `git check-ignore` in both directions (W-11).
 - [ ] An invalid `severity` or an unknown key on **any** rule family names the key and, for an enum, the allowed values; every config diagnostic names the file; one path notation throughout (W-12).
 - [ ] `npm run typecheck && npm test && npm run build && npm run lint && npm run format` green.

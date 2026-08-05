@@ -22,7 +22,7 @@ The field test measured the anchoring half on a real monorepo: no config / the R
 
 1. **Decide the negation direction — it is a behavior change either way, so decide it deliberately and record the choice.**
    - **(A) Deliver negation:** route `matchesConfigGlob` through the list form already used at `workspace-packages.ts:254`. Negation becomes a feature; any corpus relying on today's accidental widening shrinks.
-   - **(B) Reject it loudly:** reject a leading `!` during config validation, with a diagnostic that names the pattern and the key. Smaller behavioral change, turns a silent wrong answer into a loud one, does not deliver the feature.
+   - **(B) Reject it loudly:** reject a leading `!` during config validation, with a diagnostic that names the pattern and the key. Smaller behavioral change, turns a silent wrong answer into a loud one, does not deliver the feature. **If (B) is chosen, the diagnostic is a config diagnostic** — [P13.06](06-config-diagnostics.md) owns the path notation and the "name the key and the allowed values" shape for that validator, so emit the new message through whatever it settles rather than inventing a second format. The two tasks are otherwise independent; this is the one place they touch.
    - Either way, normalize a leading `!` **before** the depth-agnostic prefix at `globs.ts:14`, or a bare `!keep.md` stays a silent no-op under (A) and slips past validation under (B).
 2. **Close it in one place.** The fix belongs in [`packages/core/src/discovery/globs.ts`](../../../packages/core/src/discovery/globs.ts), not per-surface — the whole point of the shared matcher is that every surface inherits it.
 3. **Add the ordered-negation case to `packages/core/test/rule-utils.test.ts`**, which is where its absence let this ship. Cover the three reproduced shapes: negated `include`, negated `exclude`, and a negated rule-level `files`.
@@ -41,6 +41,7 @@ Changing what any shipped default `exclude` contains — that is [P13.02](02-def
 - [ ] A rule-level negated `files` no longer pulls in a third file.
 - [ ] A slash-free `!a.md` is not a silent no-op.
 - [ ] `packages/core/test/rule-utils.test.ts` carries an ordered-negation case that fails before the fix.
+- [ ] If (B), the rejection diagnostic uses [P13.06](06-config-diagnostics.md)'s notation and message shape rather than a second format.
 - [ ] Each of the four shapes in the field test's anchoring table (`NOTE.md`, `*.md`, `./NOTE.md`, `node_modules/**`) has a documented, predictable answer in `configuration.md` and `config-reference.md`.
 - [ ] The `README.md` example prunes a nested `node_modules`.
 - [ ] The glossary's **File scope** entry states the anchoring rule and the negation decision.

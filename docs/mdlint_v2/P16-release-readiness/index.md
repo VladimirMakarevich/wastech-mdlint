@@ -46,7 +46,7 @@ Two halves, and the order between them is deliberate.
 
 ## Phase exit criteria
 
-- [ ] Each of W-01, W-02, W-14, W-26, W-27 has a test that fails before its fix (W-57).
+- [ ] Each of W-01, W-02, W-14, W-26, W-27 has a test that fails before its fix — verified by reverting the fix, and by extending the guard the fix's own task landed rather than adding a second one (W-57).
 - [ ] A differential test pins the ad-hoc MCP `lint` step order against `lintFiles`, or an ad-hoc lint entry point is hoisted into core (W-58).
 - [ ] The build-before-test remedy clears the spawn guard on an mtime-only change, or `tsc -b --force` is named in the failure message **and** in [`.agents/rules/testing.md`](../../../.agents/rules/testing.md) (W-56).
 - [ ] Every tarball carries a README and a license, and every manifest declares `repository` with `directory` — asserted by a test or release check (W-29).

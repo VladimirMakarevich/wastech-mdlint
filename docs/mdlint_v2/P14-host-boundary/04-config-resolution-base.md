@@ -1,6 +1,6 @@
 # P14.04 · `--config` resolves against two different bases
 
-> Phase: [P14 — Host boundary](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Not started**. Backlog: [W-16](../remediation-backlog-2026-08-05.md) (Medium). Sources: audit F10 (MEDIUM, reproduced). Depends on [P13.06](../P13-correctness/06-config-diagnostics.md).
+> Phase: [P14 — Host boundary](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Not started**. Backlog: [W-16](../remediation-backlog-2026-08-05.md) (Medium). Sources: audit F10 (MEDIUM, reproduced). Depends on [P13.06](../P13-correctness/06-config-diagnostics.md), and — if direction (A) is chosen — on [P14.01](01-mcp-cwd-validation.md), which refactors the same MCP `cwd` resolver.
 
 ## Goal
 
@@ -20,7 +20,7 @@ Make `--config` mean one thing across all six handlers that accept it, or state 
    - **(A) Honor the caller's `cwd`** in `loadConfiguration` for all six call sites, and delete the two local workarounds. This is the behavior the guide implies and the one that removes a divergence rather than documenting it.
    - **(B) Keep process-cwd resolution**, add the register row, and state the base at `docs/guide/cli.md:43` where `--config` is documented.
 2. **If (A), the diagnostic path matters as much as the resolution.** The reproduced symptom is two bugs compounding: the path resolved against one base and _rendered_ relative to another. Fixing resolution without fixing rendering leaves a correct lookup reported against the wrong base. [P13.06](../P13-correctness/06-config-diagnostics.md) settles the notation question for config diagnostics; keep this consistent with whatever it chose.
-3. **If (A), check the MCP helper explicitly.** The workaround there is one of the four `cwd` sites [P14.01](01-mcp-cwd-validation.md) touches; land these two in an order that does not leave the resolver half-refactored.
+3. **If (A), land after [P14.01](01-mcp-cwd-validation.md).** The workaround there is one of the four `cwd` sites P14.01 touches, and P14.01's own first deliverable is to make that resolver the single entry point — so removing the workaround first would leave the resolver half-refactored. Direction (B) touches no MCP code and carries no such ordering.
 4. **Either way, remove the task-file-only deferral.** If (A), it is obsolete and should be marked so. If (B), it moves to the register.
 5. **Test the six handlers together**, not one: the finding is an inconsistency across call sites, so a test that pins only `lint` would pass with the divergence intact. A table-driven test over the six is the shape that catches a seventh handler added later.
 

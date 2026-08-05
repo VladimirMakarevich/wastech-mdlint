@@ -1,4 +1,4 @@
-Produce a full, implementation-ready plan from the task and its enriched spec. Do not edit code. Return the typed structured result the output schema requires.
+Produce a full, implementation-ready plan from the task file. Do not edit code. Return the typed structured result the output schema requires. You are the first step of this flow: the task file, plus any `human_input` answer file in your context, is the whole specification — nothing upstream enriched or restated it for you, so resolve every ambiguity against the repository itself or ask.
 
 ## What To Produce
 

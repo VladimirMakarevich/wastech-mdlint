@@ -25,6 +25,8 @@ The crosscheck generalizes it across the whole assessment. Of the 16 defects the
 
 ## Deliverables / steps
 
+**Read this first: several of these guards are already required by the tasks that ship the fixes.** [P13.01](../P13-correctness/01-glob-semantics.md) carries the ordered-negation case, [P13.02](../P13-correctness/02-default-exclude.md) the `shared-exclude` no-config fixture, [P14.03](../P14-host-boundary/03-init-disclosure.md) the dot-directory `init` disclosure test, and [P15.01](../P15-output-contracts/01-renderers-at-scale.md) the large-corpus renderer bounds. This task's job is therefore **verify, then fill the gaps** — confirm each guard exists and actually fails before its fix (by reverting the fix locally), extend it where the earlier task's scope stopped short, and add what no fix-task owned: the corpus-versus-tracked-files comparison, the parity pattern in step 5, W-58 and W-56. Re-adding a guard that already exists is not the work; noticing a missing or toothless one is.
+
 1. **A nested-`node_modules` fixture linted with no config.** `docs/a.md`, `mobile/node_modules/leftpad/README.md`, `node_modules/rightpad/README.md`. Covers [P13.02](../P13-correctness/02-default-exclude.md) and would have caught the blocker. Tag `@boundary-guard shared-exclude`.
 2. **A dot-directory fixture run through `init` then `lint`**, with the corpus compared to a tracked-file list in **both** directions (nothing missing, nothing extra) — the `comm` comparison the field test used to account for its 63-file gap exactly. Covers [P14.03](../P14-host-boundary/03-init-disclosure.md).
 3. **Large-corpus assertions for the two renderers:** a bound on the longest line of `graph --format human`, and a bound on the dependency section's share of a compiled skill. Covers [P15.01](../P15-output-contracts/01-renderers-at-scale.md) — which builds the generating fixture; adopt it here rather than writing a second one.
@@ -41,7 +43,7 @@ A second external-repository field test. The existing one exercised one macOS ta
 
 ## Exit criteria
 
-- [ ] Each of W-01, W-02, W-14, W-26, W-27 has a test that **fails before its fix** — verified by reverting each fix locally, not asserted.
+- [ ] Each of W-01, W-02, W-14, W-26, W-27 has a test that **fails before its fix** — verified by reverting each fix locally, not asserted. Where the fix's own task already landed that guard, this is a verification with a stated result, not a second guard.
 - [ ] The no-config nested-`node_modules` fixture and the dot-directory `init` fixture both exist, the second comparing the corpus to a tracked-file list in both directions.
 - [ ] The glob table's four shapes plus an ordered negation are covered.
 - [ ] At least one surface has a human-versus-structured parity assertion, written as a reusable pattern.
