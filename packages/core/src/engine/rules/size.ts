@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { matchesConfigGlob } from "../../discovery/globs.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
-import { estimateTokens } from "../tokens.js";
+import { estimateTokens, TOKEN_ESTIMATE_NOTE } from "../tokens.js";
 
 // SIZE-001 — per-file byte / line / token budget (D3, P3.07). Each metric is independently optional;
 // omitting one disables that check. Metrics stay independent of each other, but the two severities
@@ -153,10 +153,14 @@ export const size001: RuleDefinition = defineRule({
 
       context.report({
         severity: breach.severity,
-        message: `File exceeds ${metric} ${breach.budget} budget: ${actual} ${METRIC_UNIT[metric]} > ${breach.limit}.`,
+        // `tokens` alone carries the calibration (W-34): `bytes` and `lines` are exact counts a user
+        // can reproduce, while a token number is an estimate whose arithmetic was disclosed nowhere
+        // a reader of the finding would look.
+        message:
+          `File exceeds ${metric} ${breach.budget} budget: ${actual} ${METRIC_UNIT[metric]} > ${breach.limit}.` +
+          (metric === "tokens" ? ` ${TOKEN_ESTIMATE_NOTE}` : ""),
         line: 0,
         data,
-        helpUri: "SIZE-001",
       });
     }
   },

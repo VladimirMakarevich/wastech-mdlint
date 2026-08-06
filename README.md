@@ -172,30 +172,30 @@ The following table is generated from the rule metadata (`npm run generate:docs`
 <!-- prettier-ignore -->
 | Rule | Category | Default severity | Scope | Fixable | Description |
 | --- | --- | --- | --- | --- | --- |
-| `CTX-001` | CTX | warning | document | no | Sections are not empty or placeholder-only. |
-| `CTX-002` | CTX | warning | document | no | All checklist items are checked. |
-| `CTX-003` | CTX | warning | project | no | Content uses canonical glossary terms instead of aliases. |
-| `GRP-001` | GRP | error | project | no | No circular references between documents. |
-| `GRP-002` | GRP | warning | project | no | Documents have at least one incoming reference (except entry points). |
-| `GRP-003` | GRP | warning | project | no | IDs are carried forward across pipeline stages. |
-| `LLM-001` | LLM | warning | project | no | Eager-import context stays within the per-entrypoint token budget. |
-| `REF-001` | REF | error | document | no | Relative links resolve to a file. |
-| `REF-002` | REF | error | document | no | Link anchors match a heading slug. |
-| `REF-003` | REF | error | document | no | Image targets resolve to a file. |
-| `REF-004` | REF | error | document | no | Cross-zone links are declared in the zone's Dependencies section. |
-| `REF-005` | REF | error | project | no | IDs are traceable between definitions and references. |
-| `REF-006` | REF | warning | project | no | References do not depend on less-stable entities. |
-| `SEC-001` | SEC | error | document | yes | Required sections are present. |
-| `SEC-002` | SEC | error | document | no | Sections appear in the required order. |
-| `SEC-003` | SEC | error | project | no | Sections conform to a reference template's heading structure. |
-| `SIZE-001` | SIZE | warning | document | no | File stays within byte / line / token budgets. |
-| `STR-001` | STR | error | project | no | Required files exist in the project. |
-| `TBL-001` | TBL | error | document | no | Tables declare their required columns. |
-| `TBL-002` | TBL | warning | document | yes | Target table cells are not empty. |
-| `TBL-003` | TBL | error | document | no | Cell values fall within an allowed set. |
-| `TBL-004` | TBL | error | document | no | Cell values match a required pattern. |
-| `TBL-005` | TBL | error | document | no | Cross-column conditional holds (when → then). |
-| `TBL-006` | TBL | error | project | no | Column IDs are unique across files. |
+| [`CTX-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-001.md) | CTX | warning | document | no | Sections are not empty or placeholder-only. |
+| [`CTX-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-002.md) | CTX | warning | document | no | All checklist items are checked. |
+| [`CTX-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-003.md) | CTX | warning | project | no | Content uses canonical glossary terms instead of aliases. |
+| [`GRP-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/GRP-001.md) | GRP | error | project | no | No circular references between documents. |
+| [`GRP-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/GRP-002.md) | GRP | warning | project | no | Documents have at least one incoming reference (except entry points). |
+| [`GRP-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/GRP-003.md) | GRP | warning | project | no | IDs are carried forward across pipeline stages. |
+| [`LLM-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/LLM-001.md) | LLM | warning | project | no | Eager-import context stays within the per-entrypoint token budget. |
+| [`REF-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-001.md) | REF | error | document | no | Relative links resolve to a file. |
+| [`REF-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-002.md) | REF | error | document | no | Link anchors match a heading slug. |
+| [`REF-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-003.md) | REF | error | document | no | Image targets resolve to a file. |
+| [`REF-004`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-004.md) | REF | error | document | no | Cross-zone links are declared in the zone's Dependencies section. |
+| [`REF-005`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-005.md) | REF | error | project | no | IDs are traceable between definitions and references. |
+| [`REF-006`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-006.md) | REF | warning | project | no | References do not depend on less-stable entities. |
+| [`SEC-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-001.md) | SEC | error | document | yes | Required sections are present. |
+| [`SEC-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-002.md) | SEC | error | document | no | Sections appear in the required order. |
+| [`SEC-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-003.md) | SEC | error | project | no | Sections conform to a reference template's heading structure. |
+| [`SIZE-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SIZE-001.md) | SIZE | warning | document | no | File stays within byte / line / token budgets. |
+| [`STR-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/STR-001.md) | STR | error | project | no | Required files exist in the project. |
+| [`TBL-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-001.md) | TBL | error | document | no | Tables declare their required columns. |
+| [`TBL-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-002.md) | TBL | warning | document | yes | Target table cells are not empty. |
+| [`TBL-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-003.md) | TBL | error | document | no | Cell values fall within an allowed set. |
+| [`TBL-004`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-004.md) | TBL | error | document | no | Cell values match a required pattern. |
+| [`TBL-005`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-005.md) | TBL | error | document | no | Cross-column conditional holds (when → then). |
+| [`TBL-006`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-006.md) | TBL | error | project | no | Column IDs are unique across files. |
 
 <!-- END GENERATED RULES -->
 
@@ -226,8 +226,11 @@ node packages/cli/dist/index.js lint . --format json > report.json
 node packages/cli/dist/index.js lint . --fail-on warning   # fail CI on warnings too
 ```
 
+That `summary` wrapper is the CLI's; the MCP `lint-files` and `lint` tools return the lint record itself, so their finding counts are top-level `errorCount`/`warningCount` rather than `summary.errors`. All four surfaces that report findings — including `impact --format json` — are tabulated in [Output & exit codes](docs/guide/output.md#where-each-host-puts-the-findings), along with every key a finding carries.
+
 ## Limitations
 
+- Token counts are **estimated**, not tokenized: `ceil(characters / 4)` over UTF-16 code units, which is what `SIZE-001`'s `tokens` budget and `LLM-001`'s `maxTokensPerEntrypoint` are measured against. Real tokenizers emit more tokens per character for non-Latin scripts, so the estimate errs **low** for Cyrillic or CJK content — the wrong direction for a budget meant to prevent context overflow. Set those budgets with headroom, and read the number as an order of magnitude rather than a count. The heuristic is isolated in one function so it can be replaced by a real tokenizer later.
 - No external HTTP link checking or link caching.
 - No runtime `.ts`/`.cjs`/`.mjs` config or user-code plugins (custom rules are data-only).
 - The context graph is rebuilt each run (no incremental cache yet).

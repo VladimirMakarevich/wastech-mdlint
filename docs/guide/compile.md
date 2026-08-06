@@ -41,6 +41,10 @@ Two things that fixed bounds do **not** promise, both worth knowing before you d
 
 `Reading Order` and the excluded-from-reading-order list are **not** capped: a document silently missing from the reading order is the exact dishonesty that block exists to prevent.
 
+### The `Context Budget` numbers are estimates
+
+The corpus total and the per-entrypoint breaches in that block come from the same heuristic [SIZE-001 and LLM-001](concepts.md#token-estimation) use — `ceil(characters / 4)`, which errs **low** for non-Latin scripts. Unlike a lint finding, which now states that calibration in its own message, the block states it nowhere: the artifact is loaded into an agent's context whole, so a sentence repeated per entrypoint costs the context the block exists to protect, and adding it would move the bytes and content hash of every committed `SKILL.md` for a disclosure the reader can get here. Read those numbers as an order of magnitude, and set the budgets they are measured against with headroom.
+
 ## Config
 
 ```jsonc

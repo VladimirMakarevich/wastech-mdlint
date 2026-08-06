@@ -10,6 +10,7 @@ import { compareStrings } from "../src/deterministic-sort.js";
 import { lintFiles } from "../src/engine/lint-files.js";
 import type { Assertion } from "../src/engine/primitives/assert.js";
 import { ASSERTION_TARGETS } from "../src/engine/primitives/assert.js";
+import { CUSTOM_RULE_DOCS_URL } from "../src/engine/rule-docs-url.js";
 
 const tempDirs: string[] = [];
 
@@ -67,7 +68,11 @@ describe("declarative custom rule", () => {
       ruleId: "REQ-OWNER",
       severity: "error",
       filePath: "docs/reqs.md",
+      // W-35: `helpUri` used to be the rule id again. A user-chosen id has no page of its own, so a
+      // custom finding links the page documenting the mechanism — not `REQ-OWNER.md`, which is a 404.
+      helpUri: CUSTOM_RULE_DOCS_URL,
     });
+    expect(result.messages[0]!.helpUri).not.toBe("REQ-OWNER");
   });
 
   it("runs a project-scope custom rule (columnUnique) from config", async () => {

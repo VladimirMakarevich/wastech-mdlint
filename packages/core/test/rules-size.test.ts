@@ -12,6 +12,7 @@ import {
 import { lintFiles } from "../src/engine/lint-files.js";
 import { RuleResolutionError } from "../src/engine/registry.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
+import { TOKEN_ESTIMATE_NOTE } from "../src/engine/tokens.js";
 
 const tempDirs: string[] = [];
 
@@ -61,6 +62,30 @@ describe("SIZE-001 tokens metric", () => {
       severity: "warning",
       data: { metric: "tokens", actual: 11, warnAt: 5 },
     });
+  });
+
+  // W-34: the number is an estimate, and the message is the only place a reader of it will look.
+  it("discloses the token calibration in the message itself", async () => {
+    const cwd = await fixtureRepo({ "a.md": `${"x".repeat(40)}\n` });
+    const result = await lint(cwd, [rule("SIZE-001", { tokens: { warn: 5 } })]);
+    expect(result.messages[0]!.message).toBe(
+      `File exceeds tokens warn budget: 11 tokens > 5. ${TOKEN_ESTIMATE_NOTE}`,
+    );
+  });
+
+  // The exact-count metrics stay terse: a byte or line count needs no calibration, and appending one
+  // to all three would train readers to skip the sentence that matters.
+  it("leaves the exact-count metrics' messages unchanged", async () => {
+    const cwd = await fixtureRepo({ "a.md": "l1\nl2\nl3\nl4\n" });
+    const result = await lint(cwd, [
+      rule("SIZE-001", { lines: { warn: 2 }, bytes: { warn: 3 } }),
+    ]);
+    for (const message of result.messages) {
+      expect(message.message).not.toContain(TOKEN_ESTIMATE_NOTE);
+    }
+    expect(result.messages.map((message) => message.message)).toContain(
+      "File exceeds lines warn budget: 4 lines > 2.",
+    );
   });
 });
 

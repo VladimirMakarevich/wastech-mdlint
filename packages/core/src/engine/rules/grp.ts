@@ -81,7 +81,6 @@ export const grp001: RuleDefinition = defineRule({
         line: firstArc?.line ?? 0,
         filePath: first,
         data: { cycle },
-        helpUri: "GRP-001",
       });
     }
   },
@@ -136,7 +135,6 @@ export const grp002: RuleDefinition = defineRule({
         line: 0,
         filePath: node.path,
         data: { path: node.path },
-        helpUri: "GRP-002",
       });
     }
   },
@@ -208,7 +206,6 @@ export const grp003: RuleDefinition = defineRule({
                 fromStage: current.stage,
                 toStage: next.stage,
               },
-              helpUri: "GRP-003",
             });
           }
         }

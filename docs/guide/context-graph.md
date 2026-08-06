@@ -74,6 +74,8 @@ wastech-mdlint impact docs/requirements/auth.md --format json
 
 Linting still runs over the **whole** corpus (so project rules see every document), but the reported messages/files are narrowed to `file` plus everything it affects. If `<file>` is outside the analyzed corpus, `impact` exits `2` with a hint.
 
+In `--format json` those findings arrive under a `lint` key holding the lint **record** — `{ messages, files, errorCount, warningCount }`, the same shape MCP `lint-files` returns — not the `{ summary, messages, files }` wrapper `lint --format json` prints. See [Output & exit codes](output.md#where-each-host-puts-the-findings).
+
 Its text output is line-oriented too. The affected subgraph is the whole corpus whenever the changed file is a hub, so `reading order` and the excluded list here grow exactly as `graph`'s do — leaving them comma-joined would have kept the defect in the surface most likely to be run on a hub.
 
 ## Graph-aware rules

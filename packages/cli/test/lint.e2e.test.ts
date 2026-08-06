@@ -229,6 +229,54 @@ describe("lint command", () => {
     expect(parsed.messages).toHaveLength(1);
   });
 
+  // W-24/W-35: the shape and the message keys `docs/guide/output.md` documents, asserted through the
+  // command a consumer actually runs. The guide's table is the contract; this is what pins it.
+  it("serializes the documented top-level keys, summary keys, and message keys", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "[broken](missing.md)\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "REF-001" }],
+      }),
+    });
+
+    const result = await run(
+      ["lint", cwd, "--format", "json", "--fail-on", "off"],
+      cwd,
+    );
+    const parsed = JSON.parse(result.stdout) as {
+      summary: Record<string, unknown>;
+      messages: Record<string, unknown>[];
+    };
+
+    expect(Object.keys(parsed).sort()).toEqual([
+      "files",
+      "messages",
+      "summary",
+    ]);
+    // No `pass`/`ok` field — the exit code is that signal, which the guide used to promise here.
+    expect(Object.keys(parsed.summary).sort()).toEqual([
+      "errors",
+      "files",
+      "warnings",
+    ]);
+    // `endLine` and `fixable` are absent on a REF-001 finding: the guide's table marks which keys are
+    // always present, and these two are not among them.
+    expect(Object.keys(parsed.messages[0]!).sort()).toEqual([
+      "column",
+      "data",
+      "filePath",
+      "helpUri",
+      "line",
+      "message",
+      "ruleId",
+      "severity",
+    ]);
+    // `helpUri` resolves to a page rather than restating `ruleId`, which is what it held before.
+    expect(parsed.messages[0]!.helpUri).toBe(
+      "https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-001.md",
+    );
+  });
+
   it("applies --fix in place then reports what remains", async () => {
     const cwd = await fixtureRepo({
       "a.md": ["| ID | Owner |", "| --- | --- |", "| REQ-1 |  |"].join("\n"),

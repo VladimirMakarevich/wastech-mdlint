@@ -79,6 +79,33 @@ describe("handleLintFiles", () => {
     expect(summary).toContain("broken.md");
   });
 
+  // W-24's other half: this tool returns the raw `LintResult`, so its counts are top-level
+  // `errorCount`/`warningCount` where the CLI's JSON puts them under `summary`. Both key sets are
+  // pinned (see `lint.test.ts` for the ad-hoc tool) so the documented divergence cannot drift
+  // unnoticed in either direction.
+  it("returns the raw LintResult keys, with `files` and top-level counts", async () => {
+    const result = await handleLintFiles({
+      cwd: path.join(fixturesDir, "lint-findings-project"),
+    });
+
+    expect(
+      Object.keys(result.structuredContent as Record<string, unknown>).sort(),
+    ).toEqual(["errorCount", "files", "messages", "warningCount"]);
+    // No `summary` wrapper: a typed client reads the record, which is why the shapes differ at all.
+    expect(result.structuredContent).not.toHaveProperty("summary");
+  });
+
+  // W-35: the value `helpUri` carries over the wire is now a page, not a restatement of `ruleId`.
+  it("crosses `helpUri` as a documentation URL", async () => {
+    const result = await handleLintFiles({
+      cwd: path.join(fixturesDir, "lint-findings-project"),
+    });
+
+    expect(structured(result).messages[0]!.helpUri).toBe(
+      "https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-001.md",
+    );
+  });
+
   it("replaces config.include when an explicit patterns arg is passed", async () => {
     const result = await handleLintFiles({
       cwd: path.join(fixturesDir, "basic-project"),

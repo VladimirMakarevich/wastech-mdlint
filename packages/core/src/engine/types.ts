@@ -4,7 +4,9 @@
 //   - Severity is orchestrator-owned (R1/C2): a rule declares `defaultSeverity`; config overrides
 //     it; `"off"` filters the rule out before it runs. So a *resolved* `Severity` never includes
 //     "off" — that lives only in config (`SeverityOverride`).
-//   - Findings are structured (R3): `column`, `endLine`, `fixable`, `data`, `helpUri`.
+//   - Findings are structured (R3): `column`, `endLine`, `fixable`, `data`, `helpUri`. `helpUri` is
+//     the one a rule does *not* supply: the runner copies it from the rule's `docsUrl` so it is a
+//     real documentation URL rather than a restatement of `ruleId` (P15.03).
 //   - Fail-fast (R4): a project rule with no `documents` throws rather than silently no-oping.
 //   - Fixes (R2): an optional `fix?` hook returns offset-based `TextEdit`s over the raw content.
 
@@ -65,6 +67,9 @@ export type TextEdit = {
 // warn vs error threshold). The runner resolves final severity as
 // `configOverride ?? finding.severity ?? rule.defaultSeverity`, so a config `severity` override wins
 // (C2), then the rule's per-finding hint, then the rule default.
+//
+// Deliberately *not* a `Partial<LintMessage>`: `helpUri` is absent because it is a property of the
+// rule, not of the finding, and the runner sources it from `rule.docsUrl` (P15.03).
 export type ReportInput = {
   message: string;
   line: number;
@@ -74,12 +79,12 @@ export type ReportInput = {
   severity?: Severity;
   fixable?: boolean;
   data?: Record<string, unknown>;
-  helpUri?: string;
 };
 
 // A single finding. Superset of the legacy `Finding` capability (R3) — note `filePath` replaces the
-// legacy `path`, and `line` is required (file-level rules report line 1). JSON output is the
-// serialization of this shape.
+// legacy `path`, and `line` is required: it is 1-based, and a whole-file finding reports `0`, which
+// `formatLintResultText` renders as `-`. JSON output is the serialization of this shape; the emitted
+// key set is documented in `docs/guide/output.md`.
 export type LintMessage = {
   ruleId: string;
   severity: Severity;
@@ -90,6 +95,8 @@ export type LintMessage = {
   endLine?: number;
   fixable?: boolean;
   data?: Record<string, unknown>;
+  // The reporting rule's documentation page. Optional on the type because a `Rule` may carry no
+  // `docsUrl`, but present on every finding a registered or custom rule produces (both populate it).
   helpUri?: string;
 };
 

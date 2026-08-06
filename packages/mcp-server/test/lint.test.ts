@@ -42,6 +42,37 @@ describe("handleLint", () => {
     expect((result.content[0] as { text: string }).text).toContain("SIZE-001");
   });
 
+  // W-24: the two lint tools return deliberately different documents, and the divergence was found
+  // twice by inspection without either pass noticing. Pinned by test on both tools so the difference
+  // is a decision the guide's host table states, not a drift a third reader re-discovers.
+  it("returns the narrower ad-hoc shape: no `files` list, counts at the top level", () => {
+    const result = handleLint({
+      content: "# Title\n\nsome body\nmore body\n",
+      rules: [{ rule: "SIZE-001", options: { lines: { error: 1 } } }],
+    });
+
+    // An ad-hoc document is not a corpus, so `files` is absent here where `lint-files` carries it.
+    expect(Object.keys(structured(result)).sort()).toEqual([
+      "errorCount",
+      "messages",
+      "warningCount",
+    ]);
+  });
+
+  // W-35: `helpUri` crosses the wire schema, so the value change from a bare rule id to a URL is
+  // caller-visible. Asserted at the tool boundary, not only in core.
+  it("crosses `helpUri` as a documentation URL, not a rule id", () => {
+    const result = handleLint({
+      content: "# Title\n\nsome body\nmore body\n",
+      rules: [{ rule: "SIZE-001", options: { lines: { error: 1 } } }],
+    });
+
+    const messages = structured(result).messages as LintMessage[];
+    expect(messages[0]!.helpUri).toBe(
+      "https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SIZE-001.md",
+    );
+  });
+
   it("filters a rule requested with severity `off` after resolving it", () => {
     const result = handleLint({
       content: "# Title\n\nsome body\nmore body\n",

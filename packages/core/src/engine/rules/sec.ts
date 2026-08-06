@@ -41,7 +41,7 @@ export const sec001: RuleDefinition = defineRule({
     for (const finding of sectionPresent(context.document!, {
       sections: options.sections,
     })) {
-      context.report({ ...finding, fixable: true, helpUri: "SEC-001" });
+      context.report({ ...finding, fixable: true });
     }
   },
   fix: (options) => (context) => {
@@ -99,7 +99,7 @@ export const sec002: RuleDefinition = defineRule({
       level: options.level,
       section: options.section,
     })) {
-      context.report({ ...finding, helpUri: "SEC-002" });
+      context.report(finding);
     }
   },
 });

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { ConfiguredRule } from "../src/config/load-config.js";
 import { lintFiles } from "../src/engine/lint-files.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
-import { estimateTokens } from "../src/engine/tokens.js";
+import { estimateTokens, TOKEN_ESTIMATE_NOTE } from "../src/engine/tokens.js";
 import type { ResolvedSettings } from "../src/engine/types.js";
 
 const tempDirs: string[] = [];
@@ -71,6 +71,8 @@ describe("LLM-001 eager-import budget", () => {
     );
     expect(overBudget).toMatchObject({ filePath: "CLAUDE.md" });
     expect(overBudget?.data).toMatchObject({ maxTokens: 50 });
+    // W-34: the budget finding quotes an estimated token count, so it discloses the estimate.
+    expect(overBudget?.message).toContain(TOKEN_ESTIMATE_NOTE);
   });
 
   it("reports a missing eager import", async () => {
@@ -85,6 +87,8 @@ describe("LLM-001 eager-import budget", () => {
     expect(result.messages[0]?.message).toMatch(
       /Missing eager import @docs\/missing\.md/,
     );
+    // A missing import names no token count, so the calibration would be a non-sequitur here.
+    expect(result.messages[0]?.message).not.toContain(TOKEN_ESTIMATE_NOTE);
   });
 
   it("detects an eager-import cycle", async () => {

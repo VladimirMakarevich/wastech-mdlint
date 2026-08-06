@@ -34,16 +34,17 @@
 ## Rule engine
 
 - **Rule engine** — The registry-driven core layer that runs rules over `ParsedDocument`s and reports structured findings. See [requirements/02-rules-engine.md](requirements/02-rules-engine.md) and [P2](P2-rule-engine/index.md).
-- **`Rule`** — A runnable rule instance with `id`, `description`, `category`, `defaultSeverity`, `scope`, `fixable`, `check()`, and optional `fix()`. Produced by `resolveRule` with options already validated and bound. See [`engine/types.ts`](../../packages/core/src/engine/types.ts).
-- **`RuleContext`** — The runtime context passed to `check()`/`fix()`: the current `document`/`filePath` (document scope), the whole `documents` map + `projectFiles` (project scope), `rootDir`, resolved `settings`, the shared `graph`, and `report()`. A rule emits a finding by calling `report()` with a `ReportInput` (message, line, and optional `column`/`severity`/`data`/etc.); the runner attaches `ruleId` and resolves severity.
-- **`RuleMetadata` / `RuleDefinition`** — The static, single-source rule description (category, default severity, fixable, docs URL, messages). One source generates `schema.json`, the README rules table, `describeRules`, and `init` categories. Decision [R6](requirements/02-rules-engine.md).
+- **`Rule`** — A runnable rule instance with `id`, `description`, `category`, `defaultSeverity`, `scope`, `fixable`, `docsUrl`, `check()`, and optional `fix()`. Produced by `resolveRule` with options already validated and bound (`resolveCustomRule` builds the same shape for a `custom` entry). `docsUrl` is load-bearing at runtime, not just in generated docs: `runRules` reads it to attach every finding's `helpUri`. See [`engine/types.ts`](../../packages/core/src/engine/types.ts).
+- **`RuleContext`** — The runtime context passed to `check()`/`fix()`: the current `document`/`filePath` (document scope), the whole `documents` map + `projectFiles` (project scope), `rootDir`, resolved `settings`, the shared `graph`, and `report()`. A rule emits a finding by calling `report()` with a `ReportInput` (message, line, and optional `column`/`severity`/`data`/etc.); the runner attaches `ruleId` and `helpUri` and resolves severity. `ReportInput` deliberately has no `helpUri`: the documentation page belongs to the rule, not to the finding, so a rule cannot set it.
+- **`RuleMetadata` / `RuleDefinition`** — The static, single-source rule description (`id`, `category`, `description`, `defaultSeverity`, `scope`, `fixable`, `docsUrl`, `optionsSchema`). One source generates `schema.json`, the README rules table, `describeRules`, and `init` categories. Decision [R6](requirements/02-rules-engine.md). A declared `messages` field was dropped by [P15.03](P15-output-contracts/03-lint-output-contract.md) as vacuous.
+- **`docsUrl` / `ruleDocsUrl`** — A rule's documentation page, and the one helper that builds it (`engine/rule-docs-url.ts`, a leaf module so `registry.ts` can import it without a cycle through `rule-docs.ts`). `defineRule` fills `docsUrl` from the rule's id by convention; a `custom` rule gets the custom-rules page, since a user-chosen id has none. Two consumers read it — the README table's rule link and every finding's `helpUri` — so one rule never has two documentation URLs.
 - **`defineRule`** — Registers a rule definition (options schema + factory) with the registry.
 - **`RuleRegistry` / `ruleRegistry`** — The registry type and the singleton holding the built-in rule definitions (`BUILTIN_RULE_DEFINITIONS`).
 - **`resolveRule`** — Validates a config rule entry's options and returns a bound, runnable `Rule`. Unknown rules / bad options raise a `RuleResolutionError`.
 - **`runRules`** — Runs a set of resolved rules against one context and collects `LintMessage`s.
 - **`lintFiles`** — The top-level, intentionally **synchronous** pipeline orchestration (`globSync` + `readFileSync`): load config, load documents, split document vs project scope, run rules, apply severity + suppression, return a `LintResult`. Do not add an async variant (splits the pipeline — see [core-hosts-the-pipeline](decisions/core-hosts-the-pipeline.md)).
-- **`LintMessage`** — A single structured finding with `ruleId`, `severity`, `message`, `filePath`, `line`, and optional `column` / `endLine` / `fixable` / `data` / `helpUri`. JSON output is the serialization of this shape. Decision [R3](requirements/02-rules-engine.md).
-- **`LintResult`** — The full result of `lintFiles`: summary counts, messages, and per-file grouping. Formatted by `formatLintResultText` / `formatLintResultJson`.
+- **`LintMessage`** — A single structured finding with `ruleId`, `severity`, `message`, `filePath`, `line`, `helpUri` (the reporting rule's `docsUrl`, attached by `runRules` — not by the rule, which cannot set it), and optional `column` / `endLine` / `fixable` / `data`. JSON output is the serialization of this shape; the emitted key set is documented in the [output guide](../guide/output.md#message-keys). `endLine` is declared and set by no shipped rule. Decision [R3](requirements/02-rules-engine.md).
+- **`LintResult`** — The full result of `lintFiles`: `messages`, `files`, `errorCount`, `warningCount`. Two host projections of it ship, deliberately: `formatLintResultJson` wraps it as `{ summary, messages, files }` for CLI `lint`, while MCP `lint-files` returns the record verbatim and the ad-hoc MCP `lint` tool a narrower `{ messages, errorCount, warningCount }` (no corpus, so no `files`). CLI `impact --format json` embeds the record under a `lint` key. Tabulated for consumers in the [output guide](../guide/output.md#where-each-host-puts-the-findings); pinned by [P15.03](P15-output-contracts/03-lint-output-contract.md).
 - **Finding** — Informal name for a `LintMessage` (a single rule violation at a location).
 - **Severity** — A resolved, actionable level: `error` | `warning`. There is no `info`/`hint` level in v2.
 - **`SeverityOverride`** — A config-time severity: `error` | `warning` | `off`. `"off"` keeps a rule documented but disabled (gradual rollout). Decision [C2](requirements/01-configuration.md).
@@ -215,7 +216,8 @@ Core-only groundwork for `init`'s situational awareness, plus the CLI `init` com
 ## LLM context & tokens
 
 - **Context hygiene** — The original product mission: keeping the Markdown that feeds an LLM small, resolvable, and non-circular. The `SIZE-001` / `LLM-001` rules and the compile budget serve it.
-- **`estimateTokens`** — The isolated token heuristic (`ceil(len / 4)`), kept behind one function so a real tokenizer can replace it without broad rewrites. See [`engine/tokens.ts`](../../packages/core/src/engine/tokens.ts).
+- **`estimateTokens`** — The isolated token heuristic (`ceil(characters / 4)`, over UTF-16 code units — **not** bytes), kept behind one function so a real tokenizer can replace it without broad rewrites. See [`engine/tokens.ts`](../../packages/core/src/engine/tokens.ts).
+- **`TOKEN_ESTIMATE_NOTE`** — The one sentence stating that calibration, exported beside `estimateTokens` and appended to every finding that quotes a token count (`SIZE-001`'s `tokens` metric, `LLM-001`'s over-budget finding). It lives with the arithmetic so replacing the heuristic moves the disclosure with it. Added by [P15.03](P15-output-contracts/03-lint-output-contract.md), which fixed the honesty without touching the math.
 - **Context budget** — A byte/line/token ceiling on a file (`SIZE-001`) or on the eager-import closure of an entrypoint (`LLM-001`).
 - **Entrypoint** — A file treated as a top-level context root whose eager-import closure is budgeted by `LLM-001`.
 
@@ -286,7 +288,7 @@ Backlog / next iteration:
 
 Enabled but not built:
 
-- **SARIF output** — Structured `LintMessage`s (R3) are SARIF-ready, but no SARIF formatter ships in v2. Decision [R3](requirements/02-rules-engine.md).
+- **SARIF output** — Structured `LintMessage`s (R3) are SARIF-ready, but no SARIF formatter ships in v2. `helpUri` is the field that carries SARIF's own `helpUri`, which is why [P15.03](P15-output-contracts/03-lint-output-contract.md) made it a link rather than renaming it. Decision [R3](requirements/02-rules-engine.md).
 
 Not needed:
 

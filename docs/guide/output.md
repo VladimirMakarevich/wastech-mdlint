@@ -12,17 +12,49 @@ wastech-mdlint lint .
 
 ## JSON output
 
-`--format json` emits a structured, deterministic `{ summary, messages, files }` document for machine consumption (CI, dashboards, AI agents):
+`lint --format json` emits a structured, deterministic `{ summary, messages, files }` document for machine consumption (CI, dashboards, AI agents):
 
-- `summary` — counts (errors/warnings) and pass/fail.
-- `messages` — every finding with `ruleId`, `severity`, `message`, file, and line.
-- `files` — the files analyzed.
+- `summary` — exactly three counts: `files` (how many were analyzed), `errors`, and `warnings`. There is **no** pass/fail field: the [exit code](#exit-codes) is that signal, and it depends on `--fail-on`, which `summary` knows nothing about.
+- `messages` — every finding, as the table below.
+- `files` — the files analyzed, so a consumer can tell "no findings" from "nothing was linted".
 
 ```bash
 wastech-mdlint lint . --format json > report.json
 ```
 
 Output is sorted and uses repository-relative POSIX paths, so it is stable across runs and operating systems (no timestamps, no host-dependent ordering).
+
+### Message keys
+
+Every key a finding can carry. Absent keys are omitted, not `null`, so read the optional ones defensively:
+
+| Key | Always present | What it holds |
+| --- | --- | --- |
+| `ruleId` | yes | The canonical rule ID (`REF-001`), or the user-chosen ID of a `custom` rule. |
+| `severity` | yes | `"error"` or `"warning"` — the resolved severity, after any config override. Never `"off"`: a disabled rule does not run. |
+| `message` | yes | The human sentence. |
+| `filePath` | yes | Repository-relative POSIX path. For the few findings attributed to a config entry rather than a location — a missing [STR-001](rules/STR-001.md) required file, an unresolvable [SEC-003](rules/SEC-003.md) template — this is the value you wrote in config, unnormalized. |
+| `line` | yes | 1-based. A whole-file finding ([SIZE-001](rules/SIZE-001.md), [LLM-001](rules/LLM-001.md), a missing section) reports `0`, which the text format renders as `-`. |
+| `helpUri` | yes | The reporting rule's documentation page on GitHub. A `custom` rule points at [the custom-rules page](rules/custom.md), since a user-chosen ID has no page of its own. It stays _declared_ optional on the finding type and in the MCP `outputSchema` — a rule may in principle carry no documentation page — so a client generated from that schema will type it as nullable even though every shipped rule populates it. |
+| `data` | in practice | The machine-readable half of the message: the offending value, the expected set, the cycle path, the crossed thresholds. Its keys are per rule. Every built-in and `custom` rule sets it, but it is optional by contract. |
+| `column` | no | 1-based, and present only when the finding has a position within the line. |
+| `fixable` | no | `true` only on a finding [`--fix`](#--fix) can repair — currently [SEC-001](rules/SEC-001.md) and [TBL-002](rules/TBL-002.md). Never serialized as `false`. |
+| `endLine` | no | Declared on the finding contract for multi-line spans, and set by no rule that ships today, so it does not currently appear in output. |
+
+`data` is what makes the output actionable beyond re-printing `message` — it is why the finding contract is structured at all. If you are converting to SARIF, `helpUri` is the field that carries the rule's documentation link.
+
+### Where each host puts the findings
+
+Four commands and tools report lint findings, and they do **not** all return the same document. This is deliberate — a human-facing report gets a summary, a typed client gets the record it types against — so read the fields the surface you called actually returns:
+
+| Surface | Top-level shape | Finding counts |
+| --- | --- | --- |
+| CLI `lint --format json` | `{ summary, messages, files }` | `summary.errors`, `summary.warnings` |
+| CLI [`impact <file> --format json`](context-graph.md#impact-file) | the same record MCP returns, under a `lint` key, narrowed to the affected subgraph | `lint.errorCount`, `lint.warningCount` |
+| MCP [`lint-files`](mcp-server.md#the-6-tools) | `{ messages, files, errorCount, warningCount }` | `errorCount`, `warningCount` |
+| MCP [`lint`](mcp-server.md#the-6-tools) | `{ messages, errorCount, warningCount }` | `errorCount`, `warningCount` |
+
+`messages` is the same array of the shape above on all four. The differences are the wrapper and the counts: only the CLI's `lint` wraps the record in a `summary`, and only the ad-hoc MCP `lint` tool omits `files` — it lints one caller-supplied string, which is not a corpus, so there is no file list to report.
 
 ## Exit codes
 

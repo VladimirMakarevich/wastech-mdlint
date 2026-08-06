@@ -43,7 +43,7 @@ export const tbl001: RuleDefinition = defineRule({
       columns: options.requiredColumns,
       section: options.section,
     })) {
-      context.report({ ...finding, helpUri: "TBL-001" });
+      context.report(finding);
     }
   },
 });
@@ -151,7 +151,7 @@ export const tbl002: RuleDefinition = defineRule({
       columns: options.columns,
       section: options.section,
     })) {
-      context.report({ ...finding, fixable: true, helpUri: "TBL-002" });
+      context.report({ ...finding, fixable: true });
     }
   },
   // The gate is repeated here because `applyFixes` (engine/fix.ts) applies none of its own: it walks
@@ -196,7 +196,7 @@ export const tbl003: RuleDefinition = defineRule({
       caseSensitive: options.caseSensitive,
       section: options.section,
     })) {
-      context.report({ ...finding, helpUri: "TBL-003" });
+      context.report(finding);
     }
   },
 });
@@ -230,7 +230,7 @@ export const tbl004: RuleDefinition = defineRule({
       flags: options.flags,
       section: options.section,
     })) {
-      context.report({ ...finding, helpUri: "TBL-004" });
+      context.report(finding);
     }
   },
 });
@@ -262,7 +262,7 @@ export const tbl005: RuleDefinition = defineRule({
       then: options.then,
       section: options.section,
     })) {
-      context.report({ ...finding, helpUri: "TBL-005" });
+      context.report(finding);
     }
   },
 });
@@ -296,7 +296,7 @@ export const tbl006: RuleDefinition = defineRule({
       },
       (filePath) => matchesFileScope(filePath, options),
     )) {
-      context.report({ ...finding, helpUri: "TBL-006" });
+      context.report(finding);
     }
   },
 });

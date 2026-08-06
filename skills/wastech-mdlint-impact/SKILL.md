@@ -68,7 +68,7 @@ Prefer the MCP tool when the host exposes it (honest host semantics); otherwise 
 | `transitivelyAffected` | `{ path, depth, via }[]` | same |
 | `readingOrder` | `string[]` | same |
 | `excluded` | `string[]` | same |
-| `lint` | present (findings on the affected subgraph) | **absent** |
+| `lint` | present: `{ messages, files, errorCount, warningCount }` for the affected subgraph | **absent** |
 
 So: the changed file is under `changedFile` on the CLI and `file` on MCP; and the CLI adds a `lint` field the MCP tool does not have. There is **no `hubs` field** on either surface — do not report one; if the user wants hub context, that needs a separate `graph` call (step 4). Do not reference any field not in this table.
 
