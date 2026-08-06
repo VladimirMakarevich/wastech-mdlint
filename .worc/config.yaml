@@ -18,9 +18,12 @@ repo:
 paths:
   tasks_dir: tasks
 agents:
+  # codex temporarily removed to test Claude usage limits without a cross-provider
+  # fallback hop. The `providers.codex` block below is left intact — re-add the
+  # list entry to restore fallback. (Note: it never actually rescued a run — every
+  # fallback attempt on 2026-08-06 failed with `authentication_failed`.)
   allowed:
   - claude
-  - codex
   max_stage_attempts: 3
   max_fix_cycles: 15
   max_total_fix_iterations: 30
