@@ -6,7 +6,6 @@ import {
   parse as parseJsonc,
   printParseErrorCode,
 } from "jsonc-parser";
-import { z } from "zod";
 
 import { normalizeRelativePath } from "../discovery/globs.js";
 import { RuleResolutionError, type RuleRegistry } from "../engine/registry.js";
@@ -21,6 +20,7 @@ import type {
   SeverityOverride,
 } from "../engine/types.js";
 import { ConfigError } from "./config-error.js";
+import { flattenConfigIssues, formatConfigIssue } from "./config-issues.js";
 import { lintConfigSchema, type LintConfig } from "./config-schema.js";
 import { findConfig } from "./find-config.js";
 
@@ -55,12 +55,9 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-function formatRootIssue(issue: z.core.$ZodIssue): string {
-  const location =
-    issue.path.length === 0 ? "config" : `config.${issue.path.join(".")}`;
-  return `- ${location}: ${issue.message}`;
-}
-
+// Stage 2's issues, re-anchored onto the same absolute paths stage 1 uses so both stages render
+// through `formatConfigIssue` (P13.06). The rule-relative paths a `RuleResolutionError` carries
+// (e.g. ["options", "maxBytes"] or ["id"]) become ["rules", index, …].
 function formatRuleResolutionError(
   index: number,
   error: RuleResolutionError,
@@ -70,18 +67,19 @@ function formatRuleResolutionError(
       error.suggestion === undefined
         ? ""
         : ` Did you mean "${error.suggestion}"?`;
-    return [`- rules[${index}]: Unknown rule "${error.ruleName}".${suffix}`];
+    return [
+      formatConfigIssue({
+        path: ["rules", index],
+        message: `Unknown rule "${error.ruleName}".${suffix}`,
+      }),
+    ];
   }
 
-  // Issue paths already carry their full location (e.g. ["options", "maxBytes"] or ["id"]).
-  return (error.issues ?? [{ path: [], message: error.message }]).map(
-    (issue) => {
-      const location =
-        issue.path.length === 0
-          ? `rules[${index}]`
-          : `rules[${index}].${issue.path.join(".")}`;
-      return `- ${location}: ${issue.message}`;
-    },
+  return (error.issues ?? [{ path: [], message: error.message }]).map((issue) =>
+    formatConfigIssue({
+      path: ["rules", index, ...issue.path],
+      message: issue.message,
+    }),
   );
 }
 
@@ -126,9 +124,13 @@ function parseJsoncConfig(text: string, displayPath: string): unknown {
   return value;
 }
 
+// `displayPath` is threaded in rather than recomputed because every diagnostic must name the config
+// file being read (P13.06): an ancestor directory's config can govern a run, so "which file?" is a
+// real question, and this stage used to answer it with a bare `Invalid config:`.
 function resolveRules(
   config: LintConfig,
   registry: RuleRegistry,
+  displayPath: string,
 ): ConfiguredRule[] {
   const entries = config.rules ?? [];
   const resolved: ConfiguredRule[] = [];
@@ -157,7 +159,7 @@ function resolveRules(
     // hint = the first formatted issue (matches the task's "hint = failing path").
     throw new ConfigError(
       "CONFIG_INVALID",
-      `Invalid config:\n${errors.join("\n")}`,
+      `Invalid config at ${displayPath}:\n${errors.join("\n")}`,
       errors[0],
     );
   }
@@ -206,7 +208,9 @@ export async function loadConfiguration(params: {
 
   const parsed = lintConfigSchema.safeParse(raw);
   if (!parsed.success) {
-    const lines = parsed.error.issues.map(formatRootIssue);
+    const lines = flattenConfigIssues(parsed.error.issues, raw).map(
+      formatConfigIssue,
+    );
     throw new ConfigError(
       "CONFIG_INVALID",
       `Invalid config at ${displayPath}:\n${lines.join("\n")}`,
@@ -219,7 +223,7 @@ export async function loadConfiguration(params: {
   return {
     config,
     configPath,
-    rules: resolveRules(config, registry),
+    rules: resolveRules(config, registry, displayPath),
     settings: (config.settings ?? {}) as ResolvedSettings,
   };
 }

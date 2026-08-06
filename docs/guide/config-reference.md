@@ -344,6 +344,31 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
 }
 ```
 
+## When it is rejected
+
+Anything the schema rejects comes back as `Invalid config at <the file that was read>:` followed by one `- <path>: <problem>` line per problem, and exits `2`. Paths are `config` + `.key` + `[n]`, matching the structure above. Three real examples:
+
+```text
+Invalid config at wastech-mdlint.config.json:
+- config.rules[0].severity: Invalid option: expected one of "error"|"warning"|"off"
+```
+
+```text
+Invalid config at wastech-mdlint.config.json:
+- config.rules[0].options: Unrecognized key: "token"
+```
+
+```text
+Invalid config at wastech-mdlint.config.json:
+- config.rules[0]: Unknown rule "TBL-03". Did you mean "TBL-003"?
+```
+
+The middle one is a `SIZE-001` entry whose `tokens` budget was spelled `token`: every rule's option object is strict, so a typo'd key is rejected rather than silently ignored.
+
+A **syntax** error is reported differently, because it happens before the schema sees anything: `Failed to parse JSONC config at wastech-mdlint.config.json: CloseBraceExpected at offset 412`. Byte offsets rather than config paths are the only location a half-parsed file can honestly offer.
+
+See [Validation & errors](configuration.md#validation--errors) for the notation and for why a file with two different kinds of problem takes two runs to clear.
+
 ## Notes
 
 - The `custom` entry shows one assertion; the [custom rule page](rules/custom.md) lists all 13 assertion kinds (`requiredColumns`, `columnNotEmpty`, `columnInSet`, `columnMatches`, `columnUnique`, `crossColumn`, `sectionPresent`, `sectionOrder`, `contentNotMatch`, `noPlaceholders`, `allChecked`, `linkResolves`, `imageResolves`).

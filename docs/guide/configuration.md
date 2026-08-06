@@ -114,6 +114,23 @@ Configures the [`compile`](compile.md) command. `skill.name`/`skill.description`
 - Config errors identify the failing path/rule and exit `2` — not a bare stack trace.
 - The JSON schema powering `$schema` is generated from the rule metadata (`wastech-mdlint schema` or `npm run generate:docs`), so editor completion always matches the shipped rules.
 
+A rejection names the file it read, then one line per problem:
+
+```text
+Invalid config at wastech-mdlint.config.json:
+- config.rules[0].severity: Invalid option: expected one of "error"|"warning"|"off"
+```
+
+**The path notation is `config` + `.key` for an object key + `[n]` for an array index** — so `config.rules[0].options.assert.kind` is the `kind` of the assertion on the first rule entry. Every diagnostic uses it, and every diagnostic names the config file. The filename matters because the loader walks up from the directory being analyzed: linting `docs` in a repo whose config sits at the root reports `Invalid config at ../wastech-mdlint.config.json:`, relative to what you asked it to lint.
+
+Validation runs in two passes — the file's shape first, then each `rules[]` entry against its rule's own options — and **a run reports only the pass that failed**. Each pass reports all of its own problems at once, so a shape error and an options error in the same file take two runs to see; fixing everything one pass reports is what moves you to the next.
+
+```text
+Invalid config at wastech-mdlint.config.json:
+- config.rules[0].options.assert.columns: Invalid input: expected array, received undefined
+- config.rules[0].options.assert: Unrecognized key: "colums"
+```
+
 ## Full example
 
 The [annotated config reference](config-reference.md) is a single config that exercises **every** option — top-level keys, both settings, an entry for each rule with its options, a `custom` rule, and the whole `compile` block — with a comment on each line.

@@ -184,7 +184,7 @@ describe("declarative custom rule", () => {
     const error = await loadConfiguration({ cwd }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ConfigError);
     expect((error as ConfigError).code).toBe("CONFIG_INVALID");
-    expect((error as ConfigError).message).toMatch(/config\.rules\.0/);
+    expect((error as ConfigError).message).toMatch(/config\.rules\[0\]/);
     expect((error as ConfigError).message).toMatch(
       /"id" and "options\.assert"/,
     );
@@ -206,7 +206,7 @@ describe("declarative custom rule", () => {
     const error = await loadConfiguration({ cwd }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ConfigError);
     expect((error as ConfigError).code).toBe("CONFIG_INVALID");
-    expect((error as ConfigError).message).toMatch(/config\.rules\.0/);
+    expect((error as ConfigError).message).toMatch(/config\.rules\[0\]/);
   });
 
   it("rejects a custom entry with severity but no id (C7, not a crash)", async () => {
@@ -220,7 +220,7 @@ describe("declarative custom rule", () => {
     const error = await loadConfiguration({ cwd }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ConfigError);
     expect((error as ConfigError).code).toBe("CONFIG_INVALID");
-    expect((error as ConfigError).message).toMatch(/config\.rules\.0/);
+    expect((error as ConfigError).message).toMatch(/config\.rules\[0\]/);
   });
 
   it("rejects a custom entry with id but no options (still CONFIG_INVALID, not a new behavior)", async () => {
@@ -234,7 +234,7 @@ describe("declarative custom rule", () => {
     const error = await loadConfiguration({ cwd }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ConfigError);
     expect((error as ConfigError).code).toBe("CONFIG_INVALID");
-    expect((error as ConfigError).message).toMatch(/config\.rules\.0/);
+    expect((error as ConfigError).message).toMatch(/config\.rules\[0\]/);
   });
 });
 

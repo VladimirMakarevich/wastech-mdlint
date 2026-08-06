@@ -284,6 +284,25 @@ describe("lint command", () => {
       /Unknown rule "REF-999"\. Did you mean "REF-001"\?/,
     );
   });
+
+  it("prints a severity typo as the config file plus the offending key (P13.06)", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "REF-001", severity: "warn" }],
+      }),
+    });
+
+    // The likeliest first-time typo used to reach the user as `config.rules.0: Invalid input`. What
+    // the CLI actually writes to stderr is the contract, so assert it at the host boundary too.
+    const result = await run(["lint", cwd], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    expect(result.stderr).toContain(
+      "Invalid config at wastech-mdlint.config.json:",
+    );
+    expect(result.stderr).toContain("config.rules[0].severity");
+    expect(result.stderr).toMatch(/error.*warning.*off/);
+  });
 });
 
 describe("schema command", () => {

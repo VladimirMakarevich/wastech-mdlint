@@ -198,6 +198,171 @@ describe("loadConfiguration", () => {
   });
 });
 
+// One notation across both validation stages (P13.06 / C7): `config` root, `.key` for an object key,
+// `[n]` for an array index. Stage 1 used to emit `config.rules.0` while stage 2 emitted
+// `rules[0].options` for the same array.
+const DIAGNOSTIC_LINE = /^- config(\.[A-Za-z_$][\w$]*|\[\d+\])*: \S/;
+
+/**
+ * Load a config expected to be rejected and return the diagnostic. Every case below goes through
+ * here so the notation invariant and the "names the file" rule are asserted on all of them rather
+ * than on whichever one a future author remembers.
+ */
+async function rejectedConfig(config: unknown): Promise<string> {
+  const root = await writeConfig(JSON.stringify(config));
+  const error = await loadConfiguration({ cwd: root, registry }).catch(
+    (e: unknown) => e,
+  );
+
+  expect(error).toBeInstanceOf(ConfigError);
+  expect((error as ConfigError).code).toBe("CONFIG_INVALID");
+
+  const message = (error as ConfigError).message;
+  const [header, ...rest] = message.split("\n");
+  expect(header).toBe("Invalid config at wastech-mdlint.config.json:");
+  expect(rest.length).toBeGreaterThan(0);
+  for (const line of rest) {
+    expect(line).toMatch(DIAGNOSTIC_LINE);
+  }
+
+  return message;
+}
+
+describe("config diagnostics (P13.06 / C7)", () => {
+  it("names the offending key and the allowed values for a severity typo", async () => {
+    const message = await rejectedConfig({
+      rules: [{ rule: "REF-001", severity: "warn" }],
+    });
+
+    expect(message).toContain("config.rules[0].severity");
+    expect(message).toContain("error");
+    expect(message).toContain("warning");
+    expect(message).toContain("off");
+  });
+
+  it("names an unrecognized key on a rule entry", async () => {
+    const message = await rejectedConfig({
+      rules: [{ rule: "REF-001", bogusKey: 1 }],
+    });
+
+    expect(message).toContain("config.rules[0]");
+    expect(message).toContain("bogusKey");
+  });
+
+  it("still names an unrecognized key inside a built-in rule's options", async () => {
+    const message = await rejectedConfig({
+      rules: [{ rule: "SIZE-001", options: { maxBytes: 10, bogus: 1 } }],
+    });
+
+    expect(message).toContain("config.rules[0].options");
+    expect(message).toContain("bogus");
+  });
+
+  it("names a typo'd key inside a custom rule's assert block", async () => {
+    const message = await rejectedConfig({
+      rules: [
+        {
+          rule: "custom",
+          id: "REQ-OWNER",
+          options: { assert: { kind: "requiredColumns", colums: ["Owner"] } },
+        },
+      ],
+    });
+
+    expect(message).toContain("config.rules[0].options.assert");
+    expect(message).toContain("colums");
+  });
+
+  it("identifies the shape problem when options.assert is an array", async () => {
+    const message = await rejectedConfig({
+      rules: [
+        {
+          rule: "custom",
+          id: "REQ-OWNER",
+          options: {
+            assert: [{ kind: "requiredColumns", columns: ["Owner"] }],
+          },
+        },
+      ],
+    });
+
+    expect(message).toContain(
+      "config.rules[0].options.assert: Invalid input: expected object, received array",
+    );
+  });
+
+  it("lists the allowed assertion kinds for an unknown assert.kind", async () => {
+    const message = await rejectedConfig({
+      rules: [
+        {
+          rule: "custom",
+          id: "REQ-OWNER",
+          options: { assert: { kind: "requiredColums", columns: ["Owner"] } },
+        },
+      ],
+    });
+
+    expect(message).toContain("config.rules[0].options.assert.kind");
+    expect(message).toContain("requiredColumns");
+    expect(message).toContain("columnUnique");
+  });
+
+  it("names the config file on a stage-2 (rule resolution) failure too", async () => {
+    // `resolveRules` used to throw a bare `Invalid config:`, so the one shape a user hits on a rule
+    // typo was the one that never said which file it read.
+    const message = await rejectedConfig({
+      rules: [{ rule: "SIZE-001", options: { maxBytes: -1 } }],
+    });
+
+    expect(message).toContain("config.rules[0].options.maxBytes");
+  });
+
+  it("names an ancestor config by its path relative to the analyzed directory", async () => {
+    const root = await writeConfig(
+      JSON.stringify({ rules: [{ rule: "REF-009" }] }),
+    );
+    const nested = path.join(root, "docs");
+    await mkdir(nested, { recursive: true });
+
+    const error = await loadConfiguration({ cwd: nested, registry }).catch(
+      (e: unknown) => e,
+    );
+
+    // The walk-up means a config the user never opened can govern the run; "which file?" is only
+    // answerable if the diagnostic says so.
+    expect((error as ConfigError).message).toContain(
+      "Invalid config at ../wastech-mdlint.config.json:",
+    );
+  });
+
+  it("reports only the first failing stage (no cross-stage aggregation)", async () => {
+    // Stage 2 consumes stage 1's *parsed* output, so it cannot run on a shape the schema rejected.
+    // Recorded in docs/mdlint_v2/accepted-behaviors.md rather than fixed.
+    const message = await rejectedConfig({
+      rules: [
+        { rule: "REF-001", severity: "warn" },
+        { rule: "SIZE-001", options: { maxBytes: -1 } },
+      ],
+    });
+
+    expect(message).toContain("config.rules[0].severity");
+    expect(message).not.toContain("config.rules[1]");
+  });
+
+  it("reports every issue within one stage at once", async () => {
+    // The bound is two passes, not one error per run: each stage already aggregates its own issues.
+    const message = await rejectedConfig({
+      rules: [
+        { rule: "SIZE-001", options: { maxBytes: -1 } },
+        { rule: "REF-009" },
+      ],
+    });
+
+    expect(message).toContain("config.rules[0].options.maxBytes");
+    expect(message).toContain('config.rules[1]: Unknown rule "REF-009"');
+  });
+});
+
 describe("compile config (P5.05)", () => {
   it("accepts a fully-populated valid compile section", async () => {
     const root = await writeConfig(
