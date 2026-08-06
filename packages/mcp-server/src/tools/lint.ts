@@ -14,13 +14,13 @@ import {
   type ResolvedRule,
   type Rule,
   type RuleConfigEntry,
-  type ToolErrorCode,
 } from "@wastech-mdlint/core";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 import { lintMessageSchema } from "../shared/lint-message-schema.js";
+import { ToolInputError } from "../shared/tool-input-error.js";
 import {
   errorResult,
   READ_ONLY_ANNOTATIONS,
@@ -78,23 +78,10 @@ type LintRuleRequest = RuleConfigEntry | CustomRuleConfigEntry;
 
 type LintToolInput = { content: string; rules: LintRuleRequest[] };
 
-// Error wrapping lives on the MCP boundary (architecture split: "error wrapping" is a host concern),
-// and this is the only call site that needs it so far — so the wrapper is local, not promoted to
-// core. `ruleRegistry.resolveRule` throws `RuleResolutionError`, whose `UNKNOWN_RULE`/`INVALID_OPTIONS`
-// codes are a *different* enum than `ToolErrorCode`; without this translation an unwrapped
-// `RuleResolutionError` fails `isStructuredError`'s allowlist and degrades to a sanitized
-// `INTERNAL_ERROR`, losing the "did you mean" / bad-options message M6 exists to preserve.
-class ToolInputError extends Error {
-  readonly code: ToolErrorCode = "INVALID_INPUT";
-  readonly hint?: string;
-
-  constructor(message: string, hint?: string) {
-    super(message);
-    this.name = "ToolInputError";
-    this.hint = hint;
-  }
-}
-
+// `ruleRegistry.resolveRule` throws `RuleResolutionError`, whose `UNKNOWN_RULE`/`INVALID_OPTIONS`
+// codes are a *different* enum than `ToolErrorCode`, so it needs the shared `ToolInputError`
+// translation to keep its "did you mean" / bad-options text instead of degrading to a sanitized
+// `INTERNAL_ERROR`.
 function toToolInputError(error: RuleResolutionError): ToolInputError {
   if (error.code === "UNKNOWN_RULE") {
     const hint =
@@ -170,8 +157,9 @@ export function handleLint(input: LintToolInput): CallToolResult {
     // Build a "corpus of one" so R4's project-scope fail-fast is satisfied uniformly for any rule
     // scope without special-casing: `documents` and `projectFiles` are non-empty.
     //
-    // `rootDir` is the server cwd (mirroring the `cwd ?? process.cwd()` default tool-context.ts uses
-    // elsewhere in this package). Reusing core's standard behavior — rather than a bespoke
+    // `rootDir` is the server cwd (mirroring the fallback `resolveToolCwd` applies to the file-based
+    // tools). It is a bare call, not that helper: this tool takes no `cwd` input, so there is nothing
+    // caller-supplied to validate. Reusing core's standard behavior — rather than a bespoke
     // corpus-only mode — is deliberate: REF-001/003 non-null-assert `rootDir` into `existsSync` for
     // targets outside the corpus, so a real value both avoids a `path.resolve(undefined, …)` crash
     // and lets on-disk targets resolve exactly as they do under `lint-files` (core stays the single

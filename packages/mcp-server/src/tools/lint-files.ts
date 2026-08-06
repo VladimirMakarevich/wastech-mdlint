@@ -56,9 +56,6 @@ export async function handleLintFiles(
   input: LintFilesToolInput,
 ): Promise<CallToolResult> {
   try {
-    // `resolveToolConfiguration` computes this same default internally but doesn't return it, so
-    // `lintFiles` needs its own copy — the same one-liner tool-context.ts already duplicates.
-    const cwd = input.cwd ?? process.cwd();
     const loaded = await resolveToolConfiguration(input);
 
     // An explicit `patterns` arg *replaces* `config.include` (not merges). When it's absent we leave
@@ -70,7 +67,7 @@ export async function handleLintFiles(
         : { ...loaded.config, include: input.patterns };
 
     const result: LintResult = await lintFiles({
-      cwd,
+      cwd: loaded.cwd,
       config,
       rules: loaded.rules,
       settings: loaded.settings,

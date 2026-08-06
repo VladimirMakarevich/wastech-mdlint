@@ -32,7 +32,7 @@ These four categories are the standing answer. Each names a class of defect that
 
 | Category | What a guard in it must prove | Current guard(s) |
 | --- | --- | --- |
-| `installed-bin-spawn` | The built entrypoint actually runs when spawned through an npm-style link, not just by its real path. Only a real process populates `process.argv[1]`, which is what the entrypoint guard compares against `import.meta.url` | `packages/cli/test/bin.e2e.test.ts`, `packages/mcp-server/test/bin-entrypoint.test.ts` |
+| `installed-bin-spawn` | The built entrypoint actually runs when spawned through an npm-style link, not just by its real path. Only a real process populates `process.argv[1]`, which is what the entrypoint guard compares against `import.meta.url` — and only a spawned server shows the response a client actually receives, where a plausible-looking success can hide a missing input guard (P14.01) | `packages/cli/test/bin.e2e.test.ts`, `packages/mcp-server/test/bin-entrypoint.test.ts`, `packages/mcp-server/test/stdio-integration.test.ts` |
 | `write-failure` | A write that fails partway leaves no temp file and no half-written target, and the command reports it and exits non-zero instead of claiming success | `packages/core/test/atomic-write.test.ts`, `packages/cli/test/init.e2e.test.ts` |
 | `shared-exclude` | The shared `files`/`exclude` scope stays covered as rules and assert kinds are added, rather than a new one shipping unscoped | `packages/core/test/registry-inventory.test.ts`, `packages/core/test/rules-custom.test.ts` |
 | `determinism` | Output does not depend on evaluation order or on state carried between calls — a `g`-flagged `RegExp`'s `lastIndex` being the case that shipped | `packages/core/test/primitives.test.ts` |

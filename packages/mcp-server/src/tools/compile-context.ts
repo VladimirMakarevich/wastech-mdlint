@@ -33,16 +33,13 @@ export async function handleCompileContext(
   input: ToolFileInput,
 ): Promise<CallToolResult> {
   try {
-    // `resolveToolConfiguration` computes this same default internally but doesn't return it, so we
-    // recompute `cwd` here — the same one-liner duplication lint-files.ts already documents.
-    const cwd = input.cwd ?? process.cwd();
     const loaded = await resolveToolConfiguration(input);
 
     // `compileContext` throws `CompileConfigMissingError` (code `COMPILE_CONFIG_MISSING`, already in
     // `TOOL_ERROR_CODES`, carrying `.hint`) when `config.compile` is absent, so `errorResult` passes
     // it through verbatim with no translation wrapper — exactly like `impact-analysis`, and unlike
     // `lint.ts` whose `RuleResolutionError` codes aren't in the taxonomy.
-    const result = await compileContext(loaded, cwd);
+    const result = await compileContext(loaded, loaded.cwd);
     const { documentCount, ruleCount, componentCount } = result.metadata;
 
     return {

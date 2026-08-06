@@ -18,7 +18,7 @@ First register the server in the host (once):
 }
 ```
 
-Then the agent works through a task. Tool calls below show the exact arguments each tool accepts; all 6 tools are read-only. Optional `cwd`/`configPath` default to the process cwd and discovered config.
+Then the agent works through a task. Tool calls below show the exact arguments each tool accepts; all 6 tools are read-only. Optional `cwd`/`configPath` default to the process cwd and discovered config. A `cwd` you do pass has to be an existing directory: a mistyped one comes back as an [`INVALID_INPUT` error](../mcp-server.md#error-contract) rather than an empty-but-plausible answer, so an agent retries the path instead of concluding the repository is clean.
 
 **Step 1 — lint a draft before writing it to disk.** The agent drafted a section and checks it against explicit rules _without_ touching the filesystem (the `lint` tool takes literal content):
 

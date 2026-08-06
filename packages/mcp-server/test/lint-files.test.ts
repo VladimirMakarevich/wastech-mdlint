@@ -89,6 +89,23 @@ describe("handleLintFiles", () => {
     expect(structured(result).files).toEqual(["guide.md"]);
   });
 
+  // P14.01. Fast feedback on the module whose fix was the refactor: `lint-files` used to recompute
+  // `cwd ?? process.cwd()` outside the shared resolver, so guarding only the resolver would have left
+  // it answering `No problems found.` here. The wire-level acceptance evidence is in
+  // `stdio-integration.test.ts`.
+  it("rejects a nonexistent cwd with INVALID_INPUT instead of reporting a clean corpus", async () => {
+    const parent = await makeTempDir("mcp-lf-cwd-missing-");
+
+    const result = await handleLintFiles({
+      cwd: path.join(parent, "no-such-directory"),
+    });
+
+    expect(result.isError).toBe(true);
+    expect((result.structuredContent as { code: string }).code).toBe(
+      "INVALID_INPUT",
+    );
+  });
+
   it("passes a structured CONFIG_INVALID error through on malformed config", async () => {
     const dir = await makeTempDir("mcp-lf-invalid-");
     await writeFile(

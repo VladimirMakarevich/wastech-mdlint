@@ -43,6 +43,8 @@ All 6 carry a `readOnlyHint` annotation. Five return `structuredContent` + an `o
 
 MCP errors use a structured `{ code, message, hint }` contract, with sanitized `INTERNAL_ERROR` messages. The CLI maps the same core error taxonomy to stderr + exit codes, so both hosts behave consistently — they are thin adapters over one pipeline, not separate implementations.
 
+That consistency includes the `cwd` argument the five file-based tools accept. A `cwd` that does not exist, or that points at a file rather than a directory, is rejected with `INVALID_INPUT` naming the resolved path — it is **not** answered with an empty result. This matches the CLI, which exits `2` on a nonexistent target path for the same reason: an empty corpus is indistinguishable from a clean repository, so `lint-files` reporting `No problems found.` for a mistyped directory would be a plausible answer to a different question. Omit `cwd` to analyze the server's own working directory.
+
 One limit is worth knowing: the contract covers failures the tool itself detects. An argument shape that the tool's advertised `inputSchema` rejects outright — a misspelled `assert.kind`, an unknown key, a bad `severity` value — is refused by the MCP protocol layer before the tool runs, so it comes back as the protocol's own validation text without a `{ code, message, hint }` payload. That message still names the offending path and the values it expected, and the mistakes that need guiding advice (an incomplete `custom` entry, an unknown rule ID, invalid rule options) are deliberately let through to the tool so they can carry it.
 
 ## Boundaries

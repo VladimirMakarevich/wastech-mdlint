@@ -38,10 +38,13 @@ const repoRoot = path.resolve(
 // here is incidental, not meaningful).
 const BOUNDARY_GUARDS: Record<string, string[]> = {
   // Spawn the built entrypoint through an npm-style link. Only a real process can populate
-  // `process.argv[1]`, which is what the entrypoint guard compares against `import.meta.url`.
+  // `process.argv[1]`, which is what the entrypoint guard compares against `import.meta.url` — and,
+  // since P14.01, only a spawned server shows what a client actually receives, which is where a
+  // plausible-looking success hid a missing input guard.
   "installed-bin-spawn": [
     "packages/cli/test/bin.e2e.test.ts",
     "packages/mcp-server/test/bin-entrypoint.test.ts",
+    "packages/mcp-server/test/stdio-integration.test.ts",
   ],
   // The shared `files`/`exclude` option shape stays covered as rules are added: an inventory drift
   // guard plus a runtime assert-kind coverage check — and, since P13.02, the top-level scope's own

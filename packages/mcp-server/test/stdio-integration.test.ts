@@ -115,6 +115,22 @@ function firstText(result: Awaited<ReturnType<Client["callTool"]>>): string {
   return content[0]?.text ?? "";
 }
 
+// The five file-based tools with the minimum arguments each `inputSchema` requires, so a `cwd` guard
+// can be asserted uniformly across all of them. `context-slice.depth` is deliberately omitted rather
+// than passed: it is `.min(0)`-constrained, and a value the wire schema rejects would be refused
+// pre-handler as a bare `InvalidParams` with no `structuredContent` — never reaching the guard.
+function fileBasedToolCalls(
+  cwd: string,
+): Array<{ name: string; args: Record<string, unknown> }> {
+  return [
+    { name: "lint-files", args: { cwd } },
+    { name: "context-graph", args: { cwd } },
+    { name: "context-slice", args: { cwd, query: "guide.md" } },
+    { name: "impact-analysis", args: { cwd, file: "guide.md" } },
+    { name: "compile-context", args: { cwd } },
+  ];
+}
+
 describe("mcp-server over stdio", () => {
   it("advertises exactly the six read-only tools with the locked structured-output split", async () => {
     const { tools } = await client.listTools();
@@ -318,5 +334,42 @@ describe("mcp-server over stdio", () => {
       { cwd: missingDir },
       "COMPILE_CONFIG_MISSING",
     );
+  });
+
+  // @boundary-guard installed-bin-spawn
+  //
+  // P14.01/W-18. What this proves that no in-process test can: before the guard, four of these five
+  // tools answered a nonexistent `cwd` with a *plausible* success — `No problems found.`, an empty
+  // graph, `No match for query`, `File not found in the context graph` — which is the client-visible
+  // shape being fixed, and a handler-level assertion would have passed on it just as happily. It also
+  // exercises the payload against the client's primed output-schema validator (`beforeAll`), so a
+  // rejection whose `structuredContent` did not conform to the tool's advertised `outputSchema` fails
+  // here rather than silently reaching a real host.
+  //
+  // It does NOT cover the `argv[1]`-vs-symlink half of this category — `bin-entrypoint.test.ts` keeps
+  // that. Both are tagged because the category is "the built entrypoint, spawned as a real process",
+  // and this suite is the only place the five tools' wire responses are visible at all.
+  it("rejects a nonexistent cwd with INVALID_INPUT on every file-based tool", async () => {
+    // A path under a temp dir that is never created, so the parent exists and only the leaf is
+    // missing — the ENOENT case, not a whole-tree-missing accident.
+    const parent = await makeTempDir("mcp-it-cwd-missing-");
+    const missing = path.join(parent, "no-such-directory");
+
+    for (const { name, args } of fileBasedToolCalls(missing)) {
+      await expectToolError(name, args, "INVALID_INPUT");
+    }
+  });
+
+  it("rejects a cwd that exists but is a file with INVALID_INPUT on every file-based tool", async () => {
+    // The ENOTDIR half of the same guard: `stat` succeeds here, so only the `isDirectory()` check (or
+    // a downstream ENOTDIR) can catch it. Asserting on the code rather than platform-formatted text
+    // keeps this portable.
+    const dir = await makeTempDir("mcp-it-cwd-file-");
+    const filePath = path.join(dir, "not-a-directory.md");
+    await writeFile(filePath, "# Not a directory\n", "utf8");
+
+    for (const { name, args } of fileBasedToolCalls(filePath)) {
+      await expectToolError(name, args, "INVALID_INPUT");
+    }
   });
 });
