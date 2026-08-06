@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, statSync, symlinkSync } from "node:fs";
-import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -195,6 +195,68 @@ describe("installed-bin shape via symlink/junction (H-1 regression guard)", () =
     await import(pathToFileURL(cliDistIndex).href);
     expect(process.exitCode).toBe(before);
   }, 30_000);
+
+  // @boundary-guard installed-bin-spawn
+  //
+  // P14.02 / W-13. `init`'s merge refusal is an exit-code defect and nothing else: the message was
+  // always right, so an in-process test that reads stdout sees a correct-looking run either way.
+  // Only a real process has an exit code, which is the whole reason this guard lives here — and the
+  // shape that mattered is a CI `run:` step, which is a spawn too.
+  describe("init's merge refusal vs. skip over the same unloadable config", () => {
+    async function fixtureWithUnloadableConfig(): Promise<string> {
+      const root = await mkdtemp(
+        path.join(os.tmpdir(), "wastech-mdlint-bin-init-"),
+      );
+      tempDirs.push(root);
+      await writeFile(path.join(root, "a.md"), "# A\n", "utf8");
+      await writeFile(
+        path.join(root, "wastech-mdlint.config.json"),
+        "{ not json",
+        "utf8",
+      );
+      return root;
+    }
+
+    it("--on-existing merge over an unloadable config exits 2 and leaves the file untouched", async () => {
+      const fixtureDir = await fixtureWithUnloadableConfig();
+      const result = run(
+        process.execPath,
+        [linkedEntry, "init", "--yes", "--on-existing", "merge"],
+        fixtureDir,
+      );
+
+      expectExitCode(result, EXIT_CODE_USAGE_ERROR);
+      // Written out as a literal rather than imported from `src`: importing the formatter would
+      // assert only that the code agrees with itself, and "the message is unchanged byte for byte"
+      // is precisely what this task must not break while changing the code beside it.
+      expect(result.stdout).toContain(
+        "Not written: the existing config at wastech-mdlint.config.json could not be read, " +
+          "parsed, or validated, so a merge cannot guarantee a valid config with its existing " +
+          "entries preserved. Fix or remove it, then re-run init.",
+      );
+      await expect(
+        readFile(path.join(fixtureDir, "wastech-mdlint.config.json"), "utf8"),
+      ).resolves.toBe("{ not json");
+      // The refusal writes *nothing*, so the project-local schema must not appear either.
+      expect(existsSync(path.join(fixtureDir, "schema.json"))).toBe(false);
+    }, 30_000);
+
+    it("--on-existing skip over the same config exits 0", async () => {
+      const fixtureDir = await fixtureWithUnloadableConfig();
+      const result = run(
+        process.execPath,
+        [linkedEntry, "init", "--yes", "--on-existing", "skip"],
+        fixtureDir,
+      );
+
+      // Same unloadable input, opposite exit codes: the split between a deliberate no-write and an
+      // operational failure is the behavior under guard, not the no-write itself.
+      expectExitCode(result, EXIT_CODE_SUCCESS);
+      expect(result.stdout).toContain(
+        "skipped — existing config left untouched.",
+      );
+    }, 30_000);
+  });
 });
 
 // P11.14 / audit L-11, and an exit-code contract (M-6) at the process boundary. `runCli`'s own

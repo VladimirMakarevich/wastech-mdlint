@@ -15,6 +15,7 @@ wastech-mdlint compile --cwd packages/docs
 
 - Output path precedence: `--outdir` → `config.compile.outdir` → `.claude/skills/wastech-mdlint/`. The file is always named `SKILL.md`.
 - Unlike other commands, `compile` takes `--cwd` (not `[path]`), and resolves a relative `--config`/`--outdir` against it.
+- An `--outdir` that resolves outside `--cwd` is reported by its **absolute** path, in the success line and in a write failure alike; one inside is reported repository-relative with `/` separators, as everywhere else.
 - Requires a `compile` section in config; a missing one exits `2` with guidance, not a stack trace.
 
 ## What goes into `SKILL.md`

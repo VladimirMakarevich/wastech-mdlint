@@ -522,6 +522,48 @@ describe("compile command", () => {
     expect(result.stderr).not.toContain(cwd);
   });
 
+  it("reports an --outdir outside --cwd absolutely, not as a chain of '..' hops", async () => {
+    // W-17: the repo-relative rendering is right inside the repository and unreadable outside it —
+    // the observed report opened with five parent hops before an absolute-looking tail.
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": compileConfig,
+    });
+    const outsideDir = await fixtureRepo({});
+
+    const result = await run(
+      ["compile", "--cwd", cwd, "--outdir", outsideDir],
+      cwd,
+    );
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain(path.join(outsideDir, "SKILL.md"));
+    expect(result.stdout).not.toContain("..");
+
+    const written = await readFile(path.join(outsideDir, "SKILL.md"), "utf8");
+    expect(written).toContain('name: "docs-skill"');
+  });
+
+  it("names that same absolute path when the out-of-cwd write fails", async () => {
+    // The P11.10 invariant has to survive the fallback: a failure names the path the success line
+    // would have named, so the two renderings cannot drift apart for the same target.
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": compileConfig,
+    });
+    const outsideDir = await fixtureRepo({});
+    await mkdir(path.join(outsideDir, "SKILL.md"), { recursive: true });
+
+    const result = await run(
+      ["compile", "--cwd", cwd, "--outdir", outsideDir],
+      cwd,
+    );
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    expect(result.stderr).toContain(
+      `Could not write ${path.join(outsideDir, "SKILL.md")}`,
+    );
+    expect(result.stderr).not.toContain("..");
+  });
+
   it("exits 2 with a repo-relative message for a nonexistent --cwd", async () => {
     const cwd = await fixtureRepo({});
 

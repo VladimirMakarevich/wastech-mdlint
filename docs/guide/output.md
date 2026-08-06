@@ -32,7 +32,7 @@ Output is sorted and uses repository-relative POSIX paths, so it is stable acros
 | `1` | Findings at or above `--fail-on` (default `error`). Reserved exclusively for findings. |
 | `2` | Operational/usage error (unknown subcommand, bad flag, a nonexistent target path, missing config section, target outside the corpus, unreadable config, an unwritable file). |
 
-An operational error goes to stderr, naming its path `/`-separated and relative to the directory the command works in (see [the CLI reference](cli.md#exit-codes) for the two cases that cannot be), so `1` always means "the linter found problems" and never "the command could not run". The one exception to the stream is `init`: a file it could not write is listed in its own report on stdout, alongside the files it did write, since a partial init is more useful read as one summary — the exit code is still `2`.
+An operational error goes to stderr, naming its path `/`-separated and relative to the directory the command works in (see [the CLI reference](cli.md#exit-codes) for the two cases that are named differently — an argument echoed back as you typed it, and a file written outside that directory, which is named absolutely rather than through a chain of `../` hops), so `1` always means "the linter found problems" and never "the command could not run". The one exception to the stream is `init`: its report stays on stdout even when the command exits `2` — a file it could not write is listed there alongside the files it did write, and so is the `--on-existing merge` refusal to write over a config it cannot load — since an init that half-happened, or deliberately did not, is more useful read as one summary.
 
 Control what fails CI with `--fail-on`:
 

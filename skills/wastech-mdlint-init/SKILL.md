@@ -54,10 +54,10 @@ Do not re-implement any of this inference. If the user asks "what rules should w
 
 ## 4. Install the CLI as a dev dependency
 
-**First check that `init` actually wrote a config** — it has two legitimate no-write outcomes, and steps 4–6 assume a confirmed draft and a package-manager report that neither produces:
+**First check that `init` actually wrote a config** — two outcomes write nothing, and steps 4–6 assume a confirmed draft and a package-manager report that neither produces:
 
-- `skipped — existing config left untouched.` — the user chose `skip`, so `init` returned before it ever scanned or detected a package manager. Stop and ask the user whether to continue against the _existing_ config (if so, you have no `init` report, so pick and install the package manager from the step-2 lockfile check / their answer) or to rerun `init` with `overwrite`/`merge` first. Do not fabricate a draft.
-- `Not written: ... could not be read, parsed, or validated` — a `merge` aborted, so there is still no valid config. Stop and tell the user to fix or remove the existing config, or rerun with `overwrite`, before continuing.
+- `skipped — existing config left untouched.` — the user chose `skip`, so `init` returned before it ever scanned or detected a package manager. This is a legitimate no-write and exits `0`. Stop and ask the user whether to continue against the _existing_ config (if so, you have no `init` report, so pick and install the package manager from the step-2 lockfile check / their answer) or to rerun `init` with `overwrite`/`merge` first. Do not fabricate a draft.
+- `Not written: ... could not be read, parsed, or validated` — a `merge` aborted, so there is still no valid config. This one is a failure, not a choice: it exits `2`, so a runner reports the step as failed and the summary is on stdout. Stop and tell the user to fix or remove the existing config, or rerun with `overwrite`, before continuing.
 
 Once a config was written, install `@wastech-mdlint/cli` as a development dependency using the package manager that `init` detected (reuse its report rather than detecting again). Pin the same `<skill-version>` as step 2 so the installed CLI matches this skill release:
 

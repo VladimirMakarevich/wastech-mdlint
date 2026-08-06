@@ -108,17 +108,28 @@ export type ConfigPreview = {
   rules: RuleConfigEntry[];
 };
 
+/**
+ * Every way `runInitCommand` can end, named — because four of the six write nothing and the host has
+ * to sort them into two exit codes that mean opposite things (P14.02, W-13). A boolean could not:
+ * the previous `writeFailed` flag collapsed "the user asked for no write" and "the file we were told
+ * to merge into is invalid" into one `false`, so a CI merge step that refused to write reported
+ * success. Which bucket a new outcome belongs in is a decision, so it is spelled out here and
+ * switched exhaustively at the boundary rather than inferred from a flag.
+ *
+ * Deliberate no-write (exit `0`): `skipped`, `declined`. Operational failure (exit `2`):
+ * `invalid-existing-config`, `write-failed`, `ci-workflow-write-failed`.
+ */
+export type InitOutcome =
+  | "written"
+  | "skipped"
+  | "declined"
+  | "invalid-existing-config"
+  | "write-failed"
+  | "ci-workflow-write-failed";
+
 export type RunInitCommandResult = {
   output: string;
-  // Whether the user actually confirmed the draft (via `--yes` or `confirmDraft`) — distinct from
-  // whether anything was *written*: the unreadable-merge abort still sets this `true` because the
-  // draft was confirmed, even though the write itself was then withheld for an unrelated safety reason.
-  wasConfirmed: boolean;
-  // True only when a write the user asked for actually *failed* (P11.09) — an operational failure the
-  // host maps to a non-zero exit code. Required, not optional, so every return path has to state its
-  // answer: a deliberate no-write outcome (`skip`, an unconfirmed draft, the unreadable-merge abort)
-  // is `false`, because nothing failed — the command correctly chose not to write.
-  writeFailed: boolean;
+  outcome: InitOutcome;
 };
 
 const DRAFT_SUMMARY_HEADER = "wastech-mdlint init — draft configuration";
@@ -923,8 +934,7 @@ export async function runInitCommand(
       // write — the CI-workflow offer belongs only to the confirmed config-write branch below.
       return {
         output: `${DRAFT_SUMMARY_HEADER}\n\nskipped — existing config left untouched.\n`,
-        wasConfirmed: false,
-        writeFailed: false,
+        outcome: "skipped",
       };
     }
   }
@@ -1026,8 +1036,7 @@ export async function runInitCommand(
   if (!confirmed) {
     return {
       output: "Aborted: configuration not confirmed.\n",
-      wasConfirmed: false,
-      writeFailed: false,
+      outcome: "declined",
     };
   }
 
@@ -1053,12 +1062,11 @@ export async function runInitCommand(
     // never mismatches it for the same file (H-3: the two used different bases before this fix).
     return {
       output: composeOutput(formatNotWrittenSummary(relativeConfigPath)),
-      // The user did confirm the draft above (`confirmed === true`) — only the write itself was
-      // withheld, for a reason unrelated to their choice. See the type's own comment.
-      wasConfirmed: true,
-      // A deliberate refusal to write, not a failed write: nothing was attempted, so this stays 0-exit
-      // (the summary tells the user how to recover).
-      writeFailed: false,
+      // An operational failure, not a deliberate no-write: the user confirmed the draft and asked for
+      // a merge, and it is the *state of their file* that made it impossible. Exiting 0 here made a
+      // CI merge step that produced nothing report success (P14.02, W-13) — `--on-existing skip`
+      // above is the outcome that legitimately writes nothing.
+      outcome: "invalid-existing-config",
     };
   }
 
@@ -1164,8 +1172,7 @@ export async function runInitCommand(
           code: writeResult.code,
         }),
       ),
-      wasConfirmed: true,
-      writeFailed: true,
+      outcome: "write-failed",
     };
   }
 
@@ -1188,10 +1195,10 @@ export async function runInitCommand(
         ciWorkflow,
       }),
     ),
-    wasConfirmed: true,
     // The config and schema landed; only the opt-in workflow the user asked for did not. Still a
     // failed write, so the exit code has to say so — the summary above names which file it was.
-    writeFailed: ciWorkflow?.kind === "failed",
+    outcome:
+      ciWorkflow?.kind === "failed" ? "ci-workflow-write-failed" : "written",
   };
 }
 

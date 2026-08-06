@@ -521,6 +521,30 @@ describe("init command · existing config handling", () => {
     ).resolves.toBe(existingConfigText);
   });
 
+  it("--on-existing skip over an unloadable config still exits 0 (deliberate no-write)", async () => {
+    // The other half of the P14.02 split, on the same input the merge cases above exit 2 on: the
+    // file being unloadable is irrelevant to `skip`, which never intended to write. Only the reason
+    // for not writing separates the two outcomes, so both need pinning against the same fixture.
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      "wastech-mdlint.config.json": "{ not json",
+    });
+
+    const result = await run(
+      ["init", cwd, "--yes", "--on-existing", "skip"],
+      cwd,
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain(
+      "skipped — existing config left untouched.",
+    );
+    expect(result.stdout).not.toContain("Not written:");
+    await expect(
+      readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8"),
+    ).resolves.toBe("{ not json");
+  });
+
   it("passes the existing-config prompt a repository-relative POSIX path, never an absolute one", async () => {
     const cwd = await fixtureRepo({
       ...CROSS_LINKED_DOCS_FIXTURE,
@@ -556,7 +580,11 @@ describe("init command · existing config handling", () => {
       cwd,
     );
 
-    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    // Exit 2, not 0 (P14.02 / W-13): the refusal is caused by an invalid file, which is an
+    // operational failure, not the deliberate no-write that `--on-existing skip` is. The four
+    // sibling merge-abort cases below pin the same code for the other ways the config can be
+    // unloadable.
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
     expect(result.stdout).toContain(
       "WARNING: the existing config could not be read, parsed, or validated",
     );
@@ -580,7 +608,7 @@ describe("init command · existing config handling", () => {
       cwd,
     );
 
-    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
     expect(result.stdout).toContain(
       "WARNING: the existing config could not be read, parsed, or validated",
     );
@@ -606,7 +634,7 @@ describe("init command · existing config handling", () => {
       cwd,
     );
 
-    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
     expect(result.stdout).toContain(
       "WARNING: the existing config could not be read, parsed, or validated",
     );
@@ -637,7 +665,7 @@ describe("init command · existing config handling", () => {
       cwd,
     );
 
-    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
     expect(result.stdout).toContain(
       "WARNING: the existing config could not be read, parsed, or validated",
     );
@@ -665,7 +693,7 @@ describe("init command · existing config handling", () => {
       cwd,
     );
 
-    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
     expect(result.stdout).toContain(
       "WARNING: the existing config could not be read, parsed, or validated",
     );

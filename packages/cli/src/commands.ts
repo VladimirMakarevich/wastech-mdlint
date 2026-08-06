@@ -17,7 +17,6 @@ import {
   lintFiles,
   loadConfiguration,
   loadContext,
-  normalizeRelativePath,
   renderContextGraphDot,
   renderContextGraphMermaid,
   renderContextGraphText,
@@ -37,9 +36,10 @@ import { createInquirerPrompter } from "./init-prompter.js";
 import {
   runInitCommand,
   type ExistingConfigAction,
+  type InitOutcome,
   type InitPrompter,
 } from "./init-command.js";
-import { formatWriteFailure } from "./operational-errors.js";
+import { formatWriteFailure, toWriteTargetPath } from "./operational-errors.js";
 
 // Resolution order (P5.05): an explicit `--outdir` wins, then `config.compile.outdir`, then this
 // fallback — matching the locked example path in docs/mdlint_v2/requirements/01-configuration.md.
@@ -451,36 +451,59 @@ async function handleCompile(
   const resolvedOutdir = path.resolve(command.cwd, outdirSetting);
   const outputPath = path.join(resolvedOutdir, "SKILL.md");
 
-  // Repository-relative POSIX path in user-visible output (invariant), not an absolute,
-  // platform-native one — normalize `\` to `/` so this reads identically on Windows. Computed before
-  // the write so a failure can name the same path the success line would have (P11.10).
-  const relativeOutputPath = normalizeRelativePath(
-    path.relative(command.cwd, outputPath),
-  );
+  // Repository-relative POSIX path in user-visible output (invariant) while the target is inside
+  // `--cwd`, and the absolute path once it is not — an `--outdir` above the repository rendered as a
+  // chain of `../..` hops nobody can read (P14.02, W-17). Computed before the write so a failure can
+  // name the same path the success line would have (P11.10).
+  const outputPathForUser = toWriteTargetPath(command.cwd, outputPath);
 
   try {
     await mkdir(resolvedOutdir, { recursive: true });
     await writeFileAtomic(outputPath, result.skillContent);
   } catch (error) {
-    throw new CliUsageError(formatWriteFailure(relativeOutputPath, error));
+    throw new CliUsageError(formatWriteFailure(outputPathForUser, error));
   }
 
   return {
-    output: `SKILL.md written to ${relativeOutputPath}\n`,
+    output: `SKILL.md written to ${outputPathForUser}\n`,
     exitCode: EXIT_CODE_SUCCESS,
   };
 }
 
+// The exit code for each way `init` can end. A switch rather than a predicate so the `never` check
+// makes a newly added outcome a *compile* error until someone decides which side of the taxonomy it
+// falls on — the distinction is the deliverable of P14.02, and the previous boolean got it wrong for
+// `invalid-existing-config` precisely because nobody had to state an answer.
+//
+// The dividing question is not "was anything written" — four of these six write nothing. It is
+// whether *the user asked for* no write (`skip`, declining the draft: exit 0) or the command could
+// not do what they asked (an unloadable file to merge into, a failed write: exit 2, W-13).
+function initExitCode(outcome: InitOutcome): number {
+  switch (outcome) {
+    case "written":
+    case "skipped":
+    case "declined":
+      return EXIT_CODE_SUCCESS;
+    case "invalid-existing-config":
+    case "write-failed":
+    case "ci-workflow-write-failed":
+      return EXIT_CODE_USAGE_ERROR;
+    default: {
+      const exhaustiveCheck: never = outcome;
+      return exhaustiveCheck;
+    }
+  }
+}
+
 // `init` (P6.04): core generates the config bytes; `runInitCommand` performs the writes. Its output is
 // informational on every path (draft / write / abort / partial-write summary) and always goes to
-// stdout — but a *failed* write is an operational failure, so it exits 2 rather than reporting success
-// for files that never landed (P11.09). A deliberate no-write outcome (`skip`, an unconfirmed draft,
-// the unreadable-merge abort) is not a failure and still exits 0.
+// stdout, including on a failure (P11.09) — only the exit code, via `initExitCode` above, says which
+// kind of ending it was.
 async function handleInit(
   command: InitCommand,
   prompter: InitPrompter,
 ): Promise<CommandExecutionResult> {
-  const { output, writeFailed } = await runInitCommand(
+  const { output, outcome } = await runInitCommand(
     {
       cwd: command.cwd,
       yes: command.yes,
@@ -491,10 +514,7 @@ async function handleInit(
     },
     prompter,
   );
-  return {
-    output,
-    exitCode: writeFailed ? EXIT_CODE_USAGE_ERROR : EXIT_CODE_SUCCESS,
-  };
+  return { output, exitCode: initExitCode(outcome) };
 }
 
 export async function executeCommand(
