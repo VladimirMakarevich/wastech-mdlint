@@ -226,8 +226,10 @@ async function handleGraph(
   });
 
   // The G5 coverage signal is shared by the JSON and human formats (audit B): JSON consumers (CI,
-  // MCP, agents) must see `filesOutsideCorpus` too, not just the human reader. Computed lazily via a
-  // closure so both call sites can't drift on rootDir/siteRouter and mermaid/dot skip the work.
+  // agents) must see `filesOutsideCorpus` too, not just the human reader. The MCP `context-graph`
+  // tool now makes this same call for its own `summary` branch (P15.02/W-22) rather than depending on
+  // this host. Computed lazily via a closure so both call sites can't drift on rootDir/siteRouter and
+  // mermaid/dot skip the work.
   const coverage = () =>
     computeGraphCoverage(documents, graph, {
       rootDir: path.resolve(command.path),

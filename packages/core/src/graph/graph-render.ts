@@ -34,28 +34,41 @@ export type ContextGraphSummary = {
   edges: ContextGraphEdge[];
   components: string[][];
   readingOrder: string[];
+  // The nodes a cycle kept out of `readingOrder` (W-23). Always present, never optional: it is the
+  // same field name and `string[]` shape `ImpactClassification.excluded` already ships, and a
+  // machine consumer that had to derive it as `nodes` minus `readingOrder` was the defect — at 43 of
+  // 139 nodes on the large-corpus fixture, the omission reads as a silently truncated reading order.
+  // The human renderer drops the section when it is empty (a report for a reader omits empty
+  // sections); a machine contract must not drop a key, so this side of the parity always carries it.
+  excluded: string[];
   // G5 coverage (audit B): included only when the host supplies it. The CLI `graph` command always
-  // does now, so JSON consumers (CI, MCP, agents) get `filesOutsideCorpus` too — but a caller that
-  // summarizes a bare graph (e.g. an MCP field without disk access) can still omit it.
+  // does, and since P15.02 so does the MCP `context-graph` tool's `summary` branch — but a caller
+  // that summarizes a bare graph without disk access can still omit it.
   coverage?: GraphCoverage;
 };
 
-// The AC's `{ nodes, edges, components, readingOrder }` JSON shape (P4.07 step 1), plus an additive
-// `coverage` field when the host passes one (audit B — the G5 signal must reach JSON consumers, not
-// only human output). Mirrors `renderContextGraphText`'s optional-coverage parameter so both formats
-// expose the same signal. `components`/`readingOrder` reuse P4.02's algorithms verbatim rather than
-// recomputing clusters/order here.
+// The shipped JSON key set is `{ nodes, edges, components, readingOrder, excluded, coverage? }` —
+// P4.07 step 1 specified the first four, `coverage` was added for audit B, and `excluded` by W-23
+// (P15.02); that task file records the supersession. Mirrors `renderContextGraphText`'s
+// optional-coverage parameter so both formats expose the same signals.
+// `components`/`readingOrder`/`excluded` reuse P4.02's algorithms verbatim rather than recomputing
+// clusters/order here.
 export function summarizeContextGraph(
   graph: ContextGraph,
   coverage?: GraphCoverage,
 ): ContextGraphSummary {
+  // One `topologicalSort` call for both halves of the order: the excluded set is a byproduct of the
+  // same Kahn pass, so reading `.order` and `.excluded` from separate calls would sort twice.
+  const { order, excluded } = topologicalSort(graph);
+
   return {
     nodes: [...graph.nodes].sort((left, right) =>
       byPath(left.path, right.path),
     ),
     edges: [...graph.edges].sort(compareEdges),
     components: getComponents(graph),
-    readingOrder: topologicalSort(graph).order,
+    readingOrder: order,
+    excluded,
     ...(coverage !== undefined ? { coverage } : {}),
   };
 }

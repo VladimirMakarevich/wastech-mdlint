@@ -60,15 +60,17 @@ See [Output](output.md) for the report shapes and [Suppression](suppression.md) 
 
 ## `graph`
 
-Builds and summarizes the [context graph](context-graph.md): clusters, hubs, reading order, and the coverage signal.
+Builds and summarizes the [context graph](context-graph.md): clusters, hubs, reading order, the nodes a cycle excluded from it, and the coverage signal.
 
 | Flag | Default | Description |
 | --- | --- | --- |
 | `[path]` | cwd | Directory to scan; must be an existing directory (exits `2` otherwise). |
 | `--config <file>` | auto | Config file. Resolved against `[path]`. |
-| `--format human\|json\|mermaid\|dot` | `human` | `human` text; deterministic `{ nodes, edges, components, readingOrder, coverage }` JSON (no `cycles` field — see the [`graph` notes](context-graph.md#graph)); or a `mermaid`/`dot` diagram. |
+| `--format human\|json\|mermaid\|dot` | `human` | `human` text; deterministic `{ nodes, edges, components, readingOrder, excluded, coverage }` JSON (no `cycles` field — see the [`graph` notes](context-graph.md#graph)); or a `mermaid`/`dot` diagram. |
 
 Read-only; exits `0` on success.
+
+**`graph` spells its text format `human`, while `lint`/`slice`/`impact` spell theirs `text` — deliberately.** `graph` has three text formats: `mermaid` and `dot` are plain text too, so calling one of them `text` would name the encoding rather than the difference, and the difference is the audience — `human` is the one written to be read. `lint`, `slice` and `impact` have exactly one text format, so `text` is unambiguous there. Neither word is accepted on the other side: a wrong one exits `2` and lists the valid choices for the command you actually ran.
 
 ## `slice <query>`
 

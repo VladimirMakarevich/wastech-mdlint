@@ -35,15 +35,19 @@ All output is sorted and uses repository-relative POSIX paths — no timestamps,
 ## `graph`
 
 ```bash
-wastech-mdlint graph .                    # human summary: clusters, hubs, reading order, coverage
-wastech-mdlint graph . --format json      # { nodes, edges, components, readingOrder, coverage }
+wastech-mdlint graph .                    # human summary: clusters, hubs, reading order, excluded, coverage
+wastech-mdlint graph . --format json      # { nodes, edges, components, readingOrder, excluded, coverage }
 wastech-mdlint graph . --format mermaid   # a Mermaid diagram
 wastech-mdlint graph . --format dot       # Graphviz DOT
 ```
 
+The MCP [`context-graph`](mcp-server.md) tool's `format: "summary"` returns that same JSON document, key for key.
+
+**Both formats carry the excluded set.** A node is excluded from the reading order when a topological sort cannot place it — it sits in a cycle, or it is reachable only through one — so `readingOrder` shorter than `nodes` is explained rather than left to be derived by subtraction. The `human` report prints it as `excluded from reading order (N):` and **omits the section when nothing is excluded**; `--format json` always carries `excluded`, as `[]` when empty, because a machine consumer must not have to tell a missing key from an empty set. What neither format states is _why_ a particular node is excluded: the two reasons above are not distinguished per node. Recorded in the [accepted-behaviors register](../mdlint_v2/accepted-behaviors.md).
+
 The `human` format is **line-oriented throughout**: after the three scalar counters (`nodes:`, `edges:`, `cycles:`), every path-bearing section is a header line plus one indented item per line, so `graph . --format human | head -60`, `grep`, and `wc -l` all behave the way the pipe implies. The shape is not perfectly uniform: `top hubs:`, `clusters:` and `coverage:` carry no count in the header, a `top hubs` item is `path (degree)` rather than a bare path, and `clusters` nests one extra level — `  cluster 1 (88 files):` then its members — to keep the boundary between one component and the next.
 
-The one line whose length follows graph shape rather than a path's own length — a cycle path — is elided past eight entries: the first seven, then `...`, then the node the cycle closes on, then `(+N more hops)` for what was dropped. That middle is **not** recoverable from the CLI: `--format json` carries the complete edge and node lists but has no `cycles` field, so reconstructing the path means re-deriving the cycle from the edges yourself. The MCP [`context-graph`](mcp-server.md) tool's `format: "json"` does return `cycles` in full. Recorded in the [accepted-behaviors register](../mdlint_v2/accepted-behaviors.md).
+The one line whose length follows graph shape rather than a path's own length — a cycle path — is elided past eight entries: the first seven, then `...`, then the node the cycle closes on, then `(+N more hops)` for what was dropped. That middle is **not** recoverable from the CLI: `--format json` carries the complete edge and node lists but has no `cycles` field, so reconstructing the path means re-deriving the cycle from the edges yourself. The MCP [`context-graph`](mcp-server.md) tool's `format: "raw"` does return `cycles` in full. Recorded in the [accepted-behaviors register](../mdlint_v2/accepted-behaviors.md).
 
 ## `slice <query>`
 

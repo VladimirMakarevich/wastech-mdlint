@@ -55,13 +55,22 @@ describe("handleContextGraph", () => {
       new Set(["cycle-a.md", "cycle-b.md"]),
     );
 
-    // The summary-only fields must be absent on the json branch.
-    expect(
-      (structured as unknown as { components?: unknown }).components,
-    ).toBeUndefined();
+    // The summary-only fields must be absent on the raw branch: `raw` means the verbatim
+    // `ContextGraph`, which is what P15.02's rename claims and what keeps the default branch free of
+    // coverage's disk re-scan.
+    for (const field of [
+      "components",
+      "readingOrder",
+      "excluded",
+      "coverage",
+    ]) {
+      expect(
+        structured as unknown as Record<string, unknown>,
+      ).not.toHaveProperty(field);
+    }
   });
 
-  it("returns components and topological reading order for format: summary", async () => {
+  it("returns the same document as CLI graph --format json for format: summary", async () => {
     const result = await handleContextGraph({
       cwd: graphProject,
       format: "summary",
@@ -91,6 +100,42 @@ describe("handleContextGraph", () => {
       "orphan.md",
       "requirements.md",
     ]);
+    // W-23/W-22: both keys the CLI's `json` carries now reach MCP too. `excluded` explains the short
+    // reading order; `coverage` is the graph's best diagnostic and was unreachable from this host.
+    expect(structured.excluded).toEqual(["cycle-a.md", "cycle-b.md"]);
+    expect(structured.coverage).toEqual({
+      nodeCount: 7,
+      edgeCount: structured.edges.length,
+      filesOutsideCorpus: [],
+    });
+  });
+
+  it("names a linked-but-excluded file in coverage.filesOutsideCorpus", async () => {
+    // The G5 signal the field test called the graph report's single best diagnostic, and W-22's
+    // reason for adding coverage here: an agent asking for the graph could not see that 12 linked
+    // files were never linted. The shared `graph-project` fixture has no out-of-corpus file and
+    // other suites assert its exact node set, so this scenario builds its own root rather than
+    // perturbing it — mirroring the CLI fixture's excluded `appendix.md`.
+    const dir = await makeTempDir("mcp-cg-coverage-");
+    await writeFile(
+      path.join(dir, "wastech-mdlint.config.json"),
+      `${JSON.stringify({ include: ["**/*.md"], exclude: ["appendix.md"], rules: [] })}\n`,
+      "utf8",
+    );
+    await writeFile(
+      path.join(dir, "index.md"),
+      "# Index\n\nBackground: [appendix](appendix.md).\n",
+      "utf8",
+    );
+    await writeFile(path.join(dir, "appendix.md"), "# Appendix\n", "utf8");
+
+    const result = await handleContextGraph({ cwd: dir, format: "summary" });
+
+    expect(result.isError).toBeFalsy();
+    const structured =
+      result.structuredContent as unknown as ContextGraphSummary;
+    expect(structured.nodes.map((node) => node.path)).toEqual(["index.md"]);
+    expect(structured.coverage?.filesOutsideCorpus).toEqual(["appendix.md"]);
   });
 
   it("returns an empty graph with no error for a zero-config empty directory", async () => {
@@ -109,16 +154,16 @@ describe("handleContextGraph", () => {
   it("returns the human summary as the text block on both format branches", async () => {
     // Nothing asserted the text block before P15.01, yet it is the graph report a host actually
     // renders — and it is the same `formatContextGraphSummary` output regardless of `format`.
-    const [json, summary] = await Promise.all([
-      handleContextGraph({ cwd: graphProject }),
+    const [raw, summary] = await Promise.all([
+      handleContextGraph({ cwd: graphProject, format: "raw" }),
       handleContextGraph({ cwd: graphProject, format: "summary" }),
     ]);
 
     const textOf = (result: Awaited<ReturnType<typeof handleContextGraph>>) =>
       result.content.map((block) => (block as { text?: string }).text).join("");
 
-    expect(textOf(json)).toContain("entry points (");
-    expect(textOf(json)).toBe(textOf(summary));
+    expect(textOf(raw)).toContain("entry points (");
+    expect(textOf(raw)).toBe(textOf(summary));
   });
 
   it("passes a structured CONFIG_INVALID error through on malformed config", async () => {

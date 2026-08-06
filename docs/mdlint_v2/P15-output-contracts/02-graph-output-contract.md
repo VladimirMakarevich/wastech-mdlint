@@ -1,6 +1,6 @@
 # P15.02 · Graph output: coverage, format parity, one vocabulary
 
-> Phase: [P15 — Output contracts](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**. Backlog: [W-22](../remediation-backlog-2026-08-05.md) (Medium), [W-23](../remediation-backlog-2026-08-05.md) (Medium), [W-25](../remediation-backlog-2026-08-05.md) (Low). Sources: audit F11 (MEDIUM) and field F-25 (minor) — reproduced identically and independently on both hosts; field F-20, F-12. Depends on [P14](../P14-host-boundary/index.md).
+> Phase: [P15 — Output contracts](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Done**. Backlog: [W-22](../remediation-backlog-2026-08-05.md) (Medium), [W-23](../remediation-backlog-2026-08-05.md) (Medium), [W-25](../remediation-backlog-2026-08-05.md) (Low). Sources: audit F11 (MEDIUM) and field F-25 (minor) — reproduced identically and independently on both hosts; field F-20, F-12. Depends on [P14](../P14-host-boundary/index.md).
 
 ## Goal
 
@@ -43,11 +43,27 @@ Make `--format json` denote one document, make the graph's best diagnostic reach
 
 The human format's line shape — that is [P15.01](01-renderers-at-scale.md), which touches the same renderer file. Coordinate the two rather than merging them.
 
+## Implementation notes
+
+**The rename went `json` → `raw`, and the caller-visible consequence is a pre-handler rejection.** On a JSON-RPC tool _every_ projection is JSON, so `json` never named an axis on this tool — `raw` (the verbatim `ContextGraph`) vs `summary` (the derived `ContextGraphSummary`) names the one that exists, and it stops the word `json` denoting two documents across the two hosts. The default is unchanged (`input.format ?? "raw"`), so a caller that omits `format` gets the same document as before. A caller that passes `"json"` explicitly is refused by the wire `inputSchema` **before the handler runs**: `isError: true`, **no `structuredContent`**, and raw `-32602` text naming `format` and the valid set. That is the documented pre-handler exemption ([register](../accepted-behaviors.md), [MCP guide](../../guide/mcp-server.md#error-contract)) rather than a new failure mode, and it is loud — a host still on the old name cannot be silently handed a projection it did not ask for. Pinned at the wire in [`stdio-integration.test.ts`](../../../packages/mcp-server/test/stdio-integration.test.ts), which is the only place a pre-handler rejection is observable.
+
+**`coverage` lands on the `summary` branch only.** `raw` has to stay exactly `ContextGraph` or the rename's rationale collapses, and this also keeps [P7.03](../P7-mcp-server/03-graph-tools.md)'s "no disk re-scan by default" concern intact: `computeGraphCoverage` re-scans raw link targets against disk, and the default branch still pays nothing for it. No new core helper was added — the tool calls `computeGraphCoverage(documents, graph, { rootDir, siteRouter })` directly, mirroring [`commands.ts`](../../../packages/cli/src/commands.ts)'s own call, because `resolveToolContext` already returns `documents`, `settings` and the validated `cwd`. Cross-host drift is closed by the ordered key-set assertion in [`graph-render.test.ts`](../../../packages/core/test/graph-render.test.ts) — the one object both hosts serialize — not by a wrapper neither host needed.
+
+**`excluded` is required on `ContextGraphSummary`, not optional.** `ImpactClassification.excluded` already ships it as an always-present `string[]`, and the task forbids inventing a second name or shape for the same concept. The asymmetry between the formats is deliberate and now stated in the guide: the human report **omits** an empty `excluded from reading order` section (a report for a reader drops empty sections, exactly as `renderImpactSummary` does), while the JSON always carries the key, as `[]` when empty — a machine consumer must not have to distinguish a missing key from an empty set. The parity test therefore reads the human section back out of the rendered text and treats an absent section as the empty set, rather than comparing two calls to `topologicalSort`, which would assert nothing about what either format ships.
+
+**`cycles` was considered for `ContextGraphSummary` and declined.** The [register](../accepted-behaviors.md) named this task as the owner of that contract, so the question was live. W-23 asks _why a node is excluded_ — a per-node attribution — and a corpus-wide cycle list is a different signal; adding it would widen the deliverable past what either backlog item asks for. The register row stays, with its enumerated key list updated and the reasoning recorded there so it is not re-litigated. Note that [P15.01](01-renderers-at-scale.md)'s implementation notes still name the MCP format `"json"` in the same sentence; that record is left as written, and it already points here for this contract.
+
+**The per-node exclusion reason is not shipped, and is recorded rather than dropped.** Answering it means running SCC over the excluded subgraph inside `topologicalSort`, whose `{ order, excluded }` result also feeds `ImpactClassification`, both human renderers, and the generated skill's `Reading Order` block — a four-surface contract change, not a field addition. What ships instead is the closed set of causes stated as a pair in [`context-graph.md`](../../guide/context-graph.md#graph) (in a cycle, or reachable only through one), plus a [register](../accepted-behaviors.md) row.
+
+**W-25 — the split stays; only the intent was missing.** [`program.ts`](../../../packages/cli/src/program.ts) is untouched. On `graph`, `mermaid` and `dot` are _also_ plain text, so `text` would name the encoding rather than the difference, and the difference is the audience — which is what `human` says. On `lint`/`slice`/`impact` there is exactly one text format, so `text` is unambiguous there. Both rejections already exit `2` naming the valid choices for the command actually run, which is why this was Low rather than silent; the [CLI guide](../../guide/cli.md#graph) and the glossary now carry the reason, and the [register](../accepted-behaviors.md) carries the decision.
+
+**Digest movement.** `graph-render.test.ts`'s recorded `json` digest moved exactly once, deliberately, for the added `excluded` key; the `mermaid` and `dot` digests are unchanged, which is what proves the change is confined to the summary projection.
+
 ## Exit criteria
 
-- [ ] `coverage` is reachable from MCP in the documented format(s) and appears in that tool's output schema.
-- [ ] One format name denotes one shape across CLI and MCP; the source comment at `context-graph.ts:50-54` describes what ships.
-- [ ] All five surfaces document the fifth key, including the authoritative `P4-graph/07-cli-graph-slice-impact.md` and the glossary.
-- [ ] Both graph formats carry the excluded set, using `impact-analysis`'s existing field name, with parity asserted by a test — on [P15.01](01-renderers-at-scale.md)'s fixture, not a duplicate of it.
-- [ ] One word means "plain text for a human" across the CLI, or the split is documented as deliberate.
-- [ ] Gates green.
+- [x] `coverage` is reachable from MCP in the documented format(s) and appears in that tool's output schema.
+- [x] One format name denotes one shape across CLI and MCP; the source comment at `context-graph.ts:50-54` describes what ships.
+- [x] All five surfaces document the fifth key, including the authoritative `P4-graph/07-cli-graph-slice-impact.md` and the glossary.
+- [x] Both graph formats carry the excluded set, using `impact-analysis`'s existing field name, with parity asserted by a test — on [P15.01](01-renderers-at-scale.md)'s fixture, not a duplicate of it.
+- [x] One word means "plain text for a human" across the CLI, or the split is documented as deliberate.
+- [x] Gates green.

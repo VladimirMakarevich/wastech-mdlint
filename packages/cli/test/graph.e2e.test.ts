@@ -13,6 +13,7 @@ import { runCli } from "../src/program.js";
 import {
   LARGE_CORPUS_DOCUMENT_COUNT,
   LARGE_CORPUS_ENTRY_POINT_COUNT,
+  LARGE_CORPUS_EXCLUDED_COUNT,
   LARGE_CORPUS_LINE_WIDTH_BOUND,
   writeLargeCorpus,
 } from "../../core/test/support/large-corpus.js";
@@ -65,6 +66,7 @@ describe("graph command over the fixture corpus", () => {
       edges: { from: string; to: string; type: string }[];
       components: string[][];
       readingOrder: string[];
+      excluded: string[];
       coverage: {
         nodeCount: number;
         edgeCount: number;
@@ -122,6 +124,10 @@ describe("graph command over the fixture corpus", () => {
     expect(payload.readingOrder).not.toContain("cycle-a.md");
     expect(payload.readingOrder).not.toContain("cycle-b.md");
     expect(payload.readingOrder).toHaveLength(payload.nodes.length - 2);
+
+    // W-23: the two nodes the cycle dropped are named, so a consumer never has to derive the set by
+    // subtracting `readingOrder` from `nodes` to learn why the order is short.
+    expect(payload.excluded).toEqual(["cycle-a.md", "cycle-b.md"]);
 
     // audit B: the G5 coverage signal now reaches JSON consumers, not just human output. appendix.md
     // is linked-to but outside `include`, exactly the "silently incomplete graph" case G5 exists for.
@@ -224,6 +230,39 @@ describe("graph command over the large corpus", () => {
       `entry points (${LARGE_CORPUS_ENTRY_POINT_COUNT}):`,
     );
     expect(longest.length).toBeLessThanOrEqual(LARGE_CORPUS_LINE_WIDTH_BOUND);
+  }, 60_000);
+
+  // W-23's exit criterion, at the boundary a user actually reads: one graph, both formats, the
+  // excluded sets compared. The renderer-level twin lives in core's `graph-render.test.ts`; this one
+  // proves the key survives `JSON.stringify` and the command dispatch, which is where a shape the CLI
+  // never passed through would still look fine in a unit test.
+  it("reports the same excluded set in the human and JSON formats", async () => {
+    const [human, json] = await Promise.all([
+      run(["graph", root], root),
+      run(["graph", root, "--format", "json"], root),
+    ]);
+    expect(human.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(json.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const lines = human.stdout.split("\n");
+    const header = lines.indexOf(
+      `excluded from reading order (${LARGE_CORPUS_EXCLUDED_COUNT}):`,
+    );
+    expect(header).toBeGreaterThan(-1);
+
+    // Items are the `  `-indented lines following the header; the section ends at the next unindented
+    // line, which here is the `coverage:` header the CLI always appends.
+    const humanExcluded: string[] = [];
+    for (const line of lines.slice(header + 1)) {
+      if (!line.startsWith("  ")) {
+        break;
+      }
+      humanExcluded.push(line.trim());
+    }
+
+    const payload = JSON.parse(json.stdout) as { excluded: string[] };
+    expect(humanExcluded).toHaveLength(LARGE_CORPUS_EXCLUDED_COUNT);
+    expect(payload.excluded).toEqual(humanExcluded);
   }, 60_000);
 });
 

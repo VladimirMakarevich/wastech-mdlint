@@ -253,6 +253,21 @@ describe("mcp-server over stdio", () => {
     expect((output.nodes as unknown[]).length).toBe(7);
     expect((output.cycles as unknown[]).length).toBe(1);
 
+    // The `summary` branch's two P15.02 keys, over the wire: `coverage` and `excluded` are advertised
+    // as optional in the superset `outputSchema`, so only a real round trip proves the client's
+    // schema validator accepts them rather than stripping the payload.
+    const summary = await client.callTool({
+      name: "context-graph",
+      arguments: { cwd: graphProject, format: "summary" },
+    });
+    expect(summary.isError).toBeFalsy();
+    const summaryOutput = structuredOf(summary);
+    expect(summaryOutput.excluded).toEqual(["cycle-a.md", "cycle-b.md"]);
+    expect(summaryOutput.coverage).toMatchObject({
+      nodeCount: 7,
+      filesOutsideCorpus: [],
+    });
+
     const dir = await makeTempDir("mcp-it-cg-invalid-");
     await writeFile(
       path.join(dir, "wastech-mdlint.config.json"),
@@ -438,6 +453,25 @@ describe("mcp-server over stdio", () => {
     expect(firstText(result)).toContain("Input validation error");
     expect(firstText(result)).toContain("depth");
     expect(firstText(result)).toContain("Too small: expected number to be >=0");
+  });
+
+  // The caller-visible consequence of P15.02's `json` → `raw` rename, pinned where a host meets it.
+  // `format: "json"` is now refused by the wire `inputSchema` before the handler runs, so it lands in
+  // the documented pre-handler exemption above: `isError` with no `structuredContent`. That is loud
+  // rather than silent — a host still calling the old name gets an error naming the valid set, not a
+  // default projection it did not ask for.
+  it("refuses the retired context-graph format name at the wire, naming the valid set", async () => {
+    const result = await client.callTool({
+      name: "context-graph",
+      arguments: { cwd: graphProject, format: "json" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
+    expect(firstText(result)).toContain("-32602");
+    expect(firstText(result)).toContain("format");
+    expect(firstText(result)).toContain("raw");
+    expect(firstText(result)).toContain("summary");
   });
 
   it("rejects a cwd that exists but is a file with INVALID_INPUT on every file-based tool", async () => {

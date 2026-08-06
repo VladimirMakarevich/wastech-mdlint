@@ -64,7 +64,11 @@ Now the agent knows to update `login.md`/`session.md` too. (A file outside the c
 ```jsonc
 // tool: context-graph
 { "format": "summary" }
-// → { nodes:[{path,inDegree,outDegree}], edges:[...], components:[...], readingOrder:[...] }
+// → { nodes:[{path,inDegree,outDegree}], edges:[...], components:[...], readingOrder:[...],
+//     excluded:[...], coverage:{nodeCount,edgeCount,filesOutsideCorpus} }
+// (`excluded` is what a cycle kept out of readingOrder; `coverage.filesOutsideCorpus` names
+//  Markdown that is linked-to but outside `include`, so it is never linted. Omit `format`, or
+//  pass "raw", for the verbatim graph with its `cycles` list instead.)
 ```
 
 Or a focused forward slice from an entry point or ID (exact match only — ID, `#slug`, or path):

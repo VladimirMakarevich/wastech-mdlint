@@ -16,6 +16,7 @@ import {
 import type { ParsedDocument } from "../src/markdown/document-types.js";
 import { parseDocument } from "../src/markdown/parse-document.js";
 import {
+  LARGE_CORPUS_EXCLUDED_COUNT,
   LARGE_CORPUS_LARGEST_CLUSTER_SIZE,
   LARGE_CORPUS_LINE_WIDTH_BOUND,
 } from "./support/large-corpus.js";
@@ -52,6 +53,39 @@ describe("summarizeContextGraph", () => {
     ]);
     expect(summary.components).toEqual([["a.md", "b.md", "c.md"]]);
     expect(summary.readingOrder).toEqual(["a.md", "b.md", "c.md"]);
+    // Present even when nothing is excluded (W-23): the human report omits an empty section, but a
+    // machine consumer must not have to distinguish "no cycles" from "an older shape".
+    expect(summary.excluded).toEqual([]);
+  });
+
+  it("emits the shipped key set in order, which both hosts inherit", () => {
+    const graph = graphOf({ "a.md": "[b](b.md)\n", "b.md": "# B\n" });
+    const coverage = computeGraphCoverage(
+      new Map([["a.md", parseDocument({ path: "a.md", content: "# A\n" })]]),
+      graph,
+      { rootDir: "/repo" },
+    );
+
+    // The one pin for the graph JSON document: CLI `graph --format json` and the MCP `context-graph`
+    // tool's `summary` branch both serialize this object, so a key added or renamed on one host
+    // cannot silently diverge from the other or from the five documented surfaces (W-22/W-23).
+    expect(Object.keys(summarizeContextGraph(graph, coverage))).toEqual([
+      "nodes",
+      "edges",
+      "components",
+      "readingOrder",
+      "excluded",
+      "coverage",
+    ]);
+  });
+
+  it("lists the nodes a cycle kept out of the reading order", () => {
+    const graph = graphOf({ "a.md": "[b](b.md)\n", "b.md": "[a](a.md)\n" });
+
+    const summary = summarizeContextGraph(graph);
+
+    expect(summary.readingOrder).toEqual([]);
+    expect(summary.excluded).toEqual(["a.md", "b.md"]);
   });
 
   it("sorts edges by (from, to, type, line) regardless of construction order", () => {
@@ -233,18 +267,43 @@ describe("the renderers at corpus scale", () => {
     expect(members).toBe(LARGE_CORPUS_LARGEST_CLUSTER_SIZE);
   });
 
+  // W-23's parity assertion at the renderer level: one graph, both formats, the same set. The human
+  // section is the source the JSON key had to match, so it is parsed back out of the text rather than
+  // recomputed — a shared `topologicalSort` call would assert nothing about what either format ships.
+  it("carries the same excluded set in the human and JSON formats", () => {
+    const lines = renderContextGraphText(graph).split("\n");
+    const header = lines.indexOf(
+      `excluded from reading order (${LARGE_CORPUS_EXCLUDED_COUNT}):`,
+    );
+    expect(header).toBeGreaterThan(-1);
+
+    // Every item of the section is one `  `-indented line; the section ends at the next unindented
+    // line or at the end of the report, which is where it sits when no coverage is supplied.
+    const humanExcluded: string[] = [];
+    for (const line of lines.slice(header + 1)) {
+      if (!line.startsWith("  ")) {
+        break;
+      }
+      humanExcluded.push(line.trim());
+    }
+
+    expect(humanExcluded).toHaveLength(LARGE_CORPUS_EXCLUDED_COUNT);
+    expect(summarizeContextGraph(graph).excluded).toEqual(humanExcluded);
+  });
+
   const digest = (text: string): string =>
     createHash("sha256").update(text, "utf8").digest("hex").slice(0, 16);
 
   // The machine formats must be byte-identical across runs *and* unchanged by this task. A recorded
   // digest pins the second half of that (a 216 KB golden file is not worth checking in); the
-  // equality below pins the first. P15.02 is the expected next deliberate updater of the `json`
-  // digest — nothing else should move any of these three.
+  // equality below pins the first. The `json` digest moved once, deliberately, at P15.02: the
+  // summary gained the `excluded` key (W-23). `mermaid`/`dot` are untouched by that change and their
+  // digests must not move.
   it.each([
     [
       "json",
       () => JSON.stringify(summarizeContextGraph(graph)),
-      "c81bc23aee0421a2",
+      "4c9a275b3a0e8668",
     ],
     ["mermaid", () => renderContextGraphMermaid(graph), "381fd263c4b5f838"],
     ["dot", () => renderContextGraphDot(graph), "501c8e77e92c1658"],
