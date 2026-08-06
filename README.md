@@ -124,7 +124,7 @@ Configuration is JSONC (comments + trailing commas) in `wastech-mdlint.config.js
 {
   "$schema": "./node_modules/@wastech-mdlint/cli/schema.json",
   "include": ["**/*.md"],
-  "exclude": ["node_modules/**", "dist/**", ".git/**"],
+  "exclude": ["**/node_modules/**", "**/dist/**", "**/.git/**"],
   "respectGitignore": false,
   "settings": {
     "siteRouter": {
@@ -156,6 +156,7 @@ Configuration is JSONC (comments + trailing commas) in `wastech-mdlint.config.js
 ```
 
 - `exclude` wins over `include`; `respectGitignore` opts into honoring `.gitignore`.
+- A glob containing a `/` is anchored to the repository root, one without a `/` is matched at any depth — which is why the `exclude` above is `**/`-prefixed, so a nested `packages/foo/node_modules` is pruned and not just the root copy. Entries are applied in order and a leading `!` subtracts, so `["docs/**", "!docs/private/**"]` lints `docs` without its `private` subtree. Full rules, including what a `!` cannot do: [glob semantics](docs/guide/configuration.md#glob-semantics).
 - Each rule entry may set `severity` to `"error" | "warning" | "off"`; `"off"` documents but disables a rule. Rule IDs are case-insensitive and dash-optional (`ref-001` → `REF-001`).
 - `settings.siteRouter` is inherited by reference rules and may be overridden per rule.
 - `settings.idRef` (`{ idPattern, definitions, idColumn }`) feeds the shared context graph's `id-ref` edges, so ID references also count toward `GRP-001` cycles and `GRP-002` incoming references. It mirrors REF-005's own options shape but is configured separately — REF-005 cannot expose its resolved options back to the graph builder, so a project that wants both ID traceability (REF-005) and ID-aware graph analysis configures the same shape in both places.

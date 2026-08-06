@@ -16,10 +16,17 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
   "$schema": "./node_modules/@wastech-mdlint/cli/schema.json",
 
   // Files to lint (globs). Default when omitted: ["**/*.md"].
+  //
+  // Anchoring: a pattern WITH a "/" is root-anchored, one WITHOUT is matched at any depth.
+  // So "NOTE.md" and "*.md" match at any depth, "./NOTE.md" matches only the root file, and
+  // "node_modules/**" prunes only the ROOT copy while "**/node_modules/**" prunes every copy.
+  // Ordering: entries are applied left to right, a leading "!" subtracts, and the last entry
+  // that matches a path wins. Full rules: ./configuration.md#glob-semantics
   "include": ["**/*.md"],
 
-  // Globs to remove from the set. `exclude` WINS over `include`.
-  "exclude": ["node_modules/**", "dist/**", ".git/**"],
+  // Globs to remove from the set. `exclude` WINS over `include`. Same anchoring and ordering as
+  // `include` — but a "!" here cannot reach into a directory an earlier entry already pruned.
+  "exclude": ["**/node_modules/**", "**/dist/**", "**/.git/**"],
 
   // When true, also skip files ignored by .gitignore. Default: false — but a fresh `init` write
   // sets an explicit true, matching the trees its own scan skipped (a `merge` never adds it).

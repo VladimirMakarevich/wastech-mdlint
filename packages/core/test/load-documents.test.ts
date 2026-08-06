@@ -94,6 +94,49 @@ describe("loadDocuments", () => {
     expect([...documents.values()].map((doc) => doc.path)).toEqual(["keep.md"]);
   });
 
+  it("narrows the corpus when an include entry is negated (W-01)", async () => {
+    const root = await createFixtureTree({
+      "README.md": "# Readme\n",
+      "docs/public.md": "# Public\n",
+      "docs/private/secret.md": "# Secret\n",
+    });
+
+    // Negation in `include` does reach into a subdirectory, unlike the `exclude` case below: only
+    // `exclude` prunes directories, so `docs/private` is still walked and its files are then filtered.
+    const documents = await loadDocuments(["docs/**", "!docs/private/**"], {
+      cwd: root,
+    });
+
+    expect([...documents.values()].map((doc) => doc.path)).toEqual([
+      "docs/public.md",
+    ]);
+  });
+
+  it("keeps the corpus when an exclude entry is negated (W-01)", async () => {
+    const root = await createFixtureTree({
+      "keep.md": "# Keep\n",
+      "docs/public.md": "# Public\n",
+      "docs/private/secret.md": "# Secret\n",
+      "docs/private/keepme.md": "# Keep me\n",
+    });
+
+    // Before P13.01 this returned *nothing*: `keep.md` is not `docs/private/keepme.md`, so it matched
+    // the inverted second entry and every file in the tree was excluded.
+    const documents = await loadDocuments(["**/*.md"], {
+      cwd: root,
+      exclude: ["docs/private/**", "!docs/private/keepme.md"],
+    });
+
+    // `keepme.md` is not restored, and that is deliberate: `shouldPruneDirectory` decides
+    // `docs/private` before descending into it, so no file inside is ever offered to the file-level
+    // filter that the negation would rescue. Honoring it would mean walking every excluded tree — the
+    // cost `exclude` exists to avoid. Recorded in `docs/mdlint_v2/accepted-behaviors.md`.
+    expect([...documents.values()].map((doc) => doc.path)).toEqual([
+      "docs/public.md",
+      "keep.md",
+    ]);
+  });
+
   it("honors .gitignore (root and nested) when respectGitignore is true", async () => {
     const root = await createFixtureTree({
       ".gitignore": "build/\n*.tmp.md\n",

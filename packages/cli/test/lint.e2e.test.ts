@@ -140,6 +140,26 @@ describe("lint command", () => {
     expect(result.stdout).not.toContain("drafts");
   });
 
+  // W-01's user-visible half: the wrong answer was an *exit code*. A negated `exclude` matched every
+  // path through the old first-truthy OR, so the corpus was empty, the report said "No problems
+  // found." and the command exited 0 on a repository that has a finding — a green CI leg for a
+  // one-character config edit. Asserted at the host boundary because that is where the 0 was believed.
+  it("exits non-zero when a negated exclude no longer empties the corpus", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "[broken](missing.md)\n",
+      "docs/private/secret.md": "# Secret\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        exclude: ["docs/private/**", "!docs/private/keepme.md"],
+        rules: [{ rule: "REF-001" }],
+      }),
+    });
+
+    const result = await run(["lint", cwd], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_FINDINGS);
+    expect(result.stdout).toContain("a.md");
+    expect(result.stdout).not.toContain("secret.md");
+  });
+
   it("emits structured JSON with --format json", async () => {
     const cwd = await fixtureRepo({
       "a.md": "[broken](missing.md)\n",

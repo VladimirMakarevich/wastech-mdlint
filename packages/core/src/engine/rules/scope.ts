@@ -3,7 +3,9 @@ import { z } from "zod";
 import { matchesConfigGlob } from "../../discovery/globs.js";
 
 // Shared `files`/`exclude` file-scoping base for every rule (R7 / P3.01). `glob-match` semantics are
-// picomatch-with-`{dot:true}` via the repo's matchesConfigGlob, so dotfiles (`.claude/…`) match.
+// picomatch-with-`{dot:true}` via the repo's matchesConfigGlob, so dotfiles (`.claude/…`) match. Each
+// list is also *ordered* (P13.01): a leading `!` subtracts from what the entries before it selected,
+// so a negated `files` narrows the rule's scope instead of widening it.
 
 // Options fragment mixed into rules that scope by file. `.strict()` is applied by each rule's own
 // object; these are just the shared fields.

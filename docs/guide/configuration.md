@@ -24,7 +24,7 @@ The same discovery runs for every host (CLI and MCP server) because both go thro
 {
   "$schema": "./node_modules/@wastech-mdlint/cli/schema.json",
   "include": ["**/*.md"],
-  "exclude": ["node_modules/**", "dist/**", ".git/**"],
+  "exclude": ["**/node_modules/**", "**/dist/**", "**/.git/**"],
   "respectGitignore": false,
   "settings": {
     /* shared settings inherited by rules */
@@ -51,6 +51,65 @@ Unknown top-level keys are rejected. Validation is two-stage: the root shape fir
 | `compile` | object | — | Config for [`compile`](compile.md); required by that command. |
 
 Two caveats remain on `respectGitignore`, both narrower than the precedence rule above. Matching is **pattern-only**: `wastech-mdlint` reads `.gitignore` files — not `.git/info/exclude`, not a global `core.excludesFile`, and not git's index — so a file that is already **tracked** but matches an ignore pattern is skipped here even though `git` keeps it (a `.gitignore` does not un-track anything). And patterns match **case-insensitively** on every platform, so a `README.md` pattern also skips `readme.md` — which `git` would keep on a case-sensitive filesystem. In both cases the linter skips a file `git` tracks; if you need such a file linted, list it in `include` and leave `respectGitignore` off, or drop the pattern.
+
+## Glob semantics
+
+Every glob in this file — `include`, `exclude`, a rule's `files`/`exclude`, and every rule option that takes patterns — goes through one matcher, so these rules are the same everywhere. One exception, because it is not file scope at all: [`STR-001`](rules/STR-001.md)'s `files` is a _required-file set_, and it strips a leading `./` and probes a non-glob entry on disk before the matcher ever sees it. The any-depth half below holds there; the `./` row and the `!` rule do not.
+
+### Anchoring: a `/` is what pins a pattern to the repository root
+
+- **A pattern that contains a `/` is root-anchored.** `docs/*.md` means the `docs` at the root of the analyzed repository, not a `packages/foo/docs`.
+- **A pattern with no `/` is matched at any depth.** `NOTE.md` and `*.md` behave as `**/NOTE.md` and `**/*.md`.
+
+This is the opposite of your shell and of `tsconfig.json`, where `*.md` is one directory rather than the whole tree. It is the same rule `.gitignore` uses — with one difference that matters once `respectGitignore` is on: a slash-containing ignore pattern anchors to the directory holding _that_ `.gitignore`, where here it always anchors to the repository root. Here are the shapes worth spelling out:
+
+| You write | It means | Matches |
+| --- | --- | --- |
+| `NOTE.md` | any depth | `NOTE.md`, `docs/NOTE.md`, `packages/foo/NOTE.md` |
+| `*.md` | any depth | every Markdown file in the tree |
+| `./NOTE.md` | root only | `NOTE.md` — **not** `docs/NOTE.md` |
+| `node_modules/**` | root only | `node_modules/…` — **not** `packages/foo/node_modules/…` |
+| `**/node_modules/**` | any depth, root included | both of the above (a `**/` segment also matches zero segments) |
+
+Two consequences worth internalizing. To exclude a directory wherever it appears — the usual intent for `node_modules`, `dist`, `build` — write the `**/`-prefixed form; the bare `node_modules/**` prunes only the root copy and silently leaves a monorepo's nested copies in the corpus. And to pin something _to_ the root, give it a `/`: the leading `./` in the `"./*.{md,mdx}"` that [`init`](cli.md#init) proposes is load-bearing, not decoration — remove it and the pattern expands from "the Markdown files at the root" to every Markdown file in the repository.
+
+### Ordering: entries are applied in order, and a leading `!` subtracts
+
+A pattern list is not a plain OR. It is evaluated **left to right**, and the last entry that matches a path decides:
+
+```jsonc
+"include": ["docs/**", "!docs/private/**", "docs/private/keepme.md"]
+```
+
+- `docs/public/a.md` — selected by `docs/**`.
+- `docs/private/secret.md` — selected, then removed by the `!` entry.
+- `docs/private/keepme.md` — removed, then put back by the entry after it.
+- `README.md` — never selected at all.
+
+Reverse the last two entries and `keepme.md` is excluded again: order is the whole mechanism. Three more rules follow from it:
+
+- **Negation obeys the anchoring rule too.** `!keep.md` has no `/`, so it subtracts `keep.md` at any depth; `!./keep.md` subtracts only the one at the root.
+- **A list of nothing but negations starts from "everything".** `"include": ["!drafts/**"]` selects every file outside `drafts` — including non-Markdown ones, which would then be parsed as Markdown. Keep a positive entry (`["**/*.md", "!drafts/**"]`): the positives define the set the negations subtract from.
+- **A negation is a filter, not a search.** It can only remove from what the entries before it selected — `"include": ["docs/**", "!docs/private/**"]` never reaches a file outside `docs`.
+
+### Two edge cases
+
+**A leading `!(` is an extglob, not a negation.** `!(draft).md` is the "any name except `draft`" pattern, matched at any depth, and stays that. But a slash-containing form such as `!(docs)/**` is read as _subtractive_ — so `["docs/**", "!(docs)/**"]` selects nothing at all. When you mean "not under `docs`", write `!docs/**`.
+
+**A filename that really starts with `!` needs a bracket class.** Write `[!]notes.md`, not `\!notes.md` — a backslash is normalized away as a Windows path separator before the pattern is compiled.
+
+### What negation cannot do: reach inside an excluded directory
+
+A directory matched by `exclude` is pruned before the walk descends into it, so a later `!` entry cannot bring a file back out of it:
+
+```jsonc
+// keepme.md is NOT restored — docs/private is never walked.
+"exclude": ["docs/private/**", "!docs/private/keepme.md"]
+```
+
+Honoring that would mean walking every excluded tree — `node_modules` included — which is the cost `exclude` exists to avoid. Negate at the level that selects instead: leave `docs/private` out of `exclude` and narrow `include`, or exclude the individual files. `git` has the same restriction on its own patterns — a `.gitignore` cannot re-include a file whose parent directory is ignored — which is why re-including the _directory_ is the move there too.
+
+Speaking of which: `respectGitignore` is a **separate** matcher with git's own semantics, including its own deepest-file-wins precedence (see the [table above](#top-level-shape)). Nothing in this section describes it.
 
 ## Rule entries
 
