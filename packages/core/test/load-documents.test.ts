@@ -59,6 +59,24 @@ describe("loadDocuments", () => {
     ]);
   });
 
+  // The layering P13.02 depends on: the lint-time default `exclude` lives in `resolveCorpusScope`,
+  // never here. This loader's contract is "what you pass is what I walk" — `gitignore-layers.test.ts`
+  // compares its corpus against real `git ls-files` with an explicit pattern set, so a loader that
+  // silently added the eleven default patterns would make that oracle compare two different trees.
+  it("applies no default exclude of its own (P13.02 layering)", async () => {
+    const root = await createFixtureTree({
+      "keep.md": "# Keep\n",
+      "node_modules/pkg/README.md": "# Dep\n",
+    });
+
+    const documents = await loadDocuments(["**/*.md"], { cwd: root });
+
+    expect([...documents.values()].map((doc) => doc.path)).toEqual([
+      "keep.md",
+      "node_modules/pkg/README.md",
+    ]);
+  });
+
   it("honors explicit exclude patterns (exclude wins over include)", async () => {
     const root = await createFixtureTree({
       "keep.md": "# Keep\n",
@@ -82,7 +100,7 @@ describe("loadDocuments", () => {
       "node_modules/root-lib/y.md": "# Root dep\n",
     });
 
-    // The depth-agnostic form `init` writes (config-writer's DEFAULT_EXCLUDE_GLOBS). This exercises
+    // The depth-agnostic form of `DEFAULT_EXCLUDE_GLOBS` (`config/corpus-scope.ts`). This exercises
     // the *directory* prune, not just file matching: shouldPruneDirectory's synthetic-child probe has
     // to match both `node_modules/...` and `packages/foo/node_modules/...` or the walk descends into
     // the dependency tree before the file filter ever runs.

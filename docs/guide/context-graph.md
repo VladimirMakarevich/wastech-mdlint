@@ -2,7 +2,7 @@
 
 > [Guide index](README.md) · [CLI reference](cli.md) · [Rules: GRP](rules/README.md)
 
-`wastech-mdlint` builds a **context graph** of how documents reference one another, from the same single parse pass the rules use. The graph is shared infrastructure: the `graph`, `slice`, and `impact` commands, the graph-integrity rules ([GRP-001](rules/GRP-001.md)…[GRP-003](rules/GRP-003.md)), the [MCP graph tools](mcp-server.md), and [`compile`](compile.md) all read the same graph — there is no parallel traversal logic.
+`wastech-mdlint` builds a **context graph** of how documents reference one another, from the same single parse pass the rules use. The graph is shared infrastructure: the `graph`, `slice`, and `impact` commands, the graph-integrity rules ([GRP-001](rules/GRP-001.md)…[GRP-003](rules/GRP-003.md)), the [MCP graph tools](mcp-server.md), and [`compile`](compile.md) all read the same graph — there is no parallel traversal logic. It is also built over the same corpus the lint runs over, `include`/`exclude` and the [default `exclude`](configuration.md#what-is-excluded-before-you-write-anything) included: a document under a default-excluded tree is not a node, which is why `impact` on such a file reports it as outside the corpus rather than answering over a tree the linter would never read.
 
 ## Nodes and edges
 

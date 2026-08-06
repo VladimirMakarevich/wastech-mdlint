@@ -16,10 +16,10 @@ import { parseDocument } from "./parse-document.js";
 
 export type LoadDocumentsOptions = {
   cwd: string;
-  // Config `exclude` (C1). Excluded paths win over `include`; excluded directories are pruned.
+  // Config `exclude` (C1). Excluded paths win over `patterns`; excluded directories are pruned.
+  // Omitted means "exclude nothing" — the defaults live one layer up (see below).
   exclude?: string[];
   // Config `respectGitignore` (C8). When true, `.gitignore` files (root + nested) are honored.
-  // Wiring to config happens in P2 — P1 only accepts the parameter.
   respectGitignore?: boolean;
 };
 
@@ -121,8 +121,11 @@ async function collectFiles(params: {
  * Deterministic document loader (P1.05): expand `patterns` under `cwd`, read + parse each match into
  * a `ParsedDocument`, and return `Map<absolutePathPosix, ParsedDocument>` with sorted, POSIX keys.
  *
- * `exclude`/`respectGitignore` are config-driven: `lintFiles` passes `config.exclude` /
- * `config.respectGitignore` through as this function's `options`.
+ * Applies **no** defaults of its own: what the caller passes is exactly what is walked. The
+ * zero-config `include`/`exclude`/`respectGitignore` values live in `resolveCorpusScope`
+ * (`config/corpus-scope.ts`), which every corpus entry point goes through. Keeping them out of here
+ * is what lets `test/gitignore-layers.test.ts` compare this loader's corpus against real
+ * `git ls-files` with a known pattern set.
  */
 export async function loadDocuments(
   patterns: string[],

@@ -17,10 +17,24 @@
       "type": "array",
       "items": {
         "type": "string"
-      }
+      },
+      "default": [
+        "**/.*/**",
+        "**/.cache/**",
+        "**/.git/**",
+        "**/.next/**",
+        "**/build/**",
+        "**/coverage/**",
+        "**/dist/**",
+        "**/node_modules/**",
+        "**/out/**",
+        "**/target/**",
+        "**/vendor/**"
+      ]
     },
     "respectGitignore": {
-      "type": "boolean"
+      "type": "boolean",
+      "default": false
     },
     "settings": {
       "type": "object",

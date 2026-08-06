@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { resolveCorpusScope } from "../config/corpus-scope.js";
 import type { ConfiguredRule } from "../config/load-config.js";
 import { compareStrings } from "../deterministic-sort.js";
 import { buildContextGraph } from "../graph/build-context-graph.js";
@@ -72,10 +73,13 @@ function compareMessages(left: LintMessage, right: LintMessage): number {
 export async function lintFiles(input: LintFilesInput): Promise<LintResult> {
   const rootDir = path.resolve(input.cwd);
 
-  const loaded = await loadDocuments(input.config.include ?? ["**/*.md"], {
+  // Corpus scope comes from the config layer (P13.02), so a zero-config run prunes `node_modules`
+  // and friends without any host or caller having to remember to pass an `exclude`.
+  const scope = resolveCorpusScope(input.config);
+  const loaded = await loadDocuments(scope.include, {
     cwd: rootDir,
-    exclude: input.config.exclude,
-    respectGitignore: input.config.respectGitignore,
+    exclude: scope.exclude,
+    respectGitignore: scope.respectGitignore,
   });
 
   // Re-key the loader's absolute-path map to repo-relative POSIX paths — the identity rules resolve

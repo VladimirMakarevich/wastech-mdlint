@@ -160,6 +160,30 @@ describe("lint command", () => {
     expect(result.stdout).not.toContain("secret.md");
   });
 
+  // @boundary-guard shared-exclude
+  // W-02 / P13.02: the zero-config first run must prune the noise trees before it parses them. The
+  // *nested* copy is the half an in-repo fixture never had — the field test measured 2740 files
+  // under a `mobile/node_modules/` reaching the parser, at exit `0` with zero findings, so the
+  // blow-up was silent in every direction. Asserted at the host boundary because that is where a
+  // user meets it, and with no config file at all because that is the path being fixed.
+  it("prunes node_modules at every depth with no config file (P13.02)", async () => {
+    const cwd = await fixtureRepo({
+      "docs/a.md": "# A\n",
+      "mobile/node_modules/leftpad/README.md": "# leftpad\n",
+      "node_modules/rightpad/README.md": "# rightpad\n",
+    });
+
+    const result = await run(["lint", cwd, "--format", "json"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    const parsed = JSON.parse(result.stdout) as {
+      summary: { files: number };
+      files: string[];
+    };
+    expect(parsed.files).toEqual(["docs/a.md"]);
+    expect(parsed.summary.files).toBe(1);
+  });
+
   it("emits structured JSON with --format json", async () => {
     const cwd = await fixtureRepo({
       "a.md": "[broken](missing.md)\n",

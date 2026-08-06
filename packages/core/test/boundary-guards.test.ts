@@ -44,8 +44,10 @@ const BOUNDARY_GUARDS: Record<string, string[]> = {
     "packages/mcp-server/test/bin-entrypoint.test.ts",
   ],
   // The shared `files`/`exclude` option shape stays covered as rules are added: an inventory drift
-  // guard plus a runtime assert-kind coverage check.
+  // guard plus a runtime assert-kind coverage check — and, since P13.02, the top-level scope's own
+  // zero-config default, which only a run with no config file at all can exercise.
   "shared-exclude": [
+    "packages/cli/test/lint.e2e.test.ts",
     "packages/core/test/registry-inventory.test.ts",
     "packages/core/test/rules-custom.test.ts",
   ],

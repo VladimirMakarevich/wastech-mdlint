@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 import { compileConfigSchema } from "../config/config-schema.js";
+import {
+  DEFAULT_EXCLUDE_GLOBS,
+  DEFAULT_RESPECT_GITIGNORE,
+} from "../config/corpus-scope.js";
 import { assertionSchema } from "./primitives/assert.js";
 import { ruleRegistry } from "./rules/index.js";
 
@@ -135,8 +139,19 @@ export function generateConfigSchema(opts?: {
     properties: {
       $schema: { type: "string" },
       include: { type: "array", items: { type: "string" } },
-      exclude: { type: "array", items: { type: "string" } },
-      respectGitignore: { type: "boolean" },
+      // Both defaults are declared so an editor can show them (P13.02, deliverable 3): before this,
+      // nothing in the schema hinted that a run excludes anything at all. A spread rather than the
+      // constant itself, so the generated JSON never aliases the shared array. `include` deliberately
+      // gets no `default` — nothing in the backlog asks for one and it would only widen the diff.
+      exclude: {
+        type: "array",
+        items: { type: "string" },
+        default: [...DEFAULT_EXCLUDE_GLOBS],
+      },
+      respectGitignore: {
+        type: "boolean",
+        default: DEFAULT_RESPECT_GITIGNORE,
+      },
       settings: {
         type: "object",
         additionalProperties: false,

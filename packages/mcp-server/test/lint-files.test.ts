@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -43,6 +43,26 @@ describe("handleLintFiles", () => {
 
     expect(result.isError).toBeFalsy();
     expect(structured(result).files.sort()).toEqual(["a.md", "b.md"]);
+  });
+
+  // The default `exclude` is core's, not the CLI's (P13.02): both hosts reach the corpus through
+  // `resolveCorpusScope`, so an agent asking this tool about a repository with a dependency tree gets
+  // the same pruned corpus a `lint` run would — and does not spend its context on `node_modules`.
+  it("inherits the lint-time default exclude with no config present (P13.02)", async () => {
+    const dir = await makeTempDir("mcp-lf-default-exclude-");
+    await mkdir(path.join(dir, "docs"), { recursive: true });
+    await mkdir(path.join(dir, "node_modules", "pkg"), { recursive: true });
+    await writeFile(path.join(dir, "docs", "a.md"), "# A\n", "utf8");
+    await writeFile(
+      path.join(dir, "node_modules", "pkg", "README.md"),
+      "# Dep\n",
+      "utf8",
+    );
+
+    const result = await handleLintFiles({ cwd: dir });
+
+    expect(result.isError).toBeFalsy();
+    expect(structured(result).files).toEqual(["docs/a.md"]);
   });
 
   it("reports a REF-001 error from a real project fixture", async () => {

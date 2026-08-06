@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { createScanner, SyntaxKind } from "jsonc-parser";
 
+import { DEFAULT_EXCLUDE_GLOBS } from "../config/corpus-scope.js";
 import { compareStrings } from "../deterministic-sort.js";
 import { canonicalizeRuleId } from "../rule-id.js";
 import {
@@ -10,7 +11,6 @@ import {
 } from "../engine/schema.js";
 import { ruleRegistry } from "../engine/rules/index.js";
 import { CUSTOM_ID_GRAMMAR } from "../engine/rules/custom.js";
-import { DEFAULT_NOISE_DIR_NAMES } from "./repo-scan-constants.js";
 import { normalizeRelativePath } from "./globs.js";
 import type { InferredRule } from "./rule-inference.js";
 
@@ -113,37 +113,6 @@ export function resolvePackageSchemaRef(
   // A same-dir/descendant path needs an explicit `./` prefix; a `../` path already reads as relative.
   return relative.startsWith("../") ? relative : `./${relative}`;
 }
-
-// Mirrors the scan's `isPrunedDirName` hidden-directory prune (audit L-7): `.github`, `.venv`,
-// `.husky` and friends hold tooling Markdown `init` never proposed, so leaving them lintable made
-// the written config disagree with the draft the user approved. Named rather than inlined below
-// because the pattern is unreadable without this explanation: it matches a dot-prefixed directory
-// at any depth and only ever matches its *contents*, so a dotfile at the repo root (`.README.md`)
-// stays in the corpus.
-const HIDDEN_DIR_EXCLUDE_GLOB = "**/.*/**";
-
-// The fresh-write `exclude` (C1 / deliverable 1): the scanner's own pruned noise directories as
-// globs, plus the hidden-directory glob above, so a written config never re-scans the
-// `node_modules`/`.git`/`dist`/`.github`/… trees that `init` deliberately ignored — including when
-// `include` falls back to the implicit `**/*.md`.
-//
-// The `**/` prefix is load-bearing: `collectMarkdownFiles` prunes these by *basename at every depth*
-// (`repo-scan.ts`), so only a depth-agnostic glob faithfully mirrors what the scan skipped. The
-// earlier root-anchored `<name>/**` form silently under-delivered on this same promise in a monorepo
-// — `packages/foo/dist/**` was still linted (audit M-4). A leading `**/` matches zero leading
-// segments in picomatch, so root-level `node_modules/` stays pruned too.
-//
-// Accepted tradeoff: hand-written docs under a nested directory literally named `build`/`out`/
-// `vendor`/… are now pruned as well, and `exclude` wins over `include` (C1). `init` could never have
-// proposed such files anyway (same basename prune), and the written config is a starting point the
-// user is expected to edit.
-//
-// Sorted for a deterministic, set-like array (order is not meaningful here). A `merge` never touches
-// an existing `exclude`; this is only for the fresh/overwrite path.
-const DEFAULT_EXCLUDE_GLOBS = [
-  ...DEFAULT_NOISE_DIR_NAMES.map((name) => `**/${name}/**`),
-  HIDDEN_DIR_EXCLUDE_GLOB,
-].sort(compareStrings);
 
 // Canonical top-level key order, applied on every write rather than preserving an existing file's
 // original order — simpler and fully deterministic, at only the cosmetic cost of reordering a merged
@@ -461,11 +430,15 @@ export function generateInitConfig(
       values.set("include", indentValue(JSON.stringify(include, null, 2)));
       wroteEmptyInclude = include.length === 0;
     }
-    // Always written so a fallback/root config never re-scans the noise trees the scanner pruned
-    // (deliverable 1 / C1), and `respectGitignore` is pinned explicitly to `true` rather than left
-    // at the loader's `false` default (C8): the scan already skipped gitignored trees, so a config
-    // that lints them would contradict the draft the user approved (audit L-7). Explicit in the file
-    // — not a changed loader default — so it stays a visible, editable decision.
+    // Both keys stay explicit in the written file so each remains a visible, editable decision.
+    // `respectGitignore: true` is still the load-bearing one: it is pinned rather than left at the
+    // resolver's `false` default (C8), because the scan already skipped gitignored trees and a
+    // config that lints them would contradict the draft the user approved (audit L-7). The written
+    // `exclude` is no longer the only thing in force, though — since P13.02 the same
+    // `DEFAULT_EXCLUDE_GLOBS` applies on every run and a config's own `exclude` *extends* it
+    // (`config/corpus-scope.ts`, and `docs/guide/configuration.md` for users), so writing it here
+    // now discloses the default rather than establishing it. What `init` should therefore say about
+    // it — and whether it should still write the list verbatim — is P14.03's question (W-15).
     values.set(
       "exclude",
       indentValue(JSON.stringify(DEFAULT_EXCLUDE_GLOBS, null, 2)),

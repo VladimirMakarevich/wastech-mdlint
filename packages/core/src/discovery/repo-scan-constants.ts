@@ -23,9 +23,10 @@ export const DEFAULT_NOISE_DIR_NAMES: readonly string[] = [
  *
  * Hidden directories are pruned by shape rather than by name (audit L-7) because the noise list can
  * never enumerate them: `.github`, `.venv`, `.husky`, `.changeset` and friends hold tooling
- * Markdown that `init` would otherwise propose as a doc cluster. The written config mirrors this
- * with a hidden-directory exclude glob (see `HIDDEN_DIR_EXCLUDE_GLOB` in config-writer.ts), so the
- * scan's view and the linted corpus agree.
+ * Markdown that `init` would otherwise propose as a doc cluster. The default `exclude` mirrors this
+ * with a hidden-directory exclude glob (see `HIDDEN_DIR_EXCLUDE_GLOB` in config/corpus-scope.ts,
+ * which is both what `init` writes and what every run excludes since P13.02), so the scan's view and
+ * the linted corpus agree.
  *
  * `.` and `..` never reach this (`readdir` does not emit them), so the plain prefix test is safe.
  */

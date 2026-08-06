@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { DEFAULT_EXCLUDE_GLOBS } from "../src/config/corpus-scope.js";
 import { generateConfigSchema } from "../src/engine/schema.js";
 
 // The shipped schema lives in the CLI package (its path is the config's default local `$schema`).
@@ -21,6 +22,22 @@ describe("generateConfigSchema", () => {
     // If this fails, regenerate: `npm run build && npm run generate:docs`.
     const shipped = readFileSync(shippedSchemaPath, "utf8");
     expect(shipped).toBe(generateConfigSchema());
+  });
+
+  // P13.02, deliverable 3: the lint-time defaults have to be visible to an editor, or the only way
+  // to learn that a run excludes anything is to notice a file missing from the report.
+  it("declares the resolved defaults for exclude and respectGitignore (P13.02)", () => {
+    const schema = JSON.parse(generateConfigSchema()) as {
+      properties: {
+        exclude: { default: string[] };
+        respectGitignore: { default: boolean };
+      };
+    };
+
+    expect(schema.properties.exclude.default).toEqual([
+      ...DEFAULT_EXCLUDE_GLOBS,
+    ]);
+    expect(schema.properties.respectGitignore.default).toBe(false);
   });
 
   it("declares the JSON Schema dialect but no remote config-schema URL (C9)", () => {

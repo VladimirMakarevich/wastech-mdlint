@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -61,7 +61,11 @@ async function fixtureRepo(files: Record<string, string>): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-lint-"));
   tempDirs.push(root);
   for (const [relativePath, content] of Object.entries(files)) {
-    await writeFile(path.join(root, relativePath), content, "utf8");
+    const absolutePath = path.join(root, relativePath);
+    // Nested fixtures let a scenario exercise the default `exclude`'s any-depth pruning; without
+    // this the write ENOENTs.
+    await mkdir(path.dirname(absolutePath), { recursive: true });
+    await writeFile(absolutePath, content, "utf8");
   }
   return root;
 }
@@ -149,6 +153,46 @@ describe("lintFiles orchestration", () => {
     expect(
       result.messages.map((message) => `${message.filePath}:${message.line}`),
     ).toEqual(["block.md:4", "nextline.md:3"]);
+  });
+
+  // The corpus half of W-02, one layer below the CLI guard: `lintFiles` resolves the lint-time
+  // default `exclude` itself, so no host has to remember to pass one.
+  it("prunes the default noise trees when the config names no exclude (P13.02)", async () => {
+    const cwd = await fixtureRepo({
+      "docs/a.md": "# A\n",
+      "mobile/node_modules/leftpad/README.md": "# leftpad\n",
+      "node_modules/rightpad/README.md": "# rightpad\n",
+    });
+
+    const result = await lintFiles({
+      cwd,
+      config: { include: ["**/*.md"] },
+      rules: [],
+      settings: {},
+    });
+
+    expect(result.files).toEqual(["docs/a.md"]);
+  });
+
+  // The case that would silently regress if a user `exclude` *replaced* the default instead of
+  // extending it: `["drafts/**"]` is a plausible first edit, and under replace it re-opens every
+  // `node_modules` tree while still exiting 0 with a believable file count.
+  it("extends rather than replaces the default exclude (P13.02)", async () => {
+    const cwd = await fixtureRepo({
+      "docs/a.md": "# A\n",
+      "drafts/wip.md": "# WIP\n",
+      "mobile/node_modules/leftpad/README.md": "# leftpad\n",
+      "node_modules/rightpad/README.md": "# rightpad\n",
+    });
+
+    const result = await lintFiles({
+      cwd,
+      config: { include: ["**/*.md"], exclude: ["drafts/**"] },
+      rules: [],
+      settings: {},
+    });
+
+    expect(result.files).toEqual(["docs/a.md"]);
   });
 
   it("counts errors and warnings", async () => {

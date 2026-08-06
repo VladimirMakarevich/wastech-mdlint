@@ -374,8 +374,9 @@ export async function scanRepository(
   // The fallback is global (not per-scope): it only fires when nothing qualified anywhere but
   // Markdown exists somewhere. The glob is deliberately the literal `**/*.md` — the task spec's
   // "give up, cover everything the normal way" safety net mirrors the tool's actual zero-config
-  // default include (lintFiles/fix/loadContext all default `config.include` to `["**/*.md"]`),
-  // not the scan's own broader `.md`+`.mdx` discovery criteria. In an `.mdx`-only repo this
+  // default include (`DEFAULT_INCLUDE_GLOBS`, which `resolveCorpusScope` applies for
+  // lintFiles/fix/loadContext alike), not the scan's own broader `.md`+`.mdx` discovery criteria.
+  // In an `.mdx`-only repo this
   // fallback's `sampleFiles` can include paths the glob itself won't match — an accepted,
   // documented tradeoff of proposing the tool's real default rather than a scan-specific one.
   if (clusters.length === 0 && allFiles.length > 0) {

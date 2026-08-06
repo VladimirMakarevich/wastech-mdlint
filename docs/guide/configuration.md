@@ -8,7 +8,7 @@ Configuration is **JSONC** (JSON with `//` comments and trailing commas) in a fi
 
 ## Zero-config default
 
-With **no config file**, the CLI lints every `**/*.md` with an **empty ruleset** — always a clean pass. Rules only run once you add a config that lists them. This makes adopting the tool safe: nothing fails until you opt in.
+With **no config file**, the CLI lints every `**/*.md` outside the [always-excluded trees](#what-is-excluded-before-you-write-anything) with an **empty ruleset** — always a clean pass. Rules only run once you add a config that lists them. This makes adopting the tool safe: nothing fails until you opt in.
 
 ## How the config file is found
 
@@ -44,13 +44,50 @@ Unknown top-level keys are rejected. Validation is two-stage: the root shape fir
 | --- | --- | --- | --- |
 | `$schema` | string | — | **Local** path to the JSON schema (for editor completion). Never a remote URL. |
 | `include` | string[] | `["**/*.md"]` | Globs of files to lint. |
-| `exclude` | string[] | — | Globs to remove; **`exclude` wins over `include`**. |
-| `respectGitignore` | boolean | `false` | When `true`, also skip `.gitignore`d files — root and nested alike, with git's own precedence: the **deepest** `.gitignore` that has a pattern for a path decides, so a nested `!keep.md` re-includes a file a root pattern ignored. An excluded **directory** takes its whole subtree with it, and that exclusion is resolved the same way — a nested `!generated/` re-includes the directory, and the files inside are then judged on the patterns that match them directly. A fresh `init` write sets an explicit `true`; a `merge` never adds it. |
+| `exclude` | string[] | [11 noise globs](#what-is-excluded-before-you-write-anything) | Globs to remove; **`exclude` wins over `include`**. What you write **extends** the default rather than replacing it. |
+| `respectGitignore` | boolean | `false` | Off by default on purpose: a `.gitignore` records what should not be committed, which is not the same statement as "do not lint this" — and the trees a first run must skip are already covered by the default `exclude`. When `true`, also skip `.gitignore`d files — root and nested alike, with git's own precedence: the **deepest** `.gitignore` that has a pattern for a path decides, so a nested `!keep.md` re-includes a file a root pattern ignored. An excluded **directory** takes its whole subtree with it, and that exclusion is resolved the same way — a nested `!generated/` re-includes the directory, and the files inside are then judged on the patterns that match them directly. A fresh `init` write sets an explicit `true`; a `merge` never adds it. |
 | `settings` | object | — | Shared settings (`siteRouter`, `idRef`) inherited by rules. |
 | `rules` | array | `[]` | The rules to run (see below). |
 | `compile` | object | — | Config for [`compile`](compile.md); required by that command. |
 
 Two caveats remain on `respectGitignore`, both narrower than the precedence rule above. Matching is **pattern-only**: `wastech-mdlint` reads `.gitignore` files — not `.git/info/exclude`, not a global `core.excludesFile`, and not git's index — so a file that is already **tracked** but matches an ignore pattern is skipped here even though `git` keeps it (a `.gitignore` does not un-track anything). And patterns match **case-insensitively** on every platform, so a `README.md` pattern also skips `readme.md` — which `git` would keep on a case-sensitive filesystem. In both cases the linter skips a file `git` tracks; if you need such a file linted, list it in `include` and leave `respectGitignore` off, or drop the pattern.
+
+### What is excluded before you write anything
+
+Every run starts from a default `exclude`, so a first lint never descends into a dependency tree or a build directory. It is the same list a fresh [`init`](cli.md#init) writes:
+
+```jsonc
+"exclude": [
+  "**/.*/**", // any dot-directory at any depth: .github, .agents, .venv, …
+  "**/.cache/**",
+  "**/.git/**",
+  "**/.next/**",
+  "**/build/**",
+  "**/coverage/**",
+  "**/dist/**",
+  "**/node_modules/**",
+  "**/out/**",
+  "**/target/**",
+  "**/vendor/**",
+]
+```
+
+Each entry is depth-agnostic, so a monorepo's `packages/foo/node_modules` is pruned along with the root copy. The dot-directory entry matches a hidden directory's _contents_ only — a dotfile at the root, such as `.README.md`, is still linted.
+
+**Your `exclude` extends this list; it does not replace it.** What you write is appended to the defaults, which has three consequences worth knowing before you edit the key:
+
+- `"exclude": ["drafts/**"]` excludes `drafts` **in addition to** everything above, not instead of it.
+- `"exclude": []` is not an opt-out. It adds nothing, and the defaults still apply.
+- **Deleting** an entry from your own `exclude` cannot remove a default, because you were never the one who put it there.
+
+To lint one of those trees anyway, negate it. Entries are applied in order and a leading `!` subtracts, and yours are applied after the defaults:
+
+```jsonc
+"exclude": ["!**/build/**"] // lint build/ after all; every other default still applies
+"exclude": ["!**"]          // no default exclusions at all
+```
+
+A negation has to name the **directory**, not a file inside it: `"!**/vendor/keep.md"` does not rescue that file, because `vendor` is pruned before the walk descends into it. That limitation is the subject of [what negation cannot do](#what-negation-cannot-do-reach-inside-an-excluded-directory) below.
 
 ## Glob semantics
 

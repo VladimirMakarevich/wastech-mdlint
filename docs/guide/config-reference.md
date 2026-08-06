@@ -26,10 +26,18 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
 
   // Globs to remove from the set. `exclude` WINS over `include`. Same anchoring and ordering as
   // `include` — but a "!" here cannot reach into a directory an earlier entry already pruned.
+  //
+  // Every run already excludes 11 noise globs (node_modules, dist, build, .git, any dot-directory,
+  // …) before you write anything, and what you put here is APPENDED to them rather than replacing
+  // them — so "[]" is not an opt-out, and deleting an entry cannot remove a default. Negate one
+  // instead ("!**/build/**" for a single tree, "!**" for all of them).
+  // Full list and rules: ./configuration.md#what-is-excluded-before-you-write-anything
   "exclude": ["**/node_modules/**", "**/dist/**", "**/.git/**"],
 
-  // When true, also skip files ignored by .gitignore. Default: false — but a fresh `init` write
-  // sets an explicit true, matching the trees its own scan skipped (a `merge` never adds it).
+  // When true, also skip files ignored by .gitignore. Default: false, deliberately — a .gitignore
+  // says what not to commit, which is not the same as "do not lint this", and the trees a first run
+  // must skip are covered by the default `exclude` above. A fresh `init` write does set an explicit
+  // true, matching the trees its own scan skipped (a `merge` never adds it).
   "respectGitignore": false,
 
   // Shared settings inherited by the rules that understand them.
