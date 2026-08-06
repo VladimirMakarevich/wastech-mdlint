@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -105,6 +105,49 @@ describe("handleLintFiles", () => {
       "INVALID_INPUT",
     );
   });
+
+  // W-21/P14.05. Fast in-process feedback on the operational classifier; the wire-level evidence is
+  // in `stdio-integration.test.ts`. This is the field test's own scenario — a directory inside the
+  // corpus with its permissions removed — which used to come back as `INTERNAL_ERROR` and "An
+  // unexpected internal error occurred.", dropping the errno and the path that are the entire
+  // actionable content.
+  //
+  // Root ignores directory permissions and Windows has no equivalent model, so the fault only exists
+  // for an unprivileged POSIX user — the same precondition, and the same guard, as the CLI's
+  // write-failure tests. The portable half of this behavior is pinned by synthetic errno cases in
+  // `tool-response.test.ts`, which run everywhere.
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "classifies an unreadable directory as OPERATIONAL_ERROR naming the errno and the relative path",
+    async () => {
+      const dir = await makeTempDir("mcp-lf-locked-");
+      const locked = path.join(dir, "locked");
+      await mkdir(locked, { recursive: true });
+      await writeFile(path.join(dir, "a.md"), "# A\n", "utf8");
+      await chmod(locked, 0o000);
+
+      try {
+        const result = await handleLintFiles({ cwd: dir });
+
+        expect(result.isError).toBe(true);
+        const error = result.structuredContent as {
+          code: string;
+          message: string;
+          hint?: string;
+        };
+        expect(error.code).toBe("OPERATIONAL_ERROR");
+        expect(error.message).toBe("Operational error: EACCES on locked");
+        // No hint by design — the message already carries the whole remedy-bearing content.
+        expect(error.hint).toBeUndefined();
+        // The absolute base must not survive anywhere in an `OPERATIONAL_ERROR` payload — the errno's
+        // path is rendered relative to it. (P14.01's `INVALID_INPUT` rejection is the deliberate
+        // exception: there the `cwd` is itself the broken thing and is named absolutely.)
+        expect(JSON.stringify(result)).not.toContain(dir);
+      } finally {
+        // Without this the shared afterAll `rm(..., { recursive: true })` fails with EACCES.
+        await chmod(locked, 0o755);
+      }
+    },
+  );
 
   it("passes a structured CONFIG_INVALID error through on malformed config", async () => {
     const dir = await makeTempDir("mcp-lf-invalid-");

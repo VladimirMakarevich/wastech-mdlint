@@ -212,7 +212,13 @@ export function handleLint(input: LintToolInput): CallToolResult {
       structured: { messages, errorCount, warningCount },
     });
   } catch (error) {
-    return errorResult(error, EMPTY_LINT_OUTPUT);
+    // `process.cwd()` is the right base here even though this tool takes no `cwd` input: it is the
+    // same root the corpus-of-one above lints against (`rootDir`), so a file-resolving rule that
+    // fails on an errno names its path relative to the directory the rule actually probed.
+    return errorResult(error, {
+      successFields: EMPTY_LINT_OUTPUT,
+      cwd: process.cwd(),
+    });
   }
 }
 

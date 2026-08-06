@@ -8,6 +8,7 @@ import { z } from "zod";
 
 import {
   resolveToolContext,
+  toolCwdBase,
   type ToolFileInput,
 } from "../shared/tool-context.js";
 import {
@@ -71,6 +72,10 @@ const EMPTY_CONTEXT_GRAPH_OUTPUT = {
 export async function handleContextGraph(
   input: ContextGraphToolInput,
 ): Promise<CallToolResult> {
+  // Outside the `try`: `resolveToolContext` is itself a throw site (config read, corpus walk), so the
+  // catch needs the base independently of whether resolution got far enough to produce one.
+  const cwd = toolCwdBase(input);
+
   try {
     const { graph } = await resolveToolContext(input);
 
@@ -89,7 +94,10 @@ export async function handleContextGraph(
       structured,
     });
   } catch (error) {
-    return errorResult(error, EMPTY_CONTEXT_GRAPH_OUTPUT);
+    return errorResult(error, {
+      successFields: EMPTY_CONTEXT_GRAPH_OUTPUT,
+      cwd,
+    });
   }
 }
 

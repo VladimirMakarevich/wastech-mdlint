@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -85,16 +85,23 @@ function structuredOf(
 }
 
 // Assert the FULL M6 error payload survives the wire in `structuredContent` (not just the code): a
-// regression that dropped `message` or `hint` guidance must fail here. Every error case exercised in
-// this suite is a guided error, so `hint` is required for all of them. The payload round-trips
+// regression that dropped `message` or `hint` guidance must fail here. The payload round-trips
 // because each schema-carrying tool keeps its success schema strict while attaching schema-compatible
 // placeholder success fields on errors (see `errorResult`/`withErrorOutput`); with the validator
 // cache primed in `beforeAll`, a non-conforming
 // `structuredContent` would be rejected by the client — so this genuinely pins the wire contract.
+//
+// `hint` handling has two halves (P14.05/W-19). Whenever one is present, the rendered text block must
+// contain it — that is the assertion the exit criterion asks for, and it applies uniformly because
+// `errorResult` owns the concatenation. Whether one must be present at all is per-call: every guided
+// path in this suite requires a non-empty `hint`, and only the callers that opt out with
+// `guided: false` (the operational-error path, which deliberately carries none) relax it. Defaulting
+// to required is what keeps a future dropped hint failing instead of silently passing.
 async function expectToolError(
   name: string,
   args: Record<string, unknown>,
   code: string,
+  options: { guided?: boolean } = {},
 ): Promise<void> {
   const result = await client.callTool({ name, arguments: args });
   expect(result.isError).toBe(true);
@@ -106,8 +113,17 @@ async function expectToolError(
   expect(error.code).toBe(code);
   expect(typeof error.message).toBe("string");
   expect(error.message as string).not.toBe("");
-  expect(typeof error.hint).toBe("string");
-  expect(error.hint as string).not.toBe("");
+
+  if (options.guided ?? true) {
+    expect(typeof error.hint).toBe("string");
+    expect(error.hint as string).not.toBe("");
+  }
+
+  // The text block is what a host renders and what a model reads, so a hint that exists only in
+  // `structuredContent` is invisible to most callers.
+  if (typeof error.hint === "string") {
+    expect(firstText(result)).toContain(error.hint);
+  }
 }
 
 function firstText(result: Awaited<ReturnType<Client["callTool"]>>): string {
@@ -358,6 +374,70 @@ describe("mcp-server over stdio", () => {
     for (const { name, args } of fileBasedToolCalls(missing)) {
       await expectToolError(name, args, "INVALID_INPUT");
     }
+  });
+
+  // P14.05/W-21. Over the wire because that is where the defect was measured: the field test saw
+  // `INTERNAL_ERROR` and "An unexpected internal error occurred." against a directory whose
+  // permissions were removed, while the CLI on the same fixture printed `Operational error: EACCES on
+  // docs/locked` and exited 2. It also exercises the new code against the client's primed
+  // output-schema validator (`beforeAll`) — `OPERATIONAL_ERROR` is a fresh member of the advertised
+  // `code` enum, so a payload the enum did not admit would be rejected here.
+  //
+  // Root ignores directory permissions and Windows has no equivalent model, so the fault only exists
+  // for an unprivileged POSIX user; the portable half is pinned by synthetic errno cases in
+  // `tool-response.test.ts`.
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "reports an unreadable directory as OPERATIONAL_ERROR naming the errno and the relative path",
+    async () => {
+      const dir = await makeTempDir("mcp-it-locked-");
+      const locked = path.join(dir, "docs", "locked");
+      await mkdir(locked, { recursive: true });
+      await writeFile(path.join(dir, "a.md"), "# A\n", "utf8");
+      await chmod(locked, 0o000);
+
+      try {
+        // `guided: false`: this path carries no `hint` by design — an errno-specific remedy would be
+        // guesswork — which is exactly the conditional-hint case the exit criterion calls for.
+        await expectToolError("lint-files", { cwd: dir }, "OPERATIONAL_ERROR", {
+          guided: false,
+        });
+
+        const result = await client.callTool({
+          name: "lint-files",
+          arguments: { cwd: dir },
+        });
+        expect(structuredOf(result).message).toBe(
+          "Operational error: EACCES on docs/locked",
+        );
+        // The absolute base must not survive the wire in any field of an `OPERATIONAL_ERROR`; only
+        // P14.01's `INVALID_INPUT` names a `cwd` absolutely, and there it is the failure itself.
+        expect(JSON.stringify(result)).not.toContain(dir);
+      } finally {
+        await chmod(locked, 0o755);
+      }
+    },
+  );
+
+  // P14.05/W-20 characterization pin, not a fix. The decision was to keep schema rejections
+  // contract-exempt (loosening a tool's advertised `inputSchema` purely so the handler can reject the
+  // shape better would destroy the discoverability contract a host uses to *construct* valid calls),
+  // so this passed before the change and passes after. Its value is failing if that shape ever moves
+  // — an SDK upgrade, or a decision to pre-validate — because `docs/guide/mcp-server.md` describes
+  // exactly this response to users.
+  it("leaves a schema-level rejection outside the structured contract, as documented", async () => {
+    const result = await client.callTool({
+      name: "context-slice",
+      arguments: { cwd: graphProject, query: "guide.md", depth: -1 },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
+    // Every claim the guide makes about this response: the JSON-RPC number leaks into user-facing
+    // text, and the text still names the offending field and its constraint.
+    expect(firstText(result)).toContain("-32602");
+    expect(firstText(result)).toContain("Input validation error");
+    expect(firstText(result)).toContain("depth");
+    expect(firstText(result)).toContain("Too small: expected number to be >=0");
   });
 
   it("rejects a cwd that exists but is a file with INVALID_INPUT on every file-based tool", async () => {

@@ -42,6 +42,19 @@ wastech-mdlint lint . --fail-on warning    # fail on warnings too
 wastech-mdlint lint . --fail-on off        # never fail; report only
 ```
 
+### Operational failures on both hosts
+
+An unreadable directory, an unreadable config, a file that vanished mid-run — the environment failing rather than the input being wrong — reads the same on the CLI and on the [MCP server](mcp-server.md), because both name the errno and the path instead of dropping them:
+
+| Host | What you get |
+| --- | --- |
+| CLI | `Operational error: EACCES on docs/locked` on **stderr**, exit `2`. |
+| MCP | `isError: true` plus `{ "code": "OPERATIONAL_ERROR", "message": "Operational error: EACCES on docs/locked" }` in `structuredContent`, and the same sentence in the text block. |
+
+The path is relative to the directory being analyzed — the command's working directory for the CLI, the tool's `cwd` for MCP — and `/`-separated on every platform. It is `.` when that directory is itself the thing that could not be read. Neither host attaches a `hint` here: the errno and the path are the whole remedy.
+
+MCP is stricter than the CLI about what it will name. A failure whose path falls **outside** the analyzed directory, or that reports no path at all (`ENOSPC: no space left on device, write`), comes back as `INTERNAL_ERROR` with a fixed sanitized message instead, while the CLI, writing to your own terminal, keeps the `../` form and the original message. The property that buys is that no MCP payload names a host path outside the directory being analyzed. That directory itself is the one absolute path a payload can carry, and only in the [`INVALID_INPUT` rejection](mcp-server.md#error-contract) that echoes back a `cwd` which does not exist or is not a directory.
+
 ## `--fix`
 
 `lint --fix` applies deterministic fixes in place, then re-reports what remains. Only rules with a fix hook change files — currently [SEC-001](rules/SEC-001.md) (scaffold missing sections) and [TBL-002](rules/TBL-002.md) (empty target cell → `TODO`). Everything else is reported, never rewritten.

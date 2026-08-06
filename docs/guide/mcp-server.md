@@ -43,11 +43,32 @@ All 6 carry a `readOnlyHint` annotation. Five return `structuredContent` + an `o
 
 MCP errors use a structured `{ code, message, hint }` contract, with sanitized `INTERNAL_ERROR` messages. The CLI maps the same core error taxonomy to stderr + exit codes, so both hosts behave consistently — they are thin adapters over one pipeline, not separate implementations.
 
+The payload lives in `structuredContent`, and the text block carries `message` plus `hint` together — a host that renders only `content[].text` still sees the actionable half, so a mistyped rule id reads `Unknown rule "REF-01". Did you mean "REF-001"?` there, matching what the CLI prints. `hint` is optional by design: an unknown id with no near-miss carries a code and a message only.
+
+Something the tool could not read — an unreadable directory, an unreadable config — is `OPERATIONAL_ERROR`, naming the errno and the path relative to that tool's `cwd`, which is the same sentence the CLI prints before exiting `2`. See [Output & exit codes](output.md#operational-failures-on-both-hosts) for the shape on both hosts and for the two cases MCP sanitizes instead of naming.
+
 That consistency includes the `cwd` argument the five file-based tools accept. A `cwd` that does not exist, or that points at a file rather than a directory, is rejected with `INVALID_INPUT` naming the resolved path — it is **not** answered with an empty result. This matches the CLI, which exits `2` on a nonexistent target path for the same reason: an empty corpus is indistinguishable from a clean repository, so `lint-files` reporting `No problems found.` for a mistyped directory would be a plausible answer to a different question. Omit `cwd` to analyze the server's own working directory.
 
 It includes their `configPath` too: a relative one is resolved against that tool's `cwd`, never against the server process's working directory — the same rule the CLI follows for `--config` ([CLI reference](cli.md#lint-default)). An absolute `configPath` is used as given; a missing one comes back as `CONFIG_NOT_FOUND` naming the path relative to that `cwd`, which for a relative `configPath` is the string you passed.
 
-One limit is worth knowing: the contract covers failures the tool itself detects. An argument shape that the tool's advertised `inputSchema` rejects outright — a misspelled `assert.kind`, an unknown key, a bad `severity` value — is refused by the MCP protocol layer before the tool runs, so it comes back as the protocol's own validation text without a `{ code, message, hint }` payload. That message still names the offending path and the values it expected, and the mistakes that need guiding advice (an incomplete `custom` entry, an unknown rule ID, invalid rule options) are deliberately let through to the tool so they can carry it.
+One limit is worth knowing, and it is deliberate: **the contract covers failures the tool itself detects.** An argument shape that the tool's advertised `inputSchema` rejects outright — a misspelled `assert.kind`, an unknown key, a bad `severity` value, a negative `depth` — is refused by the MCP protocol layer before the tool runs, so it comes back as `isError: true` with **no `structuredContent` at all** and the protocol's own validation text, which carries the JSON-RPC error number:
+
+```text
+MCP error -32602: Input validation error: Invalid arguments for tool context-slice: [
+  {
+    "origin": "number",
+    "code": "too_small",
+    "minimum": 0,
+    "inclusive": true,
+    "path": ["depth"],
+    "message": "Too small: expected number to be >=0"
+  }
+]
+```
+
+That text still names the offending field and the constraint or valid set, so a human or a model can fix the call — but the `code` it carries is the validator's, not this contract's, and a host branching on `{ code, message, hint }` sees nothing. **Branch on `isError` with `structuredContent` absent** to detect this case.
+
+Closing it would mean loosening every tool's `inputSchema` to accept shapes it intends to reject, purely so the handler could reject them better — and that schema is what a host or model reads to _construct_ a valid call in the first place. So the loosening is selective, aimed only where guidance pays: the mistakes that need it (an incomplete `custom` entry, an unknown rule ID, invalid rule options) are deliberately let through to the tool so they can carry a `{ code, message, hint }` payload.
 
 ## Boundaries
 

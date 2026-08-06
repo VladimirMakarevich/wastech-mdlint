@@ -66,6 +66,35 @@ describe("handleLint", () => {
     expect(output.hint).toContain("SIZE-001");
   });
 
+  // W-19/P14.05. The text block is what a host renders and what a model reads, so dropping the
+  // did-you-mean there left the actionable half of the error visible only to a client that also
+  // inspects `structuredContent`. The CLI prints both sentences together for the same typo.
+  it("renders the did-you-mean hint in the text block, not only in structuredContent", () => {
+    const result = handleLint({
+      content: "# Title\n",
+      rules: [{ rule: "SIZE-002" }],
+    });
+
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('Unknown rule "SIZE-002"');
+    expect(text).toContain(structured(result).hint as string);
+    expect(text).toContain('Did you mean "SIZE-001"?');
+  });
+
+  // The negative half of the same contract: the hint is optional by design, so a bare unknown id
+  // with no near-miss must render the message alone rather than an empty trailing separator.
+  it("renders the message alone when an unknown rule has no near-miss suggestion", () => {
+    const result = handleLint({
+      content: "# Title\n",
+      rules: [{ rule: "NOPE-999" }],
+    });
+
+    expect(result.isError).toBe(true);
+    const output = structured(result);
+    expect(output.hint).toBeUndefined();
+    expect((result.content[0] as { text: string }).text).toBe(output.message);
+  });
+
   it("maps invalid per-rule options to INVALID_INPUT", () => {
     const result = handleLint({
       content: "# Title\n",

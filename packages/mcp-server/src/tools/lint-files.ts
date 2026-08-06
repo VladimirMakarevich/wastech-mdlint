@@ -10,6 +10,7 @@ import { z } from "zod";
 import { lintMessageSchema } from "../shared/lint-message-schema.js";
 import {
   resolveToolConfiguration,
+  toolCwdBase,
   type ToolFileInput,
 } from "../shared/tool-context.js";
 import {
@@ -55,6 +56,10 @@ const EMPTY_LINT_FILES_OUTPUT = {
 export async function handleLintFiles(
   input: LintFilesToolInput,
 ): Promise<CallToolResult> {
+  // Outside the `try` so the catch can still name it: an errno thrown *by* `resolveToolConfiguration`
+  // (an unreadable config, a `configPath` naming a directory) has no `loaded.cwd` to render against.
+  const cwd = toolCwdBase(input);
+
   try {
     const loaded = await resolveToolConfiguration(input);
 
@@ -78,7 +83,7 @@ export async function handleLintFiles(
       structured: result,
     });
   } catch (error) {
-    return errorResult(error, EMPTY_LINT_FILES_OUTPUT);
+    return errorResult(error, { successFields: EMPTY_LINT_FILES_OUTPUT, cwd });
   }
 }
 

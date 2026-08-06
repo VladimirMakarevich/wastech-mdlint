@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import {
   resolveToolConfiguration,
+  toolCwdBase,
   type ToolFileInput,
 } from "../shared/tool-context.js";
 import { errorResult, READ_ONLY_ANNOTATIONS } from "../shared/tool-response.js";
@@ -32,6 +33,10 @@ const compileContextInputShape = {
 export async function handleCompileContext(
   input: ToolFileInput,
 ): Promise<CallToolResult> {
+  // Outside the `try` for the same reason as its four file-based siblings: an errno raised while
+  // resolving the configuration has no resolved `loaded.cwd` to render its path against.
+  const cwd = toolCwdBase(input);
+
   try {
     const loaded = await resolveToolConfiguration(input);
 
@@ -58,7 +63,8 @@ export async function handleCompileContext(
       ],
     };
   } catch (error) {
-    return errorResult(error);
+    // No `successFields`: this is the one tool with no `outputSchema` to satisfy.
+    return errorResult(error, { cwd });
   }
 }
 

@@ -22,27 +22,38 @@ import { ToolInputError } from "./tool-input-error.js";
 export type ToolFileInput = { cwd?: string; configPath?: string };
 
 /**
- * Resolve a tool's `cwd` and reject it if it is not a usable directory — the single entry point for
- * both jobs (P14.01).
+ * The resolved `cwd` a call will use, computed without touching the filesystem.
  *
- * **The default.** `cwd ?? process.cwd()` is a deliberate departure from the CLI's layering, where
- * commander supplies the default; MCP tools have no argument-parsing layer. It lives here alone so
- * the two callers below and the two tool modules that need the value read it back rather than
- * recomputing it — four copies of the same line was how the guard below came to be missed at three
- * of them.
+ * `cwd ?? process.cwd()` is a deliberate departure from the CLI's layering, where commander supplies
+ * the default; MCP tools have no argument-parsing layer. It lives here alone so the callers below and
+ * the tool modules that need the value read it back rather than recomputing it — four copies of the
+ * same line was how `resolveToolCwd`'s guard came to be missed at three of them (P14.01).
  *
- * **The guard.** Core deliberately does not do this: `loadDocuments` answers a root that does not
- * stat as a directory with a silent empty map, pinned as intentional by core's own test and relied on
- * by other callers. Left unguarded that reads to a client as `No problems found.` / an empty graph /
- * `No match for query` — a plausible answer to a different question, which is the CLI's own stated
- * rationale for its identical check ("indistinguishable from a clean repository").
+ * Split out of `resolveToolCwd` so a tool's `catch` block can name the base its failure happened
+ * under (P14.05: `errorResult` renders an errno's path relative to it) even when the failure is the
+ * `stat` inside `resolveToolCwd` itself, and so P14.01's exit criterion — `cwd ?? process.cwd()`
+ * appears in exactly one place — keeps holding. Deliberately not async and deliberately not
+ * validating: a `catch` handler cannot afford a second throw.
+ */
+export function toolCwdBase(input: ToolFileInput): string {
+  return path.resolve(input.cwd ?? process.cwd());
+}
+
+/**
+ * Resolve a tool's `cwd` and reject it if it is not a usable directory (P14.01).
+ *
+ * Core deliberately does not do this: `loadDocuments` answers a root that does not stat as a
+ * directory with a silent empty map, pinned as intentional by core's own test and relied on by other
+ * callers. Left unguarded that reads to a client as `No problems found.` / an empty graph / `No match
+ * for query` — a plausible answer to a different question, which is the CLI's own stated rationale
+ * for its identical check ("indistinguishable from a clean repository").
  *
  * Runs on every call, including when `cwd` is omitted: one `stat` against a whole corpus walk is not
  * worth an `input.cwd !== undefined` branch, and a server whose own working directory has gone away
  * is a real failure worth naming.
  */
 export async function resolveToolCwd(input: ToolFileInput): Promise<string> {
-  const resolved = path.resolve(input.cwd ?? process.cwd());
+  const resolved = toolCwdBase(input);
 
   // Always present: the stdio error contract carries `hint` as the actionable half of `{ code,
   // message, hint }`, and there is exactly one useful remedy here.
@@ -56,7 +67,9 @@ export async function resolveToolCwd(input: ToolFileInput): Promise<string> {
   const stats = await stat(resolved).catch((error: unknown) => {
     // Mirrors the CLI's `resolveDirectoryArgument`: only these two errnos mean "no usable directory
     // here". Anything else (EACCES, ELOOP, …) is a *different* operational failure and must not be
-    // misreported as bad input, so it rethrows and reaches `errorResult`'s sanitized INTERNAL_ERROR.
+    // misreported as bad input, so it rethrows — and since P14.05 it reaches `errorResult`'s errno
+    // classifier, which answers `OPERATIONAL_ERROR` naming the errno (or a sanitized INTERNAL_ERROR
+    // when the errno names no path) instead of the flat INTERNAL_ERROR it used to get.
     const code =
       error instanceof Error && "code" in error ? error.code : undefined;
     if (code === "ENOENT") {
