@@ -400,8 +400,9 @@ describe("compile command", () => {
 
   it("resolves a relative --config path against --cwd, not the process cwd", async () => {
     // The process running this test has its own cwd (the repo root), which differs from the
-    // fixture directory — exactly the scenario that broke a naive `path.resolve(command.config)`
-    // inside loadConfiguration, since that resolves against the real process cwd, not `--cwd`.
+    // fixture directory — the only scenario in which the two bases can be told apart. The handler
+    // used to pre-resolve `--config` itself; since P14.04 core owns the resolve for all six call
+    // sites and this stays as the compile-shaped regression guard over that one base.
     const cwd = await fixtureRepo({
       "a.md": "# A\n",
       "custom.config.json": compileConfig,

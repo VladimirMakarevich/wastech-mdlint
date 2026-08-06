@@ -95,6 +95,12 @@ function formatRuleResolutionError(
  * `impact` that is the `[path]` operand, not the repository root), so a root config reached from
  * `lint docs` renders as `../wastech-mdlint.config.json`: relative and pointing at the file actually
  * read, which is the contract, rather than repo-root-anchored.
+ *
+ * Since P14.04 an explicit config path is *resolved* against `params.cwd` too, so resolution and
+ * rendering finally share one base. That is what makes `Config file not found:` name the path the
+ * user actually typed: while the two disagreed, `lint proj --config cfg.json` reported
+ * `../cfg.json` — a path nobody wrote, produced by relativizing a process-cwd lookup against the
+ * lint root.
  */
 function displayConfigPath(cwd: string, configPath: string): string {
   return normalizeRelativePath(path.relative(cwd, configPath));
@@ -174,6 +180,15 @@ function resolveRules(
  * keys), then each `rules[]` entry is resolved through the registry, which validates its options and
  * surfaces path-prefixed / did-you-mean errors. Returns the validated config, the resolved rules
  * (with severity overrides), and the resolved settings.
+ *
+ * **One base for `explicitConfigPath`: `params.cwd`** (P14.04 / W-16) — the directory being analyzed,
+ * which is `[path]` for `lint`/`graph`, the CLI's own cwd for `slice`/`impact`, `--cwd` for `compile`,
+ * and the tool `cwd` for the five file-based MCP tools. It used to resolve against `process.cwd()`
+ * instead, which silently diverged whenever a host analyzed a different directory than the shell was
+ * standing in; `compile` and the MCP context helper each pre-resolved it locally to compensate, so
+ * the same flag meant two things across the six call sites. Owning it here is what deletes both
+ * workarounds: hosts now forward the caller's string untouched. Every host already passes an absolute
+ * `cwd`, so nothing downstream of this line moves.
  */
 export async function loadConfiguration(params: {
   cwd: string;
@@ -182,7 +197,7 @@ export async function loadConfiguration(params: {
 }): Promise<LoadedConfiguration> {
   const registry = params.registry ?? ruleRegistry;
   const explicitConfigPath = params.explicitConfigPath
-    ? path.resolve(params.explicitConfigPath)
+    ? path.resolve(params.cwd, params.explicitConfigPath)
     : undefined;
 
   if (
@@ -192,7 +207,9 @@ export async function loadConfiguration(params: {
     throw new ConfigError(
       "CONFIG_NOT_FOUND",
       `Config file not found: ${displayConfigPath(params.cwd, explicitConfigPath)}`,
-      "Check that configPath/cwd points to an existing wastech-mdlint.config.json, or omit it to use the zero-config default.",
+      // Names the base, because the message above names a *relative* path and a reader has no other
+      // way to tell which directory it was looked for under (P14.04).
+      "Check that configPath/cwd points to an existing wastech-mdlint.config.json — a relative configPath is resolved against the directory being analyzed — or omit it to use the zero-config default.",
     );
   }
 

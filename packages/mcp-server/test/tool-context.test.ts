@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -12,10 +13,9 @@ import {
   resolveToolCwd,
 } from "../src/shared/tool-context.js";
 
-const fixtureDir = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "fixtures/basic-project",
-);
+const testDir = path.dirname(fileURLToPath(import.meta.url));
+const fixtureDir = path.resolve(testDir, "fixtures/basic-project");
+const srcDir = path.resolve(testDir, "../src");
 
 const tempDirs: string[] = [];
 
@@ -92,9 +92,11 @@ describe("resolveToolConfiguration", () => {
   });
 
   it("resolves a relative configPath against the tool cwd, not the process cwd", async () => {
-    // The test process cwd is the repo root, not this temp dir, so a relative configPath forwarded
-    // unchanged would resolve against the wrong root and raise CONFIG_NOT_FOUND. The fix resolves it
-    // against the tool cwd.
+    // The sixth `--config` call site (P14.04): the behavior is unchanged, but the resolution moved.
+    // This helper used to pre-resolve the path itself; now it forwards the caller's string verbatim
+    // and core resolves it against the validated `cwd` — the same base the CLI's five handlers get.
+    // The test process cwd is the repo root, not this temp dir, which is the only shape in which a
+    // process-cwd base could be told apart from the tool one.
     const dir = await makeTempDir("mcp-tc-relconfig-");
     await writeFile(
       path.join(dir, "custom.config.json"),
@@ -166,5 +168,40 @@ describe("resolveToolContext", () => {
       cwd: path.join(parent, "no-such-directory"),
     }).catch((e: unknown) => e)) as { code?: unknown };
     expect(error.code).toBe("INVALID_INPUT");
+  });
+});
+
+/**
+ * The seventh-handler guard for MCP's half of P14.04.
+ *
+ * The CLI's five `--config` handlers are covered by a table derived from `--help`
+ * (`packages/cli/test/config-resolution-base.test.ts`); a tool module cannot be enumerated that way,
+ * so this pins the property instead: one call site means one resolution base. A future file-based
+ * tool that calls `loadConfiguration` directly would silently reintroduce the divergence this task
+ * removed — and would pass every behavioral test in this package, because each tool is tested
+ * against its own handler. Reading source from a test follows the precedent of
+ * `packages/core/test/boundary-guards.test.ts`.
+ */
+describe("loadConfiguration has exactly one MCP call site", () => {
+  function sourceFiles(dir: string): string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        return sourceFiles(full);
+      }
+      return entry.isFile() && entry.name.endsWith(".ts") ? [full] : [];
+    });
+  }
+
+  it("is called only from shared/tool-context.ts", () => {
+    const callers = sourceFiles(srcDir)
+      .filter((file) =>
+        readFileSync(file, "utf8").includes("loadConfiguration("),
+      )
+      // POSIX-relative so the failure message reads the same on every host.
+      .map((file) => path.relative(srcDir, file).split(path.sep).join("/"))
+      .sort();
+
+    expect(callers).toEqual(["shared/tool-context.ts"]);
   });
 });

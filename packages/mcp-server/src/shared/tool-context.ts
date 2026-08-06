@@ -17,7 +17,8 @@ import { ToolInputError } from "./tool-input-error.js";
 // loadContext, never a second implementation.
 
 // The MCP tool inputs, before mapping onto core's parameter names. `configPath` becomes core's
-// `explicitConfigPath`; `cwd` maps straight through.
+// `explicitConfigPath` — forwarded verbatim, since core resolves a relative one against the `cwd`
+// validated below (P14.04), the same base the CLI's handlers get; `cwd` maps straight through.
 export type ToolFileInput = { cwd?: string; configPath?: string };
 
 /**
@@ -89,20 +90,9 @@ export async function resolveToolConfiguration(
   const cwd = await resolveToolCwd(input);
   const loaded = await loadConfiguration({
     cwd,
-    explicitConfigPath: resolveConfigPath(cwd, input.configPath),
+    explicitConfigPath: input.configPath,
   });
   return { ...loaded, cwd };
-}
-
-// A relative `configPath` must be resolved against the tool's own `cwd`, not the server process
-// cwd: `loadConfiguration` resolves `explicitConfigPath` against `process.cwd()`, which silently
-// diverges from the tool `cwd` when the two differ (the CLI's `compile` handler guards the same
-// sharp edge). An absolute path is left untouched.
-function resolveConfigPath(
-  cwd: string,
-  configPath?: string,
-): string | undefined {
-  return configPath === undefined ? undefined : path.resolve(cwd, configPath);
 }
 
 // A flattened intersection rather than a nested { config, context }: the graph tools (P7.03) want

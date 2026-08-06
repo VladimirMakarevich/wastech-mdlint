@@ -12,7 +12,7 @@ With **no config file**, the CLI lints every `**/*.md` outside the [always-exclu
 
 ## How the config file is found
 
-- `--config <file>` names the file explicitly.
+- `--config <file>` names the file explicitly. A relative path is resolved against the directory the command analyzes — `[path]` for `lint`/`graph`, the cwd for `slice`/`impact`, `--cwd` for `compile`, and the tool's own `cwd` for the [MCP server](mcp-server.md)'s `configPath` — not against the shell you launched from. So `lint docs --config cfg.json` reads `docs/cfg.json`.
 - Otherwise `findConfig` walks up from the target directory looking for `wastech-mdlint.config.json`, and lints relative to the directory that holds it. The walk stops at your **home directory** — it never inspects `$HOME` or anything above it as an ancestor. A config that far up almost certainly belongs to something else (a dotfiles repo, another checkout), so treating it as "the project's config" would silently lint the wrong ruleset and, under `init`, put an unrelated file at risk of being overwritten.
 - The boundary applies to **ancestors only**: a config sitting directly in the directory you invoke from is always used, even when that directory _is_ your home directory. Hiding it there would be the opposite failure — the tool ignoring a config you can plainly see.
 

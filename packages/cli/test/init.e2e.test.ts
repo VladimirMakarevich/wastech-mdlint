@@ -103,6 +103,18 @@ async function run(
   return { exitCode, stdout: stdout.read(), stderr: stderr.read() };
 }
 
+// Split a generated workflow's `run:` line the way POSIX sh would, so a test can execute the emitted
+// argv instead of a hand-written approximation of it. Only single quotes need handling — that is the
+// only quoting `buildCiWorkflowYaml` emits (`shellSingleQuote`), including its `'\''` escape.
+function shellArgv(command: string): string[] {
+  return [...command.trim().matchAll(/'((?:[^']|'\\'')*)'|(\S+)/g)].map(
+    (match) =>
+      match[1] === undefined
+        ? (match[2] as string)
+        : match[1].replaceAll("'\\''", "'"),
+  );
+}
+
 // A --yes-shaped prompter: every method returns exactly what --yes would pick without a prompt, so
 // tests can assert interactive output is byte-identical to --yes output.
 function createDefaultFakePrompter(
@@ -1324,10 +1336,12 @@ describe("init command · writing the config (P6.04)", () => {
     );
     // ...but the workflow is anchored at the repo root, where GitHub will actually load it, and it
     // scopes lint to the config's directory (so include/exclude resolve there) plus an explicit
-    // --config — both single-quoted, POSIX, relative to the repo root.
+    // --config — both single-quoted and POSIX. `[path]` is relative to the repo root the workflow
+    // runs from; `--config` is relative to `[path]`, which is the base the CLI resolves it against
+    // (P14.04).
     const workflow = await readFile(path.join(cwd, workflowPath), "utf8");
     expect(workflow).toContain(
-      "npx wastech-mdlint lint 'docs' --fail-on error --config 'docs/wastech-mdlint.config.json'",
+      "npx wastech-mdlint lint 'docs' --fail-on error --config 'wastech-mdlint.config.json'",
     );
     // The dead-workflow location under docs/ is never created.
     await expect(
@@ -1345,18 +1359,27 @@ describe("init command · writing the config (P6.04)", () => {
       "docs/b.md": "# B\n\nSee [A](a.md).\n",
     });
 
-    const initResult = await run(["init", "docs", "--yes"], cwd);
+    const initResult = await run(
+      ["init", "docs", "--yes", "--with-ci-workflow"],
+      cwd,
+    );
     expect(initResult.exitCode).toBe(EXIT_CODE_SUCCESS);
 
-    // Mirror the workflow's `lint <configDir> --config <configPath>` (absolute here so the lint cwd
-    // is unambiguous, exactly as the repo-root-run workflow resolves `docs`).
+    // Run the emitted argv *verbatim*, from the repo root where GitHub runs the workflow. This test
+    // used to mirror the command with hand-written absolute paths, which is precisely why the
+    // generator's relative `--config` form went unguarded through P14.04's change of base: only
+    // executing what was actually written can catch a workflow that fails on its first run.
+    const workflow = await readFile(
+      path.join(cwd, ".github", "workflows", "wastech-mdlint.yml"),
+      "utf8",
+    );
+    const lintCommand = workflow
+      .split("\n")
+      .find((line) => line.includes("npx wastech-mdlint lint"));
+    expect(lintCommand).toBeDefined();
+
     const lintResult = await run(
-      [
-        "lint",
-        path.join(cwd, "docs"),
-        "--config",
-        path.join(cwd, "docs", CONFIG_FILE),
-      ],
+      shellArgv(lintCommand as string).slice(2),
       cwd,
     );
 
@@ -1394,10 +1417,13 @@ describe("init command · writing the config (P6.04)", () => {
     expect(written.$schema).toBe(
       "../node_modules/@wastech-mdlint/cli/schema.json",
     );
-    // Workflow is anchored at the project root, not under docs/.
+    // Workflow is anchored at the project root, not under docs/ — `[path]` carries that evidence,
+    // since `--config` is relative to it (P14.04).
     await expect(
       readFile(path.join(cwd, workflowPath), "utf8"),
-    ).resolves.toContain("--config 'docs/wastech-mdlint.config.json'");
+    ).resolves.toContain(
+      "lint 'docs' --fail-on error --config 'wastech-mdlint.config.json'",
+    );
     await expect(
       readFile(path.join(cwd, "docs", workflowPath), "utf8"),
     ).rejects.toThrow();
@@ -1437,10 +1463,11 @@ describe("init command · writing the config (P6.04)", () => {
     expect(written.$schema).toBe(
       "../../node_modules/@wastech-mdlint/cli/schema.json",
     );
-    // Workflow lives at the repo root (where GitHub loads it), pointed at the nested config...
+    // Workflow lives at the repo root (where GitHub loads it), pointed at the nested config via a
+    // repo-root-relative `[path]` and a `--config` relative to that (P14.04)...
     const workflow = await readFile(path.join(cwd, workflowPath), "utf8");
     expect(workflow).toContain(
-      "--config 'packages/foo/wastech-mdlint.config.json'",
+      "lint 'packages/foo' --fail-on error --config 'wastech-mdlint.config.json'",
     );
     // ...and never at the dead `packages/foo/.github/...` location.
     await expect(
@@ -1519,13 +1546,13 @@ describe("init command · writing the config (P6.04)", () => {
     }
   });
 
-  it("shell-quotes a config path with spaces so the lint command stays a single argument", async () => {
+  it("shell-quotes a path with spaces so the lint command stays a single argument", async () => {
     const workflowPath = path.join(
       ".github",
       "workflows",
       "wastech-mdlint.yml",
     );
-    // A legal target directory containing a space: the config path must not split into two tokens.
+    // A legal target directory containing a space: it must not split into two tokens.
     const cwd = await fixtureRepo({
       ".git/HEAD": "ref: refs/heads/main\n",
       "doc site/a.md": "# A\n\nSee [B](b.md).\n",
@@ -1542,11 +1569,13 @@ describe("init command · writing the config (P6.04)", () => {
       readFile(path.join(cwd, "doc site", CONFIG_FILE), "utf8"),
     ).resolves.toBeDefined();
     const workflow = await readFile(path.join(cwd, workflowPath), "utf8");
-    // Single-quoted as one shell argument — never the bare, space-split `--config doc site/...`.
+    // Since P14.04 the space lives in `[path]`, not in `--config` (which is now a bare filename
+    // relative to it), so that argument is where the quoting has to hold: single-quoted as one shell
+    // argument, never the bare, space-split `lint doc site`.
     expect(workflow).toContain(
-      "--config 'doc site/wastech-mdlint.config.json'",
+      "lint 'doc site' --fail-on error --config 'wastech-mdlint.config.json'",
     );
-    expect(workflow).not.toContain("--config doc site/");
+    expect(workflow).not.toContain("lint doc site");
   });
 
   it("never overwrites an existing CI workflow file", async () => {

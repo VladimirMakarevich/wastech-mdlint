@@ -40,7 +40,7 @@ A path still needs its subcommand: `wastech-mdlint docs` is `error: unknown comm
 | Flag | Default | Description |
 | --- | --- | --- |
 | `[path]` | cwd | Directory to lint; must exist. Resolved against the cwd. Exits `2` if it is missing or is a file. |
-| `--config <file>` | auto-discovered | Path to a config file (otherwise `findConfig` walks up). |
+| `--config <file>` | auto-discovered | Path to a config file (otherwise `findConfig` walks up). Resolved against `[path]`. |
 | `--format text\|json` | `text` | Human report vs machine `{ summary, messages, files }`. |
 | `--fail-on error\|warning\|off` | `error` | Minimum severity that forces exit `1`. `off` never fails. |
 | `--fix` | — | Apply deterministic fixes in place (SEC-001, TBL-002), then re-report what remains. |
@@ -51,6 +51,8 @@ wastech-mdlint lint docs --format json > report.json
 wastech-mdlint lint . --fail-on warning     # fail CI on warnings too
 wastech-mdlint lint . --fix
 ```
+
+**A relative `--config` is resolved against the directory the command analyzes, not against your shell.** For `lint` and `graph` that is `[path]`, so `wastech-mdlint lint docs --config cfg.json` reads `docs/cfg.json`; for `slice` and `impact` it is the cwd (they take no `[path]`), and for `compile` it is `--cwd`. One rule, every command — and the MCP server's `configPath` follows it too, against that tool's own `cwd`. An absolute `--config` is used as given. If a relative one is not there, the error names it exactly as you typed it — resolution and reporting share the one base, which is what stopped `lint proj --config cfg.json` from blaming a `../cfg.json` nobody wrote; an absolute one that is missing is still reported relative to the analyzed directory, like every other path (see [Exit codes](#exit-codes)).
 
 `--fix` writes only inside the scope of the rule instance that produced the fix: if a [SEC-001](rules/SEC-001.md) or [TBL-002](rules/TBL-002.md) entry sets `files`/`exclude`, files outside that scope are left byte-unchanged. The two surfaces are separate passes over the corpus, so "reported" and "rewritten" could in principle drift apart — they are held together deliberately, since a `--fix` that edited files the report never mentions would be the worst kind of surprise.
 
@@ -63,7 +65,7 @@ Builds and summarizes the [context graph](context-graph.md): clusters, hubs, rea
 | Flag | Default | Description |
 | --- | --- | --- |
 | `[path]` | cwd | Directory to scan; must be an existing directory (exits `2` otherwise). |
-| `--config <file>` | auto | Config file. |
+| `--config <file>` | auto | Config file. Resolved against `[path]`. |
 | `--format human\|json\|mermaid\|dot` | `human` | `human` text; deterministic `{ nodes, edges, components, readingOrder }` JSON; or a `mermaid`/`dot` diagram. |
 
 Read-only; exits `0` on success.
@@ -76,7 +78,7 @@ Prints the files reachable within `--depth` hops of a resolved query, following 
 | --- | --- | --- |
 | `<query>` | — | ID, `#slug`, or file path. |
 | `--depth <n>` | `2` | Traversal depth; must be a non-negative integer. |
-| `--config <file>` | auto | Config file. |
+| `--config <file>` | auto | Config file. Resolved against the cwd. |
 | `--format text\|json` | `text` | — |
 
 `slice` always scans the current working directory — it takes no `[path]` argument.
@@ -85,7 +87,7 @@ Prints the files reachable within `--depth` hops of a resolved query, following 
 
 Classifies the blast radius of changing `<file>` and lints the affected subgraph. Linting still runs over the whole corpus (so project-scope rules like [GRP-001](rules/GRP-001.md) see every document), but the reported messages/files are narrowed to `file` plus everything directly or transitively affected by it.
 
-- Takes no `[path]` argument (always the cwd).
+- Takes no `[path]` argument (always the cwd) — so a relative `--config <file>` is resolved against the cwd, as for `slice`.
 - Exits `2` with a hint if `<file>` is outside the analyzed corpus.
 
 ## `compile`
@@ -94,12 +96,12 @@ Generates a deterministic [`SKILL.md`](compile.md) from the document graph, rule
 
 | Flag | Default | Description |
 | --- | --- | --- |
-| `--config <file>` | auto | Config file. |
-| `--outdir <dir>` | `config.compile.outdir` → `.claude/skills/wastech-mdlint/` | Where to write `SKILL.md`. |
+| `--config <file>` | auto | Config file. Resolved against `--cwd`. |
+| `--outdir <dir>` | `config.compile.outdir` → `.claude/skills/wastech-mdlint/` | Where to write `SKILL.md`. Resolved against `--cwd`. |
 | `--dry-run` | — | Print the generated content to stdout instead of writing. |
 | `--cwd <dir>` | cwd | Working directory to compile from; must be an existing directory (exits `2` otherwise). |
 
-Unlike other commands, `compile` takes `--cwd` (not `[path]`) and resolves a relative `--config`/`--outdir` against it. Requires a `compile` section in config; a missing one exits `2` with guidance instead of a stack trace.
+Unlike other commands, `compile` takes `--cwd` rather than a `[path]` argument — that is what makes `--outdir` compile-specific in where it lands. `--config` is not special: it resolves against the directory being analyzed exactly as everywhere else, which for this command is `--cwd`. Requires a `compile` section in config; a missing one exits `2` with guidance instead of a stack trace.
 
 ## `init`
 

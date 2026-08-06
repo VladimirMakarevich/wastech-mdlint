@@ -196,6 +196,66 @@ describe("loadConfiguration", () => {
     expect((error as ConfigError).code).toBe("CONFIG_NOT_FOUND");
     expect((error as ConfigError).hint).toBeTruthy();
   });
+
+  // P14.04 / W-16: one resolution base for `explicitConfigPath`, and the same base the diagnostic
+  // renders against. The five CLI handlers and the MCP helper all reach this line, so getting it
+  // right here is what makes `--config` mean one thing across the six.
+  it("resolves a relative explicit config path against params.cwd, not the process cwd", async () => {
+    // The test process runs from the repo root, which is deliberately *not* the fixture dir — the
+    // only shape in which the old `path.resolve(explicitConfigPath)` and this one differ.
+    const root = await writeConfig(
+      JSON.stringify({ include: ["**/*.md"], rules: [] }),
+      "custom.config.json",
+    );
+
+    const loaded = await loadConfiguration({
+      cwd: root,
+      explicitConfigPath: "custom.config.json",
+      registry,
+    });
+
+    expect(loaded.configPath).toBe(path.join(root, "custom.config.json"));
+  });
+
+  it("leaves an absolute explicit config path alone", async () => {
+    const root = await writeConfig(
+      JSON.stringify({ include: ["**/*.md"], rules: [] }),
+      "custom.config.json",
+    );
+    const absolute = path.join(root, "custom.config.json");
+
+    // `path.resolve(base, absolute)` returns `absolute`, so an absolute argument is unaffected by the
+    // base — pinned because that is the half of the change nothing else would notice breaking.
+    const loaded = await loadConfiguration({
+      cwd: os.tmpdir(),
+      explicitConfigPath: absolute,
+      registry,
+    });
+
+    expect(loaded.configPath).toBe(absolute);
+  });
+
+  it("reports a missing relative config path as the user typed it", async () => {
+    const root = await mkdtemp(
+      path.join(os.tmpdir(), "wastech-mdlint-relmissing-"),
+    );
+    tempDirs.push(root);
+
+    const error = await loadConfiguration({
+      cwd: root,
+      explicitConfigPath: "nope.json",
+      registry,
+    }).catch((e: unknown) => e);
+
+    expect((error as ConfigError).code).toBe("CONFIG_NOT_FOUND");
+    // Resolution and rendering share `params.cwd` now. While they disagreed this read
+    // `../nope.json`: a lookup against the process cwd relativized against the analyzed directory,
+    // naming a path nobody typed.
+    expect((error as ConfigError).message).toBe(
+      "Config file not found: nope.json",
+    );
+    expect((error as ConfigError).message).not.toContain("../");
+  });
 });
 
 // One notation across both validation stages (P13.06 / C7): `config` root, `.key` for an object key,

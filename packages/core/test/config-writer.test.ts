@@ -416,10 +416,25 @@ describe("buildCiWorkflowYaml", () => {
     expect(yaml).not.toContain("uses: VladimirMakarevich/");
   });
 
-  it("shell-quotes a config path with spaces as a single argument inside a block scalar", () => {
+  it("shell-quotes a path with spaces as a single argument inside a block scalar", () => {
     const yaml = buildCiWorkflowYaml("doc site/wastech-mdlint.config.json");
-    expect(yaml).toContain("--config 'doc site/wastech-mdlint.config.json'");
+    // The space lives in the directory, so it is `[path]` that carries the quoting evidence: since
+    // P14.04 `--config` is emitted relative to that directory and is a bare filename.
+    expect(yaml).toContain(
+      "npx wastech-mdlint lint 'doc site' --fail-on error --config 'wastech-mdlint.config.json'",
+    );
     expect(yaml).toContain("- run: |");
+  });
+
+  it("emits --config relative to the [path] argument, not to the repo root", () => {
+    // The CLI resolves a relative `--config` against `[path]` (P14.04), so a repo-root-relative
+    // config path here would make the generated workflow look for `docs/docs/…` and exit 2 on its
+    // first run.
+    const yaml = buildCiWorkflowYaml("docs/wastech-mdlint.config.json");
+    expect(yaml).toContain(
+      "npx wastech-mdlint lint 'docs' --fail-on error --config 'wastech-mdlint.config.json'",
+    );
+    expect(yaml).not.toContain("--config 'docs/");
   });
 
   it("rejects a config path with a line terminator rather than emit a broken/mis-run workflow", () => {

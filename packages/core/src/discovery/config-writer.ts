@@ -152,11 +152,17 @@ function shellSingleQuote(value: string): string {
  *
  * GitHub loads workflows only from the repo-root `.github/workflows`, so when the config being wired
  * lives in a subdirectory the caller passes its repo-root-relative POSIX path here. The lint step
- * then scopes to that config's *directory* (`lint <dir>`) AND passes `--config <path>`: `lintFiles`
+ * then scopes to that config's *directory* (`lint <dir>`) AND passes `--config <file>`: `lintFiles`
  * resolves `include`/`exclude` relative to the command cwd, so without the directory arg the workflow
  * would lint the repo root against subdirectory-relative globs and match the wrong tree (or nothing).
  * It is a YAML literal block scalar (`run: |`) so the command is taken verbatim (no plain-scalar
  * `#`/split surprises) and each path is single-quoted for POSIX sh.
+ *
+ * The two arguments are anchored differently on purpose. `[path]` is repo-root-relative because the
+ * workflow runs from the repo root; `--config` is relative to *that* directory, because since P14.04
+ * the CLI resolves a relative `--config` against `[path]`. Emitting the repo-root-relative config
+ * path here — which is what this template did while the two bases disagreed — would now make every
+ * generated workflow look for `<dir>/<dir>/wastech-mdlint.config.json` and exit `2` on its first run.
  *
  * A line terminator in the path cannot be represented in the block scalar and would silently mis-run,
  * so it is rejected (the CLI declines the opt-in workflow rather than reach this) — an explicit
@@ -179,11 +185,12 @@ export function buildCiWorkflowYaml(configPath?: string): string {
 
   let lintStep = "      - run: npx wastech-mdlint lint --fail-on error";
   if (configPath !== undefined) {
-    // POSIX dirname of the (already POSIX-normalized) config path; the caller only passes a path for
-    // a subdirectory config, so a slash is expected, but default to "." defensively.
+    // POSIX dirname/basename of the (already POSIX-normalized) config path; the caller only passes a
+    // path for a subdirectory config, so a slash is expected, but default to "." defensively.
     const lastSlash = configPath.lastIndexOf("/");
     const configDir = lastSlash === -1 ? "." : configPath.slice(0, lastSlash);
-    const lintCommand = `npx wastech-mdlint lint ${shellSingleQuote(configDir)} --fail-on error --config ${shellSingleQuote(configPath)}`;
+    const configFile = configPath.slice(lastSlash + 1);
+    const lintCommand = `npx wastech-mdlint lint ${shellSingleQuote(configDir)} --fail-on error --config ${shellSingleQuote(configFile)}`;
     lintStep = `      - run: |\n          ${lintCommand}`;
   }
 

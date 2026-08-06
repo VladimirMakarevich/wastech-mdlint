@@ -45,6 +45,8 @@ MCP errors use a structured `{ code, message, hint }` contract, with sanitized `
 
 That consistency includes the `cwd` argument the five file-based tools accept. A `cwd` that does not exist, or that points at a file rather than a directory, is rejected with `INVALID_INPUT` naming the resolved path — it is **not** answered with an empty result. This matches the CLI, which exits `2` on a nonexistent target path for the same reason: an empty corpus is indistinguishable from a clean repository, so `lint-files` reporting `No problems found.` for a mistyped directory would be a plausible answer to a different question. Omit `cwd` to analyze the server's own working directory.
 
+It includes their `configPath` too: a relative one is resolved against that tool's `cwd`, never against the server process's working directory — the same rule the CLI follows for `--config` ([CLI reference](cli.md#lint-default)). An absolute `configPath` is used as given; a missing one comes back as `CONFIG_NOT_FOUND` naming the path relative to that `cwd`, which for a relative `configPath` is the string you passed.
+
 One limit is worth knowing: the contract covers failures the tool itself detects. An argument shape that the tool's advertised `inputSchema` rejects outright — a misspelled `assert.kind`, an unknown key, a bad `severity` value — is refused by the MCP protocol layer before the tool runs, so it comes back as the protocol's own validation text without a `{ code, message, hint }` payload. That message still names the offending path and the values it expected, and the mistakes that need guiding advice (an incomplete `custom` entry, an unknown rule ID, invalid rule options) are deliberately let through to the tool so they can carry it.
 
 ## Boundaries

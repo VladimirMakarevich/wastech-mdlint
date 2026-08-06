@@ -417,17 +417,13 @@ async function handleSchema(
 async function handleCompile(
   command: CompileCommand,
 ): Promise<CommandExecutionResult> {
-  // `compile` is the one command with a named `--cwd` instead of a `[path]` argument that defaults
-  // to the CLI's own injected cwd, so a relative `--config` must be resolved against `command.cwd`
-  // explicitly — `loadConfiguration` resolves `explicitConfigPath` against `process.cwd()`, which
-  // silently diverges from `command.cwd` when the two differ.
-  const explicitConfigPath =
-    command.config === undefined
-      ? undefined
-      : path.resolve(command.cwd, command.config);
+  // `--config` is forwarded as typed: core resolves a relative one against the `cwd` below, the same
+  // base every other handler gets (P14.04). This handler used to pre-resolve it, back when core
+  // resolved against `process.cwd()` instead and `compile`'s named `--cwd` made the divergence
+  // reachable from an ordinary invocation.
   const loaded = await loadConfiguration({
     cwd: command.cwd,
-    explicitConfigPath,
+    explicitConfigPath: command.config,
   });
 
   let result: CompileResult;
