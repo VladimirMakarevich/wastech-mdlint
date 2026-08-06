@@ -15,6 +15,7 @@ import {
   identifyExistingRule,
   inferRuleSet,
   loadConfiguration,
+  MARKDOWN_GLOB_SUFFIX,
   normalizeRelativePath,
   PACKAGE_SCHEMA_SEGMENTS,
   resolvePackageSchemaRef,
@@ -31,6 +32,7 @@ import {
   type ProjectSchemaReason,
   type RuleCategory,
   type RuleConfigEntry,
+  type ScanPruning,
 } from "@wastech-mdlint/core";
 
 // `init` (P6.03/P6.04): the thin host boundary over P6.01/02's core scan + inference. This module
@@ -101,6 +103,10 @@ export type ConfirmedInitSelections = {
   clustersWereOffered: boolean;
   // Only meaningful for `"merge"`: the existing config carries JSONC comments the rebuild will drop.
   existingConfigHasComments: boolean;
+  // What the scan refused to walk, straight from `scanRepository`. Required for the same reason
+  // `clustersWereOffered` is: the draft has to disclose it (W-14), and an optional field would let a
+  // new call site drop the disclosure silently — which is the exact defect this closes.
+  pruning: ScanPruning;
 };
 
 export type ConfigPreview = {
@@ -344,10 +350,124 @@ function formatExistingConfigLine(
   }
 }
 
+// How many directories one exclusion line names before it collapses into `+N more`. A monorepo can
+// prune dozens of `node_modules` copies, and a wall of paths is what makes a disclosure ignorable —
+// the failure mode W-14 is about. The input is sorted, so which entries survive the cap is stable.
+const EXCLUSION_LIST_CAP = 5;
+
+function formatCappedList(items: string[]): string {
+  if (items.length <= EXCLUSION_LIST_CAP) {
+    return items.join(", ");
+  }
+  const shown = items.slice(0, EXCLUSION_LIST_CAP).join(", ");
+  return `${shown}, +${items.length - EXCLUSION_LIST_CAP} more`;
+}
+
+function pluralize(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+// Deduped, sorted basenames of a pruned set — `mobile/node_modules` and `node_modules` are one fact
+// to report, not two.
+function prunedBaseNames(directories: readonly { path: string }[]): string[] {
+  return [
+    ...new Set(directories.map((entry) => path.posix.basename(entry.path))),
+  ].sort(compareStrings);
+}
+
+/**
+ * The scan-exclusion disclosure (P14.03 / W-14): what the scan refused to walk, and why. Pure and
+ * exported so the wording is asserted directly, mirroring `formatDraftSummary`/`formatWriteSummary`.
+ *
+ * **One line per reason, never one total.** The three classes are not one class: a pruned
+ * `node_modules` is unsurprising, and a `.claude/skills/` dropped because its parent starts with a
+ * dot is the finding. A single aggregate count is precisely what invites a user to skim past it.
+ *
+ * Only the hidden class carries a file count, and the asymmetry is deliberate — it is the one class
+ * whose contents are plausibly documentation the user wants linted, and it is also the only one
+ * cheap to size (`scanRepository` counts it while pruning; counting a dependency tree would mean
+ * walking the tree that pruning exists to avoid). The other two say "contents not counted" out loud
+ * rather than implying a zero.
+ *
+ * Returns `[]` when there is nothing to disclose, so the caller can omit the block entirely.
+ *
+ * `includeWillBeWritten` decides the hidden line's actionable half, and it has to be passed in
+ * because the two answers are opposites: with an `include` written, a dot-directory is outside the
+ * corpus and the user needs a pattern to add. With the key omitted — the scan found no cluster at
+ * all, which is exactly the shape of a repo whose only Markdown *is* in dot-directories — the
+ * dot-matching default `include` is in force and those files are already linted. Claiming otherwise
+ * in that branch would contradict the `Include (…)` line printed two lines above it.
+ *
+ * (No default glob is spelled out in this block comment on purpose: a depth-agnostic prefix contains
+ * `*` `*` `/`, which would close the comment early — the same reason `config/corpus-scope.ts` uses
+ * `//` throughout.)
+ */
+export function formatScanExclusions(
+  pruning: ScanPruning,
+  includeWillBeWritten: boolean,
+): string[] {
+  // Sorted here rather than trusted from the caller: `ScanPruning` is public core API and this
+  // formatter is exported, so an unsorted record would otherwise render in input order and shift
+  // which entries the cap keeps (.agents/rules/coding-style.md — sort at the rendering site).
+  const hidden = pruning.directories
+    .filter(
+      (entry) =>
+        entry.reason === "hidden" && (entry.markdownFileCount ?? 0) > 0,
+    )
+    .sort((left, right) => compareStrings(left.path, right.path));
+  const noise = pruning.directories.filter((entry) => entry.reason === "noise");
+  const gitignored = pruning.directories.filter(
+    (entry) => entry.reason === "gitignored",
+  );
+
+  const lines: string[] = [];
+
+  if (hidden.length > 0) {
+    const total = hidden.reduce(
+      (sum, entry) => sum + (entry.markdownFileCount ?? 0),
+      0,
+    );
+    const named = formatCappedList(
+      hidden.map((entry) => `${entry.path} (${entry.markdownFileCount})`),
+    );
+    // The suggested pattern splices MARKDOWN_GLOB_SUFFIX rather than a literal `*.md`, because the
+    // count beside it was produced with MARKDOWN_EXTENSIONS: a hardcoded `.md` tail would advertise
+    // a pattern that lints fewer files than the number in the same sentence (P13.05 / W-09).
+    const advice = includeWillBeWritten
+      ? `The scan never proposes a dot-directory as a doc cluster, so no include pattern above ` +
+        `names one; add a pattern such as "${hidden[0]!.path}/**/${MARKDOWN_GLOB_SUFFIX}" to lint it.`
+      : `The scan never proposes a dot-directory as a doc cluster, but no include will be written ` +
+        `either, so the dot-matching **/*.md default stays in force and the .md files among these ` +
+        `are linted.`;
+    lines.push(
+      `  hidden directories: ${pluralize(total, "Markdown file", "Markdown files")} in ` +
+        `${pluralize(hidden.length, "directory", "directories")} whose name starts with a dot — ` +
+        `${named}. ${advice}`,
+    );
+  }
+
+  if (noise.length > 0) {
+    lines.push(
+      `  build and dependency directories: ${pluralize(noise.length, "directory", "directories")} ` +
+        `skipped by name, contents not counted — ${formatCappedList(prunedBaseNames(noise))}.`,
+    );
+  }
+
+  if (gitignored.length > 0) {
+    lines.push(
+      `  gitignored directories: ${pluralize(gitignored.length, "directory", "directories")} ` +
+        `skipped, contents not counted — ${formatCappedList(prunedBaseNames(gitignored))}.`,
+    );
+  }
+
+  return lines.length === 0 ? [] : ["Excluded from the scan:", ...lines];
+}
+
 /**
  * Deterministic, human-readable preview of the confirmed draft: existing-config disposition,
  * package manager, include globs (from `buildConfigPreview`, so the printed list matches exactly
- * what P6.04 would serialize), and rules grouped by category with their per-rule rationale.
+ * what P6.04 would serialize), the scan-exclusion disclosure, and rules grouped by category with
+ * their per-rule rationale.
  *
  * `merge` is additive/existing-wins (P6.03's locked contract): it only ever appends new `rules[]`
  * entries and must never touch `include`/`exclude`/`settings`. So a merge preview omits the
@@ -386,6 +506,22 @@ export function formatDraftSummary(
       for (const glob of preview.include) {
         lines.push(`  - ${glob}`);
       }
+    }
+
+    // Only on a fresh write, and only after the Include block it qualifies: `merge` has just said
+    // scope is left unchanged, so disclosing what the scan skipped there would imply a decision the
+    // merge path is not making. Under `--yes` this reaches stdout via `composeOutput`; interactively
+    // `confirmDraft` shows it while the user can still decline, which is where the warn-before-
+    // confirming discipline wants it.
+    // Same three-valued `include` decision `runInitCommand` makes before writing: the key is omitted
+    // only when nothing was selected *and* nothing was offered, and that is the one case where the
+    // hidden files end up linted by the default rather than skipped.
+    const exclusions = formatScanExclusions(
+      selections.pruning,
+      preview.include.length > 0 || selections.clustersWereOffered,
+    );
+    if (exclusions.length > 0) {
+      lines.push("", ...exclusions);
     }
   }
   lines.push("");
@@ -1025,6 +1161,7 @@ export async function runInitCommand(
     existingConfigUnreadable,
     clustersWereOffered,
     existingConfigHasComments,
+    pruning: scanResult.pruned,
   };
 
   const summary = formatDraftSummary(selections, relativeConfigPath);

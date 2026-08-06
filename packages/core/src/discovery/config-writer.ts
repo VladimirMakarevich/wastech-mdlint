@@ -127,6 +127,16 @@ const TOP_LEVEL_KEY_ORDER = [
   "compile",
 ] as const;
 
+// The `//` lines a fresh write puts above `exclude` (P14.03 / W-15). Without them the block reads
+// as this config's own exclusions, and the natural edit — delete the line you disagree with — does
+// nothing at all, because the same list is the lint-time default with or without a config. Stated
+// as data rather than prose so the writer's tests can pin the wording that makes it actionable.
+const EXCLUDE_KEY_COMMENT: readonly string[] = [
+  "These are wastech-mdlint's own defaults, written out so they are visible rather than implicit.",
+  "The same list applies with no config at all, and your entries EXTEND it rather than replace it —",
+  'so deleting a line here changes nothing. To lint one of these trees, negate it: "!**/vendor/**".',
+];
+
 // Single-quote a value for POSIX sh so spaces or shell metacharacters (`#`, `&`, …) in an otherwise
 // legal repo path can't split the argument or be reinterpreted. Embedded single quotes are closed,
 // escaped, and reopened — the standard `'\''` idiom.
@@ -410,6 +420,10 @@ export function generateInitConfig(
   const schemaRef = useProjectSchema ? PROJECT_SCHEMA_REF : packageSchemaRef;
 
   const values = new Map<string, string>();
+  // `//` lines emitted immediately above a key, keyed the same way `values` is so the two stay in
+  // step through the ordering pass below. Only `exclude` uses it today; a map rather than a special
+  // case because the body build has to handle the general shape either way.
+  const leadingComments = new Map<string, readonly string[]>();
   values.set("$schema", JSON.stringify(schemaRef));
 
   let wroteEmptyInclude = false;
@@ -433,16 +447,21 @@ export function generateInitConfig(
     // Both keys stay explicit in the written file so each remains a visible, editable decision.
     // `respectGitignore: true` is still the load-bearing one: it is pinned rather than left at the
     // resolver's `false` default (C8), because the scan already skipped gitignored trees and a
-    // config that lints them would contradict the draft the user approved (audit L-7). The written
-    // `exclude` is no longer the only thing in force, though — since P13.02 the same
+    // config that lints them would contradict the draft the user approved (audit L-7).
+    //
+    // The written `exclude` is no longer the only thing in force — since P13.02 the same
     // `DEFAULT_EXCLUDE_GLOBS` applies on every run and a config's own `exclude` *extends* it
     // (`config/corpus-scope.ts`, and `docs/guide/configuration.md` for users), so writing it here
-    // now discloses the default rather than establishing it. What `init` should therefore say about
-    // it — and whether it should still write the list verbatim — is P14.03's question (W-15).
+    // discloses the default rather than establishing it. P14.03 (W-15) settled deliverable 4 in
+    // favor of keeping the list rather than omitting what the default already covers: extend is
+    // exactly what makes *deleting* one of these lines a no-op, and a bare list of a dozen globs
+    // invites that dead edit. The key must also exist for a user to write a negation into. So the
+    // duplication stays, and the comment below is what keeps it from being silent.
     values.set(
       "exclude",
       indentValue(JSON.stringify(DEFAULT_EXCLUDE_GLOBS, null, 2)),
     );
+    leadingComments.set("exclude", EXCLUDE_KEY_COMMENT);
     values.set("respectGitignore", "true");
   }
 
@@ -463,7 +482,15 @@ export function generateInitConfig(
   ];
 
   const body = orderedKeys
-    .map((key) => `  ${JSON.stringify(key)}: ${values.get(key)!}`)
+    .map((key) => {
+      // The comma from the previous entry has already been emitted by the join, so a key's own
+      // comment lines sit between that comma and the key — valid JSONC, and it reads as belonging
+      // to the key below it rather than trailing the value above.
+      const comment = (leadingComments.get(key) ?? [])
+        .map((line) => `  // ${line}\n`)
+        .join("");
+      return `${comment}  ${JSON.stringify(key)}: ${values.get(key)!}`;
+    })
     .join(",\n");
   const configText = `{\n${body}\n}\n`;
 

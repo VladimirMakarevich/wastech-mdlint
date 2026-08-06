@@ -18,7 +18,7 @@ npm run build     # tsc -b → each package's dist/
 
 ## Your first lint
 
-With no config file present, the CLI lints every `**/*.md` outside the [always-excluded trees](configuration.md#what-is-excluded-before-you-write-anything) — `node_modules`, build output, and dot-directories, at any depth — with an **empty ruleset**, a clean pass. Rules only run once you add a config.
+With no config file present, the CLI lints every `**/*.md` outside the [always-excluded trees](configuration.md#what-is-excluded-before-you-write-anything) — `node_modules`, build output, and dependency directories such as `.venv`, at any depth — with an **empty ruleset**, a clean pass. Rules only run once you add a config.
 
 ```bash
 node packages/cli/dist/index.js lint .              # text output, exit 0 on a clean repo

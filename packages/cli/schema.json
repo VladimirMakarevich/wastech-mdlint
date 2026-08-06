@@ -19,10 +19,11 @@
         "type": "string"
       },
       "default": [
-        "**/.*/**",
         "**/.cache/**",
         "**/.git/**",
         "**/.next/**",
+        "**/.venv/**",
+        "**/.yarn/**",
         "**/build/**",
         "**/coverage/**",
         "**/dist/**",

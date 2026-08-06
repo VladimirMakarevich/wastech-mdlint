@@ -391,6 +391,7 @@ describe("scanRepository", () => {
       clusters: [],
       packageManager: undefined,
       workspacePackages: [],
+      pruned: { directories: [] },
     });
   });
 
@@ -531,5 +532,117 @@ describe("scanRepository · hidden and gitignored trees", () => {
     const result = await scanRepository({ cwd: root });
 
     expect(result.clusters.map((cluster) => cluster.path)).toEqual(["specs"]);
+  });
+});
+
+// W-14 (P14.03): the scan records what it pruned so `init` can disclose it. The record is the whole
+// point — a second directory walk to produce the same numbers is a second thing to disagree with the
+// first, so these tests pin what the *scan* reports rather than what a re-walk would find.
+describe("scanRepository · the pruning record", () => {
+  it("records a hidden directory with the Markdown it holds", async () => {
+    const root = await createFixtureTree({
+      "docs/one.md": "# One\n",
+      ".agents/rules/a.md": "# A\n",
+      ".agents/rules/b.md": "# B\n",
+      ".claude/skills/x/SKILL.md": "# Skill\n",
+    });
+
+    const result = await scanRepository({ cwd: root });
+
+    // Only the hidden *roots* are recorded — a nested `.agents/rules` is part of `.agents`'s total,
+    // not a second entry, so the counts can never be double-read.
+    expect(result.pruned.directories).toEqual([
+      { path: ".agents", reason: "hidden", markdownFileCount: 2 },
+      { path: ".claude", reason: "hidden", markdownFileCount: 1 },
+    ]);
+  });
+
+  it("classifies a hidden dependency tree as noise and never counts it", async () => {
+    // The bound on the count walk: `.venv`/`.yarn` are in DEFAULT_NOISE_DIR_NAMES precisely so
+    // sizing the hidden class never descends into a virtualenv or a Yarn Berry cache.
+    const root = await createFixtureTree({
+      "docs/one.md": "# One\n",
+      ".venv/lib/site-packages/pkg/README.md": "# Vendored\n",
+      "mobile/node_modules/leftpad/README.md": "# leftpad\n",
+    });
+
+    const result = await scanRepository({ cwd: root });
+
+    expect(result.pruned.directories).toEqual([
+      { path: ".venv", reason: "noise" },
+      { path: "mobile/node_modules", reason: "noise" },
+    ]);
+    for (const entry of result.pruned.directories) {
+      expect(entry.markdownFileCount).toBeUndefined();
+    }
+  });
+
+  it("records a gitignored directory without counting it, and honors ignores inside a hidden one", async () => {
+    const root = await createFixtureTree({
+      ".gitignore": "generated-docs/\n.claude/drafts/\n",
+      "docs/one.md": "# One\n",
+      "generated-docs/api/a.md": "# A\n",
+      "generated-docs/api/b.md": "# B\n",
+      ".claude/keep.md": "# Keep\n",
+      ".claude/drafts/skip.md": "# Skip\n",
+    });
+
+    const result = await scanRepository({ cwd: root });
+
+    expect(result.pruned.directories).toEqual([
+      // The hidden count runs the same gitignore layers the corpus walk does, so the number agrees
+      // with `git ls-files` rather than with a raw directory listing.
+      { path: ".claude", reason: "hidden", markdownFileCount: 1 },
+      { path: "generated-docs", reason: "gitignored" },
+    ]);
+  });
+
+  it("counts only MARKDOWN_EXTENSIONS files inside a hidden directory", async () => {
+    const root = await createFixtureTree({
+      "docs/one.md": "# One\n",
+      ".claude/a.md": "# A\n",
+      ".claude/b.mdx": "# B\n",
+      ".claude/settings.json": "{}\n",
+      ".claude/notes.txt": "notes\n",
+    });
+
+    const result = await scanRepository({ cwd: root });
+
+    expect(result.pruned.directories).toEqual([
+      { path: ".claude", reason: "hidden", markdownFileCount: 2 },
+    ]);
+  });
+
+  it("is sorted by path and stable across repeated scans", async () => {
+    const root = await createFixtureTree({
+      ".gitignore": "generated-docs/\n",
+      "docs/one.md": "# One\n",
+      "zeta/node_modules/pkg/README.md": "# Pkg\n",
+      "alpha/dist/out.md": "# Out\n",
+      ".github/PULL_REQUEST_TEMPLATE.md": "# PR\n",
+      "generated-docs/api/a.md": "# A\n",
+    });
+
+    const first = await scanRepository({ cwd: root });
+    const second = await scanRepository({ cwd: root });
+
+    expect(first.pruned.directories.map((entry) => entry.path)).toEqual([
+      ".github",
+      "alpha/dist",
+      "generated-docs",
+      "zeta/node_modules",
+    ]);
+    expect(first.pruned).toEqual(second.pruned);
+  });
+
+  it("records nothing for a tree with no pruned directory at all", async () => {
+    const root = await createFixtureTree({
+      "docs/one.md": "# One\n",
+      "docs/two.md": "# Two\n",
+    });
+
+    const result = await scanRepository({ cwd: root });
+
+    expect(result.pruned).toEqual({ directories: [] });
   });
 });

@@ -27,10 +27,12 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
   // Globs to remove from the set. `exclude` WINS over `include`. Same anchoring and ordering as
   // `include` — but a "!" here cannot reach into a directory an earlier entry already pruned.
   //
-  // Every run already excludes 11 noise globs (node_modules, dist, build, .git, any dot-directory,
-  // …) before you write anything, and what you put here is APPENDED to them rather than replacing
-  // them — so "[]" is not an opt-out, and deleting an entry cannot remove a default. Negate one
-  // instead ("!**/build/**" for a single tree, "!**" for all of them).
+  // Every run already excludes 12 noise globs (node_modules, dist, build, .git, .venv, …) before
+  // you write anything, and what you put here is APPENDED to them rather than replacing them — so
+  // "[]" is not an opt-out, and deleting an entry cannot remove a default. Negate one instead
+  // ("!**/build/**" for a single tree, "!**" for all of them). Each one names a dependency or build
+  // tree; a directory is never excluded merely for starting with a dot, so .github/ and .agents/
+  // are linted by default even though the `init` scan will not propose them.
   // Full list and rules: ./configuration.md#what-is-excluded-before-you-write-anything
   "exclude": ["**/node_modules/**", "**/dist/**", "**/.git/**"],
 

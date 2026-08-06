@@ -10,25 +10,29 @@ import type { LintConfig } from "./config-schema.js";
 // These deliberately do NOT live in `loadDocuments`. That loader is public API whose contract is
 // "what you pass is what I walk", and `test/gitignore-layers.test.ts` relies on it: that suite hands
 // in an explicit `exclude` and compares the resulting corpus against real `git ls-files`, so a loader
-// that silently added eleven patterns of its own would make the oracle compare two different trees.
+// that silently added a dozen patterns of its own would make the oracle compare two different trees.
 // The config layer is also where a user's own `exclude` arrives, which is what the extend rule on
 // `resolveCorpusScope` has to reason about.
 //
 // Every comment here uses `//` rather than a `/** */` block on purpose: a glob such as the
 // depth-agnostic prefix below contains `*` `*` `/`, which would close a block comment early.
 
-// Mirrors the scan's `isPrunedDirName` hidden-directory prune (audit L-7): `.github`, `.venv`,
-// `.husky` and friends hold tooling Markdown `init` never proposed, so leaving them lintable made
-// the written config disagree with the draft the user approved. Named rather than inlined below
-// because the pattern is unreadable without this explanation: it matches a dot-prefixed directory
-// at any depth and only ever matches its *contents*, so a dotfile at the repo root (`.README.md`)
-// stays in the corpus.
-const HIDDEN_DIR_EXCLUDE_GLOB = "**/.*/**";
-
-// The default `exclude` — the scanner's own pruned noise directories as globs, plus the
-// hidden-directory glob above. One list with two consumers, deliberately: it is both what a fresh
-// `init` writes (C1) and, since P13.02, what a run with **no config at all** excludes. Two lists
-// that must agree is the shape of the next drift, so `discovery/config-writer.ts` imports this one.
+// The default `exclude` — the scanner's own pruned noise directories as globs, and nothing else.
+// One list with two consumers, deliberately: it is both what a fresh `init` writes (C1) and, since
+// P13.02, what a run with **no config at all** excludes. Two lists that must agree is the shape of
+// the next drift, so `discovery/config-writer.ts` imports this one.
+//
+// W-15, decided in P14.03: the scan's *other* prune — every dot-prefixed directory, by shape
+// (`classifyPrunedDirName`, audit L-7) — is deliberately NOT mirrored here. The two questions have
+// inverted failure modes. Over-pruning the scan is cheap: an unproposed cluster is one `include`
+// edit away. Over-excluding the lint corpus is silent under-reporting — exit `0`, a plausible file
+// count, and the documents most likely to matter never read. Measured on the field-test target,
+// `**/.*/**` put 31% of the tracked corpus (`.claude/skills/`, `.agents/rules/`, two `.rules/`
+// sets) outside a zero-config run; this repository has the same shape. What genuinely belongs in a
+// lint-time default is the dependency and build trees that happen to be hidden — `.venv`, `.yarn`,
+// `.git`, `.next`, `.cache` — and those are named in `DEFAULT_NOISE_DIR_NAMES`, which states the
+// rule for future additions. `init` discloses the scan-only prune instead of encoding it
+// (`formatScanExclusions`, W-14).
 //
 // The leading `**/` is load-bearing: `collectMarkdownFiles` prunes these by *basename at every
 // depth* (`repo-scan.ts`), so only a depth-agnostic glob faithfully mirrors what the scan skipped —
@@ -39,16 +43,13 @@ const HIDDEN_DIR_EXCLUDE_GLOB = "**/.*/**";
 // picomatch, so a root-level `node_modules/` stays pruned too.
 //
 // Accepted tradeoff, now on every run rather than only after `init`: hand-written docs under a
-// nested directory literally named `build`/`out`/`vendor`/… are pruned as well, as is Markdown under
-// any dot-directory (`.github/`, `.agents/`), and `exclude` wins over `include` (C1). The escape
-// hatch is a negated entry naming the *directory* — see `resolveCorpusScope`. Whether the
-// hidden-directory glob belongs in a *lint-time* default is W-15's question, owned by P14.03.
+// nested directory literally named `build`/`out`/`vendor`/… are pruned as well, and `exclude` wins
+// over `include` (C1). The escape hatch is a negated entry naming the *directory* — see
+// `resolveCorpusScope`.
 //
 // Sorted for a deterministic, set-like array (order is not meaningful among positive patterns).
-export const DEFAULT_EXCLUDE_GLOBS: readonly string[] = [
-  ...DEFAULT_NOISE_DIR_NAMES.map((name) => `**/${name}/**`),
-  HIDDEN_DIR_EXCLUDE_GLOB,
-].sort(compareStrings);
+export const DEFAULT_EXCLUDE_GLOBS: readonly string[] =
+  DEFAULT_NOISE_DIR_NAMES.map((name) => `**/${name}/**`).sort(compareStrings);
 
 // The zero-config `include` (C1): every linted Markdown file at any depth. Derived rather than
 // spelled, so this and the repo scan cannot drift on what a Markdown file is (P13.05 / W-09) — the

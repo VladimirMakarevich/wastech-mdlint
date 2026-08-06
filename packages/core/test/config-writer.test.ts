@@ -16,12 +16,12 @@ import { DEFAULT_NOISE_DIR_NAMES } from "../src/discovery/repo-scan-constants.js
 import type { InferredRule } from "../src/discovery/rule-inference.js";
 
 // The fresh-write `exclude` mirrors the scanner's pruned noise directories as depth-agnostic globs
-// (the scan prunes by basename at any depth) plus the hidden-directory prune (audit L-7), sorted by
-// the same host-independent comparator as production.
-const EXPECTED_EXCLUDE = [
-  ...DEFAULT_NOISE_DIR_NAMES.map((name) => `**/${name}/**`),
-  "**/.*/**",
-].sort(compareStrings);
+// (the scan prunes by basename at any depth), sorted by the same host-independent comparator as
+// production — and nothing else since P14.03 resolved W-15: the scan's shape-based hidden-directory
+// prune has no lint-time counterpart.
+const EXPECTED_EXCLUDE = DEFAULT_NOISE_DIR_NAMES.map(
+  (name) => `**/${name}/**`,
+).sort(compareStrings);
 
 function buildRule(
   overrides: Partial<InferredRule> & { rule: string },
@@ -110,28 +110,50 @@ describe("generateInitConfig · fresh", () => {
       // Root-level regression guard — this is what makes the leading `**/` matching zero segments a
       // contract rather than an assumption about picomatch.
       "node_modules/somelib/README.md",
-      // `dot: true` still applies through the new prefix.
+      // `dot: true` still applies through the new prefix — and a hidden dependency/build tree must
+      // prune through BOTH matcher entry points: the plain file test and `shouldPruneDirectory`'s
+      // synthetic `__directory_probe__` child (which is what makes loadDocuments skip the directory
+      // instead of walking it).
       ".git/config.md",
-      // Audit L-7: the hidden-directory glob must prune through BOTH matcher entry points — the
-      // plain file test and `shouldPruneDirectory`'s synthetic `__directory_probe__` child (which
-      // is what makes loadDocuments skip the directory instead of walking it).
-      ".github/PULL_REQUEST_TEMPLATE.md",
-      ".github/__directory_probe__",
       ".venv/lib/site-packages/README.md",
-      "packages/foo/.husky/NOTES.md",
+      ".venv/__directory_probe__",
     ]) {
       expect(matchesConfigGlob(excluded, exclude)).toBe(true);
     }
 
     // No over-exclusion: a real cluster's docs stay in the corpus at the root and under a package,
     // and a dot in a *file* or directory name (rather than a leading dot) is not a hidden directory.
+    // The three dot-directories below are W-15's answer (P14.03): a hidden directory that is not a
+    // dependency or build tree is not excluded from the lint corpus, so `init`'s written `exclude`
+    // does not silently drop `.claude/skills/` or `.agents/rules/` either.
     for (const kept of [
       "docs/guide.md",
       "packages/foo/docs/guide.md",
       "docs/a.b/c.md",
       "docs/release.notes.md",
+      ".github/PULL_REQUEST_TEMPLATE.md",
+      ".github/__directory_probe__",
+      "packages/foo/.husky/NOTES.md",
     ]) {
       expect(matchesConfigGlob(kept, exclude)).toBe(false);
+    }
+  });
+
+  it("explains above the exclude key that the list is a default a user entry extends", () => {
+    // The block is a verbatim copy of the lint-time default, so the natural edit — delete the line
+    // you disagree with — is a no-op (P13.02 decided *extend*). P14.03 keeps the list and makes the
+    // duplication explicit rather than omitting it, so the comment is the deliverable, not a nicety.
+    const { configText } = generateInitConfig(FRESH_PARAMS);
+    const excludeIndex = configText.indexOf('"exclude"');
+    expect(excludeIndex).toBeGreaterThan(-1);
+    const preamble = configText.slice(0, excludeIndex);
+
+    expect(preamble).toContain("EXTEND it rather than replace it");
+    expect(preamble).toContain("deleting a line here changes nothing");
+    expect(preamble).toContain('negate it: "!**/vendor/**"');
+    // Every comment line has to sit above the key, not between the key and its value.
+    for (const line of preamble.split("\n").slice(-4, -1)) {
+      expect(line.trimStart().startsWith("//")).toBe(true);
     }
   });
 

@@ -14,6 +14,7 @@ wastech-mdlint compile --cwd packages/docs
 ```
 
 - Output path precedence: `--outdir` → `config.compile.outdir` → `.claude/skills/wastech-mdlint/`. The file is always named `SKILL.md`.
+- **The default outdir is inside the default lint corpus.** Nothing is excluded merely for starting with a dot, so a later `lint` reads the `SKILL.md` this command generated — a parse and no findings on the zero-config path, and governed by your `include` once you have a config. Retarget `outdir` if you would rather it stay out of scope; see [what is excluded before you write anything](configuration.md#what-is-excluded-before-you-write-anything).
 - Unlike other commands, `compile` takes `--cwd` (not `[path]`), and resolves a relative `--config`/`--outdir` against it.
 - An `--outdir` that resolves outside `--cwd` is reported by its **absolute** path, in the success line and in a write failure alike; one inside is reported repository-relative with `/` separators, as everywhere else.
 - Requires a `compile` section in config; a missing one exits `2` with guidance, not a stack trace.

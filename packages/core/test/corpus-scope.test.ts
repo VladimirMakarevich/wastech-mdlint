@@ -20,14 +20,13 @@ function directoryProbe(relativeDirectory: string): string {
 describe("DEFAULT_EXCLUDE_GLOBS", () => {
   // Reconstructed independently rather than imported from the production list — the same
   // reconstruction `config-writer.test.ts` already pins for what `init` writes. Two tests deriving
-  // the same 11 patterns from `DEFAULT_NOISE_DIR_NAMES` is what proves the "one list, reachable from
+  // the same patterns from `DEFAULT_NOISE_DIR_NAMES` is what proves the "one list, reachable from
   // both `init` and lint" criterion without either test importing the other's expectation.
-  it("is the scan's noise names plus the hidden-directory glob, depth-agnostic and sorted", () => {
+  it("is exactly the scan's noise names, depth-agnostic and sorted", () => {
     expect([...DEFAULT_EXCLUDE_GLOBS]).toEqual(
-      [
-        ...DEFAULT_NOISE_DIR_NAMES.map((name) => `**/${name}/**`),
-        "**/.*/**",
-      ].sort(compareStrings),
+      DEFAULT_NOISE_DIR_NAMES.map((name) => `**/${name}/**`).sort(
+        compareStrings,
+      ),
     );
   });
 
@@ -38,17 +37,31 @@ describe("DEFAULT_EXCLUDE_GLOBS", () => {
       "node_modules/pkg/README.md",
       "mobile/node_modules/leftpad/README.md",
       "packages/foo/dist/generated.md",
-      ".github/PULL_REQUEST_TEMPLATE.md",
+      // A hidden *dependency* tree is still excluded, but by name (`.venv` is in the noise list),
+      // not by shape — which is the whole of W-15's answer.
+      ".venv/lib/site-packages/README.md",
+      directoryProbe(".venv"),
     ]) {
       expect(matchesConfigGlob(candidate, [...DEFAULT_EXCLUDE_GLOBS])).toBe(
         true,
       );
     }
 
-    // A dot-prefixed *file* at the root is not a hidden directory, so it stays lintable.
-    expect(matchesConfigGlob(".README.md", [...DEFAULT_EXCLUDE_GLOBS])).toBe(
-      false,
-    );
+    // W-15 (P14.03): a hidden directory that is *not* a dependency or build tree is no longer
+    // excluded from the lint corpus merely for starting with a dot. `.claude/skills/` and
+    // `.agents/rules/` were 31% of the field-test target's tracked Markdown.
+    for (const candidate of [
+      ".github/PULL_REQUEST_TEMPLATE.md",
+      directoryProbe(".github"),
+      ".agents/rules/testing.md",
+      "packages/foo/.husky/NOTES.md",
+      // A dot-prefixed *file* at the root was never a hidden directory, and still is not.
+      ".README.md",
+    ]) {
+      expect(matchesConfigGlob(candidate, [...DEFAULT_EXCLUDE_GLOBS])).toBe(
+        false,
+      );
+    }
   });
 });
 

@@ -44,7 +44,7 @@ Unknown top-level keys are rejected. Validation is two-stage: the root shape fir
 | --- | --- | --- | --- |
 | `$schema` | string | — | **Local** path to the JSON schema (for editor completion). Never a remote URL. |
 | `include` | string[] | `["**/*.md"]` | Globs of files to lint. |
-| `exclude` | string[] | [11 noise globs](#what-is-excluded-before-you-write-anything) | Globs to remove; **`exclude` wins over `include`**. What you write **extends** the default rather than replacing it. |
+| `exclude` | string[] | [12 noise globs](#what-is-excluded-before-you-write-anything) | Globs to remove; **`exclude` wins over `include`**. What you write **extends** the default rather than replacing it. |
 | `respectGitignore` | boolean | `false` | Off by default on purpose: a `.gitignore` records what should not be committed, which is not the same statement as "do not lint this" — and the trees a first run must skip are already covered by the default `exclude`. When `true`, also skip `.gitignore`d files — root and nested alike, with git's own precedence: the **deepest** `.gitignore` that has a pattern for a path decides, so a nested `!keep.md` re-includes a file a root pattern ignored. An excluded **directory** takes its whole subtree with it, and that exclusion is resolved the same way — a nested `!generated/` re-includes the directory, and the files inside are then judged on the patterns that match them directly. A fresh `init` write sets an explicit `true`; a `merge` never adds it. |
 | `settings` | object | — | Shared settings (`siteRouter`, `idRef`) inherited by rules. |
 | `rules` | array | `[]` | The rules to run (see below). |
@@ -58,10 +58,11 @@ Every run starts from a default `exclude`, so a first lint never descends into a
 
 ```jsonc
 "exclude": [
-  "**/.*/**", // any dot-directory at any depth: .github, .agents, .venv, …
   "**/.cache/**",
   "**/.git/**",
   "**/.next/**",
+  "**/.venv/**",
+  "**/.yarn/**",
   "**/build/**",
   "**/coverage/**",
   "**/dist/**",
@@ -72,7 +73,11 @@ Every run starts from a default `exclude`, so a first lint never descends into a
 ]
 ```
 
-Each entry is depth-agnostic, so a monorepo's `packages/foo/node_modules` is pruned along with the root copy. The dot-directory entry matches a hidden directory's _contents_ only — a dotfile at the root, such as `.README.md`, is still linted.
+Each entry is depth-agnostic, so a monorepo's `packages/foo/node_modules` is pruned along with the root copy.
+
+**Every entry names a dependency or build tree, and nothing is excluded merely for starting with a dot.** `.venv` and `.yarn` are on the list because of what they hold, not because they are hidden — so Markdown under `.github/`, `.agents/`, `.claude/` or a `.rules/` directory _is_ linted by default. That is often exactly the documentation you want checked. The [`init`](cli.md#init) scan is stricter: it never proposes a dot-directory as a doc cluster, because a name list cannot enumerate the tooling directories that would pollute the proposal. `init` therefore tells you what it skipped and how much Markdown is in there, and you decide whether to add a pattern such as `".agents/**/*.{md,mdx}"` to `include`.
+
+One consequence is worth knowing before it surprises you: [`compile`](compile.md) writes its `SKILL.md` to `.claude/skills/wastech-mdlint/` by default, and that path is inside the default corpus — so the next run reads the file the previous one generated. Harmless with no config (the zero-config ruleset is empty, so it is a parse and nothing else) and governed by `include` once you have one, since an `init`-written `include` never covers a dot-directory. If you want it out of scope regardless, point `compile.outdir` somewhere your `include` does not reach, or exclude that directory by name.
 
 **Your `exclude` extends this list; it does not replace it.** What you write is appended to the defaults, which has three consequences worth knowing before you edit the key:
 

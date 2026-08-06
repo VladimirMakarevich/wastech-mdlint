@@ -50,7 +50,9 @@ Do not re-implement any of this inference. If the user asks "what rules should w
 
 ## 3. Relay the draft and let the user confirm
 
-`init` prints a deterministic draft summary (existing-config disposition, package manager, include globs, and rules grouped by category with per-rule rationale). Surface that summary to the user and let them confirm through the command's own prompt (or via `--yes`). Do not paraphrase the rule set as if it were your own recommendation.
+`init` prints a deterministic draft summary (existing-config disposition, package manager, include globs, an `Excluded from the scan:` block, and rules grouped by category with per-rule rationale). Surface that summary to the user and let them confirm through the command's own prompt (or via `--yes`). Do not paraphrase the rule set as if it were your own recommendation.
+
+**Relay the exclusion block verbatim, including its `hidden directories:` line.** It exists precisely because the scan never proposes a dot-directory as a doc cluster, so the proposed `include` will not cover `.claude/`, `.agents/` or a `.rules/` set — often the documentation the user most wants linted. Those files are not excluded from the lint corpus, only from the proposal, so the fix is an `include` pattern and the block names the one to add. Summarizing that line away, or folding the three reasons into one total, reproduces the silent-omission defect the disclosure was added to close.
 
 ## 4. Install the CLI as a dev dependency
 

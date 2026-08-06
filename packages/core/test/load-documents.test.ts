@@ -62,7 +62,7 @@ describe("loadDocuments", () => {
   // The layering P13.02 depends on: the lint-time default `exclude` lives in `resolveCorpusScope`,
   // never here. This loader's contract is "what you pass is what I walk" — `gitignore-layers.test.ts`
   // compares its corpus against real `git ls-files` with an explicit pattern set, so a loader that
-  // silently added the eleven default patterns would make that oracle compare two different trees.
+  // silently added the default patterns of its own would make that oracle compare two different trees.
   it("applies no default exclude of its own (P13.02 layering)", async () => {
     const root = await createFixtureTree({
       "keep.md": "# Keep\n",

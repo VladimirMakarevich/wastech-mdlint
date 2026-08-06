@@ -39,11 +39,16 @@ export type { AtomicFileWrite, AtomicWriteResult } from "./atomic-write.js";
 
 // Repo scan (P6.01)
 export {
+  classifyPrunedDirName,
   DEFAULT_KNOWN_CLUSTER_NAMES,
   DEFAULT_MIN_CLUSTER_SIZE,
   DEFAULT_NOISE_DIR_NAMES,
   DEFAULT_SAMPLE_SIZE,
 } from "./discovery/repo-scan-constants.js";
+// Exported for the hosts, not only for core's own walks: `init`'s scan-exclusion disclosure suggests
+// an `include` pattern for a pruned directory, and it must splice the same tail every other proposal
+// does or it would advertise a narrower set than the scan counted (P13.05 / W-09).
+export { MARKDOWN_GLOB_SUFFIX } from "./discovery/markdown-extensions.js";
 export { detectPackageManager } from "./discovery/package-manager.js";
 export type { DetectedPackageManager } from "./discovery/package-manager.js";
 export { detectWorkspacePackages } from "./discovery/workspace-packages.js";
@@ -52,7 +57,10 @@ export { scanRepository } from "./discovery/repo-scan.js";
 export type {
   DocCluster,
   DocClusterKind,
+  PrunedDirectory,
+  PrunedDirectoryReason,
   RepoScanResult,
+  ScanPruning,
   ScanRepositoryOptions,
 } from "./discovery/repo-scan.js";
 

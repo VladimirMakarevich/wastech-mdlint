@@ -184,6 +184,30 @@ describe("lint command", () => {
     expect(parsed.summary.files).toBe(1);
   });
 
+  // W-15 / P14.03, at the boundary where the behavior changed: a zero-config run now reads Markdown
+  // under a dot-directory that is not a dependency or build tree, while still pruning the ones that
+  // are. The two halves have to be asserted together — dropping `**/.*/**` would be a regression on
+  // W-02 if it also re-opened `.venv`, and keeping it was 31% of the field-test target's corpus.
+  it("reads a dot-directory but not a hidden dependency tree with no config file", async () => {
+    const cwd = await fixtureRepo({
+      "docs/a.md": "# A\n",
+      ".github/NOTES.md": "# Notes\n",
+      ".agents/rules/testing.md": "# Testing\n",
+      ".venv/lib/site-packages/pkg/README.md": "# Vendored\n",
+      "mobile/node_modules/leftpad/README.md": "# leftpad\n",
+    });
+
+    const result = await run(["lint", cwd, "--format", "json"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    const parsed = JSON.parse(result.stdout) as { files: string[] };
+    expect(parsed.files).toEqual([
+      ".agents/rules/testing.md",
+      ".github/NOTES.md",
+      "docs/a.md",
+    ]);
+  });
+
   it("emits structured JSON with --format json", async () => {
     const cwd = await fixtureRepo({
       "a.md": "[broken](missing.md)\n",

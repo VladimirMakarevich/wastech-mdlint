@@ -13,11 +13,11 @@ import {
 } from "./gitignore-layers.js";
 import { isMarkdownFile, MARKDOWN_GLOB_SUFFIX } from "./markdown-extensions.js";
 import {
+  classifyPrunedDirName,
   DEFAULT_KNOWN_CLUSTER_NAMES,
   DEFAULT_MIN_CLUSTER_SIZE,
   DEFAULT_NOISE_DIR_NAMES,
   DEFAULT_SAMPLE_SIZE,
-  isPrunedDirName,
 } from "./repo-scan-constants.js";
 import {
   detectWorkspacePackagesWithNoise,
@@ -39,10 +39,39 @@ export type DocCluster = {
   workspacePackage?: string;
 };
 
+/**
+ * Why the Markdown walk refused to descend into a directory. `"noise"` and `"hidden"` come straight
+ * from `classifyPrunedDirName`; `"gitignored"` is the third prune the walk applies itself.
+ */
+export type PrunedDirectoryReason = "hidden" | "noise" | "gitignored";
+
+/**
+ * One directory the scan skipped, as a repo-relative POSIX path.
+ *
+ * `markdownFileCount` is populated for `"hidden"` only, and that asymmetry is the point rather than
+ * an omission: a hidden directory is the one class whose contents a user plausibly wants linted
+ * (`.claude/skills/`, `.agents/rules/`), so `init` has to be able to say how much is in there.
+ * Counting a `"noise"` or `"gitignored"` tree would mean walking `node_modules` — the exact cost
+ * pruning exists to avoid — for a number nobody acts on.
+ */
+export type PrunedDirectory = {
+  path: string;
+  reason: PrunedDirectoryReason;
+  markdownFileCount?: number;
+};
+
+/**
+ * The scan's record of what it pruned, so `init` can disclose it (W-14) without a second directory
+ * walk that could disagree with the first about noise names, gitignore layers, or what counts as a
+ * Markdown file. Sorted by `path`.
+ */
+export type ScanPruning = { directories: PrunedDirectory[] };
+
 export type RepoScanResult = {
   clusters: DocCluster[];
   packageManager: DetectedPackageManager;
   workspacePackages: WorkspacePackage[];
+  pruned: ScanPruning;
 };
 
 export type ScanRepositoryOptions = {
@@ -111,17 +140,26 @@ function isOwnedByPackageScope(
 // tree the config it writes then refuses to lint, and a generated `generated-docs/**` cluster is
 // noise the user has already declared uninteresting. The gitignore layering reuses the loader's own
 // helpers (gitignore-layers.ts), so the two walks can never drift on negation or nesting semantics.
+//
+// The walk also records *what* it pruned, which is what lets `init` disclose the gap between the
+// tracked tree and the proposed corpus (W-14). `"count"` mode is the same function re-entered under
+// a pruned hidden root purely to size it, rather than a second traversal — so the disclosed number
+// is produced by the same noise, gitignore and Markdown-extension rules as the corpus itself, by
+// construction and not by two implementations agreeing.
 async function collectMarkdownFiles(
   cwd: string,
   noiseDirNames: readonly string[],
-): Promise<string[]> {
+): Promise<{ files: string[]; pruned: PrunedDirectory[] }> {
   const results: string[] = [];
+  const pruned: PrunedDirectory[] = [];
 
+  // Returns the number of Markdown files this subtree contributes, which only `"count"` mode reads.
   async function walk(
     directoryPath: string,
     relDirectory: string,
     parentLayers: IgnoreLayer[],
-  ): Promise<void> {
+    mode: "collect" | "count",
+  ): Promise<number> {
     const localLayer = await readIgnoreLayer(directoryPath, relDirectory);
     const layers =
       localLayer === undefined ? parentLayers : [...parentLayers, localLayer];
@@ -130,18 +168,49 @@ async function collectMarkdownFiles(
       () => [],
     );
 
+    let markdownCount = 0;
+
     for (const entry of entries) {
       const relPath =
         relDirectory === "" ? entry.name : `${relDirectory}/${entry.name}`;
 
       if (entry.isDirectory()) {
-        if (
-          isPrunedDirName(entry.name, noiseDirNames) ||
-          isGitIgnored(relPath, true, layers)
-        ) {
+        const childPath = path.join(directoryPath, entry.name);
+        const classification = classifyPrunedDirName(entry.name, noiseDirNames);
+
+        if (classification === "noise") {
+          // Never descended into, in either mode: an unbounded count walk through a dependency tree
+          // is precisely the cost `.venv`/`.yarn` were added to `DEFAULT_NOISE_DIR_NAMES` to avoid.
+          if (mode === "collect") {
+            pruned.push({ path: relPath, reason: "noise" });
+          }
           continue;
         }
-        await walk(path.join(directoryPath, entry.name), relPath, layers);
+
+        if (classification === "hidden") {
+          const hiddenCount = await walk(childPath, relPath, layers, "count");
+          if (mode === "collect") {
+            pruned.push({
+              path: relPath,
+              reason: "hidden",
+              markdownFileCount: hiddenCount,
+            });
+          } else {
+            // Already inside a recorded hidden root: this subtree is part of that root's total, not
+            // a second entry to disclose.
+            markdownCount += hiddenCount;
+          }
+          continue;
+        }
+
+        if (isGitIgnored(relPath, true, layers)) {
+          if (mode === "collect") {
+            pruned.push({ path: relPath, reason: "gitignored" });
+          }
+          continue;
+        }
+
+        markdownCount += await walk(childPath, relPath, layers, mode);
         continue;
       }
 
@@ -150,13 +219,20 @@ async function collectMarkdownFiles(
         isMarkdownFile(entry.name) &&
         !isGitIgnored(relPath, false, layers)
       ) {
-        results.push(relPath);
+        markdownCount += 1;
+        if (mode === "collect") {
+          results.push(relPath);
+        }
       }
     }
+
+    return markdownCount;
   }
 
-  await walk(cwd, "", []);
-  return results;
+  await walk(cwd, "", [], "collect");
+  // `readdir` order is filesystem-dependent, so the record is only deterministic once sorted.
+  pruned.sort((left, right) => compareStrings(left.path, right.path));
+  return { files: results, pruned };
 }
 
 type ScopeClustersParams = {
@@ -298,9 +374,14 @@ const CLUSTER_KIND_RANK: Record<DocClusterKind, number> = {
  *
  * The walk skips noise directories, every dot-prefixed directory, and anything matched by a
  * `.gitignore` (root or nested) — always, not behind a flag (P11.14 / audit L-7). The scan exists
- * to propose a config, and the config `init` writes pins `respectGitignore: true` plus a hidden-
- * directory `exclude`, so a cluster the scan could only see by ignoring those rules would be a
- * proposal the resulting config immediately contradicts.
+ * to propose a config, and the config `init` writes pins `respectGitignore: true` plus the noise
+ * `exclude`, so a cluster the scan could only see by ignoring those rules would be a proposal the
+ * resulting config immediately contradicts.
+ *
+ * The dot-prefixed prune is the one that has no lint-time counterpart (W-15): a hidden directory
+ * that is not also a dependency tree stays lintable. `pruned` is what closes that gap honestly —
+ * `init` reports the skipped directories and how much Markdown the hidden ones hold, rather than
+ * leaving the user to infer it from a file count (W-14).
  */
 export async function scanRepository(
   options: ScanRepositoryOptions,
@@ -317,16 +398,21 @@ export async function scanRepository(
 
   const rootStats = await stat(cwd).catch(() => undefined);
   if (rootStats === undefined || !rootStats.isDirectory()) {
-    return { clusters: [], packageManager: undefined, workspacePackages: [] };
+    return {
+      clusters: [],
+      packageManager: undefined,
+      workspacePackages: [],
+      pruned: { directories: [] },
+    };
   }
 
-  const [packageManager, workspacePackages, unsortedFiles] = await Promise.all([
+  const [packageManager, workspacePackages, collected] = await Promise.all([
     detectPackageManager(cwd),
     detectWorkspacePackagesWithNoise(cwd, noiseDirNames),
     collectMarkdownFiles(cwd, noiseDirNames),
   ]);
 
-  const allFiles = unsortedFiles.sort(compareStrings);
+  const allFiles = collected.files.sort(compareStrings);
 
   const scopes: { scopeRoot: string; workspacePackage?: string }[] = [
     { scopeRoot: "" },
@@ -396,5 +482,10 @@ export async function scanRepository(
     return scoreDiff !== 0 ? scoreDiff : compareStrings(left.path, right.path);
   });
 
-  return { clusters, packageManager, workspacePackages };
+  return {
+    clusters,
+    packageManager,
+    workspacePackages,
+    pruned: { directories: collected.pruned },
+  };
 }
