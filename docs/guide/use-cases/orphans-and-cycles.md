@@ -7,9 +7,11 @@
 ```jsonc
 {
   "rules": [
-    { "rule": "GRP-001" }, // no cycles
+    { "rule": "GRP-001" }, // no cycles spanning 3+ documents; add "options": { "minCycleLength": 2 } for mutual links
     {
       "rule": "GRP-002",
+      // Replaces the default ["README.md", "CLAUDE.md", "AGENTS.md", "index.md"]; drop `options`
+      // entirely to keep it.
       "options": { "entryPoints": ["README.md", "docs/index.md"] },
     },
   ],

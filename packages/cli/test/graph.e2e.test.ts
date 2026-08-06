@@ -281,6 +281,10 @@ describe("impact command over the fixture corpus", () => {
 });
 
 describe("GRP-001/GRP-002 against the fixture corpus (P4.06 refactor confirmation)", () => {
+  // cycle-a.md ↔ cycle-b.md is a two-node cycle, which GRP-001's default `minCycleLength` of 3 now
+  // skips (P13.04 / W-07), so the fixture config sets it to 2 explicitly. That is deliberate coverage
+  // rather than a workaround: this is the only place the option travels through a real config file at
+  // the process boundary.
   it("still flags the cycle-a.md/cycle-b.md cycle and the orphan.md orphan", async () => {
     const result = await run(
       ["lint", FIXTURE_ROOT, "--format", "json", "--fail-on", "off"],

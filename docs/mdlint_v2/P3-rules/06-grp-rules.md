@@ -16,14 +16,14 @@ Implement the three graph-integrity rules to reach lint parity. GRP-001/002 **co
 
 | ID | Scope | Severity | Checks | Key options |
 | --- | --- | --- | --- | --- |
-| GRP-001 | project | error | no circular references | _(none)_ |
+| GRP-001 | project | error | no circular references | `minCycleLength?` (default 3) |
 | GRP-002 | project | warning | every doc has ≥1 incoming ref (except entry points) | `files?`, `exclude?`, `entryPoints?` |
 | GRP-003 | project | warning | ID chain across stages (stage N IDs appear at N+1) | `chain[{stage,files,idColumn?,refColumn}]`, `idPattern?` |
 
 ## Deliverables / steps
 
 1. GRP-001 cycle detection (DFS color-marking / reuse the existing Tarjan SCC); canonicalize cycles to avoid duplicate reports; attribute to the first arc.
-2. GRP-002 incoming-reference count with `entryPoints` allowlist + site-router resolution. **Superseded in part by [P11.13](../P11-remediation/13-grp-size-hygiene.md):** the key-options column above dropped the keys both rules accepted but ignored — GRP-001 now takes no options at all, and neither rule takes a per-rule `siteRouter` (the shared graph resolves routes from `settings.siteRouter`). GRP-002's `files`/`exclude` survive as reporting scope.
+2. GRP-002 incoming-reference count with `entryPoints` allowlist + site-router resolution. **Superseded in part by [P11.13](../P11-remediation/13-grp-size-hygiene.md):** the key-options column above dropped the keys both rules accepted but ignored — GRP-001 kept no options at that point, and neither rule takes a per-rule `siteRouter` (the shared graph resolves routes from `settings.siteRouter`). GRP-002's `files`/`exclude` survive as reporting scope. **And in part by [P13.04](../P13-correctness/04-rule-option-defaults.md):** GRP-001 gained `minCycleLength` (default 3, so a two-document mutual link is not reported) — wireable where the removed keys were not, because it filters the rule's own findings rather than the corpus-wide graph — and GRP-002's `entryPoints` gained a default of `["README.md", "CLAUDE.md", "AGENTS.md", "index.md"]`.
 3. GRP-003 chain traversal across stage files by ID/ref columns.
 4. **Graph source (decided 2026-07-02, audit 2.2):** GRP-001 reads the graph's explicit cycle list and GRP-002 reads node `inDegree` from `RuleContext.graph` — **no local adjacency in rule code**. The orchestrator ([P2.05](../P2-rule-engine/05-orchestration-lintfiles.md)) builds and injects that graph: the relocated legacy builder in P3, the semantic `buildContextGraph` from [P4.06](../P4-graph/06-grp-refactor-coverage.md) later. Because the rules code against the injected graph's read shape, only the builder changes in P4 — rule code and its (output-focused) tests stay put. GRP-003 is graph-independent: it walks the `chain[]` ID/ref columns directly.
 

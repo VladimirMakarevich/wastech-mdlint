@@ -7,6 +7,7 @@ import {
   columnNotEmpty,
   columnUnique,
   crossColumn,
+  DEFAULT_COLUMN_IN_SET_CASE_SENSITIVE,
   requiredColumns,
 } from "./table.js";
 import { sectionOrder, sectionPresent } from "./section.js";
@@ -58,7 +59,10 @@ export const assertionSchema = z.discriminatedUnion("kind", [
       kind: z.literal("columnInSet"),
       column: z.string().min(1),
       values: z.array(z.string()).min(1),
-      caseSensitive: z.boolean().optional(),
+      // `.default()` rather than `.optional()` (W-06): the resolved value is what `describeRules`
+      // renders into a committed skill, and an absent key rendered identically to an explicit
+      // `false` there. Declaring it here also puts the default in `schema.json` for editors.
+      caseSensitive: z.boolean().default(DEFAULT_COLUMN_IN_SET_CASE_SENSITIVE),
       section: z.string().optional(),
     })
     .strict(),

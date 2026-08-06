@@ -25,7 +25,7 @@ The graph exposes deterministic algorithms reused across commands and rules:
 
 - **Topological sort** (Kahn) — the reading order; nodes in cycles are reported as excluded.
 - **Connected components** — ordered by size, then by a stable representative.
-- **Cycles** (Tarjan SCC) — canonicalized cycle lists, surfaced by [GRP-001](rules/GRP-001.md).
+- **Cycles** (Tarjan SCC) — canonicalized cycle lists, surfaced by [GRP-001](rules/GRP-001.md). The graph reports every cycle it found; the rule filters them by [`minCycleLength`](rules/GRP-001.md#options) (default 3), so a two-document mutual link appears here and not in the lint output.
 - **Slice** — forward reachability from a resolved query.
 - **Impact** — reverse reachability (who depends on this file), with direct/transitive classification and the `via` path.
 - **Coverage** — a signal of how much of the corpus the graph covers (files outside it).
@@ -66,7 +66,7 @@ Linting still runs over the **whole** corpus (so project rules see every documen
 
 ## Graph-aware rules
 
-- [GRP-001](rules/GRP-001.md) — no cycles.
+- [GRP-001](rules/GRP-001.md) — no cycles spanning at least `minCycleLength` documents (default 3).
 - [GRP-002](rules/GRP-002.md) — no orphan documents (except declared entry points).
 - [GRP-003](rules/GRP-003.md) — IDs carried forward across pipeline stages.
 

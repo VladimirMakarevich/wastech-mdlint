@@ -92,7 +92,7 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
       "options": {
         "column": "Status", // required
         "values": ["todo", "doing", "done"], // required (≥1)
-        "caseSensitive": false, // default false
+        "caseSensitive": false, // default true
         "section": "Requirements",
       },
     },
@@ -256,14 +256,23 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
     },
 
     // ── GRP — graph integrity (all project scope) ───────────────────────────────────────────
-    // GRP-001: no circular references between documents. Takes no options — the graph is corpus-wide
-    // (narrow it with the top-level include/exclude); any options key is a config error.
-    { "rule": "GRP-001" },
+    // GRP-001: no circular references between documents. The graph itself is corpus-wide and cannot be
+    // scoped per rule (narrow it with the top-level include/exclude); minCycleLength filters this
+    // rule's own findings, and at its default of 3 a two-document mutual link is not reported.
+    {
+      "rule": "GRP-001",
+      "options": {
+        "minCycleLength": 2, // ≥2; default 3
+      },
+    },
     // GRP-002: documents have at least one incoming reference (except entry points).
     {
       "rule": "GRP-002",
       "options": {
-        "entryPoints": ["README.md", "docs/index.md"], // roots exempt from the orphan check
+        // Roots exempt from the orphan check. Default ["README.md", "CLAUDE.md", "AGENTS.md",
+        // "index.md"], matched at any depth; a value here REPLACES that default rather than adding
+        // to it (unlike the top-level `exclude`, which extends).
+        "entryPoints": ["README.md", "docs/index.md"],
         "files": [], // scopes reporting only; the graph stays corpus-wide
         "exclude": [],
       },
@@ -293,7 +302,9 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
 
     // ── SIZE / LLM — context hygiene ────────────────────────────────────────────────────────
     // SIZE-001: file stays within byte/line/token budgets. Metrics are independent; within one
-    // metric the highest crossed threshold is reported (one finding per metric).
+    // metric the highest crossed threshold is reported (one finding per metric). At least one budget
+    // is required — bytes/lines/tokens at the top level or inside an overrides entry — and each
+    // threshold object needs a warn or an error; a config that sets none is rejected at load.
     {
       "rule": "SIZE-001",
       "options": {

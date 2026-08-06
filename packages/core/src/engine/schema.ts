@@ -26,8 +26,17 @@ type JsonSchema = Record<string, unknown>;
 
 // z.toJSONSchema tags each sub-schema with its own `$schema`; strip it so only the root carries the
 // dialect declaration.
+//
+// `io: "input"` is load-bearing, not a preference. z.toJSONSchema defaults to `io: "output"`, where a
+// key carrying a Zod `.default()` is emitted as **`required`** — the parsed result always has it, so
+// the output shape demands it. This file describes the config a user *writes*, where such a key is by
+// definition optional, so the first `.default()` added to any options schema (P13.04 added two) would
+// otherwise have made `schema.json` reject every config omitting it. Nothing in the product validates
+// against this file, so an editor would have been the only thing to notice. The MCP SDK converts its
+// own tool schemas with `io: "input"` for the same reason
+// (`@modelcontextprotocol/sdk/.../zod-json-schema-compat.js`).
 function optionsToJsonSchema(schema: z.ZodType): JsonSchema {
-  const generated = z.toJSONSchema(schema) as JsonSchema;
+  const generated = z.toJSONSchema(schema, { io: "input" }) as JsonSchema;
   delete generated.$schema;
   return generated;
 }

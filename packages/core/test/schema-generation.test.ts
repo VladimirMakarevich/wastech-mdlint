@@ -40,6 +40,43 @@ describe("generateConfigSchema", () => {
     expect(schema.properties.respectGitignore.default).toBe(false);
   });
 
+  // P13.04: `z.toJSONSchema`'s default `io: "output"` emits a `.default()` key as `required`, which
+  // would make this schema reject every config that omits it. Nothing in the product validates against
+  // schema.json, so only an editor would ever have said so — hence an explicit guard rather than
+  // trusting the byte-sync test, which only proves the file matches whatever the generator produces.
+  it.each([
+    ["GRP-002", "entryPoints"],
+    ["TBL-003", "caseSensitive"],
+  ])("declares %s.%s as an optional key carrying its default", (id, key) => {
+    const schema = JSON.parse(generateConfigSchema()) as {
+      properties: {
+        rules: {
+          items: {
+            oneOf: Array<{
+              properties?: {
+                rule?: { const?: string };
+                options?: {
+                  properties?: Record<string, { default?: unknown }>;
+                  required?: string[];
+                };
+              };
+            }>;
+          };
+        };
+      };
+    };
+    const branch = schema.properties.rules.items.oneOf.find(
+      (candidate) => candidate.properties?.rule?.const === id,
+    );
+
+    expect(branch?.properties?.options?.properties?.[key]?.default).toEqual(
+      id === "GRP-002"
+        ? ["README.md", "CLAUDE.md", "AGENTS.md", "index.md"]
+        : true,
+    );
+    expect(branch?.properties?.options?.required ?? []).not.toContain(key);
+  });
+
   it("declares the JSON Schema dialect but no remote config-schema URL (C9)", () => {
     const schema = JSON.parse(generateConfigSchema()) as { $schema: string };
     expect(schema.$schema).toBe("https://json-schema.org/draft/2020-12/schema");

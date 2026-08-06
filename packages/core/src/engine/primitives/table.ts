@@ -89,13 +89,22 @@ export type ColumnInSetOptions = {
   section?: string;
 };
 
+// The single source of truth for `columnInSet`'s case sensitivity (W-06). It used to be a bare `?? true`
+// here with no `.default()` in either Zod schema, so nothing recorded it: `schema.json` emitted a plain
+// boolean, one guide page documented the inverse, and the skill renderer treated "absent" as a third
+// state. Both option schemas (TBL-003's and the `columnInSet` assertion's) now default to this
+// constant, so a resolved option is never `undefined` in product code — the fallback below survives
+// only for direct primitive callers, which do not pass through Zod.
+export const DEFAULT_COLUMN_IN_SET_CASE_SENSITIVE = true;
+
 // columnInSet — cell values must be one of an allowed set (TBL-003).
 export function columnInSet(
   document: ParsedDocument,
   options: ColumnInSetOptions,
 ): PrimitiveFinding[] {
   const findings: PrimitiveFinding[] = [];
-  const caseSensitive = options.caseSensitive ?? true;
+  const caseSensitive =
+    options.caseSensitive ?? DEFAULT_COLUMN_IN_SET_CASE_SENSITIVE;
   const normalize = (value: string): string =>
     caseSensitive ? value : value.toLowerCase();
   const allowed = new Set(options.values.map(normalize));

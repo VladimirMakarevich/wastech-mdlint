@@ -44,7 +44,7 @@ In words: uppercase, dash-separated, with at least one dash (e.g. `REQ-OWNER`, `
 | --- | --- | --- | --- |
 | `requiredColumns` | table | `columns: string[]` (**req**, ≥1) · `section?` | [TBL-001](TBL-001.md) |
 | `columnNotEmpty` | table | `column: string` (**req**) · `section?` | [TBL-002](TBL-002.md) |
-| `columnInSet` | table | `column: string` (**req**) · `values: string[]` (**req**, ≥1) · `caseSensitive?: boolean` · `section?` | [TBL-003](TBL-003.md) |
+| `columnInSet` | table | `column: string` (**req**) · `values: string[]` (**req**, ≥1) · `caseSensitive?: boolean` (default `true`) · `section?` | [TBL-003](TBL-003.md) |
 | `columnMatches` | table | `column: string` (**req**) · `pattern: string` (**req**) · `flags?: string` · `section?` | [TBL-004](TBL-004.md) |
 | `columnUnique` | table | `column: string` (**req**) · `idPattern?: string` · `section?` | [TBL-006](TBL-006.md) |
 | `crossColumn` | table | `when` (**req**) · `then` (**req**) · `section?` | [TBL-005](TBL-005.md) |

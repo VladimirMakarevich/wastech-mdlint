@@ -102,9 +102,10 @@ export async function lintFiles(input: LintFilesInput): Promise<LintResult> {
   // resolve root-relative links identically to the REF rules; P4.06 adds idRef so id-ref edges
   // materialize whenever the shared setting is configured. Those two settings are the builder's
   // whole input: R5's proposed `exclude`/`entryPoints` were dropped from its options at P4.06
-  // because the graph is corpus-wide, so every rule reasons over the same relationships — GRP-001
-  // accordingly takes no options at all, and GRP-002's `files`/`exclude`/`entryPoints` filter its
-  // *reporting* rather than the graph ([P11.13]). Callers may pass a graph to override (e.g. tests).
+  // because the graph is corpus-wide, so every rule reasons over the same relationships — which is why
+  // every option the GRP rules do keep filters their *reporting* rather than the graph: GRP-002's
+  // `files`/`exclude`/`entryPoints` ([P11.13]) and GRP-001's `minCycleLength` ([P13.04]) all act on
+  // findings already produced. Callers may pass a graph to override (e.g. tests).
   const graph =
     input.graph ??
     buildContextGraph(documents, {
