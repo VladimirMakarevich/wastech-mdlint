@@ -36,10 +36,14 @@ All output is sorted and uses repository-relative POSIX paths — no timestamps,
 
 ```bash
 wastech-mdlint graph .                    # human summary: clusters, hubs, reading order, coverage
-wastech-mdlint graph . --format json      # { nodes, edges, components, readingOrder }
+wastech-mdlint graph . --format json      # { nodes, edges, components, readingOrder, coverage }
 wastech-mdlint graph . --format mermaid   # a Mermaid diagram
 wastech-mdlint graph . --format dot       # Graphviz DOT
 ```
+
+The `human` format is **line-oriented throughout**: after the three scalar counters (`nodes:`, `edges:`, `cycles:`), every path-bearing section is a header line plus one indented item per line, so `graph . --format human | head -60`, `grep`, and `wc -l` all behave the way the pipe implies. The shape is not perfectly uniform: `top hubs:`, `clusters:` and `coverage:` carry no count in the header, a `top hubs` item is `path (degree)` rather than a bare path, and `clusters` nests one extra level — `  cluster 1 (88 files):` then its members — to keep the boundary between one component and the next.
+
+The one line whose length follows graph shape rather than a path's own length — a cycle path — is elided past eight entries: the first seven, then `...`, then the node the cycle closes on, then `(+N more hops)` for what was dropped. That middle is **not** recoverable from the CLI: `--format json` carries the complete edge and node lists but has no `cycles` field, so reconstructing the path means re-deriving the cycle from the edges yourself. The MCP [`context-graph`](mcp-server.md) tool's `format: "json"` does return `cycles` in full. Recorded in the [accepted-behaviors register](../mdlint_v2/accepted-behaviors.md).
 
 ## `slice <query>`
 
@@ -53,6 +57,8 @@ wastech-mdlint slice docs/index.md
 
 Resolution is **exact match only** — a defined ID, a heading/anchor slug (`#slug`), or a file path. No fuzzy, substring, keyword, or LLM matching. A query that matches nothing returns an honest empty result (`matchKind: null` in JSON), never an error. `slice` always scans the cwd (no `[path]`).
 
+The text output is line-oriented like `graph`'s, for the same reason: `starts` only looks like a singleton — an anchor, heading, or ID query resolves to _every_ file carrying that slug — so it is its own `starts (N):` list rather than a parenthetical on the `matched:` line. Read the resolved target(s) from that list, and prefer `--format json` if you are parsing rather than reading.
+
 ## `impact <file>`
 
 The blast radius of changing `<file>`: files that reference it directly, files affected transitively, and the reading order over the affected subgraph.
@@ -63,6 +69,8 @@ wastech-mdlint impact docs/requirements/auth.md --format json
 ```
 
 Linting still runs over the **whole** corpus (so project rules see every document), but the reported messages/files are narrowed to `file` plus everything it affects. If `<file>` is outside the analyzed corpus, `impact` exits `2` with a hint.
+
+Its text output is line-oriented too. The affected subgraph is the whole corpus whenever the changed file is a hub, so `reading order` and the excluded list here grow exactly as `graph`'s do — leaving them comma-joined would have kept the defect in the surface most likely to be run on a hub.
 
 ## Graph-aware rules
 

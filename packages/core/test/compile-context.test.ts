@@ -2,16 +2,24 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import type { LintConfig } from "../src/config/config-schema.js";
 import type { LoadedConfiguration } from "../src/config/load-config.js";
+import { loadConfiguration } from "../src/config/load-config.js";
 import {
   compileContext,
   CompileConfigMissingError,
 } from "../src/compile/compile-context.js";
 import { lintFiles } from "../src/engine/lint-files.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
+import {
+  LARGE_CORPUS_DOCUMENT_COUNT,
+  LARGE_CORPUS_HUB_IN_DEGREE,
+  LARGE_CORPUS_HUB_PATH,
+  LARGE_CORPUS_LINE_WIDTH_BOUND,
+  writeLargeCorpus,
+} from "./support/large-corpus.js";
 
 const tempDirs: string[] = [];
 
@@ -96,10 +104,10 @@ describe("compileContext", () => {
     );
 
     expect(defaultResult.skillContent).toContain(
-      "| bridge.md | hub | narrative |",
+      "| bridge.md | hub | narrative | 3 / 1 |",
     );
     expect(raisedThreshold.skillContent).toContain(
-      "| bridge.md | bridge | narrative |",
+      "| bridge.md | bridge | narrative | 3 / 1 |",
     );
   });
 
@@ -309,4 +317,94 @@ describe("compileContext", () => {
       "!npx wastech-mdlint impact $ARGUMENTS",
     );
   });
+});
+
+// W-27's exit criteria at the scale that produced them. The field test's artifact at this corpus
+// size was 110 789 bytes with an 89.7% dependency section and a single 17 530-character line.
+describe("compileContext at corpus scale", () => {
+  let root: string;
+  let skillContent: string;
+  let contentHash: string;
+
+  // One materialization for the whole suite: writing 139 files per test dominates its runtime.
+  beforeAll(async () => {
+    root = await mkdtemp(
+      path.join(os.tmpdir(), "wastech-mdlint-large-corpus-"),
+    );
+    await writeLargeCorpus(root);
+    const config = await loadConfiguration({ cwd: root });
+    const result = await compileContext(config, root);
+    skillContent = result.skillContent;
+    contentHash = result.metadata.contentHash;
+  }, 60_000);
+
+  afterAll(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  function sectionShare(heading: string): number {
+    const order = [
+      "## Context Budget",
+      "## Document Architecture",
+      "## Document Rules",
+      "## Document Dependencies",
+      "## Workflow",
+    ];
+    const start = skillContent.indexOf(heading);
+    const next = order
+      .map((candidate) => skillContent.indexOf(candidate))
+      .filter((index) => index > start);
+    const end = next.length > 0 ? Math.min(...next) : skillContent.length;
+    return (end - start) / skillContent.length;
+  }
+
+  it("compiles all 139 documents", () => {
+    expect(skillContent).toContain(
+      `Generated from ${LARGE_CORPUS_DOCUMENT_COUNT} docs,`,
+    );
+  });
+
+  it("keeps every line under the stated cap", () => {
+    const longest = skillContent
+      .split("\n")
+      .reduce(
+        (widest, line) => (line.length > widest.length ? line : widest),
+        "",
+      );
+
+    expect(longest.length).toBeLessThanOrEqual(LARGE_CORPUS_LINE_WIDTH_BOUND);
+  });
+
+  it("bounds the dependency section and discloses the bound in the artifact", () => {
+    expect(skillContent).toContain(
+      `- from (${LARGE_CORPUS_HUB_IN_DEGREE}, showing 10):`,
+    );
+    expect(skillContent).toContain(
+      "Bounded summary: at most 10 references are listed per document per direction",
+    );
+    expect(skillContent).toContain(
+      `The 25 most-referenced of ${LARGE_CORPUS_DOCUMENT_COUNT} documents are listed below, in path order; the other 114 are omitted.`,
+    );
+    // The most-referenced document is the one a bounded list must not drop.
+    expect(skillContent).toContain(`\`${LARGE_CORPUS_HUB_PATH}\``);
+  });
+
+  it("gives the budget back: dependencies shrink and rules + workflow grow", () => {
+    // Measured 89.7% / 0.7% in the field. The bars are the contract; REFERENCE_DOCUMENT_LIMIT is
+    // the dial. `Document Architecture` is ~32% here and is legitimately the corpus inventory, so
+    // it is not the section expected to give.
+    expect(sectionShare("## Document Dependencies")).toBeLessThanOrEqual(0.65);
+    expect(
+      sectionShare("## Document Rules") + sectionShare("## Workflow"),
+    ).toBeGreaterThanOrEqual(0.03);
+    expect(Buffer.byteLength(skillContent, "utf8")).toBeLessThanOrEqual(40_000);
+  });
+
+  it("stays byte-identical and hash-stable across two compiles (capping is deterministic)", async () => {
+    const config = await loadConfiguration({ cwd: root });
+    const second = await compileContext(config, root);
+
+    expect(second.skillContent).toBe(skillContent);
+    expect(second.metadata.contentHash).toBe(contentHash);
+  }, 60_000);
 });

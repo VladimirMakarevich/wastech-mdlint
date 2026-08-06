@@ -187,10 +187,15 @@ describe("graph command", () => {
 
     const result = await run(["graph", cwd], cwd);
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
-    expect(result.stdout).toContain("top hubs:");
-    expect(result.stdout).toContain("clusters:");
-    expect(result.stdout).toContain("reading order (2): a.md, b.md");
-    expect(result.stdout).toContain("coverage:");
+
+    const lines = result.stdout.split("\n");
+    expect(lines).toContain("top hubs:");
+    expect(lines).toContain("clusters:");
+    // One item per indented line, not a comma-joined blob (P15.01 / W-26).
+    expect(lines).toContain("reading order (2):");
+    expect(lines).toContain("  a.md");
+    expect(lines).toContain("  b.md");
+    expect(lines).toContain("coverage:");
   });
 
   it("renders a Mermaid flowchart", async () => {

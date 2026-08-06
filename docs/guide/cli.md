@@ -66,7 +66,7 @@ Builds and summarizes the [context graph](context-graph.md): clusters, hubs, rea
 | --- | --- | --- |
 | `[path]` | cwd | Directory to scan; must be an existing directory (exits `2` otherwise). |
 | `--config <file>` | auto | Config file. Resolved against `[path]`. |
-| `--format human\|json\|mermaid\|dot` | `human` | `human` text; deterministic `{ nodes, edges, components, readingOrder }` JSON; or a `mermaid`/`dot` diagram. |
+| `--format human\|json\|mermaid\|dot` | `human` | `human` text; deterministic `{ nodes, edges, components, readingOrder, coverage }` JSON (no `cycles` field — see the [`graph` notes](context-graph.md#graph)); or a `mermaid`/`dot` diagram. |
 
 Read-only; exits `0` on success.
 

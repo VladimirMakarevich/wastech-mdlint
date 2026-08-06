@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import { compareStrings } from "../deterministic-sort.js";
 import type { ContextGraphEdge } from "../graph/context-graph-types.js";
+import { formatCyclePath } from "../render-bounds.js";
 import type { DocumentProfile } from "./doc-profile.js";
 import type { RuleDescriptionGroup } from "./describe-rules.js";
 import type { GraphAnalysis } from "./graph-analysis.js";
@@ -11,6 +12,36 @@ import { skillFrontmatterSchema } from "./skill-frontmatter.js";
 // (`GraphAnalysis`), P5.02 (`DocumentProfile`), and P5.03 (`RuleDescriptionGroup`) data. `synthesize`
 // never touches the filesystem or `cwd` — that orchestration lives in `compile-context.ts` — so this
 // module stays trivially unit-testable with hand-built fixtures.
+
+// P15.01 / W-27: a `SKILL.md` is loaded into an agent's context *whole*, so its budget is the
+// product. On a 139-document corpus the unbounded References block made the artifact 110 789 bytes,
+// 89.7% of it an edge list an agent cannot act on, while `Document Rules` and `Workflow` — the two
+// sections that say how to operate — were 0.7% between them. These two caps buy that budget back.
+//
+// Both are **fixed**, not corpus-relative: neither engages below its bound, and the bound the
+// artifact states means the same thing in every repository rather than varying with corpus size.
+// That is not a promise that an existing artifact is unchanged — P15.01 also added the `Refs`
+// column, the always-on disclosure paragraph, and one-edge-per-line fan-out, so every generated
+// `SKILL.md` changes bytes and content hash once and has to be regenerated. Nor is it independence
+// from the rest of the corpus: `REFERENCE_DOCUMENT_LIMIT` is a top-N selection, so adding a
+// document elsewhere can evict an existing one's entry (see `renderReferencesBlock`).
+// `compile.hubMinInDegree` is deliberately *not* reused here: it governs role assignment, not
+// fan-out.
+
+/** Maximum edges listed per document per direction. The bullet's count is always the full total. */
+const REFERENCE_FANOUT_LIMIT = 10;
+
+/**
+ * Maximum documents given a References entry. The ranking (total references desc, then path asc)
+ * selects *which* documents are listed; they are rendered in path order. The rest are reachable
+ * through `graph --format json`, which the disclosure names.
+ *
+ * This is the dial the section-share bars are tuned against: `Document Architecture` is ~32% of the
+ * artifact at 139 documents and is legitimately the inventory, so References is the only block with
+ * slack. At 25 it lands at 62.8% of the artifact against a 65% bar, with enough margin that an
+ * unrelated byte added elsewhere does not flip the assertion.
+ */
+const REFERENCE_DOCUMENT_LIMIT = 25;
 
 export type CompileSections = {
   architecture: boolean;
@@ -177,14 +208,19 @@ function renderArchitecture(
     const role = profile?.role ?? "isolated";
     const type =
       profile === undefined ? "narrative" : classifyDocumentType(profile);
-    return `| ${tableCell(documentPath)} | ${role} | ${type} |`;
+    // W-28: the role vocabulary is coarse by construction — on the 139-document fixture `hub` and
+    // `isolated` hold 86% of the corpus and in practice read as "has edges" / "has no edges". The
+    // degrees the bucket rounds off are already on the profile, so the row carries them and a
+    // reader can tell a 3-reference hub from a 124-reference one. See `accepted-behaviors.md`.
+    const refs = `${profile?.referencedBy.length ?? 0} / ${profile?.referencesTo.length ?? 0}`;
+    return `| ${tableCell(documentPath)} | ${role} | ${type} | ${refs} |`;
   });
 
   return [
     "## Document Architecture",
     "",
-    "| Path | Role | Type |",
-    "| --- | --- | --- |",
+    "| Path | Role | Type | Refs (in/out) |",
+    "| --- | --- | --- | --- |",
     ...rows,
   ].join("\n");
 }
@@ -233,39 +269,68 @@ function renderReadingOrderBlock(
 // G6 honesty: cycle members (and anything only reachable through them) never appear in the reading
 // order above, so this block names them explicitly instead of letting them vanish silently.
 function renderCyclesBlock(analysis: GraphAnalysis): string {
+  // `formatCyclePath` bounds the hop count: a large strongly connected component otherwise renders
+  // as one multi-KB line here, exactly as it did in the graph summary (W-26/W-27 share the site).
   const lines = ["### Cycles", ""];
 
   for (const cycle of analysis.cycles) {
-    lines.push(`- ${codeSpan(cycle.join(" -> "))}`);
+    lines.push(`- ${codeSpan(formatCyclePath(cycle))}`);
   }
 
-  const excludedText =
-    analysis.excludedFromReadingOrder.length === 0
-      ? "(none)"
-      : analysis.excludedFromReadingOrder
-          .map((documentPath) => codeSpan(documentPath))
-          .join(", ");
-  lines.push("", `Excluded from reading order: ${excludedText}`);
+  // One excluded path per bullet, uncapped: the field test measured this as a 3702-character single
+  // line, and unlike the fan-out it is a fact about the corpus a reader needs in full — a document
+  // missing from the reading order with no explanation is the G6 dishonesty this block exists for.
+  const excluded = analysis.excludedFromReadingOrder;
+  if (excluded.length === 0) {
+    lines.push("", "Excluded from reading order: (none)");
+    return lines.join("\n");
+  }
+
+  lines.push("", `Excluded from reading order (${excluded.length}):`, "");
+  for (const documentPath of excluded) {
+    lines.push(`- ${codeSpan(documentPath)}`);
+  }
 
   return lines.join("\n");
 }
 
-function formatEdgeList(
+// One edge per line, capped at `REFERENCE_FANOUT_LIMIT`. The parent bullet states the *full* count
+// and derives "showing N" from the same two numbers, so a truncated list can never present itself
+// as a complete one — an unmarked truncation is worse than no list at all, since a reader acts on it.
+function renderEdgeBullets(
   edges: readonly ContextGraphEdge[],
   endpoint: "to" | "from",
-): string {
+): string[] {
+  // `- to (0): (none)` rather than `- to: (none)`: the count belongs in the same position in both
+  // branches, so a `^- (to|from) \((\d+)` scan over the artifact sees the empty case too.
   if (edges.length === 0) {
-    return "(none)";
+    return [`- ${endpoint} (0): (none)`];
   }
 
+  // `line` completes the ordering: without it, parallel edges to the same target with the same type
+  // are tied, and slicing a tied list would make which edges survive the cap depend on input order.
   const sorted = [...edges].sort(
     (left, right) =>
       compareStrings(left[endpoint], right[endpoint]) ||
-      compareStrings(left.type, right.type),
+      compareStrings(left.type, right.type) ||
+      (left.line ?? 0) - (right.line ?? 0),
   );
-  return sorted
-    .map((edge) => `${codeSpan(edge[endpoint])} (${edge.type})`)
-    .join(", ");
+  const shown = sorted.slice(0, REFERENCE_FANOUT_LIMIT);
+  const header =
+    shown.length === sorted.length
+      ? `- ${endpoint} (${sorted.length}):`
+      : `- ${endpoint} (${sorted.length}, showing ${shown.length}):`;
+
+  return [
+    header,
+    ...shown.map((edge) => `  - ${codeSpan(edge[endpoint])} (${edge.type})`),
+  ];
+}
+
+function totalReferences(profile: DocumentProfile | undefined): number {
+  return (
+    (profile?.referencesTo.length ?? 0) + (profile?.referencedBy.length ?? 0)
+  );
 }
 
 function renderReferencesBlock(
@@ -276,18 +341,50 @@ function renderReferencesBlock(
     return ["### References", "", "(no documents found)"].join("\n");
   }
 
-  const entries = documentPaths.map((documentPath) => {
+  // Rank by total references, then by path. Both keys are load-bearing: a tie broken by the
+  // caller's array order would be deterministic only by accident, and that is precisely the kind of
+  // implicit ordering a two-run determinism test cannot see. Note what the ranking costs: which
+  // documents survive depends on the whole corpus, so adding a well-referenced document elsewhere
+  // can drop an existing one's entry. The disclosure below is what keeps that visible.
+  const ranked = [...documentPaths].sort(
+    (left, right) =>
+      totalReferences(profiles.get(right)) -
+        totalReferences(profiles.get(left)) || compareStrings(left, right),
+  );
+  // Rendered back in path order: rank decides *which* documents are listed, not where a reader
+  // looks for one, and below the cap the entries keep the order the section always had.
+  const listed = ranked.slice(0, REFERENCE_DOCUMENT_LIMIT).sort(compareStrings);
+  const omitted = documentPaths.length - listed.length;
+
+  const entries = listed.map((documentPath) => {
     const profile = profiles.get(documentPath);
     return [
       // A code span (not bold) — consistent with every other path in this module, and a `**`
       // sequence inside a path would otherwise prematurely close a bold span (audit finding).
       codeSpan(documentPath),
-      `- to: ${formatEdgeList(profile?.referencesTo ?? [], "to")}`,
-      `- from: ${formatEdgeList(profile?.referencedBy ?? [], "from")}`,
+      ...renderEdgeBullets(profile?.referencesTo ?? [], "to"),
+      ...renderEdgeBullets(profile?.referencedBy ?? [], "from"),
     ].join("\n");
   });
 
-  return ["### References", entries.join("\n\n")].join("\n\n");
+  // The document bound is stated only when it engages, so a small corpus is not told about an
+  // elision that did not happen; the per-direction bound is stated always, because a reader cannot
+  // tell "10 references" from "10 of many" without knowing a cap exists at all.
+  //
+  // Emitted as one sentence per line — soft-wrapped, so it is still a single Markdown paragraph.
+  // Joining them would make the disclosure itself the longest line in an artifact whose whole point
+  // is that no line is a blob.
+  const disclosure = [
+    `Bounded summary: at most ${REFERENCE_FANOUT_LIMIT} references are listed per document per direction, and each bullet's count is the full total.`,
+    ...(omitted > 0
+      ? [
+          `The ${listed.length} most-referenced of ${documentPaths.length} documents are listed below, in path order; the other ${omitted} are omitted.`,
+        ]
+      : []),
+    "Run `wastech-mdlint graph --format json` for the complete edge list, or `wastech-mdlint impact <file>` for one document's.",
+  ].join("\n");
+
+  return ["### References", disclosure, entries.join("\n\n")].join("\n\n");
 }
 
 // Locked verbatim (audit 3.4) — copy exactly; presets change only this block, never the computed

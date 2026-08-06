@@ -4,9 +4,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { ContextGraph, ContextGraphSummary } from "@wastech-mdlint/core";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { handleContextGraph } from "../src/tools/context-graph.js";
+// Shared with core and cli (P15.01): one 139-document corpus, not three copies.
+import {
+  LARGE_CORPUS_DOCUMENT_COUNT,
+  LARGE_CORPUS_ENTRY_POINT_COUNT,
+  LARGE_CORPUS_LINE_WIDTH_BOUND,
+  writeLargeCorpus,
+} from "../../core/test/support/large-corpus.js";
 
 const fixturesDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -99,6 +106,21 @@ describe("handleContextGraph", () => {
     });
   });
 
+  it("returns the human summary as the text block on both format branches", async () => {
+    // Nothing asserted the text block before P15.01, yet it is the graph report a host actually
+    // renders — and it is the same `formatContextGraphSummary` output regardless of `format`.
+    const [json, summary] = await Promise.all([
+      handleContextGraph({ cwd: graphProject }),
+      handleContextGraph({ cwd: graphProject, format: "summary" }),
+    ]);
+
+    const textOf = (result: Awaited<ReturnType<typeof handleContextGraph>>) =>
+      result.content.map((block) => (block as { text?: string }).text).join("");
+
+    expect(textOf(json)).toContain("entry points (");
+    expect(textOf(json)).toBe(textOf(summary));
+  });
+
   it("passes a structured CONFIG_INVALID error through on malformed config", async () => {
     const dir = await makeTempDir("mcp-cg-invalid-");
     await writeFile(
@@ -114,4 +136,35 @@ describe("handleContextGraph", () => {
       "CONFIG_INVALID",
     );
   });
+});
+
+describe("handleContextGraph at corpus scale", () => {
+  // The MCP text block is the same human report the CLI prints, so it inherits W-26's line-shape
+  // fix — an exit criterion this suite is the only place to prove.
+  let root: string;
+
+  beforeAll(async () => {
+    root = await makeTempDir("mcp-cg-large-");
+    await writeLargeCorpus(root);
+  }, 60_000);
+
+  it("emits a line-oriented text block under the stated width at 139 documents", async () => {
+    const result = await handleContextGraph({ cwd: root, format: "summary" });
+
+    expect(result.isError).toBeFalsy();
+    const text = result.content
+      .map((block) => (block as { text?: string }).text ?? "")
+      .join("");
+    const lines = text.split("\n");
+    const longest = lines.reduce(
+      (widest, line) => (line.length > widest.length ? line : widest),
+      "",
+    );
+
+    expect(lines).toContain(`nodes: ${LARGE_CORPUS_DOCUMENT_COUNT}`);
+    expect(lines).toContain(
+      `entry points (${LARGE_CORPUS_ENTRY_POINT_COUNT}):`,
+    );
+    expect(longest.length).toBeLessThanOrEqual(LARGE_CORPUS_LINE_WIDTH_BOUND);
+  }, 60_000);
 });

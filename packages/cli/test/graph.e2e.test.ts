@@ -1,11 +1,21 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { compareStrings } from "@wastech-mdlint/core";
 
 import { EXIT_CODE_SUCCESS } from "../src/commands.js";
 import { runCli } from "../src/program.js";
+// The 139-document fixture lives in core's test support so cli, mcp-server, and core all assert
+// against one corpus (P15.01); duplicating it is what the fixture exists to prevent.
+import {
+  LARGE_CORPUS_DOCUMENT_COUNT,
+  LARGE_CORPUS_ENTRY_POINT_COUNT,
+  LARGE_CORPUS_LINE_WIDTH_BOUND,
+  writeLargeCorpus,
+} from "../../core/test/support/large-corpus.js";
 
 // P4.08: e2e coverage for `graph`/`slice`/`impact`/`lint` driven off a single committed, multi-doc
 // fixture (packages/cli/test/fixtures/graph-project). Unlike cli.test.ts's ad hoc temp-dir fixtures,
@@ -124,13 +134,15 @@ describe("graph command over the fixture corpus", () => {
     const result = await run(["graph", FIXTURE_ROOT], FIXTURE_ROOT);
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
 
-    expect(result.stdout).toContain("top hubs:");
-    expect(result.stdout).toContain("clusters:");
-    expect(result.stdout).toContain(
-      "excluded from reading order (2): cycle-a.md, cycle-b.md",
-    );
-    expect(result.stdout).toContain("coverage:");
-    expect(result.stdout).toContain("files outside corpus (1): appendix.md");
+    const lines = result.stdout.split("\n");
+    expect(lines).toContain("top hubs:");
+    expect(lines).toContain("clusters:");
+    expect(lines).toContain("excluded from reading order (2):");
+    expect(lines).toContain("  cycle-a.md");
+    expect(lines).toContain("  cycle-b.md");
+    expect(lines).toContain("coverage:");
+    expect(lines).toContain("  files outside corpus (1):");
+    expect(lines).toContain("    appendix.md");
   });
 
   it("renders a Mermaid flowchart", async () => {
@@ -180,6 +192,39 @@ describe("graph command over the fixture corpus", () => {
       [...payload.edges.map(edgeSortKey)].sort(compareStrings),
     );
   });
+});
+
+describe("graph command over the large corpus", () => {
+  // The human format's line shape is a property of what a terminal receives, so it is asserted at
+  // the command boundary as well as in core's renderer unit tests. `graph . --format human | head`
+  // — the documented invocation — truncates by line, which does nothing for a comma-joined blob.
+  let root: string;
+
+  beforeAll(async () => {
+    root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-cli-large-"));
+    await writeLargeCorpus(root);
+  }, 60_000);
+
+  afterAll(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it("keeps every human-format line under the stated width at 139 documents", async () => {
+    const result = await run(["graph", root], root);
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const lines = result.stdout.split("\n");
+    const longest = lines.reduce(
+      (widest, line) => (line.length > widest.length ? line : widest),
+      "",
+    );
+
+    expect(lines).toContain(`nodes: ${LARGE_CORPUS_DOCUMENT_COUNT}`);
+    expect(lines).toContain(
+      `entry points (${LARGE_CORPUS_ENTRY_POINT_COUNT}):`,
+    );
+    expect(longest.length).toBeLessThanOrEqual(LARGE_CORPUS_LINE_WIDTH_BOUND);
+  }, 60_000);
 });
 
 describe("slice command over the fixture corpus", () => {

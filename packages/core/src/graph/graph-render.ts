@@ -60,6 +60,22 @@ export function summarizeContextGraph(
   };
 }
 
+// Every path-bearing section of the human format is a `header (count):` line followed by one
+// indented item per line — the shape `top hubs` and `files (N):` already had, and now the shape all
+// of them have (W-26). Comma-joining produced 3500–3900-character single lines on a 139-node graph
+// and left the format internally inconsistent, three sections line-oriented and three not.
+function pushPathList(
+  lines: string[],
+  label: string,
+  items: readonly string[],
+  indent = "  ",
+): void {
+  lines.push(`${label} (${items.length}):`);
+  for (const item of items) {
+    lines.push(`${indent}${item}`);
+  }
+}
+
 // `renderContextGraphText` builds on `formatContextGraphSummary` (nodes/edges/cycles/entry
 // points/hubs) rather than re-deriving those fields, then appends the three signals the AC asks for
 // that the P4.02 summary does not already cover: clusters, reading order, and (optionally) the P4.06
@@ -70,26 +86,38 @@ export function renderContextGraphText(
 ): string {
   const lines = [formatContextGraphSummary(graph)];
 
+  // Clusters nest one level deeper than the other sections because a component is itself a list:
+  // flattening the members under a single `clusters:` header would lose the boundary between one
+  // component and the next, which is the only information the section carries.
   const components = getComponents(graph);
   lines.push("clusters:");
-  for (const component of components) {
-    lines.push(`  ${component.join(", ")}`);
-  }
+  components.forEach((component, index) => {
+    // "(N files)" rather than the bare "(N)" the other sections use: next to an ordinal the bare
+    // count reads like a second index.
+    lines.push(`  cluster ${index + 1} (${component.length} files):`);
+    for (const member of component) {
+      lines.push(`    ${member}`);
+    }
+  });
 
   const { order, excluded } = topologicalSort(graph);
-  lines.push(`reading order (${order.length}): ${order.join(", ")}`);
+  pushPathList(lines, "reading order", order);
   if (excluded.length > 0) {
-    lines.push(
-      `excluded from reading order (${excluded.length}): ${excluded.join(", ")}`,
-    );
+    pushPathList(lines, "excluded from reading order", excluded);
   }
 
   if (coverage !== undefined) {
     lines.push("coverage:");
     lines.push(`  nodes: ${coverage.nodeCount}`);
     lines.push(`  edges: ${coverage.edgeCount}`);
-    lines.push(
-      `  files outside corpus (${coverage.filesOutsideCorpus.length}): ${coverage.filesOutsideCorpus.join(", ")}`,
+    // Also comma-joined before P15.01. The backlog called coverage "correctly line-oriented"
+    // because the field corpus had only 12 files outside it; the defect is the same one, and the
+    // exit criterion ("no line exceeds a stated width") is unconditional.
+    pushPathList(
+      lines,
+      "  files outside corpus",
+      coverage.filesOutsideCorpus,
+      "    ",
     );
   }
 
@@ -178,14 +206,12 @@ export function renderContextSliceSummary(result: ContextSliceResult): string {
     return `No match for query "${result.query}".`;
   }
 
-  const lines = [
-    `query: ${result.query}`,
-    `matched: ${result.matchKind} (${result.starts.join(", ")})`,
-    `files (${result.files.length}):`,
-  ];
-  for (const file of result.files) {
-    lines.push(`  ${file}`);
-  }
+  // `starts` is not a one-element list: an `#anchor`, heading, or ID query resolves to *every* file
+  // carrying that slug, so comma-joining it is the same multi-KB blob W-26 is about, in the same
+  // file as the renderers that shed it. Line-oriented here too, for the same reason.
+  const lines = [`query: ${result.query}`, `matched: ${result.matchKind}`];
+  pushPathList(lines, "starts", result.starts);
+  pushPathList(lines, "files", result.files);
 
   return lines.join("\n");
 }
@@ -206,13 +232,12 @@ export function renderImpactSummary(result: ImpactClassification): string {
     lines.push(`  ${entry.path} (depth ${entry.depth}, via ${entry.via})`);
   }
 
-  lines.push(
-    `reading order (${result.readingOrder.length}): ${result.readingOrder.join(", ")}`,
-  );
+  // The same comma-joined pair `renderContextGraphText` had, on a subgraph that can be the whole
+  // corpus when the changed file is a hub. Fixing three of the four instances of one defect would
+  // recreate the inconsistency W-26 is about, so `impact --format text` moves with them.
+  pushPathList(lines, "reading order", result.readingOrder);
   if (result.excluded.length > 0) {
-    lines.push(
-      `excluded from reading order (${result.excluded.length}): ${result.excluded.join(", ")}`,
-    );
+    pushPathList(lines, "excluded from reading order", result.excluded);
   }
 
   return lines.join("\n");
