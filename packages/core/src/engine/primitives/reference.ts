@@ -1,10 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 
-import {
-  matchesConfigGlob,
-  normalizeRelativePath,
-} from "../../discovery/globs.js";
+import { matchesConfigGlob } from "../../discovery/globs.js";
 import type {
   ParsedDocument,
   ParsedLink,
@@ -12,10 +9,8 @@ import type {
 import {
   candidateEscapesRoot,
   filePart,
-  resolveRelativeToSource,
-  sourceLocale,
+  resolveTargetCandidates,
 } from "../path-resolve.js";
-import { resolveRoutedUrl } from "../site-router.js";
 import type { SiteRouterSettings } from "../types.js";
 import type { PrimitiveContext, PrimitiveFinding } from "./types.js";
 
@@ -34,6 +29,24 @@ function targetResolves(relPath: string, context: ReferenceContext): boolean {
   return (
     context.documents.has(relPath) ||
     existsSync(path.resolve(context.rootDir, relPath))
+  );
+}
+
+// The `exclude` gate both primitives share (W-08). It matches the **resolved** repo-relative
+// candidates, not the raw target, and a match on *any* candidate skips the target: `exclude` is a
+// suppression filter and must never *create* a finding, which is what dropping matched candidates
+// and re-resolving the rest would do for a link that only resolves via an excluded candidate. Under
+// a router the list is one target expressed several ways, so "any" is also the honest reading.
+//
+// The whole list goes to `matchesConfigGlob` in one call — it is P13.01's ordered, negation-aware
+// matcher, so evaluating patterns one at a time would lose a leading `!`'s subtraction.
+function targetExcluded(
+  candidates: readonly string[],
+  exclude: string[] | undefined,
+): boolean {
+  return (
+    exclude !== undefined &&
+    candidates.some((candidate) => matchesConfigGlob(candidate, exclude))
   );
 }
 
@@ -64,36 +77,16 @@ export function linkResolves(
       continue;
     }
 
-    const isRootRelative = target.startsWith("/");
-    let resolved: boolean;
+    // One candidate list for every target shape (relative, root-relative, routed), so the `exclude`
+    // gate below cannot go inert on one branch the way it did before P13.05 (W-08): a bare `{}`
+    // router validates and resolves like the no-router case, yet used to turn the option off.
+    const candidates = resolveTargetCandidates(document.path, target, router);
 
-    if (isRootRelative && router !== undefined) {
-      const candidates = resolveRoutedUrl(
-        target,
-        router,
-        sourceLocale(document.path, router),
-      );
-      resolved = candidates.some((candidate) =>
-        targetResolves(normalizeRelativePath(candidate), context),
-      );
-    } else {
-      const relTarget = isRootRelative
-        ? normalizeRelativePath(
-            path.posix.normalize(target.replace(/^\/+/, "")),
-          )
-        : resolveRelativeToSource(document.path, target);
-
-      if (
-        options.exclude !== undefined &&
-        matchesConfigGlob(relTarget, options.exclude)
-      ) {
-        continue;
-      }
-
-      resolved = targetResolves(relTarget, context);
+    if (targetExcluded(candidates, options.exclude)) {
+      continue;
     }
 
-    if (!resolved) {
+    if (!candidates.some((candidate) => targetResolves(candidate, context))) {
       findings.push({
         message: `Link target "${link.rawTarget}" does not resolve to a file.`,
         line: link.line,
@@ -126,21 +119,26 @@ export function imageResolves(
       continue;
     }
 
-    const relTarget = target.startsWith("/")
-      ? normalizeRelativePath(path.posix.normalize(target.replace(/^\/+/, "")))
-      : resolveRelativeToSource(document.path, target);
+    // Deliberately router-blind, and the same shared helper the link path uses (W-10): a site
+    // router maps a URL to *Markdown source* files, so routing an image target would only ever
+    // offer `.md`/`.mdx` candidates for an asset — manufacturing REF-003 findings rather than
+    // resolving them. Root-relative image targets resolve against the repository root, which is
+    // what `docs/guide/rules/REF-003.md` documents.
+    const candidates = resolveTargetCandidates(document.path, target);
 
-    if (
-      options.exclude !== undefined &&
-      matchesConfigGlob(relTarget, options.exclude)
-    ) {
+    if (targetExcluded(candidates, options.exclude)) {
       continue;
     }
 
-    if (
-      candidateEscapesRoot(relTarget) ||
-      !existsSync(path.resolve(context.rootDir, relTarget))
-    ) {
+    // `candidateEscapesRoot` must run before `existsSync`: a `..`-cancelled drive-absolute
+    // remainder would otherwise be probed outside `rootDir` on Windows (audit H-2 class).
+    const resolved = candidates.some(
+      (candidate) =>
+        !candidateEscapesRoot(candidate) &&
+        existsSync(path.resolve(context.rootDir, candidate)),
+    );
+
+    if (!resolved) {
       findings.push({
         message: `Image target "${image.rawTarget}" does not resolve to a file.`,
         line: image.line,

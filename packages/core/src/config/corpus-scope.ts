@@ -1,4 +1,5 @@
 import { compareStrings } from "../deterministic-sort.js";
+import { LINTED_MARKDOWN_EXTENSIONS } from "../discovery/markdown-extensions.js";
 import { DEFAULT_NOISE_DIR_NAMES } from "../discovery/repo-scan-constants.js";
 import type { LintConfig } from "./config-schema.js";
 
@@ -49,9 +50,12 @@ export const DEFAULT_EXCLUDE_GLOBS: readonly string[] = [
   HIDDEN_DIR_EXCLUDE_GLOB,
 ].sort(compareStrings);
 
-// The zero-config `include` (C1): every Markdown file at any depth. `.mdx` is deliberately absent —
-// the repo scan discovers it, the linter has never linted it by default.
-export const DEFAULT_INCLUDE_GLOBS: readonly string[] = ["**/*.md"];
+// The zero-config `include` (C1): every linted Markdown file at any depth. Derived rather than
+// spelled, so this and the repo scan cannot drift on what a Markdown file is (P13.05 / W-09) — the
+// gap between the two is `LINTED_MARKDOWN_EXTENSIONS` being a declared subset of
+// `MARKDOWN_EXTENSIONS`, i.e. `.mdx` is discovered by the scan and never linted by default.
+export const DEFAULT_INCLUDE_GLOBS: readonly string[] =
+  LINTED_MARKDOWN_EXTENSIONS.map((extension) => `**/*${extension}`);
 
 // C8 keeps `respectGitignore` opt-in, and P13.02 re-decided it rather than inheriting it: a
 // `.gitignore` is a commit-time statement, not a "do not lint this" one. Flipping it would put a

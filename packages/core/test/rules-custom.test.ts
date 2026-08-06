@@ -463,4 +463,32 @@ describe("custom rule file scope (exclude)", () => {
       await run({ exclude: ["drafts/**"], assertExclude: ["drafts/**"] }),
     ).toEqual(["docs/a.md:nope.md"]);
   });
+
+  // W-08 (P13.05): the custom dispatcher hands `assert.exclude` straight to the same `linkResolves`
+  // primitive REF-001 uses, so the router branch dropping the option took this family with it —
+  // the family where the option is most likely hand-written, and the half no test reached.
+  it("honors assert.exclude on a root-relative target when a siteRouter is configured", async () => {
+    const run = async (settings: unknown) => {
+      const cwd = await repo({
+        "docs/a.md": "[gen](/generated/x.md)\n",
+        "wastech-mdlint.config.json": JSON.stringify({
+          settings,
+          rules: [
+            {
+              rule: "custom",
+              id: "SCOPE-CHECK",
+              options: {
+                assert: { kind: "linkResolves", exclude: ["generated/**"] },
+              },
+            },
+          ],
+        }),
+      });
+      const result = await lintWithConfig(cwd);
+      return result.messages.map((message) => String(message.data?.target));
+    };
+
+    expect(await run({})).toEqual([]);
+    expect(await run({ siteRouter: {} })).toEqual([]);
+  });
 });

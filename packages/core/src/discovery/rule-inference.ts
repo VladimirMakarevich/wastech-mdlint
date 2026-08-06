@@ -111,8 +111,9 @@ function tallyPatterns(
     }
     for (const image of doc.images) {
       const target = filePart(image.rawTarget);
-      // Mirrors imageResolves (REF-003): skip an empty target and any scheme-qualified target
-      // (http:, https:, data:, …), neither of which REF-003 ever evaluates.
+      // Mirrors imageResolves (REF-003)'s *skip guards* — it counts, it does not resolve: skip an
+      // empty target and any scheme-qualified target (http:, https:, data:, …), neither of which
+      // REF-003 ever evaluates.
       if (target.length === 0 || /^[a-z][a-z0-9+.-]*:/i.test(target)) {
         continue;
       }

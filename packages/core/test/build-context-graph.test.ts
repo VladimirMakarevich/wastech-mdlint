@@ -350,6 +350,23 @@ describe("buildContextGraph · siteRouter resolution", () => {
       },
     ]);
   });
+
+  // W-10 (P13.05): the builder's invariant is that its resolution mirrors the REF rules, and
+  // REF-003 resolves a root-relative image target against the repository root — a router maps a URL
+  // to Markdown source, never to an asset. So the same root-relative target yields a link edge and
+  // no image edge.
+  it("routes links but not images (REF-003's model)", () => {
+    const documents = docs({
+      "src/content/docs/guide.md": "[intro](/intro)\n\n![diagram](/intro)\n",
+      "src/content/docs/intro.md": "# Intro\n",
+    });
+
+    const graph = buildContextGraph(documents, {
+      siteRouter: { preset: "starlight" },
+    });
+
+    expect(graph.edges.map((edge) => edge.type)).toEqual(["link"]);
+  });
 });
 
 describe("buildContextGraph · node identity matches loadDocuments() output directly", () => {

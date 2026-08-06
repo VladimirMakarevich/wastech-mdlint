@@ -11,6 +11,7 @@ import {
   readIgnoreLayer,
   type IgnoreLayer,
 } from "./gitignore-layers.js";
+import { isMarkdownFile, MARKDOWN_GLOB_SUFFIX } from "./markdown-extensions.js";
 import {
   DEFAULT_KNOWN_CLUSTER_NAMES,
   DEFAULT_MIN_CLUSTER_SIZE,
@@ -51,12 +52,6 @@ export type ScanRepositoryOptions = {
   knownClusterNames?: string[];
   noiseDirNames?: string[];
 };
-
-const MARKDOWN_EXTENSIONS = new Set([".md", ".mdx"]);
-
-function isMarkdownFile(fileName: string): boolean {
-  return MARKDOWN_EXTENSIONS.has(path.extname(fileName).toLowerCase());
-}
 
 function dirnameOf(filePath: string): string {
   const dir = path.posix.dirname(filePath);
@@ -105,7 +100,8 @@ function isOwnedByPackageScope(
   );
 }
 
-// A private, NOISE-pruned recursive walk collecting *.md/*.mdx as repo-relative POSIX paths.
+// A private, NOISE-pruned recursive walk collecting every `MARKDOWN_EXTENSIONS` file as a
+// repo-relative POSIX path.
 // Deliberately does not follow symlinks (unlike load-documents.ts's loop-safe symlink
 // following): this is a heuristic pre-config scan, not the authoritative lint corpus, so
 // `Dirent.isDirectory()`/`isFile()` both returning false for a symlink entry (the simplest
@@ -260,7 +256,7 @@ function computeScopeClusters(params: ScopeClustersParams): DocCluster[] {
     kind: "cluster",
     score,
     subtreeCount,
-    includeGlob: `${escapeGlobPath(dir)}/**/*.{md,mdx}`,
+    includeGlob: `${escapeGlobPath(dir)}/**/${MARKDOWN_GLOB_SUFFIX}`,
     sampleFiles: files
       .filter((file) => file.startsWith(`${dir}/`))
       .slice(0, sampleSize),
@@ -279,8 +275,8 @@ function computeScopeClusters(params: ScopeClustersParams): DocCluster[] {
       // root-only proposal into a repo-wide one once `init` writes it into config.
       includeGlob:
         scopeRoot === ""
-          ? "./*.{md,mdx}"
-          : `${escapeGlobPath(scopeRoot)}/*.{md,mdx}`,
+          ? `./${MARKDOWN_GLOB_SUFFIX}`
+          : `${escapeGlobPath(scopeRoot)}/${MARKDOWN_GLOB_SUFFIX}`,
       sampleFiles: directFiles.slice(0, sampleSize),
       ...workspacePackageTag,
     });
@@ -375,8 +371,8 @@ export async function scanRepository(
   // Markdown exists somewhere. The glob is deliberately the literal `**/*.md` — the task spec's
   // "give up, cover everything the normal way" safety net mirrors the tool's actual zero-config
   // default include (`DEFAULT_INCLUDE_GLOBS`, which `resolveCorpusScope` applies for
-  // lintFiles/fix/loadContext alike), not the scan's own broader `.md`+`.mdx` discovery criteria.
-  // In an `.mdx`-only repo this
+  // lintFiles/fix/loadContext alike, and which is built from `LINTED_MARKDOWN_EXTENSIONS`), not the
+  // scan's own broader `MARKDOWN_EXTENSIONS` discovery criteria. In an `.mdx`-only repo this
   // fallback's `sampleFiles` can include paths the glob itself won't match — an accepted,
   // documented tradeoff of proposing the tool's real default rather than a scan-specific one.
   if (clusters.length === 0 && allFiles.length > 0) {
