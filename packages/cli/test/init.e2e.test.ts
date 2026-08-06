@@ -1792,6 +1792,57 @@ describe("init command · the scan-exclusion disclosure (W-14)", () => {
     );
   });
 
+  // @boundary-guard shared-exclude
+  // W-57 / P16.01 §2. The arithmetic above is necessary and not sufficient: `corpus + disclosed ==
+  // tracked` also holds when the corpus drops one tracked file and gains one untracked file, which is
+  // the failure a count cannot see. This is the set comparison instead — the two `comm` directions the
+  // field test ran to account for its 63-file gap — so *which* files, not how many.
+  //
+  // The `extra` direction is the one that would have caught the blocker: an untracked
+  // `node_modules` document entering the corpus is invisible to a total that the same run's exclusion
+  // summary also feeds. Asserted at the host boundary, over a config this repository did not
+  // hand-write but `init` chose, because "the corpus a user gets on their first two commands" is the
+  // property, not "the corpus a config we authored produces".
+  it("accounts for the corpus against the tracked set in both directions", async () => {
+    const cwd = await fixtureRepo(DOT_DIRECTORY_FIXTURE);
+
+    const init = await run(["init", cwd, "--yes"], cwd);
+    expect(init.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const lint = await run(
+      ["lint", cwd, "--format", "json", "--fail-on", "off"],
+      cwd,
+    );
+    expect(lint.exitCode).toBe(EXIT_CODE_SUCCESS);
+    const { files } = JSON.parse(lint.stdout) as { files: string[] };
+
+    const corpus = new Set(files);
+    const tracked = new Set(DOT_DIRECTORY_TRACKED_MARKDOWN);
+    const missing = DOT_DIRECTORY_TRACKED_MARKDOWN.filter(
+      (file) => !corpus.has(file),
+    );
+    const extra = files.filter((file) => !tracked.has(file));
+
+    // Nothing the fixture does not track — not the gitignored `generated-docs/api/one.md`, and above
+    // all not `mobile/node_modules/leftpad/README.md`.
+    expect(extra).toEqual([]);
+    // And the gap is exactly the dot-directory files, named rather than counted: the prune `init`
+    // discloses and does not encode (W-15), which is why they are absent from an `init`-written
+    // `include` while a zero-config run would read them.
+    expect(missing).toEqual([
+      ".agents/rules/architecture.md",
+      ".agents/rules/testing.md",
+      ".claude/skills/lint/SKILL.md",
+    ]);
+    // The number in the disclosure is a claim about that same set, so it is checked against it rather
+    // than restated: a disclosure that drifts from the gap it explains is the W-14 defect again.
+    const disclosed = /hidden directories: (\d+) Markdown files/.exec(
+      init.stdout,
+    );
+    expect(disclosed).not.toBeNull();
+    expect(Number(disclosed![1])).toBe(missing.length);
+  });
+
   it("tells a dot-directory-only repository that the default lints those files anyway", async () => {
     // The branch the unconditional wording got wrong. With every Markdown file behind a dot, the
     // scan sees no cluster, `init` omits `include`, and the dot-matching `**/*.md` default lints

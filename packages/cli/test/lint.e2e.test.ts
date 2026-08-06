@@ -9,6 +9,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 
+import type { LintMessage } from "@wastech-mdlint/core";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -17,6 +18,12 @@ import {
   EXIT_CODE_USAGE_ERROR,
 } from "../src/commands.js";
 import { runCli } from "../src/program.js";
+import {
+  lintMessagesAsRows,
+  PARITY_LINT_FIXTURE,
+  readLintFindingLines,
+  readLintSummaryLine,
+} from "../../core/test/support/output-parity.js";
 
 function createMemoryWriter() {
   let text = "";
@@ -418,6 +425,81 @@ describe("lint command", () => {
     );
     expect(result.stderr).toContain("config.rules[0].severity");
     expect(result.stderr).toMatch(/error.*warning.*off/);
+  });
+});
+
+// @boundary-guard host-parity
+//
+// W-57 / P16.01 §5. One run, two renderings, and nothing had ever compared them: the crosscheck's
+// fourth bucket of missed defects is process-boundary rendering, and three of them — a `hint` the
+// human path dropped, a `--format json` word collision, a `summary` key missing from one format —
+// were all found by reading code rather than by any test. The pattern the readers in
+// `core/test/support/output-parity.ts` establish is that the text is parsed *back* into rows and the
+// location rule is restated there, so the two sides of each comparison are two formulations rather
+// than one shared helper answering itself.
+describe("lint output parity: human text vs the JSON payload", () => {
+  it("renders every message of the payload, with the same fields", async () => {
+    // The corpus and its expected location set both come from `PARITY_LINT_FIXTURE`, beside the readers:
+    // it is what makes these comparisons non-vacuous (all three location shapes at once), and it is
+    // shared so the MCP twin and the cross-host guard cannot drift from it.
+    const cwd = await fixtureRepo({ ...PARITY_LINT_FIXTURE.files });
+
+    const [text, json] = await Promise.all([
+      run(["lint", cwd], cwd),
+      run(["lint", cwd, "--format", "json"], cwd),
+    ]);
+    expect(text.exitCode).toBe(EXIT_CODE_FINDINGS);
+    expect(json.exitCode).toBe(EXIT_CODE_FINDINGS);
+
+    const payload = JSON.parse(json.stdout) as {
+      summary: { files: number; errors: number; warnings: number };
+      messages: LintMessage[];
+      files: string[];
+    };
+
+    // Both directions at once: an equal array of rows means no finding is rendered that the payload
+    // does not carry, *and* none is carried that the text does not render — including the file
+    // grouping, which the human format states once per file and the payload repeats per message.
+    expect(readLintFindingLines(text.stdout)).toEqual(
+      lintMessagesAsRows(payload.messages),
+    );
+    // Non-vacuous, and specifically that all three location shapes are present.
+    expect(
+      readLintFindingLines(text.stdout)
+        .map((row) => row.location)
+        .sort(),
+    ).toEqual(PARITY_LINT_FIXTURE.locations);
+
+    // The totals are their own rendering of the same counts, and the one a CI log is read for.
+    expect(readLintSummaryLine(text.stdout)).toEqual({
+      total: payload.summary.errors + payload.summary.warnings,
+      errors: payload.summary.errors,
+      warnings: payload.summary.warnings,
+    });
+  });
+
+  it("renders the clean report in place of a summary line when the payload is empty", async () => {
+    // The empty case is a different code path in the formatter (an early return), so parity there is a
+    // separate claim: `No problems found.` must correspond to zero messages, not to a report that
+    // failed to render them.
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "REF-001" }],
+      }),
+    });
+
+    const [text, json] = await Promise.all([
+      run(["lint", cwd], cwd),
+      run(["lint", cwd, "--format", "json"], cwd),
+    ]);
+    expect(text.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const payload = JSON.parse(json.stdout) as { messages: LintMessage[] };
+    expect(payload.messages).toEqual([]);
+    expect(readLintFindingLines(text.stdout)).toEqual([]);
+    expect(readLintSummaryLine(text.stdout)).toBeUndefined();
+    expect(text.stdout).toContain("No problems found.");
   });
 });
 

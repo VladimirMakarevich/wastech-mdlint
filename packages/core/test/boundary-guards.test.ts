@@ -37,6 +37,17 @@ const repoRoot = path.resolve(
 // inventory reads the same way the assertions below compare it (determinism invariant: the order
 // here is incidental, not meaningful).
 const BOUNDARY_GUARDS: Record<string, string[]> = {
+  // Every user-facing surface renders twice — a human document and a structured one — and each host
+  // renders both. P16.01 added this category because the crosscheck traced three missed defects to
+  // nothing ever diffing those against each other: they agree by construction in a handler test, and
+  // diverge only in what a reader or a client actually receives.
+  "host-parity": [
+    "packages/cli/test/lint.e2e.test.ts",
+    "packages/mcp-server/test/context-graph.test.ts",
+    "packages/mcp-server/test/host-parity.test.ts",
+    "packages/mcp-server/test/lint-files.test.ts",
+    "packages/mcp-server/test/lint.test.ts",
+  ],
   // Spawn the built entrypoint through an npm-style link. Only a real process can populate
   // `process.argv[1]`, which is what the entrypoint guard compares against `import.meta.url` — and,
   // since P14.01, only a spawned server shows what a client actually receives, which is where a
@@ -48,8 +59,11 @@ const BOUNDARY_GUARDS: Record<string, string[]> = {
   ],
   // The shared `files`/`exclude` option shape stays covered as rules are added: an inventory drift
   // guard plus a runtime assert-kind coverage check — and, since P13.02, the top-level scope's own
-  // zero-config default, which only a run with no config file at all can exercise.
+  // zero-config default, which only a run with no config file at all can exercise. P16.01 adds the
+  // other direction: the corpus an `init`-written scope produces, compared against the tracked set
+  // both ways, so a document entering it is as visible as one missing from it.
   "shared-exclude": [
+    "packages/cli/test/init.e2e.test.ts",
     "packages/cli/test/lint.e2e.test.ts",
     "packages/core/test/registry-inventory.test.ts",
     "packages/core/test/rules-custom.test.ts",
@@ -80,6 +94,7 @@ describe("process-boundary guard inventory (P12.06)", () => {
     // added there, add it here (with its guard) — and vice versa; that pairing is the whole point.
     expect(categories).toEqual([
       "determinism",
+      "host-parity",
       "installed-bin-spawn",
       "shared-exclude",
       "write-failure",

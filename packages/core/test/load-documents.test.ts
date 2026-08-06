@@ -290,3 +290,76 @@ describe("loadDocuments", () => {
     ]);
   });
 });
+
+// W-57 / P16.01 §4. The four shapes of the field test's anchoring table are pinned at the matcher in
+// `rule-utils.test.ts` ("matchesConfigGlob anchoring"), which is where the *rule* lives. What no test
+// had was the same table one layer up, against a real tree — and that layer is where the shapes stop
+// being equivalent: `exclude` prunes whole directories through a synthetic-child probe before any file
+// is offered to the file-level filter, so a root-anchored `node_modules/**` does not merely fail to
+// match a nested copy, it descends into it and parses every file inside. That is the blocker the
+// field test measured (2740 files under one `mobile/node_modules/`), and a matcher-level `false` is
+// not evidence about it.
+//
+// One fixture for the whole table so a failing row names a pattern rather than a fixture.
+describe("loadDocuments glob anchoring over a real tree (W-03/W-01)", () => {
+  const FIXTURE = {
+    "NOTE.md": "# Root\n",
+    "docs/NOTE.md": "# Nested\n",
+    "mobile/node_modules/leftpad/NOTE.md": "# Vendored\n",
+  };
+
+  const ROOT_ONLY = ["NOTE.md"];
+  const NOT_VENDORED = ["NOTE.md", "docs/NOTE.md"];
+  const EVERYTHING = [
+    "NOTE.md",
+    "docs/NOTE.md",
+    "mobile/node_modules/leftpad/NOTE.md",
+  ];
+
+  it.each([
+    // A slash-free pattern is depth-agnostic, which is the answer that surprises: `"NOTE.md"` is not
+    // "the NOTE.md in the root".
+    ["NOTE.md", ["NOTE.md"], [], EVERYTHING],
+    ["*.md", ["*.md"], [], EVERYTHING],
+    // A slash — even a leading `./` — root-anchors it. This is the shape a user reaches for when the
+    // depth-agnostic answer above is not what they wanted.
+    ["./NOTE.md", ["./NOTE.md"], [], ROOT_ONLY],
+    // The two `exclude` forms, and the whole reason `DEFAULT_EXCLUDE_GLOBS` carries a `**/` prefix.
+    ["exclude node_modules/**", ["**/*.md"], ["node_modules/**"], EVERYTHING],
+    [
+      "exclude **/node_modules/**",
+      ["**/*.md"],
+      ["**/node_modules/**"],
+      NOT_VENDORED,
+    ],
+    // Ordered negation: a later entry re-includes what an earlier one subtracted, and the reverse
+    // order subtracts again. Before P13.01 the first of these returned the whole tree (the negation
+    // compiled to an inverting matcher in a first-truthy OR) and the second returned it too.
+    [
+      "ordered negation, negation last",
+      ["**/*.md", "docs/**", "!docs/**"],
+      [],
+      ["NOTE.md", "mobile/node_modules/leftpad/NOTE.md"],
+    ],
+    [
+      "ordered negation, re-include last",
+      ["**/*.md", "!docs/**", "docs/NOTE.md"],
+      [],
+      EVERYTHING,
+    ],
+  ] as const)(
+    "include %s selects the documented set",
+    async (_name, include, exclude, expected) => {
+      const root = await createFixtureTree(FIXTURE);
+
+      const documents = await loadDocuments([...include], {
+        cwd: root,
+        exclude: [...exclude],
+      });
+
+      expect([...documents.values()].map((doc) => doc.path)).toEqual([
+        ...expected,
+      ]);
+    },
+  );
+});

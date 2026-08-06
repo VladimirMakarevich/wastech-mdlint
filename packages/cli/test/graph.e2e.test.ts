@@ -17,6 +17,7 @@ import {
   LARGE_CORPUS_LINE_WIDTH_BOUND,
   writeLargeCorpus,
 } from "../../core/test/support/large-corpus.js";
+import { readHumanSections } from "../../core/test/support/output-parity.js";
 
 // P4.08: e2e coverage for `graph`/`slice`/`impact`/`lint` driven off a single committed, multi-doc
 // fixture (packages/cli/test/fixtures/graph-project). Unlike cli.test.ts's ad hoc temp-dir fixtures,
@@ -151,6 +152,35 @@ describe("graph command over the fixture corpus", () => {
     expect(lines).toContain("    appendix.md");
   });
 
+  // The fourth path-bearing section of the human format, and the one the top-level parity test below
+  // structurally cannot see: `files outside corpus` lives *inside* the coverage block, header at two
+  // spaces and items at four, so the shared reader has to be pointed at that nesting level. It is
+  // diffed here rather than on the large corpus because only this fixture has a file outside `include`
+  // — an empty section would agree with an empty JSON array vacuously, which is how the section P15.01
+  // made line-oriented last would have stayed the one nothing compares. It also re-pins W-26 here: a
+  // comma-joined `files outside corpus (1): appendix.md` no longer ends in `:` and the reader stops
+  // finding the section at all.
+  it("reports the same nested coverage section in the human and JSON formats", async () => {
+    const [human, json] = await Promise.all([
+      run(["graph", FIXTURE_ROOT], FIXTURE_ROOT),
+      run(["graph", FIXTURE_ROOT, "--format", "json"], FIXTURE_ROOT),
+    ]);
+    expect(human.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(json.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const nested = readHumanSections(human.stdout, "    ", "  ");
+    const payload = JSON.parse(json.stdout) as {
+      coverage: { filesOutsideCorpus: string[] };
+    };
+
+    expect(nested["files outside corpus"]).toEqual(
+      payload.coverage.filesOutsideCorpus,
+    );
+    // Non-vacuous on both sides: appendix.md is linked-to but outside the corpus, so the section and
+    // the array each have something to be wrong about.
+    expect(payload.coverage.filesOutsideCorpus).toEqual(["appendix.md"]);
+  });
+
   it("renders a Mermaid flowchart", async () => {
     const result = await run(
       ["graph", FIXTURE_ROOT, "--format", "mermaid"],
@@ -232,11 +262,16 @@ describe("graph command over the large corpus", () => {
     expect(longest.length).toBeLessThanOrEqual(LARGE_CORPUS_LINE_WIDTH_BOUND);
   }, 60_000);
 
-  // W-23's exit criterion, at the boundary a user actually reads: one graph, both formats, the
-  // excluded sets compared. The renderer-level twin lives in core's `graph-render.test.ts`; this one
-  // proves the key survives `JSON.stringify` and the command dispatch, which is where a shape the CLI
-  // never passed through would still look fine in a unit test.
-  it("reports the same excluded set in the human and JSON formats", async () => {
+  // W-23's exit criterion, at the boundary a user actually reads: one graph, both formats, the path
+  // sections compared. The renderer-level twin lives in core's `graph-render.test.ts`; this one proves
+  // the keys survive `JSON.stringify` and the command dispatch, which is where a shape the CLI never
+  // passed through would still look fine in a unit test.
+  //
+  // Widened by P16.01 from `excluded` alone to all three *top-level* sections, through the shared
+  // `readHumanSections` reader — checking one of three is how the next missing key stays invisible. The
+  // format's fourth path section, the coverage block's nested `files outside corpus`, is diffed by
+  // "reports the same nested coverage section…" above, on the fixture corpus where it is non-empty.
+  it("reports the same top-level path sections in the human and JSON formats", async () => {
     const [human, json] = await Promise.all([
       run(["graph", root], root),
       run(["graph", root, "--format", "json"], root),
@@ -244,25 +279,30 @@ describe("graph command over the large corpus", () => {
     expect(human.exitCode).toBe(EXIT_CODE_SUCCESS);
     expect(json.exitCode).toBe(EXIT_CODE_SUCCESS);
 
-    const lines = human.stdout.split("\n");
-    const header = lines.indexOf(
-      `excluded from reading order (${LARGE_CORPUS_EXCLUDED_COUNT}):`,
+    const sections = readHumanSections(human.stdout);
+    const payload = JSON.parse(json.stdout) as {
+      nodes: { path: string; inDegree: number }[];
+      readingOrder: string[];
+      excluded: string[];
+    };
+
+    expect({
+      entryPoints: sections["entry points"],
+      readingOrder: sections["reading order"],
+      excluded: sections["excluded from reading order"],
+    }).toEqual({
+      entryPoints: payload.nodes
+        .filter((node) => node.inDegree === 0)
+        .map((node) => node.path),
+      readingOrder: payload.readingOrder,
+      excluded: payload.excluded,
+    });
+    expect(sections["excluded from reading order"]).toHaveLength(
+      LARGE_CORPUS_EXCLUDED_COUNT,
     );
-    expect(header).toBeGreaterThan(-1);
-
-    // Items are the `  `-indented lines following the header; the section ends at the next unindented
-    // line, which here is the `coverage:` header the CLI always appends.
-    const humanExcluded: string[] = [];
-    for (const line of lines.slice(header + 1)) {
-      if (!line.startsWith("  ")) {
-        break;
-      }
-      humanExcluded.push(line.trim());
-    }
-
-    const payload = JSON.parse(json.stdout) as { excluded: string[] };
-    expect(humanExcluded).toHaveLength(LARGE_CORPUS_EXCLUDED_COUNT);
-    expect(payload.excluded).toEqual(humanExcluded);
+    expect(sections["entry points"]).toHaveLength(
+      LARGE_CORPUS_ENTRY_POINT_COUNT,
+    );
   }, 60_000);
 });
 

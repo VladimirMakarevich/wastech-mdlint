@@ -8,24 +8,27 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { compileContext, loadConfiguration } from "@wastech-mdlint/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { assertBuilt } from "../../core/test/support/assert-built.js";
+
 // M4: the only suite in this package that crosses a real OS process boundary. `smoke.test.ts` and
 // `context-slice.test.ts` use `InMemoryTransport`, and every `handle*.test.ts` calls handlers
 // in-process — none of those can catch stdio framing bugs, argv/entrypoint-guard breakage, or
 // stdout/stderr channel confusion. Here a real `StdioClientTransport → node dist/index.js →
 // StdioServerTransport` round trip proves the wire actually works.
 //
-// PRECONDITION: this requires `packages/mcp-server/dist/index.js` to already be built. It is under
-// the documented verification order (`npm run typecheck` is `tsc -b`, which emits before `npm test`
-// runs), but a bare `vitest run` on a never-built checkout will fail to spawn — build first.
+// PRECONDITION: `packages/mcp-server/dist/index.js` must already be built — `assertBuilt` fails fast
+// with the remedy, including the forced-build fallback for the case where `npm run build` cannot clear
+// it (W-56, see `packages/core/test/support/assert-built.ts`). Stating it here as prose instead is what
+// W-56 was: an unbuilt or stale spawn surfaces as a behavioral diff, and the only pointer a reader gets
+// is a command that may have just exited `0`.
 
-const DIST_INDEX = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../dist/index.js",
-);
-const fixturesDir = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "fixtures",
-);
+const testDir = path.dirname(fileURLToPath(import.meta.url));
+const DIST_INDEX = path.resolve(testDir, "../dist/index.js");
+const SRC_INDEX = path.resolve(testDir, "../src/index.ts");
+
+assertBuilt(DIST_INDEX, SRC_INDEX);
+
+const fixturesDir = path.resolve(testDir, "fixtures");
 const graphProject = path.join(fixturesDir, "graph-project");
 const lintFindingsProject = path.join(fixturesDir, "lint-findings-project");
 
@@ -72,10 +75,16 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await client.close();
-  await Promise.all(
-    tempDirs.map((dir) => rm(dir, { recursive: true, force: true })),
-  );
+  // `client?` and try/finally: `client` is assigned at the end of `beforeAll`, so a failing spawn or
+  // handshake leaves it `undefined` and an unguarded `close()` would replace the real failure with a
+  // TypeError while leaking every `mkdtemp` root this suite created.
+  try {
+    await client?.close();
+  } finally {
+    await Promise.all(
+      tempDirs.map((dir) => rm(dir, { recursive: true, force: true })),
+    );
+  }
 });
 
 function structuredOf(

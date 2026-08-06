@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, statSync, symlinkSync } from "node:fs";
+import { chmodSync, existsSync, symlinkSync } from "node:fs";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
+import { assertBuilt } from "../../core/test/support/assert-built.js";
 import {
   EXIT_CODE_FINDINGS,
   EXIT_CODE_SUCCESS,
@@ -37,7 +38,8 @@ import {
 // PRECONDITION: packages/cli's own dist must already be built. True under the documented order
 // (`npm run typecheck` == `tsc -b`, which emits before `npm test` runs) — a bare `vitest run` on a
 // checkout where src/index.ts changed since the last build spawns stale/missing output, so
-// assertBuilt() below fails fast with a clear message.
+// assertBuilt() below fails fast with a clear message. That message, and the mtime heuristic behind
+// it, are shared with the mcp-server twin (W-56): see packages/core/test/support/assert-built.ts.
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -46,22 +48,7 @@ const repoRoot = path.resolve(
 const cliDistIndex = path.join(repoRoot, "packages/cli/dist/index.js");
 const cliSrcIndex = path.join(repoRoot, "packages/cli/src/index.ts");
 
-function assertBuilt(): void {
-  if (!existsSync(cliDistIndex)) {
-    throw new Error(
-      `Expected ${cliDistIndex} to exist. This suite spawns the compiled bin, not the ` +
-        "TypeScript source — run `npm run build` (or `npm run typecheck`, which also emits) first.",
-    );
-  }
-  if (statSync(cliSrcIndex).mtimeMs > statSync(cliDistIndex).mtimeMs) {
-    throw new Error(
-      `${cliDistIndex} is older than ${cliSrcIndex}. This suite spawns the compiled bin, not ` +
-        "the TypeScript source — run `npm run build` (or `npm run typecheck`, which also emits) " +
-        "first.",
-    );
-  }
-}
-assertBuilt();
+assertBuilt(cliDistIndex, cliSrcIndex);
 
 interface Spawned {
   status: number | null;

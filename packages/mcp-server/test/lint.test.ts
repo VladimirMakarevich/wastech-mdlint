@@ -1,11 +1,18 @@
+import { readFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import type { LintMessage } from "@wastech-mdlint/core";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { handleLint } from "../src/tools/lint.js";
+import {
+  lintMessagesAsRows,
+  readLintFindingLines,
+  readLintSummaryLine,
+} from "../../core/test/support/output-parity.js";
 
 // P7.02 exercises the computational layer (`handleLint`) directly — wire-level McpServer testing is
 // deferred to P7.05 — so these assert the structured output / error contract without a transport.
@@ -57,6 +64,41 @@ describe("handleLint", () => {
       "messages",
       "warningCount",
     ]);
+  });
+
+  // @boundary-guard host-parity
+  //
+  // W-57 / P16.01 §5, on the ad-hoc tool: the text block must render exactly the messages
+  // `structuredContent` carries. Worth its own assertion rather than inheriting `lint-files`' — this
+  // tool builds a narrower structured document (no `files`) from the same `LintResult`, and dropping a
+  // field on the way out is precisely the class of defect the reading passes kept missing.
+  it("renders its own structured messages in the text block", () => {
+    const result = handleLint({
+      // Both the `-` and the `line:column` branches of the human formatter, plus both severities.
+      content: "# Title\n\n[broken](does-not-exist-here.md)\n\nmore\nlines\n",
+      rules: [
+        { rule: "REF-001" },
+        { rule: "SIZE-001", options: { lines: { warn: 2 } } },
+      ],
+    });
+
+    expect(result.isError).toBeFalsy();
+    const text = (result.content[0] as { text: string }).text;
+    const output = structured(result);
+    const rows = readLintFindingLines(text);
+
+    expect(rows).toEqual(lintMessagesAsRows(output.messages as LintMessage[]));
+    expect(rows.map((row) => row.location).sort()).toEqual(["-", "3:1"]);
+    // Every row is attributed to the synthetic path, which is the only file name a caller of this tool
+    // ever sees in either document.
+    expect([...new Set(rows.map((row) => row.filePath))]).toEqual([
+      "content.md",
+    ]);
+    expect(readLintSummaryLine(text)).toEqual({
+      total: (output.errorCount as number) + (output.warningCount as number),
+      errors: output.errorCount as number,
+      warnings: output.warningCount as number,
+    });
   });
 
   // W-35: `helpUri` crosses the wire schema, so the value change from a bare rule id to a URL is
@@ -417,5 +459,46 @@ describe("handleLint", () => {
     expect(messages.some((message) => message.ruleId === "REF-001")).toBe(
       false,
     );
+  });
+});
+
+/**
+ * W-58's structural half.
+ *
+ * The behavioral tests above pass whether this handler calls core's `lintContent` or re-assembles the
+ * sequence itself — that is exactly why the duplication survived two review passes. So this asserts
+ * the shape instead: the step primitives are no longer named here, which is what makes "a step added
+ * to the core entry point reaches this tool" true by construction rather than by a differential test
+ * that has to be kept in step with the sequence (`packages/core/test/lint-content.test.ts` holds the
+ * behavioral half, between `lintContent` and `lintFiles`).
+ *
+ * Reading source from a test follows the precedent of `test/tool-context.test.ts`'s seventh-handler
+ * guard and `packages/core/test/boundary-guards.test.ts`.
+ */
+describe("the ad-hoc lint step order lives in core, not in this handler", () => {
+  const source = readFileSync(
+    path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../src/tools/lint.ts",
+    ),
+    "utf8",
+  );
+
+  it("imports the core entry point and none of the steps it composes", () => {
+    expect(source).toContain("lintContent");
+    // `parseDocument` + `runRules` + `createSuppressionChecker` were the hand-assembled sequence.
+    // Asserted as one object so a failure names every primitive that came back, not just the first.
+    const named = Object.fromEntries(
+      ["parseDocument", "runRules", "createSuppressionChecker"].map((step) => [
+        step,
+        source.includes(step),
+      ]),
+    );
+
+    expect(named).toEqual({
+      parseDocument: false,
+      runRules: false,
+      createSuppressionChecker: false,
+    });
   });
 });

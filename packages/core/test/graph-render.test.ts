@@ -16,11 +16,13 @@ import {
 import type { ParsedDocument } from "../src/markdown/document-types.js";
 import { parseDocument } from "../src/markdown/parse-document.js";
 import {
+  LARGE_CORPUS_ENTRY_POINT_COUNT,
   LARGE_CORPUS_EXCLUDED_COUNT,
   LARGE_CORPUS_LARGEST_CLUSTER_SIZE,
   LARGE_CORPUS_LINE_WIDTH_BOUND,
 } from "./support/large-corpus.js";
 import { largeCorpusGraph } from "./support/large-corpus-graph.js";
+import { readHumanSections } from "./support/output-parity.js";
 
 // Mirrors graph-algorithms.test.ts: build real graphs from small inline Markdown maps so these
 // tests stay coupled to the actual edge shape rather than hand-authored ContextGraph literals.
@@ -267,28 +269,45 @@ describe("the renderers at corpus scale", () => {
     expect(members).toBe(LARGE_CORPUS_LARGEST_CLUSTER_SIZE);
   });
 
-  // W-23's parity assertion at the renderer level: one graph, both formats, the same set. The human
-  // section is the source the JSON key had to match, so it is parsed back out of the text rather than
-  // recomputed — a shared `topologicalSort` call would assert nothing about what either format ships.
-  it("carries the same excluded set in the human and JSON formats", () => {
-    const lines = renderContextGraphText(graph).split("\n");
-    const header = lines.indexOf(
-      `excluded from reading order (${LARGE_CORPUS_EXCLUDED_COUNT}):`,
+  // W-23's parity assertion at the renderer level: one graph, both formats, the same sets. The human
+  // sections are the source the JSON keys had to match, so they are parsed back out of the text rather
+  // than recomputed — a shared `topologicalSort` call would assert nothing about what either format
+  // ships.
+  //
+  // P16.01 widened this from the `excluded` set alone to all three of the top-level path sections,
+  // through the shared `readHumanSections` reader: `excluded` was missing from the JSON for three
+  // phases and its two siblings were never compared at all, so checking one of three is how the next
+  // omission stays invisible. The reader also asserts each header's `(N)` against the items under it,
+  // which is a second claim the format makes about itself.
+  //
+  // Three is the whole overlap *as invoked here*: neither call is given a `GraphCoverage`, so no
+  // coverage block is rendered and no `coverage` key is serialized. The fourth section that block
+  // nests, `files outside corpus`, is diffed at the command boundary in `cli/test/graph.e2e.test.ts`,
+  // where the CLI always supplies coverage and the fixture has a file outside the corpus to report.
+  it("carries the same top-level path sections in the human and JSON formats", () => {
+    const sections = readHumanSections(renderContextGraphText(graph));
+    const summary = summarizeContextGraph(graph);
+
+    expect({
+      entryPoints: sections["entry points"],
+      readingOrder: sections["reading order"],
+      excluded: sections["excluded from reading order"],
+    }).toEqual({
+      entryPoints: summary.nodes
+        .filter((node) => node.inDegree === 0)
+        .map((node) => node.path),
+      readingOrder: summary.readingOrder,
+      excluded: summary.excluded,
+    });
+    // Non-vacuous: all three are populated at this corpus size, so a reader that silently returned
+    // nothing would not pass by matching an empty payload.
+    expect(sections["excluded from reading order"]).toHaveLength(
+      LARGE_CORPUS_EXCLUDED_COUNT,
     );
-    expect(header).toBeGreaterThan(-1);
-
-    // Every item of the section is one `  `-indented line; the section ends at the next unindented
-    // line or at the end of the report, which is where it sits when no coverage is supplied.
-    const humanExcluded: string[] = [];
-    for (const line of lines.slice(header + 1)) {
-      if (!line.startsWith("  ")) {
-        break;
-      }
-      humanExcluded.push(line.trim());
-    }
-
-    expect(humanExcluded).toHaveLength(LARGE_CORPUS_EXCLUDED_COUNT);
-    expect(summarizeContextGraph(graph).excluded).toEqual(humanExcluded);
+    expect(sections["entry points"]).toHaveLength(
+      LARGE_CORPUS_ENTRY_POINT_COUNT,
+    );
+    expect(sections["reading order"]!.length).toBeGreaterThan(0);
   });
 
   const digest = (text: string): string =>

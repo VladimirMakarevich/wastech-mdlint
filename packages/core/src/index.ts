@@ -224,6 +224,13 @@ export { runRules } from "./engine/run-rules.js";
 export type { RunRulesContext } from "./engine/run-rules.js";
 export { lintFiles } from "./engine/lint-files.js";
 export type { LintFilesInput, LintResult } from "./engine/lint-files.js";
+// The ad-hoc entry point over the shared step order (W-58), and the only half of that split a host
+// needs: `lintContent` is the MCP `lint` tool's whole body. `lintCorpus` itself stays **unexported**
+// on purpose — its two callers are `lintFiles` and `lintContent`, both inside core, and it takes an
+// already-parsed corpus plus already-resolved rules, which a host has no way to hold without
+// re-assembling the discovery half the split exists to keep in one place.
+export { lintContent } from "./engine/lint-content.js";
+export type { LintContentInput } from "./engine/lint-content.js";
 export { createSuppressionChecker } from "./engine/suppression.js";
 export type { SuppressionChecker } from "./engine/suppression.js";
 export {

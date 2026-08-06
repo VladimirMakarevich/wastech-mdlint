@@ -14,6 +14,7 @@ import {
   LARGE_CORPUS_LINE_WIDTH_BOUND,
   writeLargeCorpus,
 } from "../../core/test/support/large-corpus.js";
+import { readHumanSections } from "../../core/test/support/output-parity.js";
 
 const fixturesDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -211,5 +212,39 @@ describe("handleContextGraph at corpus scale", () => {
       `entry points (${LARGE_CORPUS_ENTRY_POINT_COUNT}):`,
     );
     expect(longest.length).toBeLessThanOrEqual(LARGE_CORPUS_LINE_WIDTH_BOUND);
+  }, 60_000);
+
+  // @boundary-guard host-parity
+  // W-57 / P16.01 §5. This tool returns two documents for one call, and they are deliberately not the
+  // same view: the text block is `formatContextGraphSummary` (nodes/edges/cycles/entry points/hubs)
+  // while `structuredContent` on the `summary` branch is the full `ContextGraphSummary`. What must
+  // hold is that where they overlap they agree — the narrower one being *stale* rather than narrow is
+  // the failure, and reading the code cannot tell those apart.
+  //
+  // `entry points` is the whole overlap, which is itself the finding: the reading order and the set a
+  // cycle excluded from it reach a model only through `structuredContent`. Stated in the tool's own
+  // description, and worth pinning as a decision rather than rediscovering as an omission.
+  it("agrees with its own structured payload on the text block's one path section", async () => {
+    const result = await handleContextGraph({ cwd: root, format: "summary" });
+
+    expect(result.isError).toBeFalsy();
+    const text = result.content
+      .map((block) => (block as { text?: string }).text ?? "")
+      .join("");
+    const summary = result.structuredContent as unknown as ContextGraphSummary;
+    const sections = readHumanSections(text);
+
+    expect(sections["entry points"]).toEqual(
+      summary.nodes
+        .filter((node) => node.inDegree === 0)
+        .map((node) => node.path),
+    );
+    expect(sections["entry points"]).toHaveLength(
+      LARGE_CORPUS_ENTRY_POINT_COUNT,
+    );
+    // The overlap is exactly one section: everything else the structured payload carries is absent
+    // from the text, so a caller that reads only `content` sees no reading order at all.
+    expect(Object.keys(sections)).toEqual(["entry points"]);
+    expect(summary.excluded.length).toBeGreaterThan(0);
   }, 60_000);
 });
