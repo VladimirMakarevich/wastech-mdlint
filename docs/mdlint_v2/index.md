@@ -380,6 +380,8 @@ Recommended milestones:
 - Incremental/cached graph rebuilds.
 - Runtime TypeScript config files.
 
+Work that is shaped and measured but deliberately not scheduled lives in [`backlog/`](backlog/index.md), one file per item, with the rule for what goes in and how an item leaves stated there. It is not this list: out of scope means "not this product version", backlog means "decided, costed, waiting".
+
 ---
 
 ## 10. Next steps

@@ -1,6 +1,6 @@
 # Phase P18 — Follow-up burn-down
 
-> Roadmap: [v2 Index](../index.md) · Phase **P18** · Size **M** · Status **In progress** · Depends on [P17](../P17-plan-of-record/index.md) (the plan of record now describes what shipped).
+> Roadmap: [v2 Index](../index.md) · Phase **P18** · Size **M** · Status **Done** · Depends on [P17](../P17-plan-of-record/index.md) (the plan of record now describes what shipped).
 >
 > **Goal:** close the small defects the P13–P17 rounds recorded rather than fixed, and put the ones verification already closed on the record so nobody re-opens them. Sourced from the orchestrator's accumulated follow-up file, triaged on 2026-08-07.
 
@@ -30,10 +30,12 @@ Twenty finished orchestrator tasks (`p13-01` … `p17-04`) each appended their u
 | [P18.05](05-doc-claims.md) | Three surviving documentation over-claims | FU-37, FU-45, FU-48 | Medium | S | P18.01 |
 | [P18.06](06-plan-residue.md) | Plan-of-record residue P17 left behind | FU-54, FU-56, FU-61, FU-62 | Low | S | — |
 | [P18.07](07-dependency-register-audit.md) | Trace the remaining dependency-register entries | FU-71 | Medium | M | — |
-| [P18.08](08-excluded-reason-attribution.md) | Per-node reason for the graph's excluded set | FU-72 | Low | M–L | — |
+| P18.08 | The graph's excluded set says which cause, by count | FU-72 | Low | S | — |
 | [P18.09](09-doc-citation-guard.md) | A guard against docs citing APIs that do not exist | FU-73 | Medium | M | P18.02 |
 
 **Sequence.** [P18.01](01-compile-renderers.md) and [P18.02](02-code-fixes.md) first, because the test pins in [P18.03](03-core-test-pins.md)/[P18.04](04-host-test-pins.md) pin the corrected behavior and [P18.05](05-doc-claims.md) describes it. [P18.06](06-plan-residue.md) touches only plan documents and can run at any point. The three spun-out tasks are independent of the burn-down; [P18.09](09-doc-citation-guard.md) comes last of them so it runs against a tree whose citations are already correct.
+
+**P18.08 has no task file, and that is its outcome.** Measuring it first changed what it was: on this repository one two-document mutual link excludes 230 of 231 nodes, and **two** of those 230 are the cycle — the flat list is ~99% consequence. So the task split. The cheap half, a count line above the excluded list naming how many fall under each of the two causes, shipped here; the expensive half — per-node attribution across four surfaces, one of them a byte contract — moved to [`backlog/`](../backlog/excluded-reason-attribution.md) with the measurement in it. The brittleness the measurement exposed is now a [register row](../accepted-behaviors.md) of its own, since a reading order that one ordinary mutual link can empty — and that `GRP-001` will not warn about — is a property users hit and nothing stated.
 
 ## Progress
 
@@ -45,9 +47,11 @@ Twenty finished orchestrator tasks (`p13-01` … `p17-04`) each appended their u
 | [P18.04](04-host-test-pins.md) | **Done** | FU-24 … FU-33, FU-75 |
 | [P18.05](05-doc-claims.md) | **Done** | FU-45, FU-48 (FU-37 closed on arrival) |
 | [P18.06](06-plan-residue.md) | **Done** | FU-54, FU-56, FU-61, FU-62 |
-| [P18.07](07-dependency-register-audit.md) … [P18.09](09-doc-citation-guard.md) | Not started | — |
+| [P18.09](09-doc-citation-guard.md) | **Done** | FU-73 |
+| [P18.07](07-dependency-register-audit.md) | **Done** | FU-71 |
+| P18.08 | **Done** (split — see below) | FU-72 |
 
-**37 of the 40 live items are closed, 3 remain — the six burn-down tasks are done, and what is left is the three spun-out ones.** Four of them turned out not to be defects at all. FU-02 and FU-21 were behaviors already decided and registered, which the triage read as live because it checked the source and not the register. FU-37 was already fixed, by the docs pass of a round that never saw the follow-up — the same sweep that had closed 35 items before triage, still running. FU-19 was the same lesson inverted: it asked for a test pinning `**/.*/**` in the lint-time default exclude, a glob [P14.03](../P14-host-boundary/03-init-disclosure.md) had removed a phase after the item was recorded, so writing the step as prescribed would have asserted the opposite of what ships — it was closed by pinning the surviving half, the missing end-to-end coverage, against the _current_ default. So: **an item that still reproduces may be a documented decision, and an item that no longer reproduces may still name a real gap.** The register and the owning task's implementation notes are part of verifying one, not just the tree, and the follow-up file carries no dates or status to tell an item recorded before a decision from one recorded after it.
+**All 40 live items are closed.** Four of them turned out not to be defects at all. FU-02 and FU-21 were behaviors already decided and registered, which the triage read as live because it checked the source and not the register. FU-37 was already fixed, by the docs pass of a round that never saw the follow-up — the same sweep that had closed 35 items before triage, still running. FU-19 was the same lesson inverted: it asked for a test pinning `**/.*/**` in the lint-time default exclude, a glob [P14.03](../P14-host-boundary/03-init-disclosure.md) had removed a phase after the item was recorded, so writing the step as prescribed would have asserted the opposite of what ships — it was closed by pinning the surviving half, the missing end-to-end coverage, against the _current_ default. So: **an item that still reproduces may be a documented decision, and an item that no longer reproduces may still name a real gap.** The register and the owning task's implementation notes are part of verifying one, not just the tree, and the follow-up file carries no dates or status to tell an item recorded before a decision from one recorded after it.
 
 ## Closed on arrival — do not re-open
 

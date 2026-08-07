@@ -45,6 +45,18 @@ Rules for keeping this honest:
 - Adding a category here means adding it to that inventory too, and vice versa. Be aware which half of that pairing a test can hold: the inventory pins its own category set, so growing it fails until the author updates that list — which points back at this table — but the inventory does not parse this file, so a row added here alone fails nothing. Keeping this table honest is discipline, not enforcement, and it is the direction in which the table could start claiming coverage the tree no longer has.
 - Behaviors a task decides to accept rather than guard belong in the [accepted behaviors register](../../docs/mdlint_v2/accepted-behaviors.md), not in an untested gap.
 
+## Guards over the repository's own documents
+
+Three suites read this repository's Markdown rather than a fixture, and each answers a question no product test can. They are not process-boundary guards — the five categories above are a closed set about the process boundary — but they follow the same rule: a document that drifts fails a test rather than being noticed a phase later.
+
+| Guard | What it proves |
+| --- | --- |
+| `packages/core/test/docs-sync.test.ts` | Generated documentation (the README rule table, the schema) still matches what the registry declares. |
+| `packages/core/test/plan-completion-surface.test.ts` | A phase index's status is the one its task files add up to, and no `Done` file leaves an open checkbox. Status is read from the header blockquote only, so a prose quotation cannot supply one. |
+| `packages/core/test/doc-citations.test.ts` | A precedence-tier document does not cite a function, export or constant that is absent from `packages/*/src`. Scoped to `docs/mdlint_v2/decisions/` and `docs/mdlint_v2/requirements/`; a document joins that corpus once a run over it already reports zero, the same way a rule joins the self-lint config. Citations that name something absent on purpose live in one allowlist and each carry a reason. |
+
+`npm run lint:docs` is the fourth, and the only one outside Vitest: it runs this tool over its own docs corpus and catches a broken link or anchor.
+
 ## Cross-Platform Expectations
 
 - Treat Windows, macOS, and Linux support as a product requirement for `core`, `cli`, and `mcp-server`, not an optional extra.
