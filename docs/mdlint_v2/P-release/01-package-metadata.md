@@ -14,7 +14,7 @@ Make every package correctly publishable, building on the [P0.07 baseline](../P0
 
 ## Deliverables / steps
 
-1. **Verify** per-package `package.json` — most of this shipped in P0/P3, so this is an audit, not fresh authoring. Already in place across all three: `engines.node: ">=24.17.0"` (no upper bound), `publishConfig: { access: "public", provenance: true }`, the `bin` names (`wastech-mdlint` on `cli`, `wastech-mdlint-mcp` on `mcp-server`), and `files` allowlists. Library `exports` (+ types) applies to **`core` only** — `cli`/`mcp-server` are bin-only apps and correctly ship no `exports` map. Confirm/add any metadata the P7/P8 surface introduced.
+1. **Verify** per-package `package.json` — most of this shipped in P0/P3, so this is an audit, not fresh authoring. Already in place across all three: `engines.node: ">=24.17.0"` (no upper bound), `publishConfig: { access: "public", provenance: true }`, the `bin` names (`wastech-mdlint` on `cli`, `wastech-mdlint-mcp` on `mcp-server`), and `files` allowlists. Library `exports` (+ types) applies to **`core` only** — `cli`/`mcp-server` are bin-only apps and correctly ship no `exports` map. Also verify the three fields this list omitted until [P16.02](../P16-release-readiness/02-package-metadata.md) delivered them: a per-package `README.md`, MIT `LICENSE` text in the payload, and `repository` with the package's `directory` subpath. Their omission here is how F-04 (W-29) went unnoticed, so they are audited as part of this step rather than assumed. Confirm/add any metadata the P7/P8 surface introduced.
 2. Internal deps are exact literal pins (`"@wastech-mdlint/core": "0.0.0"`, the npm-workspaces convention — there is **no** `workspace:*` protocol here, so nothing "resolves on publish"). The release tool ([PR.02](02-single-tag-release.md)) must bump each package version **and every internal `@wastech-mdlint/*` dependency pin** to the same `vX.Y.Z` in one atomic change, so published `cli`/`mcp-server` depend on the published `core`, not a stale `0.0.0`.
 3. Confirm the generated `schema.json` still ships in `cli`'s `files` (already listed) so editor `$schema` resolution works from the installed package ([C9](../requirements/01-configuration.md)).
 4. `npm pack --dry-run` per package: confirm `dist` (+ `cli`'s `schema.json`) is present and no dev/test files leak.
@@ -26,6 +26,7 @@ Make every package correctly publishable, building on the [P0.07 baseline](../P0
 ## Exit criteria
 
 - [ ] All three packages' publish metadata + provenance verified (`core` has `exports`; `cli`/`mcp-server` are bin-only, no `exports`).
+- [ ] Every tarball carries a per-package `README.md` and readable MIT `LICENSE` text, and every manifest declares `repository` with its own `directory` — **delivered by [P16.02](../P16-release-readiness/02-package-metadata.md)** and asserted by `packages/core/test/package-payload.test.ts`, so this criterion is measured by running the gate rather than re-tracked here.
 - [ ] Package version + internal `@wastech-mdlint/*` pins bump in lockstep — no stale `0.0.0` dependency ships.
 - [ ] `npm pack --dry-run` clean per package; `cli` ships `schema.json`.
 
