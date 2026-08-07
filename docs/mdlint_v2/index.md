@@ -2,13 +2,13 @@
 
 > **Status:** Draft for review · **Owner:** TBD · **Created:** 2026-06-21
 >
-> This document is the top-level roadmap for turning the current single-package implementation into the production-ready target product. It defines the gap, the target architecture, the phased plan, and the decisions we confirmed before deep work. Each phase has its own detailed folder under `docs/mdlint_v2/` (meta `index.md` + numbered task files), the same way [docs/plan/](../plan/00-meta-plan.md) broke v1 into 16 tasks.
+> This document is the top-level roadmap for turning the current single-package implementation into the production-ready target product. It defines the gap, the target architecture, the phased plan, and the decisions we confirmed before deep work. Each phase has its own detailed folder under `docs/mdlint_v2/` (meta `index.md` + numbered task files).
 
 ---
 
 ## 1. TL;DR
 
-The current implementation ([PLAN.md](../PLAN.md)) shipped a **single-package CLI** with two commands (`scan`, `graph`) and five hardcoded checks (size, broken links, orphan docs, eager imports, context budget). It is clean and well-factored, but its config model and rule model are **fundamentally different** from the target product.
+The current implementation — v1, described by a root `PLAN.md` that was deleted in `957a1ca` and is recoverable from git history — shipped a **single-package CLI** with two commands (`scan`, `graph`) and five hardcoded checks (size, broken links, orphan docs, eager imports, context budget). It is clean and well-factored, but its config model and rule model are **fundamentally different** from the target product.
 
 The target is a substantially larger product (**`wastech-mdlint`**):
 
@@ -235,7 +235,7 @@ Each phase is an epic detailed in its own folder (meta `index.md` + numbered tas
 
 ### Phase 11 — Post-P9 audit remediation (code) · `M–L` · depends on: P10 · reuse: n/a
 
-**Goal:** close the code-level **release-blocking**, **security**, **correctness**, and **data-loss** defects from the [post-P9 audit](audit-2026-07-25-post-p9.md) and the confirmed rule defects from the [`p9-09` deep audit](../research/p9-09-full-solution-deep-audit/report.md). See [P11 tasks](P11-remediation/index.md).
+**Goal:** close the code-level **release-blocking**, **security**, **correctness**, and **data-loss** defects from the [post-P9 audit](audit-2026-07-25-post-p9.md) and the confirmed rule defects from the `p9-09` deep audit, whose report was removed from the tree in `d96b64c`. See [P11 tasks](P11-remediation/index.md).
 
 - Two **release-blockers first**: the CLI `bin` no-op through the npm symlink (H-1) and `SEC-003` reading files outside the analyzed root (H-2).
 - `init` data-loss guards: bounded `findConfig` walk-up (H-3) and an existing-`schema.json` guard (H-4).

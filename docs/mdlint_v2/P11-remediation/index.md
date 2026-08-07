@@ -2,7 +2,7 @@
 
 > Roadmap: [v2 Index](../index.md) · Phase **P11** · Size **M–L** · Status **Not started** · Depends on [P10](../P10-consistency/index.md) (first-audit consistency landed).
 >
-> **Goal:** close the code-level **release-blocking**, **security**, **correctness**, and **data-loss** defects surfaced by the [post-P9 audit](../audit-2026-07-25-post-p9.md) and the confirmed rule defects from the [`p9-09` deep audit](../../research/p9-09-full-solution-deep-audit/report.md) — before the product is packaged for release. Every task here maps to a HIGH/MEDIUM (or a code-level LOW) finding from those two reports. [P12](../P12-consistency/index.md) handles the coverage/docs/accepted-behavior findings.
+> **Goal:** close the code-level **release-blocking**, **security**, **correctness**, and **data-loss** defects surfaced by the [post-P9 audit](../audit-2026-07-25-post-p9.md) and the confirmed rule defects from the `p9-09` deep audit — before the product is packaged for release. Every task here maps to a HIGH/MEDIUM (or a code-level LOW) finding from those two reports. [P12](../P12-consistency/index.md) handles the coverage/docs/accepted-behavior findings.
 
 ## Why this phase exists
 
@@ -29,7 +29,7 @@ The audit's [§4](../audit-2026-07-25-post-p9.md) reframes several findings as *
 | [P11.13](13-grp-size-hygiene.md) | Retire dead `GRP` options; collapse duplicate `SIZE-001` | SC-1, SC-2 | LOW | S | P10 |
 | [P11.14](14-init-cli-lows.md) | `init`-scan honesty + CLI-plumbing micro-fixes | L-7…L-11 | LOW | S–M | P11.08 |
 
-> **Finding key.** `H-*`/`M-*`/`L-*` are from the [post-P9 audit](../audit-2026-07-25-post-p9.md); `BL-*`/`TP-*`/`SC-*` are the confirmed defects from the [`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md). `OG-1` and `SC-3` from `p9-09` are decisions/documentation and live in [P12](../P12-consistency/index.md).
+> **Finding key.** `H-*`/`M-*`/`L-*` are from the [post-P9 audit](../audit-2026-07-25-post-p9.md); `BL-*`/`TP-*`/`SC-*` are the confirmed defects from the `p9-09` report, which was removed from the tree in `d96b64c` — each task file restates the finding it closes, so the evidence stays reachable without it. `OG-1` and `SC-3` from `p9-09` are decisions/documentation and live in [P12](../P12-consistency/index.md).
 
 ## Sequence
 
@@ -47,7 +47,7 @@ The audit's [§4](../audit-2026-07-25-post-p9.md) reframes several findings as *
 
 ## Execution note
 
-The two release-blockers are already staged as runnable orchestrator tasks: [`tasks/pending/p11-01-cli-bin-noop.md`](../../../tasks/pending/p11-01-cli-bin-noop.md) (P11.01) and [`tasks/pending/p11-02-sec003-path-escape.md`](../../../tasks/pending/p11-02-sec003-path-escape.md) (P11.02). Promote the remaining tasks per-task via the `worc-task` flow as execution starts; keep the orchestrator task and its phase file in sync.
+The two release-blockers were staged as runnable orchestrator tasks — `tasks/pending/p11-01-cli-bin-noop.md` (P11.01) and `tasks/pending/p11-02-sec003-path-escape.md` (P11.02) — and both have landed. `tasks/` is gitignored, so those files are not part of a clone and cannot be linked to from here. The remaining tasks were promoted per-task via the `worc-task` flow, keeping each orchestrator task and its phase file in sync.
 
 ## Phase exit criteria
 

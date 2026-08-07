@@ -2,7 +2,7 @@
 
 > Roadmap: [v2 Index](../index.md) · Phase **P12** · Size **S–M** · Status **Not started** · Depends on [P11](../P11-remediation/index.md) (code remediation landed).
 >
-> **Goal:** close the **test-boundary**, **performance**, **docs-vs-code**, and **decision** findings from the [post-P9 audit](../audit-2026-07-25-post-p9.md) and the [`p9-09` deep audit](../../research/p9-09-full-solution-deep-audit/report.md), so the coverage and the words describe the _current_ product — and so the class of defect that let P11's findings ship cannot recur silently. [P11](../P11-remediation/index.md) fixed the behavior; this phase hardens the tests and reconciles the contracts.
+> **Goal:** close the **test-boundary**, **performance**, **docs-vs-code**, and **decision** findings from the [post-P9 audit](../audit-2026-07-25-post-p9.md) and the `p9-09` deep audit, so the coverage and the words describe the _current_ product — and so the class of defect that let P11's findings ship cannot recur silently. [P11](../P11-remediation/index.md) fixed the behavior; this phase hardens the tests and reconciles the contracts.
 
 ## Why this phase exists
 
@@ -19,7 +19,7 @@ The post-P9 audit's [§4](../audit-2026-07-25-post-p9.md) traces the missed defe
 | [P12.05](05-recursion-depth.md) | Recursive DFS depth — document the bound or guard it | SC-3 | LOW | S | P11 |
 | [P12.06](06-process-boundary-tests.md) | Process-boundary test guards + format-gate publish process | §4, §1 | LOW | S–M | P11.01 |
 
-> **Finding key.** `L-*` are from the [post-P9 audit](../audit-2026-07-25-post-p9.md); `OG-1`/`SC-3` are the two "needs-confirmation" items from the [`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md) (Open questions) — recorded here as maintainer decisions, not asserted defects.
+> **Finding key.** `L-*` are from the [post-P9 audit](../audit-2026-07-25-post-p9.md); `OG-1`/`SC-3` are the two "needs-confirmation" items from the `p9-09` report (Open questions), which was removed from the tree in `d96b64c` — each task file restates the item it closes, so the evidence stays reachable without it. Both are recorded here as maintainer decisions, not asserted defects.
 
 ## Sequence
 

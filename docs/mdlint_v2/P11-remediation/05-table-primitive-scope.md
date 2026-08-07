@@ -1,6 +1,6 @@
 # P11.05 · Table primitives — honor `exclude`, use stateless `g`/`y` regex
 
-> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Done**. Findings **M-2** ([post-P9 audit](../audit-2026-07-25-post-p9.md)) and **TP-1** ([`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md)).
+> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Done**. Findings **M-2** ([post-P9 audit](../audit-2026-07-25-post-p9.md)) and **TP-1** from the `p9-09` deep audit, whose report was removed from the tree in `d96b64c`. The [post-P9 audit](../audit-2026-07-25-post-p9.md) corroborates that TP-1 is the only instance of its class — the other module-level `g` regexes are consumed through `matchAll`, which does not share `lastIndex` — but it does not restate the defect, so the Problem section below is TP-1's record.
 
 ## Goal
 

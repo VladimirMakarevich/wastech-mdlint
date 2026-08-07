@@ -41,7 +41,7 @@ Two of these sit in the **precedence tiers a contributor is told to obey** rathe
 
 ## Phase exit criteria
 
-- [ ] The 11 citations of the deleted report are repointed and the four `tasks/pending/` links dropped or re-targeted; `PLAN.md`/`docs/plan/` references are gone (W-43, W-44).
+- [x] The 11 citations of the deleted report are repointed and the four `tasks/pending/` links dropped or re-targeted; `PLAN.md`/`docs/plan/` references are gone (W-43, W-44).
 - [ ] CI fails on a dead link inside `docs/`, run by the product's own `REF-001` against a repository configuration that exists (W-53).
 - [ ] The enforced ADR's three nonexistent API names are corrected and its synchronicity clause replaced with the real constraint; the glossary's **LSP server** and **Async rules** entries say which layer they mean, and the register residual recording the ADR's divergence is deleted (W-41).
 - [ ] Decision entry 4.2 is narrowed to what shipped, and 4.3 agrees with the barrel comment that cites it (W-47).

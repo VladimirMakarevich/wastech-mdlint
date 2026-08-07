@@ -36,7 +36,7 @@ When documents disagree, use this precedence:
 
 If a contradiction changes implementation behavior, surface it explicitly instead of guessing.
 
-Historical v1 planning remains in `PLAN.md` and `docs/plan/`, but it is background context only when it conflicts with `docs/mdlint_v2/`.
+Historical v1 planning is no longer in the tree: `PLAN.md` was deleted in `957a1ca` and is recoverable from git history, and `docs/plan/` was never tracked at all. Either way it is background context only when it conflicts with `docs/mdlint_v2/`.
 
 ## Architecture Invariants
 

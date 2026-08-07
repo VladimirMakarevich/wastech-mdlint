@@ -1,6 +1,6 @@
 # P11.12 · `STR-001` filesystem reach vs corpus-only (+ guide)
 
-> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Done**. Finding **BL-1** ([`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md), Medium, confirmed).
+> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Done**. Finding **BL-1** (Medium, confirmed) from the `p9-09` deep audit, whose report was removed from the tree in `d96b64c`. Neither surviving audit restates it, so the Problem section below is its record.
 
 ## Goal
 
