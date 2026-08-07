@@ -32,7 +32,8 @@ Some tasks ship prose, not code — a skill/agent doc, a README section, a doc p
 - Prefer rationale, invariants, tradeoffs, cross-platform notes, and bug-prevention context over narrating what the syntax already says.
 - Do not add comments that merely restate names, types, assignments, loops, or conditionals.
 - When behavior is non-obvious or surprising, capture that reason next to the relevant code path.
-- If a block is hard to justify with a short why-comment, simplify or restructure it until the intent and rationale are clear.{?memory_path}
+- If a block is hard to justify with a short why-comment, simplify or restructure it until the intent and rationale are clear.
+- **Every comment must stand on its own.** Do not tag a comment with a phase, task, backlog, finding, audit, or ticket id, and do not point it at a documentation file, plan, decision page, or rules doc — as a path, a link, a section title, or a "see ..." aside. Those documents get superseded, archived, and deleted, and the comment is then a dangling pointer where a reason used to be. Write the reason itself into the comment instead — the constraint, the decision, the rejected alternative, the failure this shape prevents — at whatever length it takes. The check: strike every reference out; if what remains no longer explains the code, the comment is not finished. This applies to comments in any non-prose file, not only source: JSONC, `#`-comments in dotfiles, YAML in CI workflows, and JSDoc all count. Two things stay allowed — naming another source file or symbol (state the fact first, so a rename does not empty the comment), and a marker something actually parses, such as a test-harness tag or a linter directive.{?memory_path}
 
 ## Repository Memory
 
