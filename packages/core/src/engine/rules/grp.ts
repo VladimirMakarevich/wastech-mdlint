@@ -6,13 +6,13 @@ import { defineRule, type RuleDefinition } from "../registry.js";
 import { regexStringSchema } from "../regex.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
 
-// Graph-integrity rules (P3.06). GRP-001/002 read the injected ContextGraph (audit 2.2) — no local
+// Graph-integrity rules. GRP-001/002 read the injected ContextGraph — no local
 // adjacency. GRP-003 is graph-independent (walks chain columns).
 
 // Distinct nodes a cycle must span before GRP-001 reports it. See the rationale above `grp001`.
 export const DEFAULT_GRP001_MIN_CYCLE_LENGTH = 3;
 
-// The document names that are entry points unless the config says otherwise (W-05). Slash-free by
+// The document names that are entry points unless the config says otherwise. Slash-free by
 // design: `normalizeConfigGlob` rewrites each to `**/<name>`, so a per-package `AGENTS.md` or a
 // `docs/README.md` is exempt at any depth, not only at the repository root. Root-anchoring these
 // would reproduce the defect for every repository that keeps its roots in subdirectories.
@@ -23,16 +23,16 @@ export const DEFAULT_GRP002_ENTRY_POINTS = [
   "index.md",
 ] as const;
 
-// GRP-001 — no circular references. Reads the graph's explicit cycle list (G6).
+// GRP-001 — no circular references. Reads the graph's explicit cycle list.
 //
-// `minCycleLength` is the one wireable option, and the distinction from the keys [P11.13] removed is
+// `minCycleLength` is the one wireable option, and the distinction from the keys removed is
 // what makes it so: `files`/`exclude`/`siteRouter` had to reach `buildContextGraph` to mean anything,
 // and cannot — the graph is corpus-wide and a resolved rule's options are closed over before the
-// orchestrator builds it ([P4.06]) — so they validated into a no-op. This key filters the rule's *own*
+// orchestrator builds it — so they validated into a no-op. This key filters the rule's *own*
 // findings after the fact, which needs nothing from the builder. Narrowing what cycle detection sees
 // still requires a graph-scoping design, not a schema key.
 //
-// The default of 3 excludes two-document mutual links (W-07). A README indexing its siblings while a
+// The default of 3 excludes two-document mutual links. A README indexing its siblings while a
 // sibling links back is a deliberate, recognizable documentation shape, and at `error` severity it
 // failed the build — whose likely answer is disabling GRP-001 outright, forfeiting the genuine multi-hop
 // cycles it also finds. Severity stays `error` because a 3+-hop cycle is worth failing on. Mutual eager
@@ -72,7 +72,7 @@ export const grp001: RuleDefinition = defineRule({
         continue;
       }
       const first = cycle[0]!;
-      // Attribute to the first arc (audit): the edge from cycle[0] to cycle[1].
+      // Attribute to the first arc: the edge from cycle[0] to cycle[1].
       const firstArc = graph.edges.find(
         (edge) => edge.from === first && edge.to === cycle[1],
       );
@@ -88,11 +88,11 @@ export const grp001: RuleDefinition = defineRule({
 
 // GRP-002 — every document has ≥1 incoming reference, except declared entry points. `files`/`exclude`
 // are honored below as *reporting* scope (an out-of-scope file still contributes its outgoing edges);
-// `siteRouter` was removed with GRP-001's dead keys ([P11.13]) since the shared graph already resolves
+// `siteRouter` was removed with GRP-001's dead keys since the shared graph already resolves
 // routes from `settings.siteRouter`.
 //
-// A user `entryPoints` **replaces** the default rather than extending it (W-05) — deliberately unlike
-// P13.02's extend semantics for the top-level `exclude`. There, dropping a default silently re-opened
+// A user `entryPoints` **replaces** the default rather than extending it — deliberately unlike the
+// top-level `exclude`, which extends. There, dropping a default silently re-opened
 // `node_modules`, which is the blocker that key exists to prevent; here the value is a list of roots
 // the author knows, and extending would make "do not exempt README.md" inexpressible.
 export const grp002: RuleDefinition = defineRule({
@@ -130,7 +130,7 @@ export const grp002: RuleDefinition = defineRule({
       }
       context.report({
         // Name the option that performs the exemption, not just the outcome: a reader told to "mark it
-        // an entry point" had no way to learn from the finding which key does that (W-05).
+        // an entry point" had no way to learn from the finding which key does that.
         message: `${node.path} has no incoming references; link it from another document or add it to GRP-002's \`entryPoints\`.`,
         line: 0,
         filePath: node.path,

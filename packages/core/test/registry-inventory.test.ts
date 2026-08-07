@@ -24,7 +24,7 @@ const RULE_DOCS_DIR = path.resolve(
 // The documented shipped inventory (README rule table / glossary). Asserted here, against the
 // *real* `BUILTIN_RULE_DEFINITIONS`, so a dropped/renamed/re-categorized rule fails this one test
 // instead of relying on a rule's own (deletable) `*.test.ts` or the self-referential schema/README
-// sync tests, which regenerate from the same registry and so stay green through a drop (audit L-12).
+// sync tests, which regenerate from the same registry and so stay green through a drop.
 const EXPECTED: Record<string, { scope: RuleScope; severity: Severity }> = {
   "TBL-001": { scope: "document", severity: "error" },
   "TBL-002": { scope: "document", severity: "warning" },
@@ -63,7 +63,7 @@ const EXPECTED_CATEGORIES = [
   "TBL",
 ].sort(compareStrings);
 
-describe("BUILTIN_RULE_DEFINITIONS inventory (L-12)", () => {
+describe("BUILTIN_RULE_DEFINITIONS inventory", () => {
   it("ships exactly the documented 24 rule ids", () => {
     const ids = BUILTIN_RULE_DEFINITIONS.map(
       (definition) => definition.metadata.id,
@@ -102,10 +102,10 @@ describe("BUILTIN_RULE_DEFINITIONS inventory (L-12)", () => {
   });
 });
 
-// W-35/W-36: `docsUrl` is what makes a finding's `helpUri` a link instead of a restatement of
+// `docsUrl` is what makes a finding's `helpUri` a link instead of a restatement of
 // `ruleId`, so "the URL resolves" is the property that has to hold — a page renamed or a rule added
 // without one turns every one of its findings' `helpUri` into a 404 that nothing else would catch.
-describe("rule documentation URLs (W-35/W-36)", () => {
+describe("rule documentation URLs", () => {
   it("derives every built-in's docsUrl from its id by convention", () => {
     for (const { metadata } of BUILTIN_RULE_DEFINITIONS) {
       expect(metadata.docsUrl).toBe(ruleDocsUrl(metadata.id));
@@ -132,7 +132,7 @@ describe("rule documentation URLs (W-35/W-36)", () => {
     ).toBe(true);
   });
 
-  // P15.03 dropped `messages` (R6's other vacuous field: declared at one line, set by no rule, read
+  // `messages` was dropped as a vacuous field (declared at one line, set by no rule, read
   // by no generator). Asserted at runtime rather than as a `satisfies` constraint because no tsconfig
   // includes `test/**`, so a type-level guard here would never be checked.
   it("declares exactly the metadata fields something reads (no vacuous `messages`)", () => {
@@ -177,10 +177,10 @@ const LINK_TARGET_EXCLUDE = ["REF-001", "REF-003"].sort(compareStrings);
 
 // @boundary-guard shared-exclude
 //
-// Audit L-4: `exclude` shipped with zero end-to-end coverage, which is how M-2 (`columnUnique`
+// `exclude` shipped with zero end-to-end coverage, which is how the unscoped `columnUnique`
 // ignoring it) survived. This inventory is the drift guard — a new rule that mixes in
 // `fileScopeShape` fails here until its family test file gains an `exclude` case.
-describe("file-scope option inventory (L-4)", () => {
+describe("file-scope option inventory", () => {
   // Read the declared option keys the same way `generateConfigSchema` does (`engine/schema.ts`), so
   // this agrees with the shipped `schema.json` rather than with a second reading of the Zod objects.
   function optionKeys(schema: z.ZodType): Set<string> {
@@ -211,7 +211,7 @@ describe("file-scope option inventory (L-4)", () => {
   });
 
   // STR-001's `files` is the *required-file set* it checks for, not a scope filter — so it must
-  // never grow an `exclude` (P11.12). LLM-001 and the remaining GRP/REF rules are whole-corpus by
+  // never grow an `exclude`. LLM-001 and the remaining GRP/REF rules are whole-corpus by
   // construction and take neither key.
   it("keeps STR-001's `files` a required-file set with no `exclude` beside it", () => {
     expect(

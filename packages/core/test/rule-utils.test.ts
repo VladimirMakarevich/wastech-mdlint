@@ -15,7 +15,7 @@ import { escapeRegExp, regexStringSchema } from "../src/engine/regex.js";
 import { resolveRoutedUrl } from "../src/engine/site-router.js";
 import { parseDocument } from "../src/markdown/parse-document.js";
 
-describe("matchesFileScope (glob-match, R7)", () => {
+describe("matchesFileScope (glob-match)", () => {
   it("includes matching files and lets exclude win", () => {
     expect(matchesFileScope("docs/a.md", { files: ["docs/**"] })).toBe(true);
     expect(matchesFileScope("src/a.md", { files: ["docs/**"] })).toBe(false);
@@ -34,10 +34,10 @@ describe("matchesFileScope (glob-match, R7)", () => {
   });
 });
 
-// W-01 (audit F1). The absence of an ordered-negation case here is what let the shared matcher ship
+// The absence of an ordered-negation case here is what let the shared matcher ship
 // with `isMatch(input, patterns)`, a first-truthy OR in which a `!` entry compiles to an *inverting*
-// matcher — so every one of these expectations was the opposite before P13.01.
-describe("matchesConfigGlob ordered negation (W-01)", () => {
+// matcher — so every one of these expectations was the opposite before ordered negation landed.
+describe("matchesConfigGlob ordered negation", () => {
   it("subtracts a negated entry from a top-level include", () => {
     const include = ["docs/**", "!docs/private/**"];
 
@@ -155,9 +155,9 @@ describe("matchesConfigGlob ordered negation (W-01)", () => {
   });
 });
 
-// W-03 (field F-14). The anchoring rule is now stated for users in `docs/guide/configuration.md`;
+// The anchoring rule is stated for users in the configuration guide;
 // these pin the four shapes that document answers, so the prose cannot drift from the matcher.
-describe("matchesConfigGlob anchoring (W-03)", () => {
+describe("matchesConfigGlob anchoring", () => {
   it("matches a slash-free pattern at any depth", () => {
     expect(matchesConfigGlob("NOTE.md", ["NOTE.md"])).toBe(true);
     expect(matchesConfigGlob("docs/NOTE.md", ["NOTE.md"])).toBe(true);
@@ -191,7 +191,7 @@ describe("matchesConfigGlob anchoring (W-03)", () => {
 describe("isGlobPattern", () => {
   it("classifies plain paths as literals", () => {
     // These are the shapes STR-001 must pin to one location: misclassifying any of them as a glob
-    // would send it back to the corpus-only branch and re-open BL-1 for that entry.
+    // would send it back to the corpus-only branch, so a required `LICENSE` would report missing again.
     expect(isGlobPattern("README.md")).toBe(false);
     expect(isGlobPattern("LICENSE")).toBe(false);
     expect(isGlobPattern("docs/index.md")).toBe(false);

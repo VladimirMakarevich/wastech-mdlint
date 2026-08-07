@@ -1,7 +1,7 @@
 import { ruleRegistry } from "./rules/index.js";
 
-// Generated README rule table (R6 / P3.09). One metadata source drives the registry, schema.json,
-// AND this table — so docs never drift. Includes the per-rule fixable column (audit 4.2), whose
+// Generated README rule table. One metadata source drives the registry, schema.json,
+// AND this table — so docs never drift. Includes the per-rule fixable column, whose
 // `yes` set is exactly the deterministic-fixable subset (SEC-001 scaffold, TBL-002 empty→TODO).
 export function generateRuleDocs(): string {
   const header =
@@ -9,7 +9,7 @@ export function generateRuleDocs(): string {
   const divider = "| --- | --- | --- | --- | --- | --- |";
   const rows = ruleRegistry.getAllMetadata().map((metadata) => {
     const fixable = metadata.fixable ? "yes" : "no";
-    // The generator is the second reader of `docsUrl` (W-36: it previously had none), so the table's
+    // The generator is the second reader of `docsUrl` — it previously had none — so the table's
     // link and a finding's `helpUri` cannot point at different pages. No `Docs` column: linking the
     // id keeps the column set — which `docs-sync.test.ts` and the shipped fix skill both key on —
     // unchanged. `defineRule` always fills `docsUrl`, so the bare-code-span fallback is unreachable

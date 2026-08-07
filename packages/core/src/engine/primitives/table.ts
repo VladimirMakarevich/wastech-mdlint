@@ -51,7 +51,7 @@ export type ColumnNotEmptyOptions = { columns?: string[]; section?: string };
 
 // columnNotEmpty — cells in the target column(s) must be non-empty (TBL-002). When `columns` is
 // omitted, every column of each scoped table is checked. Findings are flagged fixable so the
-// TBL-002 fix hook (empty → TODO, P3) can act; custom rules ignore the flag (no fix hook).
+// TBL-002 fix hook (empty → TODO) can act; custom rules ignore the flag (no fix hook).
 export function columnNotEmpty(
   document: ParsedDocument,
   options: ColumnNotEmptyOptions,
@@ -89,7 +89,7 @@ export type ColumnInSetOptions = {
   section?: string;
 };
 
-// The single source of truth for `columnInSet`'s case sensitivity (W-06). It used to be a bare `?? true`
+// The single source of truth for `columnInSet`'s case sensitivity. It used to be a bare `?? true`
 // here with no `.default()` in either Zod schema, so nothing recorded it: `schema.json` emitted a plain
 // boolean, one guide page documented the inverse, and the skill renderer treated "absent" as a third
 // state. Both option schemas (TBL-003's and the `columnInSet` assertion's) now default to this
@@ -276,8 +276,8 @@ export function columnUnique(
 
   for (const document of documents) {
     // File scope is this callback and nothing else — it applies both `files` and `exclude` (see the
-    // call sites in rules/tbl.ts and rules/custom.ts). W-40 removed the unread `files` option that
-    // used to sit beside it: gating on it would have silently skipped the exclude-only case.
+    // call sites in rules/tbl.ts and rules/custom.ts). An unread `files` option that used to sit
+    // beside it was removed: gating on it would have silently skipped the exclude-only case.
     if (!fileMatches(document.path)) {
       continue;
     }

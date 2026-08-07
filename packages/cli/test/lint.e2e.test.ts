@@ -103,7 +103,7 @@ describe("lint command", () => {
     expect(result.stdout).toContain("No problems found.");
   });
 
-  it("passes when a required non-Markdown file is present on disk (audit BL-1)", async () => {
+  it("passes when a required non-Markdown file is present on disk", async () => {
     // The user-visible symptom: a repository that really ships a `LICENSE` used to exit 1, because
     // STR-001 could only see the Markdown corpus.
     const cwd = await fixtureRepo({
@@ -121,7 +121,7 @@ describe("lint command", () => {
     expect(result.stdout).toContain("No problems found.");
   });
 
-  // Audit L-4: the per-rule `exclude` had no coverage past the engine. This proves it survives the
+  // The per-rule `exclude` had no coverage past the engine. This proves it survives the
   // whole path — JSONC parse → `resolveRule` → `lintFiles` → report — rather than being dropped at
   // the config boundary, where a silent loss would look exactly like a clean repository.
   it("honors a per-rule exclude written in the config file", async () => {
@@ -147,7 +147,7 @@ describe("lint command", () => {
     expect(result.stdout).not.toContain("drafts");
   });
 
-  // W-01's user-visible half: the wrong answer was an *exit code*. A negated `exclude` matched every
+  // The user-visible half: the wrong answer was an *exit code*. A negated `exclude` matched every
   // path through the old first-truthy OR, so the corpus was empty, the report said "No problems
   // found." and the command exited 0 on a repository that has a finding — a green CI leg for a
   // one-character config edit. Asserted at the host boundary because that is where the 0 was believed.
@@ -168,12 +168,12 @@ describe("lint command", () => {
   });
 
   // @boundary-guard shared-exclude
-  // W-02 / P13.02: the zero-config first run must prune the noise trees before it parses them. The
-  // *nested* copy is the half an in-repo fixture never had — the field test measured 2740 files
+  // The zero-config first run must prune the noise trees before it parses them. The
+  // *nested* copy is the half an in-repo fixture never had — a real repository had 2740 files
   // under a `mobile/node_modules/` reaching the parser, at exit `0` with zero findings, so the
   // blow-up was silent in every direction. Asserted at the host boundary because that is where a
   // user meets it, and with no config file at all because that is the path being fixed.
-  it("prunes node_modules at every depth with no config file (P13.02)", async () => {
+  it("prunes node_modules at every depth with no config file", async () => {
     const cwd = await fixtureRepo({
       "docs/a.md": "# A\n",
       "mobile/node_modules/leftpad/README.md": "# leftpad\n",
@@ -191,10 +191,10 @@ describe("lint command", () => {
     expect(parsed.summary.files).toBe(1);
   });
 
-  // W-15 / P14.03, at the boundary where the behavior changed: a zero-config run now reads Markdown
+  // At the boundary where the behavior changed: a zero-config run reads Markdown
   // under a dot-directory that is not a dependency or build tree, while still pruning the ones that
   // are. The two halves have to be asserted together — dropping `**/.*/**` would be a regression on
-  // W-02 if it also re-opened `.venv`, and keeping it was 31% of the field-test target's corpus.
+  // the corpus blow-up if it also re-opened `.venv`, and keeping it was 31% of a real target's corpus.
   it("reads a dot-directory but not a hidden dependency tree with no config file", async () => {
     const cwd = await fixtureRepo({
       "docs/a.md": "# A\n",
@@ -236,7 +236,7 @@ describe("lint command", () => {
     expect(parsed.messages).toHaveLength(1);
   });
 
-  // W-24/W-35: the shape and the message keys `docs/guide/output.md` documents, asserted through the
+  // The shape and the message keys the output contract promises, asserted through the
   // command a consumer actually runs. The guide's table is the contract; this is what pins it.
   it("serializes the documented top-level keys, summary keys, and message keys", async () => {
     const cwd = await fixtureRepo({
@@ -299,7 +299,7 @@ describe("lint command", () => {
     expect(written).toContain("| REQ-1 | TODO |");
   });
 
-  // Audit L-6 end to end: the CRLF fixture is built at runtime (`.gitattributes` forces `eol=lf` on
+  // Newline preservation end to end: the CRLF fixture is built at runtime (`.gitattributes` forces `eol=lf` on
   // committed files, so a checked-in CRLF fixture would be silently converted).
   it("keeps a CRLF document's line endings when --fix rewrites it", async () => {
     const crlfDocument = [
@@ -335,7 +335,7 @@ describe("lint command", () => {
     expect(written).not.toContain("\r\r");
   });
 
-  // P11.10 / audit M-6 + M-7: an operational failure must be distinguishable from findings (exit 2,
+  // An operational failure must be distinguishable from findings (exit 2,
   // not 1) and must never print an absolute host path. `not.toContain(cwd)` is the portable form of
   // that second assertion — matching an absolute prefix would be platform-specific.
   it("exits 2 for a nonexistent [path] instead of reporting a clean corpus", async () => {
@@ -408,7 +408,7 @@ describe("lint command", () => {
     );
   });
 
-  it("prints a severity typo as the config file plus the offending key (P13.06)", async () => {
+  it("prints a severity typo as the config file plus the offending key", async () => {
     const cwd = await fixtureRepo({
       "a.md": "# A\n",
       "wastech-mdlint.config.json": JSON.stringify({
@@ -430,7 +430,7 @@ describe("lint command", () => {
 
 // @boundary-guard host-parity
 //
-// W-57 / P16.01 §5. One run, two renderings, and nothing had ever compared them: the crosscheck's
+// One run, two renderings, and nothing had ever compared them: the
 // fourth bucket of missed defects is process-boundary rendering, and three of them — a `hint` the
 // human path dropped, a `--format json` word collision, a `summary` key missing from one format —
 // were all found by reading code rather than by any test. The pattern the readers in
@@ -519,7 +519,7 @@ describe("schema command", () => {
     );
   });
 
-  // Audit L-11: a relative `--out` used to resolve against the real `process.cwd()`, so a run with
+  // A relative `--out` used to resolve against the real `process.cwd()`, so a run with
   // an injected cwd wrote the schema into whatever directory the process happened to start in —
   // the class of bug `handleCompile` already fixed for `--outdir`.
   it("resolves a relative --out against the run's cwd, not process.cwd()", async () => {
@@ -557,7 +557,7 @@ describe("schema command", () => {
         expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
         // `--out` is echoed back exactly as typed, the same contract as the `schema written to …`
         // success line and the directory-path guard above it — the documented exception to naming
-        // paths relative to the working directory (docs/guide/cli.md §Exit codes), since the tool
+        // paths relative to the working directory, since the tool
         // must not silently rewrite an argument the caller chose to spell absolutely.
         expect(result.stderr).toContain(`Could not write ${outPath} (EACCES).`);
         // What the guard is actually for: none of the raw fs message survives — neither its own

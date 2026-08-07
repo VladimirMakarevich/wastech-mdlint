@@ -71,7 +71,7 @@ describe("LLM-001 eager-import budget", () => {
     );
     expect(overBudget).toMatchObject({ filePath: "CLAUDE.md" });
     expect(overBudget?.data).toMatchObject({ maxTokens: 50 });
-    // W-34: the budget finding quotes an estimated token count, so it discloses the estimate.
+    // The budget finding quotes an estimated token count, so it discloses the estimate.
     expect(overBudget?.message).toContain(TOKEN_ESTIMATE_NOTE);
   });
 
@@ -111,7 +111,7 @@ describe("LLM-001 eager-import budget", () => {
   });
 
   it("resolves a routed root-relative eager import through settings.siteRouter", async () => {
-    // Regression pin (audit finding): LLM-001's resolver now reuses `resolveTargetCandidates`
+    // Regression pin: LLM-001's resolver now reuses `resolveTargetCandidates`
     // instead of an ad hoc slash-strip, so a root-relative import under a configured `siteRouter`
     // must resolve to the router's candidate — asserted here directly against the rule, not just
     // via a compile-vs-lint parity check that could pass if both sides drifted the same wrong way.
@@ -200,7 +200,7 @@ describe("LLM-001 eager-import budget", () => {
   }
 
   it("reports a diagnostic in a shared import subtree once per identity, not once per entrypoint", async () => {
-    // Regression fixture for the dedup contract (audit L-3): both entrypoints reach `shared/hub.md`,
+    // Regression fixture for the dedup contract: both entrypoints reach `shared/hub.md`,
     // so each traversal re-derives the same missing import and the same cycle.
     const cwd = await fixtureRepo({
       "one.md": "# One\n@shared/hub.md\n",

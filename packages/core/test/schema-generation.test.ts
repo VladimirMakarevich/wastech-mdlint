@@ -19,15 +19,15 @@ describe("generateConfigSchema", () => {
     expect(generateConfigSchema()).toBe(generateConfigSchema());
   });
 
-  it("stays byte-in-sync with the shipped schema.json (R6)", () => {
+  it("stays byte-in-sync with the shipped schema.json", () => {
     // If this fails, regenerate: `npm run build && npm run generate:docs`.
     const shipped = readFileSync(shippedSchemaPath, "utf8");
     expect(shipped).toBe(generateConfigSchema());
   });
 
-  // P13.02, deliverable 3: the lint-time defaults have to be visible to an editor, or the only way
+  // The lint-time defaults have to be visible to an editor, or the only way
   // to learn that a run excludes anything is to notice a file missing from the report.
-  it("declares the resolved defaults for exclude and respectGitignore (P13.02)", () => {
+  it("declares the resolved defaults for exclude and respectGitignore", () => {
     const schema = JSON.parse(generateConfigSchema()) as {
       properties: {
         exclude: { default: string[] };
@@ -41,7 +41,7 @@ describe("generateConfigSchema", () => {
     expect(schema.properties.respectGitignore.default).toBe(false);
   });
 
-  // P13.04: `z.toJSONSchema`'s default `io: "output"` emits a `.default()` key as `required`, which
+  // `z.toJSONSchema`'s default `io: "output"` emits a `.default()` key as `required`, which
   // would make this schema reject every config that omits it. Nothing in the product validates against
   // schema.json, so only an editor would ever have said so — hence an explicit guard rather than
   // trusting the byte-sync test, which only proves the file matches whatever the generator produces.
@@ -78,12 +78,12 @@ describe("generateConfigSchema", () => {
     expect(branch?.properties?.options?.required ?? []).not.toContain(key);
   });
 
-  it("declares the JSON Schema dialect but no remote config-schema URL (C9)", () => {
+  it("declares the JSON Schema dialect but no remote config-schema URL", () => {
     const schema = JSON.parse(generateConfigSchema()) as { $schema: string };
     expect(schema.$schema).toBe("https://json-schema.org/draft/2020-12/schema");
   });
 
-  it("includes the generic declarative custom-rule shape (R9)", () => {
+  it("includes the generic declarative custom-rule shape", () => {
     const schema = JSON.parse(generateConfigSchema()) as {
       properties: {
         rules: {
@@ -100,11 +100,11 @@ describe("generateConfigSchema", () => {
     expect(customBranch).toBeDefined();
   });
 
-  // W-37: the two custom branches spelled this enum as a literal, so a new assert kind carrying a
+  // The two custom branches spelled this enum as a literal, so a new assert kind carrying a
   // new target needed two hand edits in an otherwise metadata-driven file. The byte-sync test cannot
   // see the difference — it only proves schema.json matches whatever the generator produces — so the
   // derivation needs its own guard.
-  it("derives every custom branch's target enum from ASSERTION_TARGETS (W-37)", () => {
+  it("derives every custom branch's target enum from ASSERTION_TARGETS", () => {
     const schema = JSON.parse(
       generateConfigSchema({ customRules: [{ id: "REQ-OWNER" }] }),
     ) as {
@@ -135,7 +135,7 @@ describe("generateConfigSchema", () => {
     }
   });
 
-  it("requires compile.skill and forbids unknown keys at the compile and compile.skill levels (P5.05)", () => {
+  it("requires compile.skill and forbids unknown keys at the compile and compile.skill levels", () => {
     const schema = JSON.parse(generateConfigSchema()) as {
       properties: {
         compile: {

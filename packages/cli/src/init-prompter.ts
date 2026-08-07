@@ -76,7 +76,7 @@ export function buildPackageManagerPromptConfig(): {
 }
 
 /**
- * `default: false` — "ask first, don't write silently" (I6) means a bare Enter must not opt into
+ * `default: false` — "ask first, don't write silently" means a bare Enter must not opt into
  * dropping a CI workflow file; `@inquirer/confirm` otherwise defaults to yes.
  */
 export function buildCiWorkflowPromptConfig(): {

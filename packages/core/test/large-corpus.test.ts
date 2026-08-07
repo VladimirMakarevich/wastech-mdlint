@@ -19,8 +19,8 @@ import { largeCorpusGraph } from "./support/large-corpus-graph.js";
 
 // The fixture's stated properties, asserted in one place so the renderer suites that depend on them
 // (graph-render, compile-context, and the cli/mcp e2e suites across the workspace) fail here — with
-// the property named — rather than in a confusing downstream diff. P16.01 §3 adopts this fixture,
-// and P15.02 reuses it for the graph JSON contract.
+// the property named — rather than in a confusing downstream diff. The graph JSON contract test
+// reuses the same fixture.
 
 describe("large corpus fixture", () => {
   it("generates the stated node count", () => {
@@ -75,8 +75,8 @@ describe("large corpus fixture", () => {
     );
   });
 
-  it("reproduces the field's collapsed role histogram (W-28 evidence)", () => {
-    // This exact histogram is quoted in `docs/mdlint_v2/accepted-behaviors.md`. It is asserted, not
+  it("reproduces a real corpus's collapsed role histogram", () => {
+    // This exact histogram is quoted as an accepted limitation elsewhere. It is asserted, not
     // computed into the doc, because the register's claim is about a *measured* corpus — if the
     // fixture drifts, the register row becomes false and this is what says so.
     const histogram: Partial<Record<NodeRole, number>> = {};
@@ -91,7 +91,7 @@ describe("large corpus fixture", () => {
       bridge: 5,
       leaf: 4,
     });
-    // 86% in two buckets, against the field's 83% — the coarseness W-28 is about is a property of
+    // 86% in two buckets, against a real corpus's 83% — that coarseness is a property of
     // the vocabulary, not of one corpus.
     expect((73 + 46) / LARGE_CORPUS_DOCUMENT_COUNT).toBeGreaterThan(0.85);
   });

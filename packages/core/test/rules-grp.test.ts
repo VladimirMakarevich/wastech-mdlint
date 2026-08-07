@@ -108,10 +108,10 @@ describe("GRP-001 cycles (reads the injected graph)", () => {
   });
 });
 
-// W-07: a README indexing a sibling that links back is a documentation shape, not a defect, and at
+// A README indexing a sibling that links back is a documentation shape, not a defect, and at
 // `error` severity it failed builds. `minCycleLength` is what makes the two-node back-link and a
 // longer chain distinguishable by configuration.
-describe("GRP-001 minCycleLength (P13.04 / W-07)", () => {
+describe("GRP-001 minCycleLength", () => {
   const MUTUAL_LINK = {
     "README.md": "See [a](a.md).\n",
     "a.md": "Back to [README](README.md).\n",
@@ -189,7 +189,7 @@ describe("GRP-002 orphans", () => {
 
   it("prunes an excluded orphan from the report while it still contributes its outgoing edge", async () => {
     // a.md is reachable only from draft.md, so the two halves are separable: `exclude` scopes
-    // reporting, not the corpus-wide graph — the reason the option survived P11.13's removal.
+    // reporting, not the corpus-wide graph — which is why this option survived when the dead ones went.
     const files = {
       "index.md": "# Index\n",
       "a.md": "# A\n",
@@ -208,8 +208,8 @@ describe("GRP-002 orphans", () => {
     // draft.md silenced; a.md still non-orphan because the excluded file's edge survives.
     expect(withExclude.messages).toEqual([]);
 
-    // Same outcome with a `files` list beside it — `exclude` wins over `files` (C1), so the pairing
-    // cannot be what makes the filtering work (audit L-4: the exclude-only path above is the one M-2
+    // Same outcome with a `files` list beside it — `exclude` wins over `files`, so the pairing
+    // cannot be what makes the filtering work (the exclude-only path above is the one an unscoped rule
     // proved could rot untested).
     const withBoth = await lint(await fixtureRepo(files), [
       rule("GRP-002", {
@@ -221,7 +221,7 @@ describe("GRP-002 orphans", () => {
     expect(withBoth.messages).toEqual([]);
   });
 
-  // W-05: with no `entryPoints` the exemption used to be skipped entirely, so a repository's own
+  // With no `entryPoints` the exemption used to be skipped entirely, so a repository's own
   // roots were 55% of the noise that gets a rule disabled.
   it("exempts the default entry points when no entryPoints are configured", async () => {
     const cwd = await fixtureRepo({
@@ -286,7 +286,7 @@ describe("GRP-002 orphans", () => {
   });
 });
 
-describe("GRP option schemas (P11.13 / SC-1)", () => {
+describe("GRP option schemas", () => {
   function resolutionError(id: string, options: unknown): RuleResolutionError {
     let thrown: unknown;
     try {

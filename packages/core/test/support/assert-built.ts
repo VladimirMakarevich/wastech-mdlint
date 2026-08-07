@@ -7,12 +7,12 @@ import { existsSync, statSync } from "node:fs";
 // both). On a checkout whose source moved since the last build a stale artifact would otherwise
 // surface as a confusing behavioral diff instead of "you did not build".
 //
-// P16.03 added a fifth caller that spawns nothing: `packages/core/test/package-payload.test.ts`
+// A fifth caller spawns nothing: `packages/core/test/package-payload.test.ts`
 // packs a tree it does not build (`npm pack --workspaces` runs no lifecycle script), and now asserts
 // on what `dist` contains. Same precondition, arrived at from the other direction — the artifact is
 // the subject rather than the runner.
 //
-// W-56 (P16.01) is why the two near-identical copies became one helper. The defect was in the
+// Two near-identical copies became one helper for a reason. The defect was in the
 // *message*, not the check: both told the reader to run `npm run build` / `npm run typecheck`, and
 // both of those are `tsc -b`, whose up-to-date decision is content-aware. So when a source file's
 // timestamp moved but its content did not — `git checkout --`, a stash pop, a copy that resets
@@ -23,9 +23,8 @@ import { existsSync, statSync } from "node:fs";
 // The check itself stays a modification-time comparison: comparing real build state would mean
 // re-deriving `tsc -b`'s own `.tsbuildinfo` bookkeeping, which is a second implementation of the
 // thing being verified. Naming the forced build as the fallback closes the harmful half — a message
-// that names a command which does not fix the problem is worse than no message. Registered in
-// `docs/mdlint_v2/accepted-behaviors.md`, and the remedy is stated for readers in
-// `.agents/rules/testing.md` ("Build before test").
+// that names a command which does not fix the problem is worse than no message. The residual
+// imprecision is accepted; the message below is what carries the remedy to the reader.
 //
 // Lives in core's test support directory for the same reason `large-corpus.ts` does: it is imported
 // across the workspace, so it must import nothing from any package's `src`.

@@ -1,6 +1,6 @@
 import type { ParsedHeading } from "../markdown/document-types.js";
 
-// `extract-section-body` util (P3.01): return the body text of a section — the lines after a heading
+// `extract-section-body` util: return the body text of a section — the lines after a heading
 // up to the next heading of the **same or higher** level (so a parent section's body includes its
 // subsections, and a leaf section's body is just its own prose). Used by CTX-001 placeholder/empty
 // detection.

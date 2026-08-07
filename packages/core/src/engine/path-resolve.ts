@@ -4,8 +4,8 @@ import { normalizeRelativePath } from "../discovery/globs.js";
 import { resolveRoutedUrl } from "./site-router.js";
 import type { SiteRouterSettings } from "./types.js";
 
-// Shared link/image target-resolution helpers used by the reference primitives (P2.02) and REF-002
-// (P3.04). Centralized so link resolution behaves identically across rules.
+// Shared link/image target-resolution helpers used by the reference primitives and REF-002
+// Centralized so link resolution behaves identically across rules.
 
 // The file part of a target (drop any `#fragment`).
 export function filePart(rawTarget: string): string {
@@ -44,7 +44,7 @@ export function candidateEscapesRoot(relPath: string): boolean {
 // helper only ever sees repo-relative POSIX candidates link/image resolution builds internally
 // (never OS-absolute by construction), whereas an option like SEC-003's `template` hands
 // `path.resolve` a raw string that can itself be absolute (which `path.resolve` honors verbatim,
-// ignoring `rootDir` entirely — audit H-2) or a relative path whose `..` segments climb past it.
+// ignoring `rootDir` entirely) or a relative path whose `..` segments climb past it.
 export function resolvesOutsideRoot(rootDir: string, rawPath: string): boolean {
   if (path.isAbsolute(rawPath)) {
     return true;
@@ -76,7 +76,7 @@ export function sourceLocale(
 }
 
 // Ordered repo-relative candidates a link/image/import target could resolve to, shared by the graph
-// builder (P4.06) and REF rules so root-relative/router resolution never disagrees between the two
+// builder and REF rules so root-relative/router resolution never disagrees between the two
 // consumers. Callers check candidates in order against whatever "exists" means for them (a corpus
 // node set, or the filesystem) — this helper only enumerates possibilities.
 export function resolveTargetCandidates(

@@ -16,10 +16,10 @@ import { parseDocument } from "./parse-document.js";
 
 export type LoadDocumentsOptions = {
   cwd: string;
-  // Config `exclude` (C1). Excluded paths win over `patterns`; excluded directories are pruned.
+  // Config `exclude`. Excluded paths win over `patterns`; excluded directories are pruned.
   // Omitted means "exclude nothing" — the defaults live one layer up (see below).
   exclude?: string[];
-  // Config `respectGitignore` (C8). When true, `.gitignore` files (root + nested) are honored.
+  // Config `respectGitignore`. When true, `.gitignore` files (root + nested) are honored.
   respectGitignore?: boolean;
 };
 
@@ -118,7 +118,7 @@ async function collectFiles(params: {
 }
 
 /**
- * Deterministic document loader (P1.05): expand `patterns` under `cwd`, read + parse each match into
+ * Deterministic document loader: expand `patterns` under `cwd`, read + parse each match into
  * a `ParsedDocument`, and return `Map<absolutePathPosix, ParsedDocument>` with sorted, POSIX keys.
  *
  * Applies **no** defaults of its own: what the caller passes is exactly what is walked. The

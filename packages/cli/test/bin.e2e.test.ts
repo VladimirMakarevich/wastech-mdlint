@@ -18,10 +18,10 @@ import {
 //
 // The only suite in this package that crosses a real OS process boundary (mirrors
 // packages/mcp-server/test/stdio-integration.test.ts). Every other CLI test calls runCli()
-// in-process, which can never exercise src/index.ts's entrypoint guard (H-1): that guard only does
+// in-process, which can never exercise src/index.ts's entrypoint guard: that guard only does
 // anything when Node itself populates process.argv[1] for a real invocation.
 //
-// The "installed bin" describe block below manufactures the exact install shape H-1 lived in
+// The "installed bin" describe block below manufactures the exact install shape the entrypoint bug lived in
 // (a POSIX symlink, or a Windows directory junction) itself, in an isolated temp dir, instead of
 // depending on npm's own node_modules/.bin linking for the package under test. That ambient link
 // depends on install-time ordering this repo's own CI has: `.github/workflows/ci.yml` runs
@@ -39,7 +39,7 @@ import {
 // (`npm run typecheck` == `tsc -b`, which emits before `npm test` runs) — a bare `vitest run` on a
 // checkout where src/index.ts changed since the last build spawns stale/missing output, so
 // assertBuilt() below fails fast with a clear message. That message, and the mtime heuristic behind
-// it, are shared with the mcp-server twin (W-56): see packages/core/test/support/assert-built.ts.
+// it, are shared with the mcp-server twin: see packages/core/test/support/assert-built.ts.
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -108,7 +108,7 @@ async function fixtureWithError(): Promise<string> {
   return root;
 }
 
-describe("installed-bin shape via symlink/junction (H-1 regression guard)", () => {
+describe("installed-bin shape via symlink/junction", () => {
   let linkRoot: string;
   let linkedEntry: string;
 
@@ -120,7 +120,7 @@ describe("installed-bin shape via symlink/junction (H-1 regression guard)", () =
       // Windows requires elevated privileges (or Developer Mode) to symlink a *file*, but
       // directory junctions need neither — and a junction is exactly what npm creates for a
       // workspace/global-linked install on Windows (not only the .cmd shim a plain registry
-      // install gets, which passes an already-real relative path and never hit H-1: a linked
+      // install gets, which passes an already-real relative path and never hit the bug: a linked
       // install's junction does, since Node's realpath resolution dereferences junctions the same
       // way it dereferences POSIX symlinks).
       const junctionDir = path.join(linkRoot, "dist-junction");
@@ -163,7 +163,7 @@ describe("installed-bin shape via symlink/junction (H-1 regression guard)", () =
     expect(result.stdout).toContain("1 problem (1 error, 0 warnings)");
   }, 30_000);
 
-  // P11.10 / audit M-7, crossed over a real process boundary because that is the shape the defect
+  // A typo'd subcommand, crossed over a real process boundary because that is the shape the defect
   // actually shipped in: a typo'd `run:` step in CI, whose only signal is the process exit status.
   it("a typo'd subcommand exits 2 through the real process boundary, not 0", async () => {
     const fixtureDir = await fixtureWithError();
@@ -185,7 +185,7 @@ describe("installed-bin shape via symlink/junction (H-1 regression guard)", () =
 
   // @boundary-guard installed-bin-spawn
   //
-  // P14.02 / W-13. `init`'s merge refusal is an exit-code defect and nothing else: the message was
+  // `init`'s merge refusal is an exit-code defect and nothing else: the message was
   // always right, so an in-process test that reads stdout sees a correct-looking run either way.
   // Only a real process has an exit code, which is the whole reason this guard lives here — and the
   // shape that mattered is a CI `run:` step, which is a spawn too.
@@ -246,7 +246,7 @@ describe("installed-bin shape via symlink/junction (H-1 regression guard)", () =
   });
 });
 
-// P11.14 / audit L-11, and an exit-code contract (M-6) at the process boundary. `runCli`'s own
+// Lockfile detection, and an exit-code contract at the process boundary. `runCli`'s own
 // try/catch does not start until after `readPackageVersion()` has already run, so a rejection from
 // there escapes the bin's top-level `await`. Node terminates an unhandled rejection with exit 1 —
 // the code reserved for lint findings — so CI could not tell "found problems" from "could not

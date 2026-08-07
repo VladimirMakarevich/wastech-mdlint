@@ -1,4 +1,4 @@
-// Shared tunables for P6.01 repo scanning (doc-cluster detection + workspace-package
+// Shared tunables for repo scanning (doc-cluster detection + workspace-package
 // detection). Both modules need the same NOISE list; a single source avoids duplicating the
 // literal array and avoids a value-level import cycle between the two.
 
@@ -6,11 +6,12 @@
 // not — never contain source-of-truth Markdown worth clustering. This list is also the sole source
 // of the lint-time default `exclude` (config/corpus-scope.ts), so the rule for adding to it is
 // narrower than "the scan would rather not walk this": a hidden directory earns a place here only
-// when it is a dependency or build tree, never merely for being hidden (W-15, P14.03). `.venv` and
+// when it is a dependency or build tree, never merely for being hidden. `.venv` and
 // `.yarn` are here for that reason, which keeps the hidden-directory *count* walk in repo-scan.ts
 // off a virtualenv or a Yarn Berry cache — but only off *those two*. The bound is name-based, so any
 // unlisted hidden cache (`.tox`, `.gradle`, `.terraform`, `.turbo`, …) classifies as `"hidden"` and
-// is walked to size it; that cost is accepted and recorded in docs/mdlint_v2/accepted-behaviors.md.
+// is walked to size it. That cost is accepted rather than fixed: name-listing every cache tool in
+// existence would rot faster than the walk costs, and the walk happens once, during `init`.
 export const DEFAULT_NOISE_DIR_NAMES: readonly string[] = [
   "node_modules",
   ".git",
@@ -31,9 +32,9 @@ export const DEFAULT_NOISE_DIR_NAMES: readonly string[] = [
  * so a dot-prefixed dependency tree (`.git`, `.venv`, `.yarn`, `.next`, `.cache`) reports as
  * `"noise"` and only the rest (`.github`, `.claude`, `.agents`, `.husky`, …) as `"hidden"`. The two
  * classes carry different consequences downstream — noise is also excluded at lint time, hidden is
- * not (W-15) — so the distinction has to be made once, here, rather than re-derived per caller.
+ * not — so the distinction has to be made once, here, rather than re-derived per caller.
  *
- * Hidden directories are pruned from the *scan* by shape rather than by name (audit L-7) because a
+ * Hidden directories are pruned from the *scan* by shape rather than by name because a
  * name list can never enumerate them, and a tooling directory proposed as a doc cluster is a
  * proposal the user did not ask for. That argument is about cluster inference and does not transfer
  * to the linted corpus, which is why `config/corpus-scope.ts` derives its default `exclude` from
@@ -83,5 +84,5 @@ export const DEFAULT_KNOWN_CLUSTER_NAMES: readonly string[] = [
 // and the score bonus a known-named directory gets.
 export const DEFAULT_MIN_CLUSTER_SIZE = 3;
 
-// How many sample files a cluster reports for downstream rule inference (P6.02) to sniff.
+// How many sample files a cluster reports for downstream rule inference to sniff.
 export const DEFAULT_SAMPLE_SIZE = 5;

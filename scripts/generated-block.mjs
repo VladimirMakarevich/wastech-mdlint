@@ -1,6 +1,6 @@
 // Splices generated content between a BEGIN/END marker pair.
 //
-// W-55 (P16.04): generate-docs.mjs used to pass the generated table as the *replacement string* of
+// generate-docs.mjs used to pass the generated table as the *replacement string* of
 // String.prototype.replace, where `$` is a metacharacter — a `$&`, `` $` ``, `$'`, `$n` or `$$` in
 // any rule or MCP tool description would have expanded instead of being written. The `$1`/`$2` in
 // the very same template are deliberate back-references, which is precisely why the payload spliced

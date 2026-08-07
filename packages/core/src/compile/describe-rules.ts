@@ -115,7 +115,7 @@ function summarizeAssertion(assertion: Assertion): string {
     case "columnNotEmpty":
       return `requires non-empty cells in column ${quote(assertion.column)}${formatSection(assertion.section)}`;
     case "columnInSet":
-      // Render from the *resolved* value (W-06): annotating only an explicit `true` made a
+      // Render from the *resolved* value: annotating only an explicit `true` made a
       // default-cased rule read identically to a case-insensitive one in the committed skill.
       // Tested against `=== false` rather than for a truthy value because `describeRules` is public
       // API and can be handed entries that never passed through Zod, where the key is absent — and

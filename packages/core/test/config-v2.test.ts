@@ -58,7 +58,7 @@ async function writeConfig(
 }
 
 describe("loadConfiguration", () => {
-  it("parses JSONC with comments and trailing commas (C4)", async () => {
+  it("parses JSONC with comments and trailing commas", async () => {
     const root = await writeConfig(
       [
         "{",
@@ -79,7 +79,7 @@ describe("loadConfiguration", () => {
     expect(loaded.rules[0]?.severity).toBe("warning");
   });
 
-  it("resolves settings and exposes them (C5)", async () => {
+  it("resolves settings and exposes them", async () => {
     const root = await writeConfig(
       JSON.stringify({
         settings: {
@@ -96,7 +96,7 @@ describe("loadConfiguration", () => {
     });
   });
 
-  it("resolves settings.idRef and exposes it for the graph builder (P4.06)", async () => {
+  it("resolves settings.idRef and exposes it for the graph builder", async () => {
     const root = await writeConfig(
       JSON.stringify({
         settings: {
@@ -118,7 +118,7 @@ describe("loadConfiguration", () => {
     });
   });
 
-  it("rejects a malformed settings.idRef missing idColumn (C7)", async () => {
+  it("rejects a malformed settings.idRef missing idColumn", async () => {
     const root = await writeConfig(
       JSON.stringify({
         settings: {
@@ -133,7 +133,7 @@ describe("loadConfiguration", () => {
     );
   });
 
-  it("rejects unknown top-level keys (C7)", async () => {
+  it("rejects unknown top-level keys", async () => {
     const root = await writeConfig(
       JSON.stringify({ nonsense: true, rules: [] }),
     );
@@ -164,7 +164,7 @@ describe("loadConfiguration", () => {
 
   it("throws on invalid JSONC", async () => {
     const root = await writeConfig("{ not valid ");
-    // The structured code/hint (M6) accompany the message so an MCP host can render the error
+    // The structured code/hint accompany the message so an MCP host can render the error
     // contract without re-classifying it.
     const error = await loadConfiguration({ cwd: root, registry }).catch(
       (e: unknown) => e,
@@ -197,7 +197,7 @@ describe("loadConfiguration", () => {
     expect((error as ConfigError).hint).toBeTruthy();
   });
 
-  // P14.04 / W-16: one resolution base for `explicitConfigPath`, and the same base the diagnostic
+  // One resolution base for `explicitConfigPath`, and the same base the diagnostic
   // renders against. The five CLI handlers and the MCP helper all reach this line, so getting it
   // right here is what makes `--config` mean one thing across the six.
   it("resolves a relative explicit config path against params.cwd, not the process cwd", async () => {
@@ -258,7 +258,7 @@ describe("loadConfiguration", () => {
   });
 });
 
-// One notation across both validation stages (P13.06 / C7): `config` root, `.key` for an object key,
+// One notation across both validation stages: `config` root, `.key` for an object key,
 // `[n]` for an array index. Stage 1 used to emit `config.rules.0` while stage 2 emitted
 // `rules[0].options` for the same array.
 const DIAGNOSTIC_LINE = /^- config(\.[A-Za-z_$][\w$]*|\[\d+\])*: \S/;
@@ -288,7 +288,7 @@ async function rejectedConfig(config: unknown): Promise<string> {
   return message;
 }
 
-describe("config diagnostics (P13.06 / C7)", () => {
+describe("config diagnostics", () => {
   it("names the offending key and the allowed values for a severity typo", async () => {
     const message = await rejectedConfig({
       rules: [{ rule: "REF-001", severity: "warn" }],
@@ -397,7 +397,7 @@ describe("config diagnostics (P13.06 / C7)", () => {
 
   it("reports only the first failing stage (no cross-stage aggregation)", async () => {
     // Stage 2 consumes stage 1's *parsed* output, so it cannot run on a shape the schema rejected.
-    // Recorded in docs/mdlint_v2/accepted-behaviors.md rather than fixed.
+    // Accepted rather than fixed.
     const message = await rejectedConfig({
       rules: [
         { rule: "REF-001", severity: "warn" },
@@ -423,7 +423,7 @@ describe("config diagnostics (P13.06 / C7)", () => {
   });
 });
 
-describe("compile config (P5.05)", () => {
+describe("compile config", () => {
   it("accepts a fully-populated valid compile section", async () => {
     const root = await writeConfig(
       JSON.stringify({
@@ -534,7 +534,7 @@ describe("compile config (P5.05)", () => {
     );
   });
 
-  it("rejects an unknown compile.* key (C7)", async () => {
+  it("rejects an unknown compile.* key", async () => {
     const root = await writeConfig(
       JSON.stringify({
         rules: [],
@@ -563,7 +563,7 @@ describe("findConfig", () => {
     expect(await findConfig(root)).toBeUndefined();
   });
 
-  it("never anchors above the user's home directory (H-3)", async () => {
+  it("never anchors above the user's home directory", async () => {
     const outer = await mkdtemp(
       path.join(os.tmpdir(), "wastech-mdlint-fakehome-outer-"),
     );
@@ -588,7 +588,7 @@ describe("findConfig", () => {
     }
   });
 
-  it("still finds a config that sits exactly at the home directory (H-3)", async () => {
+  it("still finds a config that sits exactly at the home directory", async () => {
     const home = await mkdtemp(
       path.join(os.tmpdir(), "wastech-mdlint-fakehome-exact-"),
     );

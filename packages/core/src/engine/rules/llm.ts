@@ -11,14 +11,14 @@ import { defineRule, type RuleDefinition } from "../registry.js";
 import { estimateTokens, TOKEN_ESTIMATE_NOTE } from "../tokens.js";
 import type { ReportInput, SiteRouterSettings } from "../types.js";
 
-// LLM-001 — eager-import context budget per entrypoint (D3, P3.07). Single total budget
+// LLM-001 — eager-import context budget per entrypoint. Single total budget
 // (maxTokensPerEntrypoint) — parity with the legacy llm/budget; per-type limits are out of scope
-// (audit 3.2). Traverses ParsedDocument.imports (one parse pass, P1) — it does not re-parse.
+// deliberately. Traverses `ParsedDocument.imports` from the single parse pass — it does not re-parse.
 
 // Resolves an eager `@target` import through the same `resolveTargetCandidates` helper the
-// ContextGraph builder (P4.01/P4.06) and REF-001/002 already use — not an ad hoc resolver. A
+// ContextGraph builder and REF-001/002 already use — not an ad hoc resolver. A
 // root-relative import under a configured `siteRouter` must resolve identically here and in the
-// graph's "import" edges; otherwise LLM-001's own traversal and compile's S6 budget (which walks
+// graph's "import" edges; otherwise LLM-001's own traversal and compile's context budget (which walks
 // those same edges) can silently disagree on what an entrypoint eagerly imports. Falls back to the
 // first candidate when none resolve, so a genuinely missing import still reports a stable,
 // deterministic `targetPath`.
@@ -57,8 +57,8 @@ type EntrypointTraversal = {
 // authored chain, since `visited` is never unwound and a branching import tree descends just as far.
 // Both are single digits in practice: `@path` imports are hand-authored, not a corpus-wide link
 // graph. `visited`/`stack` already stop a cycle from recursing forever. The same accepted "no explicit
-// depth guard" bound as the graph traversals applies (P12.05, finding SC-3), but this is the least
-// exposed of the four sites.
+// depth guard" bound as the graph traversals applies here, but this is the least exposed of the
+// four recursive sites: an import tree is authored by hand and shallow.
 function traverse(
   entrypoint: string,
   documents: Map<string, ParsedDocument>,
@@ -126,8 +126,8 @@ function traverse(
   return { importedPaths, missing, cycles };
 }
 
-// Collected instead of reported inline so the rule can suppress cross-entrypoint duplicates (audit
-// L-3): entrypoints with overlapping import closures re-derive the same missing-import/cycle
+// Collected instead of reported inline so the rule can suppress cross-entrypoint duplicates:
+// entrypoints with overlapping import closures re-derive the same missing-import/cycle
 // diagnostic once per traversal. `filePath` is required — LLM-001 is a project rule, so every
 // finding self-attributes to the file it is about rather than inheriting a current document.
 type PendingFinding = ReportInput & { filePath: string };
@@ -182,7 +182,7 @@ function collectEntrypointFindings(
       1,
     );
     findings.push({
-      // Only the budget finding quotes a token number, so only it carries the calibration (W-34);
+      // Only the budget finding quotes a token number, so only it carries the calibration;
       // the missing-import and cycle findings below would gain a non-sequitur from it.
       message: `Entrypoint ${entrypoint} is over context budget: ${totalTokens} estimated tokens exceeds ${maxTokens} (${percentOver}% over). ${TOKEN_ESTIMATE_NOTE}`,
       line: 0,

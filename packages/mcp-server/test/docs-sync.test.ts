@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { generateToolInventory } from "../src/tool-docs.js";
 
-// M3 sync check, mirroring packages/core/test/docs-sync.test.ts: the README's MCP tool table must
+// Sync check, mirroring packages/core/test/docs-sync.test.ts: the README's MCP tool table must
 // equal what the generator produces, so it can't drift from the live registration.
 const readmePath = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -15,7 +15,7 @@ const readmePath = path.resolve(
 
 function extractGeneratedTable(readme: string): string {
   // The `<!-- prettier-ignore -->` line and trailing blank line are formatting scaffolding
-  // (P9.06) that keep `npm run format` from re-wrapping the table's padding; they sit outside
+  // that keep `npm run format` from re-wrapping the table's padding; they sit outside
   // the captured group so this still compares the raw generated string byte-for-byte.
   const match =
     /<!-- BEGIN GENERATED MCP TOOLS -->\n<!-- prettier-ignore -->\n([\s\S]*?)\n\n<!-- END GENERATED MCP TOOLS -->/.exec(
@@ -56,7 +56,7 @@ describe("README MCP tool inventory", () => {
       "`lint`",
     ]);
 
-    // Every tool is read-only (M7); compile-context is the M1 exception with no structured output.
+    // Every tool is read-only; compile-context is the one exception with no structured output.
     expect(parsed.every((entry) => entry.readOnly === "yes")).toBe(true);
     const structuredOf = (name: string): string =>
       parsed.find((entry) => entry.name === `\`${name}\``)!.structured;
@@ -64,7 +64,7 @@ describe("README MCP tool inventory", () => {
     expect(structuredOf("lint")).toBe("yes");
   });
 
-  it("stays in sync with the README (M3)", async () => {
+  it("stays in sync with the README", async () => {
     // If this fails, regenerate: `npm run build && npm run generate:docs`.
     const readme = readFileSync(readmePath, "utf8");
     expect(extractGeneratedTable(readme)).toBe(await generateToolInventory());

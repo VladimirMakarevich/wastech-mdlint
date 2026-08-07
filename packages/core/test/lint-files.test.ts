@@ -106,7 +106,7 @@ describe("lintFiles orchestration", () => {
     expect(project).toMatchObject({ filePath: "a.md", severity: "warning" });
   });
 
-  it("applies per-rule severity overrides and drops off rules (R1/C2)", async () => {
+  it("applies per-rule severity overrides and drops off rules", async () => {
     const cwd = await fixtureRepo({ "a.md": "BAD\n" });
 
     const warned = await lintFiles({
@@ -155,9 +155,9 @@ describe("lintFiles orchestration", () => {
     ).toEqual(["block.md:4", "nextline.md:3"]);
   });
 
-  // The corpus half of W-02, one layer below the CLI guard: `lintFiles` resolves the lint-time
+  // The corpus half, one layer below the CLI guard: `lintFiles` resolves the lint-time
   // default `exclude` itself, so no host has to remember to pass one.
-  it("prunes the default noise trees when the config names no exclude (P13.02)", async () => {
+  it("prunes the default noise trees when the config names no exclude", async () => {
     const cwd = await fixtureRepo({
       "docs/a.md": "# A\n",
       "mobile/node_modules/leftpad/README.md": "# leftpad\n",
@@ -177,7 +177,7 @@ describe("lintFiles orchestration", () => {
   // The case that would silently regress if a user `exclude` *replaced* the default instead of
   // extending it: `["drafts/**"]` is a plausible first edit, and under replace it re-opens every
   // `node_modules` tree while still exiting 0 with a believable file count.
-  it("extends rather than replaces the default exclude (P13.02)", async () => {
+  it("extends rather than replaces the default exclude", async () => {
     const cwd = await fixtureRepo({
       "docs/a.md": "# A\n",
       "drafts/wip.md": "# WIP\n",
@@ -229,7 +229,7 @@ describe("lintFiles orchestration", () => {
 });
 
 describe("runRules fail-fast", () => {
-  it("throws when a project rule runs without a documents corpus (R4)", () => {
+  it("throws when a project rule runs without a documents corpus", () => {
     const rule = registry.resolveRule("GRP-001", {});
     expect(() => runRules([{ rule }], { settings: {} })).toThrow(
       /project-scoped but no documents/,

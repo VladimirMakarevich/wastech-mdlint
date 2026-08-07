@@ -1,23 +1,24 @@
-// The `ParsedDocument` contract (P1.01).
+// The `ParsedDocument` contract.
 //
-// `ParsedDocument` is the single data source produced by one parse pass (P1.02–P1.04) and read
+// `ParsedDocument` is the single data source produced by one parse pass and read
 // by every downstream consumer. It is deliberately a *superset* that satisfies all of them, so no
-// consumer ever re-parses Markdown. The field→consumer mapping below is the contract other phases
-// build on; per P1.01 no field moves once P1.02 starts filling it.
+// consumer ever re-parses Markdown. The field→consumer mapping below is the contract the rest of
+// the product builds on: a field may gain consumers, but moving or repurposing one silently breaks
+// every reader listed beside it.
 //
 // Field → consumer:
-//   headings   → REF-002 anchor slugs, SEC-* ordering, anchor graph edges (P4), slice index (P4)
+// headings → REF-002 anchor slugs, SEC-* ordering, anchor graph edges, slice index
 //   sections   → cheap SEC-*/CTX-* section-existence checks
-//   tables     → TBL-* rules, REF-005/006 id tables, extractDefinedIds() (P4/REF-005), compile
+//   tables     → TBL-* rules, REF-005/006 id tables, extractDefinedIds(), compile
 //   checkItems → CTX-002 checklist rules
-//   links      → REF-001/002 link resolution, link/anchor graph edges (P4), G3 explainability
-//   images     → REF-003 image resolution, image graph edges (P4)
-//   imports    → D3 LLM eager-import budget (SIZE/LLM rules), import graph edges (P4)
-//   directives → R8 inline-disable suppression (applied engine-side in P2.05)
+// links → REF-001/002 link resolution, link/anchor graph edges, edge explainability
+// images → REF-003 image resolution, image graph edges
+// imports → LLM eager-import budget (SIZE/LLM rules), import graph edges
+//   directives → inline-disable suppression (applied engine-side, not by the parser)
 //   content    → CTX-001 placeholder scan, size/token estimation, raw fallbacks
 //
-// Defined IDs are intentionally NOT a field (audit 2.1): they are derived from `tables`/`headings`
-// by the shared `extractDefinedIds(doc, idRef)` helper (P4/REF-005), keeping the parser
+// Defined IDs are intentionally NOT a field: they are derived from `tables`/`headings`
+// by the shared `extractDefinedIds(doc, idRef)` helper, keeping the parser
 // config-light (`idPattern` is config, not a parse input) and avoiding duplicated table data.
 
 // Link classification mirrors the legacy parser so behavior is preserved across the cutover.
@@ -31,7 +32,7 @@ export type ParsedLinkKind =
 export type ParsedHeading = {
   text: string;
   depth: number;
-  // GitHub-style slug (github-slugger, verbatim — audit 5.1). Authoritative for REF-002, anchor
+  // GitHub-style slug (github-slugger, verbatim — never re-derived). Authoritative for REF-002, anchor
   // edges, and the slice index, so all three resolve against the identical slug string.
   slug: string;
   line: number;
@@ -47,8 +48,8 @@ export type ParsedTableRow = {
 export type ParsedTable = {
   headers: string[];
   rows: ParsedTableRow[];
-  // Enclosing heading text (most-recent heading above, any level — audit 5.3); undefined if the
-  // table precedes every heading.
+  // Enclosing heading text (most-recent heading above, at any level — flat ownership, not nested);
+  // undefined if the table precedes every heading.
   section?: string;
   line: number;
 };
@@ -62,7 +63,7 @@ export type ParsedCheckItem = {
 
 export type ParsedLink = {
   rawTarget: string;
-  // Link label text kept for G3 explainability (`design.md:42 → via "[see REQ-001]"`).
+  // Link label text, kept so an edge can explain itself (`design.md:42 → via "[see REQ-001]"`).
   text?: string;
   // Fragment after `#`, decoded; undefined when the link has no fragment.
   anchor?: string;
@@ -76,7 +77,7 @@ export type ParsedImage = {
   line: number;
 };
 
-// Eager `@path.md` import (D3). Becomes an `import` graph edge in P4.
+// Eager `@path.md` import. Becomes an `import` edge in the context graph.
 export type ParsedImport = {
   rawTarget: string;
   line: number;
@@ -85,8 +86,8 @@ export type ParsedImport = {
 
 export type InlineDirectiveKind = "disable" | "enable" | "disable-next-line";
 
-// Inline-disable directive (R8). The parser only records position + kind + canonical rule IDs;
-// range/scope resolution is engine-side (P2.05). `ruleIds` empty ⇒ applies to all rules.
+// Inline-disable directive. The parser only records position + kind + canonical rule IDs;
+// range/scope resolution is engine-side. `ruleIds` empty ⇒ applies to all rules.
 export type InlineDirective = {
   kind: InlineDirectiveKind;
   ruleIds: string[];
@@ -94,7 +95,7 @@ export type InlineDirective = {
 };
 
 export type ParsedDocument = {
-  // Repo-relative POSIX path. Additive to the P1.01 minimum (journal [P1.01]): findings are
+  // Repo-relative POSIX path. Not strictly parse output, but carried here because findings are
   // attributed by repo-relative path, and carrying it here fixes it deterministically at load
   // time instead of recomputing per consumer.
   path: string;

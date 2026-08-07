@@ -5,7 +5,7 @@ import { parseDocument } from "../markdown/parse-document.js";
 import { lintCorpus, type LintResult } from "./lint-corpus.js";
 import type { ResolvedRule, ResolvedSettings } from "./types.js";
 
-// The ad-hoc lint entry point (P16.01 / W-58): lint one in-memory document against an explicit set of
+// The ad-hoc lint entry point: lint one in-memory document against an explicit set of
 // rules, with no config and no filesystem discovery. The MCP `lint` tool is its caller; before this
 // existed that host hand-assembled parse → corpus-of-one → `runRules` → suppression → counts →
 // formatter itself, which is the one place the pipeline's step order lived twice.
@@ -34,7 +34,7 @@ export type LintContentInput = {
 /**
  * Lint a single document's text as a corpus of one.
  *
- * The corpus-of-one is what satisfies R4's project-scope fail-fast uniformly for any rule scope
+ * The corpus-of-one is what makes the project-scope fail-fast check behave uniformly for any rule scope
  * without special-casing: `documents` and `projectFiles` are non-empty, so a project rule runs
  * instead of throwing.
  *

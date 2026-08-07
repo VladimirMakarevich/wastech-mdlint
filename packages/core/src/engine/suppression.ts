@@ -1,7 +1,7 @@
 import type { InlineDirective } from "../markdown/document-types.js";
 
-// Inline-disable range logic (P2.05 / audit 2.4, markdownlint-style). The parser only extracts
-// directives (P1.04); the engine computes whether a given (ruleId, line) is suppressed:
+// Inline-disable range logic, markdownlint-style. The parser only extracts
+// directives; the engine computes whether a given (ruleId, line) is suppressed:
 //
 //   - `disable-next-line [rules]` on line L suppresses line L+1 only.
 //   - `disable [rules]` on line L opens a disabled range from L; a later `enable [rules]` closes it,

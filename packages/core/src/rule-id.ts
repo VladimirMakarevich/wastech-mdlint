@@ -1,8 +1,8 @@
-// Canonical rule-ID normalization (C3).
+// Canonical rule-ID normalization.
 //
 // v2 kills the `ref001` (config) vs `REF-001` (output) split: input is accepted case-insensitively
 // and dash-optionally, and always emitted canonical. One helper is shared by inline-disable
-// directive extraction (P1.04), config rule resolution (P2.04), and the schema sync test (P2.06)
+// directive extraction, config rule resolution, and the schema sync test
 // so every surface normalizes identically.
 
 // Built-in IDs are `PREFIX-DIGITS` (REF-001, TBL-006, SIZE-001, LLM-001). The prefix run is lazy

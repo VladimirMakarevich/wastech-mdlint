@@ -9,7 +9,7 @@ import { lintFiles } from "../src/engine/lint-files.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
 import type { ResolvedRule } from "../src/engine/types.js";
 
-// W-58 (P16.01). `lintContent` exists so the ad-hoc lint path reaches the same steps in the same
+// `lintContent` exists so the ad-hoc lint path reaches the same steps in the same
 // order as `lintFiles` — the MCP `lint` tool used to assemble that sequence itself, and nothing
 // failed when the two disagreed. This suite is the differential: the same bytes through both entry
 // points must produce the same `LintResult`.

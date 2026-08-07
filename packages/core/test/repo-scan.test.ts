@@ -411,7 +411,7 @@ describe("scanRepository", () => {
   });
 });
 
-// Audit L-7: `init` proposed `.github/**`, `.venv/**` and `generated-docs/**` as doc clusters, and
+// `init` used to propose `.github/**`, `.venv/**` and `generated-docs/**` as doc clusters, and
 // the config it wrote then linted them. The scan is the first half of that fix.
 describe("scanRepository · hidden and gitignored trees", () => {
   it("does not propose a hidden directory as a cluster, at the root or nested", async () => {
@@ -466,7 +466,7 @@ describe("scanRepository · hidden and gitignored trees", () => {
 
   it("samples a file a nested .gitignore re-includes across layers, not just within one", async () => {
     // The case above puts both the ignore and its negation in the *same* file, so it never exercised
-    // precedence between layers. W-11 was the cross-layer shape: the root ignores, the nested file
+    // precedence between layers. The cross-layer shape is what mattered: the root ignores, the nested file
     // negates, and the deeper layer has to win or `init` proposes a corpus the linter then drops.
     const root = await createFixtureTree({
       ".gitignore": "notes/*.md\n",
@@ -535,7 +535,7 @@ describe("scanRepository · hidden and gitignored trees", () => {
   });
 });
 
-// W-14 (P14.03): the scan records what it pruned so `init` can disclose it. The record is the whole
+// The scan records what it pruned so `init` can disclose it. The record is the whole
 // point — a second directory walk to produce the same numbers is a second thing to disagree with the
 // first, so these tests pin what the *scan* reports rather than what a re-walk would find.
 describe("scanRepository · the pruning record", () => {
@@ -549,7 +549,7 @@ describe("scanRepository · the pruning record", () => {
 
     const result = await scanRepository({ cwd: root });
 
-    // Only the hidden *roots* are recorded — a nested `.agents/rules` is part of `.agents`'s total,
+    // Only the hidden *roots* are recorded — a nested `.a/b` is part of `.a`'s total,
     // not a second entry, so the counts can never be double-read.
     expect(result.pruned.directories).toEqual([
       { path: ".agents", reason: "hidden", markdownFileCount: 2 },

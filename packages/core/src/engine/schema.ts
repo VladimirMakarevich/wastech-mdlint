@@ -8,26 +8,28 @@ import {
 import { ASSERTION_TARGETS, assertionSchema } from "./primitives/assert.js";
 import { ruleRegistry } from "./rules/index.js";
 
-// `schema.json` generation from the single metadata source (P2.06 / R6). One function backs the
-// `schema` command, the sync test, and P6.04's project-local schema (audit 4.1) — its signature is
+// `schema.json` generation from the single metadata source. One function backs the
+// `schema` command, the sync test, and the project-local schema `init` writes — its signature is
 // frozen here.
 //
 // Output is a JSON Schema (2020-12, matching z.toJSONSchema's dialect). The meta-schema URL is the
 // standard dialect identifier resolved offline by validators — it is NOT the remote *config* schema
-// URL that C9 forbids (that link stays a local relative path in the config's own `$schema`).
+// URL. A *config* `$schema` must stay a local relative path, so schema resolution never needs the
+// network; only this dialect identifier is a URL, and validators resolve it offline.
 
 const JSON_SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema";
 const SEVERITY_ENUM = ["error", "warning", "off"] as const;
 
 // The custom-rule `target` vocabulary is the distinct set of `ASSERTION_TARGETS` values — the same
-// authority `resolveCustomRule` validates a declared `target` against (W-37). Derived rather than
+// authority `resolveCustomRule` validates a declared `target` against. Derived rather than
 // spelled out so a new assert kind carrying a new target reaches this metadata-driven file on its
 // own. Sorted for determinism, like the reserved-prefix list below.
 const ASSERTION_TARGET_ENUM = [
   ...new Set<string>(Object.values(ASSERTION_TARGETS)),
 ].sort();
 
-// A custom-rule descriptor for the project-local schema (P6.04). Minimal now; extended as P6 needs.
+// A custom-rule descriptor for the project-local schema. Only what the schema needs to name a
+// custom rule; widen it when the generated schema starts describing more than the id.
 export type CustomRuleDefinition = { id: string; description?: string };
 
 type JsonSchema = Record<string, unknown>;
@@ -38,7 +40,7 @@ type JsonSchema = Record<string, unknown>;
 // `io: "input"` is load-bearing, not a preference. z.toJSONSchema defaults to `io: "output"`, where a
 // key carrying a Zod `.default()` is emitted as **`required`** — the parsed result always has it, so
 // the output shape demands it. This file describes the config a user *writes*, where such a key is by
-// definition optional, so the first `.default()` added to any options schema (P13.04 added two) would
+// definition optional, so the first `.default()` added to any options schema would
 // otherwise have made `schema.json` reject every config omitting it. Nothing in the product validates
 // against this file, so an editor would have been the only thing to notice. The MCP SDK converts its
 // own tool schemas with `io: "input"` for the same reason
@@ -84,7 +86,7 @@ function customOptionsSchema(): JsonSchema {
   };
 }
 
-// Namespaced custom-id pattern (audit 3.5): uppercase dash-separated segments, at least one dash,
+// Namespaced custom-id pattern: uppercase dash-separated segments, at least one dash,
 // with a negative lookahead excluding built-in prefixes (and any project-local custom ids, which get
 // their own dedicated branch) so the generic branch never overlaps a specific one under `oneOf`.
 function customIdPattern(
@@ -136,7 +138,7 @@ function knownCustomBranch(id: string): JsonSchema {
 /**
  * Generate the config JSON Schema as deterministic, pretty-printed text (the exact bytes of
  * schema.json). No `opts` ⇒ the package schema (built-in rules only); `opts.customRules` ⇒ a
- * project-local schema that also validates those custom rules' ids (P6.04). Frozen API (audit 4.1).
+ * project-local schema that also validates those custom rules' ids. Frozen API.
  */
 export function generateConfigSchema(opts?: {
   customRules?: readonly CustomRuleDefinition[];
@@ -160,10 +162,11 @@ export function generateConfigSchema(opts?: {
     properties: {
       $schema: { type: "string" },
       include: { type: "array", items: { type: "string" } },
-      // Both defaults are declared so an editor can show them (P13.02, deliverable 3): before this,
-      // nothing in the schema hinted that a run excludes anything at all. A spread rather than the
-      // constant itself, so the generated JSON never aliases the shared array. `include` deliberately
-      // gets no `default` — nothing in the backlog asks for one and it would only widen the diff.
+      // Both defaults are declared so an editor can show them: without this, nothing in the schema
+      // hinted that a run excludes anything at all. A spread rather than the constant itself, so the
+      // generated JSON never aliases the shared array. `include` deliberately gets no `default` —
+      // declaring one would widen the generated file without telling a reader anything the
+      // `**/*.md` convention does not.
       exclude: {
         type: "array",
         items: { type: "string" },

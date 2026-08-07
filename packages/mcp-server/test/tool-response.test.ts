@@ -89,7 +89,7 @@ describe("errorResult", () => {
     expect(JSON.stringify(result)).not.toContain("/etc/passwd");
   });
 
-  // W-19/P14.05: the hint is the actionable half and a host that renders only `content[].text` was
+  // The hint is the actionable half and a host that renders only `content[].text` was
   // never shown it.
   it("appends a hint the message does not already contain to the text block", () => {
     const result = errorResult(
@@ -117,7 +117,7 @@ describe("errorResult", () => {
     expect(textOf(result)).toBe('Unknown rule "NOPE-999".');
   });
 
-  // W-21/P14.05: an errno naming a path inside the analyzed directory is the host's environment
+  // An errno naming a path inside the analyzed directory is the host's environment
   // failing, not an unexpected internal fault, and errno-plus-path is the whole actionable content —
   // the same sentence the CLI prints before exiting 2.
   it("classifies an errno inside the cwd as OPERATIONAL_ERROR with a repo-relative POSIX path", () => {
@@ -140,7 +140,7 @@ describe("errorResult", () => {
   it("names the analyzed directory itself as `.` when it is the failing path", () => {
     // `path.relative(cwd, cwd)` is `""`, which would render as a blank mid-sentence. Reachable in
     // practice: `stat` on a `0o000` directory succeeds (the permission bit that matters lives on the
-    // parent), so the P14.01 `cwd` guard passes and the corpus walk's `readdir` is what fails.
+    // parent), so the `cwd` guard passes and the corpus walk's `readdir` is what fails.
     const result = errorResult(errnoError({ code: "EACCES", path: CWD }), {
       cwd: CWD,
     });
@@ -245,7 +245,7 @@ describe("withErrorOutput", () => {
 });
 
 describe("READ_ONLY_ANNOTATIONS", () => {
-  it("advertises exactly the read-only hint (M7)", () => {
+  it("advertises exactly the read-only hint", () => {
     expect(READ_ONLY_ANNOTATIONS).toEqual({ readOnlyHint: true });
   });
 });

@@ -51,10 +51,10 @@ describe("handleLintFiles", () => {
     expect(structured(result).files.sort()).toEqual(["a.md", "b.md"]);
   });
 
-  // The default `exclude` is core's, not the CLI's (P13.02): both hosts reach the corpus through
+  // The default `exclude` is core's, not the CLI's: both hosts reach the corpus through
   // `resolveCorpusScope`, so an agent asking this tool about a repository with a dependency tree gets
   // the same pruned corpus a `lint` run would — and does not spend its context on `node_modules`.
-  it("inherits the lint-time default exclude with no config present (P13.02)", async () => {
+  it("inherits the lint-time default exclude with no config present", async () => {
     const dir = await makeTempDir("mcp-lf-default-exclude-");
     await mkdir(path.join(dir, "docs"), { recursive: true });
     await mkdir(path.join(dir, "node_modules", "pkg"), { recursive: true });
@@ -85,7 +85,7 @@ describe("handleLintFiles", () => {
     expect(summary).toContain("broken.md");
   });
 
-  // W-24's other half: this tool returns the raw `LintResult`, so its counts are top-level
+  // The other half of the divergence: this tool returns the raw `LintResult`, so its counts are top-level
   // `errorCount`/`warningCount` where the CLI's JSON puts them under `summary`. Both key sets are
   // pinned (see `lint.test.ts` for the ad-hoc tool) so the documented divergence cannot drift
   // unnoticed in either direction.
@@ -103,7 +103,7 @@ describe("handleLintFiles", () => {
 
   // @boundary-guard host-parity
   //
-  // W-57 / P16.01 §5. Every MCP success carries two documents — a human `content` block and
+  // Every MCP success carries two documents — a human `content` block and
   // `structuredContent` — and until now nothing checked that the first renders the second. The shared
   // readers in `core/test/support/output-parity.ts` parse the text back into rows and restate the
   // location rule, so this is two formulations of the same findings rather than one helper agreeing
@@ -137,7 +137,7 @@ describe("handleLintFiles", () => {
     });
   });
 
-  // W-35: the value `helpUri` carries over the wire is now a page, not a restatement of `ruleId`.
+  // The value `helpUri` carries over the wire is now a page, not a restatement of `ruleId`.
   it("crosses `helpUri` as a documentation URL", async () => {
     const result = await handleLintFiles({
       cwd: path.join(fixturesDir, "lint-findings-project"),
@@ -158,7 +158,7 @@ describe("handleLintFiles", () => {
     expect(structured(result).files).toEqual(["guide.md"]);
   });
 
-  // P14.01. Fast feedback on the module whose fix was the refactor: `lint-files` used to recompute
+  // Fast feedback on the module whose fix was the refactor: `lint-files` used to recompute
   // `cwd ?? process.cwd()` outside the shared resolver, so guarding only the resolver would have left
   // it answering `No problems found.` here. The wire-level acceptance evidence is in
   // `stdio-integration.test.ts`.
@@ -175,7 +175,7 @@ describe("handleLintFiles", () => {
     );
   });
 
-  // W-21/P14.05. Fast in-process feedback on the operational classifier; the wire-level evidence is
+  // Fast in-process feedback on the operational classifier; the wire-level evidence is
   // in `stdio-integration.test.ts`. This is the field test's own scenario — a directory inside the
   // corpus with its permissions removed — which used to come back as `INTERNAL_ERROR` and "An
   // unexpected internal error occurred.", dropping the errno and the path that are the entire
@@ -208,7 +208,7 @@ describe("handleLintFiles", () => {
         // No hint by design — the message already carries the whole remedy-bearing content.
         expect(error.hint).toBeUndefined();
         // The absolute base must not survive anywhere in an `OPERATIONAL_ERROR` payload — the errno's
-        // path is rendered relative to it. (P14.01's `INVALID_INPUT` rejection is the deliberate
+        // path is rendered relative to it. (The `INVALID_INPUT` rejection is the deliberate
         // exception: there the `cwd` is itself the broken thing and is named absolutely.)
         expect(JSON.stringify(result)).not.toContain(dir);
       } finally {

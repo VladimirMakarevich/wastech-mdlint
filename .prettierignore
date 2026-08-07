@@ -1,15 +1,20 @@
 # Prettier's default --ignore-path is BOTH .gitignore and .prettierignore (`prettier --help
 # ignore-path`), so an entry is only needed here for paths git actually tracks. That is why
 # `.claude/` and `.worc/` need a line below while `.worc-io/` does not — it is already gitignored.
-# The corollary is the one to remember: anything in .gitignore is silently outside the format gate,
-# which is why `tasks/` is not gated (P12.06 records why that is deliberate).
+# The corollary is the one to remember: anything in .gitignore is silently outside the format gate.
+# `tasks/` is the case that matters, and leaving it ungated is deliberate: those files are
+# operator-authored and were never Prettier-formatted, so gating them would be red on arrival — and
+# agents are forbidden to modify anything under `tasks/`, so the run that tripped such a gate could
+# not repair it. To gate it anyway the change is `prettier --check . --ignore-path .prettierignore`
+# in the root package.json, plus a line here for `.worc-io/` (today excluded only by .gitignore),
+# plus a one-time `prettier --write tasks/`.
 dist
 coverage
 .vitest
 packages/**/dist
 
 # Raw JSON.stringify(schema, null, 2) output (packages/core/src/engine/schema.ts); a byte-sync
-# test (schema-generation.test.ts, R6) requires this file to match that output exactly, which
+# test (schema-generation.test.ts) requires this file to match that output exactly, which
 # collapses short arrays differently than Prettier's JSON formatting would.
 packages/cli/schema.json
 

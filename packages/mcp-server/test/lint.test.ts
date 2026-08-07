@@ -14,8 +14,8 @@ import {
   readLintSummaryLine,
 } from "../../core/test/support/output-parity.js";
 
-// P7.02 exercises the computational layer (`handleLint`) directly — wire-level McpServer testing is
-// deferred to P7.05 — so these assert the structured output / error contract without a transport.
+// Exercises the computational layer (`handleLint`) directly — wire-level McpServer testing lives in
+// the stdio suite — so these assert the structured output / error contract without a transport.
 
 function structured(
   result: ReturnType<typeof handleLint>,
@@ -49,7 +49,7 @@ describe("handleLint", () => {
     expect((result.content[0] as { text: string }).text).toContain("SIZE-001");
   });
 
-  // W-24: the two lint tools return deliberately different documents, and the divergence was found
+  // The two lint tools return deliberately different documents, and the divergence was found
   // twice by inspection without either pass noticing. Pinned by test on both tools so the difference
   // is a decision the guide's host table states, not a drift a third reader re-discovers.
   it("returns the narrower ad-hoc shape: no `files` list, counts at the top level", () => {
@@ -68,7 +68,7 @@ describe("handleLint", () => {
 
   // @boundary-guard host-parity
   //
-  // W-57 / P16.01 §5, on the ad-hoc tool: the text block must render exactly the messages
+  // Output parity on the ad-hoc tool: the text block must render exactly the messages
   // `structuredContent` carries. Worth its own assertion rather than inheriting `lint-files`' — this
   // tool builds a narrower structured document (no `files`) from the same `LintResult`, and dropping a
   // field on the way out is precisely the class of defect the reading passes kept missing.
@@ -101,7 +101,7 @@ describe("handleLint", () => {
     });
   });
 
-  // W-35: `helpUri` crosses the wire schema, so the value change from a bare rule id to a URL is
+  // `helpUri` crosses the wire schema, so the value change from a bare rule id to a URL is
   // caller-visible. Asserted at the tool boundary, not only in core.
   it("crosses `helpUri` as a documentation URL, not a rule id", () => {
     const result = handleLint({
@@ -139,7 +139,7 @@ describe("handleLint", () => {
     expect(output.hint).toContain("SIZE-001");
   });
 
-  // W-19/P14.05. The text block is what a host renders and what a model reads, so dropping the
+  // The text block is what a host renders and what a model reads, so dropping the
   // did-you-mean there left the actionable half of the error visible only to a client that also
   // inspects `structuredContent`. The CLI prints both sentences together for the same typo.
   it("renders the did-you-mean hint in the text block, not only in structuredContent", () => {
@@ -178,8 +178,8 @@ describe("handleLint", () => {
     expect(structured(result).code).toBe("INVALID_INPUT");
   });
 
-  it("runs a declarative document-scope custom rule (M8)", () => {
-    // P12.04 direction (A): a `custom` entry is pure data, so ad-hoc lint executes it exactly as
+  it("runs a declarative document-scope custom rule", () => {
+    // Direction (A): a `custom` entry is pure data, so ad-hoc lint executes it exactly as
     // `lint-files` would from config — no code plugin is ever loaded.
     const result = handleLint({
       content: "| ID | Owner |\n| --- | --- |\n| REQ-1 |  |\n",
@@ -223,8 +223,8 @@ describe("handleLint", () => {
     expect(output.warningCount).toBe(1);
   });
 
-  it("runs a project-scope custom assert (columnUnique) without tripping R4", () => {
-    // `columnUnique` is the one project-scope assert; the tool's corpus-of-one satisfies R4's
+  it("runs a project-scope custom assert (columnUnique) without tripping the corpus fail-fast", () => {
+    // `columnUnique` is the one project-scope assert; the tool's corpus-of-one satisfies the
     // fail-fast, so it must report intra-document duplicates instead of degrading to INTERNAL_ERROR.
     // A corpus of one can only ever see duplicates *within* `content` — cross-file uniqueness needs
     // `lint-files`.
@@ -249,7 +249,7 @@ describe("handleLint", () => {
   it("maps a malformed `custom` entry to a guided INVALID_INPUT, not a schema crash", () => {
     // The wire schema keeps a permissive branch precisely so this shape reaches the handler: the SDK
     // validates input before the handler runs, so a wire rejection would surface as a bare protocol
-    // error with none of the M6 guidance. Also the boundary guard for P11.07's
+    // error with none of the structured guidance. Also the boundary guard for the
     // canonicalizeRuleId(undefined) crash, since `handleLint` is called directly here.
     const result = handleLint({
       content: "# Title\n",
@@ -263,7 +263,7 @@ describe("handleLint", () => {
     expect(output.hint).toContain("id");
   });
 
-  it("rejects a custom id under a reserved built-in prefix (C7)", () => {
+  it("rejects a custom id under a reserved built-in prefix", () => {
     // resolveCustomRule's own RuleResolutionError must translate through the existing
     // toToolInputError path rather than escaping as a sanitized INTERNAL_ERROR.
     const result = handleLint({
@@ -317,7 +317,7 @@ describe("handleLint", () => {
     expect(messages.some((message) => message.ruleId === "REF-001")).toBe(true);
   });
 
-  it("applies inline-disable suppression (R8) to ad-hoc content", () => {
+  it("applies inline-disable suppression to ad-hoc content", () => {
     // A `disable-next-line` directive must drop the finding on the following line, matching
     // lint-files' behavior on the same directive-bearing content.
     const suppressed = handleLint({
@@ -376,7 +376,7 @@ describe("handleLint", () => {
     ).toBe(true);
   });
 
-  it("rejects an absolute SEC-003 template path — closes the MCP host-read attack surface (audit H-2)", async () => {
+  it("rejects an absolute SEC-003 template path — closes the MCP host-read attack surface", async () => {
     // The `lint` tool takes its whole `rules` array from the caller and hard-codes
     // `rootDir: process.cwd()`; an absolute `template` must be rejected before any read, not just
     // reported as "not found" — otherwise a prompt-injected caller turns this read-only tool into a
@@ -406,7 +406,7 @@ describe("handleLint", () => {
   });
 
   it("rejects an absolute STR-001 required path — same containment as SEC-003", async () => {
-    // STR-001's disk probe (P11.12) is reachable from the same caller-supplied `rules` array, so it
+    // STR-001's disk probe is reachable from the same caller-supplied `rules` array, so it
     // is held to the same boundary: rejected outright, never answered as present/absent.
     const outsideRoot = await mkdtemp(
       path.join(os.tmpdir(), "wastech-mdlint-mcp-str-"),
@@ -436,7 +436,7 @@ describe("handleLint", () => {
 
   it("satisfies an in-root STR-001 required file via the disk probe", () => {
     // The repo-root package.json exists under the test cwd but is never in a Markdown corpus —
-    // exactly the BL-1 shape, checked at the MCP surface.
+    // exactly the literal-entry shape, checked at the MCP surface.
     const result = handleLint({
       content: "# Title\n",
       rules: [{ rule: "STR-001", options: { files: ["package.json"] } }],
@@ -463,7 +463,7 @@ describe("handleLint", () => {
 });
 
 /**
- * W-58's structural half.
+ * The structural half: both lint paths reach the same steps in the same order.
  *
  * The behavioral tests above pass whether this handler calls core's `lintContent` or re-assembles the
  * sequence itself — that is exactly why the duplication survived two review passes. So this asserts

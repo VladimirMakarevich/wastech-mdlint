@@ -1,8 +1,8 @@
 import type { SiteRouterSettings } from "./types.js";
 
-// `site-router` util (P3.01): map a root-relative site URL to candidate repo-relative source files.
-// Introduced here because REF-001's `linkResolves` primitive (P2.02) needs it; P3.04 layers the
-// i18n same-locale-first fallback on top of these candidates.
+// `site-router` util: map a root-relative site URL to candidate repo-relative source files.
+// Introduced here because REF-001's `linkResolves` primitive needs it; the i18n
+// same-locale-first fallback is layered on top of these candidates.
 //
 // Only the `starlight` preset is modeled in v2 (the reference SSG). Unknown presets fall back to
 // treating the URL as a plain repo-root-relative path.
@@ -32,7 +32,7 @@ function starlightCandidates(routePath: string, contentDir: string): string[] {
  *
  * `sourceLocale` (the locale segment of the linking file, if any) drives i18n resolution: a
  * non-default-locale source resolves same-locale first (`/<locale>/<path>`), then falls back to the
- * default locale — the P3.04 REF-001 rule. Callers check the returned candidates against the corpus
+ * default locale. Callers check the returned candidates against the corpus
  * / filesystem in order.
  */
 export function resolveRoutedUrl(
@@ -55,7 +55,7 @@ export function resolveRoutedUrl(
     firstSegment === (sourceLocale ?? router.defaultLocale);
 
   // Same-locale first when the source lives under a non-default locale and the URL is not already
-  // locale-qualified (audit — P3 REF gap i18n).
+  // locale-qualified: a translated page links to its own locale before falling back.
   if (
     sourceLocale !== undefined &&
     sourceLocale !== router.defaultLocale &&

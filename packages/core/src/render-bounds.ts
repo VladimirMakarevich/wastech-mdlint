@@ -1,4 +1,4 @@
-// Shared bounds for the two human-facing renderers (P15.01 / W-26, W-27). A sibling of
+// Shared bounds for the two human-facing renderers. A sibling of
 // `deterministic-sort.ts` rather than a helper inside either renderer: `graph/graph-render.ts` and
 // `compile/synthesize.ts` both render a cycle path, and a helper owned by one of them would make
 // the other import across a layer boundary it otherwise never crosses.

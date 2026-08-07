@@ -167,8 +167,8 @@ describe("TBL rules", () => {
   });
 });
 
-// Audit L-4: the shared `files`/`exclude` shape had no end-to-end coverage on any document-scope
-// rule, which is how M-2 shipped. Both fixture documents violate every case below, so the only
+// The shared `files`/`exclude` shape had no end-to-end coverage on any document-scope
+// rule, which is how an unscoped one shipped. Both fixture documents violate every case below, so the only
 // variable across the three runs is the scope the rule was given.
 const FILE_SCOPE_CASES: readonly { id: string; options: object }[] = [
   { id: "TBL-001", options: { requiredColumns: ["ID", "Priority"] } },
@@ -209,7 +209,7 @@ describe("TBL file scope (exclude)", () => {
         "docs/a.md",
         "drafts/b.md",
       ]);
-      // The M-2 shape — `exclude` with no `files` beside it to carry the filtering.
+      // The unscoped shape — `exclude` with no `files` beside it to carry the filtering.
       expect(
         await reportedFiles(
           cwd,
@@ -249,7 +249,7 @@ describe("TBL-002 --fix", () => {
 
   // The fix path has its own scope gate because `applyFixes` has none: it walks every loaded
   // document and calls each hook, so a hook that ignores `exclude` rewrites files the rule's own
-  // `check` never looked at. Found while writing P12.01's `exclude` matrix.
+  // `check` never looked at. Found while writing the shared `exclude` matrix.
   it("leaves an excluded file byte-unchanged on the --fix path", async () => {
     const cwd = await fixtureRepo({ "docs/a.md": TABLE, "drafts/b.md": TABLE });
     const scoped = rule("TBL-002", {
@@ -275,7 +275,7 @@ describe("TBL-002 --fix", () => {
 
   // `emptyCellEdits` only ever edits *between* a row's pipes, so its offsets were already CRLF-safe
   // (`content.split("\n")` leaves the `\r` outside the cell range) — this pins that down so the
-  // P11.09 newline normalization on the write path cannot regress it in the other direction.
+  // newline normalization on the write path cannot regress it in the other direction.
   it("fills the cell without disturbing a CRLF document's line endings", async () => {
     const cwd = await fixtureRepo({ "a.md": TABLE.replace(/\n/g, "\r\n") });
 

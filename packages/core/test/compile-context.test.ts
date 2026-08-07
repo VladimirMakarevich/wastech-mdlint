@@ -77,7 +77,7 @@ describe("compileContext", () => {
   });
 
   it("threads compile.hubMinInDegree through to role classification", async () => {
-    // Same fixture shape as P5.01's own hub-threshold test: three files link to `bridge.md`
+    // Same fixture shape as the graph analyzer's own hub-threshold test: three files link to `bridge.md`
     // (inDegree 3), which is the default `hubMinInDegree` boundary.
     const root = await fixtureRepo({
       "a.md": "[bridge](bridge.md)\n[leaf](leaf.md)\n",
@@ -257,7 +257,7 @@ describe("compileContext", () => {
   });
 
   it("computes the corpus token estimate against a CJK document's exact character count", async () => {
-    // D3's estimator (Math.ceil(text.length / 4)) counts UTF-16 code units, not UTF-8 bytes.
+    // The token estimator (Math.ceil(text.length / 4)) counts UTF-16 code units, not UTF-8 bytes.
     // `expected` is computed from that locked formula directly against the literal fixture
     // string — not by calling `estimateTokens` itself — so a future regression to a byte-based
     // measure changes only the code under test, not this assertion's expectation, and the test
@@ -319,7 +319,7 @@ describe("compileContext", () => {
   });
 });
 
-// W-27's exit criteria at the scale that produced them. The field test's artifact at this corpus
+// The SKILL.md size caps, at the corpus scale that motivated them. The artifact at this corpus
 // size was 110 789 bytes with an 89.7% dependency section and a single 17 530-character line.
 describe("compileContext at corpus scale", () => {
   let root: string;

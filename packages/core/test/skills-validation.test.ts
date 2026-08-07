@@ -33,7 +33,7 @@ describe("shipped skills", () => {
     ]);
   });
 
-  // S1: every static skill's frontmatter validates against the one shared schema.
+  // Every static skill's frontmatter validates against the one shared schema.
   it.each(skillIds)(
     "validates %s frontmatter against the schema (S1)",
     (id) => {
@@ -47,8 +47,8 @@ describe("shipped skills", () => {
     },
   );
 
-  // S7: host-neutrality — no Claude-specific command injection, no leftover placeholders.
-  describe.each(skillIds)("host-neutrality of %s (S7)", (id) => {
+  // Host-neutrality — no vendor-specific command injection, no leftover placeholders.
+  describe.each(skillIds)("host-neutrality of %s", (id) => {
     const body = readSkill(id);
 
     it("uses no $ARGUMENTS command-injection token", () => {

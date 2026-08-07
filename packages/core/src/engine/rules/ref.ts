@@ -25,8 +25,8 @@ import { resolveRoutedUrl } from "../site-router.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
 import type { RuleContext, SiteRouterSettings } from "../types.js";
 
-// Reference-integrity rules (P3.04). REF rules use the documents map + existsSync + site-router; no
-// graph needed (that's GRP, P3.06).
+// Reference-integrity rules. REF rules use the documents map + existsSync + site-router; no
+// graph needed — that is the GRP family's job.
 
 const siteRouterOptionSchema = z
   .object({
@@ -190,8 +190,8 @@ function zoneOf(relPath: string, zonesDir: string): string | undefined {
 }
 
 // REF-004 — cross-zone links must be declared in the source zone's Dependencies section. Document
-// scope, but reads the corpus to learn zones + declarations (journal [P3.04] documents this
-// interpretation of an underspecified rule).
+// scope, but reads the corpus to learn zones + declarations. The rule as specified was ambiguous
+// about whether a declaration is per-zone or per-document; per-zone is the reading implemented here.
 export const ref004: RuleDefinition = defineRule({
   metadata: {
     id: "REF-004",
@@ -218,7 +218,7 @@ export const ref004: RuleDefinition = defineRule({
     const dependencyHeading = options.dependencySection ?? "Dependencies";
     // Compiled once per zone (guarded by `.has`), not once per file that shares that zone or per
     // heading/document that scans it — `zone` is an arbitrary directory name, so it must be escaped
-    // before it becomes regex source (audit M-1: unescaped interpolation crashed on names like "c++"
+    // before it becomes regex source (unescaped interpolation crashed on names like "c++"
     // and silently mismatched on names like "node.js").
     const zoneMentionRegexes = new Map<string, RegExp>();
     for (const relPath of context.projectFiles ?? []) {
@@ -281,7 +281,7 @@ export const ref004: RuleDefinition = defineRule({
 
 // REF-005 — ID traceability: every referenced ID has a definition (dangling ref = error) and every
 // defined ID is referenced (orphan def = warning). Definitions go through the shared
-// `extractDefinedIds` (column + heading discovery, audit 5.5) so this rule and the graph's id-ref
+// `extractDefinedIds` (column + heading discovery) so this rule and the graph's id-ref
 // edges agree on what counts as a defined ID; references stay column-only via `extractColumnIds`.
 export const ref005: RuleDefinition = defineRule({
   metadata: {

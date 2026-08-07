@@ -7,7 +7,7 @@ import {
   resolvesOutsideRoot,
 } from "../src/engine/path-resolve.js";
 
-// Direct unit coverage for the raw, filesystem-facing containment check (audit H-2). Unlike
+// Direct unit coverage for the raw, filesystem-facing containment check. Unlike
 // `escapesRoot`, this helper must see the raw config/MCP-caller string before any corpus
 // normalization, so it has to independently reject an OS-absolute path as well as a `..`-escaping
 // relative one.
@@ -53,8 +53,9 @@ describe("resolvesOutsideRoot", () => {
   );
 });
 
-// Direct unit coverage for the internally-built-candidate containment check (audit H-2 class
-// sweep, REF-001/REF-003/G5 gap). Unlike `resolvesOutsideRoot`, this helper sees only
+// Direct unit coverage for the internally-built-candidate containment check, the same
+// escape-the-root class REF-001, REF-003 and coverage all had to close. Unlike
+// `resolvesOutsideRoot`, this helper sees only
 // corpus-relative POSIX candidates that `resolveRelativeToSource`/`resolveTargetCandidates`
 // already produced — but those can still normalize to a drive-absolute-looking remainder when a
 // relative link's `..` segments exactly cancel the source directory.

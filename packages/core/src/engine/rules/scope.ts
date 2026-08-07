@@ -2,9 +2,9 @@ import { z } from "zod";
 
 import { matchesConfigGlob } from "../../discovery/globs.js";
 
-// Shared `files`/`exclude` file-scoping base for every rule (R7 / P3.01). `glob-match` semantics are
+// Shared `files`/`exclude` file-scoping base for every rule. `glob-match` semantics are
 // picomatch-with-`{dot:true}` via the repo's matchesConfigGlob, so dotfiles (`.claude/…`) match. Each
-// list is also *ordered* (P13.01): a leading `!` subtracts from what the entries before it selected,
+// list is also *ordered*: a leading `!` subtracts from what the entries before it selected,
 // so a negated `files` narrows the rule's scope instead of widening it.
 
 // Options fragment mixed into rules that scope by file. `.strict()` is applied by each rule's own
@@ -18,7 +18,7 @@ export type FileScope = { files?: string[]; exclude?: string[] };
 
 /**
  * True when `filePath` is in scope for a rule: it matches `files` (if given) and does not match
- * `exclude`. `exclude` wins over `files` (C1 semantics, applied per-rule).
+ * `exclude`. `exclude` wins over `files`, matching the top-level config's precedence, applied per-rule.
  */
 export function matchesFileScope(filePath: string, scope: FileScope): boolean {
   if (scope.files !== undefined && !matchesConfigGlob(filePath, scope.files)) {

@@ -37,7 +37,7 @@ describe("isStructuredError", () => {
     expect(TOOL_ERROR_CODES).toContain("INTERNAL_ERROR");
   });
 
-  it("carries the operational code the host classifier produces (P14.05)", () => {
+  it("carries the operational code the host classifier produces", () => {
     // No core error class throws this one: a host maps a vetted errno onto it (mcp-server's
     // `toOperationalErrorInfo`). The membership assertion is what keeps the advertised MCP
     // `outputSchema` enum and the CLI's taxonomy agreeing that the code exists at all — and the raw

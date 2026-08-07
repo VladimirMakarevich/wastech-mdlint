@@ -79,7 +79,7 @@ describe("parseDocument · tables", () => {
     expect(doc.tables[0]?.section).toBeUndefined();
   });
 
-  it("assigns the most-recent heading of any level as the section (audit 5.3)", () => {
+  it("assigns the most-recent heading of any level as the section", () => {
     const doc = parse(
       ["## Outer", "", "### Inner", "", "| A |", "| --- |", "| v |", ""].join(
         "\n",
@@ -223,7 +223,7 @@ describe("parseDocument · eager imports", () => {
     expect(doc.imports).toEqual([]);
   });
 
-  it("gives each import in a multi-line block its own line and column (audit M-1)", () => {
+  it("gives each import in a multi-line block its own line and column", () => {
     // remark merges these three consecutive lines into one `text` node; the block starts at line 3
     // (not 1) so a fix that only works by coincidence at the top of a file still fails.
     const doc = parse(
@@ -244,7 +244,7 @@ describe("parseDocument · eager imports", () => {
     ]);
   });
 
-  it("anchors column to the matched import, not an earlier @-substring on the line (audit M-1)", () => {
+  it("anchors column to the matched import, not an earlier @-substring on the line", () => {
     // `foo@early.md` is not an import (the `@` is not at a word boundary), so only the second token
     // matches — the column must point at that match, not the earlier `@early.md` text on the line.
     const doc = parse("foo@early.md see @late.md here\n");
@@ -263,7 +263,7 @@ describe("parseDocument · eager imports", () => {
     ]);
   });
 
-  it("gives each import in separate paragraphs its own line (audit M-1)", () => {
+  it("gives each import in separate paragraphs its own line", () => {
     // Two paragraphs are two `text` nodes; each import's line must come from its own node, not from
     // an unrelated `@` elsewhere in the document.
     const doc = parse("@a.md\n\n@b.md\n");
@@ -274,7 +274,7 @@ describe("parseDocument · eager imports", () => {
     ]);
   });
 
-  it("reports a continuation-line column past the start of that line (audit M-1)", () => {
+  it("reports a continuation-line column past the start of that line", () => {
     // Guards the continuation-line column arithmetic: every other multi-line case here lands the
     // import at column 1, which would still pass even if the offset math were degenerate. Here the
     // second line has leading text, so the `@` sits at column 6 of its own physical line.

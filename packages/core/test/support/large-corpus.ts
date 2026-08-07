@@ -1,9 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-// A generated 139-document corpus — the fixture P15.01 needs and this repository had no way to
-// produce. Every defect W-26/W-27 describe only appears past a scale the existing 8-file fixtures
-// cannot reach: the post-P9 audit's compile output was 1415 bytes, the field test's 110 789. The
+// A generated 139-document corpus — a scale this repository had no fixture for. The unbounded-line
+// and artifact-size defects only appear past a scale the existing 8-file fixtures
+// cannot reach: on those, compile output was 1415 bytes; on a real corpus, 110 789. The
 // corpus is generated rather than checked in so its shape stays legible (each group below states
 // what it exists to exercise) instead of having to be reverse-engineered from 139 files.
 //
@@ -12,12 +12,12 @@ import path from "node:path";
 // module graph would couple those suites to core's internal layout. The helpers that need a real
 // `ContextGraph` live in the sibling `large-corpus-graph.ts` instead.
 //
-// It is also a plain module, not a `.test.ts` with exported constants (the P14.03 precedent):
+// It is also a plain module, not a `.test.ts` with exported constants:
 // importing a test file re-registers its suites inside the importer.
 
 // Group sizes. Chosen together so the corpus reproduces the *field* distribution rather than a
-// shape tuned to make the assertions pass — W-28's honesty depends on that, since the register row
-// it feeds quotes this fixture's measured role histogram.
+// shape tuned to make the assertions pass. The role-coarseness limitation recorded elsewhere quotes
+// this fixture's measured histogram, so a tuned shape would make that record dishonest.
 const TOPIC_COUNT = 34;
 const GUIDE_COUNT = 11;
 const APPENDIX_COUNT = 4;
@@ -30,7 +30,7 @@ const SIBLING_FANOUT = 3;
 
 export const LARGE_CORPUS_DOCUMENT_COUNT = 139;
 
-/** The one heavily-referenced document; its incoming edge list is what W-27's 17 530-char line was. */
+/** The one heavily-referenced document; its incoming edge list is what the 17 530-char line was. */
 export const LARGE_CORPUS_HUB_PATH = "reference/api-reference.md";
 
 /**
@@ -280,7 +280,7 @@ export function largeCorpusFiles(): Record<string, string> {
 /**
  * The config `compileContext` requires (it throws `CompileConfigMissingError` without a `compile`
  * section). The rule list is a realistic option-free selection across five families, so
- * `Document Rules` renders the grouped output W-27 asks the compiler to give budget back to —
+ * `Document Rules` renders the grouped output the size caps exist to give budget back to —
  * an empty `rules` array would collapse that section to "(no rules configured)" and make the
  * section-share assertion vacuous.
  */

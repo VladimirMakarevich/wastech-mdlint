@@ -10,7 +10,7 @@ import type { LintFilesInput } from "./lint-files.js";
 import type { RuleContext, TextEdit } from "./types.js";
 
 /**
- * Apply offset-based edits to content (P3.02 fix engine). Edits are applied from the highest offset
+ * Apply offset-based edits to content. Edits are applied from the highest offset
  * down so earlier offsets stay valid; overlapping edits are skipped (last-writer-wins by position)
  * so a malformed rule can never corrupt the file.
  */
@@ -39,7 +39,7 @@ export function applyEdits(
 export type ApplyFixesResult = { fixedFiles: string[] };
 
 /**
- * A `--fix` document write that could not be committed (P11.09). Thrown rather than swallowed: the
+ * A `--fix` document write that could not be committed. Thrown rather than swallowed: the
  * user asked for their files to be rewritten, and silently continuing would report a clean re-lint
  * for a file that was never actually fixed.
  *
@@ -77,7 +77,7 @@ export class FixWriteError extends Error {
 
 /**
  * Apply the deterministic fixes of document-scope fixable rules to the repo, writing changed files
- * in place (ESLint-style; audit 4.2). Fix is inherently document-scoped — a TextEdit targets one
+ * in place, ESLint-style. Fix is inherently document-scoped — a TextEdit targets one
  * document's content — so project-scope rules never contribute fixes. Returns the fixed file list;
  * the caller re-lints to report what remains.
  */
@@ -85,7 +85,7 @@ export async function applyFixes(
   input: LintFilesInput,
 ): Promise<ApplyFixesResult> {
   const rootDir = path.resolve(input.cwd);
-  // Same resolved scope as `lintFiles` (P13.02) — a file the lint pass never read must not be one
+  // Same resolved scope as `lintFiles` — a file the lint pass never read must not be one
   // `--fix` rewrites.
   const scope = resolveCorpusScope(input.config);
   const loaded = await loadDocuments(scope.include, {
@@ -121,7 +121,7 @@ export async function applyFixes(
 
     // Enforced once here rather than inside `applyEdits` (which stays a pure offset primitive):
     // whatever a rule hands back adopts the host document's line ending, so no rule can leave a
-    // CRLF file with mixed endings (audit L-6). Fixable rules also do this themselves where they
+    // CRLF file with mixed endings. Fixable rules also do this themselves where they
     // build multi-line content, so each is correct when called in isolation — deliberately
     // belt-and-braces, since a future fix hook that forgets is the exact failure mode this class-level
     // guarantee exists to absorb.

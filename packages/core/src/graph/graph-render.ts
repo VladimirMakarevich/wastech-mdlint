@@ -13,8 +13,8 @@ import {
 import type { ImpactClassification } from "./impact-analysis.js";
 import type { ContextSliceResult } from "./search-index.js";
 
-// Deterministic renderers over a `ContextGraph` (P4.07 CLI, later reused by P7's MCP `summary`
-// fields). All traversal/analysis is delegated to the existing P4.02/P4.05/P4.06 modules — this file
+// Deterministic renderers over a `ContextGraph`, shared by the CLI `graph` command and the MCP
+// `summary` fields. All traversal/analysis is delegated to the algorithm modules — this file
 // only projects their outputs into JSON-shaped structs or byte-stable text, so hosts never duplicate
 // graph logic (core-hosts-the-pipeline decision).
 
@@ -34,25 +34,24 @@ export type ContextGraphSummary = {
   edges: ContextGraphEdge[];
   components: string[][];
   readingOrder: string[];
-  // The nodes a cycle kept out of `readingOrder` (W-23). Always present, never optional: it is the
+  // The nodes a cycle kept out of `readingOrder`. Always present, never optional: it is the
   // same field name and `string[]` shape `ImpactClassification.excluded` already ships, and a
   // machine consumer that had to derive it as `nodes` minus `readingOrder` was the defect — at 43 of
   // 139 nodes on the large-corpus fixture, the omission reads as a silently truncated reading order.
   // The human renderer drops the section when it is empty (a report for a reader omits empty
   // sections); a machine contract must not drop a key, so this side of the parity always carries it.
   excluded: string[];
-  // G5 coverage (audit B): included only when the host supplies it. The CLI `graph` command always
-  // does, and since P15.02 so does the MCP `context-graph` tool's `summary` branch — but a caller
-  // that summarizes a bare graph without disk access can still omit it.
+  // Coverage: included only when the host supplies it. Both the CLI `graph` command and the MCP
+  // `context-graph` tool's `summary` branch do — but a caller that summarizes a bare graph without
+  // disk access can still omit it, so it stays optional.
   coverage?: GraphCoverage;
 };
 
-// The shipped JSON key set is `{ nodes, edges, components, readingOrder, excluded, coverage? }` —
-// P4.07 step 1 specified the first four, `coverage` was added for audit B, and `excluded` by W-23
-// (P15.02); that task file records the supersession. Mirrors `renderContextGraphText`'s
-// optional-coverage parameter so both formats expose the same signals.
-// `components`/`readingOrder`/`excluded` reuse P4.02's algorithms verbatim rather than recomputing
-// clusters/order here.
+// The shipped JSON key set is `{ nodes, edges, components, readingOrder, excluded, coverage? }`.
+// It mirrors `renderContextGraphText`'s optional-coverage parameter so both formats expose the same
+// signals — a key present in one and absent from the other is the drift this pairing exists to
+// prevent. `components`/`readingOrder`/`excluded` reuse the algorithm modules verbatim rather than
+// recomputing clusters/order here.
 export function summarizeContextGraph(
   graph: ContextGraph,
   coverage?: GraphCoverage,
@@ -75,7 +74,7 @@ export function summarizeContextGraph(
 
 // Every path-bearing section of the human format is a `header (count):` line followed by one
 // indented item per line — the shape `top hubs` and `files (N):` already had, and now the shape all
-// of them have (W-26). Comma-joining produced 3500–3900-character single lines on a 139-node graph
+// of them have. Comma-joining produced 3500–3900-character single lines on a 139-node graph
 // and left the format internally inconsistent, three sections line-oriented and three not.
 function pushPathList(
   lines: string[],
@@ -90,9 +89,8 @@ function pushPathList(
 }
 
 // `renderContextGraphText` builds on `formatContextGraphSummary` (nodes/edges/cycles/entry
-// points/hubs) rather than re-deriving those fields, then appends the three signals the AC asks for
-// that the P4.02 summary does not already cover: clusters, reading order, and (optionally) the P4.06
-// coverage signal.
+// points/hubs) rather than re-deriving those fields, then appends the three signals that summary
+// does not already cover: clusters, reading order, and (optionally) coverage.
 export function renderContextGraphText(
   graph: ContextGraph,
   coverage?: GraphCoverage,
@@ -123,9 +121,9 @@ export function renderContextGraphText(
     lines.push("coverage:");
     lines.push(`  nodes: ${coverage.nodeCount}`);
     lines.push(`  edges: ${coverage.edgeCount}`);
-    // Also comma-joined before P15.01. The backlog called coverage "correctly line-oriented"
-    // because the field corpus had only 12 files outside it; the defect is the same one, and the
-    // exit criterion ("no line exceeds a stated width") is unconditional.
+    // This was comma-joined too. Coverage looked "correctly line-oriented" only because the corpus
+    // it was measured on had just 12 files outside the graph; the unbounded-line defect is the same
+    // one as everywhere else here, and the no-line-exceeds-a-stated-width rule is unconditional.
     pushPathList(
       lines,
       "  files outside corpus",
@@ -220,7 +218,7 @@ export function renderContextSliceSummary(result: ContextSliceResult): string {
   }
 
   // `starts` is not a one-element list: an `#anchor`, heading, or ID query resolves to *every* file
-  // carrying that slug, so comma-joining it is the same multi-KB blob W-26 is about, in the same
+  // carrying that slug, so comma-joining it produces the same multi-KB single line, in the same
   // file as the renderers that shed it. Line-oriented here too, for the same reason.
   const lines = [`query: ${result.query}`, `matched: ${result.matchKind}`];
   pushPathList(lines, "starts", result.starts);
@@ -247,7 +245,7 @@ export function renderImpactSummary(result: ImpactClassification): string {
 
   // The same comma-joined pair `renderContextGraphText` had, on a subgraph that can be the whole
   // corpus when the changed file is a hub. Fixing three of the four instances of one defect would
-  // recreate the inconsistency W-26 is about, so `impact --format text` moves with them.
+  // leave one renderer inconsistent with the other three, so `impact --format text` moves with them.
   pushPathList(lines, "reading order", result.readingOrder);
   if (result.excluded.length > 0) {
     pushPathList(lines, "excluded from reading order", result.excluded);

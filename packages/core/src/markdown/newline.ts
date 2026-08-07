@@ -1,4 +1,4 @@
-// Newline handling for the `--fix` write path (P11.09, audit L-6). Core-internal: nothing outside
+// Newline handling for the `--fix` write path. Core-internal: nothing outside
 // core needs it, so it stays out of the public barrel (same treatment as `engine/path-resolve.ts`).
 //
 // Only the two terminators Markdown tooling actually round-trips are modelled. A document's own

@@ -88,7 +88,7 @@ function extractWorkspaceGlobsFromPnpmYaml(
 
     // A blank line inside a block sequence is legal YAML formatting (a grouping/comment separator),
     // not the end of the sequence. Breaking here truncated every entry after the first blank line
-    // and silently under-detected the monorepo (audit L-11); the real terminator is the top-level
+    // and silently under-detected the monorepo; the real terminator is the top-level
     // key check below.
     if (line.trim().length === 0) {
       continue;

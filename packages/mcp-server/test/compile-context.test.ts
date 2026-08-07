@@ -57,7 +57,7 @@ describe("handleCompileContext", () => {
     );
   });
 
-  // P14.01, the sibling of `lint-files`' case: this module also recomputed the `cwd` default outside
+  // The sibling of `lint-files`' case: this module also recomputed the `cwd` default outside
   // the shared resolver. A bad `cwd` must be named as such rather than misattributed to a missing
   // `config.compile`, which is what the zero-config fallthrough below used to report.
   it("rejects a nonexistent cwd with INVALID_INPUT rather than COMPILE_CONFIG_MISSING", async () => {

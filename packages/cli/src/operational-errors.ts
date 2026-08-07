@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { normalizeRelativePath } from "@wastech-mdlint/core";
 
-// Rendering for operational (exit 2) failures (P11.10, audit M-6). Pure formatters only, and
+// Rendering for operational (exit 2) failures. Pure formatters only, and
 // deliberately no import from `commands.js`: that module imports *from* here for its write handlers,
 // so a back-import would close a cycle.
 //
@@ -24,9 +24,9 @@ import { normalizeRelativePath } from "@wastech-mdlint/core";
  * Not every host path *has* a readable relative form: a target outside `cwd` renders with `../`
  * segments, and on Windows one on another drive (`C:\repo` vs `D:\out`) has none at all, so
  * `path.relative` hands back the absolute target. Both are passed through here rather than papered
- * over, which is why the docs promise relative-where-possible, not relative-always
- * (`docs/guide/cli.md` §Exit codes). Argument diagnostics keep that behavior deliberately: a `[path]`
- * the user passed absolutely is still *reported* relatively (P11.10), and an error must never print
+ * over, which is why the promise is relative-where-possible, not relative-always.
+ * Argument diagnostics keep that behavior deliberately: a `[path]`
+ * the user passed absolutely is still *reported* relatively, and an error must never print
  * an absolute host path. A file the command *wrote* is the opposite case — the user needs to be able
  * to open it — so `toWriteTargetPath` below falls back to the absolute form instead.
  */
@@ -37,7 +37,7 @@ export function toRepoRelativePosix(cwd: string, absolutePath: string): string {
 
 /**
  * A write target named for a human to act on: repo-relative POSIX while it is inside `cwd`, and the
- * plain absolute path once it is not (P14.02, W-17). An out-of-repo `compile --outdir` used to render
+ * plain absolute path once it is not. An out-of-repo `compile --outdir` used to render
  * as a chain of `../../../../..` hops that no user can read back to a location, which is worse than
  * the absolute path it was hiding — and on a second Windows drive there is no relative form at all.
  *

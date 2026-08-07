@@ -2,8 +2,8 @@ import { matchesConfigGlob } from "../discovery/globs.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
 import { compileRegex } from "./regex.js";
 
-// Column-based ID discovery (audit 2.1 / 5.5). One helper defines what a "defined ID" is, shared by
-// REF-005 (P3.04) and the graph's id-ref edges (P4) — so there is a single notion of ID across the
+// Column-based ID discovery. One helper defines what a "defined ID" is, shared by
+// REF-005 and the graph's id-ref edges — so there is a single notion of ID across the
 // tool, and the parser stays config-light (idPattern is config, not a parse field).
 
 export type IdOccurrence = { id: string; filePath: string; line: number };
@@ -50,7 +50,7 @@ export function extractColumnIds(
   return occurrences;
 }
 
-// The `idRef` shape from audit 2.1: `extractDefinedIds(doc, { idPattern, definitions, idColumn })`.
+// The `idRef` shape: `extractDefinedIds(doc, { idPattern, definitions, idColumn })`.
 export type IdRef = {
   idPattern: string;
   definitions: string[];
@@ -59,9 +59,10 @@ export type IdRef = {
 
 /**
  * Defined IDs of a document: the `idColumn` tokens in tables of files matching `definitions`,
- * plus heading tokens matching `idPattern` (spec "+ headings" widening, audit 5.5) — same file-glob
+ * plus heading tokens matching `idPattern` — same file-glob
  * gate as the column side, so a heading only counts as a definition in a file the config declares
- * as a definitions source. Frozen signature for P4's id-ref edges (audit 2.1).
+ * as a definitions source. The signature is frozen: the graph's id-ref edges call it too, and a
+ * second discovery model would let a rule and the graph disagree on what an ID is.
  */
 export function extractDefinedIds(
   document: ParsedDocument,

@@ -71,7 +71,7 @@ describe("REF-003 images", () => {
   });
 });
 
-// Audit L-4, the REF half of P12.01's `exclude` matrix. REF-002 is the only REF rule that mixes in
+// The REF half of the shared `exclude` matrix. REF-002 is the only REF rule that mixes in
 // the shared file-scope shape; REF-001/REF-003 spell `exclude` too but mean something else, which is
 // pinned separately below.
 describe("REF-002 file scope (exclude)", () => {
@@ -97,7 +97,7 @@ describe("REF-002 file scope (exclude)", () => {
       "docs/a.md",
       "drafts/b.md",
     ]);
-    // The M-2 shape — `exclude` with no `files` beside it to carry the filtering.
+    // The unscoped shape — `exclude` with no `files` beside it to carry the filtering.
     expect(
       await reportedFiles(cwd, rule("REF-002", { exclude: ["drafts/**"] })),
     ).toEqual(["docs/a.md"]);
@@ -159,7 +159,7 @@ describe("REF-001 / REF-003 exclude is a link-target filter, not file scope", ()
   });
 });
 
-// W-08 (P13.05): `exclude` used to be applied on only one of `linkResolves`'s two resolution
+// `exclude` used to be applied on only one of `linkResolves`'s two resolution
 // branches, so *any* configured router — including a bare `{}`, which validates because every
 // siteRouter field is optional — silently turned the option off. These pin that the two options
 // compose, on the inherited setting and on the per-rule override alike.
@@ -304,7 +304,7 @@ describe("REF-004 cross-zone links", () => {
     });
   });
 
-  it("does not crash on a regex-special zone name and matches it literally (audit M-1)", async () => {
+  it("does not crash on a regex-special zone name and matches it literally", async () => {
     const cwd = await fixtureRepo({
       "zones/auth/page.md":
         "## Dependencies\n\n- c++\n\n## Body\n\n[cpp](../c++/x.md)\n[bill](../billing/x.md)\n",
@@ -319,7 +319,7 @@ describe("REF-004 cross-zone links", () => {
     });
   });
 
-  it("does not crash on a zone name with an unbalanced paren (audit M-1)", async () => {
+  it("does not crash on a zone name with an unbalanced paren", async () => {
     const cwd = await fixtureRepo({
       "zones/auth/page.md": "## Dependencies\n\nNothing special here.\n",
       "zones/we)ird/x.md": "# x\n",
@@ -328,7 +328,7 @@ describe("REF-004 cross-zone links", () => {
     expect(result.messages).toEqual([]);
   });
 
-  it("does not let a dot in a zone name match any character (audit M-1)", async () => {
+  it("does not let a dot in a zone name match any character", async () => {
     const cwd = await fixtureRepo({
       "zones/auth/page.md":
         "## Dependencies\n\nWe rely on nodeXjs for scripting.\n\n## Body\n\n[link](../node.js/x.md)\n",
@@ -374,7 +374,7 @@ describe("REF-005 ID traceability", () => {
     });
   });
 
-  it("treats a matching heading token as a definition too, not just a table row (audit 5.5)", async () => {
+  it("treats a matching heading token as a definition too, not just a table row", async () => {
     const cwd = await fixtureRepo({
       "reqs.md": "# REQ-1\n\nIntroductory requirement.\n",
       "design.md": "| ID |\n| --- |\n| REQ-1 |\n",

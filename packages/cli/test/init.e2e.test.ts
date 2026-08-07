@@ -142,7 +142,7 @@ function readConfig(text: string): Record<string, unknown> {
 
 // Where a locally-installed `@wastech-mdlint/cli` puts its schema. `findInstalledSchemaDir` walks up
 // looking for exactly this path, so its presence in a fixture is the difference between the two
-// scenarios `init` has to get right (audit L-10): a package-relative `$schema` when the CLI is
+// scenarios `init` has to get right: a package-relative `$schema` when the CLI is
 // installed, and a generated project-local `./schema.json` when it is not (the `npx` case). Fixtures
 // are temp directories with nothing installed, so the fallback is the default they exercise.
 const INSTALLED_SCHEMA_REL_PATH =
@@ -156,7 +156,7 @@ function withInstalledSchema(
 }
 
 /**
- * The acceptance check behind L-10: resolve a written `$schema` the way an editor would — relative
+ * Resolve a written `$schema` the way an editor would — relative
  * to the config's own directory — and read the file it names. A dangling ref is exactly the defect,
  * so "it is a string that looks right" is not enough.
  */
@@ -199,7 +199,7 @@ const CROSS_LINKED_DOCS_FIXTURE: Record<string, string> = {
   ].join("\n"),
 };
 
-// A deliberately clean derivation of CROSS_LINKED_DOCS_FIXTURE (P6.05 deliverable 3 + the P6 exit
+// A deliberately clean derivation of CROSS_LINKED_DOCS_FIXTURE (the clean-fixture exit
 // criterion "on a clean fixture, lint exits 0"). Two surgical edits keep the *same* inferred rule
 // set the byte-identical draft test already proves — REF-001/REF-002/TBL-002/CTX-002/GRP-001 — so
 // the new test only has to prove the new property (zero findings): the checklist item is checked
@@ -359,7 +359,7 @@ describe("init command · scan + inference draft", () => {
     expect(confirmDraftCalls).toHaveLength(1);
     expect(yesResult.stdout.startsWith(confirmDraftCalls[0]!)).toBe(true);
     // Interactive run: the prompter already showed the draft, so runCli only prints the write
-    // summary — non-empty now that P6.04 actually writes.
+    // summary — non-empty now that the command actually writes.
     expect(interactiveResult.stdout).not.toBe("");
     expect(interactiveResult.stdout).toContain(`Wrote ${CONFIG_FILE}`);
   });
@@ -536,7 +536,7 @@ describe("init command · existing config handling", () => {
   });
 
   it("--on-existing skip over an unloadable config still exits 0 (deliberate no-write)", async () => {
-    // The other half of the P14.02 split, on the same input the merge cases above exit 2 on: the
+    // The other half of the exit-code split, on the same input the merge cases above exit 2 on: the
     // file being unloadable is irrelevant to `skip`, which never intended to write. Only the reason
     // for not writing separates the two outcomes, so both need pinning against the same fixture.
     const cwd = await fixtureRepo({
@@ -594,7 +594,7 @@ describe("init command · existing config handling", () => {
       cwd,
     );
 
-    // Exit 2, not 0 (P14.02 / W-13): the refusal is caused by an invalid file, which is an
+    // Exit 2, not 0: the refusal is caused by an invalid file, which is an
     // operational failure, not the deliberate no-write that `--on-existing skip` is. The four
     // sibling merge-abort cases below pin the same code for the other ways the config can be
     // unloadable.
@@ -718,9 +718,9 @@ describe("init command · existing config handling", () => {
   });
 
   // An explicit `[path]` names the exact directory init must operate on — a config found while
-  // walking up from it must not govern that run (H-3, P11.04). This replaces the pre-fix behavior
+  // walking up from it must not govern that run. This replaces the pre-fix behavior
   // (an explicit `[path]` silently re-rooted onto an ancestor's config) with the corrected one.
-  describe("explicit [path] vs. an ancestor's config found while walking up (H-3)", () => {
+  describe("explicit [path] vs. an ancestor's config found while walking up", () => {
     async function fixtureWithRootConfigAndLockfile(): Promise<string> {
       return fixtureRepo({
         ...CROSS_LINKED_DOCS_FIXTURE,
@@ -744,7 +744,7 @@ describe("init command · existing config handling", () => {
       expect(result.stdout).toContain("Existing config: none found.");
       expect(result.stdout).toContain("Wrote docs/wastech-mdlint.config.json");
       // The scan is not re-rooted to the parent, but `detectPackageManager` still walks up to the
-      // repo root's lockfile (audit L-11) — a subdirectory of an npm repo is still an npm repo, and
+      // repo root's lockfile — a subdirectory of an npm repo is still an npm repo, and
       // reporting "not detected" there was the defect, not the design.
       expect(result.stdout).toContain("Package manager: npm.");
       await expect(
@@ -771,7 +771,7 @@ describe("init command · existing config handling", () => {
       ).resolves.toBe(existingConfigText);
     });
 
-    it("the literal H-3 repro: init . in a nested sub-project never touches the parent's config", async () => {
+    it("init . in a nested sub-project never touches the parent's config", async () => {
       const rootConfigText = JSON.stringify({ include: ["parent-only.md"] });
       const cwd = await fixtureRepo({
         "wastech-mdlint.config.json": rootConfigText,
@@ -823,7 +823,7 @@ describe("init command · existing config handling", () => {
   });
 });
 
-describe("init command · writing the config (P6.04)", () => {
+describe("init command · writing the config", () => {
   it("--yes with no existing config writes a config loadConfiguration accepts", async () => {
     const cwd = await fixtureRepo(
       withInstalledSchema(CROSS_LINKED_DOCS_FIXTURE),
@@ -839,21 +839,21 @@ describe("init command · writing the config (P6.04)", () => {
     expect(written.$schema).toBe(
       "./node_modules/@wastech-mdlint/cli/schema.json",
     );
-    // Deliverable 1 / C1: the fresh write prunes the noise trees, so init never broadens the
+    // The fresh write prunes the noise trees, so init never broadens the
     // scanned corpus back to node_modules/.git/dist after writing.
     expect(written.exclude).toContain("**/node_modules/**");
     expect(written.exclude).toContain("**/.git/**");
-    // W-15 (P14.03): a hidden *dependency* tree is excluded by name, but no glob excludes a
+    // A hidden *dependency* tree is excluded by name, but no glob excludes a
     // directory merely for starting with a dot — that prune belongs to the scan, not to the corpus.
     expect(written.exclude).toContain("**/.venv/**");
     expect(written.exclude).not.toContain("**/.*/**");
-    // Audit L-7's other half: gitignore is honored, matching what the scan saw.
+    // The other half: gitignore is honored, matching what the scan saw.
     expect(written.respectGitignore).toBe(true);
     // Forward-compat smoke check: the written config must load without a ConfigError.
     await expect(loadConfiguration({ cwd })).resolves.toBeDefined();
   });
 
-  // Audit L-10. Every assertion here is about the ref resolving to a real file: the previous
+  // Every assertion here is about the ref resolving to a real file: an earlier
   // behavior emitted `./node_modules/@wastech-mdlint/cli/schema.json` unconditionally, which under
   // `npx` (nothing installed locally) named a path that does not exist.
   describe("the written $schema resolves to a file that exists", () => {
@@ -897,7 +897,7 @@ describe("init command · writing the config (P6.04)", () => {
       expect(result.stdout).toContain(
         "Wrote project-local schema schema.json (no installed package schema to point at).",
       );
-      // Still a local ref, never a remote URL (C9 / the security boundary).
+      // Still a local ref, never a remote URL — schema resolution stays offline.
       expect(written.$schema).not.toMatch(/https?:\/\//);
     });
 
@@ -1131,7 +1131,7 @@ describe("init command · writing the config (P6.04)", () => {
     );
   });
 
-  // P11.10 (audit M-6). This used to reach the write and report an ENOENT partial-write summary,
+  // This used to reach the write and report an ENOENT partial-write summary,
   // blaming a write for what is really a bad argument; the target is now validated up front.
   it("rejects a nonexistent [path] with a repo-relative message and exit 2", async () => {
     const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
@@ -1148,7 +1148,7 @@ describe("init command · writing the config (P6.04)", () => {
 
   // @boundary-guard write-failure
   //
-  // P11.09 (audit M-5). A directory sitting where the config file belongs is the one write fault
+  // A directory sitting where the config file belongs is the one write fault
   // reachable on every platform: `findConfig` uses `stat`, so the directory counts as an existing
   // config, staging succeeds, and only the rename fails.
   it("reports a failed config write on stdout, exits 2, and leaves the corpus untouched", async () => {
@@ -1167,7 +1167,7 @@ describe("init command · writing the config (P6.04)", () => {
     expect(result.stdout).toContain(
       `Write failed: could not replace ${CONFIG_FILE}`,
     );
-    // The project-local schema is committed first (P11.09's schema-first ordering) and this fixture
+    // The project-local schema is committed first (schema-first ordering) and this fixture
     // has no installed package schema, so it genuinely lands before the config rename fails — the
     // summary has to name it rather than claim nothing was written.
     expect(result.stdout).toContain("Written: schema.json.");
@@ -1250,7 +1250,7 @@ describe("init command · writing the config (P6.04)", () => {
       const schemaPath = path.join(cwd, "schema.json");
       // Unreadable but present. The read that feeds the byte-comparison degrades any failure to
       // `undefined`, which used to be safe only because the write would fail identically — a
-      // temp+rename commit would have replaced it (P11.09).
+      // temp+rename commit would have replaced it.
       await chmod(schemaPath, 0o000);
 
       const result = await run(
@@ -1291,7 +1291,7 @@ describe("init command · writing the config (P6.04)", () => {
     expect(withResult.exitCode).toBe(EXIT_CODE_SUCCESS);
     expect(withResult.stdout).toContain("Wrote CI workflow");
     const workflow = await readFile(path.join(withCwd, workflowPath), "utf8");
-    // Self-contained: installs the published CLI and runs it directly (P9.03's composite Action is
+    // Self-contained: installs the published CLI and runs it directly (a composite Action is
     // not built yet, so no `uses:` reference to a not-yet-published Action).
     expect(workflow).toContain("npm install --no-save @wastech-mdlint/cli");
     expect(workflow).toContain("npx wastech-mdlint lint --fail-on error");
@@ -1339,7 +1339,7 @@ describe("init command · writing the config (P6.04)", () => {
     // scopes lint to the config's directory (so include/exclude resolve there) plus an explicit
     // --config — both single-quoted and POSIX. `[path]` is relative to the repo root the workflow
     // runs from; `--config` is relative to `[path]`, which is the base the CLI resolves it against
-    // (P14.04).
+    // against the target directory.
     const workflow = await readFile(path.join(cwd, workflowPath), "utf8");
     expect(workflow).toContain(
       "npx wastech-mdlint lint 'docs' --fail-on error --config 'wastech-mdlint.config.json'",
@@ -1368,7 +1368,7 @@ describe("init command · writing the config (P6.04)", () => {
 
     // Run the emitted argv *verbatim*, from the repo root where GitHub runs the workflow. This test
     // used to mirror the command with hand-written absolute paths, which is precisely why the
-    // generator's relative `--config` form went unguarded through P14.04's change of base: only
+    // generator's relative `--config` form went unguarded through a change of resolution base: only
     // executing what was actually written can catch a workflow that fails on its first run.
     const workflow = await readFile(
       path.join(cwd, ".github", "workflows", "wastech-mdlint.yml"),
@@ -1419,7 +1419,7 @@ describe("init command · writing the config (P6.04)", () => {
       "../node_modules/@wastech-mdlint/cli/schema.json",
     );
     // Workflow is anchored at the project root, not under docs/ — `[path]` carries that evidence,
-    // since `--config` is relative to it (P14.04).
+    // since `--config` is relative to it.
     await expect(
       readFile(path.join(cwd, workflowPath), "utf8"),
     ).resolves.toContain(
@@ -1465,7 +1465,7 @@ describe("init command · writing the config (P6.04)", () => {
       "../../node_modules/@wastech-mdlint/cli/schema.json",
     );
     // Workflow lives at the repo root (where GitHub loads it), pointed at the nested config via a
-    // repo-root-relative `[path]` and a `--config` relative to that (P14.04)...
+    // repo-root-relative `[path]` and a `--config` relative to that...
     const workflow = await readFile(path.join(cwd, workflowPath), "utf8");
     expect(workflow).toContain(
       "lint 'packages/foo' --fail-on error --config 'wastech-mdlint.config.json'",
@@ -1570,7 +1570,7 @@ describe("init command · writing the config (P6.04)", () => {
       readFile(path.join(cwd, "doc site", CONFIG_FILE), "utf8"),
     ).resolves.toBeDefined();
     const workflow = await readFile(path.join(cwd, workflowPath), "utf8");
-    // Since P14.04 the space lives in `[path]`, not in `--config` (which is now a bare filename
+    // The space lives in `[path]`, not in `--config` (which is a bare filename
     // relative to it), so that argument is where the quoting has to hold: single-quoted as one shell
     // argument, never the bare, space-split `lint doc site`.
     expect(workflow).toContain(
@@ -1597,7 +1597,7 @@ describe("init command · writing the config (P6.04)", () => {
     // Never clobber a file the user already owns — no "Wrote CI workflow" line, and the file is
     // byte-for-byte untouched (the offer is skipped before ever reaching the prompt/write step).
     expect(result.stdout).not.toContain("Wrote CI workflow");
-    // ...but the skip is now stated (audit L-11). Silence read identically to "no workflow was ever
+    // ...but the skip is now stated. Silence read identically to "no workflow was ever
     // offered", leaving a user who passed --with-ci-workflow unsure whether anything happened.
     expect(result.stdout).toContain(
       "Kept the existing CI workflow .github/workflows/wastech-mdlint.yml",
@@ -1636,9 +1636,9 @@ describe("init command · writing the config (P6.04)", () => {
   });
 });
 
-// Audit L-7: `init` proposed `.github/**`, `.venv/**` and `generated-docs/**` as doc clusters, and
+// `init` used to propose `.github/**`, `.venv/**` and `generated-docs/**` as doc clusters, and
 // because the written config left `respectGitignore` at its `false` default, lint then read them.
-describe("init command · hidden and gitignored trees (L-7)", () => {
+describe("init command · hidden and gitignored trees", () => {
   const HONEST_SCAN_FIXTURE: Record<string, string> = {
     ".gitignore": "generated-docs/\n",
     "docs/a.md": "# A\n\nSee [B](b.md).\n",
@@ -1657,8 +1657,8 @@ describe("init command · hidden and gitignored trees (L-7)", () => {
     const init = await run(["init", cwd, "--yes"], cwd);
     expect(init.exitCode).toBe(EXIT_CODE_SUCCESS);
 
-    // Since P14.03 these names DO appear in stdout — in the disclosure that says they were skipped
-    // (W-14). What L-7 is about is that they are not *proposed*, so the assertion is now scoped to
+    // These names DO appear in stdout — in the disclosure that says they were skipped.
+    // The point is that they are not *proposed*, so the assertion is scoped to
     // the Include section and to the written `include` rather than to the whole of stdout.
     const includeSection = init.stdout.slice(
       init.stdout.indexOf("Include ("),
@@ -1692,7 +1692,7 @@ describe("init command · hidden and gitignored trees (L-7)", () => {
     expect(files).toEqual(["docs/a.md", "docs/b.md"]);
   });
 
-  it("names the hidden count and the reason in the summary (W-14)", async () => {
+  it("names the hidden count and the reason in the summary", async () => {
     const cwd = await fixtureRepo(HONEST_SCAN_FIXTURE);
 
     const init = await run(["init", cwd, "--yes"], cwd);
@@ -1715,12 +1715,13 @@ describe("init command · hidden and gitignored trees (L-7)", () => {
   });
 });
 
-// W-14 (P14.03): the field test's own shape — a repository whose LLM-facing documentation lives
+// The field test's own shape — a repository whose LLM-facing documentation lives
 // under dot-directories, beside an ordinary `docs/` cluster, a nested dependency tree, and a
 // gitignored build output. On the real target this shape left the corpus at 139 files where
 // `git ls-files` tracked 202, and nothing said so.
 //
-// The fixture and its companion tracked-file list are exported module-level consts so P16.01 §2 can
+// The fixture and its companion tracked-file list are exported module-level consts so the corpus
+// comparison below can
 // import them for the both-directions corpus comparison (nothing missing, nothing extra) rather than
 // building a second dot-directory repository that drifts from this one.
 export const DOT_DIRECTORY_FIXTURE: Record<string, string> = {
@@ -1747,7 +1748,7 @@ export const DOT_DIRECTORY_TRACKED_MARKDOWN: string[] = [
   "docs/reference.md",
 ];
 
-describe("init command · the scan-exclusion disclosure (W-14)", () => {
+describe("init command · the scan-exclusion disclosure", () => {
   it("names the excluded count and the reason for each class", async () => {
     const cwd = await fixtureRepo(DOT_DIRECTORY_FIXTURE);
 
@@ -1794,7 +1795,7 @@ describe("init command · the scan-exclusion disclosure (W-14)", () => {
   });
 
   // @boundary-guard shared-exclude
-  // W-57 / P16.01 §2. The arithmetic above is necessary and not sufficient: `corpus + disclosed ==
+  // The arithmetic above is necessary and not sufficient: `corpus + disclosed ==
   // tracked` also holds when the corpus drops one tracked file and gains one untracked file, which is
   // the failure a count cannot see. This is the set comparison instead — the two `comm` directions the
   // field test ran to account for its 63-file gap — so *which* files, not how many.
@@ -1828,7 +1829,7 @@ describe("init command · the scan-exclusion disclosure (W-14)", () => {
     // all not `mobile/node_modules/leftpad/README.md`.
     expect(extra).toEqual([]);
     // And the gap is exactly the dot-directory files, named rather than counted: the prune `init`
-    // discloses and does not encode (W-15), which is why they are absent from an `init`-written
+    // discloses and does not encode, which is why they are absent from an `init`-written
     // `include` while a zero-config run would read them.
     expect(missing).toEqual([
       ".agents/rules/architecture.md",
@@ -1836,7 +1837,7 @@ describe("init command · the scan-exclusion disclosure (W-14)", () => {
       ".claude/skills/lint/SKILL.md",
     ]);
     // The number in the disclosure is a claim about that same set, so it is checked against it rather
-    // than restated: a disclosure that drifts from the gap it explains is the W-14 defect again.
+    // than restated: a disclosure that drifts from the gap it explains is worse than none.
     const disclosed = /hidden directories: (\d+) Markdown files/.exec(
       init.stdout,
     );
@@ -1880,9 +1881,10 @@ describe("init command · the scan-exclusion disclosure (W-14)", () => {
   });
 
   it("lints the dot-directories once the user adds the pattern the disclosure suggests", async () => {
-    // W-15's answer made this possible at all: the lint-time default no longer excludes a directory
-    // for starting with a dot, so the suggested `include` entry is sufficient on its own. Before
-    // P14.03 the same edit produced an empty corpus, because `exclude` wins over `include`.
+    // This is possible at all because the lint-time default no longer excludes a directory
+    // for starting with a dot, so the suggested `include` entry is sufficient on its own. While a
+    // shape-based default was in force the same edit produced an empty corpus, because `exclude`
+    // wins over `include`.
     const cwd = await fixtureRepo({
       ...DOT_DIRECTORY_FIXTURE,
       [CONFIG_FILE]: JSON.stringify({
@@ -1908,9 +1910,9 @@ describe("init command · the scan-exclusion disclosure (W-14)", () => {
   });
 });
 
-// Audit L-9: `include: []` used to be omitted from the written config, and `lintFiles` defaults an
+// `include: []` used to be omitted from the written config, and `lintFiles` defaults an
 // absent `include` to `**/*.md` — so turning every cluster down linted the entire repository.
-describe("init command · deselecting every cluster (L-9)", () => {
+describe("init command · deselecting every cluster", () => {
   it('writes an explicit "include": [], says so, and lints nothing', async () => {
     const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
     let offeredClusterCount = 0;
@@ -1990,9 +1992,9 @@ describe("init command · deselecting every cluster (L-9)", () => {
   });
 });
 
-// Audit L-8: the merge is advertised as additive and non-destructive, but it rebuilds the file from
+// The merge is advertised as additive and non-destructive, but it rebuilds the file from
 // parsed values, so every comment the user wrote disappears without a word.
-describe("init command · merge over a comment-bearing config (L-8)", () => {
+describe("init command · merge over a comment-bearing config", () => {
   const COMMENTED_CONFIG = [
     "{",
     "  // Keep REF-001 at warning until the backlog is cleared.",
@@ -2290,7 +2292,7 @@ describe("buildConfigPreview", () => {
     expect(Object.keys(preview.rules[0]!)).not.toContain("options");
   });
 
-  it("stays forward-compatible with lintConfigSchema/ruleEntrySchema (P6.04 smoke check)", () => {
+  it("stays forward-compatible with lintConfigSchema/ruleEntrySchema", () => {
     const cluster = buildDocCluster({ path: "docs" });
     const rule = buildInferredRule({
       rule: "SEC-001",
@@ -2333,7 +2335,7 @@ describe("formatDraftSummary", () => {
     expect(summary).toContain("(none inferred)");
   });
 
-  // Audit L-9: both empty cases render "Include (0)", so the parenthetical is the only thing telling
+  // Both empty cases render "Include (0)", so the parenthetical is the only thing telling
   // the user whether a config that lints everything or one that lints nothing is about to be written.
   it("distinguishes 'no clusters detected' from 'every offered cluster deselected'", () => {
     const detectedNone = formatDraftSummary(
@@ -2408,7 +2410,7 @@ describe("formatDraftSummary", () => {
     );
   });
 
-  // W-39: P16.05 decided against widening inference to reach SIZE-001/LLM-001, so the draft has to
+  // Inference is deliberately not widened to reach SIZE-001/LLM-001, so the draft has to
   // name them — the README leads with both, and an absence a user has to notice is the gap the
   // decision would otherwise leave open. Unconditional, including on the merge path, because it
   // states what `init` proposes rather than what the resulting config contains.
@@ -2519,7 +2521,7 @@ describe("formatScanExclusions", () => {
     expect(lines[1]).toContain("1 Markdown file in 1 directory");
     // The actionable half: a dot-directory is invisible to the scan, so no proposal covers it. The
     // suggested tail is MARKDOWN_GLOB_SUFFIX, not a literal `*.md`: the count in the same sentence
-    // was produced with `.md` + `.mdx`, so a narrower pattern would under-deliver on it (W-09).
+    // was produced with `.md` + `.mdx`, so a narrower pattern would under-deliver on it.
     expect(lines[1]).toContain(
       'add a pattern such as ".claude/**/*.{md,mdx}" to lint it',
     );
@@ -2638,7 +2640,7 @@ describe("formatWriteSummary", () => {
 
     expect(summary).toContain("Kept existing schema.json at schema.json");
     expect(summary).not.toContain("Wrote project-local schema");
-    // H-4 follow-up: the config's $schema still points at the pre-existing file even though the
+    // The config's $schema still points at the pre-existing file even though the
     // write was skipped, and the only working regeneration route is --on-existing merge — a real
     // --on-existing overwrite run always discards the custom rules this write depends on, so it
     // can never reach this branch and must not be advertised as a fix.
@@ -2765,7 +2767,7 @@ describe("formatWriteSummary", () => {
     expect(summary).not.toContain("()");
   });
 
-  // Audit L-11: both of these used to be silent — the summary simply had no workflow line, which
+  // Both of these used to be silent — the summary simply had no workflow line, which
   // reads identically to a run that never offered one.
   it("reports a pre-existing CI workflow as kept rather than saying nothing", () => {
     const summary = formatWriteSummary({
@@ -2805,7 +2807,7 @@ describe("formatWriteSummary", () => {
     expect(summary).toContain("The config above was still written");
   });
 
-  // Audit L-8: the merge presents itself as non-destructive, so the one thing it does destroy has to
+  // The merge presents itself as non-destructive, so the one thing it does destroy has to
   // be said out loud.
   it("reports dropped JSONC comments on a merge", () => {
     const summary = formatWriteSummary({
@@ -2832,7 +2834,7 @@ describe("formatWriteSummary", () => {
     expect(summary).not.toContain("JSONC comments");
   });
 
-  // Audit L-9: a config that lints zero files is a legitimate outcome, but an unannounced one looks
+  // A config that lints zero files is a legitimate outcome, but an unannounced one looks
   // exactly like a broken install the first time `lint` reports nothing.
   it("flags an empty include so a zero-file config is not a silent surprise", () => {
     const summary = formatWriteSummary({
@@ -2976,7 +2978,7 @@ describe("resolveSchemaWriteOutcome", () => {
     ).toEqual({ shouldWrite: false, kind: "kept" });
   });
 
-  // P11.09: `rename` only needs write permission on the *directory*, so an unreadable target no
+  // `rename` only needs write permission on the *directory*, so an unreadable target no
   // longer blocks the write the way a truncating `writeFile` did. This branch must therefore win
   // ahead of everything else — including an explicit `overwrite`, which cannot be an informed
   // instruction about a file nobody could read.
@@ -3052,7 +3054,7 @@ describe("formatNotWrittenSummary", () => {
   });
 });
 
-// The production read path (audit L-11 retired `readExistingRuleIds`, an exported wrapper with no
+// The production read path (`readExistingRuleIds` was retired — an exported wrapper with no
 // caller): `readExistingConfigDocument` parses the file once and `extractExistingRuleIds` derives
 // the merge identity from that snapshot. These are the two functions `runInitCommand` actually
 // calls, so the coverage below follows them rather than a parallel convenience wrapper.
@@ -3163,7 +3165,7 @@ describe("readExistingConfigDocument + extractExistingRuleIds", () => {
     });
   });
 
-  // Audit L-8: the merge rebuilds the file, so this flag is what lets the summaries admit the loss.
+  // The merge rebuilds the file, so this flag is what lets the summaries admit the loss.
   it("reports whether the file on disk carries JSONC comments", async () => {
     const withComments = await fixtureRepo({
       [CONFIG_FILE]: '{\n  // link integrity\n  "rules": []\n}\n',
@@ -3225,8 +3227,8 @@ describe("interactive prompt defaults match --yes", () => {
   });
 });
 
-describe("init command · clean fixture lints clean (P6.05)", () => {
-  // The P6 exit criterion is "on a clean fixture (no violations), lint exits 0". Severity is not a
+describe("init command · clean fixture lints clean", () => {
+  // The property: on a clean fixture (no violations), lint exits 0. Severity is not a
   // safe proxy: TBL-002/CTX-002 default to `warning`, so a fixture with lingering warnings would
   // still exit 0 under the default `--fail-on error` while violating "content with no violations".
   // Assert the stronger, direct property instead — the exact zero-messages string plus exit 0.
@@ -3258,7 +3260,7 @@ describe("init command · clean fixture lints clean (P6.05)", () => {
   });
 });
 
-describe("init command · custom layout (specs/, adr/) (P6.05)", () => {
+describe("init command · custom layout (specs/, adr/)", () => {
   it("--yes produces a deterministic draft covering both clusters with a local $schema and no remote URL", async () => {
     const cwdOne = await fixtureRepo(
       withInstalledSchema(CUSTOM_LAYOUT_FIXTURE),
@@ -3288,7 +3290,7 @@ describe("init command · custom layout (specs/, adr/) (P6.05)", () => {
       "SEC-001",
       "TBL-002",
     ]);
-    // Local, version-matched schema ref — never a remote URL (architecture invariant / C9).
+    // Local, version-matched schema ref — never a remote URL; schema resolution stays offline.
     expect(written.$schema).toBe(
       "./node_modules/@wastech-mdlint/cli/schema.json",
     );
@@ -3297,7 +3299,7 @@ describe("init command · custom layout (specs/, adr/) (P6.05)", () => {
   });
 });
 
-describe("init command · small monorepo layout (P6.05)", () => {
+describe("init command · small monorepo layout", () => {
   it("--yes detects each workspace package's docs/ cluster into one deterministic root config", async () => {
     const cwdOne = await fixtureRepo(MONOREPO_FIXTURE);
     const cwdTwo = await fixtureRepo(MONOREPO_FIXTURE);
@@ -3321,7 +3323,7 @@ describe("init command · small monorepo layout (P6.05)", () => {
   });
 });
 
-describe("init command · package-manager detection e2e (P6.05)", () => {
+describe("init command · package-manager detection e2e", () => {
   // Core unit-tests every lockfile→manager mapping; this proves the full CLI run surfaces the same
   // detection in the --yes draft. One case per lockfile plus the no-lockfile fallback.
   const lockfileCases: { lockfile: string; expected: string }[] = [
@@ -3346,7 +3348,7 @@ describe("init command · package-manager detection e2e (P6.05)", () => {
   }
 
   it('reports "not detected" when no lockfile is present', async () => {
-    // The `.git` marker bounds the ancestor walk to the fixture (audit L-11): without it, "no
+    // The `.git` marker bounds the ancestor walk to the fixture: without it, "no
     // lockfile" would be a claim about every directory above the temp dir on the host.
     const cwd = await fixtureRepo({
       ...CROSS_LINKED_DOCS_FIXTURE,
@@ -3359,7 +3361,7 @@ describe("init command · package-manager detection e2e (P6.05)", () => {
     expect(result.stdout).toContain("Package manager: not detected.");
   });
 
-  // P9.07 (L-7): the detected manager is surfaced in the draft summary above, but the opt-in CI
+  // The detected manager is surfaced in the draft summary above, but the opt-in CI
   // workflow is npm-universal BY DESIGN (buildCiWorkflowYaml's own comment explains why) — a
   // bun/pnpm/yarn repo must still get the same npm-based workflow, not have its detection leak in.
   for (const { lockfile, expected } of lockfileCases) {

@@ -13,12 +13,12 @@ import type {
 // The lint pipeline's **step order**, over a corpus that is already in memory: split rules by scope,
 // run document rules per file and project rules once, apply inline-disable, sort, count.
 //
-// Split out of `lint-files.ts` at P16.01 for W-58. The order used to exist twice — once here (as part
+// Split out of `lint-files.ts`. The order used to exist twice — once here (as part
 // of `lintFiles`) and once hand-assembled inside the MCP `lint` tool's handler, which lints ad-hoc
 // text rather than a discovered corpus. Every step there composed a core export, so it was never a
 // fork of the pipeline; the problem was that **a step added to `lintFiles` would silently not reach
 // that tool**, and nothing failed when the two disagreed. One entry point both callers go through is
-// the seam the audit said would pay for itself, and it is preferred over a differential test because
+// the seam that closes it, and it is preferred over a differential test because
 // a differential test over a hand-assembled sequence rots as the sequence grows.
 //
 // Deliberately **synchronous**: everything asynchronous about linting (discovery, reads) happens
@@ -41,7 +41,7 @@ export type LintCorpusInput = {
   // link and ID targets against, and the keys that become `files`. Note this is *not*
   // `loadDocuments`' absolute-keyed map; `lintFiles` re-keys before calling here.
   documents: Map<string, ParsedDocument>;
-  // Severity-resolved and already filtered of `"off"` (R1/C2). Resolution belongs to the caller:
+  // Severity-resolved and already filtered of `"off"`. Resolution belongs to the caller:
   // `lintFiles` reads it from config, while a host that takes rules from a request also owns
   // translating a resolution failure into its own error contract.
   rules: readonly ResolvedRule[];
@@ -49,7 +49,7 @@ export type LintCorpusInput = {
   // a real directory even when the corpus is synthetic.
   rootDir: string;
   settings: ResolvedSettings;
-  // The shared `ContextGraph` (R5), when the caller has one. Graph-aware rules (GRP-001/002) no-op
+  // The shared `ContextGraph`, when the caller has one. Graph-aware rules (GRP-001/002) no-op
   // gracefully without it.
   graph?: ContextGraph;
 };
@@ -69,7 +69,7 @@ function compareMessages(left: LintMessage, right: LintMessage): number {
  *
  * Document rules run once per file in sorted path order; project rules run once over the whole
  * corpus and self-attribute each finding to a file. Missing `documents` for a project rule throws
- * (R4) — unreachable from here, since the corpus is always passed.
+ * — unreachable from here, since the corpus is always passed.
  */
 export function lintCorpus(input: LintCorpusInput): LintResult {
   const projectFiles = [...input.documents.keys()].sort(compareStrings);

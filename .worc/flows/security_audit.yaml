@@ -47,8 +47,8 @@
 # patterns), filesystem escape (glob/symlink/traversal, atomic writes), untrusted-input parsing, MCP
 # output flowing back into an agent's context as if it were instructions, and the npm supply chain.
 #
-# Because `docs/mdlint_v2/` declares this product local-first with no network and no code execution,
-# the mere PRESENCE of a network call or dynamic code evaluation in product code is a finding in
+# Because this product is local-first by design — no network access and no code execution anywhere
+# in its runtime — the mere PRESENCE of a network call or dynamic code evaluation in product code is a finding in
 # itself, not a hardening gap. Verified at authoring time: no `child_process`, no `eval`, no
 # `new Function`, no dynamic `import()` and no `fetch` anywhere under `packages/*/src`.
 #

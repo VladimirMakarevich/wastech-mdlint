@@ -2,9 +2,9 @@ name: Publish
 
 # PLACEHOLDER — no automated publishing yet.
 #
-# Real releases are wired in P9 (roadmap I4): a single `vX.Y.Z` tag publishes
+# The intended shape, not yet built: a single `vX.Y.Z` tag publishes
 # @wastech-mdlint/{core,cli,mcp-server} together with npm provenance and tags the skills, via a
-# changesets/release workflow. Until P9 lands, this workflow only proves the tagged commit is
+# changesets/release workflow. Until that exists, this workflow only proves the tagged commit is
 # publish-shaped (gate + per-package `npm pack --dry-run`); it intentionally does not run
 # `npm publish`.
 
@@ -16,7 +16,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write # reserved for npm provenance once P9 turns on publishing
+  id-token: write # reserved for npm provenance once this workflow actually publishes
 
 jobs:
   publish-readiness:
@@ -30,7 +30,7 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm run typecheck
-      # lint and format match the CI `verify` job's gate (P12.06): without them a red style gate
+      # lint and format match the CI `verify` job's gate: without them a red style gate
       # could reach a `v*` tag through a direct push, since this workflow triggers on the tag rather
       # than on the PR that CI gates.
       - run: npm run lint

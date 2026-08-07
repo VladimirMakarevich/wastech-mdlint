@@ -8,7 +8,7 @@ import { loadDocuments } from "../markdown/load-documents.js";
 import { buildContextGraph } from "./build-context-graph.js";
 import type { ContextGraph } from "./context-graph-types.js";
 
-// Shared doc-load + graph-build sequence for graph-consuming hosts (P4.07 CLI, P7 MCP). Mirrors the
+// Shared doc-load + graph-build sequence for every graph-consuming host. Mirrors the
 // same steps `lint-files.ts` runs internally, but is exposed standalone here so a host can build one
 // `ContextGraph` up front, hand it to `lintFiles({ graph })` to avoid rebuilding it, and reuse it for
 // query/slice/impact — without `lint-files.ts` importing from a CLI/MCP-facing module.
@@ -24,7 +24,7 @@ export async function loadContext(params: {
   settings: ResolvedSettings;
 }): Promise<GraphContext> {
   const rootDir = path.resolve(params.cwd);
-  // Same resolved scope as `lintFiles` (P13.02), so the graph a host queries covers exactly the
+  // Same resolved scope as `lintFiles`, so the graph a host queries covers exactly the
   // corpus that host lints — a divergence here would make `impact`/`slice` answer over a wider tree.
   const scope = resolveCorpusScope(params.config);
   const loaded = await loadDocuments(scope.include, {

@@ -11,8 +11,9 @@ export type NodeClassification = {
 };
 
 export type GraphAnalysisOptions = {
-  // P5.05 validates `config.compile.hubMinInDegree`; this surface only threads the resolved
-  // threshold into the degree-only classifier so later compile work does not need to reopen the API.
+  // Config validation of `compile.hubMinInDegree` happens in the config schema; this surface only
+  // threads the resolved threshold into the degree-only classifier, so compile work that needs a
+  // different threshold does not have to reopen this API.
   hubMinInDegree?: number;
 };
 
@@ -33,7 +34,7 @@ function classifyNode(
     return "isolated";
   }
   // Order is load-bearing: a heavily referenced terminal document must stay a `hub`, not fall
-  // through to `leaf`, because P5 defines roles from first-match degree thresholds.
+  // through to `leaf`, because roles are assigned by first-match degree thresholds, in order.
   if (inDegree >= hubMinInDegree) {
     return "hub";
   }
@@ -71,8 +72,9 @@ export function analyzeGraph(
     excludedFromReadingOrder: excluded,
     components: getComponents(graph),
     classification: classifyNodes(graph, options),
-    // The illustrative task shape omits `cycles`, but the same task explicitly requires threading
-    // `graph.cycles` through so P5.04 can report truncated reading order honestly.
+    // Threaded through even though nothing in this module reads it: `synthesize` needs the cycles
+    // to say *why* a reading order is truncated, and recomputing them there would duplicate the
+    // Tarjan pass the graph builder already ran.
     cycles: graph.cycles.map((cycle) => [...cycle]),
   };
 }

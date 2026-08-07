@@ -1,11 +1,11 @@
-// Token estimation, isolated behind one function (D3 / roadmap §8) so the heuristic can be swapped
-// for a real tokenizer later without touching rules. Matches the legacy `ceil(len/4)` behavior so
-// SIZE-001/LLM-001 numbers are stable across the re-platform.
+// Token estimation, isolated behind one function so the heuristic can be swapped for a real
+// tokenizer later without touching rules. `ceil(len/4)` is deliberately crude: SIZE-001 and LLM-001
+// report it as an estimate, and every number they print moves the day this changes.
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-// The calibration, stated where a reader meets the number (P15.03 / W-34): every rule that reports a
+// The calibration, stated where a reader meets the number: every rule that reports a
 // token count appends this to its message, because a budget whose arithmetic is undisclosed is a
 // budget a user cannot set. It lives beside the heuristic on purpose — swapping `estimateTokens` for
 // a real tokenizer has to move the sentence with the math, or the disclosure silently goes stale.

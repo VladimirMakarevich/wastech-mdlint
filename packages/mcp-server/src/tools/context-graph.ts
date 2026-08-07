@@ -21,10 +21,10 @@ import {
 
 // `context-graph` — build the project's `ContextGraph` and return it either verbatim
 // (`format: "raw"`, the default) or as the derived `ContextGraphSummary` (`format: "summary"`). Core
-// owns graph construction via `resolveToolContext` (P7.01) → `loadContext`; this handler only picks
+// owns graph construction via `resolveToolContext` → `loadContext`; this handler only picks
 // which projection to return, and calls `computeGraphCoverage` for the one that carries coverage.
 //
-// The branch was named `"json"` until P15.02 (W-22). On a JSON-RPC tool *every* projection is JSON,
+// The branch was once named `"json"`. On a JSON-RPC tool *every* projection is JSON,
 // so `json` never named an axis here — and it collided with the CLI's `graph --format json`, which
 // denotes the summary document, not the raw graph. `raw` vs `summary` names the axis that exists.
 
@@ -64,7 +64,7 @@ const contextGraphInputShape = {
 // One tool, two structured shapes: `format: "raw"` returns `{ nodes, edges, cycles }` (the verbatim
 // `ContextGraph`), `format: "summary"` returns
 // `{ nodes, edges, components, readingOrder, excluded, coverage }` — the same document the CLI's
-// `graph --format json` prints, which is the parity W-22/W-23 asked for. `registerTool` takes a
+// `graph --format json` prints, which is the parity between hosts. `registerTool` takes a
 // single `outputSchema`, so the format-specific fields are individually optional — a superset schema
 // rather than a discriminated union, which would require echoing a `format` field neither core type
 // carries. `nodes`/`edges` stay required because both shapes always carry them.
@@ -104,13 +104,13 @@ export async function handleContextGraph(
     } = await resolveToolContext(input);
 
     // Default `"raw"`: the unprocessed graph is the more fundamental of the two shapes, `"summary"`
-    // is the derived view. Keeping raw the default is also what makes the P15.02 rename
+    // is the derived view. Keeping raw the default is also what makes the rename
     // behavior-preserving for a caller that omits `format`.
     const format = input.format ?? "raw";
     const structured =
       format === "summary"
         ? // Coverage is computed on this branch only: `raw` must stay exactly `ContextGraph`, and the
-          // disk re-scan coverage needs is work the default branch has no mandate to do (P7.03).
+          // disk re-scan coverage needs is work the default branch has no mandate to do.
           // Mirrors the CLI's own call so neither host can drift on rootDir/siteRouter.
           summarizeContextGraph(
             graph,

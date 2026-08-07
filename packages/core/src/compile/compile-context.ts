@@ -26,12 +26,12 @@ import {
   type CompileSections,
 } from "./synthesize.js";
 
-// P5.04 orchestration: the entry point both the CLI (P5.05) and MCP (P7.04) call. Reuses
+// Compile orchestration: the entry point both the CLI and MCP call. Reuses
 // `loadContext`/`analyzeGraph`/`extractDocProfile`/`describeRules`/`query`/`estimateTokens` — no
 // parallel parsing, graph traversal, or token-estimation logic lives here.
 
 // Thrown when `config.compile` is absent. Mirrors `ImpactAnalysisError`'s hint-carrying pattern so
-// a host can catch this type specifically: the CLI (P5.05) maps it to exit 2, the MCP tool (P7.04)
+// a host can catch this type specifically: the CLI maps it to exit 2, the MCP tool
 // maps it to `{ code, message, hint }`.
 export class CompileConfigMissingError extends Error {
   readonly code: ToolErrorCode = "COMPILE_CONFIG_MISSING";
@@ -54,7 +54,7 @@ type ResolvedCompileSettings = {
 };
 
 // `config-schema.ts`'s strict `compileConfigSchema` already validated presence and shape of every
-// leaf (P5.05), so only *absent* optional leaves need a default here — no more per-leaf `safeParse`
+// leaf, so only *absent* optional leaves need a default here — no more per-leaf `safeParse`
 // defaulting. `outdir` still isn't read here — that stays the CLI's job.
 function resolveCompileSettings(
   compileConfig: CompileConfig,
@@ -83,7 +83,7 @@ type ActiveLlm001Entry = {
   maxTokensPerEntrypoint: number;
 };
 
-// S6: reuses LLM-001's own options schema (so budget options are validated exactly the way
+// Reuses LLM-001's own options schema (so budget options are validated exactly the way
 // `resolveRule` validates them) and the shared graph traversal (`query`, edgeTypes: ["import"])
 // instead of re-exporting `llm.ts`'s internal eager-import walk or writing a second BFS.
 function computeBudget(
@@ -208,7 +208,7 @@ export async function compileContext(
   const documentPaths = [...documents.keys()].sort(compareStrings);
   // One batch, so the corpus-wide graph index (roles + edge partition) is built once. Calling
   // `extractDocProfile` per document reclassified every node and rescanned `graph.edges` N times
-  // — O(N² + N·E) in corpus size (audit L-5). Sorted the same way as `documentPaths` so the
+  // — O(N² + N·E) in corpus size. Sorted the same way as `documentPaths` so the
   // returned Map's order matches the render order, even though `synthesize` only ever looks
   // profiles up by path.
   const profiles = extractDocProfiles(

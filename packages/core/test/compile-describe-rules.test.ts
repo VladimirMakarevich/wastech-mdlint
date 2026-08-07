@@ -205,7 +205,7 @@ describe("describeRules", () => {
     ]);
   });
 
-  // W-06: annotating only an explicit `true` made a committed skill render a case-sensitive custom
+  // Annotating only an explicit `true` made a committed skill render a case-sensitive custom
   // rule identically to a case-insensitive one. Both entries are parsed through the real config schema
   // so the test proves the default reaches the renderer from Zod, not from a literal written here.
   it("distinguishes a default-cased columnInSet rule from one with caseSensitive disabled", () => {

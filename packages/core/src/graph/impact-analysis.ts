@@ -7,15 +7,15 @@ import type { ContextGraph } from "./context-graph-types.js";
 import { topologicalSort } from "./graph-algorithms.js";
 import { impact, type QueryVisit } from "./query.js";
 
-// P4.05 impact analysis (G2 hand-off): the blast radius of changing a file, built entirely on the
-// P4.03 reverse traversal (`impact`) and the P4.02 topo-sort. No new traversal is written here —
+// Impact analysis: the blast radius of changing a file, built entirely on the shared
+// reverse traversal (`impact`) and the shared topo-sort. No new traversal is written here —
 // the architecture invariant is "one traversal, one topo-sort", not per-feature reimplementations.
 
 const byPath = compareStrings;
 
 // Thrown when the requested file is not a node in the graph (typo, or excluded by config globs).
-// Mirrors the ConfigError/RuleResolutionError dedicated-error pattern so a host (P4.07 CLI, P7 MCP
-// M6) can catch this type specifically and render its `.hint` instead of a bare stack trace. No
+// Mirrors the ConfigError/RuleResolutionError dedicated-error pattern so either host can catch this
+// type specifically and render its `.hint` instead of a bare stack trace. No
 // "did you mean" suggestion: that would make the error's shape depend on corpus contents, which
 // cuts against deterministic, reproducible diagnostics.
 export class ImpactAnalysisError extends Error {
@@ -78,8 +78,8 @@ export function classifyImpact(
     .filter((visit) => visit.depth === 1)
     .map((visit) => ({
       path: visit.path,
-      // Retained edge multiplicity (P4.01 constraint, mirrored from graph-algorithms.ts's degree
-      // semantics): two `visit.path -> start` links are two references, not one deduped edge.
+      // Retained edge multiplicity, mirroring graph-algorithms.ts's degree semantics: two
+      // `visit.path -> start` links are two references, not one deduped edge.
       references: graph.edges.filter(
         (edge) => edge.from === visit.path && edge.to === start,
       ).length,

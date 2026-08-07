@@ -159,7 +159,7 @@ describe("CTX-003 glossary aliases", () => {
     ).toEqual(["gql@1", "graphql@3", "gql@5"]);
   });
 
-  it("counts every occurrence, including ones separated by a single space (audit L-1)", async () => {
+  it("counts every occurrence, including ones separated by a single space", async () => {
     const cwd = await fixtureRepo({
       "glossary.md": "| Term | Aliases |\n| --- | --- |\n| GraphQL | gql |\n",
       "doc.md": "gql gql gql\n",
@@ -193,7 +193,7 @@ describe("CTX-003 glossary aliases", () => {
   });
 });
 
-// Audit L-4, the CTX half of P12.01's `exclude` matrix. Both documents trip all three rules at once
+// The CTX half of the shared `exclude` matrix. Both documents trip all three rules at once
 // (an empty section, an unchecked box, an alias); `glossary.md` has no headings and no checklist, so
 // it stays clean under CTX-001/CTX-002 and is self-skipped by CTX-003.
 const CONTENT_DOC = "## Empty\n\n## Tasks\n\n- [ ] wire gql\n";
@@ -236,7 +236,7 @@ describe("CTX file scope (exclude)", () => {
         "docs/a.md",
         "drafts/b.md",
       ]);
-      // The M-2 shape — `exclude` with no `files` beside it to carry the filtering.
+      // The unscoped shape — `exclude` with no `files` beside it to carry the filtering.
       expect(
         await reportedFiles(
           cwd,

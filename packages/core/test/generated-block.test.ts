@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { replaceGeneratedBlock } from "../../../scripts/generated-block.mjs";
 
-// P16.04 / W-55. `scripts/generate-docs.mjs` spliced generated tables into the README through
+// `scripts/generate-docs.mjs` spliced generated tables into the README through
 // `String.prototype.replace` with an *interpolated replacement string*, where `$` is a
 // metacharacter. The templates' own `$1`/`$2` back-references were deliberate, so a `$&` or `` $` ``
 // in any rule or MCP tool description would have expanded silently: the README would have gained a
@@ -38,7 +38,7 @@ const DOCUMENT = [
   "Trailing prose.",
 ].join("\n");
 
-describe("replaceGeneratedBlock (W-55)", () => {
+describe("replaceGeneratedBlock", () => {
   it("emits the wrapper shape the docs-sync extraction regexes key on", () => {
     // The regression guard for the refactor itself: this pattern is copied from
     // `docs-sync.test.ts` / `packages/mcp-server/test/docs-sync.test.ts`, both of which compare the
@@ -87,7 +87,7 @@ describe("replaceGeneratedBlock (W-55)", () => {
   });
 });
 
-describe("generate-docs.mjs splice sites (W-55)", () => {
+describe("generate-docs.mjs splice sites", () => {
   // Reading the script text follows the `release:check` precedent in `package-payload.test.ts`: a
   // behavioral test over the two current call sites stays green when a *third* one is added with an
   // interpolated replacement string, and that third one is the whole risk this task closes.

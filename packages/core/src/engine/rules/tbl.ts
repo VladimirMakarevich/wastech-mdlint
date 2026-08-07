@@ -16,7 +16,7 @@ import { defineRule, type RuleDefinition } from "../registry.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
 import type { TextEdit } from "../types.js";
 
-// The six table rules (P3.02) — thin presets over the P2.02 table primitives + shared file scoping.
+// The six table rules — thin presets over the shared table primitives plus file scoping.
 
 // TBL-001 — required columns present.
 export const tbl001: RuleDefinition = defineRule({
@@ -81,7 +81,8 @@ function locateCellRange(
   return { start: pipes[cellIndex]! + 1, end: pipes[cellIndex + 1]! };
 }
 
-// TBL-002 fix: replace each empty target cell with ` TODO ` (audit 4.2 deterministic-fixable set).
+// TBL-002 fix: replace each empty target cell with ` TODO ` — deterministic, so it is safe to apply
+// unattended.
 function emptyCellEdits(
   document: ParsedDocument,
   options: { columns?: string[]; section?: string },
@@ -179,7 +180,7 @@ export const tbl003: RuleDefinition = defineRule({
     .object({
       column: z.string().min(1),
       values: z.array(z.string()).min(1),
-      // Same `.default()` as the `columnInSet` assertion (W-06) — the two shapes must agree, or a
+      // Same `.default()` as the `columnInSet` assertion — the two shapes must agree, or a
       // built-in and its declarative twin would compare cell values differently from one config.
       caseSensitive: z.boolean().default(DEFAULT_COLUMN_IN_SET_CASE_SENSITIVE),
       section: z.string().optional(),

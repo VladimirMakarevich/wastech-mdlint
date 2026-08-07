@@ -19,7 +19,7 @@ export function contentNotMatch(
 
   const findings: PrimitiveFinding[] = [];
   // Index the content once: resolving each match with a fresh scan from offset zero made this
-  // O(matches · content length) on the documents with the most findings (audit L-5).
+  // O(matches · content length) on the documents with the most findings.
   const lineAt = createLineNumberLookup(document.content);
 
   for (const match of document.content.matchAll(regex)) {
@@ -33,7 +33,7 @@ export function contentNotMatch(
   return findings;
 }
 
-// Locked default placeholder set (audit 3.1). The `placeholders` option *extends* this (union).
+// Locked default placeholder set. The `placeholders` option *extends* this (union).
 export const DEFAULT_PLACEHOLDERS = [
   "TBD",
   "TODO",
@@ -48,7 +48,7 @@ export type NoPlaceholdersOptions = {
 };
 
 // Whole-body placeholder check (case-insensitive, optional trailing `:`) — NOT substring, so prose
-// that merely mentions a token is not flagged (audit 3.1).
+// that merely mentions a token is not flagged.
 function classifyBody(
   body: string,
   placeholders: Set<string>,

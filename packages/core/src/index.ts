@@ -2,9 +2,9 @@
 //
 // This is the whole public contract for the v2 pipeline (core-hosts-the-pipeline decision): the CLI
 // and MCP hosts import parsing, config, graph, rules, and formatting exclusively through this module.
-// The legacy single-package pipeline was removed at the P3.09 cutover (D2 greenfield).
+// The legacy single-package pipeline is gone; this barrel is the whole public surface.
 
-// Parser (P1)
+// Parser
 export type {
   InlineDirective,
   InlineDirectiveKind,
@@ -32,12 +32,12 @@ export {
 } from "./discovery/globs.js";
 export { compareStrings } from "./deterministic-sort.js";
 
-// Atomic writes (P11.09) — the single write path both hosts use, so no surface re-invents
+// Atomic writes — the single write path both hosts use, so no surface re-invents
 // truncate-and-write. The newline helpers behind `--fix` stay core-internal.
 export { writeFileAtomic, writeFilesAtomic } from "./atomic-write.js";
 export type { AtomicFileWrite, AtomicWriteResult } from "./atomic-write.js";
 
-// Repo scan (P6.01)
+// Repo scan
 export {
   classifyPrunedDirName,
   DEFAULT_KNOWN_CLUSTER_NAMES,
@@ -47,7 +47,7 @@ export {
 } from "./discovery/repo-scan-constants.js";
 // Exported for the hosts, not only for core's own walks: `init`'s scan-exclusion disclosure suggests
 // an `include` pattern for a pruned directory, and it must splice the same tail every other proposal
-// does or it would advertise a narrower set than the scan counted (P13.05 / W-09).
+// does or it would advertise a narrower set than the scan counted.
 export { MARKDOWN_GLOB_SUFFIX } from "./discovery/markdown-extensions.js";
 export { detectPackageManager } from "./discovery/package-manager.js";
 export type { DetectedPackageManager } from "./discovery/package-manager.js";
@@ -64,7 +64,7 @@ export type {
   ScanRepositoryOptions,
 } from "./discovery/repo-scan.js";
 
-// Rule inference (P6.02)
+// Rule inference
 export { inferRuleSet } from "./discovery/rule-inference.js";
 export type {
   ClusterRuleInference,
@@ -73,7 +73,7 @@ export type {
   RuleInferenceResult,
 } from "./discovery/rule-inference.js";
 
-// Config writer (P6.04)
+// Config writer
 export {
   buildCiWorkflowYaml,
   CI_WORKFLOW_YAML,
@@ -113,9 +113,9 @@ export {
 } from "./graph/graph-algorithms.js";
 export type { TopologicalSortResult } from "./graph/graph-algorithms.js";
 // `query` has no host caller of its own (the graph commands and MCP tools reach it through
-// `getContextSlice` / `impact` / compile). W-40 removed the four exports in that position; this one
-// and `getImpactSet` below stay because decision entry 4.3 names both as reused by P7.03, which
-// makes them a documented expectation rather than an open call — settled in P17.03 (W-47), not here.
+// `getContextSlice` / `impact` / compile). Four other exports in that position were removed as
+// unused; this one and `getImpactSet` below stay because the MCP graph tools are documented as
+// reusing them, which makes them a stated expectation rather than dead API.
 export { impact, query } from "./graph/query.js";
 export type {
   QueryDirection,
@@ -157,7 +157,7 @@ export {
 } from "./graph/graph-render.js";
 export type { ContextGraphSummary } from "./graph/graph-render.js";
 
-// Compile (P5)
+// Compile
 export {
   analyzeGraph,
   classifyNodes,
@@ -195,7 +195,7 @@ export {
   CompileConfigMissingError,
 } from "./compile/compile-context.js";
 
-// Skills (P8)
+// Skills
 export {
   skillModelSchema,
   validateSkill,
@@ -208,7 +208,7 @@ export type {
   SkillValidationResult,
 } from "./skills/skill-model.js";
 
-// Engine (P2)
+// Engine
 export type {
   LintMessage,
   ReportInput,
@@ -227,7 +227,7 @@ export { runRules } from "./engine/run-rules.js";
 export type { RunRulesContext } from "./engine/run-rules.js";
 export { lintFiles } from "./engine/lint-files.js";
 export type { LintFilesInput, LintResult } from "./engine/lint-files.js";
-// The ad-hoc entry point over the shared step order (W-58), and the only half of that split a host
+// The ad-hoc entry point over the shared step order, and the only half of that split a host
 // needs: `lintContent` is the MCP `lint` tool's whole body. `lintCorpus` itself stays **unexported**
 // on purpose — its two callers are `lintFiles` and `lintContent`, both inside core, and it takes an
 // already-parsed corpus plus already-resolved rules, which a host has no way to hold without
@@ -254,7 +254,7 @@ export { findLineNumber } from "./engine/text-position.js";
 export { extractSectionBody } from "./engine/section-body.js";
 export { resolveRoutedUrl } from "./engine/site-router.js";
 
-// Primitives (P2.02)
+// Primitives
 export {
   assertionSchema,
   ASSERTION_TARGETS,
@@ -268,7 +268,7 @@ export type {
   PrimitiveFinding,
 } from "./engine/primitives/types.js";
 
-// Registry + rules (P2.03 / P3)
+// Registry + rules
 export {
   defineRule,
   RuleRegistry,
@@ -289,12 +289,12 @@ export type { FileScope } from "./engine/rules/scope.js";
 export { resolveCustomRule } from "./engine/rules/custom.js";
 export type { CustomRuleEntry } from "./engine/rules/custom.js";
 
-// Schema + docs generation (P2.06 / P3.09)
+// Schema + docs generation
 export { generateConfigSchema } from "./engine/schema.js";
 export type { CustomRuleDefinition } from "./engine/schema.js";
 export { generateRuleDocs } from "./engine/rule-docs.js";
 
-// Config (P2.04 / P3.08)
+// Config
 export {
   compileCommandPresetSchema,
   compileConfigSchema,
@@ -312,7 +312,7 @@ export type {
 } from "./config/config-schema.js";
 export { ConfigError } from "./config/config-error.js";
 
-// Structured error taxonomy (M6) — defined once here, shared by cli + mcp-server.
+// Structured error taxonomy — defined once here, shared by cli + mcp-server.
 export { TOOL_ERROR_CODES, isStructuredError } from "./errors.js";
 export type { StructuredErrorInfo, ToolErrorCode } from "./errors.js";
 export { CONFIG_FILE_NAME, findConfig } from "./config/find-config.js";

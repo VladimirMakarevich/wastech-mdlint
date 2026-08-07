@@ -57,9 +57,9 @@ function layer(baseRel: string, patterns: string): IgnoreLayer {
   return { baseRel, ig: ignore().add(patterns) };
 }
 
-describe("isGitIgnored · layer precedence (W-11)", () => {
+describe("isGitIgnored · layer precedence", () => {
   it("lets the deepest layer's negation re-include a file a root pattern ignored", () => {
-    // The W-11 bug itself: the old root-first loop returned at `docs/*.md` and never reached the
+    // The bug itself: an earlier root-first loop returned at `docs/*.md` and never reached the
     // nested negation, so the corpus dropped a file `git check-ignore` reports as kept.
     const layers = [layer("", "docs/*.md\n"), layer("docs", "!keep.md\n")];
 
@@ -175,7 +175,7 @@ describe("isGitIgnored · layer precedence (W-11)", () => {
   });
 });
 
-// Explicit argv lists and no shell, per `.agents/rules/security.md` (Command Execution). `git`
+// Explicit argv lists and no shell — a spawned command must never be built by interpolation. `git`
 // resolves through PATH (+PATHEXT on Windows) without one.
 function runGit(
   root: string,
@@ -368,7 +368,7 @@ describe.skipIf(!hasGit)(
       ).toEqual(gitPatternIgnored(root, FIXTURE_A_CANDIDATES));
 
       // Anti-vacuity: a fixture that failed to write would leave both sides empty and pass. Naming
-      // the re-included file pins the actual W-11 case rather than mere agreement.
+      // the re-included file pins the nested-override case rather than mere agreement.
       expect(loaded).toContain("docs/keep.md");
       expect(loaded).toContain("guides/deep/b.md");
       expect(loaded).not.toContain("docs/other.md");

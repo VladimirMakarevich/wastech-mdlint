@@ -9,7 +9,7 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 
-// The single write path for every product file (P11.09, audit M-5/L-6). A bare `writeFile` is
+// The single write path for every product file. A bare `writeFile` is
 // truncate-then-write: a crash, an `ENOSPC`, or a permission failure partway through leaves the
 // user's existing config / schema / Markdown truncated with no recovery route. Every write here
 // lands in a temp file in the *target's own directory* first and is then `rename`d into place —

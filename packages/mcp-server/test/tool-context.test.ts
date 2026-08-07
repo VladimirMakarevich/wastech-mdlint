@@ -31,7 +31,7 @@ async function makeTempDir(prefix: string): Promise<string> {
   return dir;
 }
 
-// P14.01. The stdio suite is the acceptance evidence (an in-process call cannot see the plausible
+// The stdio suite is the acceptance evidence (an in-process call cannot see the plausible
 // success shape being fixed); these pin the guard's own contract — code, hint, and the offending path
 // in the message — without spawning a server for each case.
 describe("resolveToolCwd", () => {
@@ -92,7 +92,7 @@ describe("resolveToolConfiguration", () => {
   });
 
   it("resolves a relative configPath against the tool cwd, not the process cwd", async () => {
-    // The sixth `--config` call site (P14.04): the behavior is unchanged, but the resolution moved.
+    // The sixth `--config` call site: the behavior is unchanged, but the resolution moved.
     // This helper used to pre-resolve the path itself; now it forwards the caller's string verbatim
     // and core resolves it against the validated `cwd` — the same base the CLI's five handlers get.
     // The test process cwd is the repo root, not this temp dir, which is the only shape in which a
@@ -172,7 +172,7 @@ describe("resolveToolContext", () => {
 });
 
 /**
- * The seventh-handler guard for MCP's half of P14.04.
+ * The seventh-handler guard for MCP's half of single-base `--config` resolution.
  *
  * The CLI's five `--config` handlers are covered by a table derived from `--help`
  * (`packages/cli/test/config-resolution-base.test.ts`); a tool module cannot be enumerated that way,

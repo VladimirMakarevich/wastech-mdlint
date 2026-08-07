@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { assertBuilt } from "../../core/test/support/assert-built.js";
 
-// M4: the only suite in this package that crosses a real OS process boundary. `smoke.test.ts` and
+// The only suite in this package that crosses a real OS process boundary. `smoke.test.ts` and
 // `context-slice.test.ts` use `InMemoryTransport`, and every `handle*.test.ts` calls handlers
 // in-process — none of those can catch stdio framing bugs, argv/entrypoint-guard breakage, or
 // stdout/stderr channel confusion. Here a real `StdioClientTransport → node dist/index.js →
@@ -18,8 +18,8 @@ import { assertBuilt } from "../../core/test/support/assert-built.js";
 //
 // PRECONDITION: `packages/mcp-server/dist/index.js` must already be built — `assertBuilt` fails fast
 // with the remedy, including the forced-build fallback for the case where `npm run build` cannot clear
-// it (W-56, see `packages/core/test/support/assert-built.ts`). Stating it here as prose instead is what
-// W-56 was: an unbuilt or stale spawn surfaces as a behavioral diff, and the only pointer a reader gets
+// it (see `packages/core/test/support/assert-built.ts`). Stating it here as prose instead is the
+// failure it prevents: an unbuilt or stale spawn surfaces as a behavioral diff, and the only pointer a reader gets
 // is a command that may have just exited `0`.
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
@@ -93,14 +93,14 @@ function structuredOf(
   return result.structuredContent as Record<string, unknown>;
 }
 
-// Assert the FULL M6 error payload survives the wire in `structuredContent` (not just the code): a
+// Assert the FULL error payload survives the wire in `structuredContent` (not just the code): a
 // regression that dropped `message` or `hint` guidance must fail here. The payload round-trips
 // because each schema-carrying tool keeps its success schema strict while attaching schema-compatible
 // placeholder success fields on errors (see `errorResult`/`withErrorOutput`); with the validator
 // cache primed in `beforeAll`, a non-conforming
 // `structuredContent` would be rejected by the client — so this genuinely pins the wire contract.
 //
-// `hint` handling has two halves (P14.05/W-19). Whenever one is present, the rendered text block must
+// `hint` handling has two halves. Whenever one is present, the rendered text block must
 // contain it — that is the assertion the exit criterion asks for, and it applies uniformly because
 // `errorResult` owns the concatenation. Whether one must be present at all is per-call: every guided
 // path in this suite requires a non-empty `hint`, and only the callers that opt out with
@@ -162,12 +162,12 @@ describe("mcp-server over stdio", () => {
 
     expect(tools.map((tool) => tool.name).sort()).toEqual(EXPECTED_TOOL_NAMES);
 
-    // M7 at the wire level: every tool carries the read-only annotation.
+    // At the wire level: every tool carries the read-only annotation.
     for (const tool of tools) {
       expect(tool.annotations?.readOnlyHint).toBe(true);
     }
 
-    // M1 five-tool scoping at the wire level: compile-context is the deliberate exception with no
+    // Five-tool structured-output scoping at the wire level: compile-context is the deliberate exception with no
     // outputSchema; the other five advertise one.
     for (const tool of tools) {
       if (tool.name === "compile-context") {
@@ -199,10 +199,10 @@ describe("mcp-server over stdio", () => {
     );
   });
 
-  it("lint: runs a declarative custom rule and keeps the M6 payload for a malformed one", async () => {
-    // P12.04 at the wire: a `{ rule: "custom" }` entry must survive the SDK's pre-handler input
+  it("lint: runs a declarative custom rule and keeps the structured payload for a malformed one", async () => {
+    // At the wire: a `{ rule: "custom" }` entry must survive the SDK's pre-handler input
     // validation in both directions. Valid — it lints. Malformed — the failure still arrives as the
-    // M6 `{ code, message, hint }` payload (what `expectToolError` checks) rather than an `McpError`
+    // `{ code, message, hint }` payload (what `expectToolError` checks) rather than an `McpError`
     // protocol error, which is what a narrower wire schema would have produced.
     const ok = await client.callTool({
       name: "lint",
@@ -262,7 +262,7 @@ describe("mcp-server over stdio", () => {
     expect((output.nodes as unknown[]).length).toBe(7);
     expect((output.cycles as unknown[]).length).toBe(1);
 
-    // The `summary` branch's two P15.02 keys, over the wire: `coverage` and `excluded` are advertised
+    // The `summary` branch's two added keys, over the wire: `coverage` and `excluded` are advertised
     // as optional in the superset `outputSchema`, so only a real round trip proves the client's
     // schema validator accepts them rather than stripping the payload.
     const summary = await client.callTool({
@@ -354,7 +354,7 @@ describe("mcp-server over stdio", () => {
     expect(ok.isError).toBeFalsy();
 
     // Independent oracle: core's own pipeline, proving the tool reshapes nothing. This is also the
-    // one success path with no `structuredContent` (M1) — its output lives in two text blocks.
+    // one success path with no `structuredContent` — its output lives in two text blocks.
     const loaded = await loadConfiguration({ cwd: dir });
     const expected = await compileContext(loaded, dir);
     const content = ok.content as Array<{ text: string }>;
@@ -366,7 +366,7 @@ describe("mcp-server over stdio", () => {
 
     const missingDir = await makeTempDir("mcp-it-cc-missing-");
     await writeFile(path.join(missingDir, "a.md"), "# A\n", "utf8");
-    // compile-context's success path returns no structuredContent (M1); its error path returns the
+    // compile-context's success path returns no structuredContent; its error path returns the
     // machine payload in `structuredContent` (no `outputSchema` to conflict with) like every other
     // tool — pinned here at the wire level.
     await expectToolError(
@@ -378,7 +378,7 @@ describe("mcp-server over stdio", () => {
 
   // @boundary-guard installed-bin-spawn
   //
-  // P14.01/W-18. What this proves that no in-process test can: before the guard, four of these five
+  // What this proves that no in-process test can: before the guard, four of these five
   // tools answered a nonexistent `cwd` with a *plausible* success — `No problems found.`, an empty
   // graph, `No match for query`, `File not found in the context graph` — which is the client-visible
   // shape being fixed, and a handler-level assertion would have passed on it just as happily. It also
@@ -400,7 +400,7 @@ describe("mcp-server over stdio", () => {
     }
   });
 
-  // P14.05/W-21. Over the wire because that is where the defect was measured: the field test saw
+  // Over the wire because that is where the defect was measured: the field test saw
   // `INTERNAL_ERROR` and "An unexpected internal error occurred." against a directory whose
   // permissions were removed, while the CLI on the same fixture printed `Operational error: EACCES on
   // docs/locked` and exited 2. It also exercises the new code against the client's primed
@@ -434,7 +434,7 @@ describe("mcp-server over stdio", () => {
           "Operational error: EACCES on docs/locked",
         );
         // The absolute base must not survive the wire in any field of an `OPERATIONAL_ERROR`; only
-        // P14.01's `INVALID_INPUT` names a `cwd` absolutely, and there it is the failure itself.
+        // The `INVALID_INPUT` case names a `cwd` absolutely, and there it is the failure itself.
         expect(JSON.stringify(result)).not.toContain(dir);
       } finally {
         await chmod(locked, 0o755);
@@ -442,11 +442,11 @@ describe("mcp-server over stdio", () => {
     },
   );
 
-  // P14.05/W-20 characterization pin, not a fix. The decision was to keep schema rejections
+  // Characterization pin, not a fix. The decision was to keep schema rejections
   // contract-exempt (loosening a tool's advertised `inputSchema` purely so the handler can reject the
   // shape better would destroy the discoverability contract a host uses to *construct* valid calls),
   // so this passed before the change and passes after. Its value is failing if that shape ever moves
-  // — an SDK upgrade, or a decision to pre-validate — because `docs/guide/mcp-server.md` describes
+  // — an SDK upgrade, or a decision to pre-validate — because the documented error contract describes
   // exactly this response to users.
   it("leaves a schema-level rejection outside the structured contract, as documented", async () => {
     const result = await client.callTool({
@@ -464,7 +464,7 @@ describe("mcp-server over stdio", () => {
     expect(firstText(result)).toContain("Too small: expected number to be >=0");
   });
 
-  // The caller-visible consequence of P15.02's `json` → `raw` rename, pinned where a host meets it.
+  // The caller-visible consequence of the `json` → `raw` rename, pinned where a host meets it.
   // `format: "json"` is now refused by the wire `inputSchema` before the handler runs, so it lands in
   // the documented pre-handler exemption above: `isError` with no `structuredContent`. That is loud
   // rather than silent — a host still calling the old name gets an error naming the valid set, not a

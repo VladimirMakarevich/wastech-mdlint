@@ -5,10 +5,10 @@ import {
   type SkillFrontmatter,
 } from "../compile/skill-frontmatter.js";
 
-// Unified skill model (S5). Static skills (P8) and the compiler's generated output (P5) are the
+// Unified skill model. Static skills and the compiler's generated output are the
 // same shape so the two provenances stay provably interchangeable. The `frontmatter` field is the
-// P5.04 `skillFrontmatterSchema` by import — never a parallel definition — which is what keeps
-// generated and static skills validating against one contract (S1).
+// the compile path's `skillFrontmatterSchema` by import — never a parallel definition — which is what keeps
+// generated and static skills validating against one contract.
 export type SkillKind = "static" | "generated";
 
 // `Skill.path` is public core data, so it must be an already-normalized repository-relative POSIX
@@ -52,8 +52,8 @@ export type SkillValidationResult =
   | { ok: false; issues: SkillValidationIssue[] };
 
 // Two entry points wrap the one schema because the two callers need opposite ergonomics:
-// CI (P8.05) wants per-file structured diagnostics without throwing so it can report every bad
-// skill in one pass, while `synthesize` (P5.04) throws a ZodError and a pinned test depends on it.
+// CI wants per-file structured diagnostics without throwing so it can report every bad
+// skill in one pass, while `synthesize` throws a ZodError and a pinned test depends on it.
 
 // Non-throwing validator for CI and model construction. Issues are sorted (by path, then message)
 // so a report over multiple skills is deterministic regardless of Zod's internal issue order.

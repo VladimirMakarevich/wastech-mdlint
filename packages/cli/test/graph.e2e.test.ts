@@ -9,7 +9,7 @@ import { compareStrings } from "@wastech-mdlint/core";
 import { EXIT_CODE_SUCCESS } from "../src/commands.js";
 import { runCli } from "../src/program.js";
 // The 139-document fixture lives in core's test support so cli, mcp-server, and core all assert
-// against one corpus (P15.01); duplicating it is what the fixture exists to prevent.
+// against one corpus; duplicating it is what the fixture exists to prevent.
 import {
   LARGE_CORPUS_DOCUMENT_COUNT,
   LARGE_CORPUS_ENTRY_POINT_COUNT,
@@ -19,7 +19,7 @@ import {
 } from "../../core/test/support/large-corpus.js";
 import { readHumanSections } from "../../core/test/support/output-parity.js";
 
-// P4.08: e2e coverage for `graph`/`slice`/`impact`/`lint` driven off a single committed, multi-doc
+// E2e coverage for `graph`/`slice`/`impact`/`lint` driven off a single committed, multi-doc
 // fixture (packages/cli/test/fixtures/graph-project). Unlike cli.test.ts's ad hoc temp-dir fixtures,
 // these commands are read-only, so the checked-in directory is used directly as `cwd` rather than
 // copied into a tempdir per test.
@@ -126,12 +126,12 @@ describe("graph command over the fixture corpus", () => {
     expect(payload.readingOrder).not.toContain("cycle-b.md");
     expect(payload.readingOrder).toHaveLength(payload.nodes.length - 2);
 
-    // W-23: the two nodes the cycle dropped are named, so a consumer never has to derive the set by
+    // The two nodes the cycle dropped are named, so a consumer never has to derive the set by
     // subtracting `readingOrder` from `nodes` to learn why the order is short.
     expect(payload.excluded).toEqual(["cycle-a.md", "cycle-b.md"]);
 
-    // audit B: the G5 coverage signal now reaches JSON consumers, not just human output. appendix.md
-    // is linked-to but outside `include`, exactly the "silently incomplete graph" case G5 exists for.
+    // The coverage signal reaches JSON consumers, not just human output. appendix.md
+    // is linked-to but outside `include`, exactly the "silently incomplete graph" case it exists for.
     expect(payload.coverage.filesOutsideCorpus).toEqual(["appendix.md"]);
     expect(payload.coverage.nodeCount).toBe(payload.nodes.length);
     expect(payload.coverage.edgeCount).toBe(payload.edges.length);
@@ -156,8 +156,8 @@ describe("graph command over the fixture corpus", () => {
   // structurally cannot see: `files outside corpus` lives *inside* the coverage block, header at two
   // spaces and items at four, so the shared reader has to be pointed at that nesting level. It is
   // diffed here rather than on the large corpus because only this fixture has a file outside `include`
-  // — an empty section would agree with an empty JSON array vacuously, which is how the section P15.01
-  // made line-oriented last would have stayed the one nothing compares. It also re-pins W-26 here: a
+  // — an empty section would agree with an empty JSON array vacuously, which is how the last section
+  // to become line-oriented would have stayed the one nothing compares. It also pins the line bound here: a
   // comma-joined `files outside corpus (1): appendix.md` no longer ends in `:` and the reader stops
   // finding the section at all.
   it("reports the same nested coverage section in the human and JSON formats", async () => {
@@ -262,12 +262,12 @@ describe("graph command over the large corpus", () => {
     expect(longest.length).toBeLessThanOrEqual(LARGE_CORPUS_LINE_WIDTH_BOUND);
   }, 60_000);
 
-  // W-23's exit criterion, at the boundary a user actually reads: one graph, both formats, the path
+  // Parity at the boundary a user actually reads: one graph, both formats, the path
   // sections compared. The renderer-level twin lives in core's `graph-render.test.ts`; this one proves
   // the keys survive `JSON.stringify` and the command dispatch, which is where a shape the CLI never
   // passed through would still look fine in a unit test.
   //
-  // Widened by P16.01 from `excluded` alone to all three *top-level* sections, through the shared
+  // Widened from `excluded` alone to all three *top-level* sections, through the shared
   // `readHumanSections` reader — checking one of three is how the next missing key stays invisible. The
   // format's fourth path section, the coverage block's nested `files outside corpus`, is diffed by
   // "reports the same nested coverage section…" above, on the fixture corpus where it is non-empty.
@@ -385,7 +385,7 @@ describe("impact command over the fixture corpus", () => {
     ).toBe(false);
   });
 
-  it("includes cycle-excluded nodes in the JSON payload for parity with human output (audit C)", async () => {
+  it("includes cycle-excluded nodes in the JSON payload for parity with human output", async () => {
     // cycle-b.md's affected subgraph is exactly the cycle-a.md ↔ cycle-b.md 2-cycle, so topo-sort
     // emits nothing and both nodes land in `excluded` — the field a JSON consumer needs to explain
     // why readingOrder is empty despite affected files existing.
@@ -404,9 +404,9 @@ describe("impact command over the fixture corpus", () => {
   });
 });
 
-describe("GRP-001/GRP-002 against the fixture corpus (P4.06 refactor confirmation)", () => {
+describe("GRP-001/GRP-002 against the fixture corpus", () => {
   // cycle-a.md ↔ cycle-b.md is a two-node cycle, which GRP-001's default `minCycleLength` of 3 now
-  // skips (P13.04 / W-07), so the fixture config sets it to 2 explicitly. That is deliberate coverage
+  // skips, so the fixture config sets it to 2 explicitly. That is deliberate coverage
   // rather than a workaround: this is the only place the option travels through a real config file at
   // the process boundary.
   it("still flags the cycle-a.md/cycle-b.md cycle and the orphan.md orphan", async () => {

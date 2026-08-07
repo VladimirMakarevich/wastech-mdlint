@@ -50,7 +50,8 @@ export type PrunedDirectoryReason = "hidden" | "noise" | "gitignored";
  *
  * `markdownFileCount` is populated for `"hidden"` only, and that asymmetry is the point rather than
  * an omission: a hidden directory is the one class whose contents a user plausibly wants linted
- * (`.claude/skills/`, `.agents/rules/`), so `init` has to be able to say how much is in there.
+ * (agent-instruction and skill trees live under dot-directories), so `init` has to be able to say
+ * how much is in there.
  * Counting a `"noise"` or `"gitignored"` tree would mean walking `node_modules` — the exact cost
  * pruning exists to avoid — for a number nobody acts on.
  */
@@ -61,7 +62,7 @@ export type PrunedDirectory = {
 };
 
 /**
- * The scan's record of what it pruned, so `init` can disclose it (W-14) without a second directory
+ * The scan's record of what it pruned, so `init` can disclose it without a second directory
  * walk that could disagree with the first about noise names, gitignore layers, or what counts as a
  * Markdown file. Sorted by `path`.
  */
@@ -136,13 +137,13 @@ function isOwnedByPackageScope(
 // `Dirent.isDirectory()`/`isFile()` both returning false for a symlink entry (the simplest
 // "skip anything that isn't a plain dir/file" behavior) is an acceptable simplification.
 //
-// Hidden and gitignored trees are skipped (audit L-7): `init` must not propose an `include` for a
+// Hidden and gitignored trees are skipped: `init` must not propose an `include` for a
 // tree the config it writes then refuses to lint, and a generated `generated-docs/**` cluster is
 // noise the user has already declared uninteresting. The gitignore layering reuses the loader's own
 // helpers (gitignore-layers.ts), so the two walks can never drift on negation or nesting semantics.
 //
 // The walk also records *what* it pruned, which is what lets `init` disclose the gap between the
-// tracked tree and the proposed corpus (W-14). `"count"` mode is the same function re-entered under
+// tracked tree and the proposed corpus. `"count"` mode is the same function re-entered under
 // a pruned hidden root purely to size it, rather than a second traversal — so the disclosed number
 // is produced by the same noise, gitignore and Markdown-extension rules as the corpus itself, by
 // construction and not by two implementations agreeing.
@@ -246,7 +247,7 @@ type ScopeClustersParams = {
   sampleSize: number;
 };
 
-// The scoring heuristic (docs/mdlint_v2/P6-init/01-repo-scan-detection.md), run once per scope
+// The cluster-scoring heuristic, run once per scope
 // (the repo root minus workspace-package files, or a single workspace package's own files).
 // Root never "qualifies" as a cluster itself — if it did, its subtreeCount would almost always
 // clear minClusterSize and the rollup step below would collapse everything into one giant
@@ -368,20 +369,20 @@ const CLUSTER_KIND_RANK: Record<DocClusterKind, number> = {
 };
 
 /**
- * Scans a repository for Markdown doc clusters and the package manager in use (P6.01), so
- * `init` (P6.03/04) can propose defaults instead of hardcoding `docs/`. Pure and read-only;
+ * Scans a repository for Markdown doc clusters and the package manager in use, so
+ * `init` can propose defaults instead of hardcoding `docs/`. Pure and read-only;
  * does not write anything.
  *
  * The walk skips noise directories, every dot-prefixed directory, and anything matched by a
- * `.gitignore` (root or nested) — always, not behind a flag (P11.14 / audit L-7). The scan exists
+ * `.gitignore` (root or nested) — always, not behind a flag. The scan exists
  * to propose a config, and the config `init` writes pins `respectGitignore: true` plus the noise
  * `exclude`, so a cluster the scan could only see by ignoring those rules would be a proposal the
  * resulting config immediately contradicts.
  *
- * The dot-prefixed prune is the one that has no lint-time counterpart (W-15): a hidden directory
+ * The dot-prefixed prune is the one that has no lint-time counterpart: a hidden directory
  * that is not also a dependency tree stays lintable. `pruned` is what closes that gap honestly —
  * `init` reports the skipped directories and how much Markdown the hidden ones hold, rather than
- * leaving the user to infer it from a file count (W-14).
+ * leaving the user to infer it from a file count.
  */
 export async function scanRepository(
   options: ScanRepositoryOptions,
