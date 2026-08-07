@@ -327,6 +327,32 @@ export async function readExistingConfigDocument(
  * validated against `lintConfigSchema` only in tests (a forward-compat smoke check, not a runtime
  * dependency on the schema).
  */
+/**
+ * The `include` value a fresh write will use — the one place this three-valued rule is decided.
+ *
+ * Three values, because an empty selection and an empty scan need opposite files: a literal `[]` is
+ * written only when clusters were offered and turned down (lints nothing, as asked), while a scan
+ * that found none omits the key so the tool's own dot-matching default `include` applies. Inverting a
+ * deliberate "none of these" into that default is the bug this shape exists to prevent. (The default
+ * glob is not spelled here for the reason the comment on `formatScanExclusions` gives: it contains a
+ * sequence that would close this block comment early.)
+ *
+ * It is one function because two callers need the same answer in different forms: the writer needs the
+ * value, and the draft's scan-exclusion disclosure needs to know whether the key will be written at
+ * all (`resolveIncludeToWrite(...) !== undefined`) — the case where the skipped hidden files end up
+ * linted by the default rather than excluded. Derived twice, they could disagree, and the disclosure
+ * would then claim the opposite of what was written.
+ */
+export function resolveIncludeToWrite(
+  previewInclude: readonly string[],
+  clustersWereOffered: boolean,
+): string[] | undefined {
+  if (previewInclude.length > 0) {
+    return [...previewInclude];
+  }
+  return clustersWereOffered ? [] : undefined;
+}
+
 export function buildConfigPreview(
   clusters: DocCluster[],
   rules: InferredRule[],
@@ -546,12 +572,13 @@ export function formatDraftSummary(
     // merge path is not making. Under `--yes` this reaches stdout via `composeOutput`; interactively
     // `confirmDraft` shows it while the user can still decline, which is where the warn-before-
     // confirming discipline wants it.
-    // Same three-valued `include` decision `runInitCommand` makes before writing: the key is omitted
-    // only when nothing was selected *and* nothing was offered, and that is the one case where the
-    // hidden files end up linted by the default rather than skipped.
+    // Asks the writer's own decision function rather than re-deriving it: the key is omitted only
+    // when nothing was selected *and* nothing was offered, and that is the one case where the hidden
+    // files end up linted by the default rather than skipped.
     const exclusions = formatScanExclusions(
       selections.pruning,
-      preview.include.length > 0 || selections.clustersWereOffered,
+      resolveIncludeToWrite(preview.include, selections.clustersWereOffered) !==
+        undefined,
     );
     if (exclusions.length > 0) {
       lines.push("", ...exclusions);
@@ -1225,16 +1252,8 @@ export async function runInitCommand(
   const schemaAnchor = await findInstalledSchemaDir(cwd);
   const preview = buildConfigPreview(confirmedClusters, selectedRules);
   // `include` is only meaningful for a fresh write; generateInitConfig ignores it under "merge".
-  // Three-valued: an empty selection is written as a literal `[]` only when clusters
-  // were actually offered and turned down. When the scan found none, the key is omitted so the
-  // tool's own `**/*.md` default applies, which is what a repo with no recognizable doc cluster
-  // wants — inverting a deliberate "none of these" into that same default is the bug.
-  const include =
-    preview.include.length > 0
-      ? preview.include
-      : clustersWereOffered
-        ? []
-        : undefined;
+  // Three-valued; the rule and its reasons live in `resolveIncludeToWrite`.
+  const include = resolveIncludeToWrite(preview.include, clustersWereOffered);
   // Generated *before* the draft, not at write time, because the draft has to name the schema file
   // this run would create — and generation is pure, so the only observable difference is that the
   // one anchor lookup above now also happens on a run the user goes on to decline. The same `result`

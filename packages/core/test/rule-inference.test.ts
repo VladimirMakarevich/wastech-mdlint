@@ -129,9 +129,11 @@ describe("inferRuleSet · end to end", () => {
       registry: ruleRegistry,
     });
 
-    const globalRules = result.rules.filter(
-      (rule) => rule.options === undefined,
-    );
+    // "Global" is about the *evidence*, not about carrying no options: every rule here but SEC-001
+    // is proposed from corpus-wide patterns, while SEC-001 is scoped to the cluster that earned it.
+    // Filtering on `options === undefined` used to express that and no longer does, because GRP-001
+    // now carries a corpus-wide option of its own — asserted right below.
+    const globalRules = result.rules.filter((rule) => rule.rule !== "SEC-001");
     expect(globalRules.map((rule) => rule.rule)).toEqual([
       "CTX-001",
       "CTX-002",
@@ -140,6 +142,12 @@ describe("inferRuleSet · end to end", () => {
       "REF-002",
       "TBL-002",
     ]);
+    // The sampled cycle is `docs/a.md -> docs/b.md -> docs/a.md`, two documents — below GRP-001's
+    // own `minCycleLength` floor of 3. The entry lowers the floor to the cycle its rationale cites,
+    // so the config it proposes reports the finding the comment above it describes.
+    expect(
+      globalRules.find((rule) => rule.rule === "GRP-001")?.options,
+    ).toEqual({ minCycleLength: 2 });
     for (const rule of globalRules) {
       expect(rule.rationale.length).toBeGreaterThan(0);
       expect(rule.description.length).toBeGreaterThan(0);
@@ -689,6 +697,9 @@ describe("inferRuleSet · cross-cluster cycle heuristic", () => {
     expect(grp001?.rationale).toContain("docs/b.md");
     expect(grp001?.rationale).toContain("docs/c.md");
     expect(grp001?.rationale).not.toContain("reference each other");
+    // Three documents is the rule's own default floor, so the cited cycle reports without help and
+    // the entry stays option-free — the common case, and the other half of the two-node pin above.
+    expect(grp001?.options).toBeUndefined();
   });
 });
 

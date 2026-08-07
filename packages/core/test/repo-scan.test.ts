@@ -597,6 +597,27 @@ describe("scanRepository · the pruning record", () => {
     ]);
   });
 
+  it("discloses a gitignored hidden directory as gitignored, not as hidden", async () => {
+    // Both classes apply, and only one of them has advice that works: the hidden line suggests an
+    // `include` pattern, which a fresh `init` config defeats by writing `respectGitignore: true`.
+    // Classified as hidden, the directory was also never named on the gitignored line, so the user
+    // was not told why their pattern did nothing. Uncounted for the same reason every gitignored
+    // directory is: the walk does not descend into it.
+    const root = await createFixtureTree({
+      ".gitignore": ".scratch/\n",
+      "docs/one.md": "# One\n",
+      ".scratch/notes.md": "# Notes\n",
+      ".github/PR.md": "# PR\n",
+    });
+
+    const result = await scanRepository({ cwd: root });
+
+    expect(result.pruned.directories).toEqual([
+      { path: ".github", reason: "hidden", markdownFileCount: 1 },
+      { path: ".scratch", reason: "gitignored" },
+    ]);
+  });
+
   it("counts only MARKDOWN_EXTENSIONS files inside a hidden directory", async () => {
     const root = await createFixtureTree({
       "docs/one.md": "# One\n",

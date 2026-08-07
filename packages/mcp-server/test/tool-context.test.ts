@@ -35,6 +35,13 @@ async function makeTempDir(prefix: string): Promise<string> {
 // success shape being fixed); these pin the guard's own contract — code, hint, and the offending path
 // in the message — without spawning a server for each case.
 describe("resolveToolCwd", () => {
+  // The rejection messages render `/` separators on every host, so the expectation has to be built
+  // the same way — comparing against a native path would pass on POSIX and fail on Windows for a
+  // message that is correct there.
+  function posix(value: string): string {
+    return value.split(path.sep).join("/");
+  }
+
   async function rejectionOf(cwd: string): Promise<{
     code?: unknown;
     hint?: unknown;
@@ -61,7 +68,7 @@ describe("resolveToolCwd", () => {
 
     const error = await rejectionOf(missing);
     expect(error.code).toBe("INVALID_INPUT");
-    expect(error.message).toContain(missing);
+    expect(error.message).toContain(posix(missing));
     expect(error.hint).toBeTruthy();
   });
 
@@ -72,8 +79,22 @@ describe("resolveToolCwd", () => {
 
     const error = await rejectionOf(filePath);
     expect(error.code).toBe("INVALID_INPUT");
-    expect(error.message).toContain(filePath);
+    expect(error.message).toContain(posix(filePath));
     expect(error.hint).toBeTruthy();
+  });
+
+  it("rejects an explicitly empty cwd instead of silently using the process cwd", async () => {
+    // `path.resolve("")` returns `process.cwd()`, so without a guard ahead of it this call would
+    // stat successfully and analyze the server's own directory — the plausible-answer-to-a-different-
+    // question failure the whole guard exists to prevent, and the one caller mistake it could not see.
+    const error = await rejectionOf("");
+    expect(error.code).toBe("INVALID_INPUT");
+    expect(error.message).toBe("cwd must not be empty");
+    expect(error.hint).toBeTruthy();
+  });
+
+  it("rejects a whitespace-only cwd the same way", async () => {
+    expect((await rejectionOf("   ")).message).toBe("cwd must not be empty");
   });
 });
 

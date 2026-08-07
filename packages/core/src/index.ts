@@ -39,7 +39,6 @@ export type { AtomicFileWrite, AtomicWriteResult } from "./atomic-write.js";
 
 // Repo scan
 export {
-  classifyPrunedDirName,
   DEFAULT_KNOWN_CLUSTER_NAMES,
   DEFAULT_MIN_CLUSTER_SIZE,
   DEFAULT_NOISE_DIR_NAMES,

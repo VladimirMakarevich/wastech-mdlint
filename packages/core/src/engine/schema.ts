@@ -171,6 +171,12 @@ export function generateConfigSchema(opts?: {
         type: "array",
         items: { type: "string" },
         default: [...DEFAULT_EXCLUDE_GLOBS],
+        // The `default` alone says the opposite of what happens: in JSON Schema it reads as "the
+        // value used when the key is absent", i.e. the *replace* semantics this product rejected. An
+        // editor tooltip is the one surface a user reaches without the guide, and it is where they
+        // decide whether writing their own `exclude` drops these entries.
+        description:
+          'Extra globs to exclude. Entries are APPENDED to the default shown here rather than replacing it, so deleting one of the defaults from your own list changes nothing — negate it instead ("!**/vendor/**", or "!**" for all of them).',
       },
       respectGitignore: {
         type: "boolean",

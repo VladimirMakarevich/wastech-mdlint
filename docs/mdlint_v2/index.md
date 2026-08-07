@@ -118,7 +118,7 @@ A point-by-point requirements pass (2026-06-21) locked the v2 improvements. Thes
 
 Each phase is an epic detailed in its own folder (meta `index.md` + numbered task files, each with an explicit prev/next/depends/blocks chain). Effort is a rough T-shirt size (S < 2d, M ≈ 2–5d, L > 5d). "Reuse" = how much current implementation code carries over.
 
-**Detailed task plans:** [P0 Foundations](P0-foundations/index.md) · [P1 ParsedDocument](P1-parsed-document/index.md) · [P2 Rule engine](P2-rule-engine/index.md) · [P3 Rules](P3-rules/index.md) · [P4 Graph](P4-graph/index.md) · [P5 Compile](P5-compile/index.md) · [P6 init](P6-init/index.md) · [P7 MCP server](P7-mcp-server/index.md) · [P8 Skills](P8-skills/index.md) · [P9 Remediation](P9-remediation/index.md) · [P10 Consistency](P10-consistency/index.md) · [P11 Post-P9 Remediation](P11-remediation/index.md) · [P12 Post-P9 Consistency](P12-consistency/index.md) · [P13 Correctness](P13-correctness/index.md) · [P14 Host boundary](P14-host-boundary/index.md) · [P15 Output contracts](P15-output-contracts/index.md) · [P16 Release readiness](P16-release-readiness/index.md) · [P17 Plan of record](P17-plan-of-record/index.md) · [P-release Release](P-release/index.md)
+**Detailed task plans:** [P0 Foundations](P0-foundations/index.md) · [P1 ParsedDocument](P1-parsed-document/index.md) · [P2 Rule engine](P2-rule-engine/index.md) · [P3 Rules](P3-rules/index.md) · [P4 Graph](P4-graph/index.md) · [P5 Compile](P5-compile/index.md) · [P6 init](P6-init/index.md) · [P7 MCP server](P7-mcp-server/index.md) · [P8 Skills](P8-skills/index.md) · [P9 Remediation](P9-remediation/index.md) · [P10 Consistency](P10-consistency/index.md) · [P11 Post-P9 Remediation](P11-remediation/index.md) · [P12 Post-P9 Consistency](P12-consistency/index.md) · [P13 Correctness](P13-correctness/index.md) · [P14 Host boundary](P14-host-boundary/index.md) · [P15 Output contracts](P15-output-contracts/index.md) · [P16 Release readiness](P16-release-readiness/index.md) · [P17 Plan of record](P17-plan-of-record/index.md) · [P18 Follow-up burn-down](P18-followup-burndown/index.md) · [P-release Release](P-release/index.md)
 
 **Reference:** [Glossary](glossary.md) — the canonical vocabulary (public types, config keys, CLI/MCP surfaces, rule IDs, and this planning taxonomy) used across these docs · [Accepted behaviors](accepted-behaviors.md) — the register of behaviors deliberately documented rather than fixed, and the residuals recorded rather than closed · [Completion surface](completion-surface.md) — how "done" is recorded: who ticks a task's exit criteria and a phase index's status, and when a criterion is retired instead.
 
@@ -307,6 +307,16 @@ Each phase is an epic detailed in its own folder (meta `index.md` + numbered tas
 - Sweeps: 17 dead links, `PLAN.md`/`docs/plan/` referenced but absent, every stale release-sense `P9` line — across the plan, three published skill frontmatter strings, and a CI log line users read — and the register's own three contract breaches.
 - **Maps to:** backlog batches B12–B13 (W-41 – W-53).
 - **Exit:** CI fails on a dead link in `docs/`; every precedence tier describes the shipped code; the completion-surface question is decided, not just actioned.
+
+### Phase 18 — Follow-up burn-down · `M` · depends on: P17 · reuse: n/a
+
+**Goal:** close the small defects the P13–P17 rounds recorded rather than fixed, and stop the class that produced them. See [P18 tasks](P18-followup-burndown/index.md).
+
+- **Not a new audit.** The source is the orchestrator's own accumulated follow-up file, which twenty finished tasks appended to as they ran: 95 entries, deduplicated to 75 distinct items and each checked against the tree on 2026-08-07. Thirty-three were already closed by a later round's docs pass — recorded in the phase index so nobody re-opens them — and 42 are live.
+- Grouped by the surface each item touches rather than by the task that found it: nine entries named the glossary, five `compile/synthesize.ts`, four `config-reference.md`. Cutting by origin would open one file in six tasks.
+- Fifty-five of the 75 items are one defect class — a documentation claim that outran the code, written by the very task that wrote the document. [P18.09](P18-followup-burndown/09-doc-citation-guard.md) is the only item that addresses the cause: a guard for a code span naming an export that does not exist, which the dead-link gate cannot see.
+- Two items were deferred to tasks that have since closed without them, which is why the queue needed a tracked home at all rather than a second deferral.
+- **Exit:** every live item is fixed or recorded as deliberate; the queue file holds only open entries; the citation guard reports zero over its declared corpus and is blocking.
 
 ### Phase P-release — Distribution, CI & release · `M` · depends on: all (incl. P9–P17) · reuse: Medium
 
