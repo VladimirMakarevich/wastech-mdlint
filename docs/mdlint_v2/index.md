@@ -103,7 +103,7 @@ Pivotal forks that shape the roadmap. **D1–D3 and the milestone order were con
 | **Order** ✅ | **What ships first after the foundation.** | **Lint parity first** — P3 (all 22 built-in rules + the LLM rules) before graph/agents. M1→M2 is the priority path. |
 | **D4** ✅ | **`scan` command.** The current CLI uses `scan`; target uses `lint` (default). | **Default to `lint`, keep `scan` as a hidden alias** for one minor version, then deprecate. |
 | **D5** ✅ | **CLI framework.** | **Adopt `commander` + `@inquirer/prompts`** (matches reference, needed for `init`'s interactive flow). |
-| **D6** ✅ | **LSP server** (`lsp-server/config-loader.ts` in the spec). | **Out of v2 scope** (stretch). Keep `core` LSP-friendly (sync, no `process.exit` in library code). |
+| **D6** ✅ | **LSP server** (`lsp-server/config-loader.ts` in the spec). | **Out of v2 scope** (stretch). Keep `core` LSP-friendly (no `process.exit` in library code, typed errors, one awaited pipeline). |
 | **D7** ✅ | **Docs site** (reference ships Astro/Starlight). | **Out of v2 core scope**; README + schema + skills suffice for launch. |
 
 ---

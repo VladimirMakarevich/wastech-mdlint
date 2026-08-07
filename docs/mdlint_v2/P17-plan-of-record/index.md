@@ -43,8 +43,8 @@ Two of these sit in the **precedence tiers a contributor is told to obey** rathe
 
 - [x] The 11 citations of the deleted report are repointed and the four `tasks/pending/` links dropped or re-targeted; `PLAN.md`/`docs/plan/` references are gone (W-43, W-44).
 - [x] CI fails on a dead link inside `docs/`, run by the product's own `REF-001` against a repository configuration that exists (W-53).
-- [ ] The enforced ADR's three nonexistent API names are corrected and its synchronicity clause replaced with the real constraint; the glossary's **LSP server** and **Async rules** entries say which layer they mean, and the register residual recording the ADR's divergence is deleted (W-41).
-- [ ] Decision entry 4.2 is narrowed to what shipped, and 4.3 agrees with the barrel comment that cites it (W-47).
+- [x] The enforced ADR's three nonexistent API names are corrected and its synchronicity clause replaced with the real constraint; the glossary's **LSP server** and **Async rules** entries say which layer they mean, and the register residual recording the ADR's divergence is deleted (W-41).
+- [x] Decision entry 4.2 is narrowed to what shipped, and 4.3 agrees with the barrel comment that cites it (W-47).
 - [ ] No phase index reads `Not started` above task files that are all Done; the permanently unverifiable P0 parity criterion is retired or registered; the per-task checkbox question is **decided**, not just actioned (W-42).
 - [ ] The orchestrator task file is listed in its index or moved out of the phase directory (W-50).
 - [ ] Every stale release-sense `P9` is swept from the requirements, the phase indexes, and the four surviving artifact lines — **without** touching the correct remediation-sense references in the governance and rules files (W-45, W-46).
