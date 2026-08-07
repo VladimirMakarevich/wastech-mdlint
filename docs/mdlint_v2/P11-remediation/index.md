@@ -47,7 +47,7 @@ The audit's [§4](../audit-2026-07-25-post-p9.md) reframes several findings as *
 
 ## Execution note
 
-The two release-blockers were staged as runnable orchestrator tasks — `tasks/pending/p11-01-cli-bin-noop.md` (P11.01) and `tasks/pending/p11-02-sec003-path-escape.md` (P11.02) — and both have landed. `tasks/` is gitignored, so those files are not part of a clone and cannot be linked to from here. The remaining tasks were promoted per-task via the `worc-task` flow, keeping each orchestrator task and its phase file in sync.
+The two release-blockers were staged as runnable orchestrator tasks — `tasks/pending/p11-01-cli-bin-noop.md` (P11.01) and `tasks/pending/p11-02-sec003-path-escape.md` (P11.02) — and both have landed. `tasks/` is gitignored, so those files are not part of a clone and cannot be linked to from here. Promote each remaining task per-task via the `worc-task` flow, keeping the orchestrator task and its phase file in sync.
 
 ## Phase exit criteria
 

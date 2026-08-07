@@ -385,7 +385,7 @@ Recommended milestones:
 ## 10. Next steps
 
 1. ✅ **Decisions D1–D3 + milestone order confirmed** (§5). D4–D7 default-resolved.
-2. **Expand the critical-path phases into `docs/mdlint_v2/NN-*.md` task files** (mirroring the v1 `docs/plan/` granularity), in this order:
+2. ✅ **Expand the critical-path phases into per-task files** — what shipped is one file per task inside the phase's own directory, `docs/mdlint_v2/P<N>-<name>/NN-<task>.md`, beside its `index.md`. This item read "mirroring the v1 `docs/plan/` granularity" until [P18.06](P18-followup-burndown/06-plan-residue.md): `docs/plan/` was never tracked in this repository (`git log --all -- docs/plan` is empty), so there was no granularity to mirror. The order the expansion followed:
    - **P0** — workspace/monorepo bootstrap (gates everything);
    - **P2** — rule engine + new config model (the engine core);
    - **P3** — the 22 built-in rules + the two preserved LLM rules (the lint-parity milestone, M2). P1/P4 can be detailed in parallel once P0 is drafted.

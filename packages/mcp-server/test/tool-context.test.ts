@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -148,6 +148,26 @@ describe("resolveToolConfiguration", () => {
       configPath: "custom.config.json",
     });
     expect(loaded.configPath).toBe(path.join(dir, "custom.config.json"));
+  });
+
+  it("names a configPath above the cwd as the caller typed it, `../` included", async () => {
+    // The one place a payload carries a path outside the tool's `cwd`, and it is there because the
+    // caller put it there: resolution and rendering share the `cwd` base, so the message quotes the
+    // argument back rather than inventing a path nobody wrote. The guides state the containment
+    // property as "no payload names a host path the caller did not itself supply" for exactly this
+    // reason — they said "nothing outside the analyzed directory" until this case was checked
+    // against the code, so the claim is pinned here rather than left to the next reading.
+    const dir = await makeTempDir("mcp-tc-configpath-escape-");
+    const cwd = path.join(dir, "proj");
+    await mkdir(cwd);
+
+    const error = (await resolveToolConfiguration({
+      cwd,
+      configPath: "../secrets/x.json",
+    }).catch((e: unknown) => e)) as { code?: unknown; message?: unknown };
+
+    expect(error.code).toBe("CONFIG_NOT_FOUND");
+    expect(error.message).toBe("Config file not found: ../secrets/x.json");
   });
 
   it("exposes the resolved cwd so callers need not recompute the default", async () => {
