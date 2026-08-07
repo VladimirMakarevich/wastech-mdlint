@@ -292,7 +292,6 @@ export const tbl006: RuleDefinition = defineRule({
         column: options.column,
         idPattern: options.idPattern,
         section: options.section,
-        files: options.files,
       },
       (filePath) => matchesFileScope(filePath, options),
     )) {

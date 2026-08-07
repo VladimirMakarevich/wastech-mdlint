@@ -248,9 +248,6 @@ export function crossColumn(
 export type ColumnUniqueOptions = {
   column: string;
   section?: string;
-  // Retained for callers' option shape; scope is actually enforced via the `fileMatches`
-  // callback below, which also honors `exclude`.
-  files?: string[];
   // Optional token validation: only cells matching this pattern are considered IDs.
   idPattern?: string;
 };
@@ -278,9 +275,9 @@ export function columnUnique(
   );
 
   for (const document of documents) {
-    // Always consult fileMatches — it applies both `files` and `exclude` (see the call sites in
-    // rules/tbl.ts and rules/custom.ts), so gating this on `options.files` being set would
-    // silently skip the exclude-only case.
+    // File scope is this callback and nothing else — it applies both `files` and `exclude` (see the
+    // call sites in rules/tbl.ts and rules/custom.ts). W-40 removed the unread `files` option that
+    // used to sit beside it: gating on it would have silently skipped the exclude-only case.
     if (!fileMatches(document.path)) {
       continue;
     }

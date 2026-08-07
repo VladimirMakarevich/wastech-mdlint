@@ -147,6 +147,19 @@ const COMMENT_LOSS_NOTE =
   "merge rebuilds the config from its parsed values, so the JSONC comments in the existing file " +
   "are not preserved.";
 
+// The two rules the README leads with are the two `init` can never propose (W-39): both require a
+// budget, and inference sees 3–5 sampled files per cluster — not a corpus — so any threshold it
+// derived would be invented rather than measured. That is a scope choice, and an unstated one is
+// what turns into a finding a second time, so the draft says it out loud rather than leaving the
+// user to notice the absence. Same disclosure discipline as the scan-exclusion block above it.
+const NOT_INFERRED_NOTE = [
+  "Not proposed by init:",
+  "  SIZE-001 (byte / line / token budgets) and LLM-001 (eager-import token budget) are never " +
+    "inferred — both need a budget only you can choose, and no honest threshold follows from a " +
+    "3–5 file sample. Add them by hand: see docs/guide/rules/SIZE-001.md and " +
+    "docs/guide/rules/LLM-001.md.",
+];
+
 /**
  * Groups inferred rules by category, preserving `inferRuleSet`'s own deterministic id order within
  * each group (a computed sequence, not an incidental one — re-sorting here would just be redundant).
@@ -466,8 +479,8 @@ export function formatScanExclusions(
 /**
  * Deterministic, human-readable preview of the confirmed draft: existing-config disposition,
  * package manager, include globs (from `buildConfigPreview`, so the printed list matches exactly
- * what P6.04 would serialize), the scan-exclusion disclosure, and rules grouped by category with
- * their per-rule rationale.
+ * what P6.04 would serialize), the scan-exclusion disclosure, rules grouped by category with their
+ * per-rule rationale, and the two rules inference will never reach (`NOT_INFERRED_NOTE`).
  *
  * `merge` is additive/existing-wins (P6.03's locked contract): it only ever appends new `rules[]`
  * entries and must never touch `include`/`exclude`/`settings`. So a merge preview omits the
@@ -542,6 +555,10 @@ export function formatDraftSummary(
       }
     }
   }
+
+  // Unconditional, including on `merge`: it states what `init` proposes, which is true whatever the
+  // existing config already lists, so no branch needs to opt out of it.
+  lines.push("", ...NOT_INFERRED_NOTE);
 
   return `${lines.join("\n")}\n`;
 }

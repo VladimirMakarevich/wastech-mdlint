@@ -19,6 +19,7 @@ import {
   lintConfigSchema,
   loadConfiguration,
   ruleEntrySchema,
+  ruleRegistry,
   type DocCluster,
   type GeneratedInitConfig,
   type InferredRule,
@@ -2405,6 +2406,34 @@ describe("formatDraftSummary", () => {
     expect(summary).toContain(
       "WARNING: the existing config could not be read, parsed, or validated",
     );
+  });
+
+  // W-39: P16.05 decided against widening inference to reach SIZE-001/LLM-001, so the draft has to
+  // name them — the README leads with both, and an absence a user has to notice is the gap the
+  // decision would otherwise leave open. Unconditional, including on the merge path, because it
+  // states what `init` proposes rather than what the resulting config contains.
+  it.each([["none"], ["merge"], ["overwrite"]] as const)(
+    "names SIZE-001 and LLM-001 as never inferred, with their pages (%s)",
+    (existingConfigAction) => {
+      const summary = formatDraftSummary(
+        buildSelections({ existingConfigAction }),
+        "wastech-mdlint.config.json",
+      );
+
+      expect(summary).toContain("Not proposed by init:");
+      expect(summary).toContain("SIZE-001");
+      expect(summary).toContain("LLM-001");
+      expect(summary).toContain("docs/guide/rules/SIZE-001.md");
+      expect(summary).toContain("docs/guide/rules/LLM-001.md");
+    },
+  );
+
+  // The two rules are absent from inference, not from the product: a note claiming a rule id the
+  // registry does not carry would send the reader to a page that does not exist.
+  it("names only rule ids the registry actually ships", () => {
+    for (const id of ["SIZE-001", "LLM-001"]) {
+      expect(ruleRegistry.has(id)).toBe(true);
+    }
   });
 });
 

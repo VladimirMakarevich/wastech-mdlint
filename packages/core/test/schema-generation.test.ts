@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_EXCLUDE_GLOBS } from "../src/config/corpus-scope.js";
+import { ASSERTION_TARGETS } from "../src/engine/primitives/assert.js";
 import { generateConfigSchema } from "../src/engine/schema.js";
 
 // The shipped schema lives in the CLI package (its path is the config's default local `$schema`).
@@ -97,6 +98,41 @@ describe("generateConfigSchema", () => {
       (branch) => branch.properties?.rule?.const === "custom",
     );
     expect(customBranch).toBeDefined();
+  });
+
+  // W-37: the two custom branches spelled this enum as a literal, so a new assert kind carrying a
+  // new target needed two hand edits in an otherwise metadata-driven file. The byte-sync test cannot
+  // see the difference — it only proves schema.json matches whatever the generator produces — so the
+  // derivation needs its own guard.
+  it("derives every custom branch's target enum from ASSERTION_TARGETS (W-37)", () => {
+    const schema = JSON.parse(
+      generateConfigSchema({ customRules: [{ id: "REQ-OWNER" }] }),
+    ) as {
+      properties: {
+        rules: {
+          items: {
+            oneOf: Array<{
+              properties?: {
+                rule?: { const?: string };
+                target?: { enum?: string[] };
+              };
+            }>;
+          };
+        };
+      };
+    };
+    const customBranches = schema.properties.rules.items.oneOf.filter(
+      (branch) => branch.properties?.rule?.const === "custom",
+    );
+    const expected = [
+      ...new Set<string>(Object.values(ASSERTION_TARGETS)),
+    ].sort();
+
+    // Both the generic branch and the known-custom-id branch, so neither can drift alone.
+    expect(customBranches).toHaveLength(2);
+    for (const branch of customBranches) {
+      expect(branch.properties?.target?.enum).toEqual(expected);
+    }
   });
 
   it("requires compile.skill and forbids unknown keys at the compile and compile.skill levels (P5.05)", () => {

@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  extractDocProfile,
-  extractDocProfiles,
-} from "../src/compile/doc-profile.js";
+import { extractDocProfiles } from "../src/compile/doc-profile.js";
+import type { DocumentProfile } from "../src/compile/doc-profile.js";
+import type { GraphAnalysisOptions } from "../src/compile/graph-analysis.js";
 import { buildContextGraph } from "../src/graph/build-context-graph.js";
 import type {
   BuildContextGraphOptions,
@@ -39,9 +38,28 @@ function getDocument(
   return document;
 }
 
-// Shared between the single-document and batch describes so the pinned profile literal exists in
-// exactly one place: `extractDocProfile` and `extractDocProfiles` build profiles through the same
-// helper, so asserting the batch against the single result alone would not catch a shared bug.
+// One-element call through the single entry point, so the single-document assertions below read as
+// assertions rather than as map plumbing. W-40 removed the `extractDocProfile` wrapper this used to
+// call: it sat on the barrel with no caller in either host.
+function profileOne(
+  document: ParsedDocument,
+  graph: ContextGraph,
+  options: GraphAnalysisOptions = {},
+): DocumentProfile {
+  const profile = extractDocProfiles([document], graph, options).get(
+    document.path,
+  );
+
+  if (profile === undefined) {
+    throw new Error(`Missing profile for "${document.path}".`);
+  }
+
+  return profile;
+}
+
+// Shared between the single-document and corpus describes so the pinned profile literal exists in
+// exactly one place: both go through the same `buildProfile`, so asserting the corpus result against
+// the single one alone would not catch a shared bug.
 const REFERENCE_ENTRIES: Record<string, string> = {
   "consumer.md": [
     "# Usage",
@@ -123,7 +141,7 @@ const EXPECTED_CONSUMER_PROFILE = {
   ],
 };
 
-describe("extractDocProfile", () => {
+describe("extractDocProfiles · one document", () => {
   it("projects outline and table schemas in source order and detects one table ID family", () => {
     const { documents, graph } = contextOf({
       "profile.md": [
@@ -143,9 +161,7 @@ describe("extractDocProfile", () => {
       ].join("\n"),
     });
 
-    expect(
-      extractDocProfile(getDocument(documents, "profile.md"), graph),
-    ).toEqual({
+    expect(profileOne(getDocument(documents, "profile.md"), graph)).toEqual({
       role: "isolated",
       outline: [
         { text: "Overview", depth: 1, slug: "overview", line: 1 },
@@ -182,13 +198,13 @@ describe("extractDocProfile", () => {
     });
 
     expect(
-      extractDocProfile(
+      profileOne(
         getDocument(mixedWidths.documents, "mixed-widths.md"),
         mixedWidths.graph,
       ).idPattern,
     ).toBeUndefined();
     expect(
-      extractDocProfile(
+      profileOne(
         getDocument(mixedPrefixes.documents, "mixed-prefixes.md"),
         mixedPrefixes.graph,
       ).idPattern,
@@ -201,9 +217,9 @@ describe("extractDocProfile", () => {
       REFERENCE_OPTIONS,
     );
 
-    expect(
-      extractDocProfile(getDocument(documents, "consumer.md"), graph),
-    ).toEqual(EXPECTED_CONSUMER_PROFILE);
+    expect(profileOne(getDocument(documents, "consumer.md"), graph)).toEqual(
+      EXPECTED_CONSUMER_PROFILE,
+    );
   });
 
   it("threads the hub threshold through role lookup instead of hard-coding the default", () => {
@@ -217,8 +233,8 @@ describe("extractDocProfile", () => {
     });
     const bridge = getDocument(documents, "bridge.md");
 
-    expect(extractDocProfile(bridge, graph).role).toBe("hub");
-    expect(extractDocProfile(bridge, graph, { hubMinInDegree: 4 }).role).toBe(
+    expect(profileOne(bridge, graph).role).toBe("hub");
+    expect(profileOne(bridge, graph, { hubMinInDegree: 4 }).role).toBe(
       "bridge",
     );
   });
@@ -239,16 +255,16 @@ describe("extractDocProfile", () => {
     });
     const document = getDocument(documents, "a.md");
 
-    expect(extractDocProfile(document, graph)).toEqual(
-      extractDocProfile(document, graph),
-    );
+    expect(profileOne(document, graph)).toEqual(profileOne(document, graph));
   });
 });
 
-// The batch entry point indexes the graph once for the whole corpus (audit L-5). These assertions
-// are the byte-identity guard for that refactor: same profiles, same edge order, same throw.
-describe("extractDocProfiles", () => {
-  it("produces the same pinned profile as the single-document path, edge order included", () => {
+// One index per call is what makes a corpus affordable (audit L-5), and it is also the one thing
+// that can go wrong: the index's edge buckets are shared across a batch, so a profile handing one
+// out directly would alias another document's list. These assertions are that guard — a whole-corpus
+// call must produce exactly what one-document calls produce, edge order included.
+describe("extractDocProfiles · corpus", () => {
+  it("produces the same pinned profile as a one-document call, edge order included", () => {
     const { documents, graph } = contextOf(
       REFERENCE_ENTRIES,
       REFERENCE_OPTIONS,
@@ -259,7 +275,7 @@ describe("extractDocProfiles", () => {
     expect(profiles.get("consumer.md")).toEqual(EXPECTED_CONSUMER_PROFILE);
   });
 
-  it("matches a per-document extractDocProfile map across the whole corpus", () => {
+  it("matches a map built one document at a time across the whole corpus", () => {
     const { documents, graph } = contextOf(
       REFERENCE_ENTRIES,
       REFERENCE_OPTIONS,
@@ -269,7 +285,7 @@ describe("extractDocProfiles", () => {
     const individual = new Map(
       [...documents.values()].map((document) => [
         document.path,
-        extractDocProfile(document, graph),
+        profileOne(document, graph),
       ]),
     );
 

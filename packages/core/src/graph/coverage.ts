@@ -72,8 +72,9 @@ function collectRawTargets(document: ParsedDocument): RawTarget[] {
 
 /**
  * Compute the G5 coverage signal: graph node/edge counts plus the deduped, sorted list of on-disk
- * Markdown files that are linked-to but outside the analyzed corpus. Core-only for P4.06 — there is
- * no CLI/lint-output consumer yet (P4.07 surfaces this in the `graph` command).
+ * Markdown files that are linked-to but outside the analyzed corpus. Two hosts consume it: the CLI
+ * `graph` command in both its formats (P4.07) and the MCP `context-graph` tool's `summary` branch
+ * (P15.02) — each calling this directly rather than through the other.
  *
  * "Markdown file" is `MARKDOWN_EXTENSIONS` (`discovery/markdown-extensions.ts`) — the same set the
  * repo scan walks, so a file this reports is one a proposed `include` could actually admit.

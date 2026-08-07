@@ -328,6 +328,12 @@ function findSampleCycle(
 // safe way to derive it from 3-5 sampled files (a pipeline `chain`, a `template` file, a
 // `zonesDir`, an idColumn/idPattern split, a glossary table, an enumerated `values` set, etc.) —
 // see docs/mdlint_v2/P6-init/02-rule-inference.md's "Deliberately not inferred" note.
+//
+// W-39 re-opened that scope for the two rules the README leads with, SIZE-001 and LLM-001, and
+// reached the same answer: both are budgets, and a sample of 3-5 files per cluster cannot measure a
+// corpus (LLM-001's is over the whole transitive @-import closure, which inference never builds).
+// P16.05 decided against widening and made the gap visible instead — `init`'s draft names both
+// rules and points at their guide pages. Changing that means changing the disclosure too.
 const PATTERN_GATES: Record<
   string,
   {

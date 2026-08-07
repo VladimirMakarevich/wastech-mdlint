@@ -4,10 +4,10 @@ import type {
   ContextGraphEdgeType,
 } from "./context-graph-types.js";
 
-// P4.03 unified traversal (G2): the one BFS that `slice`/`impact`/MCP/compile call instead of each
-// hand-rolling its own walk. Cycle-safety is by construction — a node enters `visited` at most once
-// and is never re-expanded — so cyclic graphs terminate without any cycle-removal step; GRP-001
-// (`graph.cycles`) stays the sole owner of *reporting* cycles.
+// P4.03 unified traversal (G2): the one BFS that `impact`, `getContextSlice`, the MCP tools, and
+// compile call instead of each hand-rolling its own walk. Cycle-safety is by construction — a node
+// enters `visited` at most once and is never re-expanded — so cyclic graphs terminate without any
+// cycle-removal step; GRP-001 (`graph.cycles`) stays the sole owner of *reporting* cycles.
 
 const byPath = compareStrings;
 
@@ -120,15 +120,6 @@ export function query(graph: ContextGraph, options: QueryOptions): QueryResult {
       byPath(left.path, right.path),
     ),
   };
-}
-
-export function slice(
-  graph: ContextGraph,
-  start: string,
-  depth = 2,
-  edgeTypes?: ContextGraphEdgeType[],
-): QueryResult {
-  return query(graph, { start, direction: "forward", depth, edgeTypes });
 }
 
 export function impact(

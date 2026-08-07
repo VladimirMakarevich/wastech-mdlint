@@ -95,6 +95,14 @@ export const customRuleEntrySchema = z
     id: z.string().min(1),
     description: z.string().optional(),
     severity: severityOverrideSchema.optional(),
+    // Deliberately looser than `schema.json`'s `target` enum, which W-37 now derives from the same
+    // `ASSERTION_TARGETS` authority. Narrowing this to a `z.enum` would preempt resolveCustomRule's
+    // check, which is *stricter* — it validates the target against the specific assert kind and says
+    // which one was expected — with a generic Zod message. It would also fire earlier on the MCP
+    // `lint` wire path (tools/lint.ts), where a pre-handler rejection escapes the M6
+    // `{ code, message, hint }` contract entirely. Editor and linter cannot drift apart on the
+    // vocabulary now that both read `ASSERTION_TARGETS`; the enum is a coarse pre-filter and this
+    // loader defers the verdict to the one place that can give a useful one.
     target: z.string().optional(),
     options: z
       .object({

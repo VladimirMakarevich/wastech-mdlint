@@ -108,7 +108,6 @@ export function resolveCustomRule(
             column: assert.column,
             idPattern: assert.idPattern,
             section: assert.section,
-            files: fileScope.files,
           },
           (filePath) => matchesFileScope(filePath, fileScope),
         )) {

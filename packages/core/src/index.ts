@@ -112,7 +112,11 @@ export {
   topologicalSort,
 } from "./graph/graph-algorithms.js";
 export type { TopologicalSortResult } from "./graph/graph-algorithms.js";
-export { impact, query, slice } from "./graph/query.js";
+// `query` has no host caller of its own (the graph commands and MCP tools reach it through
+// `getContextSlice` / `impact` / compile). W-40 removed the four exports in that position; this one
+// and `getImpactSet` below stay because decision entry 4.3 names both as reused by P7.03, which
+// makes them a documented expectation rather than an open call — settled in P17.03 (W-47), not here.
+export { impact, query } from "./graph/query.js";
 export type {
   QueryDirection,
   QueryOptions,
@@ -165,7 +169,6 @@ export type {
   NodeClassification,
   NodeRole,
 } from "./compile/graph-analysis.js";
-export { extractDocProfile } from "./compile/doc-profile.js";
 export type {
   DocumentOutlineItem,
   DocumentProfile,
@@ -258,10 +261,7 @@ export {
   isProjectAssertion,
   runAssertion,
 } from "./engine/primitives/assert.js";
-export type {
-  Assertion,
-  RunAssertionOptions,
-} from "./engine/primitives/assert.js";
+export type { Assertion } from "./engine/primitives/assert.js";
 export { DEFAULT_PLACEHOLDERS } from "./engine/primitives/content.js";
 export type {
   PrimitiveContext,

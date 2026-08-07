@@ -161,17 +161,11 @@ export function isProjectAssertion(kind: Assertion["kind"]): boolean {
   return kind === "columnUnique";
 }
 
-export type RunAssertionOptions = {
-  // For project assertions (columnUnique): which corpus files participate. Defaults to all.
-  fileMatches?: (filePath: string) => boolean;
-};
-
 // Dispatch a validated assertion to its executor. `custom` rules and primitive tests call this; the
 // discriminated union guarantees exhaustive, type-safe dispatch.
 export function runAssertion(
   assertion: Assertion,
   context: PrimitiveContext,
-  options: RunAssertionOptions = {},
 ): PrimitiveFinding[] {
   switch (assertion.kind) {
     case "requiredColumns":
@@ -199,6 +193,10 @@ export function runAssertion(
         section: assertion.section,
       });
     case "columnUnique":
+      // Unscoped by construction: `custom.ts` dispatches the one project-scoped kind directly to
+      // `columnUnique` with the rule's own `files`/`exclude` matcher, so this branch is only ever
+      // reached by a caller that has no file scope to apply. W-40 removed the `fileMatches` option
+      // that could have carried one — nothing ever passed it.
       return columnUnique(
         context,
         {
@@ -206,7 +204,7 @@ export function runAssertion(
           idPattern: assertion.idPattern,
           section: assertion.section,
         },
-        options.fileMatches ?? (() => true),
+        () => true,
       );
     case "crossColumn":
       return crossColumn(context.document, {

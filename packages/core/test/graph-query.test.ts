@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildContextGraph } from "../src/graph/build-context-graph.js";
-import { impact, query, slice } from "../src/graph/query.js";
+import { impact, query } from "../src/graph/query.js";
 import type { ParsedDocument } from "../src/markdown/document-types.js";
 import { parseDocument } from "../src/markdown/parse-document.js";
 
@@ -15,7 +15,7 @@ function graphOf(entries: Record<string, string>) {
   return buildContextGraph(map);
 }
 
-describe("query · forward / slice", () => {
+describe("query · forward", () => {
   it("bounds a linear chain by depth, excluding nodes past the bound", () => {
     const graph = graphOf({
       "a.md": "[b](b.md)\n",
@@ -24,7 +24,9 @@ describe("query · forward / slice", () => {
       "d.md": "# D\n",
     });
 
-    expect(slice(graph, "a.md", 2)).toEqual({
+    expect(
+      query(graph, { start: "a.md", direction: "forward", depth: 2 }),
+    ).toEqual({
       visited: [
         { path: "a.md", depth: 0, via: null },
         { path: "b.md", depth: 1, via: "a.md" },
