@@ -41,6 +41,7 @@ These five categories are the standing answer. Each names a class of defect that
 Rules for keeping this honest:
 
 - Each guard carries a `@boundary-guard <category>` comment at the guard itself. `packages/core/test/boundary-guards.test.ts` asserts every category still has its tagged guard, so deleting one fails the suite while renaming a test does not.
+- That marker is the carve-out to the self-contained-comment rule in `.agents/rules/coding-style.md`, not an exception to it: it is parsed by a test, so it is program input that happens to use comment syntax. Everything else a test's comments say obeys the same rule as product code — describe the defect the guard exists to catch and what a green run therefore proves, never the audit round, backlog item, or task file that asked for it.
 - Adding a category here means adding it to that inventory too, and vice versa. Be aware which half of that pairing a test can hold: the inventory pins its own category set, so growing it fails until the author updates that list — which points back at this table — but the inventory does not parse this file, so a row added here alone fails nothing. Keeping this table honest is discipline, not enforcement, and it is the direction in which the table could start claiming coverage the tree no longer has.
 - Behaviors a task decides to accept rather than guard belong in the [accepted behaviors register](../../docs/mdlint_v2/accepted-behaviors.md), not in an untested gap.
 

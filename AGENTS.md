@@ -58,6 +58,7 @@ Historical v1 planning remains in `PLAN.md` and `docs/plan/`, but it is backgrou
 - Reuse parser libraries and structured AST traversal instead of ad hoc Markdown parsing.
 - Keep token estimation isolated so the current heuristic can be replaced later without refactoring unrelated code.
 - Do not add broad abstractions before the phase plan creates a concrete need for them.
+- Code comments must be self-contained. No phase/task/backlog/finding/audit ids (`P16.03`, `W-31`) and no references to `docs/`, `AGENTS.md`, `CLAUDE.md`, `.agents/rules/`, or the accepted-behaviors register inside a comment — in any file that carries comments, including JSONC, dotfiles, and CI YAML. Write the reason out in the comment instead: those documents get superseded and deleted, and what is left behind is a pointer where a rationale used to be. The full rule, including the carve-out for machine-read markers such as `@boundary-guard`, is in `.agents/rules/coding-style.md`.
 - Do not add new skills, `.claude/skills/`, hooks, LSP support, docs-site work, external HTTP link checking, external link caches, or code-plugin execution unless the user explicitly asks for that scope.
 
 ## Testing And Verification

@@ -28,6 +28,21 @@ Match the repository's actual tooling and configuration unless a phase task expl
 - When behavior is non-obvious, surprising, or roadmap-constrained, capture that reason next to the relevant code path.
 - If a block is hard to justify with a short why-comment, simplify or restructure it until the intent and rationale are clear.
 
+### Comments Are Self-Contained
+
+A comment is read by somebody sitting in the code, often long after it was written, with no planning tree open beside them. Documents get superseded, renamed, archived, and deleted; a comment that outsources its reason to one decays into a dangling pointer, and the reason it was protecting goes with it. So every comment carries its own justification in full.
+
+This covers comments in **every** non-prose file, not only `.ts`: JSONC (`tsconfig.base.json`), `#`-comments (`.npmrc`, `.gitattributes`), YAML (`.github/workflows/`), and doc comments (JSDoc/TSDoc) are all code comments for this rule.
+
+- **No planning tags.** Do not open or annotate a comment with a phase or task id (`P16.03`), a backlog or finding id (`W-31`), an audit round, or a ticket number. They say nothing to a reader without that backlog in front of them, and they outlive the item they name.
+- **No references to documentation.** Do not point a comment at `docs/`, `AGENTS.md`, `CLAUDE.md`, `.agents/rules/`, a task or decision page, an audit report, or the accepted-behaviors register — not as a path, a link, a section title, or a bare "see ..." aside.
+- **Write the substance instead.** Whatever the pointer stood in for — the constraint, the decision, the alternative that was rejected, the failure this shape prevents — state it in the comment, at whatever length it honestly takes. Deleting the pointer and leaving nothing is the wrong fix: the rationale is the deliverable and the pointer was only ever a shortcut to it.
+- **The check:** strike every reference out of the comment. If what is left no longer explains why the code looks like this, the comment is not finished.
+- **Pointing at code is allowed.** Naming another source or test file, a symbol, or an upstream library's behavior links two things that live in the same tree and move together under review. State the fact first anyway, so the comment survives that file being renamed.
+- **One carve-out — machine-read markers.** A marker something actually parses (`@boundary-guard <category>`, an ESLint or TypeScript directive, `prettier-ignore`) is program input wearing comment syntax, not a documentation reference. Keep those, in exactly the form their reader expects.
+
+Rationale that must not be lost belongs in the documentation tree, where it is maintained and reviewed as prose. The comment's job is to leave the code defensible on its own.
+
 ## Glossary And Naming
 
 - The canonical vocabulary lives in `docs/mdlint_v2/glossary.md`. Use the established term for a concept (type name, config key, rule ID, edge type, node role) rather than coining a synonym; consistent naming is a contract, not a style preference.

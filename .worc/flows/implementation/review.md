@@ -39,6 +39,7 @@ Assess the change against the repository's own idioms and conventions (if docume
 - **SOLID, pragmatically**: modules should be small and single-purpose; the dependency direction should point from adapters/UI toward core logic, never the reverse.
 - **DRY**: reuse existing primitives instead of duplicating them — but do not abstract two incidental similarities into a shared unit prematurely.
 - **Comments**: new non-obvious code carries a `why, not what` rationale where it is introduced.
+- **Self-contained comments**: no comment may carry a phase/task/backlog/finding/audit/ticket id, or a reference to a documentation file, plan, decision page, or rules doc — in source, JSONC, dotfile `#`-comments, CI YAML, or JSDoc alike. Those documents get archived and deleted; the comment must state the reason itself and survive every reference in it being struck out. A marker something actually parses (a test-harness tag, a linter directive) and a plain cross-reference to another source file or symbol are not violations. Where the project documents this rule for itself, a breach is a documented-invariant violation and blocks.
 
 ## Test Coverage
 
