@@ -220,7 +220,7 @@ describe("detectWorkspacePackages", () => {
     ]);
   });
 
-  // Audit L-11: the reader stopped at the first blank line, silently truncating a grouped
+  // The reader used to stop at the first blank line, silently truncating a grouped
   // `packages:` block to whatever preceded it.
   it("reads the whole packages block across blank lines and full-line comments", async () => {
     const root = await createFixtureTree({
@@ -254,7 +254,7 @@ describe("detectWorkspacePackages", () => {
   });
 
   it("prunes a package.json nested inside a hidden directory", async () => {
-    // Same hidden-directory prune as the Markdown walk (audit L-7): tooling scaffolding under
+    // Same hidden-directory prune as the Markdown walk: tooling scaffolding under
     // `.config/` is not a workspace package, even when a sibling-fallback glob would match it.
     const root = await createFixtureTree({
       "package.json": JSON.stringify({ name: "root" }),

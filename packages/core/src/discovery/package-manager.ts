@@ -62,13 +62,13 @@ async function detectInDirectory(
  * Detects the package manager from the nearest lockfile at or above `cwd`. Priority order
  * bun > pnpm > yarn > npm mirrors the spec; returns `undefined` when no lockfile is found rather
  * than defaulting to `"npm"` — guessing a manager with no evidence is a UX call for the interactive
- * `init` layer (P6.03), not core's job.
+ * `init` layer, not core's job.
  *
  * The walk is bounded, mirroring `findConfig`'s ancestor discipline (config/find-config.ts). `cwd`
  * itself is always checked; the walk then climbs strict ancestors and stops after the first
  * directory containing a `.git` (the repository root owns the lockfile — a monorepo member has none
- * of its own, which is exactly why the old root-only check reported "not detected" for it, audit
- * L-11) and never reaches the user's home directory (an unrelated lockfile at `$HOME` must not be
+ * of its own, which is exactly why an earlier root-only check reported "not detected" for it)
+ * and never reaches the user's home directory (an unrelated lockfile at `$HOME` must not be
  * attributed to the scanned project).
  */
 export async function detectPackageManager(

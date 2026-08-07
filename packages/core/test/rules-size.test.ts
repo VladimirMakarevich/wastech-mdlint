@@ -64,7 +64,7 @@ describe("SIZE-001 tokens metric", () => {
     });
   });
 
-  // W-34: the number is an estimate, and the message is the only place a reader of it will look.
+  // The number is an estimate, and the message is the only place a reader of it will look.
   it("discloses the token calibration in the message itself", async () => {
     const cwd = await fixtureRepo({ "a.md": `${"x".repeat(40)}\n` });
     const result = await lint(cwd, [rule("SIZE-001", { tokens: { warn: 5 } })]);
@@ -103,7 +103,7 @@ describe("SIZE-001 pass case", () => {
   });
 });
 
-describe("SIZE-001 threshold supersession (P11.13 / SC-2)", () => {
+describe("SIZE-001 threshold supersession", () => {
   it("reports one error finding, carrying both thresholds, when a metric crosses warn and error", async () => {
     const cwd = await fixtureRepo({ "a.md": "l1\nl2\nl3\nl4\n" });
     const result = await lint(cwd, [
@@ -154,9 +154,9 @@ describe("SIZE-001 threshold supersession (P11.13 / SC-2)", () => {
   });
 });
 
-// W-04: `{"rule":"SIZE-001"}` used to be a valid, enabled rule that measured nothing — the only rule
+// `{"rule":"SIZE-001"}` used to be a valid, enabled rule that measured nothing — the only rule
 // in the registry that could be enabled into inertness.
-describe("SIZE-001 requires at least one budget (P13.04 / W-04)", () => {
+describe("SIZE-001 requires at least one budget", () => {
   function resolutionError(options: unknown): RuleResolutionError {
     let thrown: unknown;
     try {

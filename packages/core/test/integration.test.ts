@@ -8,7 +8,7 @@ import { loadConfiguration } from "../src/config/load-config.js";
 import { formatLintResultJson } from "../src/engine/format-lint-result.js";
 import { lintFiles } from "../src/engine/lint-files.js";
 
-// Core-pipeline integration test (P3.09): a representative multi-rule config over a small fixture
+// Core-pipeline integration test: a representative multi-rule config over a small fixture
 // repo, exercised end-to-end through loadConfiguration → lintFiles, including a determinism check.
 
 const tempDirs: string[] = [];

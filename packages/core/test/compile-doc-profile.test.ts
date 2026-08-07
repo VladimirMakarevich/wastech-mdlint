@@ -39,7 +39,7 @@ function getDocument(
 }
 
 // One-element call through the single entry point, so the single-document assertions below read as
-// assertions rather than as map plumbing. W-40 removed the `extractDocProfile` wrapper this used to
+// assertions rather than as map plumbing. The `extractDocProfile` wrapper this used to
 // call: it sat on the barrel with no caller in either host.
 function profileOne(
   document: ParsedDocument,
@@ -259,7 +259,7 @@ describe("extractDocProfiles · one document", () => {
   });
 });
 
-// One index per call is what makes a corpus affordable (audit L-5), and it is also the one thing
+// One index per call is what makes a corpus affordable, and it is also the one thing
 // that can go wrong: the index's edge buckets are shared across a batch, so a profile handing one
 // out directly would alias another document's list. These assertions are that guard — a whole-corpus
 // call must produce exactly what one-document calls produce, edge order included.

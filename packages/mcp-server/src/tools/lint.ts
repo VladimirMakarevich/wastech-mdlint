@@ -39,13 +39,13 @@ const AD_HOC_DOCUMENT_PATH = "content.md";
 // also carries `severity` (including `"off"`), and honoring the field the schema exposes is safer
 // than silently ignoring it.
 //
-// P12.04 widened this to a union so M8's "executes declarative custom rules" holds for ad-hoc `lint`
+// Widened to a union so "executes declarative custom rules" holds for ad-hoc `lint`
 // too. Custom-first, because the strict built-in branch would reject a custom entry's `id`/`target`
 // keys. The second branch is `ruleEntrySchema` — the permissive one — deliberately NOT the config-only
 // `ruleEntryUnionSchema`, whose standard branch refine-rejects the literal `"custom"`: the SDK
 // `safeParseAsync`s this schema *before* the handler runs and turns a failure into an
 // `InvalidParams` result carrying raw validation text and no `structuredContent`, so any shape
-// rejected here can never carry the M6 `{code,message,hint}` payload. A malformed
+// rejected here can never carry the `{code,message,hint}` payload. A malformed
 // `{ "rule": "custom" }` must therefore reach `handleLint`
 // and be re-validated there (see `resolveCustomRequest`). Config load stays fail-closed on the same
 // shape; only this wire schema is permissive.
@@ -98,7 +98,7 @@ function toToolInputError(error: RuleResolutionError): ToolInputError {
 // a malformed custom entry through on purpose (see `ruleRequestSchema`), and `entry.rule === "custom"`
 // does not narrow `RuleConfigEntry` away — its `rule` is an open `z.string()` — so this parses rather
 // than casts. That also means `handleLint`, which tests call directly, never reaches
-// `resolveCustomRule` with an absent `id` (the crash P11.07 fixed at the config boundary).
+// `resolveCustomRule` with an absent `id` — the same crash the config boundary already guards.
 function resolveCustomRequest(entry: LintRuleRequest): Rule {
   const parsed = customRuleEntrySchema.safeParse(entry);
   if (!parsed.success) {
@@ -146,8 +146,8 @@ export function handleLint(input: LintToolInput): CallToolResult {
   try {
     // Rule *resolution* stays here — `resolveRequestedRules` owns translating a `RuleResolutionError`
     // into this host's `{ code, message, hint }` contract — and every step after it is core's
-    // `lintContent`: parse, corpus of one, scope split, inline-disable, counts. Before P16.01 (W-58)
-    // those steps were assembled in this function, which made this the one place `lintFiles`' step
+    // `lintContent`: parse, corpus of one, scope split, inline-disable, counts. Those steps used to
+    // be assembled in this function, which made this the one place `lintFiles`' step
     // order existed twice; a step added there would silently not have reached this tool.
     //
     // `rootDir` is the server cwd, mirroring the fallback `resolveToolCwd` applies to the file-based
@@ -167,8 +167,8 @@ export function handleLint(input: LintToolInput): CallToolResult {
       // Core's own text formatter, so `lint` and `lint-files` render byte-for-byte consistently.
       summary: formatLintResultText(result),
       // Deliberately narrower than `LintResult`: an ad-hoc document is not a corpus, so there is no
-      // `files` list to report (W-24 — the divergence from `lint-files` is a decision, documented in
-      // `docs/guide/output.md`, and pinned by `test/lint.test.ts`).
+      // `files` list to report. The divergence from `lint-files` is deliberate, and pinned by
+      // `test/lint.test.ts` so it cannot drift into an accident.
       structured: {
         messages: result.messages,
         errorCount: result.errorCount,

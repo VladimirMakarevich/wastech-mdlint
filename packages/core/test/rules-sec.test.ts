@@ -63,7 +63,7 @@ describe("SEC-001 required sections", () => {
     expect(after.messages).toEqual([]);
   });
 
-  // Audit L-6: the scaffold used to be a hard-coded `\n## X\n\nTODO\n`, so fixing a CRLF document
+  // The scaffold used to be a hard-coded `\n## X\n\nTODO\n`, so fixing a CRLF document
   // left it with mixed line endings. The fixture is built at runtime because `.gitattributes` forces
   // `eol=lf` on committed files, which would silently convert a checked-in CRLF fixture.
   it("scaffolds with CRLF in a CRLF document, leaving no lone LF behind", async () => {
@@ -264,7 +264,7 @@ describe("SEC-003 template conformance", () => {
   });
 });
 
-// Audit L-4, the SEC half of P12.01's `exclude` matrix. One fixture serves all three cases: both
+// The SEC half of the shared `exclude` matrix. One fixture serves all three cases: both
 // documents violate every case, while `templates/t.md` satisfies SEC-001/SEC-002 (it has `Summary`,
 // and neither `Overview` nor `Usage`, which `sectionOrder` skips) and is self-skipped by SEC-003.
 const SECTION_DOC = "# Title\n\n## Usage\n\n## Overview\n";
@@ -301,7 +301,7 @@ describe("SEC file scope (exclude)", () => {
         "docs/a.md",
         "drafts/b.md",
       ]);
-      // The M-2 shape — `exclude` with no `files` beside it to carry the filtering.
+      // The unscoped shape — `exclude` with no `files` beside it to carry the filtering.
       expect(
         await reportedFiles(
           cwd,
@@ -318,7 +318,7 @@ describe("SEC file scope (exclude)", () => {
   );
 
   // SEC-001's fix hook re-applies the gate itself because `applyFixes` has none — the pattern
-  // TBL-002's hook was missing until P12.01. Without it, `--fix` scaffolds into files `check` skipped.
+  // TBL-002's hook was missing once. Without it, `--fix` scaffolds into files `check` skipped.
   it("SEC-001 --fix scaffolds only the in-scope document", async () => {
     const cwd = await fixtureRepo({
       "docs/a.md": SECTION_DOC,

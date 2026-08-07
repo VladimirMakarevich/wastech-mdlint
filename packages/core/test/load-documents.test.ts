@@ -59,11 +59,11 @@ describe("loadDocuments", () => {
     ]);
   });
 
-  // The layering P13.02 depends on: the lint-time default `exclude` lives in `resolveCorpusScope`,
+  // The layering the lint-time defaults depend on: the default `exclude` lives in `resolveCorpusScope`,
   // never here. This loader's contract is "what you pass is what I walk" — `gitignore-layers.test.ts`
   // compares its corpus against real `git ls-files` with an explicit pattern set, so a loader that
   // silently added the default patterns of its own would make that oracle compare two different trees.
-  it("applies no default exclude of its own (P13.02 layering)", async () => {
+  it("applies no default exclude of its own", async () => {
     const root = await createFixtureTree({
       "keep.md": "# Keep\n",
       "node_modules/pkg/README.md": "# Dep\n",
@@ -112,7 +112,7 @@ describe("loadDocuments", () => {
     expect([...documents.values()].map((doc) => doc.path)).toEqual(["keep.md"]);
   });
 
-  it("narrows the corpus when an include entry is negated (W-01)", async () => {
+  it("narrows the corpus when an include entry is negated", async () => {
     const root = await createFixtureTree({
       "README.md": "# Readme\n",
       "docs/public.md": "# Public\n",
@@ -130,7 +130,7 @@ describe("loadDocuments", () => {
     ]);
   });
 
-  it("keeps the corpus when an exclude entry is negated (W-01)", async () => {
+  it("keeps the corpus when an exclude entry is negated", async () => {
     const root = await createFixtureTree({
       "keep.md": "# Keep\n",
       "docs/public.md": "# Public\n",
@@ -138,7 +138,7 @@ describe("loadDocuments", () => {
       "docs/private/keepme.md": "# Keep me\n",
     });
 
-    // Before P13.01 this returned *nothing*: `keep.md` is not `docs/private/keepme.md`, so it matched
+    // Before ordered negation this returned *nothing*: `keep.md` is not `docs/private/keepme.md`, so it matched
     // the inverted second entry and every file in the tree was excluded.
     const documents = await loadDocuments(["**/*.md"], {
       cwd: root,
@@ -148,7 +148,7 @@ describe("loadDocuments", () => {
     // `keepme.md` is not restored, and that is deliberate: `shouldPruneDirectory` decides
     // `docs/private` before descending into it, so no file inside is ever offered to the file-level
     // filter that the negation would rescue. Honoring it would mean walking every excluded tree — the
-    // cost `exclude` exists to avoid. Recorded in `docs/mdlint_v2/accepted-behaviors.md`.
+    // cost `exclude` exists to avoid. Accepted rather than fixed.
     expect([...documents.values()].map((doc) => doc.path)).toEqual([
       "docs/public.md",
       "keep.md",
@@ -187,7 +187,7 @@ describe("loadDocuments", () => {
   });
 
   it("lets a nested .gitignore negation re-include a file a root pattern ignored", async () => {
-    // W-11: layers are ranked by depth, so `docs/.gitignore` overrides the root's `docs/*.md` — the
+    // Layers are ranked by depth, so `docs/.gitignore` overrides the root's `docs/*.md` — the
     // corpus now matches what `git` keeps. Kept in the loader's own suite so the behavior stays
     // covered here with no `git` on PATH; `gitignore-layers.test.ts` is the against-real-git oracle.
     const root = await createFixtureTree({
@@ -291,7 +291,7 @@ describe("loadDocuments", () => {
   });
 });
 
-// W-57 / P16.01 §4. The four shapes of the field test's anchoring table are pinned at the matcher in
+// The four glob-anchoring shapes are pinned at the matcher in
 // `rule-utils.test.ts` ("matchesConfigGlob anchoring"), which is where the *rule* lives. What no test
 // had was the same table one layer up, against a real tree — and that layer is where the shapes stop
 // being equivalent: `exclude` prunes whole directories through a synthetic-child probe before any file
@@ -301,7 +301,7 @@ describe("loadDocuments", () => {
 // not evidence about it.
 //
 // One fixture for the whole table so a failing row names a pattern rather than a fixture.
-describe("loadDocuments glob anchoring over a real tree (W-03/W-01)", () => {
+describe("loadDocuments glob anchoring over a real tree", () => {
   const FIXTURE = {
     "NOTE.md": "# Root\n",
     "docs/NOTE.md": "# Nested\n",
@@ -333,7 +333,7 @@ describe("loadDocuments glob anchoring over a real tree (W-03/W-01)", () => {
       NOT_VENDORED,
     ],
     // Ordered negation: a later entry re-includes what an earlier one subtracted, and the reverse
-    // order subtracts again. Before P13.01 the first of these returned the whole tree (the negation
+    // order subtracts again. Before ordered negation the first of these returned the whole tree (the negation
     // compiled to an inverting matcher in a first-truthy OR) and the second returned it too.
     [
       "ordered negation, negation last",

@@ -120,7 +120,7 @@ describe("table primitives", () => {
 
   // @boundary-guard determinism
   //
-  // P11.05. A `RegExp` carrying `g`/`y` keeps `lastIndex` between `.test()` calls, so a shared
+  // A `RegExp` carrying `g`/`y` keeps `lastIndex` between `.test()` calls, so a shared
   // instance makes findings depend on evaluation order — the determinism invariant's failure mode
   // that no amount of in-process rule testing surfaces unless a case deliberately alternates
   // matching and non-matching rows, as this one does.
@@ -308,7 +308,7 @@ describe("reference primitives", () => {
     ).toHaveLength(0);
   });
 
-  // W-08 at the primitive itself: the router branch used to skip the `exclude` gate entirely, so a
+  // At the primitive itself: the router branch used to skip the `exclude` gate entirely, so a
   // routed candidate the user had excluded was still probed and reported.
   it("linkResolves applies `exclude` to routed candidates, not only unrouted ones", () => {
     const source = doc("[gen](/generated/page)\n", "src/content/docs/index.md");
@@ -349,10 +349,10 @@ describe("reference primitives", () => {
     ]);
   });
 
-  // Audit H-2 class sweep: a relative link/image target whose leading `../` segments exactly
+  // Escape-the-root sweep: a relative link/image target whose leading `../` segments exactly
   // cancel the source directory can leave a bare drive-absolute remainder (e.g. `C:/Users/...`)
   // that `escapesRoot`'s literal `..`-prefix check would miss, and that `path.win32.resolve` then
-  // treats as absolute — ignoring `rootDir` entirely, just like SEC-003's H-2 repro. Windows-only:
+  // treats as absolute — ignoring `rootDir` entirely, just like SEC-003's `template`. Windows-only:
   // on POSIX the remainder is just a harmless relative segment named "C:".
   it.runIf(process.platform === "win32")(
     "linkResolves rejects a `..`-cancelled drive-absolute target instead of treating it as resolved",

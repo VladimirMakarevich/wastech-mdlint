@@ -2,22 +2,23 @@ import { compareStrings } from "../deterministic-sort.js";
 import { formatCyclePath } from "../render-bounds.js";
 import type { ContextGraph } from "./context-graph-types.js";
 
-// P4.02 graph algorithms over the frozen `ContextGraph` read shape (G6): Kahn topo-sort with honest
+// Graph algorithms over the frozen `ContextGraph` read shape: Kahn topo-sort with honest
 // cycle-exclusion reporting, undirected connected components, and a deterministic summary. The
-// cycles themselves are already computed by P4.01's Tarjan pass and stored on `graph.cycles`; this
-// module consumes that data (that *is* the "reuse the existing Tarjan implementation" the task asks
-// for) rather than re-running SCC. Every returned array is sorted before it leaves a function, and
+// cycles themselves are already computed by the builder's Tarjan pass and stored on `graph.cycles`;
+// this module consumes that data rather than re-running SCC, so the two can never disagree about
+// what a cycle is. Every returned array is sorted before it leaves a function, and
 // all ordering uses the shared host-independent string comparator on repo-relative POSIX node paths
 // — matching build-context-graph.ts — so output is byte-stable across filesystems.
 
 const byPath = compareStrings;
 
 // Deduped, reachability-oriented views of the edge list. `node.inDegree` and the raw edge list
-// retain edge multiplicity (P4.01 constraint: two `A→B` edges are two references), but the algorithms
+// retain edge multiplicity — two `A→B` edges are two references — but the algorithms
 // here reason about *whether* one node reaches another, where a repeated edge is the same
 // relationship. Collapsing parallel edges is not cosmetic: Kahn's would otherwise leave a node fed by
 // a doubled `A→B` stuck at in-degree 2, never reaching zero, and wrongly report it as cycle-excluded.
-// Multiplicity stays only for `references`/degree display (collapsing it globally is G7 backlog).
+// Multiplicity stays only for `references`/degree display; collapsing it globally would lose the
+// "referenced three times" signal those surfaces exist to report.
 type DedupedViews = {
   successors: Map<string, string[]>;
   inDegree: Map<string, number>;
@@ -64,8 +65,8 @@ function buildDedupedViews(graph: ContextGraph): DedupedViews {
 export type TopologicalSortResult = {
   // Reading order: a node appears only after every node that links to it, ties broken by path.
   order: string[];
-  // Nodes never emitted — cycle members plus everything reachable only through them. This is the G6
-  // honesty fix: the legacy topo silently truncated to a shorter array, hiding the loss; here the
+  // Nodes never emitted — cycle members plus everything reachable only through them. Reported
+  // rather than dropped: an earlier topo-sort silently truncated to a shorter array, hiding the loss; here the
   // excluded set is reported explicitly so callers can state *what* the cycles (see `graph.cycles`)
   // kept out of reading order.
   excluded: string[];
@@ -150,7 +151,8 @@ export function getComponents(graph: ContextGraph): string[][] {
   }
 
   // Size descending, then by the component's smallest node path ascending — after the per-component
-  // sort above that smallest path is `component[0]` (audit — P4 component-sort gap).
+  // sort above that smallest path is `component[0]`. Without the tiebreak, equal-sized components
+  // came out in whatever order they were discovered.
   components.sort(
     (left, right) => right.length - left.length || byPath(left[0]!, right[0]!),
   );
@@ -177,7 +179,7 @@ export function formatContextGraphSummary(graph: ContextGraph): string {
     )
     .slice(0, TOP_HUB_LIMIT);
 
-  // Entry points are a header plus one indented path per line, matching `top hubs` below (W-26).
+  // Entry points are a header plus one indented path per line, matching `top hubs` below.
   // Comma-joining them produced a 3497-character single line on a 139-node graph, in a format whose
   // name promises a report readable in a terminal — and whose documented usage pipes it through
   // `head`, which truncates by line and so never shortens a blob.

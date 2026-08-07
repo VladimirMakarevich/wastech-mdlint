@@ -41,14 +41,14 @@ import {
 } from "./init-command.js";
 import { formatWriteFailure, toWriteTargetPath } from "./operational-errors.js";
 
-// Resolution order (P5.05): an explicit `--outdir` wins, then `config.compile.outdir`, then this
-// fallback — matching the locked example path in docs/mdlint_v2/requirements/01-configuration.md.
+// Resolution order: an explicit `--outdir` wins, then `config.compile.outdir`, then this
+// fallback, which is the path the documented example configs use.
 const DEFAULT_COMPILE_OUTDIR = ".claude/skills/wastech-mdlint/";
 
-// The whole exit-code taxonomy (roadmap §8), in one place because the distinction is load-bearing for
+// The whole exit-code taxonomy, in one place because the distinction is load-bearing for
 // CI: `1` means *the linter found problems*, `2` means *the command could not run*. `1` is therefore
 // reserved exclusively for findings at or above `--fail-on` — an operational failure that reuses it
-// leaves a CI job unable to tell a broken step from a failing document (P11.10, audit M-6), which is
+// leaves a CI job unable to tell a broken step from a failing document, which is
 // why the constant is named for findings rather than for a generic runtime error.
 export const EXIT_CODE_SUCCESS = 0;
 export const EXIT_CODE_FINDINGS = 1;
@@ -57,7 +57,7 @@ export const EXIT_CODE_USAGE_ERROR = 2;
 export type OutputFormat = "text" | "json";
 export type FailOn = "error" | "warning" | "off";
 
-// The v2 lint command (D4). `scan` is a hidden alias that dispatches to this same kind.
+// The v2 lint command. `scan` is a hidden alias that dispatches to this same kind.
 export type LintCommand = {
   kind: "lint";
   path: string;
@@ -98,7 +98,7 @@ export type SchemaCommand = {
   // The io-seam working directory a relative `--out` resolves against. Required for the same reason
   // `compile` carries one: resolving against the real `process.cwd()` silently diverges from the
   // injected `cwd` whenever the two differ, so `schema --out schema.json` wrote outside the target
-  // directory (audit L-11).
+  // directory.
   cwd: string;
   out: string;
 };
@@ -119,7 +119,7 @@ export type InitCommand = {
   isTty: boolean;
   withCiWorkflow?: boolean;
   // Whether the CLI's `[path]` argument was actually typed (vs. omitted and defaulted to cwd) —
-  // see `InitCommandOptions.pathWasExplicit` for why this must be known this far down (H-3, P11.04).
+  // see `InitCommandOptions.pathWasExplicit` for why this must be known this far down.
   pathWasExplicit: boolean;
 };
 
@@ -173,7 +173,7 @@ async function handleLint(
     explicitConfigPath: command.config,
   });
 
-  // ESLint-style --fix (audit 4.2): apply deterministic fixes in place, then re-lint the result.
+  // ESLint-style --fix: apply deterministic fixes in place, then re-lint the result.
   if (command.fix) {
     try {
       await applyFixes({
@@ -210,7 +210,7 @@ async function handleLint(
   };
 }
 
-// `graph`/`slice`/`impact` (P4.07) are thin hosts over the P4 core graph modules: this file only
+// `graph`/`slice`/`impact` are thin hosts over core's graph modules: this file only
 // picks a format and shapes stdout, all traversal/analysis/rendering lives in `@wastech-mdlint/core`.
 async function handleGraph(
   command: GraphCommand,
@@ -225,9 +225,9 @@ async function handleGraph(
     settings: loaded.settings,
   });
 
-  // The G5 coverage signal is shared by the JSON and human formats (audit B): JSON consumers (CI,
+  // The coverage signal is shared by the JSON and human formats: JSON consumers (CI,
   // agents) must see `filesOutsideCorpus` too, not just the human reader. The MCP `context-graph`
-  // tool now makes this same call for its own `summary` branch (P15.02/W-22) rather than depending on
+  // tool makes this same call for its own `summary` branch rather than depending on
   // this host. Computed lazily via a closure so both call sites can't drift on rootDir/siteRouter and
   // mermaid/dot skip the work.
   const coverage = () =>
@@ -274,7 +274,7 @@ async function handleSlice(
     settings: loaded.settings,
   });
 
-  // An unresolved query is a legitimate answer (G4 honesty), not a usage error — `getContextSlice`
+  // An unresolved query is a legitimate answer, not a usage error — `getContextSlice`
   // already returns an empty result rather than throwing, so this command always exits 0.
   const result = getContextSlice(
     graph,
@@ -361,7 +361,7 @@ async function handleImpact(
       directlyAffected: classification.directlyAffected,
       transitivelyAffected: classification.transitivelyAffected,
       readingOrder: classification.readingOrder,
-      // Parity with the human render (audit C): without `excluded`, a JSON consumer sees a
+      // Parity with the human render: without `excluded`, a JSON consumer sees a
       // readingOrder shorter than the affected set with no signal that a cycle dropped those nodes.
       excluded: classification.excluded,
       lint,
@@ -401,9 +401,9 @@ async function handleSchema(
   } catch (error) {
     // An unwritable destination is an operational failure, not a crash: convert it here so the user
     // sees the path they typed plus the errno instead of a raw fs message carrying the staged temp
-    // file's random name (P11.10). `command.out` is echoed as typed — matching the success line and
+    // file's random name. `command.out` is echoed as typed — matching the success line and
     // the directory guard above, and the documented exception to naming error paths relative to the
-    // working directory (docs/guide/cli.md §Exit codes): an argument the caller chose to spell
+    // working directory: an argument the caller chose to spell
     // absolutely is theirs, not ours to rewrite.
     throw new CliUsageError(formatWriteFailure(command.out, error));
   }
@@ -414,13 +414,13 @@ async function handleSchema(
   };
 }
 
-// `compile` (P5.05): core owns generation (`compileContext`); this handler only resolves `outdir`
+// `compile`: core owns generation (`compileContext`); this handler only resolves `outdir`
 // and does the file I/O, matching the core-hosts-the-pipeline decision.
 async function handleCompile(
   command: CompileCommand,
 ): Promise<CommandExecutionResult> {
   // `--config` is forwarded as typed: core resolves a relative one against the `cwd` below, the same
-  // base every other handler gets (P14.04). This handler used to pre-resolve it, back when core
+  // base every other handler gets. This handler used to pre-resolve it, back when core
   // resolved against `process.cwd()` instead and `compile`'s named `--cwd` made the divergence
   // reachable from an ordinary invocation.
   const loaded = await loadConfiguration({
@@ -451,8 +451,8 @@ async function handleCompile(
 
   // Repository-relative POSIX path in user-visible output (invariant) while the target is inside
   // `--cwd`, and the absolute path once it is not — an `--outdir` above the repository rendered as a
-  // chain of `../..` hops nobody can read (P14.02, W-17). Computed before the write so a failure can
-  // name the same path the success line would have (P11.10).
+  // chain of `../..` hops nobody can read. Computed before the write so a failure can
+  // name the same path the success line would have.
   const outputPathForUser = toWriteTargetPath(command.cwd, outputPath);
 
   try {
@@ -470,12 +470,12 @@ async function handleCompile(
 
 // The exit code for each way `init` can end. A switch rather than a predicate so the `never` check
 // makes a newly added outcome a *compile* error until someone decides which side of the taxonomy it
-// falls on — the distinction is the deliverable of P14.02, and the previous boolean got it wrong for
+// falls on. A boolean stood here once and got it wrong for
 // `invalid-existing-config` precisely because nobody had to state an answer.
 //
 // The dividing question is not "was anything written" — four of these six write nothing. It is
 // whether *the user asked for* no write (`skip`, declining the draft: exit 0) or the command could
-// not do what they asked (an unloadable file to merge into, a failed write: exit 2, W-13).
+// not do what they asked (an unloadable file to merge into, a failed write: exit 2).
 function initExitCode(outcome: InitOutcome): number {
   switch (outcome) {
     case "written":
@@ -493,9 +493,9 @@ function initExitCode(outcome: InitOutcome): number {
   }
 }
 
-// `init` (P6.04): core generates the config bytes; `runInitCommand` performs the writes. Its output is
+// `init`: core generates the config bytes; `runInitCommand` performs the writes. Its output is
 // informational on every path (draft / write / abort / partial-write summary) and always goes to
-// stdout, including on a failure (P11.09) — only the exit code, via `initExitCode` above, says which
+// stdout, including on a failure — only the exit code, via `initExitCode` above, says which
 // kind of ending it was.
 async function handleInit(
   command: InitCommand,

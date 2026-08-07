@@ -4,7 +4,7 @@ import type { ConfigIssue } from "../engine/registry.js";
 import { ruleEntryBranchIndex } from "./config-schema.js";
 
 /**
- * The one place a config validation issue becomes user-visible text (P13.06 / C7).
+ * The one place a config validation issue becomes user-visible text.
  *
  * Both validation stages render through `formatConfigIssue`, so `config.rules[0].severity` is the
  * single notation the product speaks — the loader used to emit `config.rules.0` from stage 1 and
@@ -111,8 +111,8 @@ export function flattenConfigIssues(
 /**
  * Render one issue as a diagnostic line: `- config.rules[0].options.assert: <message>`.
  *
- * `.key` for object keys, `[n]` for array indices, rooted at `config` — the notation stated in
- * `docs/guide/configuration.md`.
+ * `.key` for object keys, `[n]` for array indices, rooted at `config`. This notation is part of the
+ * user-facing contract, so changing it means changing what the configuration guide promises.
  */
 export function formatConfigIssue(issue: ConfigIssue): string {
   const location = issue.path.reduce<string>(

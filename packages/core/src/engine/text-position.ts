@@ -1,10 +1,10 @@
-// `find-line-number` util (P3.01): convert a 0-based character offset in `content` to a 1-based
+// `find-line-number` util: convert a 0-based character offset in `content` to a 1-based
 // line number. Newline-agnostic (`\n` count; `\r\n` shares the `\n`). Used by content primitives to
 // attribute regex matches to a line.
 
 // One-shot form: allocates nothing and stops at `index`. Callers that resolve *many* offsets in the
 // same string must hoist a `createLineNumberLookup` instead of calling this in a loop — the scan
-// restarts from offset zero every time, which is the O(M·L) hot path audit L-5 removed.
+// restarts from offset zero every time, which is an O(M·L) hot path.
 export function findLineNumber(content: string, index: number): number {
   const clamped = Math.max(0, Math.min(index, content.length));
   let line = 1;

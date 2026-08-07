@@ -47,7 +47,7 @@ describe("toWriteTargetPath", () => {
   });
 
   it("falls back to the absolute path once the relative form needs a leading '..'", () => {
-    // The W-17 case: a single hop already reads worse than the absolute path, and the observed
+    // The motivating case: a single hop already reads worse than the absolute path, and the observed
     // report had five of them. Platform-native separators on purpose — this is a path to open.
     const target = path.resolve(CWD, "..", "skill-out", "SKILL.md");
     expect(toWriteTargetPath(CWD, target)).toBe(target);

@@ -386,7 +386,7 @@ describe("inferRuleSet · ADR detection", () => {
   });
 
   it("does not propose SEC-001 when the cluster's includeGlob does not match its own .mdx samples", async () => {
-    // Mirrors the accepted P6.01 fallback shape: scanRepository's global fallback cluster uses
+    // Mirrors the scan's accepted fallback shape: scanRepository's global fallback cluster uses
     // the literal glob "**/*.md" even when its sampled files are .mdx (deliberately not
     // .mdx-aware, so it matches the tool's real zero-config default). Proposing SEC-001 scoped to
     // that glob would be a dead rule — valid config that checks none of the files that justified it.

@@ -12,7 +12,7 @@ import {
 import { runCli } from "../src/program.js";
 
 /**
- * P14.04 / W-16 — `--config` has one resolution base across every handler that accepts it: a relative
+ * `--config` has one resolution base across every handler that accepts it: a relative
  * path is resolved against the directory the command analyzes, never the shell the process was
  * launched from.
  *
@@ -145,7 +145,7 @@ const ROWS: Row[] = [
   },
 ];
 
-describe("--config resolution base (P14.04)", () => {
+describe("--config resolution base", () => {
   it("covers exactly the commands that accept --config", async () => {
     expect(await commandsAcceptingConfig()).toEqual(
       ROWS.map((row) => row.command).sort(),

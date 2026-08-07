@@ -6,11 +6,11 @@ import { describe, expect, it } from "vitest";
 
 import { compareStrings } from "../src/deterministic-sort.js";
 
-// P12.06, deliverable 1. The post-P9 audit's systemic cause was that nothing tested the process
-// boundary: `src/index.ts` had 0% coverage (H-1), `exclude` had zero e2e coverage (L-4), no `init`
-// test exercised a write failure (M-5). Each of those now has a guard — but a *prose* checklist of
-// them (`.agents/rules/testing.md`, "Process-Boundary Guards") rots silently, which is the same
-// class of failure all over again: the checklist would still claim coverage the tree no longer has.
+// A whole class of defects shipped because nothing tested the process boundary: the CLI entrypoint
+// had 0% coverage, `exclude` had zero end-to-end coverage, and no `init` test exercised a write
+// failure. Each of those now has a guard — but a *prose* checklist of them rots silently, which is
+// the same class of failure all over again: the checklist would still claim coverage the tree no
+// longer has.
 //
 // So this file is the enforcement half: it asserts each named category still has at least one
 // tagged guard. It is deliberately an inventory rather than an abstraction — the coding rules say
@@ -38,7 +38,7 @@ const repoRoot = path.resolve(
 // here is incidental, not meaningful).
 const BOUNDARY_GUARDS: Record<string, string[]> = {
   // Every user-facing surface renders twice — a human document and a structured one — and each host
-  // renders both. P16.01 added this category because the crosscheck traced three missed defects to
+  // renders both. This category exists because three missed defects all traced to
   // nothing ever diffing those against each other: they agree by construction in a handler test, and
   // diverge only in what a reader or a client actually receives.
   "host-parity": [
@@ -49,17 +49,17 @@ const BOUNDARY_GUARDS: Record<string, string[]> = {
     "packages/mcp-server/test/lint.test.ts",
   ],
   // Spawn the built entrypoint through an npm-style link. Only a real process can populate
-  // `process.argv[1]`, which is what the entrypoint guard compares against `import.meta.url` — and,
-  // since P14.01, only a spawned server shows what a client actually receives, which is where a
-  // plausible-looking success hid a missing input guard.
+  // `process.argv[1]`, which is what the entrypoint guard compares against `import.meta.url` — and
+  // only a spawned server shows what a client actually receives, which is where a
+  // plausible-looking success once hid a missing input guard.
   "installed-bin-spawn": [
     "packages/cli/test/bin.e2e.test.ts",
     "packages/mcp-server/test/bin-entrypoint.test.ts",
     "packages/mcp-server/test/stdio-integration.test.ts",
   ],
   // The shared `files`/`exclude` option shape stays covered as rules are added: an inventory drift
-  // guard plus a runtime assert-kind coverage check — and, since P13.02, the top-level scope's own
-  // zero-config default, which only a run with no config file at all can exercise. P16.01 adds the
+  // guard plus a runtime assert-kind coverage check — plus the top-level scope's own
+  // zero-config default, which only a run with no config file at all can exercise. And the
   // other direction: the corpus an `init`-written scope produces, compared against the tracked set
   // both ways, so a document entering it is as visible as one missing from it.
   "shared-exclude": [
@@ -86,12 +86,13 @@ function tagsIn(relativePath: string): string[] {
   );
 }
 
-describe("process-boundary guard inventory (P12.06)", () => {
+describe("process-boundary guard inventory", () => {
   const categories = Object.keys(BOUNDARY_GUARDS).sort(compareStrings);
 
   it("names every category the testing rules document", () => {
-    // Mirrors `.agents/rules/testing.md`'s "Process-Boundary Guards" section. If a category is
-    // added there, add it here (with its guard) — and vice versa; that pairing is the whole point.
+    // This list is duplicated as a table in the repository's testing rules. If a category is added
+    // there, add it here with its guard — and vice versa; that pairing is the whole point, and this
+    // assertion is the half of it a machine can enforce.
     expect(categories).toEqual([
       "determinism",
       "host-parity",

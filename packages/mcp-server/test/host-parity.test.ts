@@ -13,7 +13,7 @@ import { PARITY_LINT_FIXTURE } from "../../core/test/support/output-parity.js";
 
 // @boundary-guard host-parity
 //
-// W-57 / P16.01 §5, the cross-host leg: "each host's rendering against the other's".
+// The cross-host leg of output parity: each host's rendering against the other's.
 //
 // The two hosts are thin adapters over one core pipeline, which is exactly why nothing compared them —
 // each package tests its own handler, and both pass while rendering the same run differently. Three of
@@ -164,8 +164,8 @@ describe("CLI and MCP render the same lint run identically", () => {
 
     // Where the two deliberately diverge, pinned as the decision it is rather than left to be
     // rediscovered: the CLI wraps the record with a `summary` for a human reader, while MCP returns it
-    // verbatim so a typed client reads counts at the top level (W-24, documented in
-    // `docs/guide/output.md` — "Where each host puts the findings").
+    // verbatim so a typed client reads counts at the top level — deliberately different from the
+    // ad-hoc `lint` tool, which has no corpus and therefore no `files` list.
     expect(Object.keys(cliPayload).sort()).toEqual([
       "files",
       "messages",

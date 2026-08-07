@@ -11,8 +11,8 @@ import type { ParsedDocument } from "../markdown/document-types.js";
 import { parseDocument } from "../markdown/parse-document.js";
 import type { DocCluster } from "./repo-scan.js";
 
-// Rule inference (P6.02): turns P6.01's `DocCluster[]` into a draft, registry-sourced `rules[]`
-// proposal with per-rule rationale, ready for P6.03's confirmation prompt.
+// Rule inference: turns the repo scan's `DocCluster[]` into a draft, registry-sourced `rules[]`
+// proposal with per-rule rationale, ready for `init`'s confirmation prompt.
 
 export type DetectedPatterns = {
   localLinkCount: number;
@@ -45,7 +45,7 @@ export type ClusterRuleInference = {
   sampledFiles: string[];
   patterns: DetectedPatterns;
   // Canonical ids this cluster's own evidence alone would justify (a subset of the global `rules`
-  // gate, attributed per cluster for the P6.03 confirmation UI).
+  // gate, attributed per cluster so the confirmation prompt can show which cluster earned each rule).
   contributesTo: string[];
 };
 
@@ -55,7 +55,7 @@ export type RuleInferenceResult = {
 };
 
 // Reads + parses one cluster's sample files, mirroring load-documents.ts's read+parse pairing. A
-// sample path going stale between P6.01's scan and this call (e.g. deleted or renamed) must not
+// sample path going stale between the scan and this call (e.g. deleted or renamed) must not
 // crash the whole inference, so a failed read is skipped rather than thrown.
 async function readSampleDocuments(
   cwd: string,
@@ -236,7 +236,7 @@ type SampleCycle = string[];
 // create.
 //
 // `visit` below recurses, but only ever over sampled files, so the corpus-wide depth bound
-// documented on `detectCycles` (P12.05, finding SC-3) cannot be reached from here.
+// documented on `detectCycles` cannot be reached from here.
 function findSampleCycle(
   sampleDocs: Map<string, ParsedDocument>,
 ): SampleCycle | undefined {
@@ -326,14 +326,13 @@ function findSampleCycle(
 //
 // Why these 7 and not the other 17 built-ins: every other rule has a *required* option with no
 // safe way to derive it from 3-5 sampled files (a pipeline `chain`, a `template` file, a
-// `zonesDir`, an idColumn/idPattern split, a glossary table, an enumerated `values` set, etc.) —
-// see docs/mdlint_v2/P6-init/02-rule-inference.md's "Deliberately not inferred" note.
+// `zonesDir`, an idColumn/idPattern split, a glossary table, an enumerated `values` set, etc.).
 //
-// W-39 re-opened that scope for the two rules the README leads with, SIZE-001 and LLM-001, and
+// That scope was re-examined for the two rules the README leads with, SIZE-001 and LLM-001, and
 // reached the same answer: both are budgets, and a sample of 3-5 files per cluster cannot measure a
 // corpus (LLM-001's is over the whole transitive @-import closure, which inference never builds).
-// P16.05 decided against widening and made the gap visible instead — `init`'s draft names both
-// rules and points at their guide pages. Changing that means changing the disclosure too.
+// So inference was deliberately not widened; the gap is made visible instead — `init`'s draft names
+// both rules and points at their guide pages. Changing that means changing the disclosure too.
 const PATTERN_GATES: Record<
   string,
   {
@@ -391,7 +390,7 @@ function sec001Rationale(cluster: {
 }
 
 // SEC-001's inferred `files` scope is the cluster's own `includeGlob` — verify it actually matches
-// every sampled file that produced the ADR evidence before proposing it. The accepted P6.01
+// every sampled file that produced the ADR evidence before proposing it. The scan's accepted
 // fallback shape is a case where it might not: `scanRepository`'s global fallback cluster can
 // sample both `.md` and `.mdx` files under the literal glob `**/*.md` (deliberately not
 // `.mdx`-aware — it mirrors the tool's real zero-config default, not the scan's own discovery
@@ -454,8 +453,8 @@ function fileScopeSortKey(rule: InferredRule): string {
 
 /**
  * Samples each cluster's files, detects reference/table/checklist/placeholder/ADR/cycle patterns,
- * and maps them to a draft, registry-sourced rule set with per-rule rationale (P6.02). Pure and
- * read-only, like `scanRepository` (P6.01) — does not write anything.
+ * and maps them to a draft, registry-sourced rule set with per-rule rationale. Pure and
+ * read-only, like `scanRepository` — does not write anything.
  */
 export async function inferRuleSet(params: {
   cwd: string;
@@ -470,7 +469,7 @@ export async function inferRuleSet(params: {
   );
 
   // Combined map for the cross-cluster cycle heuristic; later clusters win on an (unexpected)
-  // path collision, which cannot happen in practice since P6.01 scopes clusters disjointly.
+  // path collision, which cannot happen in practice because the scan scopes clusters disjointly.
   const combinedSamples = new Map<string, ParsedDocument>();
   for (const docs of perClusterDocs) {
     for (const doc of docs) {

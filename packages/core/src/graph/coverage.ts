@@ -12,7 +12,7 @@ import type { SiteRouterSettings } from "../engine/types.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
 import type { ContextGraph } from "./context-graph-types.js";
 
-// G5 coverage signal (P4.06): report graph size plus on-disk Markdown files that are linked-to from
+// Coverage signal: report graph size plus on-disk Markdown files that are linked-to from
 // the corpus but fall outside it (excluded from `include`, so they never became graph nodes). This
 // re-scans raw link/image/import targets rather than reusing `ContextGraph` edges — the graph only
 // ever materializes edges to *corpus* nodes (architecture invariant: `ContextGraph` owns adjacency;
@@ -37,7 +37,7 @@ function hasScheme(target: string): boolean {
 }
 
 // A raw target plus whether the site router applies to it. Kinds cannot be flattened away here
-// (P13.05 / W-10): an image is router-blind, because a router maps a URL to *Markdown source* and
+// away: an image is router-blind, because a router maps a URL to *Markdown source* and
 // REF-003 resolves a root-relative image target against the repository root. Routing images would
 // make coverage disagree with the rule it exists to complement.
 type RawTarget = { target: string; routable: boolean };
@@ -71,10 +71,10 @@ function collectRawTargets(document: ParsedDocument): RawTarget[] {
 }
 
 /**
- * Compute the G5 coverage signal: graph node/edge counts plus the deduped, sorted list of on-disk
+ * Compute the coverage signal: graph node/edge counts plus the deduped, sorted list of on-disk
  * Markdown files that are linked-to but outside the analyzed corpus. Two hosts consume it: the CLI
- * `graph` command in both its formats (P4.07) and the MCP `context-graph` tool's `summary` branch
- * (P15.02) — each calling this directly rather than through the other.
+ * `graph` command in both its formats and the MCP `context-graph` tool's `summary` branch
+ * — each calling this directly rather than through the other.
  *
  * "Markdown file" is `MARKDOWN_EXTENSIONS` (`discovery/markdown-extensions.ts`) — the same set the
  * repo scan walks, so a file this reports is one a proposed `include` could actually admit.

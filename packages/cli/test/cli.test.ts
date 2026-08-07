@@ -51,7 +51,7 @@ async function run(argv: string[], cwd: string) {
 }
 
 describe("command dispatch", () => {
-  it("runs lint as the default command on the injected cwd (D4)", async () => {
+  it("runs lint as the default command on the injected cwd", async () => {
     const cwd = await fixtureRepo({
       "a.md": "[broken](missing.md)\n",
       "wastech-mdlint.config.json": JSON.stringify({
@@ -84,7 +84,7 @@ describe("command dispatch", () => {
     expect(help.stdout).not.toContain("scan");
   });
 
-  // P11.10 moved default-command routing out of commander's `isDefault` and into argv, which shifts
+  // Default-command routing moved out of commander's `isDefault` and into argv, which shifts
   // several argv shapes at once — the empty argv, a leading option, `--help`/`-v`, `help <cmd>`, and
   // an unknown operand. Each is pinned here (with the `--help`/`-v` cases above and in "version and
   // errors") because getting one wrong is silent: a mis-routed `--help` renders lint's help, and a
@@ -109,7 +109,7 @@ describe("command dispatch", () => {
     const cwd = await fixtureRepo({ "a.md": "# A\n" });
 
     const result = await run(["bogus-command"], cwd);
-    // The CI-typo scenario (M-7): this used to become lint's `[path]`, lint an empty corpus, and
+    // The CI-typo scenario: this used to become lint's `[path]`, lint an empty corpus, and
     // exit 0 "No problems found." — a broken workflow step passing green.
     expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
     expect(result.stderr).toContain("unknown command 'bogus-command'");
@@ -191,7 +191,7 @@ describe("graph command", () => {
     const lines = result.stdout.split("\n");
     expect(lines).toContain("top hubs:");
     expect(lines).toContain("clusters:");
-    // One item per indented line, not a comma-joined blob (P15.01 / W-26).
+    // One item per indented line, not a comma-joined blob.
     expect(lines).toContain("reading order (2):");
     expect(lines).toContain("  a.md");
     expect(lines).toContain("  b.md");
@@ -223,7 +223,7 @@ describe("graph command", () => {
     expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
   });
 
-  // `graph` shares `[path]` validation with `lint` (P11.10), and shares its failure mode too: without
+  // `graph` shares `[path]` validation with `lint`, and shares its failure mode too: without
   // the check a nonexistent target reports an empty graph at exit 0. Pinned per command because the
   // wiring is per call site, so dropping it here would not fail lint's own regression test.
   it("exits 2 for a nonexistent [path] instead of reporting an empty graph", async () => {
@@ -343,7 +343,7 @@ describe("impact command", () => {
     expect(payload.directlyAffected).toEqual([{ path: "b.md", references: 1 }]);
     expect(payload.transitivelyAffected).toEqual([]);
     expect(payload.readingOrder).toEqual(["b.md", "a.md"]);
-    // No cycle in this corpus, so nothing is excluded from reading order (audit C parity field).
+    // No cycle in this corpus, so nothing is excluded from reading order.
     expect(payload.excluded).toEqual([]);
     // The corpus-wide lint also flags c.md's broken link, but c.md is outside the affected subgraph.
     expect(payload.lint.files).toEqual(["a.md", "b.md"]);
@@ -406,7 +406,7 @@ describe("compile command", () => {
   it("resolves a relative --config path against --cwd, not the process cwd", async () => {
     // The process running this test has its own cwd (the repo root), which differs from the
     // fixture directory — the only scenario in which the two bases can be told apart. The handler
-    // used to pre-resolve `--config` itself; since P14.04 core owns the resolve for all six call
+    // used to pre-resolve `--config` itself; core now owns the resolve for all six call
     // sites and this stays as the compile-shaped regression guard over that one base.
     const cwd = await fixtureRepo({
       "a.md": "# A\n",
@@ -513,7 +513,7 @@ describe("compile command", () => {
     });
     // A directory where the file belongs: the rename that commits the atomic write cannot replace it.
     // Portable across platforms in a way a permission fault is not, and it proves the failure names
-    // the same repo-relative path the success line reports (P11.10) rather than the fs error's
+    // the same repo-relative path the success line reports rather than the fs error's
     // absolute paths and temp name.
     await mkdir(path.join(cwd, "generated-skill", "SKILL.md"), {
       recursive: true,
@@ -529,7 +529,7 @@ describe("compile command", () => {
   });
 
   it("reports an --outdir outside --cwd absolutely, not as a chain of '..' hops", async () => {
-    // W-17: the repo-relative rendering is right inside the repository and unreadable outside it —
+    // The repo-relative rendering is right inside the repository and unreadable outside it —
     // the observed report opened with five parent hops before an absolute-looking tail.
     const cwd = await fixtureRepo({
       "a.md": "# A\n",
@@ -550,7 +550,7 @@ describe("compile command", () => {
   });
 
   it("names that same absolute path when the out-of-cwd write fails", async () => {
-    // The P11.10 invariant has to survive the fallback: a failure names the path the success line
+    // The invariant has to survive the fallback: a failure names the path the success line
     // would have named, so the two renderings cannot drift apart for the same target.
     const cwd = await fixtureRepo({
       "a.md": "# A\n",

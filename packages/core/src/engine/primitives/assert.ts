@@ -16,12 +16,12 @@ import { allChecked } from "./checklist.js";
 import { imageResolves, linkResolves } from "./reference.js";
 import type { PrimitiveContext, PrimitiveFinding } from "./types.js";
 
-// The closed, Zod-validated assertion vocabulary (R9 Tier 1). This is the exact surface the
-// declarative `custom` rule (P3.08) and the generated schema (P2.06) expose. Built-in rules call the
+// The closed, Zod-validated assertion vocabulary. This is the exact surface the
+// declarative `custom` rule and the generated schema expose. Built-in rules call the
 // executors directly with their own option shapes; custom rules go through `runAssertion` here.
 //
 // Kinds are mutually exclusive on `kind` (a discriminated union). Each option object is `.strict()`
-// so an unknown key becomes a clear C7 config error rather than being silently ignored.
+// so an unknown key becomes a clear config error rather than being silently ignored.
 
 export const columnConditionSchema = z
   .object({
@@ -59,7 +59,7 @@ export const assertionSchema = z.discriminatedUnion("kind", [
       kind: z.literal("columnInSet"),
       column: z.string().min(1),
       values: z.array(z.string()).min(1),
-      // `.default()` rather than `.optional()` (W-06): the resolved value is what `describeRules`
+      // `.default()` rather than `.optional()`: the resolved value is what `describeRules`
       // renders into a committed skill, and an absent key rendered identically to an explicit
       // `false` there. Declaring it here also puts the default in `schema.json` for editors.
       caseSensitive: z.boolean().default(DEFAULT_COLUMN_IN_SET_CASE_SENSITIVE),
@@ -139,7 +139,8 @@ export const assertionSchema = z.discriminatedUnion("kind", [
 export type Assertion = z.infer<typeof assertionSchema>;
 
 // The target collection a `kind` operates on — drives the custom rule's scope (columnUnique is the
-// only project-scoped kind) and lets P3.08 validate the declared `target` against the assert.
+// only project-scoped kind) and lets custom-rule resolution validate the declared `target` against
+// the assert kind.
 export const ASSERTION_TARGETS = {
   requiredColumns: "table",
   columnNotEmpty: "table",
@@ -195,8 +196,8 @@ export function runAssertion(
     case "columnUnique":
       // Unscoped by construction: `custom.ts` dispatches the one project-scoped kind directly to
       // `columnUnique` with the rule's own `files`/`exclude` matcher, so this branch is only ever
-      // reached by a caller that has no file scope to apply. W-40 removed the `fileMatches` option
-      // that could have carried one — nothing ever passed it.
+      // reached by a caller that has no file scope to apply. A `fileMatches` option that could have
+      // carried one was removed — nothing ever passed it.
       return columnUnique(
         context,
         {

@@ -1,14 +1,14 @@
-// Rule-engine contracts (P2.01). Every rule, primitive, and host depends on these types.
+// Rule-engine contracts. Every rule, primitive, and host depends on these types.
 //
 // Design points from the requirements:
-//   - Severity is orchestrator-owned (R1/C2): a rule declares `defaultSeverity`; config overrides
+// - Severity is orchestrator-owned: a rule declares `defaultSeverity`; config overrides
 //     it; `"off"` filters the rule out before it runs. So a *resolved* `Severity` never includes
 //     "off" — that lives only in config (`SeverityOverride`).
-//   - Findings are structured (R3): `column`, `endLine`, `fixable`, `data`, `helpUri`. `helpUri` is
+// - Findings are structured: `column`, `endLine`, `fixable`, `data`, `helpUri`. `helpUri` is
 //     the one a rule does *not* supply: the runner copies it from the rule's `docsUrl` so it is a
-//     real documentation URL rather than a restatement of `ruleId` (P15.03).
-//   - Fail-fast (R4): a project rule with no `documents` throws rather than silently no-oping.
-//   - Fixes (R2): an optional `fix?` hook returns offset-based `TextEdit`s over the raw content.
+// real documentation URL rather than a restatement of `ruleId`.
+// - Fail-fast: a project rule with no `documents` throws rather than silently no-oping.
+// - Fixes: an optional `fix?` hook returns offset-based `TextEdit`s over the raw content.
 
 import type { ContextGraph } from "../graph/context-graph-types.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
@@ -17,12 +17,12 @@ import type { IdRef } from "./defined-ids.js";
 // Resolved, runnable severities. `"off"` is a config-time value only (see SeverityOverride).
 export type Severity = "error" | "warning";
 
-// Per-rule severity as written in config (C2). `"off"` documents-but-disables a rule.
+// Per-rule severity as written in config. `"off"` documents-but-disables a rule.
 export type SeverityOverride = Severity | "off";
 
 export type RuleScope = "document" | "project";
 
-// Category prefix a rule belongs to; drives README grouping and `init` categories (R6).
+// Category prefix a rule belongs to; drives README grouping and `init` categories.
 export type RuleCategory =
   | "TBL"
   | "SEC"
@@ -34,7 +34,7 @@ export type RuleCategory =
   | "LLM"
   | "custom";
 
-// Shared, inheritable config settings (C5). Rules read `ctx.settings`; per-rule options may
+// Shared, inheritable config settings. Rules read `ctx.settings`; per-rule options may
 // override individual fields. Kept minimal in v2 (siteRouter only) and extended as needed.
 export type SiteRouterSettings = {
   preset?: string;
@@ -42,7 +42,7 @@ export type SiteRouterSettings = {
   defaultLocale?: string;
 };
 
-// idRef feeds the shared ContextGraph's id-ref edges (P4.06), mirroring how REF-005 already accepts
+// idRef feeds the shared ContextGraph's id-ref edges, mirroring how REF-005 already accepts
 // the same shape as rule options — a shared setting so the orchestrator (which cannot read a
 // resolved rule's opaque options back out) can wire it into `buildContextGraph` too.
 export type ResolvedSettings = {
@@ -52,7 +52,7 @@ export type ResolvedSettings = {
 
 // Offset-based edit over a document's raw `content` (half-open [start, end)). Offsets are
 // unambiguous to apply (sort descending, splice) and are computed by fix hooks from line/column
-// positions. The concrete fixable rules land in P3 (audit 4.2); the hook is defined here.
+// positions. The hook is defined here; individual rules opt into it.
 export type TextEdit = {
   start: number;
   end: number;
@@ -66,10 +66,10 @@ export type TextEdit = {
 // `severity` is an optional per-finding hint for rules whose severity varies by finding (SIZE-001:
 // warn vs error threshold). The runner resolves final severity as
 // `configOverride ?? finding.severity ?? rule.defaultSeverity`, so a config `severity` override wins
-// (C2), then the rule's per-finding hint, then the rule default.
+// first, then the rule's per-finding hint, then the rule default.
 //
 // Deliberately *not* a `Partial<LintMessage>`: `helpUri` is absent because it is a property of the
-// rule, not of the finding, and the runner sources it from `rule.docsUrl` (P15.03).
+// rule, not of the finding, and the runner sources it from `rule.docsUrl`.
 export type ReportInput = {
   message: string;
   line: number;
@@ -81,10 +81,11 @@ export type ReportInput = {
   data?: Record<string, unknown>;
 };
 
-// A single finding. Superset of the legacy `Finding` capability (R3) — note `filePath` replaces the
+// A single finding. Superset of the legacy `Finding` capability — note `filePath` replaces the
 // legacy `path`, and `line` is required: it is 1-based, and a whole-file finding reports `0`, which
 // `formatLintResultText` renders as `-`. JSON output is the serialization of this shape; the emitted
-// key set is documented in `docs/guide/output.md`.
+// key set is part of the public output contract, so adding or dropping one is a breaking change
+// for JSON consumers.
 export type LintMessage = {
   ruleId: string;
   severity: Severity;
@@ -105,15 +106,15 @@ export type LintMessage = {
 // `document`/`filePath` are present for document-scope rules (the file under lint). `documents`/
 // `projectFiles` carry the whole corpus and are consumed by project rules and by cross-file
 // document rules (e.g. REF-001 resolving a link against the corpus). They are typed optional so the
-// R4 fail-fast check is meaningful, but the orchestrator always supplies them.
+// project-scope fail-fast check is meaningful, but the orchestrator always supplies them.
 //
 // Keying: `documents` is keyed by **repo-relative POSIX path** (each doc's own `.path`), which is
 // what rules resolve link/ID targets to — distinct from `loadDocuments()`'s absolute-keyed map,
 // which the orchestrator re-keys before building contexts.
 //
 // `rootDir` is the absolute cwd; REF-001/REF-003 need it for `existsSync` resolution of link/image
-// targets that live on disk but outside the Markdown corpus (audit — P3 REF gap). It extends the
-// minimal P2.01 field list (journal [P2.01]).
+// targets that live on disk but outside the Markdown corpus — a linked PDF or image resolves
+// against the filesystem, not against `documents`.
 export type RuleContext = {
   document?: ParsedDocument;
   filePath?: string;

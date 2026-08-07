@@ -14,11 +14,12 @@ import { CUSTOM_ID_GRAMMAR } from "../engine/rules/custom.js";
 import { normalizeRelativePath } from "./globs.js";
 import type { InferredRule } from "./rule-inference.js";
 
-// Config writer (P6.04): the deterministic "config-text generation" half of `init`'s write step.
+// Config writer: the deterministic "config-text generation" half of `init`'s write step.
 // Pure and fs-free (a sibling of repo-scan.ts/rule-inference.ts) — the CLI host does the actual
 // `writeFile`, matching the same core-generates / host-writes split `compile`/`schema` already use.
 // The hand-rolled JSONC serializer lives here because `JSON.stringify` cannot emit the per-rule
-// rationale comments C4 (docs/mdlint_v2/requirements/01-configuration.md) calls for.
+// rationale comments a written config is required to carry — one per proposed rule, explaining why
+// `init` proposed it.
 
 export type InitConfigAction = "fresh" | "merge";
 
@@ -32,7 +33,7 @@ export type GenerateInitConfigParams = {
   // Present only for "merge" — its every top-level key except `rules`/`$schema` is round-tripped
   // verbatim so nothing the user authored is silently dropped.
   existing?: ExistingConfigDocument;
-  // From `buildConfigPreview`, and three-valued for "fresh" (audit L-9). `undefined` omits the key
+  // From `buildConfigPreview`, and three-valued for "fresh". `undefined` omits the key
   // so the tool's own `**/*.md` default applies; a non-empty array is written as-is; `[]` is written
   // literally, which lints nothing. The empty array is reserved for the one case where that is a
   // real user choice — clusters were offered and the user deselected every one — because silently
@@ -42,12 +43,12 @@ export type GenerateInitConfigParams = {
   // The full inferred set for "fresh"; the already-diffed new-only set for "merge" (the CLI does the
   // canonical-id diff before calling in). Each entry's rationale becomes its trailing `//` comment.
   newRules: InferredRule[];
-  // The default `$schema` value (C9): a local, relative path from the config being written to the
+  // The default `$schema` value: a local, relative path from the config being written to the
   // installed package schema. Computed by the CLI relative to the config's *own* directory — never a
   // fixed `./node_modules/...` literal — so a subdirectory config gets `../node_modules/...`.
   // `undefined` when the CLI found no installed package schema on disk (the ordinary `npx` case):
   // emitting a path to a file that does not exist would leave every editor reporting an unresolvable
-  // `$schema`, so the project-local `./schema.json` is generated and pointed at instead (audit L-10).
+  // `$schema`, so the project-local `./schema.json` is generated and pointed at instead.
   // Custom rules force that same project-local schema regardless.
   packageSchemaRef: string | undefined;
 };
@@ -55,7 +56,7 @@ export type GenerateInitConfigParams = {
 /**
  * Why a project-local `schema.json` had to be generated. Both reasons produce the same file, but
  * they mean different things to the user, so the host's write summary reports which it is: custom
- * rules make the local schema *necessary* (C9), while the `npx` fallback (audit L-10) makes it the
+ * rules make the local schema *necessary*, while the `npx` fallback makes it the
  * only resolvable target — an installed package schema would have been preferred.
  */
 export type ProjectSchemaReason = "custom-rules" | "no-installed-package";
@@ -93,7 +94,7 @@ export const PACKAGE_SCHEMA_SEGMENTS = [
 ] as const;
 
 /**
- * The default `$schema` value (C9): the relative POSIX path from the config's own directory to the
+ * The default `$schema` value: the relative POSIX path from the config's own directory to the
  * installed package schema. `schemaAnchorDir` is the directory holding
  * `node_modules/@wastech-mdlint/cli/schema.json` (resolved on disk by the CLI, or the project root
  * as a fallback — locating it requires fs, so that walk stays in the host), so a subdirectory config
@@ -127,7 +128,7 @@ const TOP_LEVEL_KEY_ORDER = [
   "compile",
 ] as const;
 
-// The `//` lines a fresh write puts above `exclude` (P14.03 / W-15). Without them the block reads
+// The `//` lines a fresh write puts above `exclude`. Without them the block reads
 // as this config's own exclusions, and the natural edit — delete the line you disagree with — does
 // nothing at all, because the same list is the lint-time default with or without a config. Stated
 // as data rather than prose so the writer's tests can pin the wording that makes it actionable.
@@ -146,9 +147,9 @@ function shellSingleQuote(value: string): string {
 
 /**
  * The opt-in workflow is self-contained: it installs the published CLI and runs `lint --fail-on
- * error` directly. It deliberately does NOT `uses:` the first-class composite Action (P9.03) — that
- * Action is Not started, so a `uses:` reference would produce a workflow that cannot run today. P9.03
- * can later swap this template to the `uses:` form.
+ * error` directly. It deliberately does NOT `uses:` a first-class composite Action — no such Action
+ * is published, so a `uses:` reference would generate a workflow that cannot run. Swapping this
+ * template to the `uses:` form is safe only once one exists.
  *
  * GitHub loads workflows only from the repo-root `.github/workflows`, so when the config being wired
  * lives in a subdirectory the caller passes its repo-root-relative POSIX path here. The lint step
@@ -159,8 +160,8 @@ function shellSingleQuote(value: string): string {
  * `#`/split surprises) and each path is single-quoted for POSIX sh.
  *
  * The two arguments are anchored differently on purpose. `[path]` is repo-root-relative because the
- * workflow runs from the repo root; `--config` is relative to *that* directory, because since P14.04
- * the CLI resolves a relative `--config` against `[path]`. Emitting the repo-root-relative config
+ * workflow runs from the repo root; `--config` is relative to *that* directory, because the CLI
+ * resolves a relative `--config` against `[path]`. Emitting the repo-root-relative config
  * path here — which is what this template did while the two bases disagreed — would now make every
  * generated workflow look for `<dir>/<dir>/wastech-mdlint.config.json` and exit `2` on its first run.
  *
@@ -168,7 +169,7 @@ function shellSingleQuote(value: string): string {
  * so it is rejected (the CLI declines the opt-in workflow rather than reach this) — an explicit
  * contract guard, not a silent strip that would mis-target the config.
  *
- * Deliberately npm-universal (P9.07 / audit L-7): this never takes the repo's detected package
+ * Deliberately npm-universal: this never takes the repo's detected package
  * manager (`detectPackageManager` — bun/pnpm/yarn/npm), and `init-command.ts` does not thread it in
  * here. The install step only fetches the external `@wastech-mdlint/cli` tool into a scratch
  * `node_modules` — it never resolves or touches the target repo's own lockfile/workspace — and
@@ -218,7 +219,7 @@ export const CI_WORKFLOW_YAML = buildCiWorkflowYaml();
 
 /**
  * True when `text` contains at least one JSONC comment. Used by the CLI to warn that a `merge` over
- * a comment-bearing config drops its comments (audit L-8): the merge is a parse-and-rebuild, so
+ * a comment-bearing config drops its comments: the merge is a parse-and-rebuild, so
  * every line and block comment the user wrote is lost, and the configuration guide advertises
  * comments as a feature — silence there is a data-loss surprise.
  *
@@ -253,7 +254,7 @@ function toRuleEntry(rule: InferredRule): Record<string, unknown> {
   };
 }
 
-// C3 requires the written config to always emit canonical ids. A merged existing entry keeps its
+// A written config always emits canonical ids. A merged existing entry keeps its
 // severity/options verbatim but has its id canonicalized (built-in `rule` or `custom.id`) so an
 // accepted noncanonical input like `ref001`/`req-owner` is not re-emitted noncanonically — and so a
 // custom entry's id agrees with the `const` the generated project schema is built from. Spreading
@@ -287,7 +288,7 @@ function toCommentLine(text: string): string {
   return text.replace(/\s*[\r\n]+\s*/g, " ").trim();
 }
 
-// Renders the `rules[]` value by hand — one single-line entry per line (matching C4's example) with
+// Renders the `rules[]` value by hand — one single-line entry per line, with
 // each new entry's rationale appended as a trailing `//` comment. Built by hand because
 // `JSON.stringify` cannot emit those comments.
 function renderRulesValue(items: RuleItem[]): string {
@@ -393,7 +394,7 @@ function collectCustomRules(entries: unknown[]): CustomRuleDefinition[] {
  * top-level key verbatim except `rules` (existing entries kept, new ones appended) and `$schema`
  * (always rewired — wiring it is this task's whole point). Because the merge round-trip goes through
  * `JSON.stringify`, the original file's comments do not survive it; the CLI warns about that using
- * {@link containsJsoncComments} rather than letting the loss pass unmentioned (audit L-8).
+ * {@link containsJsoncComments} rather than letting the loss pass unmentioned.
  */
 export function generateInitConfig(
   params: GenerateInitConfigParams,
@@ -420,7 +421,7 @@ export function generateInitConfig(
   // Custom rules always live next to the config (`./schema.json`, written into the same dir), so the
   // project-schema ref is dir-independent. Falling back to it when `packageSchemaRef` is undefined
   // is what keeps the written `$schema` resolvable under `npx`, where nothing is installed locally
-  // for a relative path to reach (audit L-10) — a `$schema` that points at a nonexistent file is
+  // for a relative path to reach — a `$schema` that points at a nonexistent file is
   // worse than none, since every editor then silently drops config validation.
   const useProjectSchema =
     customRules.length > 0 || packageSchemaRef === undefined;
@@ -446,21 +447,20 @@ export function generateInitConfig(
     // Fresh write. `include` is written whenever the caller supplied one — including a literal `[]`,
     // which lints zero files: `lintFiles` defaults `include` only when the key is *absent*, so
     // omitting it for a deliberate empty selection would invert "lint nothing" into "lint the whole
-    // repo" (audit L-9). `undefined` is the caller's way to ask for that default on purpose.
+    // repo". `undefined` is the caller's way to ask for that default on purpose.
     if (include !== undefined) {
       values.set("include", indentValue(JSON.stringify(include, null, 2)));
       wroteEmptyInclude = include.length === 0;
     }
     // Both keys stay explicit in the written file so each remains a visible, editable decision.
     // `respectGitignore: true` is still the load-bearing one: it is pinned rather than left at the
-    // resolver's `false` default (C8), because the scan already skipped gitignored trees and a
-    // config that lints them would contradict the draft the user approved (audit L-7).
+    // resolver's `false` default, because the scan already skipped gitignored trees and a
+    // config that lints them would contradict the draft the user approved.
     //
-    // The written `exclude` is no longer the only thing in force — since P13.02 the same
-    // `DEFAULT_EXCLUDE_GLOBS` applies on every run and a config's own `exclude` *extends* it
-    // (`config/corpus-scope.ts`, and `docs/guide/configuration.md` for users), so writing it here
-    // discloses the default rather than establishing it. P14.03 (W-15) settled deliverable 4 in
-    // favor of keeping the list rather than omitting what the default already covers: extend is
+    // The written `exclude` is not the only thing in force — the same `DEFAULT_EXCLUDE_GLOBS`
+    // applies on every run and a config's own `exclude` *extends* it (`config/corpus-scope.ts`), so
+    // writing it here discloses the default rather than establishing it. The list is kept rather
+    // than trimmed to what the default does not already cover: extend is
     // exactly what makes *deleting* one of these lines a no-op, and a bare list of a dozen globs
     // invites that dead edit. The key must also exist for a user to write a negation into. So the
     // duplication stays, and the comment below is what keeps it from being silent.

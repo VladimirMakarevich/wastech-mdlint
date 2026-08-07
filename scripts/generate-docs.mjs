@@ -1,6 +1,6 @@
 // Regenerate all metadata-derived artifacts from their single sources of truth:
-// the shipped config schema (packages/cli/schema.json), the README rule table (R6), and the
-// README MCP tool inventory (P7 M3, introspected from the live tool registration).
+// the shipped config schema (packages/cli/schema.json), the README rule table, and the
+// README MCP tool inventory (introspected from the live tool registration, never a hand-kept list).
 // Run after building: `npm run build && npm run generate:docs`.
 //
 // Imports the built @wastech-mdlint/core (workspace symlink → packages/core/dist) and the built
@@ -37,12 +37,12 @@ const MCP_TOOL_MARKERS =
   /(<!-- BEGIN GENERATED MCP TOOLS -->)[\s\S]*?(<!-- END GENERATED MCP TOOLS -->)/;
 
 // The `<!-- prettier-ignore -->` line and the trailing blank line that replaceGeneratedBlock emits
-// keep `npm run format` (P9.06) from re-wrapping these machine-generated tables into padded
+// keep `npm run format` from re-wrapping these machine-generated tables into padded
 // columns, which would desync them from the raw, unpadded strings
 // generateRuleDocs()/generateToolInventory() return; the docs-sync tests' extraction regexes mirror
 // that exact wrapper shape. Both splices go through the helper rather than String.prototype.replace
 // with an interpolated replacement string, because a `$` in a description would otherwise expand
-// instead of being written (W-55).
+// instead of being written.
 const withRules = replaceGeneratedBlock(
   readme,
   RULE_MARKERS,

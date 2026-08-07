@@ -1,6 +1,6 @@
 import path from "node:path";
 
-// What "a Markdown file" means, stated once (P13.05 / W-09). Three subsystems used to answer that
+// What "a Markdown file" means, stated once. Three subsystems used to answer that
 // question differently — coverage said `.md`+`.markdown`, the `init` scan said `.md`+`.mdx`, and the
 // default `include` said `.md` alone — so the coverage signal, whose whole job is naming on-disk
 // Markdown linked from the corpus but outside it, looked for an extension no default configuration
@@ -13,15 +13,15 @@ import path from "node:path";
  *
  * `.markdown` is deliberately absent: it appeared only in the old coverage helper, nowhere else in
  * core and on no guide page, so recognizing it there could never lead anywhere a default `include`
- * would follow. A linked `.markdown` file is therefore invisible to coverage — see
- * `docs/mdlint_v2/accepted-behaviors.md` and the caveat on `docs/guide/context-graph.md`.
+ * would follow. A linked `.markdown` file is therefore invisible to coverage: that is an accepted
+ * limitation rather than an oversight, and the context-graph guide states it for users.
  */
 export const MARKDOWN_EXTENSIONS: readonly string[] = [".md", ".mdx"];
 
 /**
  * The subset the linter actually parses by default — the extensions `DEFAULT_INCLUDE_GLOBS` is built
- * from. Making `.mdx` first-class is a product decision with parser implications (P13.05 out of
- * scope), so the gap between this and {@link MARKDOWN_EXTENSIONS} is a stated subset relation rather
+ * from. Making `.mdx` first-class is a product decision with parser implications, deliberately not
+ * taken here, so the gap between this and {@link MARKDOWN_EXTENSIONS} is a stated subset relation rather
  * than a comment two files away that the next reader has to reconcile.
  */
 export const LINTED_MARKDOWN_EXTENSIONS: readonly string[] = [".md"];

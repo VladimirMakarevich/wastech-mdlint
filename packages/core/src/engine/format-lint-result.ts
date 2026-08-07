@@ -1,11 +1,11 @@
 import type { LintMessage } from "./types.js";
 import type { LintResult } from "./lint-files.js";
 
-// Deterministic formatters for a LintResult (P2.07). Messages are already sorted by lintFiles, so
+// Deterministic formatters for a LintResult. Messages are already sorted by lintFiles, so
 // both renderers just project them.
 //
 // The JSON shape here is the **CLI's** contract, not one shape both hosts share — the claim this
-// comment used to make (W-24). Four payloads carry lint findings and they are deliberately not one:
+// comment used to make. Four payloads carry lint findings and they are deliberately not one:
 //
 //   - CLI `lint --format json` — this wrapper: `{ summary, messages, files }`, where the finding
 //     counts live under `summary.errors` / `summary.warnings`.
@@ -17,7 +17,7 @@ import type { LintResult } from "./lint-files.js";
 //     corpus, so there is no `files` list to report.
 //
 // A typed client wants the record; a human report wants a summary. That divergence is documented for
-// consumers in `docs/guide/output.md` ("Where each host puts the findings") rather than unified here,
+// consumers, since each host puts the findings in a different place, rather than unified here,
 // because unifying it would either strip `summary` from the CLI or wrap the record MCP callers type
 // against.
 

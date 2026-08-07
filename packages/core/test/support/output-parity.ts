@@ -2,7 +2,7 @@
 // the structured payload the same run produced — plus the lint corpus those readers are exercised on,
 // which belongs here for the same reason: it is chosen to make the comparison non-vacuous.
 //
-// W-57 / P16.01 §5. The crosscheck's fourth bucket of missed defects is "process-boundary rendering":
+// Process-boundary rendering was a whole bucket of missed defects:
 // nothing diffed human text against the structured payload, and three defects lived in that gap at
 // once — a dropped `hint`, a `json` vocabulary collision, and a `summary` missing its `excluded` key.
 // Each was found by reading code. A test can only find them by parsing what the reader actually sees,

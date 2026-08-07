@@ -12,11 +12,11 @@ import { assertBuilt } from "../../core/test/support/assert-built.js";
 
 // @boundary-guard installed-bin-spawn
 //
-// P12.06. `src/index.ts`'s entrypoint guard got the same `realOrSelf` fix as the CLI's (H-1), but
+// `src/index.ts`'s entrypoint guard got the same `realOrSelf` fix as the CLI's, but
 // nothing spawned it through a *link* — `stdio-integration.test.ts` spawns `dist/index.js` by its
-// real path, which passes with the defect present, and P11.01 explicitly deferred an mcp-server
+// real path, which passes with the defect present, and an mcp-server
 // spawn test ("No new mcp-server spawn test"). That left the fix on this side unguarded: the second
-// of the two entrypoints H-1 affected. This file closes that hole, and only that hole — per-tool
+// of the two entrypoints the guard bug affected. This file closes that hole, and only that hole — per-tool
 // behavior and the whole wire contract stay in `stdio-integration.test.ts`.
 //
 // Why a link is the only shape that can catch it: an npm-linked install leaves `process.argv[1]`
@@ -27,7 +27,7 @@ import { assertBuilt } from "../../core/test/support/assert-built.js";
 //
 // PRECONDITION: `packages/mcp-server/dist/index.js` must already be built — same precondition, and
 // same reasoning, as `stdio-integration.test.ts`. `assertBuilt()` fails fast rather than letting a
-// stale/missing artifact look like a guard regression. It is the shared helper since W-56 (P16.01),
+// stale/missing artifact look like a guard regression. It is the shared helper,
 // because the remedy its message names has to be right in both copies at once.
 
 const DIST_INDEX = path.resolve(
@@ -41,7 +41,7 @@ const SRC_INDEX = path.resolve(
 
 assertBuilt(DIST_INDEX, SRC_INDEX);
 
-// Mirrors `stdio-integration.test.ts`'s list; asserted sorted so the six-tool surface (M1) is
+// Mirrors `stdio-integration.test.ts`'s list; asserted sorted so the six-tool surface is
 // pinned independently of registration order.
 const EXPECTED_TOOL_NAMES = [
   "compile-context",
@@ -52,7 +52,7 @@ const EXPECTED_TOOL_NAMES = [
   "lint-files",
 ];
 
-describe("installed-entrypoint shape via symlink/junction (H-1 regression guard)", () => {
+describe("installed-entrypoint shape via symlink/junction", () => {
   let linkRoot: string;
   let linkedEntry: string;
   let client: Client;

@@ -5,7 +5,7 @@ import {
   type StructuredErrorInfo,
 } from "@wastech-mdlint/core";
 
-// Classify a raw Node errno into the M6 `OPERATIONAL_ERROR` payload (P14.05, W-21). The code lives
+// Classify a raw Node errno into the shared `OPERATIONAL_ERROR` payload. The code lives
 // in core's closed taxonomy; the mapping lives here because deciding that a throwable is an
 // environment failure rather than an internal one is a host-boundary judgement — the same split
 // `INVALID_INPUT`/`ToolInputError` already uses. Core's `isStructuredError` is deliberately NOT
@@ -49,7 +49,7 @@ function errnoPath(error: unknown): string | undefined {
  * absolute path is refused here instead of rendered, because "no payload names a host path *outside*
  * the analyzed directory" is the property MCP's sanitization exists for, and it outweighs naming a
  * file outside the analyzed root. That directory itself is the one absolute path any payload carries,
- * and only in P14.01's `INVALID_INPUT` message (`tool-context.ts`), where the value is the caller's
+ * and only in the `INVALID_INPUT` message (`tool-context.ts`), where the value is the caller's
  * own `cwd` and is the broken thing being reported. The CLI keeps the `../` form on purpose (see
  * `operational-errors.ts`); the two hosts differ here by decision, which is why this is not that
  * function.

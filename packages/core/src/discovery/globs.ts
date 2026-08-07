@@ -4,7 +4,7 @@ function normalizePathValue(value: string): string {
   return value.replaceAll("\\", "/");
 }
 
-// Length of the leading run of `!` that negates a config glob (W-01). Peeling stops at `!(`, which
+// Length of the leading run of `!` that negates a config glob. Peeling stops at `!(`, which
 // picomatch reads as a negated *extglob* rather than a negation: its `!` branch opens an extglob when
 // the next character is `(` and only calls `negate()` otherwise (`picomatch/lib/parse.js`). Treating
 // that as a negation would rewrite the working `**/!(x).md` into `!**/(x).md` and invert a scope.
@@ -29,7 +29,7 @@ export function normalizeConfigGlob(pattern: string): string {
   const normalizedPattern = normalizePathValue(pattern);
   // The depth-agnostic prefix belongs on the pattern *body*, not on the pattern: `!keep.md` has to
   // become `!**/keep.md`, because `**/!keep.md` is a literal-filename pattern and therefore a silent
-  // no-op (W-01, second half). A `./` the prefix would hide needs no handling — picomatch strips it
+  // no-op. A `./` the prefix would hide needs no handling — picomatch strips it
   // relative to the start it advances past for the negation, so `!./docs/**` anchors like
   // `!docs/**`.
   const negationLength = globNegationLength(normalizedPattern);
@@ -39,9 +39,9 @@ export function normalizeConfigGlob(pattern: string): string {
     return normalizedPattern;
   }
 
-  // With no negation this is `**/${normalizedPattern}` — byte-identical to the pre-W-01 output, which
-  // is what keeps `init`'s root-only `./*.{md,mdx}` proposal and every other non-negated config
-  // matching exactly as before.
+  // With no negation this is `**/${normalizedPattern}` — byte-identical to what this function
+  // emitted before negations were handled at all, which is what keeps `init`'s root-only
+  // `./*.{md,mdx}` proposal and every other non-negated config matching exactly as before.
   return `${normalizedPattern.slice(0, negationLength)}**/${body}`;
 }
 
@@ -53,7 +53,7 @@ export function normalizeRelativePath(filePath: string): string {
   return normalizePathValue(filePath).replace(/^\.\/+/, "");
 }
 
-// True when a config entry is a glob rather than a plain path. STR-001 (P11.12) uses this to split
+// True when a config entry is a glob rather than a plain path. STR-001 uses this to split
 // "match anything in the corpus" entries from literal paths it can pin to one location on disk.
 // Backslashes are normalized first because picomatch reads `\` as an escape character, which would
 // make a Windows-style `docs\README.md` parse as an escaped literal instead of a path.
@@ -70,7 +70,7 @@ export function matchesConfigGlob(
   patterns: string[],
 ): boolean {
   // Match a one-item list (`micromatch(list, patterns)`) rather than `isMatch(input, patterns)`
-  // (W-01 / audit F1). `isMatch` is a first-truthy OR across the array in which a `!` entry compiles
+  // — the two are not interchangeable. `isMatch` is a first-truthy OR across the array in which a `!` entry compiles
   // to an *inverting* matcher, so `["docs/public/**", "!docs/private/**"]` read as "under docs/public
   // OR not under docs/private" — true for almost every path in a repository. The list form is the
   // only place micromatch applies negation across a set, and it is the same call shape

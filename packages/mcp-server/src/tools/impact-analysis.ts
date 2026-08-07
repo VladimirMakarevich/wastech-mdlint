@@ -21,7 +21,7 @@ import {
 
 // `impact-analysis` — the blast radius of changing `file`: which files reference it directly, which
 // depend on it transitively, and the reading order over that affected subgraph. Core owns the
-// classification (P4.05); this handler is a thin adapter.
+// classification; this handler is a thin adapter.
 
 type ImpactAnalysisToolInput = ToolFileInput & { file: string };
 

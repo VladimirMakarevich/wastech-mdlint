@@ -11,16 +11,16 @@ import { z } from "zod";
 
 import { toOperationalErrorInfo } from "./operational-error.js";
 
-// Output/error/annotation conventions (P7.01, task step 3) as reusable wrappers so every tool
+// Output/error/annotation conventions as reusable wrappers so every tool
 // renders the same success/error shape without re-deriving it.
 
-// Exactly the annotation M7 locks in. openWorldHint/idempotentHint are intentionally omitted — they
+// The annotation every tool carries. openWorldHint/idempotentHint are intentionally omitted — they
 // are not part of the decided read-only contract, and adding them would advertise hints the shipped
 // tools never agreed to.
 export const READ_ONLY_ANNOTATIONS: ToolAnnotations = { readOnlyHint: true };
 
 // Success: a machine-readable structuredContent (validated against the tool's own outputSchema by
-// the SDK) plus a human-readable text summary (M1).
+// the SDK) plus a human-readable text summary.
 export function successResult(params: {
   summary: string;
   structured: Record<string, unknown>;
@@ -33,13 +33,13 @@ export function successResult(params: {
 
 // Fixed, source-independent text for the INTERNAL_ERROR catch-all. A non-taxonomy throwable is
 // unexpected, so its raw message must never reach the client: `error.message`/`String(error)` can
-// carry absolute paths, stack fragments, or other internal detail (M6/security requires
+// carry absolute paths, stack fragments, or other internal detail (the error contract requires
 // INTERNAL_ERROR be sanitized). Structured errors keep their own vetted messages; only this
 // fallthrough is redacted.
 const INTERNAL_ERROR_MESSAGE = "An unexpected internal error occurred.";
 
 /**
- * The text block a host renders and a model reads. It carries the `hint` too (P14.05, W-19): the
+ * The text block a host renders and a model reads. It carries the `hint` too: the
  * structured payload had the actionable sentence and the text did not, so a host that renders only
  * `content[].text` — the common case — saw `Unknown rule "SIZE-002".` with the did-you-mean dropped,
  * while the CLI prints both for the same typo.
@@ -62,10 +62,10 @@ function renderErrorText(structured: StructuredErrorInfo): string {
   return `${structured.message} ${structured.hint}`;
 }
 
-// The error contract { code, message, hint } (M6), carried in `structuredContent` as the public
-// machine result (per M1's "carry a code with structured output"). Three-way classification, in
+// The error contract { code, message, hint }, carried in `structuredContent` as the public
+// machine result: every error carries a code alongside structured output. Three-way classification, in
 // order: a structured error from core (or `ToolInputError`) passes through verbatim; a raw errno
-// naming a path inside `options.cwd` becomes an OPERATIONAL_ERROR (P14.05, W-21); everything else is
+// naming a path inside `options.cwd` becomes an OPERATIONAL_ERROR; everything else is
 // wrapped as a sanitized INTERNAL_ERROR. The stack is never included, so the human-readable
 // `content` message and the structured payload only ever expose vetted text.
 //
@@ -107,7 +107,7 @@ export function errorResult(
 
 // The error object folded into every schema-carrying tool's advertised `outputSchema` so an
 // `errorResult` payload validates as structured output. `code` is constrained to the closed
-// `TOOL_ERROR_CODES` taxonomy (M6), not a bare string, so the advertised schema still documents the
+// `TOOL_ERROR_CODES` taxonomy, not a bare string, so the advertised schema still documents the
 // exact recoverable codes. Fields stay optional because the success schema remains the primary
 // contract and only some results carry error metadata.
 const ERROR_OUTPUT_SHAPE = {
@@ -116,7 +116,7 @@ const ERROR_OUTPUT_SHAPE = {
   hint: z.string().optional(),
 } as const;
 
-// Extend a success output shape with the optional M6 error fields WITHOUT weakening the success
+// Extend a success output shape with the optional error fields WITHOUT weakening the success
 // contract. The pinned MCP SDK (1.29) validates any present `structuredContent` against the
 // advertised schema even on errors, but it only advertises object schemas — a Zod union / `oneOf`
 // is silently dropped. So the safe expressible shape is "success schema plus optional error

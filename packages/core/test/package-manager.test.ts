@@ -101,7 +101,7 @@ describe("detectPackageManager", () => {
   });
 });
 
-// Audit L-11: the old check looked only at `cwd`, so a monorepo member — which by construction has
+// An earlier check looked only at `cwd`, so a monorepo member — which by construction has
 // no lockfile of its own — reported "not detected" and made `init` prompt for something it could
 // have read off disk.
 describe("detectPackageManager · ancestor walk", () => {

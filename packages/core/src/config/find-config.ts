@@ -2,7 +2,8 @@ import { access } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-// The single v2 config filename (C4 — JSONC content, `.json` extension).
+// The single v2 config filename: JSONC content under a `.json` extension, so editors treat it as
+// JSON while the loader still accepts comments.
 export const CONFIG_FILE_NAME = "wastech-mdlint.config.json";
 
 async function fileExists(filePath: string): Promise<boolean> {
@@ -15,11 +16,11 @@ async function fileExists(filePath: string): Promise<boolean> {
 }
 
 /**
- * Walk up from `cwd` looking for `wastech-mdlint.config.json` (P2.04). Returns the first match's
+ * Walk up from `cwd` looking for `wastech-mdlint.config.json`. Returns the first match's
  * absolute path, or undefined if none is found before the walk reaches the user's home directory or
  * the filesystem root. `--config` overrides this (handled by the loader).
  *
- * The home-directory boundary (H-3, P11.04) only rejects ANCESTORS at or above `$HOME`: a config
+ * The home-directory boundary only rejects ANCESTORS at or above `$HOME`: a config
  * sitting exactly at `cwd` is always returned, even when `cwd` is the home directory itself — the
  * boundary exists to stop the walk from wandering into unrelated ancestor territory (e.g. a dotfiles
  * repo at `$HOME`), not to hide a config that legitimately lives at the caller's own directory.
@@ -30,7 +31,7 @@ async function fileExists(filePath: string): Promise<boolean> {
  * where being overly cautious is harmless. Here, treating a real config at `cwd === $HOME` as "not
  * found" would make `lint`/MCP silently ignore it and would make `init` treat a real existing config
  * as absent — bypassing its overwrite prompt entirely and reaching an unconditional write. That is
- * the same silent-data-loss class (H-3) this boundary exists to remove, so the two walks cannot share
+ * the same silent-data-loss class this boundary exists to remove, so the two walks cannot share
  * that particular tradeoff even though they share the same ancestor-boundary ordering otherwise.
  */
 export async function findConfig(cwd: string): Promise<string | undefined> {

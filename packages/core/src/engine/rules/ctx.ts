@@ -9,9 +9,9 @@ import { extractSectionBody } from "../section-body.js";
 import { createLineNumberLookup } from "../text-position.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
 
-// Content-quality rules (P3.05).
+// Content-quality rules.
 
-// CTX-001 — no empty / placeholder sections (whole-body, case-insensitive; audit 3.1).
+// CTX-001 — no empty / placeholder sections (whole-body, case-insensitive).
 export const ctx001: RuleDefinition = defineRule({
   metadata: {
     id: "CTX-001",
@@ -69,8 +69,8 @@ export const ctx002: RuleDefinition = defineRule({
 // Match a term as a whole word (so "APIs" or "myapi" do not match "api"). Escapes regex-special
 // characters in the term. The trailing boundary is a lookahead, not a consumed group: `matchAll`
 // advances `lastIndex` past whatever a match consumes, so consuming the boundary character made
-// adjacent occurrences separated by exactly one character unreachable (audit L-1, e.g. "api api api"
-// under-counted as 2).
+// adjacent occurrences separated by exactly one character unreachable — "api api api" then
+// under-counted as 2.
 function wholeWordRegex(term: string): RegExp {
   const escaped = escapeRegExp(term);
   return new RegExp(`(^|[^A-Za-z0-9_])(${escaped})(?=[^A-Za-z0-9_]|$)`, "g");

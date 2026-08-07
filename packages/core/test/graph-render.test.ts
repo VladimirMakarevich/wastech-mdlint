@@ -55,7 +55,7 @@ describe("summarizeContextGraph", () => {
     ]);
     expect(summary.components).toEqual([["a.md", "b.md", "c.md"]]);
     expect(summary.readingOrder).toEqual(["a.md", "b.md", "c.md"]);
-    // Present even when nothing is excluded (W-23): the human report omits an empty section, but a
+    // Present even when nothing is excluded: the human report omits an empty section, but a
     // machine consumer must not have to distinguish "no cycles" from "an older shape".
     expect(summary.excluded).toEqual([]);
   });
@@ -70,7 +70,7 @@ describe("summarizeContextGraph", () => {
 
     // The one pin for the graph JSON document: CLI `graph --format json` and the MCP `context-graph`
     // tool's `summary` branch both serialize this object, so a key added or renamed on one host
-    // cannot silently diverge from the other or from the five documented surfaces (W-22/W-23).
+    // cannot silently diverge from the other or from the five documented surfaces.
     expect(Object.keys(summarizeContextGraph(graph, coverage))).toEqual([
       "nodes",
       "edges",
@@ -103,7 +103,7 @@ describe("summarizeContextGraph", () => {
     ).toEqual(["a.md->b.md@1", "a.md->b.md@2", "b.md->a.md@1"]);
   });
 
-  it("includes the G5 coverage signal when one is supplied, and omits it otherwise (audit B)", () => {
+  it("includes the coverage signal when one is supplied, and omits it otherwise", () => {
     const graph = graphOf({ "a.md": "# A\n" });
     // No links/images/imports, so coverage never touches disk — rootDir is required but unused here.
     const coverage = computeGraphCoverage(
@@ -134,7 +134,7 @@ describe("renderContextGraphText", () => {
     const lines = renderContextGraphText(graph).split("\n");
 
     expect(lines).toContain("top hubs:");
-    // W-26: clusters nest one level so component boundaries survive; members are their own lines
+    // Clusters nest one level so component boundaries survive; members are their own lines
     // instead of a comma-joined blob (3904 characters for one cluster on the 139-node corpus).
     expect(lines).toContain("clusters:");
     expect(lines).toContain("  cluster 1 (2 files):");
@@ -249,7 +249,7 @@ describe("the renderers at corpus scale", () => {
       "",
     );
 
-    // Before P15.01 the widest line here was a 3904-character comma-joined cluster.
+    // Before the line bounds, the widest line here was a 3904-character comma-joined cluster.
     expect(longest.length).toBeLessThanOrEqual(LARGE_CORPUS_LINE_WIDTH_BOUND);
     // …and the report is genuinely line-oriented rather than short because it is truncated.
     expect(lines.length).toBeGreaterThan(300);
@@ -269,12 +269,12 @@ describe("the renderers at corpus scale", () => {
     expect(members).toBe(LARGE_CORPUS_LARGEST_CLUSTER_SIZE);
   });
 
-  // W-23's parity assertion at the renderer level: one graph, both formats, the same sets. The human
+  // Parity at the renderer level: one graph, both formats, the same sets. The human
   // sections are the source the JSON keys had to match, so they are parsed back out of the text rather
   // than recomputed — a shared `topologicalSort` call would assert nothing about what either format
   // ships.
   //
-  // P16.01 widened this from the `excluded` set alone to all three of the top-level path sections,
+  // Widened from the `excluded` set alone to all three of the top-level path sections,
   // through the shared `readHumanSections` reader: `excluded` was missing from the JSON for three
   // phases and its two siblings were never compared at all, so checking one of three is how the next
   // omission stays invisible. The reader also asserts each header's `(N)` against the items under it,
@@ -315,8 +315,8 @@ describe("the renderers at corpus scale", () => {
 
   // The machine formats must be byte-identical across runs *and* unchanged by this task. A recorded
   // digest pins the second half of that (a 216 KB golden file is not worth checking in); the
-  // equality below pins the first. The `json` digest moved once, deliberately, at P15.02: the
-  // summary gained the `excluded` key (W-23). `mermaid`/`dot` are untouched by that change and their
+  // equality below pins the first. The `json` digest moved once, deliberately, when the
+  // summary gained the `excluded` key. `mermaid`/`dot` are untouched by that change and their
   // digests must not move.
   it.each([
     [
@@ -373,9 +373,9 @@ describe("renderContextSliceSummary", () => {
     );
   });
 
-  it("keeps a multi-start anchor query line-oriented (W-26)", () => {
+  it("keeps a multi-start anchor query line-oriented", () => {
     // An `#anchor`/heading/ID query resolves to every file carrying that slug, so `starts` grows
-    // with the corpus exactly as the sections W-26 fixed did.
+    // with the corpus exactly as the other unbounded sections did.
     const summary = renderContextSliceSummary({
       query: "#install",
       matchKind: "anchor",
@@ -415,7 +415,7 @@ describe("renderImpactSummary", () => {
         "  b.md (2 references)",
         "transitively affected (1):",
         "  c.md (depth 2, via b.md)",
-        // Same W-26 fix as the graph report: `impact`'s affected subgraph is the whole corpus when
+        // Same line-bounding as the graph report: `impact`'s affected subgraph is the whole corpus when
         // the changed file is a hub, so leaving these two comma-joined would have recreated the
         // inconsistency three lines above them.
         "reading order (2):",

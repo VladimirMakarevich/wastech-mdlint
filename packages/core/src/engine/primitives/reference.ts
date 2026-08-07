@@ -20,7 +20,7 @@ type ReferenceContext = Pick<
 >;
 
 // A repo-relative target "resolves" if it is in the Markdown corpus or exists on disk (the latter
-// covers files outside `include`, e.g. images — audit P3 REF gap, avoids false positives).
+// covers files outside `include`, e.g. images, which would otherwise be reported as broken).
 function targetResolves(relPath: string, context: ReferenceContext): boolean {
   if (candidateEscapesRoot(relPath)) {
     return false;
@@ -32,13 +32,13 @@ function targetResolves(relPath: string, context: ReferenceContext): boolean {
   );
 }
 
-// The `exclude` gate both primitives share (W-08). It matches the **resolved** repo-relative
+// The `exclude` gate both primitives share. It matches the **resolved** repo-relative
 // candidates, not the raw target, and a match on *any* candidate skips the target: `exclude` is a
 // suppression filter and must never *create* a finding, which is what dropping matched candidates
 // and re-resolving the rest would do for a link that only resolves via an excluded candidate. Under
 // a router the list is one target expressed several ways, so "any" is also the honest reading.
 //
-// The whole list goes to `matchesConfigGlob` in one call — it is P13.01's ordered, negation-aware
+// The whole list goes to `matchesConfigGlob` in one call — that matcher is ordered and negation-aware,
 // matcher, so evaluating patterns one at a time would lose a leading `!`'s subtraction.
 function targetExcluded(
   candidates: readonly string[],
@@ -78,7 +78,7 @@ export function linkResolves(
     }
 
     // One candidate list for every target shape (relative, root-relative, routed), so the `exclude`
-    // gate below cannot go inert on one branch the way it did before P13.05 (W-08): a bare `{}`
+    // gate below cannot go inert on one branch: a bare `{}`
     // router validates and resolves like the no-router case, yet used to turn the option off.
     const candidates = resolveTargetCandidates(document.path, target, router);
 
@@ -119,11 +119,11 @@ export function imageResolves(
       continue;
     }
 
-    // Deliberately router-blind, and the same shared helper the link path uses (W-10): a site
+    // Deliberately router-blind, and the same shared helper the link path uses: a site
     // router maps a URL to *Markdown source* files, so routing an image target would only ever
     // offer `.md`/`.mdx` candidates for an asset — manufacturing REF-003 findings rather than
     // resolving them. Root-relative image targets resolve against the repository root, which is
-    // what `docs/guide/rules/REF-003.md` documents.
+    // is also what the rule's documented behavior promises.
     const candidates = resolveTargetCandidates(document.path, target);
 
     if (targetExcluded(candidates, options.exclude)) {
@@ -131,7 +131,8 @@ export function imageResolves(
     }
 
     // `candidateEscapesRoot` must run before `existsSync`: a `..`-cancelled drive-absolute
-    // remainder would otherwise be probed outside `rootDir` on Windows (audit H-2 class).
+    // remainder would otherwise be probed outside `rootDir` on Windows, turning the rule into a
+    // file-existence oracle for arbitrary host paths.
     const resolved = candidates.some(
       (candidate) =>
         !candidateEscapesRoot(candidate) &&

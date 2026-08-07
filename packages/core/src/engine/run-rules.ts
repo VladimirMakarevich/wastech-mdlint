@@ -16,9 +16,9 @@ function compareMessages(left: LintMessage, right: LintMessage): number {
 
 /**
  * Run a list of severity-resolved rules against a single built context, returning deterministic
- * findings (P2.01). The runner attaches `ruleId`/`severity`/`filePath` to each reported finding.
+ * findings. The runner attaches `ruleId`/`severity`/`filePath` to each reported finding.
  *
- * Fail-fast (R4): a `project`-scope rule with no `documents` in context is a programming error — the
+ * Fail-fast: a `project`-scope rule with no `documents` in context is a programming error — the
  * runner throws instead of silently producing nothing. `"off"` rules are expected to be filtered by
  * the orchestrator before reaching here.
  */
@@ -38,7 +38,7 @@ export function runRules(
     const report = (finding: Parameters<RuleContext["report"]>[0]): void => {
       messages.push({
         ruleId: rule.id,
-        // Config override wins (C2), then the rule's per-finding hint, then its default.
+        // Config override wins, then the rule's per-finding hint, then its default.
         severity: severityOverride ?? finding.severity ?? rule.defaultSeverity,
         message: finding.message,
         filePath:
@@ -48,8 +48,8 @@ export function runRules(
         endLine: finding.endLine,
         fixable: finding.fixable,
         data: finding.data,
-        // Attached from the rule, never from the finding (P15.03 / W-35). It used to be a per-report
-        // literal, which shipped a bare rule id — duplicating `ruleId` and failing R3's SARIF
+        // Attached from the rule, never from the finding. It used to be a per-report
+        // literal, which shipped a bare rule id — duplicating `ruleId` and failing the SARIF
         // rationale, whose `helpUri` is a link — at 27 sites and no `helpUri` at all at five others.
         // Sourcing it here makes the value a URL and its presence uniform, and `ReportInput` no
         // longer carries the field so a rule cannot re-introduce either defect.

@@ -68,7 +68,7 @@ describe("declarative custom rule", () => {
       ruleId: "REQ-OWNER",
       severity: "error",
       filePath: "docs/reqs.md",
-      // W-35: `helpUri` used to be the rule id again. A user-chosen id has no page of its own, so a
+      // `helpUri` used to be the rule id again. A user-chosen id has no page of its own, so a
       // custom finding links the page documenting the mechanism — not `REQ-OWNER.md`, which is a 404.
       helpUri: CUSTOM_RULE_DOCS_URL,
     });
@@ -98,7 +98,7 @@ describe("declarative custom rule", () => {
     });
   });
 
-  it("rejects a custom id that shadows a built-in prefix (C7)", async () => {
+  it("rejects a custom id that shadows a built-in prefix", async () => {
     const cwd = await repo({
       "a.md": "# A\n",
       "wastech-mdlint.config.json": JSON.stringify({
@@ -155,7 +155,7 @@ describe("declarative custom rule", () => {
     );
   });
 
-  it("rejects a target that does not match the assert kind, including the retired 'heading' target (P9.05)", async () => {
+  it("rejects a target that does not match the assert kind, including the retired 'heading' target", async () => {
     const cwd = await repo({
       "a.md": "# A\n## B\n",
       "wastech-mdlint.config.json": JSON.stringify({
@@ -175,10 +175,10 @@ describe("declarative custom rule", () => {
     );
   });
 
-  // Audit M-3: {"rule":"custom"} without `id` used to fall through the permissive standard
+  // {"rule":"custom"} without `id` used to fall through the permissive standard
   // ruleEntrySchema and crash in resolveCustomRule's canonicalizeRuleId(undefined). These three
   // shapes must now surface as a structured CONFIG_INVALID, not a TypeError.
-  it("rejects a custom entry missing id, options, and severity (C7, not a crash)", async () => {
+  it("rejects a custom entry missing id, options, and severity — a diagnostic, not a crash", async () => {
     const cwd = await repo({
       "a.md": "# A\n",
       "wastech-mdlint.config.json": JSON.stringify({
@@ -195,7 +195,7 @@ describe("declarative custom rule", () => {
     );
   });
 
-  it("rejects a custom entry with options but no id (C7, not a crash)", async () => {
+  it("rejects a custom entry with options but no id — a diagnostic, not a crash", async () => {
     const cwd = await repo({
       "a.md": "# A\n",
       "wastech-mdlint.config.json": JSON.stringify({
@@ -214,7 +214,7 @@ describe("declarative custom rule", () => {
     expect((error as ConfigError).message).toMatch(/config\.rules\[0\]/);
   });
 
-  it("rejects a custom entry with severity but no id (C7, not a crash)", async () => {
+  it("rejects a custom entry with severity but no id — a diagnostic, not a crash", async () => {
     const cwd = await repo({
       "a.md": "# A\n",
       "wastech-mdlint.config.json": JSON.stringify({
@@ -285,7 +285,7 @@ const IN_SCOPE_ONLY = ["docs/a.md"];
 // it is NOT what enforces it: no tsconfig in this repo includes `test/**` (`packages/core/
 // tsconfig.json` is `include: ["src/**/*.ts", …]`), so `npm run typecheck` never reads this file and
 // a 14th assert kind would not fail it — the claim an earlier revision of this comment made
-// (P12.06). The enforcement is the runtime key-set assertion in the describe block below; keep it
+// The enforcement is the runtime key-set assertion in the describe block below; keep it
 // there, and prefer runtime assertions for any future coverage guard written in a test file.
 const CUSTOM_SCOPE_CASES = {
   requiredColumns: {
@@ -309,7 +309,7 @@ const CUSTOM_SCOPE_CASES = {
     scoped: IN_SCOPE_ONLY,
   },
   // The project kind: duplicates only exist *between* the two files, so the second one carries the
-  // finding and excluding it leaves nothing behind. This is the M-2 shape itself.
+  // finding and excluding it leaves nothing behind. This is the unscoped shape itself.
   columnUnique: {
     assert: { kind: "columnUnique", column: "ID" },
     control: ["drafts/b.md"],
@@ -361,7 +361,7 @@ const CUSTOM_SCOPE_CASES = {
   },
 } as const satisfies Record<Assertion["kind"], CustomScopeCase>;
 
-// Audit L-4. The 12 document kinds share one gate (`custom.ts`, before `runAssertion`) while
+// The 12 document kinds share one gate (`custom.ts`, before `runAssertion`) while
 // `columnUnique` has its own, threaded into the primitive as a `fileMatches` predicate — which is
 // why the project kind is not redundant with TBL-006's coverage.
 describe("custom rule file scope (exclude)", () => {
@@ -402,7 +402,7 @@ describe("custom rule file scope (exclude)", () => {
     "%s drops an excluded document, with and without `files`",
     async (_kind, { assert, control, scoped }) => {
       expect(await reportedFiles(assert, {})).toEqual(control);
-      // The M-2 shape — `exclude` with no `files` beside it to carry the filtering.
+      // The unscoped shape — `exclude` with no `files` beside it to carry the filtering.
       expect(await reportedFiles(assert, { exclude: ["drafts/**"] })).toEqual(
         scoped,
       );
@@ -469,7 +469,7 @@ describe("custom rule file scope (exclude)", () => {
     ).toEqual(["docs/a.md:nope.md"]);
   });
 
-  // W-08 (P13.05): the custom dispatcher hands `assert.exclude` straight to the same `linkResolves`
+  // The custom dispatcher hands `assert.exclude` straight to the same `linkResolves`
   // primitive REF-001 uses, so the router branch dropping the option took this family with it —
   // the family where the option is most likely hand-written, and the half no test reached.
   it("honors assert.exclude on a root-relative target when a siteRouter is configured", async () => {

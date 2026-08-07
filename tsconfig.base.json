@@ -6,13 +6,18 @@
     "composite": true,
     "strict": true,
     "declaration": true,
-    // P16.03 / W-31. Off, not absent: no package's `files` allowlist ships `src` — only built
-    // output plus LICENSE/README (and schema.json for cli) — so a map emitted here shipped
+    // Off, not absent: no package's `files` allowlist ships `src` — only built output plus
+    // LICENSE/README (and schema.json for cli) — so a map emitted here shipped
     // `"sources":["../src/…"]` with no `sourcesContent` into a tarball that carries no `src`
     // — 204 maps that resolve to nothing at the consumer and cost roughly half of core's packed
-    // size. The decision and the two alternatives weighed against it are recorded at
-    // docs/mdlint_v2/P-release/01-package-metadata.md; keeping the keys written out is what
-    // stops the next reader flipping them back as an oversight.
+    // size. Both alternatives grow the payload to buy a benefit two of the three packages cannot
+    // use, since `cli` and `mcp-server` are bin-only apps: `inlineSources` embeds the source text
+    // into the `.js.map` and the `.d.ts.map` alike, and adding `src` to `files` ships the whole
+    // source tree. A consumer who wants source follows `repository.directory` to the exact
+    // subtree instead. The cost paid locally: a file belonging to no tsconfig — any test file —
+    // now resolves `@wastech-mdlint/core` to `dist/index.d.ts` rather than to source, so
+    // go-to-definition lands on the declaration. Keeping both keys written out rather than
+    // omitted is what stops the next reader flipping them back as an oversight.
     "declarationMap": false,
     "sourceMap": false,
     "esModuleInterop": true,

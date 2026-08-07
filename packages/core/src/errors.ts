@@ -1,8 +1,8 @@
-// Structured error taxonomy (M6) shared by both hosts. Defined once in core — never re-invented in
+// Structured error taxonomy shared by both hosts. Defined once in core — never re-invented in
 // cli or mcp-server — so a failure renders the same `{ code, message, hint }` contract on every
 // surface. The closed set is the single source of truth for what an error code may be.
 //
-// Decided 2026-07-02 (audit — P7 error-taxonomy gap):
+// The closed set, and what each member means:
 // - CONFIG_NOT_FOUND       — no config resolved at the requested configPath/cwd.
 // - CONFIG_INVALID         — config failed JSONC/schema validation (hint = failing path).
 // - FILE_NOT_IN_CORPUS     — requested file/path outside the resolved include set.
@@ -11,7 +11,7 @@
 // - INVALID_INPUT          — tool arguments failed semantic validation beyond the input schema.
 // - INTERNAL_ERROR         — unexpected failure; message is sanitized and never leaks a stack trace.
 //
-// Amended 2026-08-06 (P14.05 / W-21), with the decision log's entry updated in the same change:
+// Amended 2026-08-06, with the decision log's entry updated in the same change:
 // - OPERATIONAL_ERROR      — the host's environment failed rather than the input: an errno (EACCES,
 //                            EISDIR, …) naming a path inside the analyzed directory. Split out of
 //                            INTERNAL_ERROR because errno-plus-path IS the actionable content, and

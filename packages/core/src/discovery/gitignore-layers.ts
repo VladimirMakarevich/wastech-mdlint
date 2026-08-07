@@ -4,8 +4,8 @@ import path from "node:path";
 import ignore, { type Ignore } from "ignore";
 
 // Shared `.gitignore` matching for every directory walk in core. It lives here rather than inside
-// `markdown/load-documents.ts` (its original home) because the pre-config repo scan (P11.14 / audit
-// L-7) must skip exactly the trees the lint corpus will skip: two independent matchers would let
+// `markdown/load-documents.ts` (its original home) because the pre-config repo scan must skip
+// exactly the trees the lint corpus will skip: two independent matchers would let
 // `init` propose an `include` for a directory the very config it writes then ignores.
 
 /**
@@ -123,7 +123,7 @@ function layerVerdict(
  * layer with an opinion. That order is git's rule: a nested `.gitignore` overrides its ancestors, so
  * `docs/.gitignore`'s `!keep.md` re-includes a file the root's `docs/*.md` excluded. The original
  * loop ran root-first and returned at the first layer that ignored, which silently dropped files
- * real `git` keeps (audit F9 / backlog W-11).
+ * real `git` keeps.
  */
 function resolveOwnVerdict(
   relPath: string,

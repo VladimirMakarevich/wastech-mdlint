@@ -3,7 +3,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 
 import { createServer } from "./index.js";
 
-// M3 generator: render the README's MCP tool inventory from the *live* registered tools rather than
+// Renders the README's MCP tool inventory from the *live* registered tools rather than
 // a hand-maintained name list. `tools/index.ts` deliberately keeps its registrars function-only so
 // no second source of truth can drift ("5 vs 6 tools"); introspecting a connected client — the same
 // `createServer()` + `InMemoryTransport` + `listTools()` technique `smoke.test.ts` uses — is the
@@ -36,7 +36,7 @@ export async function generateToolInventory(): Promise<string> {
     const header = "| Tool | Description | Read-only | Structured output |";
     const divider = "| --- | --- | --- | --- |";
     // Registration order is preserved deliberately (not alphabetized): it groups by family
-    // (lint/lint-files, the three graph tools, then compile-context last as the M1 five-tool
+    // (lint/lint-files, the three graph tools, then compile-context last as the structured-output
     // exception), which reads better than alphabetical and is still fully deterministic — the order
     // comes from a fixed registrar array, not filesystem or Map-iteration order.
     const rows = tools.map((tool) => {

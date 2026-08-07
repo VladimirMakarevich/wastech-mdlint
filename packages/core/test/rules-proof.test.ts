@@ -66,7 +66,7 @@ describe("SIZE-001 (proof rule) through the engine", () => {
     });
 
     // 101 bytes crosses both warn (10) and error (50): the error breach supersedes the warn one, so
-    // a single finding is reported (P11.13, superseding P3.07's independent firing).
+    // a single finding is reported, from the highest crossed threshold rather than one per threshold.
     expect(result.messages).toHaveLength(1);
     expect(result.messages[0]).toMatchObject({
       severity: "error",
@@ -97,7 +97,7 @@ describe("SIZE-001 (proof rule) through the engine", () => {
     expect(result.messages[0]?.filePath).toBe("CLAUDE.md");
   });
 
-  it("lets a config severity override clamp per-finding severity (C2)", async () => {
+  it("lets a config severity override clamp per-finding severity", async () => {
     const cwd = await fixtureRepo({ "big.md": `${"x".repeat(100)}\n` });
 
     const result = await lintFiles({

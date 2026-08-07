@@ -1,4 +1,4 @@
-// The one place a rule's documentation URL is constructed (P15.03 / W-35 + W-36). Two consumers
+// The one place a rule's documentation URL is constructed. Two consumers
 // need it — `helpUri` on every finding and the README rule table's link — and shipping two fields
 // or two spellings that both mean "a rule's documentation page" is exactly the drift this task
 // closes, so both read this constant.
@@ -9,7 +9,7 @@
 //
 // `blob/main` rather than a version tag: nothing at runtime knows which version is installed, and
 // the guide pages ship in no tarball, so a pinned install links to the current docs rather than to
-// its own. Recorded in `docs/mdlint_v2/accepted-behaviors.md`.
+// its own. Accepted rather than fixed: there is no runtime signal to pin the link against.
 export const RULE_DOCS_BASE_URL =
   "https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/";
 

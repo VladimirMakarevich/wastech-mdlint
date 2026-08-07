@@ -17,8 +17,8 @@ import type { InferredRule } from "../src/discovery/rule-inference.js";
 
 // The fresh-write `exclude` mirrors the scanner's pruned noise directories as depth-agnostic globs
 // (the scan prunes by basename at any depth), sorted by the same host-independent comparator as
-// production — and nothing else since P14.03 resolved W-15: the scan's shape-based hidden-directory
-// prune has no lint-time counterpart.
+// production — and nothing else: the scan's shape-based hidden-directory prune deliberately has no
+// lint-time counterpart, so a hidden directory that is not a dependency tree stays linted.
 const EXPECTED_EXCLUDE = DEFAULT_NOISE_DIR_NAMES.map(
   (name) => `**/${name}/**`,
 ).sort(compareStrings);
@@ -46,8 +46,8 @@ function parse(text: string): Record<string, unknown> {
   return parsed as Record<string, unknown>;
 }
 
-// The CLI computes this relative to the config's own directory; for a root config it is the documented
-// C9 default. Tests pass it explicitly since generateInitConfig no longer hardcodes it.
+// The CLI computes this relative to the config's own directory; for a root config it is the
+// documented default. Tests pass it explicitly since generateInitConfig no longer hardcodes it.
 const PACKAGE_SCHEMA_REF = "./node_modules/@wastech-mdlint/cli/schema.json";
 
 const FRESH_PARAMS: GenerateInitConfigParams = {
@@ -72,16 +72,16 @@ describe("generateInitConfig · fresh", () => {
       "./node_modules/@wastech-mdlint/cli/schema.json",
     );
     expect(config.include).toEqual(["docs/**/*.md"]);
-    // Deliverable 1 / C1: a fresh write carries the scanner's pruned noise dirs as `exclude`.
+    // A fresh write carries the scanner's pruned noise dirs as `exclude`.
     expect(config.exclude).toEqual(EXPECTED_EXCLUDE);
-    // Audit L-7: pinned explicitly rather than left at the loader's `false` default, so the written
+    // Pinned explicitly rather than left at the loader's `false` default, so the written
     // config lints exactly the trees the scan proposed from.
     expect(config.respectGitignore).toBe(true);
     expect(config.rules).toEqual([{ rule: "REF-001" }, { rule: "TBL-002" }]);
     expect(result.addedRuleCount).toBe(2);
     expect(result.totalRuleCount).toBe(2);
     expect(result.wroteEmptyInclude).toBe(false);
-    // C9: no remote URL anywhere, asserted on the raw bytes, not just by construction.
+    // No remote URL anywhere, asserted on the raw bytes, not just by construction.
     expect(result.configText).not.toMatch(/https?:\/\//);
     expect(result.projectSchema).toBeUndefined();
   });
@@ -101,10 +101,10 @@ describe("generateInitConfig · fresh", () => {
     expect(config.exclude).toEqual(EXPECTED_EXCLUDE);
 
     // Asserted semantically (what the globs *match*), not by literal presence: the anchoring is the
-    // actual contract, and literals passed while nested noise was still being linted (audit M-4).
+    // actual contract, and literals passed while nested noise was still being linted.
     const exclude = config.exclude as string[];
     for (const excluded of [
-      // The two M-4 repros: noise nested under a monorepo package.
+      // Noise nested under a monorepo package — the case a root-anchored glob misses.
       "packages/foo/node_modules/somelib/README.md",
       "packages/foo/dist/OUT.md",
       // Root-level regression guard — this is what makes the leading `**/` matching zero segments a
@@ -123,9 +123,9 @@ describe("generateInitConfig · fresh", () => {
 
     // No over-exclusion: a real cluster's docs stay in the corpus at the root and under a package,
     // and a dot in a *file* or directory name (rather than a leading dot) is not a hidden directory.
-    // The three dot-directories below are W-15's answer (P14.03): a hidden directory that is not a
+    // The three dot-directories below pin the rule: a hidden directory that is not a
     // dependency or build tree is not excluded from the lint corpus, so `init`'s written `exclude`
-    // does not silently drop `.claude/skills/` or `.agents/rules/` either.
+    // does not silently drop an agent-instruction or skills tree either.
     for (const kept of [
       "docs/guide.md",
       "packages/foo/docs/guide.md",
@@ -141,8 +141,8 @@ describe("generateInitConfig · fresh", () => {
 
   it("explains above the exclude key that the list is a default a user entry extends", () => {
     // The block is a verbatim copy of the lint-time default, so the natural edit — delete the line
-    // you disagree with — is a no-op (P13.02 decided *extend*). P14.03 keeps the list and makes the
-    // duplication explicit rather than omitting it, so the comment is the deliverable, not a nicety.
+    // you disagree with — is a no-op, because a user `exclude` *extends* the default. The list is
+    // kept and the duplication made explicit rather than omitted, so the comment is the deliverable.
     const { configText } = generateInitConfig(FRESH_PARAMS);
     const excludeIndex = configText.indexOf('"exclude"');
     expect(excludeIndex).toBeGreaterThan(-1);
@@ -158,7 +158,7 @@ describe("generateInitConfig · fresh", () => {
   });
 
   it('writes a literal "include": [] when the caller passes an empty array', () => {
-    // Audit L-9: an empty selection is an explicit "lint nothing", and omitting the key would invert
+    // An empty selection is an explicit "lint nothing", and omitting the key would invert
     // it into `lintFiles`'s `**/*.md` default — the exact opposite of what the user asked for.
     const result = generateInitConfig({
       action: "fresh",
@@ -174,7 +174,7 @@ describe("generateInitConfig · fresh", () => {
   });
 
   it("falls back to a project-local schema when no package schema ref is available", () => {
-    // Audit L-10: under `npx` there is no local install for a relative path to reach, so pointing at
+    // Under `npx` there is no local install for a relative path to reach, so pointing at
     // `./node_modules/@wastech-mdlint/cli/schema.json` dangles. Generate the schema instead.
     const result = generateInitConfig({
       action: "fresh",
@@ -296,7 +296,7 @@ describe("generateInitConfig · merge", () => {
     );
   });
 
-  it("canonicalizes noncanonical existing ids on write (C3), keeping severity/options intact", () => {
+  it("canonicalizes noncanonical existing ids on write, keeping severity/options intact", () => {
     const existing = {
       raw: {
         rules: [
@@ -418,8 +418,8 @@ describe("buildCiWorkflowYaml", () => {
 
   it("shell-quotes a path with spaces as a single argument inside a block scalar", () => {
     const yaml = buildCiWorkflowYaml("doc site/wastech-mdlint.config.json");
-    // The space lives in the directory, so it is `[path]` that carries the quoting evidence: since
-    // P14.04 `--config` is emitted relative to that directory and is a bare filename.
+    // The space lives in the directory, so it is `[path]` that carries the quoting evidence:
+    // `--config` is emitted relative to that directory and is a bare filename.
     expect(yaml).toContain(
       "npx wastech-mdlint lint 'doc site' --fail-on error --config 'wastech-mdlint.config.json'",
     );
@@ -427,7 +427,7 @@ describe("buildCiWorkflowYaml", () => {
   });
 
   it("emits --config relative to the [path] argument, not to the repo root", () => {
-    // The CLI resolves a relative `--config` against `[path]` (P14.04), so a repo-root-relative
+    // The CLI resolves a relative `--config` against `[path]`, so a repo-root-relative
     // config path here would make the generated workflow look for `docs/docs/…` and exit 2 on its
     // first run.
     const yaml = buildCiWorkflowYaml("docs/wastech-mdlint.config.json");
@@ -449,10 +449,10 @@ describe("buildCiWorkflowYaml", () => {
     ).toThrow(/line terminator/);
   });
 
-  // P9.07 (audit L-7): the function takes no package-manager input at all — it is npm-universal by
+  // The function takes no package-manager input at all — it is npm-universal by
   // design, not a detection result that got lost on the way in. See the function's own doc comment
   // for why (the install step only fetches the external CLI, never the target repo's dependencies).
-  it("has no package-manager parameter — the workflow is npm-universal by design (P9.07)", () => {
+  it("has no package-manager parameter — the workflow is npm-universal by design", () => {
     // Only `configPath` is accepted; there is no second parameter a caller could use to thread a
     // detected package manager through.
     expect(buildCiWorkflowYaml.length).toBe(1);

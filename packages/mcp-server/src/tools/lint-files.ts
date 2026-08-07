@@ -21,7 +21,7 @@ import {
 } from "../shared/tool-response.js";
 
 // `lint-files` — lint the project's Markdown files. Configuration (and its resolved rules/settings)
-// comes from `resolveToolConfiguration`, the shared P7.01 helper over core's `loadConfiguration`;
+// comes from `resolveToolConfiguration`, the shared helper over core's `loadConfiguration`;
 // core stays the sole owner of the pipeline (this handler is a thin adapter, mirroring the CLI's
 // `handleLint` without `--fix` and without graph loading).
 

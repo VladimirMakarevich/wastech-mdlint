@@ -7,7 +7,7 @@ import type { PrimitiveFinding } from "./types.js";
 export type SectionPresentOptions = { sections: string[] };
 
 // sectionPresent — each required section (by heading text) must appear (SEC-001). Absent sections
-// have no line, so they report at line 0 (the P3.03 "section absent" convention).
+// have no line, so they report at line 0 — the "section absent" convention across SEC rules.
 export function sectionPresent(
   document: ParsedDocument,
   options: SectionPresentOptions,
@@ -32,7 +32,7 @@ export type SectionOrderOptions = {
 };
 
 // Restrict headings to the contiguous run that belongs to `section`: everything after the section
-// heading, up to the next heading of same-or-higher level (flat ownership, audit 5.3).
+// heading, up to the next heading of same-or-higher level (flat ownership, not nested).
 function headingsInSection(
   headings: ParsedHeading[],
   section: string,

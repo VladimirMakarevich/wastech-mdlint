@@ -146,7 +146,7 @@ describe("formatContextGraphSummary", () => {
         "nodes: 3",
         "edges: 3",
         "cycles: 0",
-        // W-26: one indented item per line, exactly like `top hubs` below it. Comma-joining these
+        // One indented item per line, exactly like `top hubs` below it. Comma-joining these
         // produced a 3497-character single line on the 139-node corpus.
         "entry points (1):",
         "  index.md",

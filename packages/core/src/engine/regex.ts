@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-// `regex-string` util (used by primitives now; re-exported as a P3.01 shared util).
+// `regex-string` util, shared by the primitives and re-exported for rule use.
 //
 // Config carries regexes as strings (JSON has no RegExp literal). This validator rejects an invalid
-// pattern at config-load time with a clear C7 message instead of throwing mid-lint.
+// pattern at config-load time with a clear message instead of throwing mid-lint.
 
 function isValidRegex(pattern: string, flags?: string): boolean {
   try {
@@ -36,8 +36,7 @@ export function compileRegex(pattern: string, flags?: string): RegExp {
 
 // Escape regex metacharacters so a runtime string (a directory/zone name, a glossary alias) can be
 // embedded in a RegExp source as a literal instead of a pattern. Un-escaped interpolation is exactly
-// what let a directory named "c++" crash the whole lint run and "node.js" match more than intended
-// (audit M-1).
+// what let a directory named "c++" crash the whole lint run and "node.js" match more than intended.
 export function escapeRegExp(literal: string): string {
   return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

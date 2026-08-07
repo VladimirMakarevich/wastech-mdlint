@@ -71,13 +71,13 @@ function parseDepth(value: string): number {
 const PROGRAM_LEVEL_FLAGS = new Set(["-h", "--help", "-v", "--version"]);
 
 /**
- * Route the no-subcommand default (`lint`, D4) in argv instead of via commander's
+ * Route the no-subcommand default (`lint`) in argv instead of via commander's
  * `command(…, { isDefault: true })`.
  *
  * Commander's `_parseCommand` dispatches to a default command *before* it can reach
  * `unknownCommand()`, so with `isDefault` no operand is ever rejected: `wastech-mdlint bogus-command`
  * became lint's `[path]`, linted an empty corpus, and exited `0` — a typo'd CI step passing green
- * (M-7). Prepending the name here leaves commander's own unknown-command error (and its
+ * Prepending the name here leaves commander's own unknown-command error (and its
  * did-you-mean suggestion) intact.
  *
  * The trade-off is deliberate: a bare path with no subcommand (`wastech-mdlint ./docs`) is now
@@ -100,12 +100,12 @@ function routeDefaultCommand(argv: string[]): string[] {
  * validation belongs, and return it resolved.
  *
  * Two defects in one helper. Without the existence check a nonexistent target simply globs an empty
- * corpus and reports `0 "No problems found."` — indistinguishable from a clean repository (M-7).
+ * corpus and reports `0 "No problems found."` — indistinguishable from a clean repository.
  * Without resolving against *this run's* `cwd` first the check would disagree with what core actually
  * reads: a relative directory handed to `loadConfiguration`/`lintFiles` as their own `cwd` resolves
  * against the real `process.cwd()`, which is not the injected `cwd`. (This is about the directory
  * arguments only. A relative `--config` is core's to resolve, against whatever `cwd` it is given —
- * P14.04 — so it is passed through as typed.)
+ * so it is passed through as typed.)
  */
 async function resolveDirectoryArgument(
   cwd: string,
@@ -211,7 +211,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
       .action(lintAction);
   };
 
-  // `lint` is the default command (D4) — routed in argv by `routeDefaultCommand`, not registered as
+  // `lint` is the default command — routed in argv by `routeDefaultCommand`, not registered as
   // commander's `isDefault`; `scan` is a hidden, deprecated alias for one minor version.
   addLintCommand("lint", false);
   addLintCommand("scan", true);
@@ -361,7 +361,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
     // Deliberately no default value here (unlike `lint`/`graph`'s identical-looking `[path]`
     // arguments): the action callback below must be able to tell "omitted" (`undefined`) apart
     // from "typed, and happens to equal cwd" — an explicit target must not be silently re-rooted
-    // onto an ancestor's config (H-3, P11.04).
+    // onto an ancestor's config.
     .argument("[path]", "directory to scan")
     .addOption(
       new Option("-y, --yes", "accept the inferred draft without prompts"),
@@ -408,7 +408,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
         // it against this run's own `cwd` (the injected `io.cwd`, when set) rather than letting
         // `findConfig`/`scanRepository` fall back to the real `process.cwd()` inside core. A
         // nonexistent target is rejected here rather than reaching the write and surfacing as an
-        // ENOENT partial-write summary, which reported the cause as a write failure (P11.10).
+        // ENOENT partial-write summary, which reported the cause as a write failure.
         const pathWasExplicit = targetPath !== undefined;
         const resolvedCwd = await resolveDirectoryArgument(
           cwd,
@@ -461,7 +461,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
     // The backstop for a failure no handler converted into a CliUsageError. It is still an
     // *operational* failure, so it exits 2, not 1: exit 1 is reserved exclusively for findings at or
     // above --fail-on, and conflating the two leaves CI unable to tell "the linter found problems"
-    // from "the command could not run" (M-6). It renders through formatOperationalError rather than
+    // from "the command could not run". It renders through formatOperationalError rather than
     // writing `error.message` directly because an fs error that names a path embeds that path
     // absolutely; every other message is passed through, since here it is the only diagnosis there is.
     stderr.write(`Operational error: ${formatOperationalError(error, cwd)}\n`);

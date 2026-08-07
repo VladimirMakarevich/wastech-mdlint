@@ -17,11 +17,10 @@ import { defineRule, type RuleDefinition } from "../registry.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
 import type { TextEdit } from "../types.js";
 
-// Section + structure rules (P3.03).
+// Section + structure rules.
 
-// SEC-001 — required sections present. Fixable: scaffold each missing section at EOF (audit 4.2 —
-// the "SEC-* missing-section scaffold"; realized on the document-scope rule since fixes are
-// per-document, journal [P3.03]).
+// SEC-001 — required sections present. Fixable: scaffold each missing section at end of file.
+// The fix lives on the document-scope rule because a `TextEdit` targets one document's content.
 export const sec001: RuleDefinition = defineRule({
   metadata: {
     id: "SEC-001",
@@ -57,8 +56,8 @@ export const sec001: RuleDefinition = defineRule({
     }
     // Append a scaffold section (with a TODO body) per missing heading at end of file, joined with
     // the document's own line ending so a CRLF file does not come back with mixed endings
-    // (audit L-6). `applyFixes` normalizes every edit's `newText` too; doing it here keeps this
-    // fix hook correct when it is exercised on its own.
+    // rather than mixed ones. `applyFixes` normalizes every edit's `newText` too; doing it here
+    // keeps this fix hook correct when it is exercised on its own.
     const newline = detectNewline(document.content);
     const scaffold = missing
       .map((section) => ["", `## ${section}`, "", "TODO", ""].join(newline))
@@ -148,7 +147,7 @@ export const sec003: RuleDefinition = defineRule({
     if (resolvesOutsideRoot(rootDir, options.template)) {
       // Reject before any existsSync/readFileSync attempt: trying the read first and
       // special-casing the failure would still leak a file-existence oracle for arbitrary host
-      // paths (audit H-2's third repro).
+      // paths — the failure itself is the oracle, whatever the message says.
       context.report({
         message: `SEC-003 template "${options.template}" escapes the analyzed root; skipping conformance checks.`,
         line: 0,
@@ -178,10 +177,9 @@ export const sec003: RuleDefinition = defineRule({
       return;
     }
 
-    // `level` selects the exact heading depth to compare (P3.03: "level: 2 checks only ## headings"
-    // — journal [P3.03] resolves this against the contradictory "up to depth level" wording in favor
-    // of the concrete ADR example, so a per-doc `# Title` is not required across files). Default:
-    // compare all heading depths.
+    // `level` selects the *exact* heading depth to compare — `level: 2` checks only `##` headings,
+    // not "every heading up to depth 2". Exact-depth is what lets a per-document `# Title` differ
+    // across files without every document being required to share it. Default: compare all depths.
     const requiredHeadings = [
       ...new Set(
         template.headings
@@ -218,7 +216,7 @@ export const sec003: RuleDefinition = defineRule({
 // STR-001 — required files exist in the project (project). `files` here is the *required* set (each
 // entry is a path or glob), not file scoping.
 //
-// Satisfaction has two modes (P11.12, audit BL-1). A *literal* entry is satisfied by the corpus at
+// Satisfaction has two modes. A *literal* entry is satisfied by the corpus at
 // exactly that repo-relative path, or by anything on disk there — so a required `LICENSE` or
 // `package.json`, which no `**/*.md` corpus can ever contain, stops being reported missing on a
 // repository that ships it. "Corpus or disk" is the same resolution model REF-001 already uses
@@ -270,7 +268,8 @@ export const str001: RuleDefinition = defineRule({
 
       if (resolvesOutsideRoot(rootDir, entry)) {
         // Rejected before the probe, at the same severity as "missing", so a required entry cannot
-        // be used to ask whether an arbitrary host path exists (the SEC-003 / audit H-2 lesson).
+        // be used to ask whether an arbitrary host path exists — the same reasoning as SEC-003's
+        // template check.
         context.report({
           message: `Required file "${required}" escapes the analyzed root and cannot be verified.`,
           line: 0,
@@ -281,8 +280,8 @@ export const str001: RuleDefinition = defineRule({
       }
 
       // Root-pinned on purpose: a bare `README.md` means the one at the repository root, not any
-      // `README.md` anywhere (audit BL-1 — "the rule cannot pin a required file to a location").
-      // Write `**/README.md` for the old corpus-wide behavior.
+      // `README.md` anywhere. Without root-pinning the rule could not require a file at a specific
+      // location at all. Write `**/README.md` for the corpus-wide behavior.
       if (corpus.includes(entry) || existsSync(path.resolve(rootDir, entry))) {
         continue;
       }

@@ -15,11 +15,11 @@ import { fileURLToPath } from "node:url";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-// P16.04 / W-54. `scripts/run-npm-windows.sh` used to flatten the argument vector into one string
+// `scripts/run-npm-windows.sh` used to flatten the argument vector into one string
 // and interpolate it — together with the repository path, unquoted — into a `cmd.exe` command line.
 // A checkout under `C:\my repo` therefore ran `cd /d C:\my repo && npm ...`, and one containing `&`
-// injected. `.agents/rules/security.md` (Command Execution) forbids exactly that, so the wrapper now
-// changes directory on the bash side and hands cmd.exe an explicit argv.
+// injected. Building a command line by interpolation is exactly what a spawn must never do, so the
+// wrapper now changes directory on the bash side and hands cmd.exe an explicit argv.
 //
 // What this suite can and cannot show: it stubs `wslpath` and `cmd.exe` on PATH, so it pins the
 // argument vector cmd.exe receives, the working directory it is handed, and the UNC refusal — the
@@ -131,7 +131,7 @@ describe.skipIf(process.platform === "win32")(
       extraEnv: Record<string, string> = {},
     ): WrapperRun {
       const logPath = path.join(sandbox, `cmd-log-${String(++runCounter)}.txt`);
-      // Explicit argv and no `shell`, per `.agents/rules/security.md` — a suite about shell
+      // Explicit argv and no `shell` — a suite about shell
       // interpolation has no business introducing any. `cwd` is the sandbox rather than the
       // checkout, so a wrapper that failed to change directory itself would be visible.
       const result = spawnSync(
@@ -224,9 +224,9 @@ describe.skipIf(process.platform === "win32")(
       expect(calls).toBeNull();
     });
 
-    it("leaves the engines floor to the root .npmrc (P16.03 / W-32)", () => {
-      // The two halves of one decision: this task drops `--engine-strict=false` from the wrapper
-      // *because* P16.03 made the floor binding here. Asserting both sides in one place is what
+    it("leaves the engines floor to the root .npmrc", () => {
+      // The two halves of one decision: the wrapper drops `--engine-strict=false`
+      // *because* the root .npmrc makes the floor binding. Asserting both sides in one place is what
       // stops a later edit re-opening the contradiction from either end. Compared as a boolean so
       // a failure never prints the file.
       const npmrcPath = path.join(repoRoot, ".npmrc");

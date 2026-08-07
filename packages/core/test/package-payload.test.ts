@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { assertBuilt } from "./support/assert-built.js";
 import { readTarball } from "./support/read-tarball.js";
 
-// P16.02 / W-29. What a stranger downloads was never asserted on: every tarball carried only
+// What a stranger downloads was never asserted on: every tarball carried only
 // `package.json` + `dist/` (plus `cli`'s `schema.json`), so publishing would have produced three
 // blank npm pages under an MIT claim with no license text and no link back to the source. The
 // defect is only visible *after* publishing, which is the one moment it cannot be undone.
@@ -27,11 +27,10 @@ import { readTarball } from "./support/read-tarball.js";
 // allowlist entries naming them. `cli`'s `schema.json` is the one payload file that ships only
 // because `files` lists it, which is what gives this suite genuine allowlist sensitivity.
 //
-// No packed-file counts anywhere: `docs/mdlint_v2/P16-release-readiness/03-published-payload.md`
-// rules a count out as a baseline, because it fails on every legitimate addition while saying
-// nothing about what is in the payload. Properties only.
+// No packed-file counts anywhere: a count fails on every legitimate addition while saying nothing
+// about what is actually in the payload. Properties only.
 //
-// P16.03 / W-31, W-30 extend it to the payload's *shape*: no source maps, and no top-level entry
+// Extend it to the payload's *shape*: no source maps, and no top-level entry
 // outside each package's allowlist. That second half is what makes "no `docs/`" and "no `.github/`"
 // assertions unnecessary — an allowed-set check states the same property positively and catches the
 // leak this suite has not thought of, which is the one that would actually ship.
@@ -47,13 +46,13 @@ const repoRoot = path.resolve(
 
 // Spawning npm as `node <npm-cli.js>` is the one formulation that is both explicit-argv and
 // shell-free on Windows: since Node 18.20.2/20.12.2 `spawnSync("npm.cmd", …)` without `shell: true`
-// throws EINVAL, and `shell: true` is what `.agents/rules/security.md` (Command Execution) tells us
-// not to reach for. `npm_execpath` is set by any `npm run …`, which covers the documented gate
+// throws EINVAL, and `shell: true` is exactly what a spawn here must not reach for.
+// `npm_execpath` is set by any `npm run …`, which covers the documented gate
 // (`npm test`) and CI (`.github/workflows/ci.yml`).
 const npmExecPath = process.env["npm_execpath"];
 if (npmExecPath === undefined || npmExecPath === "") {
   // Fail fast at module scope with the remedy, the same shape `assertBuilt()` uses — never a silent
-  // skip. A guard that quietly skips where nobody looks is the post-P9 audit's systemic cause again.
+  // skip. A guard that quietly skips where nobody looks is how untested boundaries stay untested.
   throw new Error(
     "This suite packs the workspace with npm, which it locates through the `npm_execpath` " +
       "environment variable — set by any `npm run …`, and absent under a bare `vitest run`. " +
@@ -74,9 +73,9 @@ interface PublishedPackage {
   readonly allowedTopLevelEntries: readonly string[];
 }
 
-// Adding a genuinely new payload file (a `CHANGELOG.md` at PR.04, say) means one line here. That is
+// Adding a genuinely new payload file (a `CHANGELOG.md`, say) means one line here. That is
 // the guard working, not friction: the edit is the moment somebody confirms the new file is meant
-// to ship, which is exactly the review W-29 went without.
+// to ship — the review that publishing an unexamined tarball would skip.
 const ALWAYS_ALLOWED = ["package.json", "README.md", "LICENSE", "dist"];
 
 const PUBLISHED_PACKAGES: readonly PublishedPackage[] = [
@@ -98,7 +97,7 @@ const PUBLISHED_PACKAGES: readonly PublishedPackage[] = [
 ];
 
 // The suite packs with `--workspaces`, which takes npm's no-lifecycle-script path — so nothing here
-// rebuilds, and from P16.03 on the assertions below read `dist` directly. Without this, a never-built
+// rebuilds, and the assertions below read `dist` directly. Without this, a never-built
 // tree would fail the positive control below (`dist/index.js` present) as a packaging defect instead
 // of "you did not build". It does not catch stale `.map` output either way — `assertBuilt()` only
 // compares `dist/index.js` against `src/index.ts`, and `tsc` never deletes a `.map` on its own — so
@@ -112,7 +111,7 @@ for (const { directory } of PUBLISHED_PACKAGES) {
 
 /**
  * npm's own tarball filename rule: drop the leading `@`, flatten the scope separator, then the
- * version. Derived rather than hard-coded because P16.02 must not couple this suite to `0.0.0` —
+ * version. Derived rather than hard-coded so the suite is not coupled to the current `0.0.0` —
  * the release tool bumps every version in lockstep and this guard has to survive that.
  */
 function tarballPrefix(packageName: string): string {
@@ -222,13 +221,13 @@ describe.each(PUBLISHED_PACKAGES)(
       });
     });
 
-    it("ships its compiled entry point (W-31)", () => {
+    it("ships its compiled entry point", () => {
       // The positive control for the map assertion below. Without it, a `dist` that failed to emit
       // at all would satisfy "no entry ends in `.map`" perfectly.
       expect(payload().has("dist/index.js")).toBe(true);
     });
 
-    it("ships no source maps (W-31)", () => {
+    it("ships no source maps", () => {
       const maps = [...payload().keys()].filter((entry) =>
         entry.endsWith(".map"),
       );
@@ -236,7 +235,7 @@ describe.each(PUBLISHED_PACKAGES)(
       // `sourceMap` off does not delete already-emitted `.map` files, and `tsc -b` decides
       // up-to-dateness from *content* — no `src` file changed, so an incremental build leaves them
       // in place and this stays red against a command that just exited 0. A contributor with a
-      // checkout built before P16.03 hits exactly this.
+      // checkout built before maps were turned off hits exactly this.
       expect(
         maps,
         `${name} packs ${String(maps.length)} source map(s). Maps are off in tsconfig.base.json ` +
@@ -245,7 +244,7 @@ describe.each(PUBLISHED_PACKAGES)(
       ).toEqual([]);
     });
 
-    it("ships nothing outside its allowlist (W-30)", () => {
+    it("ships nothing outside its allowlist", () => {
       // Stated as an allowed set rather than as "no docs/, no .github/": a denylist only catches
       // the leaks somebody already imagined, and the root pack this replaced was shipping a CI
       // workflow and a guide page precisely because nobody had imagined them.
@@ -266,10 +265,10 @@ describe.each(PUBLISHED_PACKAGES)(
   },
 );
 
-describe("release:check (W-30)", () => {
-  // The script is the only local command a maintainer runs before tagging, and until P16.03 it
-  // packed the *root* — which is `private: true` with no `files`, so it exercised none of the three
-  // allowlists while the glossary described it as validating exactly those. Nothing could have
+describe("release:check", () => {
+  // The script is the only local command a maintainer runs before tagging, and it used to pack the
+  // *root* — which is `private: true` with no `files`, so it exercised none of the three
+  // allowlists while being described as validating exactly those. Nothing could have
   // caught that: the payload assertions above pack the workspaces themselves, so they stay green no
   // matter what the script does. Reading the script text is the only way this property is visible.
   const releaseCheck = rootManifest.scripts["release:check"];
@@ -295,11 +294,11 @@ describe("release:check (W-30)", () => {
   });
 });
 
-describe("published payload of @wastech-mdlint/cli (W-29)", () => {
+describe("published payload of @wastech-mdlint/cli", () => {
   it("still ships schema.json", () => {
     // The one payload file that ships *only* because `files` lists it — README and LICENSE are
     // force-included by npm regardless. So this is where the suite has real allowlist sensitivity,
-    // and it is also PR.01 deliverable 3 (editor `$schema` resolution from the installed package).
+    // and it is what makes editor `$schema` resolution work from the installed package.
     const schema = payloads.get("@wastech-mdlint/cli")!.get("schema.json");
     expect(schema).toBeDefined();
     expect(JSON.parse(schema!.toString("utf8"))).toMatchObject({

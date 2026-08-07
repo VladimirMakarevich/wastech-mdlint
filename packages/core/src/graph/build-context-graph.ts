@@ -12,18 +12,20 @@ import type {
   ContextGraphNode,
 } from "./context-graph-types.js";
 
-// P4.01 semantic ContextGraph builder (G1/G3). Extends the P3.06 "relocated legacy builder" (link
-// edges only, deduped by (from,to)) into the full taxonomy — link/anchor/image/import/id-ref, one
-// edge per source construct, multiplicity retained (dedup+count is G7 backlog). The read shape
+// Semantic ContextGraph builder. It widened an earlier link-only builder (edges deduped by
+// (from,to)) into the full taxonomy — link/anchor/image/import/id-ref, one edge per source
+// construct, multiplicity retained. Collapsing parallel edges into one carrying a count is a
+// possible future shape, deliberately not taken: multiplicity is what lets a consumer say a
+// document references another three times. The read shape
 // (`path`/`from`/`to`/`inDegree`/`outDegree`/`cycles`) stays frozen so GRP-001/002 are unaffected.
 
 // Resolve a link/image/import target to a corpus node path, mirroring REF-001/002 resolution
 // exactly (relative → source dir; root-relative → site router, else strip leading `/` from root) so
 // graph edges never disagree with the REF rules on router/root-relative repos. Undefined when the
 // target is not (or does not resolve to) a node in the corpus — non-corpus and missing targets are
-// skipped per the taxonomy (audit 2.5).
+// skipped per the taxonomy.
 //
-// **Images are deliberately excluded from routing** (P13.05 / W-10): the caller passes `undefined`
+// **Images are deliberately excluded from routing**: the caller passes `undefined`
 // for `siteRouter` on the image loop, matching REF-003, whose documented model is that a
 // root-relative image target resolves against the repository root. A router maps a URL to *Markdown
 // source*, so routing an image would only ever yield `.md`/`.mdx` candidates for an asset. One
@@ -47,12 +49,12 @@ function hasScheme(target: string): boolean {
 
 // Token run used to scan document prose for id-ref occurrences (Decision 2): the same
 // `[\s,]+`-splitting model as `defined-ids.ts`'s column tokenizer, applied to free text instead of a
-// table cell so a plain-text ID mention (no Markdown link) still yields a graph edge (G1).
+// table cell so a plain-text ID mention (no Markdown link) still yields a graph edge.
 //
-// KNOWN LIMITATION (v2, audit finding A): this scans `document.content` — the *raw* file text — not
-// prose-only AST nodes. `ParsedDocument` exposes no per-node text spans, and adding them is a P1
-// parser change outside this phase, so an ID that appears only inside a fenced code block, inline
-// code, or frontmatter still produces a real id-ref edge. Accepted as "honest simple" v2 behavior
+// KNOWN LIMITATION: this scans `document.content` — the *raw* file text — not
+// prose-only AST nodes. `ParsedDocument` exposes no per-node text spans, and adding them would be a
+// parser-contract change, so an ID that appears only inside a fenced code block, inline
+// code, or frontmatter still produces a real id-ref edge. Accepted as honest-and-simple behavior
 // (a snippet that names REQ-1 arguably does reference it) and pinned by test so the false positive
 // stays intentional rather than drifting silently. Revisit if code-block noise proves costly.
 const PROSE_TOKEN_PATTERN = /[^\s,]+/g;
@@ -64,7 +66,7 @@ const PROSE_TOKEN_PATTERN = /[^\s,]+/g;
 // tokenizer, justified because free text (not a cell) is where trailing punctuation actually occurs.
 const PROSE_TOKEN_TRIM_PATTERN = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
 
-// id-ref edges (G1): definitions come from `extractDefinedIds` (column + heading discovery, audit
+// id-ref edges: definitions come from `extractDefinedIds` (column + heading discovery, audit
 // 2.1/5.5); references are discovered by scanning each document's prose for tokens equal to a
 // defined ID whose definer is a *different* document.
 function buildIdRefEdges(
@@ -126,7 +128,7 @@ function buildIdRefEdges(
 }
 
 // Build the deterministic adjacency-free graph: nodes (with in/out degree), semantic edges typed
-// per the taxonomy, and the explicit cycle list (G6).
+// per the taxonomy, and the explicit cycle list.
 export function buildContextGraph(
   documents: Map<string, ParsedDocument>,
   options: BuildContextGraphOptions = {},
@@ -142,7 +144,7 @@ export function buildContextGraph(
   const nodeSet = new Set(nodePaths);
   const { siteRouter } = options;
 
-  // One edge per source construct — no (from,to) dedup (task constraint; G7 collapses this later).
+  // One edge per source construct — no (from,to) dedup, so multiplicity survives into the graph.
   const edges: ContextGraphEdge[] = [];
 
   for (const document of documentsByPath.values()) {
@@ -197,11 +199,10 @@ export function buildContextGraph(
       if (target === undefined || target === document.path) {
         continue;
       }
-      // Image edges deliberately carry no `text` (audit finding E): G3 scopes the label to
-      // link/anchor edges, and the natural image label (alt text) is not part of the P1
-      // `ParsedImage` contract. Carrying it would be an additive parser-contract change for a
-      // marginal explainability gain that no P4 task requires — revisit if MCP/`--fix` output ever
-      // needs per-image labels.
+      // Image edges deliberately carry no `text`: edge labels are scoped to link/anchor edges, and
+      // the natural image label (alt text) is not part of the `ParsedImage` contract. Carrying it
+      // would be an additive parser-contract change for a marginal explainability gain — revisit
+      // only if some output actually needs per-image labels.
       edges.push({
         from: document.path,
         to: target,
@@ -212,7 +213,7 @@ export function buildContextGraph(
     }
 
     for (const importRecord of document.imports) {
-      // `rawTarget` is `@path.md` / `@/path.md` (D3); drop the leading `@` and resolve like a link.
+      // `rawTarget` is `@path.md` / `@/path.md`; drop the leading `@` and resolve like a link.
       const target = resolveTarget(
         document.path,
         importRecord.rawTarget.slice(1),
@@ -262,12 +263,12 @@ export function buildContextGraph(
   return { nodes, edges, cycles: detectCycles(nodePaths, edges) };
 }
 
-// Tarjan SCC → components of size > 1 are cycles (G6); a representative cycle path is extracted per
+// Tarjan SCC → components of size > 1 are cycles; a representative cycle path is extracted per
 // component and canonicalized (rotated to its lexicographically smallest start) for stable, deduped
 // output. Multiplicity-insensitive: parallel edges between the same pair collapse to one adjacency
-// entry below, so retaining edge multiplicity (P4.01) does not change cycle detection.
+// entry below, so retaining edge multiplicity does not change cycle detection.
 //
-// DEPTH BOUND (P12.05, audit finding SC-3): `strongConnect` recurses once per node along the current
+// DEPTH BOUND: `strongConnect` recurses once per node along the current
 // DFS path, so its stack depth is the longest *simple DFS path inside one connected component* —
 // bounded by that component's node count, not by the length of any authored chain. A densely
 // cross-linked component descends about as deep as a linear chain of the same size, so the assumption
@@ -360,7 +361,7 @@ function detectCycles(
 // `walk` backtracks over simple paths inside a single SCC, so its stack depth is bounded by that
 // SCC's member count — a strictly smaller bound than `strongConnect`'s above, since reaching it needs
 // thousands of documents *mutually reachable* in one component, not merely one long cycle. Same
-// accepted v2 limitation (P12.05); see the note on `detectCycles`.
+// accepted v2 limitation; see the note on `detectCycles`.
 function cyclePath(
   component: string[],
   adjacency: Map<string, string[]>,

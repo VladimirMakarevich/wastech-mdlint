@@ -31,14 +31,14 @@ describe("DEFAULT_EXCLUDE_GLOBS", () => {
   });
 
   it("prunes a noise directory at any depth, not only at the root", () => {
-    // The F-07 half of W-02: a root-anchored default would have left the nested copy — 2740 of the
+    // A root-anchored default would have left the nested copy — 2740 of the
     // field test's 3063 parsed files — in the corpus.
     for (const candidate of [
       "node_modules/pkg/README.md",
       "mobile/node_modules/leftpad/README.md",
       "packages/foo/dist/generated.md",
       // A hidden *dependency* tree is still excluded, but by name (`.venv` is in the noise list),
-      // not by shape — which is the whole of W-15's answer.
+      // not by shape, so a hidden directory that is neither is still linted.
       ".venv/lib/site-packages/README.md",
       directoryProbe(".venv"),
     ]) {
@@ -47,9 +47,9 @@ describe("DEFAULT_EXCLUDE_GLOBS", () => {
       );
     }
 
-    // W-15 (P14.03): a hidden directory that is *not* a dependency or build tree is no longer
+    // A hidden directory that is *not* a dependency or build tree is no longer
     // excluded from the lint corpus merely for starting with a dot. `.claude/skills/` and
-    // `.agents/rules/` were 31% of the field-test target's tracked Markdown.
+    // agent-instruction trees under dot-directories were 31% of a real target's tracked Markdown.
     for (const candidate of [
       ".github/PULL_REQUEST_TEMPLATE.md",
       directoryProbe(".github"),
@@ -148,7 +148,7 @@ describe("resolveCorpusScope", () => {
   });
 
   it("cannot rescue a single file from inside a default-excluded directory", () => {
-    // Accepted limitation (P13.01): the negation has to name the *directory*, because the walk
+    // Accepted limitation: the negation has to name the *directory*, because the walk
     // prunes before descending. Pinned here so the guide's advice and the behavior stay one thing.
     const scope = resolveCorpusScope({ exclude: ["!**/vendor/keep.md"] });
 

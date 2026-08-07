@@ -9,7 +9,7 @@ import { createServer } from "../src/index.js";
 // Smoke check: prove the server builds, speaks MCP over a real transport, and advertises exactly
 // the tools registered so far. A linked in-memory transport pair is used instead of stdio so the
 // check is deterministic and never seizes the test runner's stdin/stdout; the wire-level
-// StdioServerTransport integration tests belong to P7.05 when the full six-tool surface lands.
+// StdioServerTransport integration lives in `stdio-integration.test.ts`.
 describe("mcp-server", () => {
   it("completes the MCP handshake and advertises the registered tools", async () => {
     const server = await createServer();
@@ -29,7 +29,7 @@ describe("mcp-server", () => {
       name: "wastech-mdlint-mcp",
     });
 
-    // P7.02 landed `lint`/`lint-files`; P7.03 added the three graph tools; P7.04 lands the last tool
+    // The full six-tool surface: two lint tools, three graph tools, and compile-context
     // (`compile-context`), completing the six-tool surface.
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name).sort()).toEqual([
@@ -41,20 +41,20 @@ describe("mcp-server", () => {
       "lint-files",
     ]);
 
-    // Pin AC2 ("context-slice description is honest") at the wire level: the tool must advertise
+    // Pin the honesty of the context-slice description at the wire level: the tool must advertise
     // core's exact exact-match wording rather than separately worded, over-promising copy.
     const slice = tools.find((tool) => tool.name === "context-slice");
     expect(slice?.description).toContain(SLICE_RESOLUTION_DESCRIPTION);
 
-    // P9.04/M2: ad-hoc lint does not load config, but selected rules can still touch cwd paths.
+    // Ad-hoc lint does not load config, but selected rules can still touch cwd paths.
     const lint = tools.find((tool) => tool.name === "lint");
     expect(lint?.description).toContain("Does not load project config");
     expect(lint?.description).toContain("REF-001/REF-003");
-    // P11.12: STR-001 joined the filesystem-probing rules, so the description must name it too.
+    // STR-001 joined the filesystem-probing rules, so the description must name it too.
     expect(lint?.description).toContain("STR-001");
     expect(lint?.description).toContain("server's working directory");
     expect(lint?.description).not.toContain("Reads no filesystem");
-    // P12.04/M8: ad-hoc lint runs declarative custom rules, and the `content.md` file-scope caveat
+    // Ad-hoc lint runs declarative custom rules, and the `content.md` file-scope caveat
     // that comes with them is disclosed rather than left to be discovered.
     expect(lint?.description).toContain("code plugins are never loaded");
     expect(lint?.description).toContain("content.md");

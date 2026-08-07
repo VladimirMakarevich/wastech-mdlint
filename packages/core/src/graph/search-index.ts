@@ -5,11 +5,11 @@ import type { ParsedDocument } from "../markdown/document-types.js";
 import type { ContextGraph } from "./context-graph-types.js";
 import { query as runQuery, type QueryVisit } from "./query.js";
 
-// P4.04 deterministic search index + slice resolution (G4). P4.03's `query`/`slice` only accept an
+// Deterministic search index + slice resolution. The shared `query`/`slice` only accept an
 // already-resolved start path; this module supplies the missing piece — resolving a user-facing
 // query string (an ID, a heading/anchor slug, or a file path) to one or more start nodes via plain
 // index lookups. Exact match only, never fuzzy/substring/keyword/LLM, so `slice` results stay
-// deterministic and the CLI/MCP surfaces (P4.07/P7) can advertise honest semantics.
+// deterministic and the CLI/MCP surfaces can advertise honest semantics.
 
 const byPath = compareStrings;
 
@@ -29,9 +29,9 @@ export type ContextSliceResult = {
   visited: QueryVisit[];
 };
 
-// Exported so P4.07's `--help` and P7's MCP tool description quote this exact sentence instead of
+// Exported so the CLI `--help` text and the MCP tool description quote this exact sentence instead of
 // drifting into separately worded (and possibly over-promising) copy — the single honesty
-// requirement (G4 / AC4) is satisfied by both hosts importing the same string.
+// requirement is satisfied by both hosts importing the same string rather than restating it.
 export const SLICE_RESOLUTION_DESCRIPTION =
   "Resolves the query by exact match against defined IDs, heading/anchor slugs, and file paths " +
   "— no fuzzy, substring, keyword, or LLM matching.";
@@ -169,7 +169,7 @@ function mergeVisited(perStart: QueryVisit[][]): QueryVisit[] {
 }
 
 /**
- * Resolve `query` via `buildSearchIndex`/`resolveQuery`, then run P4.03's forward `query()` from
+ * Resolve `query` via `buildSearchIndex`/`resolveQuery`, then run the shared forward `query()` from
  * every resolved start and merge the results — "closest start wins" for any node reachable from
  * more than one start. Exact resolution only (see `SLICE_RESOLUTION_DESCRIPTION`); a query that
  * resolves to nothing returns an empty result rather than guessing.

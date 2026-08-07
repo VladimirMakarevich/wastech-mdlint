@@ -8,19 +8,19 @@ import type { RuleDescriptionGroup } from "./describe-rules.js";
 import type { GraphAnalysis } from "./graph-analysis.js";
 import { skillFrontmatterSchema } from "./skill-frontmatter.js";
 
-// P5.04 pure renderer (S1/S2/S4/S6): assembles the final SKILL.md text from already-computed P5.01
-// (`GraphAnalysis`), P5.02 (`DocumentProfile`), and P5.03 (`RuleDescriptionGroup`) data. `synthesize`
-// never touches the filesystem or `cwd` — that orchestration lives in `compile-context.ts` — so this
-// module stays trivially unit-testable with hand-built fixtures.
+// Pure renderer: assembles the final SKILL.md text from already-computed `GraphAnalysis`,
+// `DocumentProfile`, and `RuleDescriptionGroup` data. `synthesize` never touches the filesystem or
+// `cwd` — that orchestration lives in `compile-context.ts` — so this module stays trivially
+// unit-testable with hand-built fixtures.
 
-// P15.01 / W-27: a `SKILL.md` is loaded into an agent's context *whole*, so its budget is the
+// A `SKILL.md` is loaded into an agent's context *whole*, so its byte budget is the
 // product. On a 139-document corpus the unbounded References block made the artifact 110 789 bytes,
 // 89.7% of it an edge list an agent cannot act on, while `Document Rules` and `Workflow` — the two
 // sections that say how to operate — were 0.7% between them. These two caps buy that budget back.
 //
 // Both are **fixed**, not corpus-relative: neither engages below its bound, and the bound the
 // artifact states means the same thing in every repository rather than varying with corpus size.
-// That is not a promise that an existing artifact is unchanged — P15.01 also added the `Refs`
+// That is not a promise that an existing artifact is unchanged — the same change added the `Refs`
 // column, the always-on disclosure paragraph, and one-edge-per-line fan-out, so every generated
 // `SKILL.md` changes bytes and content hash once and has to be regenerated. Nor is it independence
 // from the rest of the corpus: `REFERENCE_DOCUMENT_LIMIT` is a top-N selection, so adding a
@@ -63,7 +63,7 @@ export type CompileBudget = {
   // Whether at least one active (non-`off`) LLM-001 config entry exists, independent of whether
   // its `entrypoints` glob actually matched a corpus file. Keeping this separate from
   // `entrypointsMatched` is what lets `synthesize` tell "LLM-001 isn't configured at all" apart
-  // from "it's configured but its glob matched nothing" (S6 honesty) — both would otherwise look
+  // from "it's configured but its glob matched nothing" — both would otherwise look
   // identical (an empty `entrypointsOverBudget` array) if `entrypointsMatched` were the only signal.
   llm001Enabled: boolean;
   // Distinct entrypoints resolved from active LLM-001 entries (post-dedup); can be 0 even when
@@ -72,7 +72,7 @@ export type CompileBudget = {
   entrypointsOverBudget: CompileBudgetEntrypoint[];
 };
 
-// Frozen (audit 4.4): P7 and P8 depend on this exact shape.
+// Frozen: the MCP compile tool and the static-skill tooling both depend on this exact shape.
 export interface CompileResult {
   skillContent: string;
   metadata: {
@@ -98,7 +98,7 @@ function isDefined(value: string | undefined): value is string {
   return value !== undefined;
 }
 
-// Shared Markdown-safety helpers (audit finding): every free-form value rendered below — a
+// Shared Markdown-safety helpers: every free-form value rendered below — a
 // repo-relative path, an author-supplied rule description, the configured skill name — reaches a
 // Markdown control position (a heading line, a table cell, or an inline code span) verbatim unless
 // normalized first. Centralizing that here keeps every render site correct on the same unusual
@@ -208,10 +208,11 @@ function renderArchitecture(
     const role = profile?.role ?? "isolated";
     const type =
       profile === undefined ? "narrative" : classifyDocumentType(profile);
-    // W-28: the role vocabulary is coarse by construction — on the 139-document fixture `hub` and
-    // `isolated` hold 86% of the corpus and in practice read as "has edges" / "has no edges". The
-    // degrees the bucket rounds off are already on the profile, so the row carries them and a
-    // reader can tell a 3-reference hub from a 124-reference one. See `accepted-behaviors.md`.
+    // The role vocabulary is coarse by construction — on a 139-document corpus `hub` and
+    // `isolated` hold 86% of the documents and in practice read as "has edges" / "has no edges".
+    // That coarseness is accepted rather than fixed: the degrees the bucket rounds off are already
+    // on the profile, so the row carries them and a reader can still tell a 3-reference hub from a
+    // 124-reference one.
     const refs = `${profile?.referencedBy.length ?? 0} / ${profile?.referencesTo.length ?? 0}`;
     return `| ${tableCell(documentPath)} | ${role} | ${type} | ${refs} |`;
   });
@@ -251,7 +252,7 @@ function renderReadingOrderBlock(
   if (documentPaths.length === 0) {
     lines.push("(no documents found)");
   } else if (analysis.readingOrder.length === 0) {
-    // G6 honesty: an empty reading order with a non-empty corpus means every document was cycle-
+    // Honesty about truncation: an empty reading order with a non-empty corpus means every document was cycle-
     // excluded, not that the corpus itself is empty — those are different facts and must not share
     // the same "(no documents found)" message. The Cycles block right below names them.
     lines.push(
@@ -266,11 +267,12 @@ function renderReadingOrderBlock(
   return lines.join("\n");
 }
 
-// G6 honesty: cycle members (and anything only reachable through them) never appear in the reading
+// Honesty about truncation: cycle members (and anything only reachable through them) never appear in the reading
 // order above, so this block names them explicitly instead of letting them vanish silently.
 function renderCyclesBlock(analysis: GraphAnalysis): string {
   // `formatCyclePath` bounds the hop count: a large strongly connected component otherwise renders
-  // as one multi-KB line here, exactly as it did in the graph summary (W-26/W-27 share the site).
+  // as one multi-KB line here, exactly as it did in the graph summary before the same bound was
+  // applied there.
   const lines = ["### Cycles", ""];
 
   for (const cycle of analysis.cycles) {
@@ -279,7 +281,7 @@ function renderCyclesBlock(analysis: GraphAnalysis): string {
 
   // One excluded path per bullet, uncapped: the field test measured this as a 3702-character single
   // line, and unlike the fan-out it is a fact about the corpus a reader needs in full — a document
-  // missing from the reading order with no explanation is the G6 dishonesty this block exists for.
+  // missing from the reading order with no explanation is exactly the silence this block exists to break.
   const excluded = analysis.excludedFromReadingOrder;
   if (excluded.length === 0) {
     lines.push("", "Excluded from reading order: (none)");
@@ -360,7 +362,7 @@ function renderReferencesBlock(
     const profile = profiles.get(documentPath);
     return [
       // A code span (not bold) — consistent with every other path in this module, and a `**`
-      // sequence inside a path would otherwise prematurely close a bold span (audit finding).
+      // sequence inside a path would otherwise prematurely close a bold span.
       codeSpan(documentPath),
       ...renderEdgeBullets(profile?.referencesTo ?? [], "to"),
       ...renderEdgeBullets(profile?.referencedBy ?? [], "from"),
@@ -387,8 +389,8 @@ function renderReferencesBlock(
   return ["### References", disclosure, entries.join("\n\n")].join("\n\n");
 }
 
-// Locked verbatim (audit 3.4) — copy exactly; presets change only this block, never the computed
-// data above it (S2/S4).
+// Locked verbatim — copy exactly; presets change only this block, never the computed
+// data above it.
 function renderCommandBlock(
   commandPreset: CompileCommandPreset,
 ): string | undefined {
@@ -442,8 +444,8 @@ function renderDependencies(
   return ["## Document Dependencies", ...blocks].join("\n\n");
 }
 
-// Fixed boilerplate (S3 skipped — English scaffold only); wording is not locked by any audit
-// example, so it is not corpus-derived. Steps are still gated by `sections`, though: a step that
+// Fixed boilerplate — an English scaffold, deliberately not corpus-derived, since no part of it
+// varies with the repository. Steps are still gated by `sections`, though: a step that
 // named a disabled section would make the generated SKILL.md self-contradictory, pointing readers
 // at a heading that isn't there.
 function renderWorkflow(sections: CompileSections): string {
@@ -464,7 +466,7 @@ function renderWorkflow(sections: CompileSections): string {
       "Read Document Dependencies to trace what a change affects, and follow the reading order before editing.",
     );
   }
-  // Context Budget is never gated by `sections` (S6), so this step is always valid to reference.
+  // Context Budget is never gated by `sections`, so this step is always valid to reference.
   steps.push(
     "Mind the Context Budget so your edits do not push an eager-imported entrypoint over its token limit.",
   );
@@ -477,12 +479,13 @@ function renderWorkflow(sections: CompileSections): string {
 }
 
 export function synthesize(input: SynthesizeInput): CompileResult {
-  // Validate before rendering (S1): an empty `skill.name`/`skill.description` throws a ZodError
+  // Validate before rendering: an empty `skill.name`/`skill.description` throws a ZodError
   // here rather than silently emitting invalid frontmatter. `compile-context.ts`'s lenient reader
-  // defaults missing fields to `""`, so this is the one place that actually enforces S1 today —
-  // P5.05 replaces it with a proper load-time diagnostic. Parses against the schema directly
-  // (rather than via skills/skill-model.ts's `parseSkillFrontmatter`) so this P5 module doesn't
-  // route its own validation through the P8 skills layer.
+  // defaults missing fields to `""`, so this is the only place a non-empty name/description is
+  // actually enforced — a load-time config diagnostic would be the better home for it. Parses
+  // against the schema directly, rather than through `skills/skill-model.ts`'s
+  // `parseSkillFrontmatter`, so the compile path does not route its validation through the
+  // static-skills layer and pick up that layer's issue-collecting semantics.
   skillFrontmatterSchema.parse({
     name: input.skill.name,
     description: input.skill.description,
@@ -522,7 +525,7 @@ export function synthesize(input: SynthesizeInput): CompileResult {
   // Hash the provenance line's deterministic text too, not just the gated sections — a gated-off
   // section's own `documentCount`/`ruleCount` still change the *visible* provenance text even when
   // that section itself doesn't contribute to the hash, so excluding provenance entirely let two
-  // different `skillContent` bodies share one `contentHash` (S4 violation). Only the hash token
+  // different `skillContent` bodies share one `contentHash`, which would defeat its purpose. Only the hash token
   // itself is excluded (via a placeholder), since embedding the real hash would be circular.
   const renderProvenance = (hash: string): string =>
     `Generated from ${documentCount} docs, ${ruleCount} rules · content hash sha256:${hash}`;

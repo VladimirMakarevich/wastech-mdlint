@@ -6,7 +6,7 @@ import type { ResolvedSettings } from "../types.js";
 // (the runner defaults it to the current file).
 //
 // `line: 0` is the sentinel for "no specific line" (file/section-level findings such as an absent
-// section — P3.03 reports absent sections at line 0); the renderer omits the line suffix for 0.
+// section — an absent section reports at line 0); the renderer omits the line suffix for 0.
 export type PrimitiveFinding = {
   message: string;
   line: number;

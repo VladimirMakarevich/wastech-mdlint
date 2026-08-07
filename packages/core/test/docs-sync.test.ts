@@ -13,7 +13,7 @@ const readmePath = path.resolve(
 
 function extractGeneratedTable(readme: string): string {
   // The `<!-- prettier-ignore -->` line and trailing blank line are formatting scaffolding
-  // (P9.06) that keep `npm run format` from re-wrapping the table's padding; they sit outside
+  // that keep `npm run format` from re-wrapping the table's padding; they sit outside
   // the captured group so this still compares the raw generated string byte-for-byte.
   const match =
     /<!-- BEGIN GENERATED RULES -->\n<!-- prettier-ignore -->\n([\s\S]*?)\n\n<!-- END GENERATED RULES -->/.exec(
@@ -26,14 +26,14 @@ function extractGeneratedTable(readme: string): string {
 }
 
 describe("README rule table", () => {
-  it("stays in sync with the rule metadata (R6)", () => {
+  it("stays in sync with the rule metadata", () => {
     // If this fails, regenerate: `npm run build && npm run generate:docs`.
     const readme = readFileSync(readmePath, "utf8");
     expect(extractGeneratedTable(readme)).toBe(generateRuleDocs());
   });
 
-  it("marks exactly the deterministic-fixable subset as fixable (audit 4.2)", () => {
-    // The rule cell is `[`ID`](url)` since P15.03 linked it to the rule's `docsUrl`, so a data row is
+  it("marks exactly the deterministic-fixable subset as fixable", () => {
+    // The rule cell is `[`ID`](url)` — linked to the rule's `docsUrl` — so a data row is
     // recognized by the link opener and the id is read out of the code span inside it rather than
     // being the whole cell. The header and divider rows still fail both.
     const fixable = generateRuleDocs()
@@ -44,7 +44,7 @@ describe("README rule table", () => {
     expect(fixable.sort()).toEqual(["SEC-001", "TBL-002"]);
   });
 
-  it("links every rule id to its own documentation page (W-36)", () => {
+  it("links every rule id to its own documentation page", () => {
     const rows = generateRuleDocs()
       .split("\n")
       .filter((line) => line.startsWith("| [`"));

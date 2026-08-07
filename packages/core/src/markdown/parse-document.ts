@@ -38,11 +38,11 @@ import type {
 // document (a fresh slugger per document keeps dedupe state isolated — see parseDocument).
 const markdownProcessor = remark().use(remarkParse).use(remarkGfm);
 
-// Eager `@path.md` import syntax (D3). Kept byte-identical to the legacy llm/imports scanner so the
+// Eager `@path.md` import syntax. Kept byte-identical to the legacy llm/imports scanner so the
 // import set does not shift across the cutover: leading boundary, `@`, then a `.md` target.
 const IMPORT_PATTERN = /(^|[\s(])@(?<target>\/?[^\s@]+?\.md)\b/gm;
 
-// Directive grammar (R8 / audit 2.4). `disable-next-line` precedes `disable` in the alternation so
+// Directive grammar. `disable-next-line` precedes `disable` in the alternation so
 // the longer keyword wins; trailing tokens (if any) are the rule IDs.
 const DIRECTIVE_PATTERN =
   /^wastech-mdlint-(disable-next-line|disable|enable)(?:\s+([\s\S]*?))?$/;
@@ -236,10 +236,11 @@ function extractImports(node: Text): ParsedImport[] {
     const atCharIndex = matchIndex + atOffset;
 
     // remark packs consecutive non-blank lines into one `text` node, so a later-line import must not
-    // inherit the node's start line (audit M-1). Derive the position from node.value alone: newlines
+    // inherit the node's start line. Derive the position from node.value alone: newlines
     // before the `@` give the line delta, and the offset from the start of the `@`'s own physical
     // line gives the column. Column is measured within node.value, which remark reports 1:1 for
-    // ordinary paragraphs; container-prefix/entity-decoded columns are out of scope for P9.01.
+    // ordinary paragraphs; mapping a column back through container prefixes and decoded entities
+    // needs a full source remapper, which is deliberately not built here.
     const lineDelta = findLineNumber(node.value, atCharIndex) - 1;
     const lastNewlineIndex = node.value.lastIndexOf("\n", atCharIndex - 1);
 
@@ -257,11 +258,11 @@ function extractImports(node: Text): ParsedImport[] {
 }
 
 /**
- * Parse one Markdown document into the full `ParsedDocument` in a single traversal (P1.02–P1.04).
+ * Parse one Markdown document into the full `ParsedDocument` in a single traversal.
  *
  * Section tracking relies on `unist-util-visit` walking in source order (pre-order DFS): a heading
  * updates `currentSection` before any block that follows it, so each table/check-item records the
- * most-recent heading above it regardless of level (audit 5.3).
+ * most-recent heading above it regardless of level.
  */
 export function parseDocument(params: {
   path: string;

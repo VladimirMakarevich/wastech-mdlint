@@ -12,7 +12,7 @@ import type { ResolvedRule, ResolvedSettings } from "./types.js";
 
 // Re-exported from its new home so every existing importer — `format-lint-result.ts`, `src/index.ts`,
 // and both hosts through the barrel — keeps resolving `LintResult` from here. It moved to
-// `lint-corpus.ts` at P16.01 because that is the layer that now produces it.
+// `lint-corpus.ts`, which is the layer that now produces it.
 export type { LintResult } from "./lint-corpus.js";
 
 export type LintFilesInput = {
@@ -20,12 +20,13 @@ export type LintFilesInput = {
   config: LintConfig;
   rules: readonly ConfiguredRule[];
   settings: ResolvedSettings;
-  // Injected shared ContextGraph (R5). Undefined in P2 (no graph rules yet); the orchestrator
-  // builds and injects it starting P3.06, so GRP rules read one graph instead of building adjacency.
+  // Injected shared ContextGraph. Optional because a corpus with no graph-aware rules needs none;
+  // when GRP rules are active the orchestrator builds and injects one, so they read a single graph
+  // instead of each building its own adjacency.
   graph?: ContextGraph;
 };
 
-// Resolve config severity overrides and drop `"off"` rules (R1/C2) before running anything. Written
+// Resolve config severity overrides and drop `"off"` rules before running anything. Written
 // as a loop so TypeScript narrows `"off"` out of the override union after the guard.
 function activeRules(rules: readonly ConfiguredRule[]): ResolvedRule[] {
   const active: ResolvedRule[] = [];
@@ -44,18 +45,18 @@ function activeRules(rules: readonly ConfiguredRule[]): ResolvedRule[] {
 }
 
 /**
- * Run the full lint pipeline (P2.05) for a project: resolve the corpus scope from config, load and
+ * Run the full lint pipeline for a project: resolve the corpus scope from config, load and
  * parse it, resolve rule severities, build the shared graph, then hand all of that to
  * {@link lintCorpus}, which owns the step order from there.
  *
  * This function is the *discovery* half — everything that needs config and the filesystem. The split
  * exists so the ad-hoc text path (`lintContent`) reaches the same steps in the same order instead of
- * re-assembling them in a host (W-58).
+ * re-assembling them in a host.
  */
 export async function lintFiles(input: LintFilesInput): Promise<LintResult> {
   const rootDir = path.resolve(input.cwd);
 
-  // Corpus scope comes from the config layer (P13.02), so a zero-config run prunes `node_modules`
+  // Corpus scope comes from the config layer, so a zero-config run prunes `node_modules`
   // and friends without any host or caller having to remember to pass an `exclude`.
   const scope = resolveCorpusScope(input.config);
   const loaded = await loadDocuments(scope.include, {
@@ -71,13 +72,13 @@ export async function lintFiles(input: LintFilesInput): Promise<LintResult> {
     documents.set(document.path, document);
   }
 
-  // Build + inject one shared ContextGraph (R5 / audit 2.2). P4.01 wires siteRouter so graph edges
-  // resolve root-relative links identically to the REF rules; P4.06 adds idRef so id-ref edges
-  // materialize whenever the shared setting is configured. Those two settings are the builder's
-  // whole input: R5's proposed `exclude`/`entryPoints` were dropped from its options at P4.06
+  // Build + inject one shared ContextGraph. `siteRouter` makes graph edges
+  // resolve root-relative links identically to the REF rules; `idRef` makes id-ref edges
+  // materialize whenever that shared setting is configured. Those two settings are the builder's
+  // whole input: it deliberately takes no `exclude`/`entryPoints`,
   // because the graph is corpus-wide, so every rule reasons over the same relationships — which is why
   // every option the GRP rules do keep filters their *reporting* rather than the graph: GRP-002's
-  // `files`/`exclude`/`entryPoints` ([P11.13]) and GRP-001's `minCycleLength` ([P13.04]) all act on
+  // `files`/`exclude`/`entryPoints` and GRP-001's `minCycleLength` all act on
   // findings already produced. Callers may pass a graph to override (e.g. tests).
   const graph =
     input.graph ??

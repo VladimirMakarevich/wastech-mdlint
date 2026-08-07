@@ -351,7 +351,7 @@ describe("buildContextGraph · siteRouter resolution", () => {
     ]);
   });
 
-  // W-10 (P13.05): the builder's invariant is that its resolution mirrors the REF rules, and
+  // The builder's invariant is that its resolution mirrors the REF rules, and
   // REF-003 resolves a root-relative image target against the repository root — a router maps a URL
   // to Markdown source, never to an asset. So the same root-relative target yields a link edge and
   // no image edge.
@@ -404,7 +404,7 @@ describe("buildContextGraph · node identity matches loadDocuments() output dire
   });
 });
 
-// P12.05 (finding SC-3): `detectCycles`/`cyclePath` recurse once per node along the current DFS path,
+// Depth bound: `detectCycles`/`cyclePath` recurse once per node along the current DFS path,
 // so the supported depth — the longest simple path inside one connected component — is bounded by the
 // JS call stack rather than by anything in the code. A linear chain is the simplest shape that reaches
 // full depth, so these two tests use it to pin the documented bound empirically: DEPTH is the depth we
@@ -436,7 +436,7 @@ function deepChain(cyclic: boolean): Map<string, ParsedDocument> {
   return docs(entries);
 }
 
-describe("buildContextGraph · deep reference chains (P12.05 documented depth bound)", () => {
+describe("buildContextGraph · deep reference chains within the documented depth bound", () => {
   it(`builds a ${DEPTH}-deep acyclic chain without exhausting the stack`, () => {
     const graph = buildContextGraph(deepChain(false));
 

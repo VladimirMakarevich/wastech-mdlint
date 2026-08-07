@@ -36,8 +36,8 @@
 # WHERE THE MARKDOWN GATE LIVES (read this before moving `documentation`): that node edits the tree
 # AFTER the last `checks` node, and the mutation guard the core enforces is the green-but-dirtying
 # one — it only catches a check command that rewrote the tree, never a later node's edits. So the
-# `prettier --check .` gate this repository requires for every committed deliverable (AGENTS.md
-# "Quality gates") is enforced for the documentation node's own edits by its role prompt, not by the
+# `prettier --check .` gate this repository requires for every committed deliverable — docs
+# included — is enforced for the documentation node's own edits by its role prompt, not by the
 # graph. A second `checks` node after `documentation` would make it deterministic, at a real price:
 # command-set selection runs the union of sets matching the WHOLE task diff since base, so on any
 # code task it would re-run `npm ci` + typecheck + lint + test + build a second time, not just the

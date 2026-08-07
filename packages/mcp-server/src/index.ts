@@ -10,12 +10,11 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 
 import { registerTools } from "./tools/index.js";
 
-// The server shell (P7.01). Tools are registered through the modular seam in tools/index.ts — one
-// module per tool (M3) — so this file stays the transport/lifecycle owner, not a tool mega-file.
-// The six read-only tools land in P7.02–04 by appending to that seam; until then registerTools is a
-// no-op and no tools are advertised.
+// The server shell. Tools are registered through the modular seam in tools/index.ts — one
+// module per tool — so this file stays the transport/lifecycle owner, not a tool mega-file.
+// Every read-only tool is appended to that seam rather than registered here.
 // The invariants this shell locks in: transport is stdio-only and the server never loads
-// code-plugins (M8).
+// code-plugins.
 
 // Resolves relative to the compiled module (dist/index.js), one level under dist/, so the read
 // keeps finding packages/mcp-server/package.json regardless of the caller's cwd — the same
@@ -69,7 +68,7 @@ function realOrSelf(candidate: string): string {
 // not spin up a transport that seizes stdio, mirroring the CLI entrypoint guard. Both sides are
 // dereferenced (not just invokedPath): import.meta.url is only a realpath under Node's default
 // module resolution — under --preserve-symlinks/--preserve-symlinks-main it stays the symlink path
-// too, and an unresolved comparison there would silently reopen H-1 in that mode.
+// too, and an unresolved comparison there would reject a legitimate bin invocation in that mode.
 if (
   invokedPath !== undefined &&
   realOrSelf(path.resolve(invokedPath)) === realOrSelf(modulePath)

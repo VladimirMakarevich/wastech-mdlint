@@ -20,7 +20,7 @@ import {
 } from "../shared/tool-response.js";
 
 // `context-slice` — the files reachable within `depth` hops of a resolved query, following graph
-// edges forward. Query resolution is core's deterministic exact-match index (P4.04); this handler is
+// edges forward. Query resolution is core's deterministic exact-match index; this handler is
 // a thin adapter over `getContextSlice` and does not re-implement resolution or traversal.
 
 type ContextSliceToolInput = ToolFileInput & { query: string; depth?: number };
@@ -72,7 +72,7 @@ export async function handleContextSlice(
     );
 
     // An unresolved query is not an error: it returns `matchKind: null` with empty arrays. This is
-    // the G4/M2 "honest empty result" contract — do not throw.
+    // the honest-empty-result contract — do not throw.
     return successResult({
       summary: renderContextSliceSummary(result),
       structured: result,
@@ -99,7 +99,7 @@ export function registerContextSliceTool(server: McpServer): void {
     {
       title: "Compute a context slice",
       // Embeds the exact `SLICE_RESOLUTION_DESCRIPTION` string so the tool advertises the same honest
-      // exact-match semantics core promises (M2/AC2) instead of drifting into over-promising copy.
+      // exact-match semantics core promises, instead of drifting into over-promising copy.
       description:
         "Files reachable within `depth` hops of a resolved query, following graph edges forward. " +
         `${SLICE_RESOLUTION_DESCRIPTION} Read-only.`,

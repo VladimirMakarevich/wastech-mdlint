@@ -11,15 +11,14 @@ import {
 import { errorResult, READ_ONLY_ANNOTATIONS } from "../shared/tool-response.js";
 
 // `compile-context` — compile the project skill (the same deterministic `SKILL.md` the CLI's
-// `compile` command produces) over MCP. Core owns the whole pipeline (P5); this handler is a thin
+// `compile` command produces) over MCP. Core owns the whole pipeline; this handler is a thin
 // adapter.
 //
 // Unlike its five sibling tools, `compile-context` returns NO `structuredContent`/`outputSchema`:
-// the locked requirement M1 (docs/mdlint_v2/requirements/05-mcp-server.md) names the exact five
-// tools that get structured output (`lint`, `lint-files`, `context-graph`, `context-slice`,
-// `impact-analysis`) and pointedly omits this one, and the phase task file
-// (docs/mdlint_v2/P7-mcp-server/04-compile-tool.md) specifies "two content blocks" instead. Both
-// outrank the roadmap-summary bullet that reads as if all six tools are structured. So the
+// structured output is scoped to exactly five tools (`lint`, `lint-files`, `context-graph`,
+// `context-slice`, `impact-analysis`), and this one returns two content blocks instead. A compiled
+// SKILL.md is a document, not a record set: there is no field a client would read out of it that
+// the text does not already carry. So the
 // `registerTool` call omits `outputSchema` and the handler returns exactly two text blocks — hence
 // `successResult` (which always attaches `structuredContent`) is deliberately not reused here.
 

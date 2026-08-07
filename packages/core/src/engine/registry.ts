@@ -12,8 +12,8 @@ import type {
   TextEdit,
 } from "./types.js";
 
-// The single metadata source per rule (R6). One object drives the registry, `schema.json`
-// generation (P2.06), the README table (P3.09), `describeRules` (P5), and `init` categories (P6) —
+// The single metadata source per rule. One object drives the registry, `schema.json`
+// generation, the README table, `describeRules`, and `init` categories —
 // so those never drift from each other.
 export type RuleMetadata = {
   id: string;
@@ -22,7 +22,7 @@ export type RuleMetadata = {
   defaultSeverity: Severity;
   scope: RuleScope;
   fixable: boolean;
-  // The rule's documentation page (R6). Optional to *author* but always present on a defined rule:
+  // The rule's documentation page. Optional to *author* but always present on a defined rule:
   // `defineRule` fills it from the id by convention, and the runner copies it onto every finding as
   // `helpUri`. A rule may still override it if its page is ever not named after its id.
   docsUrl?: string;
@@ -56,7 +56,7 @@ export function defineRule<TSchema extends z.ZodType>(def: {
       ...def.metadata,
       // Derived here rather than repeated in 24 rule files: a rule that spelled its own URL could
       // disagree with the README table's link, and a rule that forgot one would emit a finding with
-      // no `helpUri` at all (which is what SEC-003/STR-001 shipped before P15.03).
+      // no `helpUri` at all — which is exactly what two rules once shipped.
       docsUrl: def.metadata.docsUrl ?? ruleDocsUrl(def.metadata.id),
       optionsSchema: def.optionsSchema,
     },
@@ -71,11 +71,11 @@ export function defineRule<TSchema extends z.ZodType>(def: {
 export type RuleResolutionCode = "UNKNOWN_RULE" | "INVALID_OPTIONS";
 
 // A validation issue decoupled from Zod's internal issue type (version-proof). Carries just what the
-// config loader needs to build a path-prefixed C7 message.
+// config loader needs to build a path-prefixed diagnostic message.
 export type ConfigIssue = { path: PropertyKey[]; message: string };
 
-// Thrown by resolveRule; the config loader (P2.04) catches it and prefixes the message with the
-// offending `rules[i]` path for a precise C7 diagnostic.
+// Thrown by resolveRule; the config loader catches it and prefixes the message with the
+// offending `rules[i]` path, so the diagnostic points at the entry the user wrote.
 export class RuleResolutionError extends Error {
   readonly code: RuleResolutionCode;
   readonly ruleName: string;
@@ -98,7 +98,7 @@ export class RuleResolutionError extends Error {
   }
 }
 
-// Classic Levenshtein for "did you mean" suggestions (C7). Small inputs (rule IDs), so the simple
+// Classic Levenshtein for "did you mean" suggestions. Small inputs (rule IDs), so the simple
 // O(n·m) matrix is fine.
 function editDistance(left: string, right: string): number {
   const rows = left.length + 1;
@@ -156,7 +156,7 @@ export class RuleRegistry {
       .sort((left, right) => compareStrings(left.id, right.id));
   }
 
-  // Reserved built-in prefixes (audit 3.5): the first segment of every built-in id. Derived from the
+  // Reserved built-in prefixes: the first segment of every built-in id. Derived from the
   // registry so custom-rule prefix validation never drifts as built-ins are added.
   getReservedPrefixes(): Set<string> {
     return new Set([...this.byId.keys()].map((id) => id.split("-")[0]!));
@@ -180,9 +180,10 @@ export class RuleRegistry {
   }
 
   /**
-   * Resolve a config rule entry to a runnable `Rule` (P2.03). Accepts any ID spelling (canonical,
-   * lower-case, dash-optional — C3), validates options via the rule's Zod schema, and throws a
-   * `RuleResolutionError` (unknown rule → did-you-mean; bad options → issue list) for C7 diagnostics.
+   * Resolve a config rule entry to a runnable `Rule`. Accepts any ID spelling (canonical,
+   * lower-case, dash-optional), validates options via the rule's Zod schema, and throws a
+   * `RuleResolutionError` (unknown rule → did-you-mean; bad options → issue list) that the config
+   * loader renders as a diagnostic.
    */
   resolveRule(name: string, rawOptions: unknown): Rule {
     const canonical = canonicalizeRuleId(name);

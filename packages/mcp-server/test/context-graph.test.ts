@@ -7,7 +7,7 @@ import type { ContextGraph, ContextGraphSummary } from "@wastech-mdlint/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { handleContextGraph } from "../src/tools/context-graph.js";
-// Shared with core and cli (P15.01): one 139-document corpus, not three copies.
+// Shared with core and cli: one 139-document corpus, not three copies.
 import {
   LARGE_CORPUS_DOCUMENT_COUNT,
   LARGE_CORPUS_ENTRY_POINT_COUNT,
@@ -57,7 +57,7 @@ describe("handleContextGraph", () => {
     );
 
     // The summary-only fields must be absent on the raw branch: `raw` means the verbatim
-    // `ContextGraph`, which is what P15.02's rename claims and what keeps the default branch free of
+    // `ContextGraph`, which is what the `raw` name claims and what keeps the default branch free of
     // coverage's disk re-scan.
     for (const field of [
       "components",
@@ -101,7 +101,7 @@ describe("handleContextGraph", () => {
       "orphan.md",
       "requirements.md",
     ]);
-    // W-23/W-22: both keys the CLI's `json` carries now reach MCP too. `excluded` explains the short
+    // Both keys the CLI's `json` carries now reach MCP too. `excluded` explains the short
     // reading order; `coverage` is the graph's best diagnostic and was unreachable from this host.
     expect(structured.excluded).toEqual(["cycle-a.md", "cycle-b.md"]);
     expect(structured.coverage).toEqual({
@@ -112,7 +112,7 @@ describe("handleContextGraph", () => {
   });
 
   it("names a linked-but-excluded file in coverage.filesOutsideCorpus", async () => {
-    // The G5 signal the field test called the graph report's single best diagnostic, and W-22's
+    // The coverage signal — the graph report's single best diagnostic — and the
     // reason for adding coverage here: an agent asking for the graph could not see that 12 linked
     // files were never linted. The shared `graph-project` fixture has no out-of-corpus file and
     // other suites assert its exact node set, so this scenario builds its own root rather than
@@ -153,7 +153,7 @@ describe("handleContextGraph", () => {
   });
 
   it("returns the human summary as the text block on both format branches", async () => {
-    // Nothing asserted the text block before P15.01, yet it is the graph report a host actually
+    // Nothing asserted the text block for a long time, yet it is the graph report a host actually
     // renders — and it is the same `formatContextGraphSummary` output regardless of `format`.
     const [raw, summary] = await Promise.all([
       handleContextGraph({ cwd: graphProject, format: "raw" }),
@@ -185,7 +185,7 @@ describe("handleContextGraph", () => {
 });
 
 describe("handleContextGraph at corpus scale", () => {
-  // The MCP text block is the same human report the CLI prints, so it inherits W-26's line-shape
+  // The MCP text block is the same human report the CLI prints, so it inherits the line-shape
   // fix — an exit criterion this suite is the only place to prove.
   let root: string;
 
@@ -215,7 +215,7 @@ describe("handleContextGraph at corpus scale", () => {
   }, 60_000);
 
   // @boundary-guard host-parity
-  // W-57 / P16.01 §5. This tool returns two documents for one call, and they are deliberately not the
+  // This tool returns two documents for one call, and they are deliberately not the
   // same view: the text block is `formatContextGraphSummary` (nodes/edges/cycles/entry points/hubs)
   // while `structuredContent` on the `summary` branch is the full `ContextGraphSummary`. What must
   // hold is that where they overlap they agree — the narrower one being *stale* rather than narrow is

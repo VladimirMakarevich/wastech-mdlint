@@ -85,8 +85,7 @@ function copyEdge(edge: ContextGraphEdge): ContextGraphEdge {
 
 // Everything a profile needs from the graph that does *not* depend on which document is being
 // profiled. Deriving it per document made `compileContext` O(N² + N·E) in corpus size: the role
-// classifier ran over every node N times and `graph.edges` was scanned twice per document
-// (audit L-5).
+// classifier ran over every node N times and `graph.edges` was scanned twice per document.
 type DocProfileGraphIndex = {
   roles: Map<string, NodeRole>;
   outgoing: Map<string, ContextGraphEdge[]>;
@@ -111,8 +110,8 @@ function indexGraph(
   graph: ContextGraph,
   options: GraphAnalysisOptions,
 ): DocProfileGraphIndex {
-  // P5.01 owns the degree classifier; profile extraction looks the role up there so P5.05 can
-  // thread `compile.hubMinInDegree` through one place instead of forked logic drifting. This
+  // `graph-analysis.ts` owns the degree classifier; profile extraction looks the role up there so
+  // `compile.hubMinInDegree` threads through one place instead of forked logic drifting. This
   // caches that classifier's result — it does not reimplement it.
   const roles = new Map(
     classifyNodes(graph, options).map((entry) => [entry.path, entry.role]),
@@ -122,8 +121,8 @@ function indexGraph(
 
   // Appending in `graph.edges` order preserves the graph's existing deterministic edge order,
   // which is already sorted by semantic identity and line number; re-sorting here would risk
-  // drifting from G1 semantics. A self-edge lands in both buckets, exactly as the two independent
-  // `filter` passes this replaces did.
+  // drifting from the ordering the graph itself guarantees. A self-edge lands in both buckets,
+  // exactly as the two independent `filter` passes this replaces did.
   for (const edge of graph.edges) {
     appendEdge(outgoing, edge.from, edge);
     appendEdge(incoming, edge.to, edge);
@@ -163,8 +162,8 @@ function buildProfile(
 /**
  * Profile documents against one graph, keyed by `document.path`. The only entry point: it indexes
  * the graph once per call, so a corpus costs one classifier pass and one edge pass rather than one
- * of each per document. A single-document caller passes a one-element iterable — W-40 removed the
- * `extractDocProfile` convenience wrapper, which was on the barrel with no caller at all.
+ * of each per document. A single-document caller passes a one-element iterable: the
+ * `extractDocProfile` convenience wrapper was removed, having sat on the barrel with no caller.
  */
 export function extractDocProfiles(
   documents: Iterable<ParsedDocument>,

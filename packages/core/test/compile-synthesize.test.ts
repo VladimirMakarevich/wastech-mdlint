@@ -128,7 +128,7 @@ describe("synthesize", () => {
     ).not.toThrow();
   });
 
-  it("throws when name or description is empty (S1 validation)", () => {
+  it("throws when name or description is empty", () => {
     expect(() =>
       synthesize(input({ skill: { name: "", description: "x" } })),
     ).toThrow();
@@ -290,7 +290,7 @@ describe("synthesize", () => {
     );
   });
 
-  it("carries the degrees the Role bucket rounds off in a Refs column (W-28)", () => {
+  it("carries the degrees the Role bucket rounds off in a Refs column", () => {
     // The role vocabulary collapses at scale — `hub` and `isolated` hold 86% of the 139-document
     // fixture — so the row must let a reader tell a 3-reference hub from a 124-reference one.
     const edge = (from: string, to: string): ContextGraphEdge => ({
@@ -377,7 +377,7 @@ describe("synthesize", () => {
     expect(block).toContain("1. Mind the Context Budget");
   });
 
-  it("renders cycles and excluded-from-reading-order explicitly (G6)", () => {
+  it("renders cycles and excluded-from-reading-order explicitly", () => {
     const result = synthesize(
       input({
         documentPaths: ["a.md", "b.md", "c.md"],
@@ -393,7 +393,7 @@ describe("synthesize", () => {
     expect(result.skillContent).toContain("- `a.md -> b.md -> a.md`");
     // One excluded path per bullet: the field test measured this as a 3702-character single line.
     // Uncapped, unlike the fan-out — a document missing from reading order with no explanation is
-    // exactly the G6 dishonesty this block exists to prevent.
+    // exactly the silent truncation this block exists to prevent.
     expect(result.skillContent).toContain(
       ["Excluded from reading order (2):", "", "- `a.md`", "- `b.md`"].join(
         "\n",
@@ -432,7 +432,7 @@ describe("synthesize", () => {
     ).toBe(true);
   });
 
-  it("does not claim an empty corpus when every document is cycle-excluded (G6)", () => {
+  it("does not claim an empty corpus when every document is cycle-excluded", () => {
     // Finding: an all-cyclic corpus has `readingOrder: []` but a non-empty corpus, so the Reading
     // Order block must not fall back to the same "(no documents found)" text an actually-empty
     // corpus gets — those are different facts.
@@ -469,7 +469,7 @@ describe("synthesize", () => {
     expect(readingOrderBlock).toContain("(no documents found)");
   });
 
-  describe("bounded References section (W-27)", () => {
+  describe("bounded References section", () => {
     function inboundEdges(to: string, count: number): ContextGraphEdge[] {
       return Array.from({ length: count }, (_unused, index) => ({
         from: `docs/area-01/topic-${String(index).padStart(3, "0")}.md`,
@@ -515,7 +515,7 @@ describe("synthesize", () => {
       expect(
         lines.filter((line) => line.startsWith("  - `docs/area-01/")),
       ).toHaveLength(10);
-      // The 17 530-character single line W-27 measured is gone.
+      // The 17 530-character single line this replaced is gone.
       expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(
         200,
       );
@@ -701,7 +701,7 @@ describe("synthesize", () => {
     expect(result.metadata.ruleCount).toBe(3);
     expect(result.metadata.componentCount).toBe(2);
     expect(result.metadata.contentHash).toMatch(/^[0-9a-f]{16}$/);
-    // S4 exit criterion: the provenance line must actually be present in `skillContent`, and its
+    // The provenance line must actually be present in `skillContent`, and its
     // embedded hash must be the exact same value returned in `metadata.contentHash` — a regression
     // that drops or mismatches this line would otherwise pass unnoticed.
     expect(result.skillContent).toContain(
@@ -813,7 +813,7 @@ describe("synthesize", () => {
 
   it("renders a CJK skill name and description intact in frontmatter and the heading", () => {
     // Finding: JSON.stringify does not escape non-ASCII BMP characters, so the hand-rolled YAML
-    // frontmatter renderer passes CJK through byte-for-byte — this pins that (S1 has no ASCII
+    // frontmatter renderer passes CJK through byte-for-byte — this pins that (the schema has no ASCII
     // assumption), it doesn't change any rendering code.
     const result = synthesize(
       input({

@@ -25,7 +25,7 @@ import { lintConfigSchema, type LintConfig } from "./config-schema.js";
 import { findConfig } from "./find-config.js";
 
 // A resolved rule paired with its config severity override. Final severity resolution and `"off"`
-// filtering happen in the orchestrator (P2.05), so an "off" rule is still resolved here (its options
+// filtering happen in the orchestrator, so an "off" rule is still resolved here (its options
 // are validated even while disabled).
 export type ConfiguredRule = { rule: Rule; severity?: SeverityOverride };
 
@@ -36,8 +36,8 @@ export type LoadedConfiguration = {
   settings: ResolvedSettings;
 };
 
-// Zero-config default (P2.04 journal): lint every Markdown file with no rules — a clean pass. `init`
-// (P6) writes a real ruleset.
+// Zero-config default: lint every Markdown file with no rules — a clean pass. `init`
+// writes a real ruleset.
 function defaultConfiguration(): LoadedConfiguration {
   return {
     config: { include: ["**/*.md"], rules: [] },
@@ -56,7 +56,7 @@ async function fileExists(filePath: string): Promise<boolean> {
 }
 
 // Stage 2's issues, re-anchored onto the same absolute paths stage 1 uses so both stages render
-// through `formatConfigIssue` (P13.06). The rule-relative paths a `RuleResolutionError` carries
+// through `formatConfigIssue`. The rule-relative paths a `RuleResolutionError` carries
 // (e.g. ["options", "maxBytes"] or ["id"]) become ["rules", index, …].
 function formatRuleResolutionError(
   index: number,
@@ -88,7 +88,7 @@ function formatRuleResolutionError(
  *
  * Those messages are printed verbatim by the CLI (`program.ts`) and returned verbatim by MCP
  * (`tool-response.ts`), so an interpolated absolute path leaks the checkout location and breaks the
- * POSIX-relative-path invariant every other report in the product honors (P11.10, audit M-6).
+ * POSIX-relative-path invariant every other report in the product honors.
  *
  * The anchor is `params.cwd` because that is the only one core has — deliberately *not* a repo root,
  * which core never computes. Hosts pass the directory being analyzed (for `lint`/`graph`/`slice`/
@@ -96,8 +96,8 @@ function formatRuleResolutionError(
  * `lint docs` renders as `../wastech-mdlint.config.json`: relative and pointing at the file actually
  * read, which is the contract, rather than repo-root-anchored.
  *
- * Since P14.04 an explicit config path is *resolved* against `params.cwd` too, so resolution and
- * rendering finally share one base. That is what makes `Config file not found:` name the path the
+ * An explicit config path is *resolved* against `params.cwd` too, so resolution and
+ * rendering share one base. That is what makes `Config file not found:` name the path the
  * user actually typed: while the two disagreed, `lint proj --config cfg.json` reported
  * `../cfg.json` — a path nobody wrote, produced by relativizing a process-cwd lookup against the
  * lint root.
@@ -131,7 +131,7 @@ function parseJsoncConfig(text: string, displayPath: string): unknown {
 }
 
 // `displayPath` is threaded in rather than recomputed because every diagnostic must name the config
-// file being read (P13.06): an ancestor directory's config can govern a run, so "which file?" is a
+// file being read: an ancestor directory's config can govern a run, so "which file?" is a
 // real question, and this stage used to answer it with a bare `Invalid config:`.
 function resolveRules(
   config: LintConfig,
@@ -174,14 +174,14 @@ function resolveRules(
 }
 
 /**
- * Load and fully validate the v2 config (P2.04).
+ * Load and fully validate the v2 config.
  *
- * Two-stage validation: the root shape is checked by `lintConfigSchema` (C7 diagnostics for unknown
+ * Two-stage validation: the root shape is checked by `lintConfigSchema` (diagnostics for unknown
  * keys), then each `rules[]` entry is resolved through the registry, which validates its options and
  * surfaces path-prefixed / did-you-mean errors. Returns the validated config, the resolved rules
  * (with severity overrides), and the resolved settings.
  *
- * **One base for `explicitConfigPath`: `params.cwd`** (P14.04 / W-16) — the directory being analyzed,
+ * **One base for `explicitConfigPath`: `params.cwd`** — the directory being analyzed,
  * which is `[path]` for `lint`/`graph`, the CLI's own cwd for `slice`/`impact`, `--cwd` for `compile`,
  * and the tool `cwd` for the five file-based MCP tools. It used to resolve against `process.cwd()`
  * instead, which silently diverged whenever a host analyzed a different directory than the shell was
@@ -208,7 +208,7 @@ export async function loadConfiguration(params: {
       "CONFIG_NOT_FOUND",
       `Config file not found: ${displayConfigPath(params.cwd, explicitConfigPath)}`,
       // Names the base, because the message above names a *relative* path and a reader has no other
-      // way to tell which directory it was looked for under (P14.04).
+      // way to tell which directory it was looked for under.
       "Check that configPath/cwd points to an existing wastech-mdlint.config.json — a relative configPath is resolved against the directory being analyzed — or omit it to use the zero-config default.",
     );
   }

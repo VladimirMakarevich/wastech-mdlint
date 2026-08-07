@@ -11,12 +11,12 @@ import { CUSTOM_RULE_DOCS_URL } from "../rule-docs-url.js";
 import { matchesFileScope } from "./scope.js";
 import type { Rule } from "../types.js";
 
-// Declarative custom rule (P3.08 / R9 Tier 1). Composed purely from the closed primitive vocabulary
-// — no code execution — so it is safe inside the MCP server (M8). Its id is user-chosen and cannot
+// Declarative custom rule. Composed purely from the closed primitive vocabulary
+// — no code execution — so it is safe inside the MCP server. Its id is user-chosen and cannot
 // shadow built-ins.
 
-// Namespaced id grammar (audit 3.5): uppercase dash-separated, at least one dash. Exported so
-// config-writer.ts (P6.04) can mirror this exact authoritative grammar for a preserved-on-merge
+// Namespaced id grammar: uppercase dash-separated, at least one dash. Exported so
+// config-writer.ts can mirror this exact authoritative grammar for a preserved-on-merge
 // custom rule instead of keeping a second hand-copied regex that could silently drift from this one.
 export const CUSTOM_ID_GRAMMAR = /^[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$/;
 
@@ -42,9 +42,9 @@ function invalid(
 }
 
 /**
- * Resolve a `{ rule: "custom", ... }` config entry into a runnable Rule (P3.08). Enforces the
+ * Resolve a `{ rule: "custom", ... }` config entry into a runnable Rule. Enforces the
  * namespaced id grammar and — authoritatively — that its prefix does not shadow a built-in
- * (reserved prefixes derived from the registry, audit 3.5). Scope is derived from the assert kind
+ * (reserved prefixes derived from the registry). Scope is derived from the assert kind
  * (columnUnique ⇒ project).
  */
 export function resolveCustomRule(
@@ -94,7 +94,7 @@ export function resolveCustomRule(
     scope,
     fixable: false,
     // A custom id is user-chosen, so there is no page named after it; the mechanism's page is the
-    // documentation a reader of one of its findings actually needs (P15.03).
+    // documentation a reader of one of its findings actually needs.
     docsUrl: CUSTOM_RULE_DOCS_URL,
     check: (context) => {
       if (scope === "project") {
