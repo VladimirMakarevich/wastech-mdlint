@@ -33,6 +33,7 @@
     "test": "vitest run",
     "typecheck": "tsc -b",
     "lint": "eslint .",
+    "lint:docs": "node packages/cli/dist/index.js lint . --fail-on error",
     "format": "prettier --check .",
     "prepack": "npm run build",
     "release:check": "npm run typecheck && npm test && npm run build && npm pack --dry-run --workspaces"

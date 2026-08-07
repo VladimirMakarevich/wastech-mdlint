@@ -35,4 +35,4 @@
 
 ## Not needed
 
-- **I8 — migration.** The project is **greenfield** (no released users; `v0.0.0`). No migration guide or `migrate` command is built; the repo's own config is simply rewritten in the new shape. Confirms [D2](../index.md).
+- **I8 — migration.** The project is **greenfield** (no released users; `v0.0.0`), so there is nothing to migrate: no migration guide and no `migrate` command is built. This repository's own config was written directly in the v2 shape rather than converted — a root `wastech-mdlint.config.json` in JSONC with a local `$schema`, scoped to `docs/**/*.md` + `README.md` and enforcing `REF-001`/`REF-002` in CI ([P17.02](../P17-plan-of-record/02-self-linting-config.md)). Confirms [D2](../index.md).
