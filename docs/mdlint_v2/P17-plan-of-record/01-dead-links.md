@@ -8,7 +8,7 @@ Clear every dead link inside the plan of record, so that [P17.02](02-self-lintin
 
 ## Problem
 
-**W-43 — 17 dead links inside the plan.** Reproduced by the product's own `REF-001` with an externally supplied config: exactly **17 problems**. They break down as:
+**W-43 — 17 dead links inside the plan.** Reproduced by the product's own `REF-001` with an externally supplied config: exactly **17 problems**. Re-run in the current tree after P13–P16, over `docs/**/*.md` + `README.md` with `REF-001`/`REF-002` enabled: still exactly 17, all `REF-001`, at the same sites. The round that added 60-odd plan files introduced no new dead link. They break down as:
 
 - **11 links across 9 files** point at a report removed in `d96b64c`. Verified in the current tree: 11 markdown-link occurrences across 9 files (there are further bare-code-span mentions of the same name, which are **not** links and must not be swept as if they were). **Five of the 11 are `Status **Done**` task-file header lines whose sole citation for the defect the task claims to fix is the missing file** — which is the half that matters, because it means the evidence for five completed tasks is unreachable.
 - **Four** point into gitignored `tasks/pending/`.

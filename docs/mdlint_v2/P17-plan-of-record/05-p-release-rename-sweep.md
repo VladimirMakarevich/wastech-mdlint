@@ -4,7 +4,9 @@
 
 ## Goal
 
-Finish a rename that was applied to one directory and never swept: `P9-release` became `P-release`, and nineteen lines still assign release work to `P9` — **seven in the plan** (W-45), **eleven in shipped artifacts and CI** (W-46), plus `README.md:34`, which W-46's fix adds as the same class through a different mechanism. The two halves are swept differently: the plan half is prose in tiers 1 and 2, the artifact half includes published skill frontmatter and a user-visible CI log line.
+Finish a rename that was applied to one directory and never swept: `P9-release` became `P-release`, and lines across the tree still assign release work to `P9` — **seven in the plan** (W-45), **four in shipped artifacts and CI** (W-46, down from eleven), plus `README.md:35`, which W-46's fix adds as the same class through a different mechanism. The two halves are swept differently: the plan half is prose in tiers 1 and 2, the artifact half is published skill frontmatter and a user-visible CI log line.
+
+> **Re-derived after P13–P16.** The artifact half shrank from eleven lines to four. Enforcing self-contained code comments during that round deleted every planning-tag comment in product code, CI, and tests — which took seven of W-46's sites with it as a side effect, along with the twelfth candidate this task was to decide. What survives is the half that is **not** a comment: three `compatibility:` strings in published skill frontmatter and one `run: echo` line users read in a CI log. W-45's seven plan sites are untouched, because prose in a task file is not a code comment. Counts below are as re-verified in the current tree.
 
 ## Problem
 
@@ -20,28 +22,24 @@ The release phase was renamed from `P9-release` to `P-release` in `573d4f6`, a c
 
 **Three of the six locked requirements documents — precedence tier 2 — assign accepted requirements to P9**, two of them naming work that shipped in P7.05 and P8.05. So a tier-2 document and a tier-1 index now contradict each other about what P9 is. `P10.02` closed this class **in the glossary alone** and says so, which is why the rest survived.
 
-**W-46 — eleven stale lines in shipped artifacts.** Verified in the current tree, ten of them in shipped artifacts across six files plus one test comment:
+**W-46 — four stale lines in shipped artifacts.** Re-verified in the current tree; a full `git grep -n P9 -- ':!docs/'` returns these four plus the correct-sense references in step 3 and lockfile hash noise:
 
 | Site | Kind |
 | --- | --- |
-| `packages/core/src/discovery/config-writer.ts:170`, `:171` | shipped core runtime, naming the composite Action as P9.03 |
-| `.github/workflows/ci.yml:44` | shipped CI comment |
-| `.github/workflows/publish.yml:5`, `:7`, `:19`, `:43` | shipped CI; `:43` is a **user-visible log line** |
-| `skills/wastech-mdlint-init/SKILL.md:5`, `skills/wastech-mdlint-fix/SKILL.md:5`, `skills/wastech-mdlint-impact/SKILL.md:5` | **published skill frontmatter** |
-| `packages/cli/test/init.e2e.test.ts:1249` | test comment, not a shipped artifact |
+| `skills/wastech-mdlint-init/SKILL.md:5`, `skills/wastech-mdlint-fix/SKILL.md:5`, `skills/wastech-mdlint-impact/SKILL.md:5` | **published skill frontmatter** — `compatibility:` promises a release "from one P9 single-tag release" |
+| `.github/workflows/publish.yml:43` | shipped CI, a **user-visible log line**: `Single-tag release … lands in P9 (I4)` |
 
-**Why it matters:** three of the sites are published skill frontmatter promising users a release that no longer has that name, and one is a CI log line users read. And this survived `P10-consistency/03-stale-comments.md` — a phase whose explicit job was cleaning stale source comments, marked Done.
+**Seven sites are already gone, and it is worth knowing why** — so a sweep does not go looking for them. `config-writer.ts` (2 lines), `ci.yml` (1), `publish.yml` (3 of its 4), one test comment, and the twelfth candidate in `compile/skill-frontmatter.ts` were all **comments**, and the self-contained-comment rule adopted during P13–P16 removed every planning tag from code, CI, and test comments. The rule is now in `.agents/rules/coding-style.md`, so those sites cannot come back in that form. Nothing decided the P8.05-versus-P9 question the twelfth candidate posed; the comment carrying it was simply deleted, which closes it.
 
-A twelfth candidate at `packages/core/src/compile/skill-frontmatter.ts:4` names "P9's CI check" for what shipped as P8.05 — softer than the others, because the check it names does exist.
+**Why the remainder still matters:** the three survivors are published skill frontmatter promising users a release that no longer has that name, and the fourth is a CI log line users read. All four are **values**, not comments, which is exactly why the comment sweep did not reach them. And the original class survived `P10-consistency/03-stale-comments.md` — a phase whose explicit job was cleaning stale source comments, marked Done.
 
 ## Deliverables / steps
 
 1. **Sweep the plan (W-45):** all seven sites in the table above — the three phase indexes, the three locked requirements documents, and `requirements/index.md:14`. The tier-2 documents are the priority: a locked requirement contradicting an index about what a phase is called is worse than a summary doing it.
-2. **Edit the eleven enumerated lines (W-46)**, plus `README.md:34`, which still describes the shipped MCP surface in future tense by phase — the same class, different mechanism, and an eighth file.
-3. **Do not sweep by pattern.** The audit checked the rest of the tree and found the references to **`P9.04`, `P9.06`, and `P9.07` are all correct** — `P9` still names the post-audit remediation phase, and only the _release_ sense of it is stale. Two live examples a blind `s/P9/P-release/` would break: `.github/workflows/ci.yml:16` (`M-6 / P9.06`, the format gate) and `requirements/06-installation.md:30` ("audit P9 engines gap"), which sits in a file this task **does** edit at `:3` — so the same file needs one line changed and one left alone. Edit the enumerated lines, then re-grep and classify each remaining hit by what it refers to.
-4. **Decide the twelfth candidate** deliberately: correct `skill-frontmatter.ts:4` to P8.05, or leave it and say why in the change. Silence here is how it becomes a thirteenth finding.
-5. **Regenerate rather than hand-edit** anything generated. The three `SKILL.md` files are published artifacts; check whether their frontmatter is generated or authored before editing, and if generated, fix the generator.
-6. **Note the shipped-runtime consequence.** `config-writer.ts:170-171` is core runtime that `init` reads when writing a CI workflow template; changing a comment there is safe, but confirm the comment is not load-bearing for the template's `uses:`-versus-inline decision, which it explains.
+2. **Edit the four enumerated lines (W-46)**, plus `README.md:35`, which still describes the shipped MCP surface in future tense by phase (`lint`/`lint-files` "ship in P7.02" …) — the same class, different mechanism, and a fifth file. All five are user-visible strings; none is a comment.
+3. **Do not sweep by pattern.** `P9` still names the post-audit remediation phase, and only the _release_ sense of it is stale. Four live examples a blind `s/P9/P-release/` would break, re-derived in the current tree: `AGENTS.md:89` and `:99`, `.agents/rules/architecture.md:51` (the roadmap order), `.agents/rules/testing.md:29` (the post-P9 audit the boundary-guard categories rest on), and `requirements/06-installation.md:30` ("audit P9 engines gap") — the last of which sits in a file this task **does** edit at `:3`, so the same file needs one line changed and one left alone. (The `ci.yml` format-gate reference the backlog paired with it is gone; it was a comment.) Edit the enumerated lines, then re-grep and classify each remaining hit by what it refers to.
+4. **Hand-edit the skill frontmatter — it is authored, not generated.** Verified: `scripts/generate-docs.mjs` writes exactly two files, `packages/cli/schema.json` and the README's generated block, and touches nothing under `skills/`. So there is no generator to fix here, and no regeneration step to run.
+5. **Say what the compatibility strings should say instead.** They are a version-coupling promise, not a phase reference: the useful form names the coupling (one tag ships the CLI and the skills together) without naming a phase that will be renamed again. Whatever is chosen lands in all three files identically, since they are three copies of one sentence.
 
 ## Out of scope
 
@@ -50,9 +48,8 @@ Renaming anything else, and re-opening the `P9-release` → `P-release` decision
 ## Exit criteria
 
 - [ ] All seven plan sites — three phase indexes, three locked requirements documents, and `requirements/index.md:14` — no longer assign release work to `P9`.
-- [ ] The eleven enumerated lines plus `README.md:34` are corrected.
+- [ ] The four enumerated artifact lines plus `README.md:35` are corrected.
 - [ ] Every remaining `P9` outside `docs/` either names the remediation phase correctly or is gone — verified by a re-grep with each hit classified, not by a pattern replace.
-- [ ] `.github/workflows/ci.yml:16` and `requirements/06-installation.md:30` are **untouched** — both name the remediation phase correctly.
-- [ ] The three published `SKILL.md` frontmatter lines are correct, via the generator if they are generated.
-- [ ] `skill-frontmatter.ts:4` is corrected or deliberately left, stated in the change.
+- [ ] `AGENTS.md:89`/`:99`, `.agents/rules/architecture.md:51`, `.agents/rules/testing.md:29`, and `requirements/06-installation.md:30` are **untouched** — all name the remediation phase correctly.
+- [ ] The three `SKILL.md` `compatibility:` strings carry the same replacement sentence and no phase name.
 - [ ] Gates green, including `npm run format`.

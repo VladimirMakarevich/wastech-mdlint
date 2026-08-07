@@ -1,6 +1,6 @@
 # Phase P15 — Output contracts & rendering at real scale
 
-> Roadmap: [v2 Index](../index.md) · Phase **P15** · Size **M** · Status **Not started** · Depends on [P14](../P14-host-boundary/index.md) (host boundary landed).
+> Roadmap: [v2 Index](../index.md) · Phase **P15** · Size **M** · Status **Done** · Depends on [P14](../P14-host-boundary/index.md) (host boundary landed).
 >
 > **Goal:** make one format name denote one shape, make every documented output contract match what ships, and make the two human-facing renderers usable on a corpus nobody designed for. Sourced from the [consolidated remediation backlog](../remediation-backlog-2026-08-05.md), batches **B8–B9** plus the documentation half of **B11**.
 
@@ -35,17 +35,17 @@ Two distinct problems land here, and they are separated by what could see them.
 
 ## Phase exit criteria
 
-- [ ] At 139 nodes, no line in `graph --format human` exceeds a stated width, and `json`/`mermaid`/`dot` stay byte-stable (W-26).
-- [ ] A 139-document corpus produces a `SKILL.md` whose dependency section is bounded and whose longest line is under a stated cap, with determinism and the content hash preserved (W-27).
-- [ ] No single node role holds a near-majority of a realistic corpus, or the coarseness is stated where the `Role` column is documented (W-28).
-- [ ] `coverage` is documented on all five surfaces and reachable from both hosts; one format name denotes one shape (W-22).
-- [ ] The `excluded from reading order` set exists in both formats, with parity asserted by a test (W-23).
-- [ ] One word means "plain text for a human" across the CLI, or the split is deliberate and stated (W-25).
-- [ ] Each host's lint JSON shape is documented where a consumer looks, and no source comment claims they are one (W-24).
-- [ ] The documented message-key set matches the emitted set; `helpUri` either resolves or is renamed (W-35).
-- [ ] Every statement of the token heuristic in the tree agrees with the code, and a reader of a `tokens` finding can learn the calibration without reading source (W-34).
-- [ ] R6's `docsUrl`/`messages` are populated and read, or dropped with the requirement amended (W-36).
-- [ ] Gates green.
+- [x] At 139 nodes, no line in `graph --format human` exceeds a stated width, and `json`/`mermaid`/`dot` stay byte-stable (W-26).
+- [x] A 139-document corpus produces a `SKILL.md` whose dependency section is bounded and whose longest line is under a stated cap, with determinism and the content hash preserved (W-27).
+- [x] No single node role holds a near-majority of a realistic corpus, or the coarseness is stated where the `Role` column is documented (W-28).
+- [x] `coverage` is documented on all five surfaces and reachable from both hosts; one format name denotes one shape (W-22).
+- [x] The `excluded from reading order` set exists in both formats, with parity asserted by a test (W-23).
+- [x] One word means "plain text for a human" across the CLI, or the split is deliberate and stated (W-25).
+- [x] Each host's lint JSON shape is documented where a consumer looks, and no source comment claims they are one (W-24).
+- [x] The documented message-key set matches the emitted set; `helpUri` either resolves or is renamed (W-35).
+- [x] Every statement of the token heuristic in the tree agrees with the code, and a reader of a `tokens` finding can learn the calibration without reading source (W-34).
+- [x] R6's `docsUrl`/`messages` are populated and read, or dropped with the requirement amended (W-36).
+- [x] Gates green.
 
 ## What P15 unblocks
 

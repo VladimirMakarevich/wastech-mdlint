@@ -10,13 +10,15 @@ Make the accepted-behaviors register satisfy its own contract — it is where ev
 
 **W-48 — the register fails its own three rules, at three sites.**
 
-1. Row `:24` names `docs/guide/output.md` as the home of the leftover-`schema.json` behavior; that page contains **zero** occurrences of "schema" (verified). The behavior **is** stated for users, at `docs/guide/cli.md:127` — so the defect is the pointer, not a missing home.
-2. The id-ref-inside-a-code-fence inflation was accepted **twice in task files** and has no row, though it inflates `impact`, `slice`, and `GRP-002`.
-3. Dangling reference-style links invisible to `REF-001` were accepted and given a README home, but never a row.
+1. Row `:24` names `docs/guide/output.md` as the home of the leftover-`schema.json` behavior. That page's **only** occurrence of the word "schema" is in the `helpUri` row, about the MCP `outputSchema` — nothing there states this behavior. (The backlog says "zero occurrences"; that was true when it was written and the one occurrence has since arrived from an unrelated change, so re-verify by reading the page rather than by counting.) The behavior **is** stated for users, on `docs/guide/cli.md` in the `init` `$schema` bullets at `:140`–`:141` — so the defect is the pointer, not a missing home.
+2. The id-ref-inside-a-code-fence inflation was accepted **twice in task files** (`P4-graph/01-context-graph-model.md:51` and `P9-remediation/08-idref-prose-scan.md`) and has no row, though it inflates `impact`, `slice`, and `GRP-002`.
+3. Dangling reference-style links invisible to `REF-001` were accepted and given a README home (`README.md:239`), but never a row.
+
+All three re-verified in the current tree after P13–P16.
 
 **Consequence:** `P12-consistency/06-process-boundary-tests.md:72` claims each accepted behavior has a home "confirmed to exist and to state it". Site 1 falsifies that.
 
-**And the register flags one row against itself.** Row `:39` — the `init` draft a user confirms does not name the project-local `schema.json` the `npx` path writes, only the after-the-fact write summary does — is marked **deferred rather than accepted**, and its own reason column calls it "the one row here a future task should close rather than keep". It is a gap against the warn-before-confirming discipline, not a behavior anyone chose. Leaving a self-flagged row untouched while fixing the register's other three failures is the one outcome to avoid.
+**And the register flags one row against itself.** The `init`-draft row — the draft a user confirms does not name the project-local `schema.json` the `npx` path writes, only the after-the-fact write summary does — is marked **deferred rather than accepted**, and its own reason column calls it "the one row here a future task should close rather than keep". It is a gap against the warn-before-confirming discipline, not a behavior anyone chose. It now sits in the **Recorded residuals** table at `:61` (the backlog's `:39` citation predates the rows P13–P16 added; locate it by its text). Leaving a self-flagged row untouched while fixing the register's other three failures is the one outcome to avoid.
 
 **W-49 — live Prettier corruption in a phase task file.** `P7-mcp-server/02-lint-tools.md:35` has been destructively rewritten where a glob-bearing code span was nested inside a bold span: the inline delimiters were eaten and the sentence is unreadable as authored (`**/_.md` where `**/*.md` was written, with the surrounding spacing collapsed). `proseWrap: "never"` is why the gate cannot see it — **the format gate passes on the damage.** The class grep returns exactly one site.
 
@@ -35,15 +37,16 @@ This is W-44's mechanism exactly — a load-bearing document removed as a side e
 
 ## Deliverables / steps
 
-1. **W-48:** repoint row `:24` at `docs/guide/cli.md:127`, and add the two missing rows.
-2. **W-48 — dispose of row `:39`.** Close it (name the schema in the `init` draft — a small [`init-command.ts`](../../../packages/cli/src/init-command.ts) change, which makes this task `docs, code` rather than docs-only) or re-classify it as genuinely accepted with a stated reason.
-3. **W-48 — this is where the phase's decisions land.** Every **decision** item across P13–P16 terminates here if it resolves to "accept": [P13.04](../P13-correctness/04-rule-option-defaults.md)'s `GRP-001` severity, [P14.03](../P14-host-boundary/03-init-disclosure.md)'s hidden-directory default, [P14.05](../P14-host-boundary/05-mcp-error-contract.md)'s two, [P15.01](../P15-output-contracts/01-renderers-at-scale.md)'s role vocabulary, [P16.03](../P16-release-readiness/03-published-payload.md)'s engines question, [P16.05](../P16-release-readiness/05-low-severity-cleanups.md)'s two. Run this task **after** those have decided, and verify each row has a real user-facing home rather than a plausible-looking pointer — which is site 1's exact failure mode.
-4. **W-49:** retype the corrupted line, avoiding the construct. The standing rule already exists in the backlog and in `AGENTS.md`; this is the live instance.
-5. **W-51:** add `schema` to both command lists at `index.md:17` and `:83`, and move `schema.json` in the tree diagram at `:87` to `packages/cli/`.
-6. **W-51a:** bring the glossary's **Milestone (M1–M4)** entry in line with the roadmap's §7 list by adding P13–P17 to M4.
-7. **W-52a — restore what `add1ee5` dropped, deliberately rather than by revert.** The glossary's `> **Status:**` header and its **Maintenance rule** come back (the rule is quoted in three governance files, so the canonical statement belongs in the document they point at); the "Shipped vs planned" roll-up does **not** need restoring as a second roll-up — [P17.04](04-completion-surface.md) maintains the surviving **Phase** entry, and reintroducing a duplicate would recreate W-42's two-places-to-drift shape. For `AGENTS.md`, decide where the two orphaned statements live: the audit-to-phase derivation (needed by W-52's argument) and the `Previous`/`Next`/`Depends on`/`Blocks` task-chain rule, which `.agents/rules/architecture.md` states only for `Depends on`-style chains. Whatever is chosen, `CLAUDE.md`'s pointer must resolve when this task is done.
-8. **W-52 — cheapest sufficient option:** one line at each report's head stating the language, plus an English rendering of the two finding tables — the parts the plan actually cites. Or record the choice, since the audits are frozen by policy. **Not a blocker for anything**, and the QA pass's disagreement about its value should be recorded alongside whatever is done.
-9. **Update `P12-consistency/06-process-boundary-tests.md:72`** if its claim is still not literally true after the register is fixed.
+1. **W-48:** repoint row `:24` at the `init` `$schema` bullets on `docs/guide/cli.md`, and add the two missing rows.
+2. **W-48 — dispose of the self-flagged `init`-draft residual.** Close it (name the schema in the `init` draft — a small [`init-command.ts`](../../../packages/cli/src/init-command.ts) change, which makes this task `docs, code` rather than docs-only) or re-classify it as genuinely accepted with a stated reason.
+3. **W-48 — this is where the phase's decisions land, and they have all landed.** Every **decision** item across P13–P16 terminated here as an accept, and the rows already exist: `GRP-001`'s two-node floor and `GRP-002.entryPoints` replace-not-extend ([P13.04](../P13-correctness/04-rule-option-defaults.md), rows `:35`–`:37`), the hidden-directory default and `compile`'s own outdir ([P14.03](../P14-host-boundary/03-init-disclosure.md), `:26`–`:27`), the MCP schema-rejection and `OPERATIONAL_ERROR` path bounds ([P14.05](../P14-host-boundary/05-mcp-error-contract.md), `:39`–`:40`), the role vocabulary and the cycle elision ([P15.01](../P15-output-contracts/01-renderers-at-scale.md), `:41`–`:42`, `:45`), the `engines` floor ([P16.03](../P16-release-readiness/03-published-payload.md), `:50`), and `init`'s 8-of-24 inference ([P16.05](../P16-release-readiness/05-low-severity-cleanups.md), `:49`, plus a re-homed residual at `:62`). So this step is **verification, not authoring**: open each row's cited page and confirm it states the behavior, rather than reading the pointer — a plausible-looking pointer is site 1's exact failure mode. Add a row only where a decision has none.
+4. **W-48 — and one row must be deleted, not verified.** [P16.01](../P16-release-readiness/01-test-debt.md) added a residual recording that the glossary's `lintFiles` entry and the enforced ADR disagree; [P17.03](03-adr-and-dependency-register.md) closes that divergence and is instructed to remove the row. Confirm it is gone rather than stale — the register's own rule is delete, not annotate.
+5. **W-49:** retype the corrupted line, avoiding the construct. The standing rule already exists in the backlog and in `AGENTS.md`; this is the live instance.
+6. **W-51:** add `schema` to both command lists at `index.md:17` and `:83`, and move `schema.json` in the tree diagram at `:87` to `packages/cli/`.
+7. **W-51a:** bring the glossary's **Milestone (M1–M4)** entry in line with the roadmap's §7 list by adding P13–P17 to M4.
+8. **W-52a — restore what `add1ee5` dropped, deliberately rather than by revert.** The glossary's `> **Status:**` header and its **Maintenance rule** come back (the rule is quoted in three governance files, so the canonical statement belongs in the document they point at); the "Shipped vs planned" roll-up does **not** need restoring as a second roll-up — [P17.04](04-completion-surface.md) maintains the surviving **Phase** entry, and reintroducing a duplicate would recreate W-42's two-places-to-drift shape. For `AGENTS.md`, decide where the two orphaned statements live: the audit-to-phase derivation (needed by W-52's argument) and the `Previous`/`Next`/`Depends on`/`Blocks` task-chain rule, which `.agents/rules/architecture.md` states only for `Depends on`-style chains. Whatever is chosen, `CLAUDE.md`'s pointer must resolve when this task is done.
+9. **W-52 — cheapest sufficient option:** one line at each report's head stating the language, plus an English rendering of the two finding tables — the parts the plan actually cites. Or record the choice, since the audits are frozen by policy. **Not a blocker for anything**, and the QA pass's disagreement about its value should be recorded alongside whatever is done.
+10. **Update `P12-consistency/06-process-boundary-tests.md:72`** if its claim is still not literally true after the register is fixed.
 
 ## Out of scope
 
@@ -52,8 +55,9 @@ Rewriting the frozen audit reports. Adding register rows for behaviors nobody ac
 ## Exit criteria
 
 - [ ] Row `:24` points at a page that states the behavior; the two missing rows exist.
-- [ ] Row `:39` is closed in code or re-classified with a reason.
-- [ ] Every P13–P16 decision that resolved to "accept" has a register row with a verified user-facing home.
+- [ ] The self-flagged `init`-draft residual is closed in code or re-classified with a reason.
+- [ ] Every P13–P16 decision that resolved to "accept" has a register row whose user-facing home was **opened and read**, not just linked.
+- [ ] The `lintFiles`-versus-ADR residual is gone from the register, deleted rather than annotated.
 - [ ] `P7-mcp-server/02-lint-tools.md:35` reads as authored, and the format gate is green on it.
 - [ ] The roadmap lists seven CLI commands and diagrams `schema.json` under `packages/cli/`.
 - [ ] The glossary's **Milestone** entry and the roadmap's §7 list agree about M4 (W-51a).

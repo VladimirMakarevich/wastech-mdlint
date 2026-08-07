@@ -1,6 +1,6 @@
 # Phase P13 — Corpus & correctness remediation
 
-> Roadmap: [v2 Index](../index.md) · Phase **P13** · Size **M–L** · Status **Not started** · Depends on [P12](../P12-consistency/index.md) (post-P9 consistency landed).
+> Roadmap: [v2 Index](../index.md) · Phase **P13** · Size **M–L** · Status **Done** · Depends on [P12](../P12-consistency/index.md) (post-P9 consistency landed).
 >
 > **Goal:** close every defect where the product gives a **wrong answer about the repository with no signal that it did** — which files entered the corpus, which rules actually ran, and what the first config error says. Sourced from the [consolidated remediation backlog](../remediation-backlog-2026-08-05.md), batches **B1–B5**.
 
@@ -41,17 +41,17 @@ What these share is the failure direction: **silence**. Exit `0`, no diagnostic,
 
 ## Phase exit criteria
 
-- [ ] A `!` entry in `include`, `exclude`, or any rule's `files`/`exclude` either subtracts or is rejected at config validation — never widens or empties scope silently (W-01).
-- [ ] `npx wastech-mdlint lint .` with no config prunes `node_modules` at every depth, and the schema declares the default so an editor shows it (W-02).
-- [ ] The glob anchoring rule is stated where a user writes config, and `README.md`'s own example prunes a nested `node_modules` (W-03).
-- [ ] No rule can be enabled into a silent no-op; `SIZE-001` and `GRP-002` either require their threshold or ship a default (W-04, W-05).
-- [ ] `TBL-003.caseSensitive` has one source of truth that the generated schema, the skill renderer, and every guide page read (W-06).
-- [ ] `GRP-001`'s two-node-cycle behavior is configurable or recorded in [`accepted-behaviors.md`](../accepted-behaviors.md) (W-07).
-- [ ] `REF-001.exclude` applies on the router branch; one extension constant governs coverage, the `init` scan, and the default `include` (W-08, W-09).
-- [ ] One image-target resolution model is claimed and implemented, or the exclusion is stated where the graph builder's invariant comment makes the claim (W-10).
-- [ ] Nested `.gitignore` negation agrees with `git check-ignore` in both directions (W-11).
-- [ ] An invalid `severity` or an unknown key on **any** rule family names the key and, for an enum, the allowed values; every config diagnostic names the file; one path notation throughout (W-12).
-- [ ] `npm run typecheck && npm test && npm run build && npm run lint && npm run format` green.
+- [x] A `!` entry in `include`, `exclude`, or any rule's `files`/`exclude` either subtracts or is rejected at config validation — never widens or empties scope silently (W-01).
+- [x] `npx wastech-mdlint lint .` with no config prunes `node_modules` at every depth, and the schema declares the default so an editor shows it (W-02).
+- [x] The glob anchoring rule is stated where a user writes config, and `README.md`'s own example prunes a nested `node_modules` (W-03).
+- [x] No rule can be enabled into a silent no-op; `SIZE-001` and `GRP-002` either require their threshold or ship a default (W-04, W-05).
+- [x] `TBL-003.caseSensitive` has one source of truth that the generated schema, the skill renderer, and every guide page read (W-06).
+- [x] `GRP-001`'s two-node-cycle behavior is configurable or recorded in [`accepted-behaviors.md`](../accepted-behaviors.md) (W-07).
+- [x] `REF-001.exclude` applies on the router branch; one extension constant governs coverage, the `init` scan, and the default `include` (W-08, W-09).
+- [x] One image-target resolution model is claimed and implemented, or the exclusion is stated where the graph builder's invariant comment makes the claim (W-10).
+- [x] Nested `.gitignore` negation agrees with `git check-ignore` in both directions (W-11).
+- [x] An invalid `severity` or an unknown key on **any** rule family names the key and, for an enum, the allowed values; every config diagnostic names the file; one path notation throughout (W-12).
+- [x] `npm run typecheck && npm test && npm run build && npm run lint && npm run format` green.
 
 ## What P13 unblocks
 
