@@ -160,6 +160,13 @@ describe("graph command over the fixture corpus", () => {
   // to become line-oriented would have stayed the one nothing compares. It also pins the line bound here: a
   // comma-joined `files outside corpus (1): appendix.md` no longer ends in `:` and the reader stops
   // finding the section at all.
+  //
+  // @boundary-guard host-parity
+  //
+  // Tags this file for both parity assertions in it — this one and the top-level path-section diff
+  // below. The renderer-level twin in `packages/core/test/graph-render.test.ts` stays untagged on
+  // purpose: it compares two functions, not what a host hands a reader, and the category is about
+  // the process boundary.
   it("reports the same nested coverage section in the human and JSON formats", async () => {
     const [human, json] = await Promise.all([
       run(["graph", FIXTURE_ROOT], FIXTURE_ROOT),

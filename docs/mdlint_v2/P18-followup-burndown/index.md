@@ -41,13 +41,13 @@ Twenty finished orchestrator tasks (`p13-01` … `p17-04`) each appended their u
 | --- | --- | --- |
 | [P18.01](01-compile-renderers.md) | **Done** | FU-03, FU-04 (FU-02 closed as an existing decision) |
 | [P18.02](02-code-fixes.md) | **Done** | FU-05 … FU-13, FU-15, FU-16, FU-68, plus FU-23 (same file as FU-12) |
-| [P18.03](03-core-test-pins.md) | Not started | — |
-| [P18.04](04-host-test-pins.md) | Not started | — |
+| [P18.03](03-core-test-pins.md) | **Done** | FU-18, FU-19 (as a pin of the _opposite_ default), FU-20, FU-22 |
+| [P18.04](04-host-test-pins.md) | **Done** | FU-24 … FU-33, FU-75 |
 | [P18.05](05-doc-claims.md) | Not started | — |
 | [P18.06](06-plan-residue.md) | Not started | — |
 | [P18.07](07-dependency-register-audit.md) … [P18.09](09-doc-citation-guard.md) | Not started | — |
 
-**15 of the 40 live items are closed, 25 remain.** Two of them turned out not to be defects at all — FU-02 and FU-21 were behaviors already decided and registered, which the triage read as live because it checked the source and not the register. That is the standing lesson of this phase: **an item that still reproduces in the code may be a documented decision**, so the register and the owning task's implementation notes are part of verifying one, not just the tree.
+**30 of the 40 live items are closed, 10 remain.** Three of them turned out not to be defects at all. FU-02 and FU-21 were behaviors already decided and registered, which the triage read as live because it checked the source and not the register. FU-19 was the same lesson inverted: it asked for a test pinning `**/.*/**` in the lint-time default exclude, a glob [P14.03](../P14-host-boundary/03-init-disclosure.md) had removed a phase after the item was recorded, so writing the step as prescribed would have asserted the opposite of what ships — it was closed by pinning the surviving half, the missing end-to-end coverage, against the _current_ default. So: **an item that still reproduces may be a documented decision, and an item that no longer reproduces may still name a real gap.** The register and the owning task's implementation notes are part of verifying one, not just the tree, and the follow-up file carries no dates or status to tell an item recorded before a decision from one recorded after it.
 
 ## Closed on arrival — do not re-open
 

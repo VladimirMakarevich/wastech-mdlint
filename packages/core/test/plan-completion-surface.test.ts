@@ -43,7 +43,12 @@ const DEFERRED_PREFIX = "Deferred";
 // Line-anchored so an inline `[ ]` written inside prose or a code span is not mistaken for a
 // tracking box. Only a list item at the start of a line is one.
 const OPEN_CHECKBOX = /^[ \t]*- \[ \] /m;
-const STATUS = /Status \*\*([^*]+)\*\*/;
+// Anchored to the header blockquote every plan file opens with, not to the first `Status **…**`
+// anywhere in the text. Plan files quote each other's statuses in prose — one of them quotes
+// `Status **Done**` while its own header reads `Not started` — so an unanchored match lets a file
+// that loses its header status silently inherit a prose one, which is precisely the "declares a
+// status" assertion below going vacuously green and a derived index status flipping unnoticed.
+const STATUS = /^> .*Status \*\*([^*]+)\*\*/m;
 
 interface PlanFile {
   /** Repository-relative POSIX path, so a failure message reads the same on every host. */

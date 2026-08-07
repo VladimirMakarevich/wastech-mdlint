@@ -86,7 +86,14 @@ async function help(args: string[]): Promise<string> {
  * `--config <file>` in the command's own help.
  *
  * The hidden `scan` alias is deliberately absent — it is not in root help, and it is registered by
- * the same `addLintCommand` builder and dispatches to `handleLint`, so `lint`'s row covers it.
+ * the same `addLintCommand` builder and dispatches to `handleLint`, so `lint`'s row covers it. Root
+ * help cannot surface a hidden command at all, so a future one that takes `--config` has to be added
+ * to `ROWS` by hand; this derivation will not find it.
+ *
+ * The flag is matched independently of its metavar. Probing for the literal `--config <file>` would
+ * drop a future command declared `--config <path>` from the derived set, leaving the equality
+ * assertion green while the new handler goes unparametrized — the silent uncoverage this derivation
+ * exists to prevent. Safe today: no other command's help text contains the token `--config`.
  */
 async function commandsAcceptingConfig(): Promise<string[]> {
   const rootHelp = await help(["--help"]);
@@ -98,7 +105,7 @@ async function commandsAcceptingConfig(): Promise<string[]> {
 
   const accepting: string[] = [];
   for (const name of names) {
-    if ((await help([name, "--help"])).includes("--config <file>")) {
+    if (/--config\b/.test(await help([name, "--help"]))) {
       accepting.push(name);
     }
   }

@@ -83,6 +83,24 @@ describe("resolveToolCwd", () => {
     expect(error.hint).toBeTruthy();
   });
 
+  it("rejects a path *under* a file, which only the errno can tell it about", async () => {
+    // The case above passes the file itself, which stats successfully and is caught by
+    // `!stats.isDirectory()` — so it leaves the `stat` rejection handler's own branch untested.
+    // Descending into a file is the only shape that makes `stat` fail with a non-`ENOENT` errno,
+    // and it is the shape a client hits by joining a subdirectory onto a path that turned out to
+    // be a file. Asserted on code, hint and path alone because the errno differs by host: POSIX
+    // reports `ENOTDIR`, Windows `ENOENT`, and both branches must answer the same way.
+    const dir = await makeTempDir("mcp-tc-cwd-under-file-");
+    const filePath = path.join(dir, "not-a-directory.md");
+    await writeFile(filePath, "# Not a directory\n", "utf8");
+    const under = path.join(filePath, "sub");
+
+    const error = await rejectionOf(under);
+    expect(error.code).toBe("INVALID_INPUT");
+    expect(error.message).toContain(posix(under));
+    expect(error.hint).toBeTruthy();
+  });
+
   it("rejects an explicitly empty cwd instead of silently using the process cwd", async () => {
     // `path.resolve("")` returns `process.cwd()`, so without a guard ahead of it this call would
     // stat successfully and analyze the server's own directory — the plausible-answer-to-a-different-
