@@ -8,6 +8,8 @@ Every Markdown file in scope is measured against up to three independent budgets
 
 This keeps individual documents from growing past a size that hurts review, diffing, or (for the token metric) the amount of context a file consumes when it is fed to an LLM. Each metric is opt-in: a metric you do not configure is simply not measured. Within a metric you may set a `warn` threshold, an `error` threshold, or both.
 
+**At least one budget is required.** Every metric being optional does not extend to configuring none of them: `{ "rule": "SIZE-001" }` measures nothing, which would be an enabled rule that can never report, so it is rejected when the config loads rather than passing silently. Set `bytes`, `lines`, or `tokens` — at the top level or inside an `overrides` entry. This one check lives only in the config loader: "at least one of three" is not expressible in the generated [`schema.json`](../cli.md#schema), so an editor validating against the schema will accept a budget-less entry that the linter then rejects. Trust the run, not the editor, for this case.
+
 The three metrics are measured as:
 
 - **bytes** — the UTF-8 byte length of the file's content.
@@ -20,12 +22,18 @@ A file-level finding has no single offending line, so it is anchored at line 0.
 
 | Option | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| `bytes` | `{ warn?, error? }` | no | — | UTF-8 byte budget. Each threshold is a positive integer. |
-| `lines` | `{ warn?, error? }` | no | — | Newline-count budget. Each threshold is a positive integer. |
-| `tokens` | `{ warn?, error? }` | no | — | Estimated-token budget. Each threshold is a positive integer. |
-| `overrides` | `Override[]` | no | — | Per-glob threshold sets that replace the top-level budget for matching files. |
+| `bytes` | `{ warn?, error? }` | one of these four | — | UTF-8 byte budget. Each threshold is a positive integer. |
+| `lines` | `{ warn?, error? }` | one of these four | — | Newline-count budget. Each threshold is a positive integer. |
+| `tokens` | `{ warn?, error? }` | one of these four | — | Estimated-token budget. Each threshold is a positive integer. |
+| `overrides` | `Override[]` | one of these four | — | Per-glob threshold sets that replace the top-level budget for matching files. |
 
-Each threshold object (`bytes`, `lines`, `tokens`) accepts an optional `warn` and an optional `error`, both positive integers. Omit a threshold to skip that severity; omit the whole metric to skip it entirely.
+No single option is required, but the four cannot all be absent: a config must set at least one budget somewhere, either as a top-level metric or inside an `overrides` entry. Omitting all four fails config loading with:
+
+```text
+- config.rules[0].options: SIZE-001 measures nothing unless at least one budget is set: configure bytes, lines, or tokens (at the top level or in an overrides entry)
+```
+
+Each threshold object (`bytes`, `lines`, `tokens`) accepts an optional `warn` and an optional `error`, both positive integers, and must carry at least one of them — an empty `{}` is the same "measures nothing" case one level down and is rejected the same way. Omit a threshold to skip that severity; omit the whole metric to skip it entirely.
 
 An `overrides` entry has the shape:
 
@@ -97,9 +105,9 @@ This is why the finding's severity comes from _which threshold was crossed_, not
 
 - **Scope:** `document` — evaluated per file, independent of other files.
 - **Severity is per finding.** The `warning`/`error` split comes from the highest threshold crossed for that metric, not from the rule's default severity. A configuration `severity` override still clamps the emitted severity through the runner — and because a metric emits at most one finding, the clamp can never turn one over-budget metric into two same-severity messages.
-- **Metrics are opt-in.** A metric with no configured thresholds is never measured, so an empty `options` object reports nothing.
+- **Metrics are opt-in, but the rule is not inert-able.** A metric with no configured thresholds is never measured; an `options` object that configures no metric at all is a config error rather than a rule that quietly reports nothing (see Options above).
 - **Overrides are first-match.** Only the first `overrides` entry that matches a file applies; it does not merge with later matching entries.
-- **Token estimation is isolated and replaceable.** The token count comes from a single heuristic — `ceil(characters / 4)` — deliberately kept behind one function so it can be swapped for a real tokenizer later without touching this rule. Treat token thresholds as approximate budgets, not exact counts. Note that `bytes` measures UTF-8 byte length while `tokens` is derived from character length, so the two diverge for multi-byte content.
+- **Token estimation is isolated and replaceable.** The token count comes from a single heuristic — `ceil(characters / 4)` — deliberately kept behind one function so it can be swapped for a real tokenizer later without touching this rule. Treat token thresholds as approximate budgets, not exact counts. Note that `bytes` measures UTF-8 byte length while `tokens` is derived from character length, so the two diverge for multi-byte content, and the token estimate errs **low** for non-Latin scripts. A `tokens` finding restates that calibration in its own message, so a reader of the number does not have to find this page; the `bytes` and `lines` findings do not, because those counts are exact.
 
 ## See also
 

@@ -138,7 +138,19 @@ flow:
       role_file: implementation/fixing.md
       session_scope: fresh_disposable
       permission_profile: workspace-write
-      reasoning: xhigh
+      # Cost pin: this node does not decide WHAT to change — `review` hands it a
+      # findings list where every item already carries a concrete `fix`, and
+      # `testing` hands it a failing command. Executing a specified change is
+      # exactly where Sonnet 5 lands closest to Opus, so the generator runs cheap
+      # while the Opus reviewer that gates it stays expensive — a strong critic
+      # over a cheaper fixer, not a cheaper critic. `high` rather than `xhigh` for
+      # the same reason: the search space was already narrowed upstream.
+      # Watch the review->fixing loop count after this change: a fix that needs a
+      # second rework round costs more than the model saved, so if `budgets.review_fix`
+      # starts being consumed where it wasn't, revert this pin first.
+      provider: claude
+      model: claude-sonnet-5
+      reasoning: high
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []
@@ -154,13 +166,19 @@ flow:
       permission_profile: workspace-write
       # Documentation is a mechanical write-up of what already shipped, so it runs at medium
       # reasoning regardless of the flow-wide default — no quality loss, less wall-time on the tail.
+      # Same argument extends to the model: the diff is already on the tree and accepted, so this
+      # node transcribes rather than decides. Cheapest node to move off Opus with no judgment at risk.
+      provider: claude
+      model: claude-sonnet-5
       reasoning: medium
       # Explicit offline stance: doc-writing needs no network, and pinning it here keeps the node
       # offline even if this flow later gains a flow-wide network_policy. This is a hard guarantee
       # only under Codex (OS-sandbox blocks Bash network); under Claude it only disables
       # WebFetch/WebSearch, so it is defense-in-depth (the role prompt forbids installs, builds,
       # tests and servers) — pin `provider: codex` on this node when you need the hard "no
-      # dependency installs" guarantee. The one command the role prompt REQUIRES here is this
+      # dependency installs" guarantee. That pin currently fails preflight: `codex` was removed
+      # from `agents.allowed` in config.yaml for a Claude-only limits test — re-add it there first.
+      # The one command the role prompt REQUIRES here is this
       # repository's own Markdown format gate (`npm run format` = `prettier --check .`, repaired with
       # a targeted `npx prettier --write <paths>`): it mutates nothing but docs, needs no network,
       # and resolves prettier out of the node_modules the run's own checks step already installed.

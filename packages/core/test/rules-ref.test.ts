@@ -9,6 +9,7 @@ import { compareStrings } from "../src/deterministic-sort.js";
 import { lintFiles } from "../src/engine/lint-files.js";
 import { RuleResolutionError } from "../src/engine/registry.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
+import type { ResolvedSettings } from "../src/engine/types.js";
 
 const tempDirs: string[] = [];
 
@@ -33,8 +34,12 @@ function rule(id: string, options?: unknown): ConfiguredRule {
   return { rule: ruleRegistry.resolveRule(id, options) };
 }
 
-async function lint(cwd: string, rules: ConfiguredRule[]) {
-  return lintFiles({ cwd, config: { rules: [] }, rules, settings: {} });
+async function lint(
+  cwd: string,
+  rules: ConfiguredRule[],
+  settings: ResolvedSettings = {},
+) {
+  return lintFiles({ cwd, config: { rules: [] }, rules, settings });
 }
 
 describe("REF-002 anchors", () => {
@@ -151,6 +156,65 @@ describe("REF-001 / REF-003 exclude is a link-target filter, not file scope", ()
     expect(filtered.messages.map((message) => message.filePath)).toEqual([
       "drafts/b.md",
     ]);
+  });
+});
+
+// W-08 (P13.05): `exclude` used to be applied on only one of `linkResolves`'s two resolution
+// branches, so *any* configured router — including a bare `{}`, which validates because every
+// siteRouter field is optional — silently turned the option off. These pin that the two options
+// compose, on the inherited setting and on the per-rule override alike.
+describe("REF-001 exclude applies with a site router configured", () => {
+  const GENERATED_LINK = "[gen](/generated/x.md)\n";
+
+  it("skips an excluded root-relative target under an inherited empty siteRouter", async () => {
+    const cwd = await fixtureRepo({ "docs/a.md": GENERATED_LINK });
+
+    // The control: no router at all. Both runs must agree — that agreement is the whole finding.
+    expect(
+      await lint(cwd, [rule("REF-001", { exclude: ["generated/**"] })]),
+    ).toMatchObject({ messages: [] });
+    expect(
+      await lint(cwd, [rule("REF-001", { exclude: ["generated/**"] })], {
+        siteRouter: {},
+      }),
+    ).toMatchObject({ messages: [] });
+  });
+
+  it("skips an excluded root-relative target under a per-rule siteRouter override", async () => {
+    const cwd = await fixtureRepo({ "docs/a.md": GENERATED_LINK });
+
+    const result = await lint(cwd, [
+      rule("REF-001", { exclude: ["generated/**"], siteRouter: {} }),
+    ]);
+    expect(result.messages).toEqual([]);
+  });
+
+  // `exclude` matches the *resolved* repo-relative candidates, never the raw URL: under starlight
+  // the router maps `/generated/page` into `contentDir`, so the glob a user writes has to name the
+  // source location. Pinned because it is the only way to tell the two models apart.
+  it("matches the router's resolved candidates rather than the raw URL", async () => {
+    const cwd = await fixtureRepo({
+      "src/content/docs/a.md": "[gen](/generated/page)\n",
+    });
+    const settings: ResolvedSettings = {
+      siteRouter: { preset: "starlight", contentDir: "src/content/docs" },
+    };
+
+    expect(
+      await lint(
+        cwd,
+        [rule("REF-001", { exclude: ["src/content/docs/generated/**"] })],
+        settings,
+      ),
+    ).toMatchObject({ messages: [] });
+    // The raw-URL-shaped glob does not match any candidate, so the link is still reported.
+    expect(
+      await lint(
+        cwd,
+        [rule("REF-001", { exclude: ["generated/**"] })],
+        settings,
+      ),
+    ).toMatchObject({ messages: [{ data: { target: "/generated/page" } }] });
   });
 });
 

@@ -33,11 +33,30 @@ describe("README rule table", () => {
   });
 
   it("marks exactly the deterministic-fixable subset as fixable (audit 4.2)", () => {
+    // The rule cell is `[`ID`](url)` since P15.03 linked it to the rule's `docsUrl`, so a data row is
+    // recognized by the link opener and the id is read out of the code span inside it rather than
+    // being the whole cell. The header and divider rows still fail both.
     const fixable = generateRuleDocs()
       .split("\n")
-      .filter((line) => line.startsWith("| `"))
+      .filter((line) => line.startsWith("| [`"))
       .filter((line) => line.split("|")[5]?.trim() === "yes")
-      .map((line) => line.split("|")[1]?.trim());
-    expect(fixable.sort()).toEqual(["`SEC-001`", "`TBL-002`"]);
+      .map((line) => /^\| \[`([^`]+)`\]/.exec(line)?.[1]);
+    expect(fixable.sort()).toEqual(["SEC-001", "TBL-002"]);
+  });
+
+  it("links every rule id to its own documentation page (W-36)", () => {
+    const rows = generateRuleDocs()
+      .split("\n")
+      .filter((line) => line.startsWith("| [`"));
+    // 24 built-ins, each linked — a rule whose cell lost its link (or gained a mismatched one) fails
+    // here rather than only showing up as a stale README diff.
+    expect(rows).toHaveLength(24);
+    for (const row of rows) {
+      const match = /^\| \[`([^`]+)`\]\((\S+)\) \|/.exec(row);
+      expect(match, row).not.toBeNull();
+      expect(match![2]).toBe(
+        `https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/${match![1]}.md`,
+      );
+    }
   });
 });

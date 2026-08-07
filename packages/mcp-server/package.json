@@ -3,6 +3,11 @@
   "version": "0.0.0",
   "description": "Model Context Protocol server for wastech-mdlint: a stdio-only, read-only adapter over core.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VladimirMakarevich/wastech-mdlint.git",
+    "directory": "packages/mcp-server"
+  },
   "type": "module",
   "bin": {
     "wastech-mdlint-mcp": "./dist/index.js"
@@ -11,7 +16,9 @@
     "node": ">=24.17.0"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE",
+    "README.md"
   ],
   "scripts": {
     "build": "tsc -b",

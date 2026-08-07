@@ -48,7 +48,7 @@ These are repository policy, not per-item advice. A task that skips one is incom
 - `npm run format` before committing **any** deliverable, docs-only included. Prose is not hard-wrapped (`proseWrap: "never"`). Never nest a glob-bearing code span inside a bold span — it corrupts silently and the gate passes on the damage (report F34, and **W-49** is the live instance).
 - Keep [`glossary.md`](glossary.md) current in the same change that adds, renames, or retires a load-bearing term — not a later pass.
 - A behavior accepted instead of fixed goes in [`accepted-behaviors.md`](accepted-behaviors.md) in the same change, with a README or guide home that actually states it. Items marked **decision** below all terminate either in code or in that register.
-- Behavior changes carry tests scaled to risk. Where an item falls into one of the four process-boundary guard categories in [`.agents/rules/testing.md`](../../.agents/rules/testing.md), tag the new guard with `@boundary-guard <category>` — `packages/core/test/boundary-guards.test.ts` enforces the pairing. **W-02** is `shared-exclude`; **W-13** and **W-18** are `installed-bin-spawn`.
+- Behavior changes carry tests scaled to risk. Where an item falls into one of the process-boundary guard categories in [`.agents/rules/testing.md`](../../.agents/rules/testing.md), tag the new guard with `@boundary-guard <category>` — `packages/core/test/boundary-guards.test.ts` enforces the pairing. **W-02** is `shared-exclude`; **W-13** and **W-18** are `installed-bin-spawn`. There were four categories when this backlog was written; **W-57** added a fifth, `host-parity`, so read the count off the table rather than from here.
 - Build before test: `npm run typecheck` or `npm run build` first, or the spawn suites assert against a stale `dist/`.
 
 ## Master index
@@ -268,7 +268,7 @@ Severity here is a **triage rank for sequencing, not a copy of either source's g
   | a typo'd key inside a custom rule's `assert` | the key and its location |
 
 - **Also:** the two stages fail fast independently, so a config with both a shape error and an options error reports only the first, and a user fixing config by trial hits one error per run. Decide whether to aggregate.
-- **Requirement impact:** report.md grades C7 "partially unmet — the standard path is covered". It is covered for `options` and uncovered for `severity` and unknown keys. Update the C7 verdict with the fix.
+- **Requirement impact:** report.md grades C7 "partially unmet — the standard path is covered; the custom-rule path bypasses the renderer", and both halves of that are wrong: it was covered for `options` and uncovered for `severity` and unknown keys, on every rule family rather than only on `custom`. **Post-fix ([P13.06](P13-correctness/06-config-diagnostics.md)) the verdict is met**: every diagnostic names the config file, one notation (`config.rules[0].options.assert.kind`) spans both validation stages, and union/enum failures name the offending key and the allowed values. The corrected verdict is carried in [requirements/01-configuration.md](requirements/01-configuration.md) at C7; `report.md` stays frozen as a historical record ([P10.01](P10-consistency/01-governance-docs.md)). The residual — no aggregation across the two stages — is in the [accepted behaviors register](accepted-behaviors.md).
 
 ### B6 — CLI boundary: exit codes, disclosure, paths
 

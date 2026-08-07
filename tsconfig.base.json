@@ -6,8 +6,15 @@
     "composite": true,
     "strict": true,
     "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
+    // P16.03 / W-31. Off, not absent: no package's `files` allowlist ships `src` — only built
+    // output plus LICENSE/README (and schema.json for cli) — so a map emitted here shipped
+    // `"sources":["../src/…"]` with no `sourcesContent` into a tarball that carries no `src`
+    // — 204 maps that resolve to nothing at the consumer and cost roughly half of core's packed
+    // size. The decision and the two alternatives weighed against it are recorded at
+    // docs/mdlint_v2/P-release/01-package-metadata.md; keeping the keys written out is what
+    // stops the next reader flipping them back as an oversight.
+    "declarationMap": false,
+    "sourceMap": false,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,

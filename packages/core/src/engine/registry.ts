@@ -2,6 +2,7 @@ import type { z } from "zod";
 
 import { compareStrings } from "../deterministic-sort.js";
 import { canonicalizeRuleId } from "../rule-id.js";
+import { ruleDocsUrl } from "./rule-docs-url.js";
 import type {
   Rule,
   RuleCategory,
@@ -21,9 +22,10 @@ export type RuleMetadata = {
   defaultSeverity: Severity;
   scope: RuleScope;
   fixable: boolean;
+  // The rule's documentation page (R6). Optional to *author* but always present on a defined rule:
+  // `defineRule` fills it from the id by convention, and the runner copies it onto every finding as
+  // `helpUri`. A rule may still override it if its page is ever not named after its id.
   docsUrl?: string;
-  // Named message templates (R6) — optional; documented alongside the rule.
-  messages?: Record<string, string>;
   // Per-rule options schema; validated in resolveRule and reflected into schema.json.
   optionsSchema: z.ZodType;
 };
@@ -50,7 +52,14 @@ export function defineRule<TSchema extends z.ZodType>(def: {
   const { fix } = def;
 
   return {
-    metadata: { ...def.metadata, optionsSchema: def.optionsSchema },
+    metadata: {
+      ...def.metadata,
+      // Derived here rather than repeated in 24 rule files: a rule that spelled its own URL could
+      // disagree with the README table's link, and a rule that forgot one would emit a finding with
+      // no `helpUri` at all (which is what SEC-003/STR-001 shipped before P15.03).
+      docsUrl: def.metadata.docsUrl ?? ruleDocsUrl(def.metadata.id),
+      optionsSchema: def.optionsSchema,
+    },
     createCheck: (options) => def.check(options as z.infer<TSchema>),
     createFix:
       fix === undefined

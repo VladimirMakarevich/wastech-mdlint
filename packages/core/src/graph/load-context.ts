@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import type { LintConfig } from "../config/config-schema.js";
+import { resolveCorpusScope } from "../config/corpus-scope.js";
 import type { ResolvedSettings } from "../engine/types.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
 import { loadDocuments } from "../markdown/load-documents.js";
@@ -23,10 +24,13 @@ export async function loadContext(params: {
   settings: ResolvedSettings;
 }): Promise<GraphContext> {
   const rootDir = path.resolve(params.cwd);
-  const loaded = await loadDocuments(params.config.include ?? ["**/*.md"], {
+  // Same resolved scope as `lintFiles` (P13.02), so the graph a host queries covers exactly the
+  // corpus that host lints — a divergence here would make `impact`/`slice` answer over a wider tree.
+  const scope = resolveCorpusScope(params.config);
+  const loaded = await loadDocuments(scope.include, {
     cwd: rootDir,
-    exclude: params.config.exclude,
-    respectGitignore: params.config.respectGitignore,
+    exclude: scope.exclude,
+    respectGitignore: scope.respectGitignore,
   });
 
   // Re-key the loader's absolute-path map to repo-relative POSIX paths — the identity rules and the

@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import {
   resolveToolConfiguration,
+  toolCwdBase,
   type ToolFileInput,
 } from "../shared/tool-context.js";
 import { errorResult, READ_ONLY_ANNOTATIONS } from "../shared/tool-response.js";
@@ -32,17 +33,18 @@ const compileContextInputShape = {
 export async function handleCompileContext(
   input: ToolFileInput,
 ): Promise<CallToolResult> {
+  // Outside the `try` for the same reason as its four file-based siblings: an errno raised while
+  // resolving the configuration has no resolved `loaded.cwd` to render its path against.
+  const cwd = toolCwdBase(input);
+
   try {
-    // `resolveToolConfiguration` computes this same default internally but doesn't return it, so we
-    // recompute `cwd` here — the same one-liner duplication lint-files.ts already documents.
-    const cwd = input.cwd ?? process.cwd();
     const loaded = await resolveToolConfiguration(input);
 
     // `compileContext` throws `CompileConfigMissingError` (code `COMPILE_CONFIG_MISSING`, already in
     // `TOOL_ERROR_CODES`, carrying `.hint`) when `config.compile` is absent, so `errorResult` passes
     // it through verbatim with no translation wrapper — exactly like `impact-analysis`, and unlike
     // `lint.ts` whose `RuleResolutionError` codes aren't in the taxonomy.
-    const result = await compileContext(loaded, cwd);
+    const result = await compileContext(loaded, loaded.cwd);
     const { documentCount, ruleCount, componentCount } = result.metadata;
 
     return {
@@ -61,7 +63,8 @@ export async function handleCompileContext(
       ],
     };
   } catch (error) {
-    return errorResult(error);
+    // No `successFields`: this is the one tool with no `outputSchema` to satisfy.
+    return errorResult(error, { cwd });
   }
 }
 

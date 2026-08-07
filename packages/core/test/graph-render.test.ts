@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
 import { buildContextGraph } from "../src/graph/build-context-graph.js";
@@ -13,6 +15,14 @@ import {
 } from "../src/graph/graph-render.js";
 import type { ParsedDocument } from "../src/markdown/document-types.js";
 import { parseDocument } from "../src/markdown/parse-document.js";
+import {
+  LARGE_CORPUS_ENTRY_POINT_COUNT,
+  LARGE_CORPUS_EXCLUDED_COUNT,
+  LARGE_CORPUS_LARGEST_CLUSTER_SIZE,
+  LARGE_CORPUS_LINE_WIDTH_BOUND,
+} from "./support/large-corpus.js";
+import { largeCorpusGraph } from "./support/large-corpus-graph.js";
+import { readHumanSections } from "./support/output-parity.js";
 
 // Mirrors graph-algorithms.test.ts: build real graphs from small inline Markdown maps so these
 // tests stay coupled to the actual edge shape rather than hand-authored ContextGraph literals.
@@ -45,6 +55,39 @@ describe("summarizeContextGraph", () => {
     ]);
     expect(summary.components).toEqual([["a.md", "b.md", "c.md"]]);
     expect(summary.readingOrder).toEqual(["a.md", "b.md", "c.md"]);
+    // Present even when nothing is excluded (W-23): the human report omits an empty section, but a
+    // machine consumer must not have to distinguish "no cycles" from "an older shape".
+    expect(summary.excluded).toEqual([]);
+  });
+
+  it("emits the shipped key set in order, which both hosts inherit", () => {
+    const graph = graphOf({ "a.md": "[b](b.md)\n", "b.md": "# B\n" });
+    const coverage = computeGraphCoverage(
+      new Map([["a.md", parseDocument({ path: "a.md", content: "# A\n" })]]),
+      graph,
+      { rootDir: "/repo" },
+    );
+
+    // The one pin for the graph JSON document: CLI `graph --format json` and the MCP `context-graph`
+    // tool's `summary` branch both serialize this object, so a key added or renamed on one host
+    // cannot silently diverge from the other or from the five documented surfaces (W-22/W-23).
+    expect(Object.keys(summarizeContextGraph(graph, coverage))).toEqual([
+      "nodes",
+      "edges",
+      "components",
+      "readingOrder",
+      "excluded",
+      "coverage",
+    ]);
+  });
+
+  it("lists the nodes a cycle kept out of the reading order", () => {
+    const graph = graphOf({ "a.md": "[b](b.md)\n", "b.md": "[a](a.md)\n" });
+
+    const summary = summarizeContextGraph(graph);
+
+    expect(summary.readingOrder).toEqual([]);
+    expect(summary.excluded).toEqual(["a.md", "b.md"]);
   });
 
   it("sorts edges by (from, to, type, line) regardless of construction order", () => {
@@ -80,7 +123,7 @@ describe("summarizeContextGraph", () => {
 });
 
 describe("renderContextGraphText", () => {
-  it("includes clusters, hubs, and reading order", () => {
+  it("renders clusters, hubs, and reading order one item per indented line", () => {
     const graph = graphOf({
       "a.md": "[b](b.md)\n",
       "b.md": "# B\n",
@@ -88,22 +131,32 @@ describe("renderContextGraphText", () => {
       "y.md": "# Y\n",
     });
 
-    const text = renderContextGraphText(graph);
+    const lines = renderContextGraphText(graph).split("\n");
 
-    expect(text).toContain("top hubs:");
-    expect(text).toContain("clusters:");
-    expect(text).toContain("a.md, b.md");
-    expect(text).toContain("x.md, y.md");
-    expect(text).toContain("reading order (4): a.md, b.md, x.md, y.md");
+    expect(lines).toContain("top hubs:");
+    // W-26: clusters nest one level so component boundaries survive; members are their own lines
+    // instead of a comma-joined blob (3904 characters for one cluster on the 139-node corpus).
+    expect(lines).toContain("clusters:");
+    expect(lines).toContain("  cluster 1 (2 files):");
+    expect(lines).toContain("    a.md");
+    expect(lines).toContain("    b.md");
+    expect(lines).toContain("  cluster 2 (2 files):");
+    expect(lines).toContain("    x.md");
+    expect(lines).toContain("    y.md");
+    expect(lines).toContain("reading order (4):");
+    expect(lines).toContain("  a.md");
+    expect(lines).toContain("  y.md");
   });
 
   it("reports what a cycle excludes from reading order", () => {
     const graph = graphOf({ "a.md": "[b](b.md)\n", "b.md": "[a](a.md)\n" });
 
-    const text = renderContextGraphText(graph);
+    const lines = renderContextGraphText(graph).split("\n");
 
-    expect(text).toContain("reading order (0): ");
-    expect(text).toContain("excluded from reading order (2): a.md, b.md");
+    expect(lines).toContain("reading order (0):");
+    expect(lines).toContain("excluded from reading order (2):");
+    expect(lines).toContain("  a.md");
+    expect(lines).toContain("  b.md");
   });
 
   it("appends the coverage signal when a GraphCoverage is supplied", () => {
@@ -118,12 +171,13 @@ describe("renderContextGraphText", () => {
       },
     );
 
-    const text = renderContextGraphText(graph, coverage);
+    const lines = renderContextGraphText(graph, coverage).split("\n");
 
-    expect(text).toContain("coverage:");
-    expect(text).toContain("nodes: 1");
-    expect(text).toContain("edges: 0");
-    expect(text).toContain("files outside corpus (0): ");
+    expect(lines).toContain("coverage:");
+    expect(lines).toContain("  nodes: 1");
+    expect(lines).toContain("  edges: 0");
+    // Line-oriented like every other path list, and with no trailing space when empty.
+    expect(lines).toContain("  files outside corpus (0):");
   });
 
   it("omits the coverage section when no coverage is supplied", () => {
@@ -184,6 +238,103 @@ describe("renderContextGraphMermaid / renderContextGraphDot", () => {
   });
 });
 
+describe("the renderers at corpus scale", () => {
+  // Module-level so the 139-document graph is built once for the whole suite, not per test.
+  const graph = largeCorpusGraph();
+
+  it("keeps every human-format line under the stated width", () => {
+    const lines = renderContextGraphText(graph).split("\n");
+    const longest = lines.reduce(
+      (widest, line) => (line.length > widest.length ? line : widest),
+      "",
+    );
+
+    // Before P15.01 the widest line here was a 3904-character comma-joined cluster.
+    expect(longest.length).toBeLessThanOrEqual(LARGE_CORPUS_LINE_WIDTH_BOUND);
+    // …and the report is genuinely line-oriented rather than short because it is truncated.
+    expect(lines.length).toBeGreaterThan(300);
+  });
+
+  it("renders the large cluster nested, with the count in its header", () => {
+    const lines = renderContextGraphText(graph).split("\n");
+    const header = `  cluster 1 (${LARGE_CORPUS_LARGEST_CLUSTER_SIZE} files):`;
+    const headerIndex = lines.indexOf(header);
+
+    expect(headerIndex).toBeGreaterThan(-1);
+    // The member count in the header must match the members actually emitted under it, or the
+    // header becomes a claim the section contradicts.
+    const members = lines
+      .slice(headerIndex + 1)
+      .findIndex((line) => !line.startsWith("    "));
+    expect(members).toBe(LARGE_CORPUS_LARGEST_CLUSTER_SIZE);
+  });
+
+  // W-23's parity assertion at the renderer level: one graph, both formats, the same sets. The human
+  // sections are the source the JSON keys had to match, so they are parsed back out of the text rather
+  // than recomputed — a shared `topologicalSort` call would assert nothing about what either format
+  // ships.
+  //
+  // P16.01 widened this from the `excluded` set alone to all three of the top-level path sections,
+  // through the shared `readHumanSections` reader: `excluded` was missing from the JSON for three
+  // phases and its two siblings were never compared at all, so checking one of three is how the next
+  // omission stays invisible. The reader also asserts each header's `(N)` against the items under it,
+  // which is a second claim the format makes about itself.
+  //
+  // Three is the whole overlap *as invoked here*: neither call is given a `GraphCoverage`, so no
+  // coverage block is rendered and no `coverage` key is serialized. The fourth section that block
+  // nests, `files outside corpus`, is diffed at the command boundary in `cli/test/graph.e2e.test.ts`,
+  // where the CLI always supplies coverage and the fixture has a file outside the corpus to report.
+  it("carries the same top-level path sections in the human and JSON formats", () => {
+    const sections = readHumanSections(renderContextGraphText(graph));
+    const summary = summarizeContextGraph(graph);
+
+    expect({
+      entryPoints: sections["entry points"],
+      readingOrder: sections["reading order"],
+      excluded: sections["excluded from reading order"],
+    }).toEqual({
+      entryPoints: summary.nodes
+        .filter((node) => node.inDegree === 0)
+        .map((node) => node.path),
+      readingOrder: summary.readingOrder,
+      excluded: summary.excluded,
+    });
+    // Non-vacuous: all three are populated at this corpus size, so a reader that silently returned
+    // nothing would not pass by matching an empty payload.
+    expect(sections["excluded from reading order"]).toHaveLength(
+      LARGE_CORPUS_EXCLUDED_COUNT,
+    );
+    expect(sections["entry points"]).toHaveLength(
+      LARGE_CORPUS_ENTRY_POINT_COUNT,
+    );
+    expect(sections["reading order"]!.length).toBeGreaterThan(0);
+  });
+
+  const digest = (text: string): string =>
+    createHash("sha256").update(text, "utf8").digest("hex").slice(0, 16);
+
+  // The machine formats must be byte-identical across runs *and* unchanged by this task. A recorded
+  // digest pins the second half of that (a 216 KB golden file is not worth checking in); the
+  // equality below pins the first. The `json` digest moved once, deliberately, at P15.02: the
+  // summary gained the `excluded` key (W-23). `mermaid`/`dot` are untouched by that change and their
+  // digests must not move.
+  it.each([
+    [
+      "json",
+      () => JSON.stringify(summarizeContextGraph(graph)),
+      "4c9a275b3a0e8668",
+    ],
+    ["mermaid", () => renderContextGraphMermaid(graph), "381fd263c4b5f838"],
+    ["dot", () => renderContextGraphDot(graph), "501c8e77e92c1658"],
+  ] as const)(
+    "leaves %s byte-identical across two runs",
+    (_name, render, sha) => {
+      expect(render()).toBe(render());
+      expect(digest(render())).toBe(sha);
+    },
+  );
+});
+
 describe("renderContextSliceSummary", () => {
   it("reports the honest empty result for an unresolved query", () => {
     const summary = renderContextSliceSummary({
@@ -212,12 +363,38 @@ describe("renderContextSliceSummary", () => {
     expect(summary).toBe(
       [
         "query: a.md",
-        "matched: path (a.md)",
+        "matched: path",
+        "starts (1):",
+        "  a.md",
         "files (2):",
         "  a.md",
         "  b.md",
       ].join("\n"),
     );
+  });
+
+  it("keeps a multi-start anchor query line-oriented (W-26)", () => {
+    // An `#anchor`/heading/ID query resolves to every file carrying that slug, so `starts` grows
+    // with the corpus exactly as the sections W-26 fixed did.
+    const summary = renderContextSliceSummary({
+      query: "#install",
+      matchKind: "anchor",
+      starts: ["a.md", "b.md", "c.md"],
+      files: ["a.md", "b.md", "c.md"],
+      visited: [
+        { path: "a.md", depth: 0, via: null },
+        { path: "b.md", depth: 0, via: null },
+        { path: "c.md", depth: 0, via: null },
+      ],
+    });
+
+    expect(summary.split("\n").slice(0, 5)).toEqual([
+      "query: #install",
+      "matched: anchor",
+      "starts (3):",
+      "  a.md",
+      "  b.md",
+    ]);
   });
 });
 
@@ -238,8 +415,14 @@ describe("renderImpactSummary", () => {
         "  b.md (2 references)",
         "transitively affected (1):",
         "  c.md (depth 2, via b.md)",
-        "reading order (2): c.md, b.md",
-        "excluded from reading order (1): d.md",
+        // Same W-26 fix as the graph report: `impact`'s affected subgraph is the whole corpus when
+        // the changed file is a hub, so leaving these two comma-joined would have recreated the
+        // inconsistency three lines above them.
+        "reading order (2):",
+        "  c.md",
+        "  b.md",
+        "excluded from reading order (1):",
+        "  d.md",
       ].join("\n"),
     );
   });

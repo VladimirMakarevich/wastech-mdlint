@@ -96,6 +96,47 @@ describe("computeGraphCoverage", () => {
     expect(coverage.filesOutsideCorpus).toEqual(["src/content/docs/intro.md"]);
   });
 
+  // W-09's reproduction verbatim (P13.05): coverage used to check `.md` + `.markdown`, so it named
+  // an extension no default `include` can admit and stayed silent about the one `init` walks. The
+  // extension set is now shared with the scan and the default include — see
+  // `markdown-extensions.test.ts` for the three-site guard.
+  it("names a linked `.mdx` file outside the corpus and ignores a `.markdown` one", async () => {
+    const root = await fixtureRepo({
+      "hub.md": "[mdx](docs/page.mdx)\n[legacy](docs/legacy.markdown)\n",
+      "docs/page.mdx": "# Page\n",
+      "docs/legacy.markdown": "# Legacy\n",
+    });
+    const documents = await loadCorpus(root);
+    const graph = buildContextGraph(documents);
+
+    const coverage = computeGraphCoverage(documents, graph, { rootDir: root });
+
+    expect(coverage.filesOutsideCorpus).toEqual(["docs/page.mdx"]);
+  });
+
+  // W-10 (P13.05): coverage routed *every* raw target, images included, while REF-003 resolves a
+  // root-relative image against the repository root. One model is now implemented in both places, so
+  // the routed candidate of an image target is never probed.
+  it("does not route image targets through the site router", async () => {
+    const root = await fixtureRepo({
+      // Contrived on purpose: an image target only differs between the two models when the router
+      // maps it onto a real Markdown file, which is why the delta was never measured in the field.
+      "src/content/docs/guide.md": "![diagram](/intro)\n",
+      "src/content/docs/intro.md": "# Intro\n",
+    });
+    const documents = await loadCorpus(root, ["src/content/docs/intro.md"]);
+    const graph = buildContextGraph(documents, {
+      siteRouter: { preset: "starlight" },
+    });
+
+    const coverage = computeGraphCoverage(documents, graph, {
+      rootDir: root,
+      siteRouter: { preset: "starlight" },
+    });
+
+    expect(coverage.filesOutsideCorpus).toEqual([]);
+  });
+
   it("dedupes repeated targets across documents and returns a sorted result", async () => {
     const root = await fixtureRepo({
       "index.md": "[x](x.md)\n",

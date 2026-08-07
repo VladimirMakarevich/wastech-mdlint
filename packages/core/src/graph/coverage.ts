@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 
 import { compareStrings } from "../deterministic-sort.js";
+import { isMarkdownFile } from "../discovery/markdown-extensions.js";
 import {
   candidateEscapesRoot,
   filePart,
@@ -29,40 +30,41 @@ export type ComputeGraphCoverageOptions = {
   siteRouter?: SiteRouterSettings;
 };
 
-const MARKDOWN_EXTENSIONS = [".md", ".markdown"];
-
-function isMarkdownFile(relPath: string): boolean {
-  return MARKDOWN_EXTENSIONS.some((extension) =>
-    relPath.toLowerCase().endsWith(extension),
-  );
-}
-
 // Scheme-qualified targets (http:, https:, data:, …) are never a local file; mirrors REF-003's
 // imageResolves guard so coverage never flags an external image as an out-of-corpus Markdown file.
 function hasScheme(target: string): boolean {
   return /^[a-z][a-z0-9+.-]*:/i.test(target);
 }
 
+// A raw target plus whether the site router applies to it. Kinds cannot be flattened away here
+// (P13.05 / W-10): an image is router-blind, because a router maps a URL to *Markdown source* and
+// REF-003 resolves a root-relative image target against the repository root. Routing images would
+// make coverage disagree with the rule it exists to complement.
+type RawTarget = { target: string; routable: boolean };
+
 // Every local-file raw target a document can point at: link (file part only, fragment dropped),
 // image (external schemes excluded), and `@import` (leading `@` dropped).
-function collectRawTargets(document: ParsedDocument): string[] {
-  const targets: string[] = [];
+function collectRawTargets(document: ParsedDocument): RawTarget[] {
+  const targets: RawTarget[] = [];
 
   for (const link of document.links) {
     if (link.kind === "local-file") {
-      targets.push(filePart(link.rawTarget));
+      targets.push({ target: filePart(link.rawTarget), routable: true });
     }
   }
 
   for (const image of document.images) {
     const target = filePart(image.rawTarget);
     if (target.length > 0 && !hasScheme(target)) {
-      targets.push(target);
+      targets.push({ target, routable: false });
     }
   }
 
   for (const importRecord of document.imports) {
-    targets.push(importRecord.rawTarget.slice(1));
+    targets.push({
+      target: importRecord.rawTarget.slice(1),
+      routable: true,
+    });
   }
 
   return targets;
@@ -70,8 +72,12 @@ function collectRawTargets(document: ParsedDocument): string[] {
 
 /**
  * Compute the G5 coverage signal: graph node/edge counts plus the deduped, sorted list of on-disk
- * Markdown files that are linked-to but outside the analyzed corpus. Core-only for P4.06 — there is
- * no CLI/lint-output consumer yet (P4.07 surfaces this in the `graph` command).
+ * Markdown files that are linked-to but outside the analyzed corpus. Two hosts consume it: the CLI
+ * `graph` command in both its formats (P4.07) and the MCP `context-graph` tool's `summary` branch
+ * (P15.02) — each calling this directly rather than through the other.
+ *
+ * "Markdown file" is `MARKDOWN_EXTENSIONS` (`discovery/markdown-extensions.ts`) — the same set the
+ * repo scan walks, so a file this reports is one a proposed `include` could actually admit.
  */
 export function computeGraphCoverage(
   documents: Map<string, ParsedDocument>,
@@ -82,11 +88,11 @@ export function computeGraphCoverage(
   const outsideCorpus = new Set<string>();
 
   for (const document of documents.values()) {
-    for (const rawTarget of collectRawTargets(document)) {
+    for (const { target, routable } of collectRawTargets(document)) {
       for (const candidate of resolveTargetCandidates(
         document.path,
-        rawTarget,
-        options.siteRouter,
+        target,
+        routable ? options.siteRouter : undefined,
       )) {
         if (
           isMarkdownFile(candidate) &&

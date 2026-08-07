@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,24 +8,27 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { compileContext, loadConfiguration } from "@wastech-mdlint/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { assertBuilt } from "../../core/test/support/assert-built.js";
+
 // M4: the only suite in this package that crosses a real OS process boundary. `smoke.test.ts` and
 // `context-slice.test.ts` use `InMemoryTransport`, and every `handle*.test.ts` calls handlers
 // in-process — none of those can catch stdio framing bugs, argv/entrypoint-guard breakage, or
 // stdout/stderr channel confusion. Here a real `StdioClientTransport → node dist/index.js →
 // StdioServerTransport` round trip proves the wire actually works.
 //
-// PRECONDITION: this requires `packages/mcp-server/dist/index.js` to already be built. It is under
-// the documented verification order (`npm run typecheck` is `tsc -b`, which emits before `npm test`
-// runs), but a bare `vitest run` on a never-built checkout will fail to spawn — build first.
+// PRECONDITION: `packages/mcp-server/dist/index.js` must already be built — `assertBuilt` fails fast
+// with the remedy, including the forced-build fallback for the case where `npm run build` cannot clear
+// it (W-56, see `packages/core/test/support/assert-built.ts`). Stating it here as prose instead is what
+// W-56 was: an unbuilt or stale spawn surfaces as a behavioral diff, and the only pointer a reader gets
+// is a command that may have just exited `0`.
 
-const DIST_INDEX = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../dist/index.js",
-);
-const fixturesDir = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "fixtures",
-);
+const testDir = path.dirname(fileURLToPath(import.meta.url));
+const DIST_INDEX = path.resolve(testDir, "../dist/index.js");
+const SRC_INDEX = path.resolve(testDir, "../src/index.ts");
+
+assertBuilt(DIST_INDEX, SRC_INDEX);
+
+const fixturesDir = path.resolve(testDir, "fixtures");
 const graphProject = path.join(fixturesDir, "graph-project");
 const lintFindingsProject = path.join(fixturesDir, "lint-findings-project");
 
@@ -72,10 +75,16 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await client.close();
-  await Promise.all(
-    tempDirs.map((dir) => rm(dir, { recursive: true, force: true })),
-  );
+  // `client?` and try/finally: `client` is assigned at the end of `beforeAll`, so a failing spawn or
+  // handshake leaves it `undefined` and an unguarded `close()` would replace the real failure with a
+  // TypeError while leaking every `mkdtemp` root this suite created.
+  try {
+    await client?.close();
+  } finally {
+    await Promise.all(
+      tempDirs.map((dir) => rm(dir, { recursive: true, force: true })),
+    );
+  }
 });
 
 function structuredOf(
@@ -85,16 +94,23 @@ function structuredOf(
 }
 
 // Assert the FULL M6 error payload survives the wire in `structuredContent` (not just the code): a
-// regression that dropped `message` or `hint` guidance must fail here. Every error case exercised in
-// this suite is a guided error, so `hint` is required for all of them. The payload round-trips
+// regression that dropped `message` or `hint` guidance must fail here. The payload round-trips
 // because each schema-carrying tool keeps its success schema strict while attaching schema-compatible
 // placeholder success fields on errors (see `errorResult`/`withErrorOutput`); with the validator
 // cache primed in `beforeAll`, a non-conforming
 // `structuredContent` would be rejected by the client — so this genuinely pins the wire contract.
+//
+// `hint` handling has two halves (P14.05/W-19). Whenever one is present, the rendered text block must
+// contain it — that is the assertion the exit criterion asks for, and it applies uniformly because
+// `errorResult` owns the concatenation. Whether one must be present at all is per-call: every guided
+// path in this suite requires a non-empty `hint`, and only the callers that opt out with
+// `guided: false` (the operational-error path, which deliberately carries none) relax it. Defaulting
+// to required is what keeps a future dropped hint failing instead of silently passing.
 async function expectToolError(
   name: string,
   args: Record<string, unknown>,
   code: string,
+  options: { guided?: boolean } = {},
 ): Promise<void> {
   const result = await client.callTool({ name, arguments: args });
   expect(result.isError).toBe(true);
@@ -106,13 +122,38 @@ async function expectToolError(
   expect(error.code).toBe(code);
   expect(typeof error.message).toBe("string");
   expect(error.message as string).not.toBe("");
-  expect(typeof error.hint).toBe("string");
-  expect(error.hint as string).not.toBe("");
+
+  if (options.guided ?? true) {
+    expect(typeof error.hint).toBe("string");
+    expect(error.hint as string).not.toBe("");
+  }
+
+  // The text block is what a host renders and what a model reads, so a hint that exists only in
+  // `structuredContent` is invisible to most callers.
+  if (typeof error.hint === "string") {
+    expect(firstText(result)).toContain(error.hint);
+  }
 }
 
 function firstText(result: Awaited<ReturnType<Client["callTool"]>>): string {
   const content = result.content as Array<{ type: string; text?: string }>;
   return content[0]?.text ?? "";
+}
+
+// The five file-based tools with the minimum arguments each `inputSchema` requires, so a `cwd` guard
+// can be asserted uniformly across all of them. `context-slice.depth` is deliberately omitted rather
+// than passed: it is `.min(0)`-constrained, and a value the wire schema rejects would be refused
+// pre-handler as a bare `InvalidParams` with no `structuredContent` — never reaching the guard.
+function fileBasedToolCalls(
+  cwd: string,
+): Array<{ name: string; args: Record<string, unknown> }> {
+  return [
+    { name: "lint-files", args: { cwd } },
+    { name: "context-graph", args: { cwd } },
+    { name: "context-slice", args: { cwd, query: "guide.md" } },
+    { name: "impact-analysis", args: { cwd, file: "guide.md" } },
+    { name: "compile-context", args: { cwd } },
+  ];
 }
 
 describe("mcp-server over stdio", () => {
@@ -221,6 +262,21 @@ describe("mcp-server over stdio", () => {
     expect((output.nodes as unknown[]).length).toBe(7);
     expect((output.cycles as unknown[]).length).toBe(1);
 
+    // The `summary` branch's two P15.02 keys, over the wire: `coverage` and `excluded` are advertised
+    // as optional in the superset `outputSchema`, so only a real round trip proves the client's
+    // schema validator accepts them rather than stripping the payload.
+    const summary = await client.callTool({
+      name: "context-graph",
+      arguments: { cwd: graphProject, format: "summary" },
+    });
+    expect(summary.isError).toBeFalsy();
+    const summaryOutput = structuredOf(summary);
+    expect(summaryOutput.excluded).toEqual(["cycle-a.md", "cycle-b.md"]);
+    expect(summaryOutput.coverage).toMatchObject({
+      nodeCount: 7,
+      filesOutsideCorpus: [],
+    });
+
     const dir = await makeTempDir("mcp-it-cg-invalid-");
     await writeFile(
       path.join(dir, "wastech-mdlint.config.json"),
@@ -318,5 +374,125 @@ describe("mcp-server over stdio", () => {
       { cwd: missingDir },
       "COMPILE_CONFIG_MISSING",
     );
+  });
+
+  // @boundary-guard installed-bin-spawn
+  //
+  // P14.01/W-18. What this proves that no in-process test can: before the guard, four of these five
+  // tools answered a nonexistent `cwd` with a *plausible* success — `No problems found.`, an empty
+  // graph, `No match for query`, `File not found in the context graph` — which is the client-visible
+  // shape being fixed, and a handler-level assertion would have passed on it just as happily. It also
+  // exercises the payload against the client's primed output-schema validator (`beforeAll`), so a
+  // rejection whose `structuredContent` did not conform to the tool's advertised `outputSchema` fails
+  // here rather than silently reaching a real host.
+  //
+  // It does NOT cover the `argv[1]`-vs-symlink half of this category — `bin-entrypoint.test.ts` keeps
+  // that. Both are tagged because the category is "the built entrypoint, spawned as a real process",
+  // and this suite is the only place the five tools' wire responses are visible at all.
+  it("rejects a nonexistent cwd with INVALID_INPUT on every file-based tool", async () => {
+    // A path under a temp dir that is never created, so the parent exists and only the leaf is
+    // missing — the ENOENT case, not a whole-tree-missing accident.
+    const parent = await makeTempDir("mcp-it-cwd-missing-");
+    const missing = path.join(parent, "no-such-directory");
+
+    for (const { name, args } of fileBasedToolCalls(missing)) {
+      await expectToolError(name, args, "INVALID_INPUT");
+    }
+  });
+
+  // P14.05/W-21. Over the wire because that is where the defect was measured: the field test saw
+  // `INTERNAL_ERROR` and "An unexpected internal error occurred." against a directory whose
+  // permissions were removed, while the CLI on the same fixture printed `Operational error: EACCES on
+  // docs/locked` and exited 2. It also exercises the new code against the client's primed
+  // output-schema validator (`beforeAll`) — `OPERATIONAL_ERROR` is a fresh member of the advertised
+  // `code` enum, so a payload the enum did not admit would be rejected here.
+  //
+  // Root ignores directory permissions and Windows has no equivalent model, so the fault only exists
+  // for an unprivileged POSIX user; the portable half is pinned by synthetic errno cases in
+  // `tool-response.test.ts`.
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "reports an unreadable directory as OPERATIONAL_ERROR naming the errno and the relative path",
+    async () => {
+      const dir = await makeTempDir("mcp-it-locked-");
+      const locked = path.join(dir, "docs", "locked");
+      await mkdir(locked, { recursive: true });
+      await writeFile(path.join(dir, "a.md"), "# A\n", "utf8");
+      await chmod(locked, 0o000);
+
+      try {
+        // `guided: false`: this path carries no `hint` by design — an errno-specific remedy would be
+        // guesswork — which is exactly the conditional-hint case the exit criterion calls for.
+        await expectToolError("lint-files", { cwd: dir }, "OPERATIONAL_ERROR", {
+          guided: false,
+        });
+
+        const result = await client.callTool({
+          name: "lint-files",
+          arguments: { cwd: dir },
+        });
+        expect(structuredOf(result).message).toBe(
+          "Operational error: EACCES on docs/locked",
+        );
+        // The absolute base must not survive the wire in any field of an `OPERATIONAL_ERROR`; only
+        // P14.01's `INVALID_INPUT` names a `cwd` absolutely, and there it is the failure itself.
+        expect(JSON.stringify(result)).not.toContain(dir);
+      } finally {
+        await chmod(locked, 0o755);
+      }
+    },
+  );
+
+  // P14.05/W-20 characterization pin, not a fix. The decision was to keep schema rejections
+  // contract-exempt (loosening a tool's advertised `inputSchema` purely so the handler can reject the
+  // shape better would destroy the discoverability contract a host uses to *construct* valid calls),
+  // so this passed before the change and passes after. Its value is failing if that shape ever moves
+  // — an SDK upgrade, or a decision to pre-validate — because `docs/guide/mcp-server.md` describes
+  // exactly this response to users.
+  it("leaves a schema-level rejection outside the structured contract, as documented", async () => {
+    const result = await client.callTool({
+      name: "context-slice",
+      arguments: { cwd: graphProject, query: "guide.md", depth: -1 },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
+    // Every claim the guide makes about this response: the JSON-RPC number leaks into user-facing
+    // text, and the text still names the offending field and its constraint.
+    expect(firstText(result)).toContain("-32602");
+    expect(firstText(result)).toContain("Input validation error");
+    expect(firstText(result)).toContain("depth");
+    expect(firstText(result)).toContain("Too small: expected number to be >=0");
+  });
+
+  // The caller-visible consequence of P15.02's `json` → `raw` rename, pinned where a host meets it.
+  // `format: "json"` is now refused by the wire `inputSchema` before the handler runs, so it lands in
+  // the documented pre-handler exemption above: `isError` with no `structuredContent`. That is loud
+  // rather than silent — a host still calling the old name gets an error naming the valid set, not a
+  // default projection it did not ask for.
+  it("refuses the retired context-graph format name at the wire, naming the valid set", async () => {
+    const result = await client.callTool({
+      name: "context-graph",
+      arguments: { cwd: graphProject, format: "json" },
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toBeUndefined();
+    expect(firstText(result)).toContain("-32602");
+    expect(firstText(result)).toContain("format");
+    expect(firstText(result)).toContain("raw");
+    expect(firstText(result)).toContain("summary");
+  });
+
+  it("rejects a cwd that exists but is a file with INVALID_INPUT on every file-based tool", async () => {
+    // The ENOTDIR half of the same guard: `stat` succeeds here, so only the `isDirectory()` check (or
+    // a downstream ENOTDIR) can catch it. Asserting on the code rather than platform-formatted text
+    // keeps this portable.
+    const dir = await makeTempDir("mcp-it-cwd-file-");
+    const filePath = path.join(dir, "not-a-directory.md");
+    await writeFile(filePath, "# Not a directory\n", "utf8");
+
+    for (const { name, args } of fileBasedToolCalls(filePath)) {
+      await expectToolError(name, args, "INVALID_INPUT");
+    }
   });
 });

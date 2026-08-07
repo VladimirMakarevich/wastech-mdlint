@@ -19,6 +19,7 @@ import {
   lintConfigSchema,
   loadConfiguration,
   ruleEntrySchema,
+  ruleRegistry,
   type DocCluster,
   type GeneratedInitConfig,
   type InferredRule,
@@ -33,6 +34,7 @@ import {
   extractExistingRuleIds,
   formatDraftSummary,
   formatNotWrittenSummary,
+  formatScanExclusions,
   formatWriteFailureSummary,
   formatWriteSummary,
   groupInferredRulesByCategory,
@@ -100,6 +102,18 @@ async function run(
     ...ioOverrides,
   });
   return { exitCode, stdout: stdout.read(), stderr: stderr.read() };
+}
+
+// Split a generated workflow's `run:` line the way POSIX sh would, so a test can execute the emitted
+// argv instead of a hand-written approximation of it. Only single quotes need handling — that is the
+// only quoting `buildCiWorkflowYaml` emits (`shellSingleQuote`), including its `'\''` escape.
+function shellArgv(command: string): string[] {
+  return [...command.trim().matchAll(/'((?:[^']|'\\'')*)'|(\S+)/g)].map(
+    (match) =>
+      match[1] === undefined
+        ? (match[2] as string)
+        : match[1].replaceAll("'\\''", "'"),
+  );
 }
 
 // A --yes-shaped prompter: every method returns exactly what --yes would pick without a prompt, so
@@ -521,6 +535,30 @@ describe("init command · existing config handling", () => {
     ).resolves.toBe(existingConfigText);
   });
 
+  it("--on-existing skip over an unloadable config still exits 0 (deliberate no-write)", async () => {
+    // The other half of the P14.02 split, on the same input the merge cases above exit 2 on: the
+    // file being unloadable is irrelevant to `skip`, which never intended to write. Only the reason
+    // for not writing separates the two outcomes, so both need pinning against the same fixture.
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      "wastech-mdlint.config.json": "{ not json",
+    });
+
+    const result = await run(
+      ["init", cwd, "--yes", "--on-existing", "skip"],
+      cwd,
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain(
+      "skipped — existing config left untouched.",
+    );
+    expect(result.stdout).not.toContain("Not written:");
+    await expect(
+      readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8"),
+    ).resolves.toBe("{ not json");
+  });
+
   it("passes the existing-config prompt a repository-relative POSIX path, never an absolute one", async () => {
     const cwd = await fixtureRepo({
       ...CROSS_LINKED_DOCS_FIXTURE,
@@ -556,7 +594,11 @@ describe("init command · existing config handling", () => {
       cwd,
     );
 
-    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    // Exit 2, not 0 (P14.02 / W-13): the refusal is caused by an invalid file, which is an
+    // operational failure, not the deliberate no-write that `--on-existing skip` is. The four
+    // sibling merge-abort cases below pin the same code for the other ways the config can be
+    // unloadable.
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
     expect(result.stdout).toContain(
       "WARNING: the existing config could not be read, parsed, or validated",
     );
@@ -580,7 +622,7 @@ describe("init command · existing config handling", () => {
       cwd,
     );
 
-    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
     expect(result.stdout).toContain(
       "WARNING: the existing config could not be read, parsed, or validated",
     );
@@ -606,7 +648,7 @@ describe("init command · existing config handling", () => {
       cwd,
     );
 
-    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
     expect(result.stdout).toContain(
       "WARNING: the existing config could not be read, parsed, or validated",
     );
@@ -637,7 +679,7 @@ describe("init command · existing config handling", () => {
       cwd,
     );
 
-    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
     expect(result.stdout).toContain(
       "WARNING: the existing config could not be read, parsed, or validated",
     );
@@ -665,7 +707,7 @@ describe("init command · existing config handling", () => {
       cwd,
     );
 
-    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
     expect(result.stdout).toContain(
       "WARNING: the existing config could not be read, parsed, or validated",
     );
@@ -801,8 +843,11 @@ describe("init command · writing the config (P6.04)", () => {
     // scanned corpus back to node_modules/.git/dist after writing.
     expect(written.exclude).toContain("**/node_modules/**");
     expect(written.exclude).toContain("**/.git/**");
-    // Audit L-7: hidden trees are excluded and gitignore is honored, matching what the scan saw.
-    expect(written.exclude).toContain("**/.*/**");
+    // W-15 (P14.03): a hidden *dependency* tree is excluded by name, but no glob excludes a
+    // directory merely for starting with a dot — that prune belongs to the scan, not to the corpus.
+    expect(written.exclude).toContain("**/.venv/**");
+    expect(written.exclude).not.toContain("**/.*/**");
+    // Audit L-7's other half: gitignore is honored, matching what the scan saw.
     expect(written.respectGitignore).toBe(true);
     // Forward-compat smoke check: the written config must load without a ConfigError.
     await expect(loadConfiguration({ cwd })).resolves.toBeDefined();
@@ -1292,10 +1337,12 @@ describe("init command · writing the config (P6.04)", () => {
     );
     // ...but the workflow is anchored at the repo root, where GitHub will actually load it, and it
     // scopes lint to the config's directory (so include/exclude resolve there) plus an explicit
-    // --config — both single-quoted, POSIX, relative to the repo root.
+    // --config — both single-quoted and POSIX. `[path]` is relative to the repo root the workflow
+    // runs from; `--config` is relative to `[path]`, which is the base the CLI resolves it against
+    // (P14.04).
     const workflow = await readFile(path.join(cwd, workflowPath), "utf8");
     expect(workflow).toContain(
-      "npx wastech-mdlint lint 'docs' --fail-on error --config 'docs/wastech-mdlint.config.json'",
+      "npx wastech-mdlint lint 'docs' --fail-on error --config 'wastech-mdlint.config.json'",
     );
     // The dead-workflow location under docs/ is never created.
     await expect(
@@ -1313,18 +1360,27 @@ describe("init command · writing the config (P6.04)", () => {
       "docs/b.md": "# B\n\nSee [A](a.md).\n",
     });
 
-    const initResult = await run(["init", "docs", "--yes"], cwd);
+    const initResult = await run(
+      ["init", "docs", "--yes", "--with-ci-workflow"],
+      cwd,
+    );
     expect(initResult.exitCode).toBe(EXIT_CODE_SUCCESS);
 
-    // Mirror the workflow's `lint <configDir> --config <configPath>` (absolute here so the lint cwd
-    // is unambiguous, exactly as the repo-root-run workflow resolves `docs`).
+    // Run the emitted argv *verbatim*, from the repo root where GitHub runs the workflow. This test
+    // used to mirror the command with hand-written absolute paths, which is precisely why the
+    // generator's relative `--config` form went unguarded through P14.04's change of base: only
+    // executing what was actually written can catch a workflow that fails on its first run.
+    const workflow = await readFile(
+      path.join(cwd, ".github", "workflows", "wastech-mdlint.yml"),
+      "utf8",
+    );
+    const lintCommand = workflow
+      .split("\n")
+      .find((line) => line.includes("npx wastech-mdlint lint"));
+    expect(lintCommand).toBeDefined();
+
     const lintResult = await run(
-      [
-        "lint",
-        path.join(cwd, "docs"),
-        "--config",
-        path.join(cwd, "docs", CONFIG_FILE),
-      ],
+      shellArgv(lintCommand as string).slice(2),
       cwd,
     );
 
@@ -1362,10 +1418,13 @@ describe("init command · writing the config (P6.04)", () => {
     expect(written.$schema).toBe(
       "../node_modules/@wastech-mdlint/cli/schema.json",
     );
-    // Workflow is anchored at the project root, not under docs/.
+    // Workflow is anchored at the project root, not under docs/ — `[path]` carries that evidence,
+    // since `--config` is relative to it (P14.04).
     await expect(
       readFile(path.join(cwd, workflowPath), "utf8"),
-    ).resolves.toContain("--config 'docs/wastech-mdlint.config.json'");
+    ).resolves.toContain(
+      "lint 'docs' --fail-on error --config 'wastech-mdlint.config.json'",
+    );
     await expect(
       readFile(path.join(cwd, "docs", workflowPath), "utf8"),
     ).rejects.toThrow();
@@ -1405,10 +1464,11 @@ describe("init command · writing the config (P6.04)", () => {
     expect(written.$schema).toBe(
       "../../node_modules/@wastech-mdlint/cli/schema.json",
     );
-    // Workflow lives at the repo root (where GitHub loads it), pointed at the nested config...
+    // Workflow lives at the repo root (where GitHub loads it), pointed at the nested config via a
+    // repo-root-relative `[path]` and a `--config` relative to that (P14.04)...
     const workflow = await readFile(path.join(cwd, workflowPath), "utf8");
     expect(workflow).toContain(
-      "--config 'packages/foo/wastech-mdlint.config.json'",
+      "lint 'packages/foo' --fail-on error --config 'wastech-mdlint.config.json'",
     );
     // ...and never at the dead `packages/foo/.github/...` location.
     await expect(
@@ -1487,13 +1547,13 @@ describe("init command · writing the config (P6.04)", () => {
     }
   });
 
-  it("shell-quotes a config path with spaces so the lint command stays a single argument", async () => {
+  it("shell-quotes a path with spaces so the lint command stays a single argument", async () => {
     const workflowPath = path.join(
       ".github",
       "workflows",
       "wastech-mdlint.yml",
     );
-    // A legal target directory containing a space: the config path must not split into two tokens.
+    // A legal target directory containing a space: it must not split into two tokens.
     const cwd = await fixtureRepo({
       ".git/HEAD": "ref: refs/heads/main\n",
       "doc site/a.md": "# A\n\nSee [B](b.md).\n",
@@ -1510,11 +1570,13 @@ describe("init command · writing the config (P6.04)", () => {
       readFile(path.join(cwd, "doc site", CONFIG_FILE), "utf8"),
     ).resolves.toBeDefined();
     const workflow = await readFile(path.join(cwd, workflowPath), "utf8");
-    // Single-quoted as one shell argument — never the bare, space-split `--config doc site/...`.
+    // Since P14.04 the space lives in `[path]`, not in `--config` (which is now a bare filename
+    // relative to it), so that argument is where the quoting has to hold: single-quoted as one shell
+    // argument, never the bare, space-split `lint doc site`.
     expect(workflow).toContain(
-      "--config 'doc site/wastech-mdlint.config.json'",
+      "lint 'doc site' --fail-on error --config 'wastech-mdlint.config.json'",
     );
-    expect(workflow).not.toContain("--config doc site/");
+    expect(workflow).not.toContain("lint doc site");
   });
 
   it("never overwrites an existing CI workflow file", async () => {
@@ -1595,16 +1657,28 @@ describe("init command · hidden and gitignored trees (L-7)", () => {
     const init = await run(["init", cwd, "--yes"], cwd);
     expect(init.exitCode).toBe(EXIT_CODE_SUCCESS);
 
-    // Not proposed: neither in the printed draft nor in the file that draft produced.
-    for (const noise of [".github", ".venv", "generated-docs"]) {
-      expect(init.stdout).not.toContain(noise);
+    // Since P14.03 these names DO appear in stdout — in the disclosure that says they were skipped
+    // (W-14). What L-7 is about is that they are not *proposed*, so the assertion is now scoped to
+    // the Include section and to the written `include` rather than to the whole of stdout.
+    const includeSection = init.stdout.slice(
+      init.stdout.indexOf("Include ("),
+      init.stdout.indexOf("Excluded from the scan:"),
+    );
+    expect(includeSection).toContain("docs/**/*.{md,mdx}");
+    for (const skipped of [".github", ".venv", "generated-docs"]) {
+      expect(includeSection).not.toContain(skipped);
+      expect(init.stdout).toContain(skipped);
     }
+
     const written = readConfig(
       await readFile(path.join(cwd, CONFIG_FILE), "utf8"),
     );
     expect(written.include).toEqual(["docs/**/*.{md,mdx}"]);
-    expect(written.exclude).toContain("**/.*/**");
     expect(written.respectGitignore).toBe(true);
+    // `.venv` is excluded because it is a dependency tree named in DEFAULT_NOISE_DIR_NAMES, and
+    // `.github` is not excluded at all — `include` is what keeps it out of this config's corpus.
+    expect(written.exclude).toContain("**/.venv/**");
+    expect(written.exclude).not.toContain("**/.*/**");
 
     // Not linted: the honest half of the fix. `--fail-on off` keeps the exit code at 0 regardless
     // of findings, and `files` carries the full analyzed corpus.
@@ -1616,6 +1690,221 @@ describe("init command · hidden and gitignored trees (L-7)", () => {
     const { files } = JSON.parse(lint.stdout) as { files: string[] };
 
     expect(files).toEqual(["docs/a.md", "docs/b.md"]);
+  });
+
+  it("names the hidden count and the reason in the summary (W-14)", async () => {
+    const cwd = await fixtureRepo(HONEST_SCAN_FIXTURE);
+
+    const init = await run(["init", cwd, "--yes"], cwd);
+    expect(init.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    // The count is the one thing the field test could not get from the draft: `.github` holds two
+    // Markdown files and nothing said so, leaving a 63-file gap on the real repository silent.
+    expect(init.stdout).toContain(
+      "hidden directories: 2 Markdown files in 1 directory whose name starts with a dot — .github (2)",
+    );
+    // Per reason, not one total: each class gets its own line, and the two uncounted ones say so
+    // rather than implying a zero.
+    expect(init.stdout).toContain(
+      "build and dependency directories: 1 directory skipped by name, contents not counted — .venv.",
+    );
+    expect(init.stdout).toContain(
+      "gitignored directories: 1 directory skipped, contents not counted — generated-docs.",
+    );
+    expect(init.stdout).not.toContain("4 files excluded");
+  });
+});
+
+// W-14 (P14.03): the field test's own shape — a repository whose LLM-facing documentation lives
+// under dot-directories, beside an ordinary `docs/` cluster, a nested dependency tree, and a
+// gitignored build output. On the real target this shape left the corpus at 139 files where
+// `git ls-files` tracked 202, and nothing said so.
+//
+// The fixture and its companion tracked-file list are exported module-level consts so P16.01 §2 can
+// import them for the both-directions corpus comparison (nothing missing, nothing extra) rather than
+// building a second dot-directory repository that drifts from this one.
+export const DOT_DIRECTORY_FIXTURE: Record<string, string> = {
+  // `node_modules/` is gitignored as a real repository would have it, which is also what makes
+  // DOT_DIRECTORY_TRACKED_MARKDOWN below a faithful `git ls-files` oracle rather than
+  // "tracked minus whatever the test decided to drop".
+  ".gitignore": "generated-docs/\nnode_modules/\n",
+  "docs/guide.md": "# Guide\n",
+  "docs/reference.md": "# Reference\n",
+  ".agents/rules/testing.md": "# Testing\n",
+  ".agents/rules/architecture.md": "# Architecture\n",
+  ".claude/skills/lint/SKILL.md": "# Skill\n",
+  "mobile/node_modules/leftpad/README.md": "# leftpad\n",
+  "generated-docs/api/one.md": "# One\n",
+};
+
+// What `git ls-files '*.md'` would list for DOT_DIRECTORY_FIXTURE: every Markdown file the fixture's
+// own `.gitignore` does not exclude, sorted. The oracle the `comm` comparison runs against.
+export const DOT_DIRECTORY_TRACKED_MARKDOWN: string[] = [
+  ".agents/rules/architecture.md",
+  ".agents/rules/testing.md",
+  ".claude/skills/lint/SKILL.md",
+  "docs/guide.md",
+  "docs/reference.md",
+];
+
+describe("init command · the scan-exclusion disclosure (W-14)", () => {
+  it("names the excluded count and the reason for each class", async () => {
+    const cwd = await fixtureRepo(DOT_DIRECTORY_FIXTURE);
+
+    const init = await run(["init", cwd, "--yes"], cwd);
+
+    expect(init.exitCode).toBe(EXIT_CODE_SUCCESS);
+    // The count and the reason together — a count alone does not tell the user that `.claude/` was
+    // considered and dropped, which is the sentence the field test found missing.
+    expect(init.stdout).toContain(
+      "hidden directories: 3 Markdown files in 2 directories whose name starts with a dot — .agents (2), .claude (1)",
+    );
+    expect(init.stdout).toContain(
+      "build and dependency directories: 1 directory skipped by name, contents not counted — node_modules.",
+    );
+    expect(init.stdout).toContain(
+      "gitignored directories: 1 directory skipped, contents not counted — generated-docs.",
+    );
+  });
+
+  it("accounts for every tracked Markdown file as either linted or disclosed", async () => {
+    // The `comm`-against-`git ls-files` arithmetic the field test used to prove its 63-file gap was
+    // entirely the hidden-directory prune: corpus + disclosed hidden must equal the tracked set,
+    // with the disclosed number read out of the summary rather than restated by the test.
+    const cwd = await fixtureRepo(DOT_DIRECTORY_FIXTURE);
+
+    const init = await run(["init", cwd, "--yes"], cwd);
+    expect(init.exitCode).toBe(EXIT_CODE_SUCCESS);
+    const disclosed = /hidden directories: (\d+) Markdown files/.exec(
+      init.stdout,
+    );
+    expect(disclosed).not.toBeNull();
+
+    const lint = await run(
+      ["lint", cwd, "--format", "json", "--fail-on", "off"],
+      cwd,
+    );
+    expect(lint.exitCode).toBe(EXIT_CODE_SUCCESS);
+    const { files } = JSON.parse(lint.stdout) as { files: string[] };
+
+    expect(files).toEqual(["docs/guide.md", "docs/reference.md"]);
+    expect(files.length + Number(disclosed![1])).toBe(
+      DOT_DIRECTORY_TRACKED_MARKDOWN.length,
+    );
+  });
+
+  // @boundary-guard shared-exclude
+  // W-57 / P16.01 §2. The arithmetic above is necessary and not sufficient: `corpus + disclosed ==
+  // tracked` also holds when the corpus drops one tracked file and gains one untracked file, which is
+  // the failure a count cannot see. This is the set comparison instead — the two `comm` directions the
+  // field test ran to account for its 63-file gap — so *which* files, not how many.
+  //
+  // The `extra` direction is the one that would have caught the blocker: an untracked
+  // `node_modules` document entering the corpus is invisible to a total that the same run's exclusion
+  // summary also feeds. Asserted at the host boundary, over a config this repository did not
+  // hand-write but `init` chose, because "the corpus a user gets on their first two commands" is the
+  // property, not "the corpus a config we authored produces".
+  it("accounts for the corpus against the tracked set in both directions", async () => {
+    const cwd = await fixtureRepo(DOT_DIRECTORY_FIXTURE);
+
+    const init = await run(["init", cwd, "--yes"], cwd);
+    expect(init.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const lint = await run(
+      ["lint", cwd, "--format", "json", "--fail-on", "off"],
+      cwd,
+    );
+    expect(lint.exitCode).toBe(EXIT_CODE_SUCCESS);
+    const { files } = JSON.parse(lint.stdout) as { files: string[] };
+
+    const corpus = new Set(files);
+    const tracked = new Set(DOT_DIRECTORY_TRACKED_MARKDOWN);
+    const missing = DOT_DIRECTORY_TRACKED_MARKDOWN.filter(
+      (file) => !corpus.has(file),
+    );
+    const extra = files.filter((file) => !tracked.has(file));
+
+    // Nothing the fixture does not track — not the gitignored `generated-docs/api/one.md`, and above
+    // all not `mobile/node_modules/leftpad/README.md`.
+    expect(extra).toEqual([]);
+    // And the gap is exactly the dot-directory files, named rather than counted: the prune `init`
+    // discloses and does not encode (W-15), which is why they are absent from an `init`-written
+    // `include` while a zero-config run would read them.
+    expect(missing).toEqual([
+      ".agents/rules/architecture.md",
+      ".agents/rules/testing.md",
+      ".claude/skills/lint/SKILL.md",
+    ]);
+    // The number in the disclosure is a claim about that same set, so it is checked against it rather
+    // than restated: a disclosure that drifts from the gap it explains is the W-14 defect again.
+    const disclosed = /hidden directories: (\d+) Markdown files/.exec(
+      init.stdout,
+    );
+    expect(disclosed).not.toBeNull();
+    expect(Number(disclosed![1])).toBe(missing.length);
+  });
+
+  it("tells a dot-directory-only repository that the default lints those files anyway", async () => {
+    // The branch the unconditional wording got wrong. With every Markdown file behind a dot, the
+    // scan sees no cluster, `init` omits `include`, and the dot-matching `**/*.md` default lints
+    // exactly the files the disclosure just named — so "add a pattern" would be false advice, and
+    // it would contradict the `Include (…)` line printed two lines above it.
+    const cwd = await fixtureRepo({
+      ".agents/rules/testing.md": "# Testing\n",
+      ".agents/rules/architecture.md": "# Architecture\n",
+    });
+
+    const init = await run(["init", cwd, "--yes"], cwd);
+    expect(init.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(init.stdout).toContain(
+      "hidden directories: 2 Markdown files in 1 directory",
+    );
+    expect(init.stdout).toContain("no include will be written");
+    expect(init.stdout).not.toContain("add a pattern");
+
+    const written = readConfig(
+      await readFile(path.join(cwd, CONFIG_FILE), "utf8"),
+    );
+    expect(written.include).toBeUndefined();
+
+    const lint = await run(
+      ["lint", cwd, "--format", "json", "--fail-on", "off"],
+      cwd,
+    );
+    expect(lint.exitCode).toBe(EXIT_CODE_SUCCESS);
+    const { files } = JSON.parse(lint.stdout) as { files: string[] };
+    expect(files).toEqual([
+      ".agents/rules/architecture.md",
+      ".agents/rules/testing.md",
+    ]);
+  });
+
+  it("lints the dot-directories once the user adds the pattern the disclosure suggests", async () => {
+    // W-15's answer made this possible at all: the lint-time default no longer excludes a directory
+    // for starting with a dot, so the suggested `include` entry is sufficient on its own. Before
+    // P14.03 the same edit produced an empty corpus, because `exclude` wins over `include`.
+    const cwd = await fixtureRepo({
+      ...DOT_DIRECTORY_FIXTURE,
+      [CONFIG_FILE]: JSON.stringify({
+        // Verbatim the shape `formatScanExclusions` suggests: the MARKDOWN_GLOB_SUFFIX tail, so the
+        // test exercises the advice the user is actually given rather than a narrower hand-written one.
+        include: [
+          "docs/**/*.{md,mdx}",
+          ".agents/**/*.{md,mdx}",
+          ".claude/**/*.{md,mdx}",
+        ],
+        rules: [],
+      }),
+    });
+
+    const lint = await run(
+      ["lint", cwd, "--format", "json", "--fail-on", "off"],
+      cwd,
+    );
+
+    expect(lint.exitCode).toBe(EXIT_CODE_SUCCESS);
+    const { files } = JSON.parse(lint.stdout) as { files: string[] };
+    expect(files).toEqual(DOT_DIRECTORY_TRACKED_MARKDOWN);
   });
 });
 
@@ -2031,6 +2320,7 @@ describe("formatDraftSummary", () => {
       existingConfigUnreadable: false,
       clustersWereOffered: false,
       existingConfigHasComments: false,
+      pruning: { directories: [] },
       ...overrides,
     };
   }
@@ -2116,6 +2406,160 @@ describe("formatDraftSummary", () => {
     expect(summary).toContain(
       "WARNING: the existing config could not be read, parsed, or validated",
     );
+  });
+
+  // W-39: P16.05 decided against widening inference to reach SIZE-001/LLM-001, so the draft has to
+  // name them — the README leads with both, and an absence a user has to notice is the gap the
+  // decision would otherwise leave open. Unconditional, including on the merge path, because it
+  // states what `init` proposes rather than what the resulting config contains.
+  it.each([["none"], ["merge"], ["overwrite"]] as const)(
+    "names SIZE-001 and LLM-001 as never inferred, with their pages (%s)",
+    (existingConfigAction) => {
+      const summary = formatDraftSummary(
+        buildSelections({ existingConfigAction }),
+        "wastech-mdlint.config.json",
+      );
+
+      expect(summary).toContain("Not proposed by init:");
+      expect(summary).toContain("SIZE-001");
+      expect(summary).toContain("LLM-001");
+      expect(summary).toContain("docs/guide/rules/SIZE-001.md");
+      expect(summary).toContain("docs/guide/rules/LLM-001.md");
+    },
+  );
+
+  // The two rules are absent from inference, not from the product: a note claiming a rule id the
+  // registry does not carry would send the reader to a page that does not exist.
+  it("names only rule ids the registry actually ships", () => {
+    for (const id of ["SIZE-001", "LLM-001"]) {
+      expect(ruleRegistry.has(id)).toBe(true);
+    }
+  });
+});
+
+describe("formatScanExclusions", () => {
+  it("renders one line per reason and no aggregate total", () => {
+    const lines = formatScanExclusions(
+      {
+        directories: [
+          { path: ".agents", reason: "hidden", markdownFileCount: 23 },
+          { path: ".claude", reason: "hidden", markdownFileCount: 28 },
+          { path: "generated-docs", reason: "gitignored" },
+          { path: "node_modules", reason: "noise" },
+        ],
+      },
+      true,
+    );
+
+    expect(lines[0]).toBe("Excluded from the scan:");
+    expect(lines).toHaveLength(4);
+    expect(lines[1]).toContain("51 Markdown files in 2 directories");
+    expect(lines[1]).toContain(".agents (23), .claude (28)");
+    expect(lines[2]).toContain("contents not counted — node_modules");
+    expect(lines[3]).toContain("contents not counted — generated-docs");
+
+    // The defect this closes is a single number the user skims past, so no line may present the
+    // three classes as one total.
+    expect(lines.join("\n")).not.toContain("52 ");
+  });
+
+  it("renders nothing when the scan pruned nothing worth disclosing", () => {
+    expect(formatScanExclusions({ directories: [] }, true)).toEqual([]);
+
+    // A hidden directory holding no Markdown is not a finding — reporting it would train the reader
+    // to ignore the line that matters.
+    expect(
+      formatScanExclusions(
+        {
+          directories: [
+            { path: ".husky", reason: "hidden", markdownFileCount: 0 },
+          ],
+        },
+        true,
+      ),
+    ).toEqual([]);
+  });
+
+  it("dedupes noise basenames and caps a long list with a +N more tail", () => {
+    const lines = formatScanExclusions(
+      {
+        directories: [
+          ...["a", "b", "c"].map((dir) => ({
+            path: `${dir}/node_modules`,
+            reason: "noise" as const,
+          })),
+          ...["d", "e", "f", "g", "h", "i"].map((dir) => ({
+            path: `${dir}/${dir}build`,
+            reason: "noise" as const,
+          })),
+        ],
+      },
+      true,
+    );
+
+    // Nine pruned directories, seven distinct basenames: the count is directories, the list is
+    // names, and the cap keeps the line readable on a monorepo.
+    expect(lines[1]).toContain("9 directories skipped by name");
+    expect(lines[1]).toContain(
+      "dbuild, ebuild, fbuild, gbuild, hbuild, +2 more",
+    );
+    expect(lines[1]).not.toContain("ibuild");
+  });
+
+  it("uses singular wording for a single file in a single directory", () => {
+    const lines = formatScanExclusions(
+      {
+        directories: [
+          { path: ".claude", reason: "hidden", markdownFileCount: 1 },
+        ],
+      },
+      true,
+    );
+
+    expect(lines[1]).toContain("1 Markdown file in 1 directory");
+    // The actionable half: a dot-directory is invisible to the scan, so no proposal covers it. The
+    // suggested tail is MARKDOWN_GLOB_SUFFIX, not a literal `*.md`: the count in the same sentence
+    // was produced with `.md` + `.mdx`, so a narrower pattern would under-deliver on it (W-09).
+    expect(lines[1]).toContain(
+      'add a pattern such as ".claude/**/*.{md,mdx}" to lint it',
+    );
+  });
+
+  it("says the default lints them instead when no include will be written", () => {
+    // The reachable case this closes: a repository whose only Markdown is in dot-directories offers
+    // the scan no cluster at all, so `include` is omitted and the dot-matching `**/*.md` default is
+    // what governs. Telling that user to add a pattern would contradict the `Include (…)` line
+    // printed two lines above.
+    const lines = formatScanExclusions(
+      {
+        directories: [
+          { path: ".agents", reason: "hidden", markdownFileCount: 2 },
+        ],
+      },
+      false,
+    );
+
+    expect(lines[1]).toContain("2 Markdown files in 1 directory");
+    expect(lines[1]).toContain("no include will be written");
+    expect(lines[1]).toContain("**/*.md default stays in force");
+    expect(lines[1]).not.toContain("add a pattern");
+  });
+
+  it("sorts the hidden entries at the rendering site", () => {
+    // `ScanPruning` is public core API and this formatter is exported, so an unsorted record must not
+    // change either the order or which entries survive the cap.
+    const lines = formatScanExclusions(
+      {
+        directories: [
+          { path: ".claude", reason: "hidden", markdownFileCount: 1 },
+          { path: ".agents", reason: "hidden", markdownFileCount: 2 },
+        ],
+      },
+      true,
+    );
+
+    expect(lines[1]).toContain(".agents (2), .claude (1)");
+    expect(lines[1]).toContain('add a pattern such as ".agents/**/*.{md,mdx}"');
   });
 });
 

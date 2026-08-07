@@ -95,6 +95,14 @@ export const customRuleEntrySchema = z
     id: z.string().min(1),
     description: z.string().optional(),
     severity: severityOverrideSchema.optional(),
+    // Deliberately looser than `schema.json`'s `target` enum, which W-37 now derives from the same
+    // `ASSERTION_TARGETS` authority. Narrowing this to a `z.enum` would preempt resolveCustomRule's
+    // check, which is *stricter* — it validates the target against the specific assert kind and says
+    // which one was expected — with a generic Zod message. It would also fire earlier on the MCP
+    // `lint` wire path (tools/lint.ts), where a pre-handler rejection escapes the M6
+    // `{ code, message, hint }` contract entirely. Editor and linter cannot drift apart on the
+    // vocabulary now that both read `ASSERTION_TARGETS`; the enum is a coarse pre-filter and this
+    // loader defers the verdict to the one place that can give a useful one.
     target: z.string().optional(),
     options: z
       .object({
@@ -111,6 +119,9 @@ export const customRuleEntrySchema = z
 // crashed in resolveCustomRule's canonicalizeRuleId(undefined). The refine is scoped to this wrapper
 // rather than `ruleEntrySchema` itself because that schema is shared with the MCP `lint` tool's wire
 // schema (see the comment above `ruleEntrySchema`), which must keep accepting "custom" there.
+// It stays load-bearing for *acceptance* even though `ruleEntryBranchIndex` below now decides which
+// branch a rejection *renders* from (P13.06): the two are independent, and dropping the refine would
+// make {"rule":"custom"} a valid standard entry again.
 const standardRuleEntrySchema = ruleEntrySchema.refine(
   (entry) => entry.rule !== "custom",
   {
@@ -127,6 +138,28 @@ export const ruleEntryUnionSchema = z.union([
   customRuleEntrySchema,
   standardRuleEntrySchema,
 ]);
+
+/**
+ * Which branch of `ruleEntryUnionSchema` a raw entry was *meant* for (P13.06 / C7).
+ *
+ * Zod reports a union failure as one `invalid_union` issue carrying an already-formatted issue list
+ * per branch, with no indication of which branch the author intended. A diagnostic that expands that
+ * detail has to choose, and choosing by issue count picks the wrong branch for custom entries — a
+ * typo inside an `assert` block yields two precise issues on the custom branch and one misleading
+ * `Unrecognized keys: "id", "description"` on the standard branch.
+ *
+ * A real `z.discriminatedUnion("rule", …)` cannot express this: `standardRuleEntrySchema`'s `rule`
+ * is `z.string()` (C3 accepts `ref-001`, `REF001`, …), which has no finite discriminator value set,
+ * and Zod throws `Invalid discriminated union option` for such a branch. So the rule lives here, next
+ * to the union, where branch order and the discrimination rule cannot drift apart.
+ */
+export function ruleEntryBranchIndex(entry: unknown): number {
+  return typeof entry === "object" &&
+    entry !== null &&
+    (entry as { rule?: unknown }).rule === "custom"
+    ? 0
+    : 1;
+}
 
 export const lintConfigSchema = z
   .object({

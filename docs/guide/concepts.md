@@ -35,7 +35,9 @@ Ordering uses a plain code-point string comparison, not locale-aware collation �
 
 ## Token estimation
 
-The context-budget rules ([SIZE-001](rules/SIZE-001.md), [LLM-001](rules/LLM-001.md)) estimate tokens with a simple, isolated heuristic (`ceil(bytes / 4)`). It is deliberately kept in one place so it can be replaced with a real tokenizer later without touching unrelated code.
+The context-budget rules ([SIZE-001](rules/SIZE-001.md), [LLM-001](rules/LLM-001.md)) estimate tokens with a simple, isolated heuristic: `ceil(characters / 4)`, counting UTF-16 code units — **not** bytes, which `SIZE-001`'s separate `bytes` metric measures and which run about 3× higher for CJK content. It is deliberately kept in one place so it can be replaced with a real tokenizer later without touching unrelated code.
+
+Because a real tokenizer emits more tokens per character for non-Latin scripts, the estimate errs **low** for Cyrillic or CJK documents — the wrong direction for a budget whose job is preventing context overflow, so set those budgets with headroom. Every finding that quotes a token count says so in its own message, so this page is not the only place the calibration is stated.
 
 ## Local & data-only
 

@@ -16,13 +16,30 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
   "$schema": "./node_modules/@wastech-mdlint/cli/schema.json",
 
   // Files to lint (globs). Default when omitted: ["**/*.md"].
+  //
+  // Anchoring: a pattern WITH a "/" is root-anchored, one WITHOUT is matched at any depth.
+  // So "NOTE.md" and "*.md" match at any depth, "./NOTE.md" matches only the root file, and
+  // "node_modules/**" prunes only the ROOT copy while "**/node_modules/**" prunes every copy.
+  // Ordering: entries are applied left to right, a leading "!" subtracts, and the last entry
+  // that matches a path wins. Full rules: ./configuration.md#glob-semantics
   "include": ["**/*.md"],
 
-  // Globs to remove from the set. `exclude` WINS over `include`.
-  "exclude": ["node_modules/**", "dist/**", ".git/**"],
+  // Globs to remove from the set. `exclude` WINS over `include`. Same anchoring and ordering as
+  // `include` — but a "!" here cannot reach into a directory an earlier entry already pruned.
+  //
+  // Every run already excludes 12 noise globs (node_modules, dist, build, .git, .venv, …) before
+  // you write anything, and what you put here is APPENDED to them rather than replacing them — so
+  // "[]" is not an opt-out, and deleting an entry cannot remove a default. Negate one instead
+  // ("!**/build/**" for a single tree, "!**" for all of them). Each one names a dependency or build
+  // tree; a directory is never excluded merely for starting with a dot, so .github/ and .agents/
+  // are linted by default even though the `init` scan will not propose them.
+  // Full list and rules: ./configuration.md#what-is-excluded-before-you-write-anything
+  "exclude": ["**/node_modules/**", "**/dist/**", "**/.git/**"],
 
-  // When true, also skip files ignored by .gitignore. Default: false — but a fresh `init` write
-  // sets an explicit true, matching the trees its own scan skipped (a `merge` never adds it).
+  // When true, also skip files ignored by .gitignore. Default: false, deliberately — a .gitignore
+  // says what not to commit, which is not the same as "do not lint this", and the trees a first run
+  // must skip are covered by the default `exclude` above. A fresh `init` write does set an explicit
+  // true, matching the trees its own scan skipped (a `merge` never adds it).
   "respectGitignore": false,
 
   // Shared settings inherited by the rules that understand them.
@@ -77,7 +94,7 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
       "options": {
         "column": "Status", // required
         "values": ["todo", "doing", "done"], // required (≥1)
-        "caseSensitive": false, // default false
+        "caseSensitive": false, // default true
         "section": "Requirements",
       },
     },
@@ -241,14 +258,23 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
     },
 
     // ── GRP — graph integrity (all project scope) ───────────────────────────────────────────
-    // GRP-001: no circular references between documents. Takes no options — the graph is corpus-wide
-    // (narrow it with the top-level include/exclude); any options key is a config error.
-    { "rule": "GRP-001" },
+    // GRP-001: no circular references between documents. The graph itself is corpus-wide and cannot be
+    // scoped per rule (narrow it with the top-level include/exclude); minCycleLength filters this
+    // rule's own findings, and at its default of 3 a two-document mutual link is not reported.
+    {
+      "rule": "GRP-001",
+      "options": {
+        "minCycleLength": 2, // ≥2; default 3
+      },
+    },
     // GRP-002: documents have at least one incoming reference (except entry points).
     {
       "rule": "GRP-002",
       "options": {
-        "entryPoints": ["README.md", "docs/index.md"], // roots exempt from the orphan check
+        // Roots exempt from the orphan check. Default ["README.md", "CLAUDE.md", "AGENTS.md",
+        // "index.md"], matched at any depth; a value here REPLACES that default rather than adding
+        // to it (unlike the top-level `exclude`, which extends).
+        "entryPoints": ["README.md", "docs/index.md"],
         "files": [], // scopes reporting only; the graph stays corpus-wide
         "exclude": [],
       },
@@ -278,7 +304,9 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
 
     // ── SIZE / LLM — context hygiene ────────────────────────────────────────────────────────
     // SIZE-001: file stays within byte/line/token budgets. Metrics are independent; within one
-    // metric the highest crossed threshold is reported (one finding per metric).
+    // metric the highest crossed threshold is reported (one finding per metric). At least one budget
+    // is required — bytes/lines/tokens at the top level or inside an overrides entry — and each
+    // threshold object needs a warn or an error; a config that sets none is rejected at load.
     {
       "rule": "SIZE-001",
       "options": {
@@ -343,6 +371,31 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
   },
 }
 ```
+
+## When it is rejected
+
+Anything the schema rejects comes back as `Invalid config at <the file that was read>:` followed by one `- <path>: <problem>` line per problem, and exits `2`. Paths are `config` + `.key` + `[n]`, matching the structure above. Three real examples:
+
+```text
+Invalid config at wastech-mdlint.config.json:
+- config.rules[0].severity: Invalid option: expected one of "error"|"warning"|"off"
+```
+
+```text
+Invalid config at wastech-mdlint.config.json:
+- config.rules[0].options: Unrecognized key: "token"
+```
+
+```text
+Invalid config at wastech-mdlint.config.json:
+- config.rules[0]: Unknown rule "TBL-03". Did you mean "TBL-003"?
+```
+
+The middle one is a `SIZE-001` entry whose `tokens` budget was spelled `token`: every rule's option object is strict, so a typo'd key is rejected rather than silently ignored.
+
+A **syntax** error is reported differently, because it happens before the schema sees anything: `Failed to parse JSONC config at wastech-mdlint.config.json: CloseBraceExpected at offset 412`. Byte offsets rather than config paths are the only location a half-parsed file can honestly offer.
+
+See [Validation & errors](configuration.md#validation--errors) for the notation and for why a file with two different kinds of problem takes two runs to clear.
 
 ## Notes
 

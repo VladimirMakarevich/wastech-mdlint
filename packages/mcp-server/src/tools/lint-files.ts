@@ -10,6 +10,7 @@ import { z } from "zod";
 import { lintMessageSchema } from "../shared/lint-message-schema.js";
 import {
   resolveToolConfiguration,
+  toolCwdBase,
   type ToolFileInput,
 } from "../shared/tool-context.js";
 import {
@@ -55,10 +56,11 @@ const EMPTY_LINT_FILES_OUTPUT = {
 export async function handleLintFiles(
   input: LintFilesToolInput,
 ): Promise<CallToolResult> {
+  // Outside the `try` so the catch can still name it: an errno thrown *by* `resolveToolConfiguration`
+  // (an unreadable config, a `configPath` naming a directory) has no `loaded.cwd` to render against.
+  const cwd = toolCwdBase(input);
+
   try {
-    // `resolveToolConfiguration` computes this same default internally but doesn't return it, so
-    // `lintFiles` needs its own copy — the same one-liner tool-context.ts already duplicates.
-    const cwd = input.cwd ?? process.cwd();
     const loaded = await resolveToolConfiguration(input);
 
     // An explicit `patterns` arg *replaces* `config.include` (not merges). When it's absent we leave
@@ -70,7 +72,7 @@ export async function handleLintFiles(
         : { ...loaded.config, include: input.patterns };
 
     const result: LintResult = await lintFiles({
-      cwd,
+      cwd: loaded.cwd,
       config,
       rules: loaded.rules,
       settings: loaded.settings,
@@ -81,7 +83,7 @@ export async function handleLintFiles(
       structured: result,
     });
   } catch (error) {
-    return errorResult(error, EMPTY_LINT_FILES_OUTPUT);
+    return errorResult(error, { successFields: EMPTY_LINT_FILES_OUTPUT, cwd });
   }
 }
 

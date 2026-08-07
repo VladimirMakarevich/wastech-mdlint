@@ -1,6 +1,6 @@
 # P14.01 · A nonexistent `cwd` silently succeeds on five MCP tools
 
-> Phase: [P14 — Host boundary](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**. Backlog: [W-18](../remediation-backlog-2026-08-05.md) (High). Sources: audit F3 (MED-HIGH, reproduced over real stdio across all five tools). Depends on [P13](../P13-correctness/index.md). Blocks [P14.05](05-mcp-error-contract.md).
+> Phase: [P14 — Host boundary](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Done**. Backlog: [W-18](../remediation-backlog-2026-08-05.md) (High). Sources: audit F3 (MED-HIGH, reproduced over real stdio across all five tools). Depends on [P13](../P13-correctness/index.md). Blocks [P14.05](05-mcp-error-contract.md).
 
 ## Goal
 
@@ -41,9 +41,21 @@ Validating `cwd` inside core. Core's silent-empty behavior is pinned as intentio
 
 ## Exit criteria
 
-- [ ] All five file-based tools reject a nonexistent `cwd` with `INVALID_INPUT` over real stdio, asserted per tool.
-- [ ] `cwd ?? process.cwd()` appears in one place, or each remaining site carries the reason it is not the resolver's.
-- [ ] A `cwd` that exists but is a **file** rather than a directory is rejected the same way.
-- [ ] The existing `configPath` guard still works — no regression from the refactor.
-- [ ] The change states the caller-visible consequence.
-- [ ] Gates green.
+- [x] All five file-based tools reject a nonexistent `cwd` with `INVALID_INPUT` over real stdio, asserted per tool. — `stdio-integration.test.ts`, one `it` looping the five tools with the minimum arguments each `inputSchema` requires, through `expectToolError` (which also pins `message` and a non-empty `hint`). Confirmed red against the pre-fix `dist/`.
+- [x] `cwd ?? process.cwd()` appears in one place, or each remaining site carries the reason it is not the resolver's. — one place: `resolveToolCwd` in `shared/tool-context.ts`. The other three sites are gone; `resolveToolConfiguration` returns the resolved `cwd` and the two tool modules read it back. `resolveToolContext` pins the de-duplication with its own test.
+- [x] A `cwd` that exists but is a **file** rather than a directory is rejected the same way. — second stdio `it` over the same five tools, plus the resolver's own unit case.
+- [x] The existing `configPath` guard still works — no regression from the refactor. — the two `resolveConfigPath` tests are untouched and green; `resolveConfigPath` itself is unchanged (P14.04 depends on it).
+- [x] The change states the caller-visible consequence. — first implementation note below, and the [MCP guide](../../guide/mcp-server.md)'s error-contract section for users.
+- [x] Gates green. — `build`, `typecheck`, `test` (946 → 958 passing), `lint`, `format`.
+
+## Implementation notes
+
+- **Caller-visible consequence, stated plainly: previously-successful calls now fail.** A `cwd` that does not exist or is not a directory used to return `No problems found.` (`lint-files`), an empty graph (`context-graph`), `No match for query "…"` (`context-slice`), `File not found in the context graph` (`impact-analysis`), or a `COMPILE_CONFIG_MISSING` error (`compile-context`). All five now return `INVALID_INPUT`. An agent relying on any of those shapes breaks — and that is the correct direction, because four of the five were plausible answers to a different question and the fifth named the wrong cause.
+- **The resolver took all four sites (deliverable 1), so deliverable 2's per-site comments were not needed.** `resolveToolCwd` computes the fallback, resolves, stats and rejects; `resolveToolConfiguration` returns `LoadedConfiguration & { cwd }`; `resolveToolContext` reuses that instead of recomputing; `lint-files` and `compile-context` read `loaded.cwd`. Neither core type carries a `cwd` key, so the widening collided with nothing. `tools/lint.ts`'s `rootDir: process.cwd()` is deliberately **out of scope and left alone**: that tool has no `cwd` input, so there is nothing caller-supplied to validate — its comment now says that rather than citing the old duplicated default.
+- **A bad `cwd` pre-empts `CONFIG_NOT_FOUND`.** `resolveToolCwd` runs before `loadConfiguration`, so a `configPath` under a nonexistent root reports the root, not the config. Checking second would have named the wrong cause; a test pins the ordering.
+- **Non-`ENOENT`/`ENOTDIR` errnos still reach `INTERNAL_ERROR`, deliberately.** The errno split mirrors the CLI's `resolveDirectoryArgument` exactly, including its stated rationale: `EACCES`, `ELOOP` and friends are a _different_ operational failure and must not be misreported as bad input. Making that path actionable is [P14.05](05-mcp-error-contract.md)/W-21's operational-code question, not this task's — no code was invented here.
+- **The message names the resolved absolute path, not the caller's string.** The CLI renders repo-relative because it has a known-good `cwd` to anchor against; here the `cwd` _is_ the anchor and it is the broken thing, so a relative form would have nothing to mean. The value is derived from caller input and is exactly what was `stat`ed, so it leaks no unrelated host state. The `hint` is always supplied (omit `cwd`, or pass an absolute path), which is also what the stdio harness's non-empty-`hint` assertion requires.
+- **`ToolInputError` moved to `shared/tool-input-error.ts`.** It was local to `tools/lint.ts` with a comment saying so because there was one call site; the guard is the second. Still a host-boundary class, still not promoted to core — the comment says exactly that now.
+- **The guard runs even when `cwd` is omitted.** One code path, no `input.cwd !== undefined` branch: one `stat` against a full corpus walk is not worth the branch, and a server whose own working directory has gone away is a real failure worth naming.
+- **Equivalence checked, not assumed.** Passing the _resolved_ absolute `cwd` into core changes nothing downstream: `loadConfiguration` resolves `explicitConfigPath` with `path.resolve`, and `loadContext`, `loadDocuments` and `compileContext` each `path.resolve(cwd)` themselves.
+- **Tagged `installed-bin-spawn`.** `stdio-integration.test.ts` joins the [process-boundary guard](../../../.agents/rules/testing.md) inventory for that category, per the backlog's standing rule. It proves the boundary — what a client actually receives — not the `argv[1]`-vs-symlink half, which `bin-entrypoint.test.ts` keeps; the tag comment says so. The in-process cases in `lint-files.test.ts` / `compile-context.test.ts` are fast feedback on the two refactored modules, not the acceptance evidence.

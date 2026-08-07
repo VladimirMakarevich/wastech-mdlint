@@ -7,6 +7,7 @@ import {
 } from "../primitives/assert.js";
 import { columnUnique } from "../primitives/table.js";
 import { RuleResolutionError, type RuleRegistry } from "../registry.js";
+import { CUSTOM_RULE_DOCS_URL } from "../rule-docs-url.js";
 import { matchesFileScope } from "./scope.js";
 import type { Rule } from "../types.js";
 
@@ -92,6 +93,9 @@ export function resolveCustomRule(
     defaultSeverity: "error",
     scope,
     fixable: false,
+    // A custom id is user-chosen, so there is no page named after it; the mechanism's page is the
+    // documentation a reader of one of its findings actually needs (P15.03).
+    docsUrl: CUSTOM_RULE_DOCS_URL,
     check: (context) => {
       if (scope === "project") {
         // columnUnique is the only project assert; it iterates the corpus and self-attributes.
@@ -104,11 +108,10 @@ export function resolveCustomRule(
             column: assert.column,
             idPattern: assert.idPattern,
             section: assert.section,
-            files: fileScope.files,
           },
           (filePath) => matchesFileScope(filePath, fileScope),
         )) {
-          context.report({ ...finding, helpUri: id });
+          context.report(finding);
         }
         return;
       }
@@ -122,7 +125,7 @@ export function resolveCustomRule(
         rootDir: context.rootDir!,
         settings: context.settings,
       })) {
-        context.report({ ...finding, helpUri: id });
+        context.report(finding);
       }
     },
   };

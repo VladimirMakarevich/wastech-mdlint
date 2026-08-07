@@ -9,6 +9,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 
+import type { LintMessage } from "@wastech-mdlint/core";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -17,6 +18,12 @@ import {
   EXIT_CODE_USAGE_ERROR,
 } from "../src/commands.js";
 import { runCli } from "../src/program.js";
+import {
+  lintMessagesAsRows,
+  PARITY_LINT_FIXTURE,
+  readLintFindingLines,
+  readLintSummaryLine,
+} from "../../core/test/support/output-parity.js";
 
 function createMemoryWriter() {
   let text = "";
@@ -140,6 +147,74 @@ describe("lint command", () => {
     expect(result.stdout).not.toContain("drafts");
   });
 
+  // W-01's user-visible half: the wrong answer was an *exit code*. A negated `exclude` matched every
+  // path through the old first-truthy OR, so the corpus was empty, the report said "No problems
+  // found." and the command exited 0 on a repository that has a finding — a green CI leg for a
+  // one-character config edit. Asserted at the host boundary because that is where the 0 was believed.
+  it("exits non-zero when a negated exclude no longer empties the corpus", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "[broken](missing.md)\n",
+      "docs/private/secret.md": "# Secret\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        exclude: ["docs/private/**", "!docs/private/keepme.md"],
+        rules: [{ rule: "REF-001" }],
+      }),
+    });
+
+    const result = await run(["lint", cwd], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_FINDINGS);
+    expect(result.stdout).toContain("a.md");
+    expect(result.stdout).not.toContain("secret.md");
+  });
+
+  // @boundary-guard shared-exclude
+  // W-02 / P13.02: the zero-config first run must prune the noise trees before it parses them. The
+  // *nested* copy is the half an in-repo fixture never had — the field test measured 2740 files
+  // under a `mobile/node_modules/` reaching the parser, at exit `0` with zero findings, so the
+  // blow-up was silent in every direction. Asserted at the host boundary because that is where a
+  // user meets it, and with no config file at all because that is the path being fixed.
+  it("prunes node_modules at every depth with no config file (P13.02)", async () => {
+    const cwd = await fixtureRepo({
+      "docs/a.md": "# A\n",
+      "mobile/node_modules/leftpad/README.md": "# leftpad\n",
+      "node_modules/rightpad/README.md": "# rightpad\n",
+    });
+
+    const result = await run(["lint", cwd, "--format", "json"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    const parsed = JSON.parse(result.stdout) as {
+      summary: { files: number };
+      files: string[];
+    };
+    expect(parsed.files).toEqual(["docs/a.md"]);
+    expect(parsed.summary.files).toBe(1);
+  });
+
+  // W-15 / P14.03, at the boundary where the behavior changed: a zero-config run now reads Markdown
+  // under a dot-directory that is not a dependency or build tree, while still pruning the ones that
+  // are. The two halves have to be asserted together — dropping `**/.*/**` would be a regression on
+  // W-02 if it also re-opened `.venv`, and keeping it was 31% of the field-test target's corpus.
+  it("reads a dot-directory but not a hidden dependency tree with no config file", async () => {
+    const cwd = await fixtureRepo({
+      "docs/a.md": "# A\n",
+      ".github/NOTES.md": "# Notes\n",
+      ".agents/rules/testing.md": "# Testing\n",
+      ".venv/lib/site-packages/pkg/README.md": "# Vendored\n",
+      "mobile/node_modules/leftpad/README.md": "# leftpad\n",
+    });
+
+    const result = await run(["lint", cwd, "--format", "json"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    const parsed = JSON.parse(result.stdout) as { files: string[] };
+    expect(parsed.files).toEqual([
+      ".agents/rules/testing.md",
+      ".github/NOTES.md",
+      "docs/a.md",
+    ]);
+  });
+
   it("emits structured JSON with --format json", async () => {
     const cwd = await fixtureRepo({
       "a.md": "[broken](missing.md)\n",
@@ -159,6 +234,54 @@ describe("lint command", () => {
     };
     expect(parsed.summary.errors).toBe(1);
     expect(parsed.messages).toHaveLength(1);
+  });
+
+  // W-24/W-35: the shape and the message keys `docs/guide/output.md` documents, asserted through the
+  // command a consumer actually runs. The guide's table is the contract; this is what pins it.
+  it("serializes the documented top-level keys, summary keys, and message keys", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "[broken](missing.md)\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "REF-001" }],
+      }),
+    });
+
+    const result = await run(
+      ["lint", cwd, "--format", "json", "--fail-on", "off"],
+      cwd,
+    );
+    const parsed = JSON.parse(result.stdout) as {
+      summary: Record<string, unknown>;
+      messages: Record<string, unknown>[];
+    };
+
+    expect(Object.keys(parsed).sort()).toEqual([
+      "files",
+      "messages",
+      "summary",
+    ]);
+    // No `pass`/`ok` field — the exit code is that signal, which the guide used to promise here.
+    expect(Object.keys(parsed.summary).sort()).toEqual([
+      "errors",
+      "files",
+      "warnings",
+    ]);
+    // `endLine` and `fixable` are absent on a REF-001 finding: the guide's table marks which keys are
+    // always present, and these two are not among them.
+    expect(Object.keys(parsed.messages[0]!).sort()).toEqual([
+      "column",
+      "data",
+      "filePath",
+      "helpUri",
+      "line",
+      "message",
+      "ruleId",
+      "severity",
+    ]);
+    // `helpUri` resolves to a page rather than restating `ruleId`, which is what it held before.
+    expect(parsed.messages[0]!.helpUri).toBe(
+      "https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-001.md",
+    );
   });
 
   it("applies --fix in place then reports what remains", async () => {
@@ -283,6 +406,100 @@ describe("lint command", () => {
     expect(result.stderr).toMatch(
       /Unknown rule "REF-999"\. Did you mean "REF-001"\?/,
     );
+  });
+
+  it("prints a severity typo as the config file plus the offending key (P13.06)", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "REF-001", severity: "warn" }],
+      }),
+    });
+
+    // The likeliest first-time typo used to reach the user as `config.rules.0: Invalid input`. What
+    // the CLI actually writes to stderr is the contract, so assert it at the host boundary too.
+    const result = await run(["lint", cwd], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    expect(result.stderr).toContain(
+      "Invalid config at wastech-mdlint.config.json:",
+    );
+    expect(result.stderr).toContain("config.rules[0].severity");
+    expect(result.stderr).toMatch(/error.*warning.*off/);
+  });
+});
+
+// @boundary-guard host-parity
+//
+// W-57 / P16.01 §5. One run, two renderings, and nothing had ever compared them: the crosscheck's
+// fourth bucket of missed defects is process-boundary rendering, and three of them — a `hint` the
+// human path dropped, a `--format json` word collision, a `summary` key missing from one format —
+// were all found by reading code rather than by any test. The pattern the readers in
+// `core/test/support/output-parity.ts` establish is that the text is parsed *back* into rows and the
+// location rule is restated there, so the two sides of each comparison are two formulations rather
+// than one shared helper answering itself.
+describe("lint output parity: human text vs the JSON payload", () => {
+  it("renders every message of the payload, with the same fields", async () => {
+    // The corpus and its expected location set both come from `PARITY_LINT_FIXTURE`, beside the readers:
+    // it is what makes these comparisons non-vacuous (all three location shapes at once), and it is
+    // shared so the MCP twin and the cross-host guard cannot drift from it.
+    const cwd = await fixtureRepo({ ...PARITY_LINT_FIXTURE.files });
+
+    const [text, json] = await Promise.all([
+      run(["lint", cwd], cwd),
+      run(["lint", cwd, "--format", "json"], cwd),
+    ]);
+    expect(text.exitCode).toBe(EXIT_CODE_FINDINGS);
+    expect(json.exitCode).toBe(EXIT_CODE_FINDINGS);
+
+    const payload = JSON.parse(json.stdout) as {
+      summary: { files: number; errors: number; warnings: number };
+      messages: LintMessage[];
+      files: string[];
+    };
+
+    // Both directions at once: an equal array of rows means no finding is rendered that the payload
+    // does not carry, *and* none is carried that the text does not render — including the file
+    // grouping, which the human format states once per file and the payload repeats per message.
+    expect(readLintFindingLines(text.stdout)).toEqual(
+      lintMessagesAsRows(payload.messages),
+    );
+    // Non-vacuous, and specifically that all three location shapes are present.
+    expect(
+      readLintFindingLines(text.stdout)
+        .map((row) => row.location)
+        .sort(),
+    ).toEqual(PARITY_LINT_FIXTURE.locations);
+
+    // The totals are their own rendering of the same counts, and the one a CI log is read for.
+    expect(readLintSummaryLine(text.stdout)).toEqual({
+      total: payload.summary.errors + payload.summary.warnings,
+      errors: payload.summary.errors,
+      warnings: payload.summary.warnings,
+    });
+  });
+
+  it("renders the clean report in place of a summary line when the payload is empty", async () => {
+    // The empty case is a different code path in the formatter (an early return), so parity there is a
+    // separate claim: `No problems found.` must correspond to zero messages, not to a report that
+    // failed to render them.
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "REF-001" }],
+      }),
+    });
+
+    const [text, json] = await Promise.all([
+      run(["lint", cwd], cwd),
+      run(["lint", cwd, "--format", "json"], cwd),
+    ]);
+    expect(text.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const payload = JSON.parse(json.stdout) as { messages: LintMessage[] };
+    expect(payload.messages).toEqual([]);
+    expect(readLintFindingLines(text.stdout)).toEqual([]);
+    expect(readLintSummaryLine(text.stdout)).toBeUndefined();
+    expect(text.stdout).toContain("No problems found.");
   });
 });
 

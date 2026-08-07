@@ -1,26 +1,22 @@
 import {
-  createSuppressionChecker,
   customRuleEntrySchema,
   formatLintResultText,
-  parseDocument,
+  lintContent,
   resolveCustomRule,
   ruleEntrySchema,
   ruleRegistry,
-  runRules,
   RuleResolutionError,
   type CustomRuleConfigEntry,
-  type LintMessage,
-  type ParsedDocument,
   type ResolvedRule,
   type Rule,
   type RuleConfigEntry,
-  type ToolErrorCode,
 } from "@wastech-mdlint/core";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 import { lintMessageSchema } from "../shared/lint-message-schema.js";
+import { ToolInputError } from "../shared/tool-input-error.js";
 import {
   errorResult,
   READ_ONLY_ANNOTATIONS,
@@ -78,23 +74,10 @@ type LintRuleRequest = RuleConfigEntry | CustomRuleConfigEntry;
 
 type LintToolInput = { content: string; rules: LintRuleRequest[] };
 
-// Error wrapping lives on the MCP boundary (architecture split: "error wrapping" is a host concern),
-// and this is the only call site that needs it so far — so the wrapper is local, not promoted to
-// core. `ruleRegistry.resolveRule` throws `RuleResolutionError`, whose `UNKNOWN_RULE`/`INVALID_OPTIONS`
-// codes are a *different* enum than `ToolErrorCode`; without this translation an unwrapped
-// `RuleResolutionError` fails `isStructuredError`'s allowlist and degrades to a sanitized
-// `INTERNAL_ERROR`, losing the "did you mean" / bad-options message M6 exists to preserve.
-class ToolInputError extends Error {
-  readonly code: ToolErrorCode = "INVALID_INPUT";
-  readonly hint?: string;
-
-  constructor(message: string, hint?: string) {
-    super(message);
-    this.name = "ToolInputError";
-    this.hint = hint;
-  }
-}
-
+// `ruleRegistry.resolveRule` throws `RuleResolutionError`, whose `UNKNOWN_RULE`/`INVALID_OPTIONS`
+// codes are a *different* enum than `ToolErrorCode`, so it needs the shared `ToolInputError`
+// translation to keep its "did you mean" / bad-options text instead of degrading to a sanitized
+// `INTERNAL_ERROR`.
 function toToolInputError(error: RuleResolutionError): ToolInputError {
   if (error.code === "UNKNOWN_RULE") {
     const hint =
@@ -161,70 +144,45 @@ function resolveRequestedRules(
 
 export function handleLint(input: LintToolInput): CallToolResult {
   try {
-    const resolved = resolveRequestedRules(input.rules);
-    const document = parseDocument({
+    // Rule *resolution* stays here — `resolveRequestedRules` owns translating a `RuleResolutionError`
+    // into this host's `{ code, message, hint }` contract — and every step after it is core's
+    // `lintContent`: parse, corpus of one, scope split, inline-disable, counts. Before P16.01 (W-58)
+    // those steps were assembled in this function, which made this the one place `lintFiles`' step
+    // order existed twice; a step added there would silently not have reached this tool.
+    //
+    // `rootDir` is the server cwd, mirroring the fallback `resolveToolCwd` applies to the file-based
+    // tools. It is a bare `process.cwd()` call, not that helper: this tool takes no `cwd` input, so
+    // there is nothing caller-supplied to validate. Passing a real directory rather than a bespoke
+    // corpus-only mode is deliberate — REF-001/003 resolve `rootDir` into `existsSync` for targets
+    // outside the corpus, so on-disk targets resolve exactly as they do under `lint-files`, and core
+    // stays the single owner of REF/SEC resolution semantics.
+    const result = lintContent({
       path: AD_HOC_DOCUMENT_PATH,
       content: input.content,
-    });
-
-    // Build a "corpus of one" so R4's project-scope fail-fast is satisfied uniformly for any rule
-    // scope without special-casing: `documents` and `projectFiles` are non-empty.
-    //
-    // `rootDir` is the server cwd (mirroring the `cwd ?? process.cwd()` default tool-context.ts uses
-    // elsewhere in this package). Reusing core's standard behavior — rather than a bespoke
-    // corpus-only mode — is deliberate: REF-001/003 non-null-assert `rootDir` into `existsSync` for
-    // targets outside the corpus, so a real value both avoids a `path.resolve(undefined, …)` crash
-    // and lets on-disk targets resolve exactly as they do under `lint-files` (core stays the single
-    // owner of REF/SEC resolution semantics; this host does not fork them).
-    //
-    // `graph` is left undefined deliberately: GRP-001/002 no-op gracefully without one, and building
-    // a real ContextGraph for a one-document corpus needs siteRouter/idRef wiring this tool's
-    // `{ content, rules }` input has no slot for — and would only ever flag the lone doc as an
-    // orphan. Intentional scope boundary, not a gap.
-    const documents = new Map<string, ParsedDocument>([
-      [document.path, document],
-    ]);
-    const rawMessages: LintMessage[] = runRules(resolved, {
-      document,
-      filePath: document.path,
-      documents,
-      projectFiles: [document.path],
+      rules: resolveRequestedRules(input.rules),
       rootDir: process.cwd(),
-      settings: {},
-    });
-
-    // Apply inline-disable suppression (R8), matching `lintFiles`: drop each message whose
-    // (ruleId, line) is disabled by a `<!-- wastech-mdlint-disable... -->` directive in the content.
-    // Without this the `lint` tool would disagree with `lint-files` on the same directive-bearing
-    // text. The runner already sorted `rawMessages`, so filtering preserves that order.
-    const isSuppressed = createSuppressionChecker(document.directives);
-    const messages = rawMessages.filter(
-      (message) => !isSuppressed(message.ruleId, message.line),
-    );
-
-    const errorCount = messages.filter(
-      (message) => message.severity === "error",
-    ).length;
-    const warningCount = messages.filter(
-      (message) => message.severity === "warning",
-    ).length;
-
-    // Reuse core's text formatter so `lint` and `lint-files` render byte-for-byte consistently.
-    // `formatLintResultText` never reads `.files`, so the one-entry placeholder only satisfies the
-    // `LintResult` type.
-    const summary = formatLintResultText({
-      messages,
-      files: [AD_HOC_DOCUMENT_PATH],
-      errorCount,
-      warningCount,
     });
 
     return successResult({
-      summary,
-      structured: { messages, errorCount, warningCount },
+      // Core's own text formatter, so `lint` and `lint-files` render byte-for-byte consistently.
+      summary: formatLintResultText(result),
+      // Deliberately narrower than `LintResult`: an ad-hoc document is not a corpus, so there is no
+      // `files` list to report (W-24 — the divergence from `lint-files` is a decision, documented in
+      // `docs/guide/output.md`, and pinned by `test/lint.test.ts`).
+      structured: {
+        messages: result.messages,
+        errorCount: result.errorCount,
+        warningCount: result.warningCount,
+      },
     });
   } catch (error) {
-    return errorResult(error, EMPTY_LINT_OUTPUT);
+    // `process.cwd()` is the right base here even though this tool takes no `cwd` input: it is the
+    // same root the corpus-of-one above lints against (`rootDir`), so a file-resolving rule that
+    // fails on an errno names its path relative to the directory the rule actually probed.
+    return errorResult(error, {
+      successFields: EMPTY_LINT_OUTPUT,
+      cwd: process.cwd(),
+    });
   }
 }
 

@@ -59,6 +59,24 @@ describe("loadDocuments", () => {
     ]);
   });
 
+  // The layering P13.02 depends on: the lint-time default `exclude` lives in `resolveCorpusScope`,
+  // never here. This loader's contract is "what you pass is what I walk" — `gitignore-layers.test.ts`
+  // compares its corpus against real `git ls-files` with an explicit pattern set, so a loader that
+  // silently added the default patterns of its own would make that oracle compare two different trees.
+  it("applies no default exclude of its own (P13.02 layering)", async () => {
+    const root = await createFixtureTree({
+      "keep.md": "# Keep\n",
+      "node_modules/pkg/README.md": "# Dep\n",
+    });
+
+    const documents = await loadDocuments(["**/*.md"], { cwd: root });
+
+    expect([...documents.values()].map((doc) => doc.path)).toEqual([
+      "keep.md",
+      "node_modules/pkg/README.md",
+    ]);
+  });
+
   it("honors explicit exclude patterns (exclude wins over include)", async () => {
     const root = await createFixtureTree({
       "keep.md": "# Keep\n",
@@ -82,7 +100,7 @@ describe("loadDocuments", () => {
       "node_modules/root-lib/y.md": "# Root dep\n",
     });
 
-    // The depth-agnostic form `init` writes (config-writer's DEFAULT_EXCLUDE_GLOBS). This exercises
+    // The depth-agnostic form of `DEFAULT_EXCLUDE_GLOBS` (`config/corpus-scope.ts`). This exercises
     // the *directory* prune, not just file matching: shouldPruneDirectory's synthetic-child probe has
     // to match both `node_modules/...` and `packages/foo/node_modules/...` or the walk descends into
     // the dependency tree before the file filter ever runs.
@@ -92,6 +110,49 @@ describe("loadDocuments", () => {
     });
 
     expect([...documents.values()].map((doc) => doc.path)).toEqual(["keep.md"]);
+  });
+
+  it("narrows the corpus when an include entry is negated (W-01)", async () => {
+    const root = await createFixtureTree({
+      "README.md": "# Readme\n",
+      "docs/public.md": "# Public\n",
+      "docs/private/secret.md": "# Secret\n",
+    });
+
+    // Negation in `include` does reach into a subdirectory, unlike the `exclude` case below: only
+    // `exclude` prunes directories, so `docs/private` is still walked and its files are then filtered.
+    const documents = await loadDocuments(["docs/**", "!docs/private/**"], {
+      cwd: root,
+    });
+
+    expect([...documents.values()].map((doc) => doc.path)).toEqual([
+      "docs/public.md",
+    ]);
+  });
+
+  it("keeps the corpus when an exclude entry is negated (W-01)", async () => {
+    const root = await createFixtureTree({
+      "keep.md": "# Keep\n",
+      "docs/public.md": "# Public\n",
+      "docs/private/secret.md": "# Secret\n",
+      "docs/private/keepme.md": "# Keep me\n",
+    });
+
+    // Before P13.01 this returned *nothing*: `keep.md` is not `docs/private/keepme.md`, so it matched
+    // the inverted second entry and every file in the tree was excluded.
+    const documents = await loadDocuments(["**/*.md"], {
+      cwd: root,
+      exclude: ["docs/private/**", "!docs/private/keepme.md"],
+    });
+
+    // `keepme.md` is not restored, and that is deliberate: `shouldPruneDirectory` decides
+    // `docs/private` before descending into it, so no file inside is ever offered to the file-level
+    // filter that the negation would rescue. Honoring it would mean walking every excluded tree — the
+    // cost `exclude` exists to avoid. Recorded in `docs/mdlint_v2/accepted-behaviors.md`.
+    expect([...documents.values()].map((doc) => doc.path)).toEqual([
+      "docs/public.md",
+      "keep.md",
+    ]);
   });
 
   it("honors .gitignore (root and nested) when respectGitignore is true", async () => {
@@ -122,6 +183,53 @@ describe("loadDocuments", () => {
       "docs/page.md",
       "keep.md",
       "scratch.tmp.md",
+    ]);
+  });
+
+  it("lets a nested .gitignore negation re-include a file a root pattern ignored", async () => {
+    // W-11: layers are ranked by depth, so `docs/.gitignore` overrides the root's `docs/*.md` — the
+    // corpus now matches what `git` keeps. Kept in the loader's own suite so the behavior stays
+    // covered here with no `git` on PATH; `gitignore-layers.test.ts` is the against-real-git oracle.
+    const root = await createFixtureTree({
+      ".gitignore": "docs/*.md\n",
+      "docs/.gitignore": "!keep.md\n",
+      "docs/keep.md": "# Keep\n",
+      "docs/other.md": "# Other\n",
+    });
+
+    const documents = await loadDocuments(["**/*.md"], {
+      cwd: root,
+      respectGitignore: true,
+    });
+
+    expect([...documents.values()].map((doc) => doc.path)).toEqual([
+      "docs/keep.md",
+    ]);
+  });
+
+  it("keeps a subtree a nested .gitignore re-includes from an excluded parent directory", async () => {
+    // The walk-level shape of the same rule, and the one that used to be self-contradictory: the
+    // root excludes the *directory* `artifacts/docs` (`artifacts/*` never matches the file itself),
+    // `artifacts/.gitignore` re-includes it, so the walk descended — and then dropped every file
+    // inside, because the file verdict re-applied the root's exclusion of a parent the deeper layer
+    // had already rescued. `git` keeps these files; the oracle for that lives in
+    // `gitignore-layers.test.ts`, and this case keeps the corpus covered with no `git` on PATH.
+    const root = await createFixtureTree({
+      ".gitignore": "artifacts/*\n",
+      "artifacts/.gitignore": "!docs/\n",
+      "artifacts/docs/one.md": "# One\n",
+      "artifacts/docs/deep/two.md": "# Two\n",
+      "artifacts/scratch.md": "# Scratch\n",
+    });
+
+    const documents = await loadDocuments(["**/*.md"], {
+      cwd: root,
+      respectGitignore: true,
+    });
+
+    expect([...documents.values()].map((doc) => doc.path)).toEqual([
+      "artifacts/docs/deep/two.md",
+      "artifacts/docs/one.md",
     ]);
   });
 
@@ -181,4 +289,77 @@ describe("loadDocuments", () => {
       "文.md",
     ]);
   });
+});
+
+// W-57 / P16.01 §4. The four shapes of the field test's anchoring table are pinned at the matcher in
+// `rule-utils.test.ts` ("matchesConfigGlob anchoring"), which is where the *rule* lives. What no test
+// had was the same table one layer up, against a real tree — and that layer is where the shapes stop
+// being equivalent: `exclude` prunes whole directories through a synthetic-child probe before any file
+// is offered to the file-level filter, so a root-anchored `node_modules/**` does not merely fail to
+// match a nested copy, it descends into it and parses every file inside. That is the blocker the
+// field test measured (2740 files under one `mobile/node_modules/`), and a matcher-level `false` is
+// not evidence about it.
+//
+// One fixture for the whole table so a failing row names a pattern rather than a fixture.
+describe("loadDocuments glob anchoring over a real tree (W-03/W-01)", () => {
+  const FIXTURE = {
+    "NOTE.md": "# Root\n",
+    "docs/NOTE.md": "# Nested\n",
+    "mobile/node_modules/leftpad/NOTE.md": "# Vendored\n",
+  };
+
+  const ROOT_ONLY = ["NOTE.md"];
+  const NOT_VENDORED = ["NOTE.md", "docs/NOTE.md"];
+  const EVERYTHING = [
+    "NOTE.md",
+    "docs/NOTE.md",
+    "mobile/node_modules/leftpad/NOTE.md",
+  ];
+
+  it.each([
+    // A slash-free pattern is depth-agnostic, which is the answer that surprises: `"NOTE.md"` is not
+    // "the NOTE.md in the root".
+    ["NOTE.md", ["NOTE.md"], [], EVERYTHING],
+    ["*.md", ["*.md"], [], EVERYTHING],
+    // A slash — even a leading `./` — root-anchors it. This is the shape a user reaches for when the
+    // depth-agnostic answer above is not what they wanted.
+    ["./NOTE.md", ["./NOTE.md"], [], ROOT_ONLY],
+    // The two `exclude` forms, and the whole reason `DEFAULT_EXCLUDE_GLOBS` carries a `**/` prefix.
+    ["exclude node_modules/**", ["**/*.md"], ["node_modules/**"], EVERYTHING],
+    [
+      "exclude **/node_modules/**",
+      ["**/*.md"],
+      ["**/node_modules/**"],
+      NOT_VENDORED,
+    ],
+    // Ordered negation: a later entry re-includes what an earlier one subtracted, and the reverse
+    // order subtracts again. Before P13.01 the first of these returned the whole tree (the negation
+    // compiled to an inverting matcher in a first-truthy OR) and the second returned it too.
+    [
+      "ordered negation, negation last",
+      ["**/*.md", "docs/**", "!docs/**"],
+      [],
+      ["NOTE.md", "mobile/node_modules/leftpad/NOTE.md"],
+    ],
+    [
+      "ordered negation, re-include last",
+      ["**/*.md", "!docs/**", "docs/NOTE.md"],
+      [],
+      EVERYTHING,
+    ],
+  ] as const)(
+    "include %s selects the documented set",
+    async (_name, include, exclude, expected) => {
+      const root = await createFixtureTree(FIXTURE);
+
+      const documents = await loadDocuments([...include], {
+        cwd: root,
+        exclude: [...exclude],
+      });
+
+      expect([...documents.values()].map((doc) => doc.path)).toEqual([
+        ...expected,
+      ]);
+    },
+  );
 });

@@ -21,15 +21,39 @@ import { normalizeRelativePath } from "@wastech-mdlint/core";
  * `"."` is the answer when the two paths are the same directory — `path.relative` returns `""`
  * there, which would otherwise render as a blank in the middle of a sentence.
  *
- * Not every host path *has* a relative form: a target outside `cwd` renders with `../` segments, and
- * on Windows one on another drive (`C:\repo` vs `D:\out`) has none at all, so `path.relative` hands
- * back the absolute target. Both are passed through rather than papered over — the message must name
- * the path actually touched — which is why the docs promise relative-where-possible, not
- * relative-always (`docs/guide/cli.md` §Exit codes).
+ * Not every host path *has* a readable relative form: a target outside `cwd` renders with `../`
+ * segments, and on Windows one on another drive (`C:\repo` vs `D:\out`) has none at all, so
+ * `path.relative` hands back the absolute target. Both are passed through here rather than papered
+ * over, which is why the docs promise relative-where-possible, not relative-always
+ * (`docs/guide/cli.md` §Exit codes). Argument diagnostics keep that behavior deliberately: a `[path]`
+ * the user passed absolutely is still *reported* relatively (P11.10), and an error must never print
+ * an absolute host path. A file the command *wrote* is the opposite case — the user needs to be able
+ * to open it — so `toWriteTargetPath` below falls back to the absolute form instead.
  */
 export function toRepoRelativePosix(cwd: string, absolutePath: string): string {
   const relative = normalizeRelativePath(path.relative(cwd, absolutePath));
   return relative === "" ? "." : relative;
+}
+
+/**
+ * A write target named for a human to act on: repo-relative POSIX while it is inside `cwd`, and the
+ * plain absolute path once it is not (P14.02, W-17). An out-of-repo `compile --outdir` used to render
+ * as a chain of `../../../../..` hops that no user can read back to a location, which is worse than
+ * the absolute path it was hiding — and on a second Windows drive there is no relative form at all.
+ *
+ * The absolute fallback stays **platform-native**, un-POSIX-slashed: this is a location to paste into
+ * a shell, not a report path, so it should echo the separators the user typed in `--outdir`. Scoped
+ * to the write summary for that reason; report paths inside a `LintResult` are a public data contract
+ * and stay repo-relative POSIX regardless.
+ */
+export function toWriteTargetPath(cwd: string, absolutePath: string): string {
+  const relative = path.relative(cwd, absolutePath);
+  // Compared by first *segment* rather than by string prefix, so `..\out` and `../out` both match
+  // while a sibling directory named `..foo` does not. `path.relative` answers an already-absolute
+  // path when no relative form exists at all (two Windows drives), which the first test catches.
+  const leavesCwd =
+    path.isAbsolute(relative) || relative.split(path.sep)[0] === "..";
+  return leavesCwd ? absolutePath : toRepoRelativePosix(cwd, absolutePath);
 }
 
 // Node's errno exceptions carry the failing syscall's code and, for single-path operations, the path

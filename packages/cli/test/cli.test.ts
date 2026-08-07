@@ -187,10 +187,15 @@ describe("graph command", () => {
 
     const result = await run(["graph", cwd], cwd);
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
-    expect(result.stdout).toContain("top hubs:");
-    expect(result.stdout).toContain("clusters:");
-    expect(result.stdout).toContain("reading order (2): a.md, b.md");
-    expect(result.stdout).toContain("coverage:");
+
+    const lines = result.stdout.split("\n");
+    expect(lines).toContain("top hubs:");
+    expect(lines).toContain("clusters:");
+    // One item per indented line, not a comma-joined blob (P15.01 / W-26).
+    expect(lines).toContain("reading order (2):");
+    expect(lines).toContain("  a.md");
+    expect(lines).toContain("  b.md");
+    expect(lines).toContain("coverage:");
   });
 
   it("renders a Mermaid flowchart", async () => {
@@ -400,8 +405,9 @@ describe("compile command", () => {
 
   it("resolves a relative --config path against --cwd, not the process cwd", async () => {
     // The process running this test has its own cwd (the repo root), which differs from the
-    // fixture directory — exactly the scenario that broke a naive `path.resolve(command.config)`
-    // inside loadConfiguration, since that resolves against the real process cwd, not `--cwd`.
+    // fixture directory — the only scenario in which the two bases can be told apart. The handler
+    // used to pre-resolve `--config` itself; since P14.04 core owns the resolve for all six call
+    // sites and this stays as the compile-shaped regression guard over that one base.
     const cwd = await fixtureRepo({
       "a.md": "# A\n",
       "custom.config.json": compileConfig,
@@ -520,6 +526,48 @@ describe("compile command", () => {
     expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
     expect(result.stderr).toContain("Could not write generated-skill/SKILL.md");
     expect(result.stderr).not.toContain(cwd);
+  });
+
+  it("reports an --outdir outside --cwd absolutely, not as a chain of '..' hops", async () => {
+    // W-17: the repo-relative rendering is right inside the repository and unreadable outside it —
+    // the observed report opened with five parent hops before an absolute-looking tail.
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": compileConfig,
+    });
+    const outsideDir = await fixtureRepo({});
+
+    const result = await run(
+      ["compile", "--cwd", cwd, "--outdir", outsideDir],
+      cwd,
+    );
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain(path.join(outsideDir, "SKILL.md"));
+    expect(result.stdout).not.toContain("..");
+
+    const written = await readFile(path.join(outsideDir, "SKILL.md"), "utf8");
+    expect(written).toContain('name: "docs-skill"');
+  });
+
+  it("names that same absolute path when the out-of-cwd write fails", async () => {
+    // The P11.10 invariant has to survive the fallback: a failure names the path the success line
+    // would have named, so the two renderings cannot drift apart for the same target.
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": compileConfig,
+    });
+    const outsideDir = await fixtureRepo({});
+    await mkdir(path.join(outsideDir, "SKILL.md"), { recursive: true });
+
+    const result = await run(
+      ["compile", "--cwd", cwd, "--outdir", outsideDir],
+      cwd,
+    );
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    expect(result.stderr).toContain(
+      `Could not write ${path.join(outsideDir, "SKILL.md")}`,
+    );
+    expect(result.stderr).not.toContain("..");
   });
 
   it("exits 2 with a repo-relative message for a nonexistent --cwd", async () => {

@@ -6,7 +6,6 @@ import {
   parse as parseJsonc,
   printParseErrorCode,
 } from "jsonc-parser";
-import { z } from "zod";
 
 import { normalizeRelativePath } from "../discovery/globs.js";
 import { RuleResolutionError, type RuleRegistry } from "../engine/registry.js";
@@ -21,6 +20,7 @@ import type {
   SeverityOverride,
 } from "../engine/types.js";
 import { ConfigError } from "./config-error.js";
+import { flattenConfigIssues, formatConfigIssue } from "./config-issues.js";
 import { lintConfigSchema, type LintConfig } from "./config-schema.js";
 import { findConfig } from "./find-config.js";
 
@@ -55,12 +55,9 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-function formatRootIssue(issue: z.core.$ZodIssue): string {
-  const location =
-    issue.path.length === 0 ? "config" : `config.${issue.path.join(".")}`;
-  return `- ${location}: ${issue.message}`;
-}
-
+// Stage 2's issues, re-anchored onto the same absolute paths stage 1 uses so both stages render
+// through `formatConfigIssue` (P13.06). The rule-relative paths a `RuleResolutionError` carries
+// (e.g. ["options", "maxBytes"] or ["id"]) become ["rules", index, …].
 function formatRuleResolutionError(
   index: number,
   error: RuleResolutionError,
@@ -70,18 +67,19 @@ function formatRuleResolutionError(
       error.suggestion === undefined
         ? ""
         : ` Did you mean "${error.suggestion}"?`;
-    return [`- rules[${index}]: Unknown rule "${error.ruleName}".${suffix}`];
+    return [
+      formatConfigIssue({
+        path: ["rules", index],
+        message: `Unknown rule "${error.ruleName}".${suffix}`,
+      }),
+    ];
   }
 
-  // Issue paths already carry their full location (e.g. ["options", "maxBytes"] or ["id"]).
-  return (error.issues ?? [{ path: [], message: error.message }]).map(
-    (issue) => {
-      const location =
-        issue.path.length === 0
-          ? `rules[${index}]`
-          : `rules[${index}].${issue.path.join(".")}`;
-      return `- ${location}: ${issue.message}`;
-    },
+  return (error.issues ?? [{ path: [], message: error.message }]).map((issue) =>
+    formatConfigIssue({
+      path: ["rules", index, ...issue.path],
+      message: issue.message,
+    }),
   );
 }
 
@@ -97,6 +95,12 @@ function formatRuleResolutionError(
  * `impact` that is the `[path]` operand, not the repository root), so a root config reached from
  * `lint docs` renders as `../wastech-mdlint.config.json`: relative and pointing at the file actually
  * read, which is the contract, rather than repo-root-anchored.
+ *
+ * Since P14.04 an explicit config path is *resolved* against `params.cwd` too, so resolution and
+ * rendering finally share one base. That is what makes `Config file not found:` name the path the
+ * user actually typed: while the two disagreed, `lint proj --config cfg.json` reported
+ * `../cfg.json` — a path nobody wrote, produced by relativizing a process-cwd lookup against the
+ * lint root.
  */
 function displayConfigPath(cwd: string, configPath: string): string {
   return normalizeRelativePath(path.relative(cwd, configPath));
@@ -126,9 +130,13 @@ function parseJsoncConfig(text: string, displayPath: string): unknown {
   return value;
 }
 
+// `displayPath` is threaded in rather than recomputed because every diagnostic must name the config
+// file being read (P13.06): an ancestor directory's config can govern a run, so "which file?" is a
+// real question, and this stage used to answer it with a bare `Invalid config:`.
 function resolveRules(
   config: LintConfig,
   registry: RuleRegistry,
+  displayPath: string,
 ): ConfiguredRule[] {
   const entries = config.rules ?? [];
   const resolved: ConfiguredRule[] = [];
@@ -157,7 +165,7 @@ function resolveRules(
     // hint = the first formatted issue (matches the task's "hint = failing path").
     throw new ConfigError(
       "CONFIG_INVALID",
-      `Invalid config:\n${errors.join("\n")}`,
+      `Invalid config at ${displayPath}:\n${errors.join("\n")}`,
       errors[0],
     );
   }
@@ -172,6 +180,15 @@ function resolveRules(
  * keys), then each `rules[]` entry is resolved through the registry, which validates its options and
  * surfaces path-prefixed / did-you-mean errors. Returns the validated config, the resolved rules
  * (with severity overrides), and the resolved settings.
+ *
+ * **One base for `explicitConfigPath`: `params.cwd`** (P14.04 / W-16) — the directory being analyzed,
+ * which is `[path]` for `lint`/`graph`, the CLI's own cwd for `slice`/`impact`, `--cwd` for `compile`,
+ * and the tool `cwd` for the five file-based MCP tools. It used to resolve against `process.cwd()`
+ * instead, which silently diverged whenever a host analyzed a different directory than the shell was
+ * standing in; `compile` and the MCP context helper each pre-resolved it locally to compensate, so
+ * the same flag meant two things across the six call sites. Owning it here is what deletes both
+ * workarounds: hosts now forward the caller's string untouched. Every host already passes an absolute
+ * `cwd`, so nothing downstream of this line moves.
  */
 export async function loadConfiguration(params: {
   cwd: string;
@@ -180,7 +197,7 @@ export async function loadConfiguration(params: {
 }): Promise<LoadedConfiguration> {
   const registry = params.registry ?? ruleRegistry;
   const explicitConfigPath = params.explicitConfigPath
-    ? path.resolve(params.explicitConfigPath)
+    ? path.resolve(params.cwd, params.explicitConfigPath)
     : undefined;
 
   if (
@@ -190,7 +207,9 @@ export async function loadConfiguration(params: {
     throw new ConfigError(
       "CONFIG_NOT_FOUND",
       `Config file not found: ${displayConfigPath(params.cwd, explicitConfigPath)}`,
-      "Check that configPath/cwd points to an existing wastech-mdlint.config.json, or omit it to use the zero-config default.",
+      // Names the base, because the message above names a *relative* path and a reader has no other
+      // way to tell which directory it was looked for under (P14.04).
+      "Check that configPath/cwd points to an existing wastech-mdlint.config.json — a relative configPath is resolved against the directory being analyzed — or omit it to use the zero-config default.",
     );
   }
 
@@ -206,7 +225,9 @@ export async function loadConfiguration(params: {
 
   const parsed = lintConfigSchema.safeParse(raw);
   if (!parsed.success) {
-    const lines = parsed.error.issues.map(formatRootIssue);
+    const lines = flattenConfigIssues(parsed.error.issues, raw).map(
+      formatConfigIssue,
+    );
     throw new ConfigError(
       "CONFIG_INVALID",
       `Invalid config at ${displayPath}:\n${lines.join("\n")}`,
@@ -219,7 +240,7 @@ export async function loadConfiguration(params: {
   return {
     config,
     configPath,
-    rules: resolveRules(config, registry),
+    rules: resolveRules(config, registry, displayPath),
     settings: (config.settings ?? {}) as ResolvedSettings,
   };
 }

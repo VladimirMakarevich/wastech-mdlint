@@ -39,11 +39,16 @@ export type { AtomicFileWrite, AtomicWriteResult } from "./atomic-write.js";
 
 // Repo scan (P6.01)
 export {
+  classifyPrunedDirName,
   DEFAULT_KNOWN_CLUSTER_NAMES,
   DEFAULT_MIN_CLUSTER_SIZE,
   DEFAULT_NOISE_DIR_NAMES,
   DEFAULT_SAMPLE_SIZE,
 } from "./discovery/repo-scan-constants.js";
+// Exported for the hosts, not only for core's own walks: `init`'s scan-exclusion disclosure suggests
+// an `include` pattern for a pruned directory, and it must splice the same tail every other proposal
+// does or it would advertise a narrower set than the scan counted (P13.05 / W-09).
+export { MARKDOWN_GLOB_SUFFIX } from "./discovery/markdown-extensions.js";
 export { detectPackageManager } from "./discovery/package-manager.js";
 export type { DetectedPackageManager } from "./discovery/package-manager.js";
 export { detectWorkspacePackages } from "./discovery/workspace-packages.js";
@@ -52,7 +57,10 @@ export { scanRepository } from "./discovery/repo-scan.js";
 export type {
   DocCluster,
   DocClusterKind,
+  PrunedDirectory,
+  PrunedDirectoryReason,
   RepoScanResult,
+  ScanPruning,
   ScanRepositoryOptions,
 } from "./discovery/repo-scan.js";
 
@@ -104,7 +112,11 @@ export {
   topologicalSort,
 } from "./graph/graph-algorithms.js";
 export type { TopologicalSortResult } from "./graph/graph-algorithms.js";
-export { impact, query, slice } from "./graph/query.js";
+// `query` has no host caller of its own (the graph commands and MCP tools reach it through
+// `getContextSlice` / `impact` / compile). W-40 removed the four exports in that position; this one
+// and `getImpactSet` below stay because decision entry 4.3 names both as reused by P7.03, which
+// makes them a documented expectation rather than an open call — settled in P17.03 (W-47), not here.
+export { impact, query } from "./graph/query.js";
 export type {
   QueryDirection,
   QueryOptions,
@@ -157,7 +169,6 @@ export type {
   NodeClassification,
   NodeRole,
 } from "./compile/graph-analysis.js";
-export { extractDocProfile } from "./compile/doc-profile.js";
 export type {
   DocumentOutlineItem,
   DocumentProfile,
@@ -216,6 +227,13 @@ export { runRules } from "./engine/run-rules.js";
 export type { RunRulesContext } from "./engine/run-rules.js";
 export { lintFiles } from "./engine/lint-files.js";
 export type { LintFilesInput, LintResult } from "./engine/lint-files.js";
+// The ad-hoc entry point over the shared step order (W-58), and the only half of that split a host
+// needs: `lintContent` is the MCP `lint` tool's whole body. `lintCorpus` itself stays **unexported**
+// on purpose — its two callers are `lintFiles` and `lintContent`, both inside core, and it takes an
+// already-parsed corpus plus already-resolved rules, which a host has no way to hold without
+// re-assembling the discovery half the split exists to keep in one place.
+export { lintContent } from "./engine/lint-content.js";
+export type { LintContentInput } from "./engine/lint-content.js";
 export { createSuppressionChecker } from "./engine/suppression.js";
 export type { SuppressionChecker } from "./engine/suppression.js";
 export {
@@ -243,10 +261,7 @@ export {
   isProjectAssertion,
   runAssertion,
 } from "./engine/primitives/assert.js";
-export type {
-  Assertion,
-  RunAssertionOptions,
-} from "./engine/primitives/assert.js";
+export type { Assertion } from "./engine/primitives/assert.js";
 export { DEFAULT_PLACEHOLDERS } from "./engine/primitives/content.js";
 export type {
   PrimitiveContext,

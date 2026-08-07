@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { isGlobPattern } from "../src/discovery/globs.js";
+import {
+  isGlobPattern,
+  matchesConfigGlob,
+  normalizeConfigGlob,
+} from "../src/discovery/globs.js";
 import { matchesFileScope } from "../src/engine/rules/scope.js";
 import {
   createLineNumberLookup,
@@ -26,6 +30,160 @@ describe("matchesFileScope (glob-match, R7)", () => {
   it("matches dotfiles (dot: true)", () => {
     expect(
       matchesFileScope(".claude/skills/SKILL.md", { files: ["**/*.md"] }),
+    ).toBe(true);
+  });
+});
+
+// W-01 (audit F1). The absence of an ordered-negation case here is what let the shared matcher ship
+// with `isMatch(input, patterns)`, a first-truthy OR in which a `!` entry compiles to an *inverting*
+// matcher — so every one of these expectations was the opposite before P13.01.
+describe("matchesConfigGlob ordered negation (W-01)", () => {
+  it("subtracts a negated entry from a top-level include", () => {
+    const include = ["docs/**", "!docs/private/**"];
+
+    expect(matchesConfigGlob("docs/public/a.md", include)).toBe(true);
+    expect(matchesConfigGlob("docs/private/secret.md", include)).toBe(false);
+    // The reproduced failure shape: under the OR, a path matching *neither* positive pattern was
+    // still "included", because it satisfies the inverted one.
+    expect(matchesConfigGlob("src/a.md", include)).toBe(false);
+  });
+
+  it("keeps a negated exclude from swallowing the whole corpus", () => {
+    const exclude = ["docs/private/**", "!docs/private/keepme.md"];
+
+    // The blocker: `README.md` is not `docs/private/keepme.md`, so it matched the inverted entry and
+    // every file in the repository was excluded — an empty corpus that exits 0 with findings unseen.
+    expect(matchesConfigGlob("README.md", exclude)).toBe(false);
+    expect(matchesConfigGlob("docs/private/other.md", exclude)).toBe(true);
+    expect(matchesConfigGlob("docs/private/keepme.md", exclude)).toBe(false);
+  });
+
+  it("does not widen a rule-level files scope through the shared scope helper", () => {
+    const scope = { files: ["docs/**", "!docs/private/**"] };
+
+    expect(matchesFileScope("docs/a.md", scope)).toBe(true);
+    expect(matchesFileScope("docs/private/p.md", scope)).toBe(false);
+    // Every rule's `files`/`exclude` inherits the shared matcher, so the widening reached each of
+    // them: a third file the rule was never scoped to used to be linted.
+    expect(matchesFileScope("src/a.md", scope)).toBe(false);
+  });
+
+  it("applies the depth-agnostic prefix to the body of a slash-free negation", () => {
+    // `**/!keep.md` (the old output) is a literal-filename pattern, so a bare `!keep.md` was a silent
+    // no-op rather than a negation.
+    expect(normalizeConfigGlob("!keep.md")).toBe("!**/keep.md");
+
+    const include = ["**/*.md", "!keep.md"];
+    expect(matchesConfigGlob("a.md", include)).toBe(true);
+    // Slash-free negation is depth-agnostic in the same direction as slash-free inclusion.
+    expect(matchesConfigGlob("keep.md", include)).toBe(false);
+    expect(matchesConfigGlob("docs/keep.md", include)).toBe(false);
+  });
+
+  it("lets a later positive entry re-include what an earlier negation removed", () => {
+    const include = ["docs/**", "!docs/private/**", "docs/private/keep.md"];
+
+    expect(matchesConfigGlob("docs/a.md", include)).toBe(true);
+    expect(matchesConfigGlob("docs/private/keep.md", include)).toBe(true);
+    expect(matchesConfigGlob("docs/private/x.md", include)).toBe(false);
+
+    // Order decides: the same three entries with the negation last subtract again.
+    expect(
+      matchesConfigGlob("docs/private/keep.md", [
+        "docs/**",
+        "docs/private/keep.md",
+        "!docs/private/**",
+      ]),
+    ).toBe(false);
+  });
+
+  it("reads an all-negated list as a subtraction from everything", () => {
+    expect(matchesConfigGlob("src/a.md", ["!docs/**"])).toBe(true);
+    expect(matchesConfigGlob("docs/a.md", ["!docs/**"])).toBe(false);
+
+    // "Everything" is literally every path, not every Markdown path — the reason the guide tells you
+    // to keep a positive entry alongside a negation rather than relying on the fallback.
+    expect(matchesConfigGlob("notes.txt", ["!docs/**"])).toBe(true);
+    expect(matchesConfigGlob("notes.txt", ["**/*.md", "!docs/**"])).toBe(false);
+  });
+
+  it("strips a `./` that a negation prefix hides", () => {
+    // picomatch's `./` strip is relative to the pattern start it advances past for a negation, so
+    // `!./docs/**` anchors like `!docs/**` with no help from normalizeConfigGlob.
+    const include = ["**/*.md", "!./docs/**"];
+
+    expect(matchesConfigGlob("src/a.md", include)).toBe(true);
+    expect(matchesConfigGlob("docs/a.md", include)).toBe(false);
+
+    // Which makes `!./keep.md` the root-only negation the guide documents, where `!keep.md` subtracts
+    // at any depth.
+    expect(matchesConfigGlob("keep.md", ["**/*.md", "!./keep.md"])).toBe(false);
+    expect(matchesConfigGlob("docs/keep.md", ["**/*.md", "!./keep.md"])).toBe(
+      true,
+    );
+  });
+
+  it("matches nothing for an empty pattern list", () => {
+    expect(matchesConfigGlob("a.md", [])).toBe(false);
+  });
+
+  it("leaves a leading `!(` as the extglob it is", () => {
+    // Peeling this as a negation would rewrite the working `**/!(x).md` into `!**/(x).md`, silently
+    // inverting a rule's scope. picomatch opens an extglob for `!(` and only negates otherwise.
+    expect(normalizeConfigGlob("!(x).md")).toBe("**/!(x).md");
+    expect(matchesConfigGlob("y.md", ["!(x).md"])).toBe(true);
+    expect(matchesConfigGlob("docs/y.md", ["!(x).md"])).toBe(true);
+    expect(matchesConfigGlob("x.md", ["!(x).md"])).toBe(false);
+  });
+
+  it("cancels an even number of leading `!`, like picomatch", () => {
+    // The prefix is re-attached verbatim, so `!!` cancels in the depth-agnostic branch exactly as it
+    // already did in the slash-containing branch that passes through untouched.
+    expect(normalizeConfigGlob("!!keep.md")).toBe("!!**/keep.md");
+    expect(matchesConfigGlob("keep.md", ["!!keep.md"])).toBe(true);
+    expect(matchesConfigGlob("a.md", ["!!keep.md"])).toBe(false);
+  });
+
+  it("matches a filename that starts with `!` through a bracket class", () => {
+    // The escape hatch a user needs and the one `escapeGlobPath` (discovery/repo-scan.ts) emits. A
+    // backslash escape is not it: normalizeConfigGlob rewrites every `\` to `/` for Windows paths,
+    // so `\!keep.md` becomes `/!keep.md` and matches nothing — pre-existing, and why the escaper
+    // uses bracket classes.
+    expect(matchesConfigGlob("!keep.md", ["[!]keep.md"])).toBe(true);
+    expect(matchesConfigGlob("docs/!keep.md", ["[!]keep.md"])).toBe(true);
+    expect(matchesConfigGlob("keep.md", ["[!]keep.md"])).toBe(false);
+  });
+});
+
+// W-03 (field F-14). The anchoring rule is now stated for users in `docs/guide/configuration.md`;
+// these pin the four shapes that document answers, so the prose cannot drift from the matcher.
+describe("matchesConfigGlob anchoring (W-03)", () => {
+  it("matches a slash-free pattern at any depth", () => {
+    expect(matchesConfigGlob("NOTE.md", ["NOTE.md"])).toBe(true);
+    expect(matchesConfigGlob("docs/NOTE.md", ["NOTE.md"])).toBe(true);
+    expect(matchesConfigGlob("x.md", ["*.md"])).toBe(true);
+    expect(matchesConfigGlob("docs/deep/x.md", ["*.md"])).toBe(true);
+  });
+
+  it("root-anchors a pattern that contains a slash, including a leading `./`", () => {
+    expect(matchesConfigGlob("NOTE.md", ["./NOTE.md"])).toBe(true);
+    expect(matchesConfigGlob("docs/NOTE.md", ["./NOTE.md"])).toBe(false);
+
+    // Why `README.md:127`'s old `node_modules/**` under-excluded a monorepo, and why `**/` is the
+    // form to copy — a globstar segment matches zero segments, so the root copy stays covered.
+    expect(matchesConfigGlob("node_modules/l/a.md", ["node_modules/**"])).toBe(
+      true,
+    );
+    expect(
+      matchesConfigGlob("packages/f/node_modules/l/a.md", ["node_modules/**"]),
+    ).toBe(false);
+    expect(
+      matchesConfigGlob("packages/f/node_modules/l/a.md", [
+        "**/node_modules/**",
+      ]),
+    ).toBe(true);
+    expect(
+      matchesConfigGlob("node_modules/l/a.md", ["**/node_modules/**"]),
     ).toBe(true);
   });
 });

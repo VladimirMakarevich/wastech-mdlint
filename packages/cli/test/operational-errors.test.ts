@@ -6,6 +6,7 @@ import {
   formatOperationalError,
   formatWriteFailure,
   toRepoRelativePosix,
+  toWriteTargetPath,
 } from "../src/operational-errors.js";
 
 // A Node errno exception, built by hand: the real ones only come from a syscall, and the properties
@@ -34,6 +35,43 @@ describe("toRepoRelativePosix", () => {
   it("renders cwd itself as '.' rather than an empty string", () => {
     expect(toRepoRelativePosix(CWD, CWD)).toBe(".");
   });
+});
+
+describe("toWriteTargetPath", () => {
+  it("renders a target under cwd exactly as toRepoRelativePosix does", () => {
+    const target = path.join(CWD, "docs", "SKILL.md");
+    expect(toWriteTargetPath(CWD, target)).toBe("docs/SKILL.md");
+    expect(toWriteTargetPath(CWD, target)).toBe(
+      toRepoRelativePosix(CWD, target),
+    );
+  });
+
+  it("falls back to the absolute path once the relative form needs a leading '..'", () => {
+    // The W-17 case: a single hop already reads worse than the absolute path, and the observed
+    // report had five of them. Platform-native separators on purpose — this is a path to open.
+    const target = path.resolve(CWD, "..", "skill-out", "SKILL.md");
+    expect(toWriteTargetPath(CWD, target)).toBe(target);
+    expect(toWriteTargetPath(CWD, target)).not.toContain("..");
+  });
+
+  it("does not mistake a sibling whose name starts with '..' for a parent hop", () => {
+    // The reason the check is on the first path *segment* and not a `startsWith("..")` on the
+    // string: `..foo` is a legal directory name directly under cwd.
+    const target = path.join(CWD, "..foo", "SKILL.md");
+    expect(toWriteTargetPath(CWD, target)).toBe("..foo/SKILL.md");
+  });
+
+  // `path.relative` only ever returns an absolute path when the two paths share no root, which on
+  // POSIX cannot happen — so this branch is genuinely unreachable off Windows and is left to CI's
+  // windows runner rather than faked.
+  it.runIf(process.platform === "win32")(
+    "falls back to the absolute path across Windows drives, where no relative form exists",
+    () => {
+      expect(toWriteTargetPath("C:\\repo", "D:\\out\\SKILL.md")).toBe(
+        "D:\\out\\SKILL.md",
+      );
+    },
+  );
 });
 
 describe("formatOperationalError", () => {
