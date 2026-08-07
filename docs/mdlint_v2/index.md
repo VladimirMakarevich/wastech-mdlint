@@ -14,7 +14,7 @@ The target is a substantially larger product (**`wastech-mdlint`**):
 
 - a **`@wastech-mdlint/core`** engine with a **registry of 22 built-in schema-validated doc-integrity rules** across 6 categories (`TBL`, `SEC`, `STR`, `REF`, `CTX`, `GRP`), plus `SIZE-001` and `LLM-001` (their own categories) and the declarative `custom` rule — **24 registered built-ins across 8 categories** in total (there is no `CHK` category; checklist completeness is `CTX-002`);
 - a richer **`ParsedDocument`** (tables, sections, checklists, images) and a **`ContextGraph`** with `slice` / `impact` / `topological-sort` / `components`;
-- a **`@wastech-mdlint/cli`** with `lint` (default) · `init` · `graph` · `slice` · `impact` · `compile`;
+- a **`@wastech-mdlint/cli`** with `lint` (default) · `init` · `graph` · `slice` · `impact` · `compile` · `schema` — seven, including the `schema` command that writes the config JSON schema to a local file, mandated by [P2.06](P2-rule-engine/06-schema-generation.md) deliverable 4 and by requirement [C9](requirements/01-configuration.md);
 - a **`@wastech-mdlint/mcp-server`** exposing 6 deterministic tools over stdio;
 - a **context compiler** that generates a project-specific `SKILL.md`;
 - **3 hand-authored Agent Skills** (`-init`, `-fix`, `-impact`) distributed via agentskills.io;
@@ -80,11 +80,13 @@ Adopt the **core-hosts-the-pipeline** model ([core-hosts-the-pipeline](decisions
 @wastech-mdlint/core        ← parser, ParsedDocument, ContextGraph, rule engine,
                                  registry (22 built-in rules + SIZE/LLM + custom), config,
                                  compiler, formatters
-        ├── @wastech-mdlint/cli         ← commander: lint|init|graph|slice|impact|compile
+        ├── @wastech-mdlint/cli         ← commander: lint|init|graph|slice|impact|compile|schema
+        │      └── schema.json          ← JSON Schema mirror of the config (editor + CI sync test),
+        │                                  shipped inside the CLI package so `$schema` can be a
+        │                                  relative local path into node_modules (C9)
         ├── @wastech-mdlint/mcp-server  ← stdio: 6 tools
         └── (optional) @wastech-mdlint/lsp-server   ← stretch / out of v2 scope
 skills/                       ← wastech-mdlint-{init,fix,impact}/SKILL.md (agentskills.io)
-schema.json                   ← JSON Schema mirror of the config (editor + CI sync test)
 ```
 
 This requires moving from a single package to a **workspace/monorepo** (npm workspaces). See Decision D1. Naming throughout: bins `wastech-mdlint` and `wastech-mdlint-mcp`, config `wastech-mdlint.config.json`, org/repo `VladimirMakarevich/wastech-mdlint` (replace any leftover `contextlint` or placeholder-org strings from early drafts).

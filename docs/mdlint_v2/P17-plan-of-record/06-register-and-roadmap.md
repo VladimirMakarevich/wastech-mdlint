@@ -1,6 +1,6 @@
 # P17.06 · Register contract and roadmap accuracy
 
-> Phase: [P17 — Plan of record](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Not started**. Depends on [P17.04](04-completion-surface.md).
+> Phase: [P17 — Plan of record](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Done**. Depends on [P17.04](04-completion-surface.md).
 
 ## Goal
 
@@ -54,14 +54,33 @@ Rewriting the frozen audit reports. Adding register rows for behaviors nobody ac
 
 ## Exit criteria
 
-- [ ] Row `:24` points at a page that states the behavior; the two missing rows exist.
-- [ ] The self-flagged `init`-draft residual is closed in code or re-classified with a reason.
-- [ ] Every P13–P16 decision that resolved to "accept" has a register row whose user-facing home was **opened and read**, not just linked.
-- [ ] The `lintFiles`-versus-ADR residual is gone from the register, deleted rather than annotated.
-- [ ] `P7-mcp-server/02-lint-tools.md:35` reads as authored, and the format gate is green on it.
-- [ ] The roadmap lists seven CLI commands and diagrams `schema.json` under `packages/cli/`.
-- [ ] The glossary's **Milestone** entry and the roadmap's §7 list agree about M4 (W-51a).
-- [ ] The glossary carries a `Status` header and the **Maintenance rule** again, `AGENTS.md`'s two orphaned statements have a home, and `CLAUDE.md`'s "see the glossary's maintenance rule" pointer resolves (W-52a).
-- [ ] Each frozen audit states its language, or the choice is recorded with the disagreement noted.
-- [ ] `P12.06`'s "confirmed to exist and to state it" claim is true or corrected.
-- [ ] `npm run format` green.
+- [x] Row `:24` points at a page that states the behavior; the two missing rows exist.
+- [x] The self-flagged `init`-draft residual is closed in code or re-classified with a reason.
+- [x] Every P13–P16 decision that resolved to "accept" has a register row whose user-facing home was **opened and read**, not just linked.
+- [x] The `lintFiles`-versus-ADR residual is gone from the register, deleted rather than annotated.
+- [x] `P7-mcp-server/02-lint-tools.md:35` reads as authored, and the format gate is green on it.
+- [x] The roadmap lists seven CLI commands and diagrams `schema.json` under `packages/cli/`.
+- [x] The glossary's **Milestone** entry and the roadmap's §7 list agree about M4 (W-51a).
+- [x] The glossary carries a `Status` header and the **Maintenance rule** again, `AGENTS.md`'s two orphaned statements have a home, and `CLAUDE.md`'s "see the glossary's maintenance rule" pointer resolves (W-52a).
+- [x] Each frozen audit states its language, or the choice is recorded with the disagreement noted.
+- [x] `P12.06`'s "confirmed to exist and to state it" claim is true or corrected.
+- [x] `npm run format` green.
+
+## Implementation notes
+
+**The verification pass found a second instance of site 1's failure mode, and it was not in the list.** Every P13–P16 decision row's cited home was opened and read (not merely resolved — a link checker over the whole register reports zero broken links and zero broken anchors, which is exactly why the mechanical check cannot substitute for reading). Two rows failed on content:
+
+- The **`helpUri` → `blob/main`** row cited `output.md`'s `helpUri` table row, which described what the field holds and its declared-optional nullability but said nothing about the `blob/main` base or its consequence for a pinned install. [P15.03](../P15-output-contracts/03-lint-output-contract.md)'s own notes say "that is a register row, not a silent trade" — the row was written, the home was not. Fixed by stating it in that table row, which is where the register already pointed.
+- The **`init` 8-of-24** row listed [SIZE-001](../../guide/rules/SIZE-001.md) and [LLM-001](../../guide/rules/LLM-001.md) beside `cli.md#init`. Neither rule page mentions `init` at all; they are the pages the draft sends you to, not a second statement of the inference boundary. Trimmed to the one home that states it, which links both pages itself.
+
+That is two page-level pointers that read as confirmation in three separate reviews, so the fix is a rule rather than three edits: the register's **How to use it** now requires citing the section carrying the sentence, and says that verifying a row means opening it. `P12.06`'s claim is true again and carries the correction inline.
+
+**The self-flagged residual was closed in code, not re-classified.** The draft now carries a `Schema:` line — the ref the config will hold, plus the filename and reason when `init` has to generate one — so the `npx` path's second file is visible while declining is still possible. This required generating the config **before** the draft rather than after it ([`init-command.ts`](../../../packages/cli/src/init-command.ts)); generation is pure, so the only behavioral difference is that the installed-schema lookup now also runs on a declined run, and the same `GeneratedInitConfig` is what gets written, so the draft and the write summary cannot describe different files. Guarded end to end by position in [`init.e2e.test.ts`](../../../packages/cli/test/init.e2e.test.ts) — under `--yes` both documents print, so the assertion is that the draft's mention comes **first**.
+
+**W-49's standing rule was in the backlog only.** This task file said it "already exists in the backlog and in `AGENTS.md`"; `grep` for it in `AGENTS.md`, `CLAUDE.md` and `.agents/rules/` returned nothing — the backlog is a work-item document that gets superseded, so the rule was one deletion away from being lost with the live instance still in the tree. It is now stated in `AGENTS.md` beside the `proseWrap` rule, with the property that makes it dangerous: **`prettier --check` passes on the damage**, because the formatter produced it.
+
+**W-52a — what came back and what deliberately did not.** The glossary's `Status` header and **Maintenance rule** are restored, the rule marked as the canonical statement the three governance files point at. The "Shipped vs planned" roll-up is **not** restored: [P17.04](04-completion-surface.md) maintains the surviving **Phase** entry, and a second roll-up is precisely W-42's two-places-to-drift shape — the preamble now says so, so the absence reads as a decision rather than an oversight. "How to use this glossary" is also not restored: nothing points at it, its two still-useful conventions are one sentence in the Status block, and its third bullet _was_ the roll-up. `AGENTS.md` gets its `## Delivery Order` section back, rewritten rather than reverted: the phase order now defers to [`.agents/rules/architecture.md`](../../../.agents/rules/architecture.md) instead of restating it (the restatement is what went stale), while the two statements that survived nowhere — the task-chain rule and the audit-to-phase derivation — are stated there, the derivation extended to name the third assessment and to say why the three reports are frozen.
+
+**W-52 — language stated, findings indexed, audits untouched.** Each report carries a `Language / Язык` line at its head explaining that it is Russian and frozen, and an appended **Appendix A: English finding index** — one row per finding ID, plus an English rendering of the second report's section 4, which is what [`.agents/rules/testing.md`](../../../.agents/rules/testing.md) rests the four boundary-guard categories on. The Russian bodies are byte-unchanged: an index is additive, a translation would replace the definition site the P9–P12 task files are written against, which this task holds out of scope. The appendices say they are glosses and that the Russian entry stays authoritative.
+
+**The QA pass's disagreement, recorded as asked.** It disputed W-52's value — the repository owner is a Russian speaker and no rule requires English — and on the narrow question of whether the reports must be English, it is right; nothing here asks them to be. What the item is actually about is that four phases are written in finding IDs these two documents alone define, so an English reader of the plan has no way to resolve `M-2` or `H-1`. An index answers that at a fraction of the cost of a translation and without touching the frozen text, which is why the cheap option was taken rather than either the expensive one or none.

@@ -1,6 +1,6 @@
 # Phase P17 — Plan of record & self-linting
 
-> Roadmap: [v2 Index](../index.md) · Phase **P17** · Size **S–M** · Status **In progress** · Depends on [P16](../P16-release-readiness/index.md) (release readiness landed).
+> Roadmap: [v2 Index](../index.md) · Phase **P17** · Size **S–M** · Status **Done** · Depends on [P16](../P16-release-readiness/index.md) (release readiness landed).
 >
 > **Goal:** make the plan of record describe the product that shipped, and make this repository run its own linter on its own documentation so the next round of drift is a build failure instead of an audit finding. Sourced from the [consolidated remediation backlog](../remediation-backlog-2026-08-05.md), batches **B12–B13**.
 
@@ -48,10 +48,10 @@ Two of these sit in the **precedence tiers a contributor is told to obey** rathe
 - [x] No phase index reads `Not started` above task files that are all Done; the permanently unverifiable P0 parity criterion is retired or registered; the per-task checkbox question is **decided**, not just actioned (W-42).
 - [x] The orchestrator task file is listed in its index or moved out of the phase directory (W-50).
 - [x] Every stale release-sense `P9` is swept from the requirements, the phase indexes, and the four surviving artifact lines — **without** touching the correct remediation-sense references in the governance and rules files (W-45, W-46).
-- [ ] The accepted-behaviors register satisfies its own three rules, including the row it flags against itself (W-48).
-- [ ] The live Prettier corruption is retyped; the roadmap lists seven CLI commands and diagrams `schema.json` where it lives; the frozen audits' language is stated (W-49, W-51, W-52).
-- [ ] The glossary's **Milestone** entry names P13–P17, its `Status` header and **Maintenance rule** are back, and `CLAUDE.md`'s pointer to that rule resolves (W-51a, W-52a).
-- [ ] `npm run format` green — this phase is almost entirely Markdown, so the format gate is the gate that matters.
+- [x] The accepted-behaviors register satisfies its own three rules, including the row it flags against itself (W-48).
+- [x] The live Prettier corruption is retyped; the roadmap lists seven CLI commands and diagrams `schema.json` where it lives; the frozen audits' language is stated (W-49, W-51, W-52).
+- [x] The glossary's **Milestone** entry names P13–P17, its `Status` header and **Maintenance rule** are back, and `CLAUDE.md`'s pointer to that rule resolves (W-51a, W-52a).
+- [x] `npm run format` green — this phase is almost entirely Markdown, so the format gate is the gate that matters.
 
 ## What P17 unblocks
 
