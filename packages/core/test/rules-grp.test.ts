@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -26,7 +26,11 @@ async function fixtureRepo(files: Record<string, string>): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-grp-"));
   tempDirs.push(root);
   for (const [relativePath, content] of Object.entries(files)) {
-    await writeFile(path.join(root, relativePath), content, "utf8");
+    // Nested keys need their parent directory created, as `rules-size.test.ts` already does — the
+    // any-depth entry-point cases below (`docs/README.md`) would otherwise ENOENT.
+    const absolutePath = path.join(root, relativePath);
+    await mkdir(path.dirname(absolutePath), { recursive: true });
+    await writeFile(absolutePath, content, "utf8");
   }
   return root;
 }
@@ -61,9 +65,11 @@ describe("GRP-001 cycles (reads the injected graph)", () => {
     expect((await lint(cwd, [rule("GRP-001")])).messages).toEqual([]);
   });
 
+  // The two edge-kind cases below are two-node cycles, so they opt out of the default
+  // `minCycleLength` of 3 — they are about which edges close a cycle, not about the length filter.
   it("detects a cycle formed purely by @import edges (no links)", async () => {
     const cwd = await fixtureRepo({ "a.md": "@b.md\n", "b.md": "@a.md\n" });
-    const result = await lint(cwd, [rule("GRP-001")]);
+    const result = await lint(cwd, [rule("GRP-001", { minCycleLength: 2 })]);
     expect(result.messages).toHaveLength(1);
     expect(result.messages[0]?.data).toMatchObject({
       cycle: ["a.md", "b.md", "a.md"],
@@ -82,7 +88,11 @@ describe("GRP-001 cycles (reads the injected graph)", () => {
         idColumn: "ID",
       },
     };
-    const result = await lint(cwd, [rule("GRP-001")], settings);
+    const result = await lint(
+      cwd,
+      [rule("GRP-001", { minCycleLength: 2 })],
+      settings,
+    );
     expect(result.messages).toHaveLength(1);
     expect(result.messages[0]?.data).toMatchObject({
       cycle: ["a.md", "b.md", "a.md"],
@@ -95,6 +105,70 @@ describe("GRP-001 cycles (reads the injected graph)", () => {
       "b.md": "| ID |\n| --- |\n| REQ-2 |\n\nSee REQ-1 for context.\n",
     });
     expect((await lint(cwd, [rule("GRP-001")])).messages).toEqual([]);
+  });
+});
+
+// W-07: a README indexing a sibling that links back is a documentation shape, not a defect, and at
+// `error` severity it failed builds. `minCycleLength` is what makes the two-node back-link and a
+// longer chain distinguishable by configuration.
+describe("GRP-001 minCycleLength (P13.04 / W-07)", () => {
+  const MUTUAL_LINK = {
+    "README.md": "See [a](a.md).\n",
+    "a.md": "Back to [README](README.md).\n",
+  };
+
+  it("reports nothing for a two-document mutual link by default", async () => {
+    const result = await lint(await fixtureRepo(MUTUAL_LINK), [
+      rule("GRP-001"),
+    ]);
+    expect(result.messages).toEqual([]);
+  });
+
+  it("still reports a three-hop cycle at the same default", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "[b](b.md)\n",
+      "b.md": "[c](c.md)\n",
+      "c.md": "[a](a.md)\n",
+    });
+    const result = await lint(cwd, [rule("GRP-001")]);
+    expect(result.messages.map((message) => message.data?.cycle)).toEqual([
+      ["a.md", "b.md", "c.md", "a.md"],
+    ]);
+  });
+
+  it("restores the two-document finding when minCycleLength is 2", async () => {
+    const result = await lint(await fixtureRepo(MUTUAL_LINK), [
+      rule("GRP-001", { minCycleLength: 2 }),
+    ]);
+    expect(result.messages.map((message) => message.data?.cycle)).toEqual([
+      ["README.md", "a.md", "README.md"],
+    ]);
+  });
+
+  it("suppresses a four-hop cycle when minCycleLength exceeds it", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "[b](b.md)\n",
+      "b.md": "[c](c.md)\n",
+      "c.md": "[d](d.md)\n",
+      "d.md": "[a](a.md)\n",
+    });
+    expect(
+      (await lint(cwd, [rule("GRP-001", { minCycleLength: 5 })])).messages,
+    ).toEqual([]);
+    expect(
+      (await lint(cwd, [rule("GRP-001", { minCycleLength: 4 })])).messages,
+    ).toHaveLength(1);
+  });
+
+  it("rejects a minCycleLength below 2, which no cycle can be shorter than", () => {
+    let thrown: unknown;
+    try {
+      ruleRegistry.resolveRule("GRP-001", { minCycleLength: 1 });
+    } catch (error: unknown) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(RuleResolutionError);
+    expect((thrown as RuleResolutionError).code).toBe("INVALID_OPTIONS");
   });
 });
 
@@ -145,6 +219,58 @@ describe("GRP-002 orphans", () => {
       }),
     ]);
     expect(withBoth.messages).toEqual([]);
+  });
+
+  // W-05: with no `entryPoints` the exemption used to be skipped entirely, so a repository's own
+  // roots were 55% of the noise that gets a rule disabled.
+  it("exempts the default entry points when no entryPoints are configured", async () => {
+    const cwd = await fixtureRepo({
+      "README.md": "# Readme\n",
+      "CLAUDE.md": "# Claude\n",
+      "AGENTS.md": "# Agents\n",
+      "index.md": "# Index\n",
+      "orphan.md": "# Orphan\n",
+    });
+    const result = await lint(cwd, [rule("GRP-002")]);
+    expect(result.messages.map((message) => message.filePath)).toEqual([
+      "orphan.md",
+    ]);
+  });
+
+  // The task requires this be verified rather than assumed: the defaults are slash-free, and
+  // `normalizeConfigGlob` turns a slash-free entry into `**/<name>`, so they exempt at any depth.
+  it("exempts a nested README/AGENTS through the default patterns' any-depth anchoring", async () => {
+    const cwd = await fixtureRepo({
+      "docs/README.md": "# Docs\n",
+      "packages/x/AGENTS.md": "# Agents\n",
+      "docs/guide/index.md": "# Guide\n",
+      "docs/stray.md": "# Stray\n",
+    });
+    const result = await lint(cwd, [rule("GRP-002")]);
+    expect(result.messages.map((message) => message.filePath)).toEqual([
+      "docs/stray.md",
+    ]);
+  });
+
+  it("replaces the default entry points rather than extending them when entryPoints is set", async () => {
+    const cwd = await fixtureRepo({
+      "README.md": "# Readme\n",
+      "roots.md": "# Roots\n",
+    });
+    const result = await lint(cwd, [
+      rule("GRP-002", { entryPoints: ["roots.md"] }),
+    ]);
+    expect(result.messages.map((message) => message.filePath)).toEqual([
+      "README.md",
+    ]);
+  });
+
+  it("names the entryPoints option in the finding, not just the outcome", async () => {
+    const cwd = await fixtureRepo({ "orphan.md": "# Orphan\n" });
+    const result = await lint(cwd, [rule("GRP-002")]);
+    expect(result.messages[0]?.message).toBe(
+      "orphan.md has no incoming references; link it from another document or add it to GRP-002's `entryPoints`.",
+    );
   });
 
   it("counts an anchor edge as an incoming reference, not just a plain link", async () => {

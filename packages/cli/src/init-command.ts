@@ -15,6 +15,7 @@ import {
   identifyExistingRule,
   inferRuleSet,
   loadConfiguration,
+  MARKDOWN_GLOB_SUFFIX,
   normalizeRelativePath,
   PACKAGE_SCHEMA_SEGMENTS,
   resolvePackageSchemaRef,
@@ -31,6 +32,7 @@ import {
   type ProjectSchemaReason,
   type RuleCategory,
   type RuleConfigEntry,
+  type ScanPruning,
 } from "@wastech-mdlint/core";
 
 // `init` (P6.03/P6.04): the thin host boundary over P6.01/02's core scan + inference. This module
@@ -101,6 +103,10 @@ export type ConfirmedInitSelections = {
   clustersWereOffered: boolean;
   // Only meaningful for `"merge"`: the existing config carries JSONC comments the rebuild will drop.
   existingConfigHasComments: boolean;
+  // What the scan refused to walk, straight from `scanRepository`. Required for the same reason
+  // `clustersWereOffered` is: the draft has to disclose it (W-14), and an optional field would let a
+  // new call site drop the disclosure silently — which is the exact defect this closes.
+  pruning: ScanPruning;
 };
 
 export type ConfigPreview = {
@@ -108,17 +114,28 @@ export type ConfigPreview = {
   rules: RuleConfigEntry[];
 };
 
+/**
+ * Every way `runInitCommand` can end, named — because four of the six write nothing and the host has
+ * to sort them into two exit codes that mean opposite things (P14.02, W-13). A boolean could not:
+ * the previous `writeFailed` flag collapsed "the user asked for no write" and "the file we were told
+ * to merge into is invalid" into one `false`, so a CI merge step that refused to write reported
+ * success. Which bucket a new outcome belongs in is a decision, so it is spelled out here and
+ * switched exhaustively at the boundary rather than inferred from a flag.
+ *
+ * Deliberate no-write (exit `0`): `skipped`, `declined`. Operational failure (exit `2`):
+ * `invalid-existing-config`, `write-failed`, `ci-workflow-write-failed`.
+ */
+export type InitOutcome =
+  | "written"
+  | "skipped"
+  | "declined"
+  | "invalid-existing-config"
+  | "write-failed"
+  | "ci-workflow-write-failed";
+
 export type RunInitCommandResult = {
   output: string;
-  // Whether the user actually confirmed the draft (via `--yes` or `confirmDraft`) — distinct from
-  // whether anything was *written*: the unreadable-merge abort still sets this `true` because the
-  // draft was confirmed, even though the write itself was then withheld for an unrelated safety reason.
-  wasConfirmed: boolean;
-  // True only when a write the user asked for actually *failed* (P11.09) — an operational failure the
-  // host maps to a non-zero exit code. Required, not optional, so every return path has to state its
-  // answer: a deliberate no-write outcome (`skip`, an unconfirmed draft, the unreadable-merge abort)
-  // is `false`, because nothing failed — the command correctly chose not to write.
-  writeFailed: boolean;
+  outcome: InitOutcome;
 };
 
 const DRAFT_SUMMARY_HEADER = "wastech-mdlint init — draft configuration";
@@ -129,6 +146,19 @@ const DRAFT_SUMMARY_HEADER = "wastech-mdlint init — draft configuration";
 const COMMENT_LOSS_NOTE =
   "merge rebuilds the config from its parsed values, so the JSONC comments in the existing file " +
   "are not preserved.";
+
+// The two rules the README leads with are the two `init` can never propose (W-39): both require a
+// budget, and inference sees 3–5 sampled files per cluster — not a corpus — so any threshold it
+// derived would be invented rather than measured. That is a scope choice, and an unstated one is
+// what turns into a finding a second time, so the draft says it out loud rather than leaving the
+// user to notice the absence. Same disclosure discipline as the scan-exclusion block above it.
+const NOT_INFERRED_NOTE = [
+  "Not proposed by init:",
+  "  SIZE-001 (byte / line / token budgets) and LLM-001 (eager-import token budget) are never " +
+    "inferred — both need a budget only you can choose, and no honest threshold follows from a " +
+    "3–5 file sample. Add them by hand: see docs/guide/rules/SIZE-001.md and " +
+    "docs/guide/rules/LLM-001.md.",
+];
 
 /**
  * Groups inferred rules by category, preserving `inferRuleSet`'s own deterministic id order within
@@ -333,10 +363,124 @@ function formatExistingConfigLine(
   }
 }
 
+// How many directories one exclusion line names before it collapses into `+N more`. A monorepo can
+// prune dozens of `node_modules` copies, and a wall of paths is what makes a disclosure ignorable —
+// the failure mode W-14 is about. The input is sorted, so which entries survive the cap is stable.
+const EXCLUSION_LIST_CAP = 5;
+
+function formatCappedList(items: string[]): string {
+  if (items.length <= EXCLUSION_LIST_CAP) {
+    return items.join(", ");
+  }
+  const shown = items.slice(0, EXCLUSION_LIST_CAP).join(", ");
+  return `${shown}, +${items.length - EXCLUSION_LIST_CAP} more`;
+}
+
+function pluralize(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+// Deduped, sorted basenames of a pruned set — `mobile/node_modules` and `node_modules` are one fact
+// to report, not two.
+function prunedBaseNames(directories: readonly { path: string }[]): string[] {
+  return [
+    ...new Set(directories.map((entry) => path.posix.basename(entry.path))),
+  ].sort(compareStrings);
+}
+
+/**
+ * The scan-exclusion disclosure (P14.03 / W-14): what the scan refused to walk, and why. Pure and
+ * exported so the wording is asserted directly, mirroring `formatDraftSummary`/`formatWriteSummary`.
+ *
+ * **One line per reason, never one total.** The three classes are not one class: a pruned
+ * `node_modules` is unsurprising, and a `.claude/skills/` dropped because its parent starts with a
+ * dot is the finding. A single aggregate count is precisely what invites a user to skim past it.
+ *
+ * Only the hidden class carries a file count, and the asymmetry is deliberate — it is the one class
+ * whose contents are plausibly documentation the user wants linted, and it is also the only one
+ * cheap to size (`scanRepository` counts it while pruning; counting a dependency tree would mean
+ * walking the tree that pruning exists to avoid). The other two say "contents not counted" out loud
+ * rather than implying a zero.
+ *
+ * Returns `[]` when there is nothing to disclose, so the caller can omit the block entirely.
+ *
+ * `includeWillBeWritten` decides the hidden line's actionable half, and it has to be passed in
+ * because the two answers are opposites: with an `include` written, a dot-directory is outside the
+ * corpus and the user needs a pattern to add. With the key omitted — the scan found no cluster at
+ * all, which is exactly the shape of a repo whose only Markdown *is* in dot-directories — the
+ * dot-matching default `include` is in force and those files are already linted. Claiming otherwise
+ * in that branch would contradict the `Include (…)` line printed two lines above it.
+ *
+ * (No default glob is spelled out in this block comment on purpose: a depth-agnostic prefix contains
+ * `*` `*` `/`, which would close the comment early — the same reason `config/corpus-scope.ts` uses
+ * `//` throughout.)
+ */
+export function formatScanExclusions(
+  pruning: ScanPruning,
+  includeWillBeWritten: boolean,
+): string[] {
+  // Sorted here rather than trusted from the caller: `ScanPruning` is public core API and this
+  // formatter is exported, so an unsorted record would otherwise render in input order and shift
+  // which entries the cap keeps (.agents/rules/coding-style.md — sort at the rendering site).
+  const hidden = pruning.directories
+    .filter(
+      (entry) =>
+        entry.reason === "hidden" && (entry.markdownFileCount ?? 0) > 0,
+    )
+    .sort((left, right) => compareStrings(left.path, right.path));
+  const noise = pruning.directories.filter((entry) => entry.reason === "noise");
+  const gitignored = pruning.directories.filter(
+    (entry) => entry.reason === "gitignored",
+  );
+
+  const lines: string[] = [];
+
+  if (hidden.length > 0) {
+    const total = hidden.reduce(
+      (sum, entry) => sum + (entry.markdownFileCount ?? 0),
+      0,
+    );
+    const named = formatCappedList(
+      hidden.map((entry) => `${entry.path} (${entry.markdownFileCount})`),
+    );
+    // The suggested pattern splices MARKDOWN_GLOB_SUFFIX rather than a literal `*.md`, because the
+    // count beside it was produced with MARKDOWN_EXTENSIONS: a hardcoded `.md` tail would advertise
+    // a pattern that lints fewer files than the number in the same sentence (P13.05 / W-09).
+    const advice = includeWillBeWritten
+      ? `The scan never proposes a dot-directory as a doc cluster, so no include pattern above ` +
+        `names one; add a pattern such as "${hidden[0]!.path}/**/${MARKDOWN_GLOB_SUFFIX}" to lint it.`
+      : `The scan never proposes a dot-directory as a doc cluster, but no include will be written ` +
+        `either, so the dot-matching **/*.md default stays in force and the .md files among these ` +
+        `are linted.`;
+    lines.push(
+      `  hidden directories: ${pluralize(total, "Markdown file", "Markdown files")} in ` +
+        `${pluralize(hidden.length, "directory", "directories")} whose name starts with a dot — ` +
+        `${named}. ${advice}`,
+    );
+  }
+
+  if (noise.length > 0) {
+    lines.push(
+      `  build and dependency directories: ${pluralize(noise.length, "directory", "directories")} ` +
+        `skipped by name, contents not counted — ${formatCappedList(prunedBaseNames(noise))}.`,
+    );
+  }
+
+  if (gitignored.length > 0) {
+    lines.push(
+      `  gitignored directories: ${pluralize(gitignored.length, "directory", "directories")} ` +
+        `skipped, contents not counted — ${formatCappedList(prunedBaseNames(gitignored))}.`,
+    );
+  }
+
+  return lines.length === 0 ? [] : ["Excluded from the scan:", ...lines];
+}
+
 /**
  * Deterministic, human-readable preview of the confirmed draft: existing-config disposition,
  * package manager, include globs (from `buildConfigPreview`, so the printed list matches exactly
- * what P6.04 would serialize), and rules grouped by category with their per-rule rationale.
+ * what P6.04 would serialize), the scan-exclusion disclosure, rules grouped by category with their
+ * per-rule rationale, and the two rules inference will never reach (`NOT_INFERRED_NOTE`).
  *
  * `merge` is additive/existing-wins (P6.03's locked contract): it only ever appends new `rules[]`
  * entries and must never touch `include`/`exclude`/`settings`. So a merge preview omits the
@@ -376,6 +520,22 @@ export function formatDraftSummary(
         lines.push(`  - ${glob}`);
       }
     }
+
+    // Only on a fresh write, and only after the Include block it qualifies: `merge` has just said
+    // scope is left unchanged, so disclosing what the scan skipped there would imply a decision the
+    // merge path is not making. Under `--yes` this reaches stdout via `composeOutput`; interactively
+    // `confirmDraft` shows it while the user can still decline, which is where the warn-before-
+    // confirming discipline wants it.
+    // Same three-valued `include` decision `runInitCommand` makes before writing: the key is omitted
+    // only when nothing was selected *and* nothing was offered, and that is the one case where the
+    // hidden files end up linted by the default rather than skipped.
+    const exclusions = formatScanExclusions(
+      selections.pruning,
+      preview.include.length > 0 || selections.clustersWereOffered,
+    );
+    if (exclusions.length > 0) {
+      lines.push("", ...exclusions);
+    }
   }
   lines.push("");
 
@@ -395,6 +555,10 @@ export function formatDraftSummary(
       }
     }
   }
+
+  // Unconditional, including on `merge`: it states what `init` proposes, which is true whatever the
+  // existing config already lists, so no branch needs to opt out of it.
+  lines.push("", ...NOT_INFERRED_NOTE);
 
   return `${lines.join("\n")}\n`;
 }
@@ -923,8 +1087,7 @@ export async function runInitCommand(
       // write — the CI-workflow offer belongs only to the confirmed config-write branch below.
       return {
         output: `${DRAFT_SUMMARY_HEADER}\n\nskipped — existing config left untouched.\n`,
-        wasConfirmed: false,
-        writeFailed: false,
+        outcome: "skipped",
       };
     }
   }
@@ -1015,6 +1178,7 @@ export async function runInitCommand(
     existingConfigUnreadable,
     clustersWereOffered,
     existingConfigHasComments,
+    pruning: scanResult.pruned,
   };
 
   const summary = formatDraftSummary(selections, relativeConfigPath);
@@ -1026,8 +1190,7 @@ export async function runInitCommand(
   if (!confirmed) {
     return {
       output: "Aborted: configuration not confirmed.\n",
-      wasConfirmed: false,
-      writeFailed: false,
+      outcome: "declined",
     };
   }
 
@@ -1053,12 +1216,11 @@ export async function runInitCommand(
     // never mismatches it for the same file (H-3: the two used different bases before this fix).
     return {
       output: composeOutput(formatNotWrittenSummary(relativeConfigPath)),
-      // The user did confirm the draft above (`confirmed === true`) — only the write itself was
-      // withheld, for a reason unrelated to their choice. See the type's own comment.
-      wasConfirmed: true,
-      // A deliberate refusal to write, not a failed write: nothing was attempted, so this stays 0-exit
-      // (the summary tells the user how to recover).
-      writeFailed: false,
+      // An operational failure, not a deliberate no-write: the user confirmed the draft and asked for
+      // a merge, and it is the *state of their file* that made it impossible. Exiting 0 here made a
+      // CI merge step that produced nothing report success (P14.02, W-13) — `--on-existing skip`
+      // above is the outcome that legitimately writes nothing.
+      outcome: "invalid-existing-config",
     };
   }
 
@@ -1164,8 +1326,7 @@ export async function runInitCommand(
           code: writeResult.code,
         }),
       ),
-      wasConfirmed: true,
-      writeFailed: true,
+      outcome: "write-failed",
     };
   }
 
@@ -1188,10 +1349,10 @@ export async function runInitCommand(
         ciWorkflow,
       }),
     ),
-    wasConfirmed: true,
     // The config and schema landed; only the opt-in workflow the user asked for did not. Still a
     // failed write, so the exit code has to say so — the summary above names which file it was.
-    writeFailed: ciWorkflow?.kind === "failed",
+    outcome:
+      ciWorkflow?.kind === "failed" ? "ci-workflow-write-failed" : "written",
   };
 }
 

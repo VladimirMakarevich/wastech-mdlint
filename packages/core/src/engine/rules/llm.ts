@@ -8,7 +8,7 @@ import {
 import type { ParsedDocument } from "../../markdown/document-types.js";
 import { resolveTargetCandidates } from "../path-resolve.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
-import { estimateTokens } from "../tokens.js";
+import { estimateTokens, TOKEN_ESTIMATE_NOTE } from "../tokens.js";
 import type { ReportInput, SiteRouterSettings } from "../types.js";
 
 // LLM-001 — eager-import context budget per entrypoint (D3, P3.07). Single total budget
@@ -182,7 +182,9 @@ function collectEntrypointFindings(
       1,
     );
     findings.push({
-      message: `Entrypoint ${entrypoint} is over context budget: ${totalTokens} estimated tokens exceeds ${maxTokens} (${percentOver}% over).`,
+      // Only the budget finding quotes a token number, so only it carries the calibration (W-34);
+      // the missing-import and cycle findings below would gain a non-sequitur from it.
+      message: `Entrypoint ${entrypoint} is over context budget: ${totalTokens} estimated tokens exceeds ${maxTokens} (${percentOver}% over). ${TOKEN_ESTIMATE_NOTE}`,
       line: 0,
       filePath: entrypoint,
       data: {
@@ -190,7 +192,6 @@ function collectEntrypointFindings(
         maxTokens,
         importedFiles: traversal.importedPaths.size,
       },
-      helpUri: "LLM-001",
     });
   }
 
@@ -201,7 +202,6 @@ function collectEntrypointFindings(
       column: missing.column,
       filePath: missing.sourcePath,
       data: { rawTarget: missing.rawTarget, targetPath: missing.targetPath },
-      helpUri: "LLM-001",
     });
   }
 
@@ -211,7 +211,6 @@ function collectEntrypointFindings(
       line: cycle.line,
       filePath: cycle.sourcePath,
       data: { cycle: cycle.paths },
-      helpUri: "LLM-001",
     });
   }
 

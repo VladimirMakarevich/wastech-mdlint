@@ -48,7 +48,12 @@ export function runRules(
         endLine: finding.endLine,
         fixable: finding.fixable,
         data: finding.data,
-        helpUri: finding.helpUri,
+        // Attached from the rule, never from the finding (P15.03 / W-35). It used to be a per-report
+        // literal, which shipped a bare rule id — duplicating `ruleId` and failing R3's SARIF
+        // rationale, whose `helpUri` is a link — at 27 sites and no `helpUri` at all at five others.
+        // Sourcing it here makes the value a URL and its presence uniform, and `ReportInput` no
+        // longer carries the field so a rule cannot re-introduce either defect.
+        helpUri: rule.docsUrl,
       });
     };
 

@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { createScanner, SyntaxKind } from "jsonc-parser";
 
+import { DEFAULT_EXCLUDE_GLOBS } from "../config/corpus-scope.js";
 import { compareStrings } from "../deterministic-sort.js";
 import { canonicalizeRuleId } from "../rule-id.js";
 import {
@@ -10,7 +11,6 @@ import {
 } from "../engine/schema.js";
 import { ruleRegistry } from "../engine/rules/index.js";
 import { CUSTOM_ID_GRAMMAR } from "../engine/rules/custom.js";
-import { DEFAULT_NOISE_DIR_NAMES } from "./repo-scan-constants.js";
 import { normalizeRelativePath } from "./globs.js";
 import type { InferredRule } from "./rule-inference.js";
 
@@ -114,37 +114,6 @@ export function resolvePackageSchemaRef(
   return relative.startsWith("../") ? relative : `./${relative}`;
 }
 
-// Mirrors the scan's `isPrunedDirName` hidden-directory prune (audit L-7): `.github`, `.venv`,
-// `.husky` and friends hold tooling Markdown `init` never proposed, so leaving them lintable made
-// the written config disagree with the draft the user approved. Named rather than inlined below
-// because the pattern is unreadable without this explanation: it matches a dot-prefixed directory
-// at any depth and only ever matches its *contents*, so a dotfile at the repo root (`.README.md`)
-// stays in the corpus.
-const HIDDEN_DIR_EXCLUDE_GLOB = "**/.*/**";
-
-// The fresh-write `exclude` (C1 / deliverable 1): the scanner's own pruned noise directories as
-// globs, plus the hidden-directory glob above, so a written config never re-scans the
-// `node_modules`/`.git`/`dist`/`.github`/… trees that `init` deliberately ignored — including when
-// `include` falls back to the implicit `**/*.md`.
-//
-// The `**/` prefix is load-bearing: `collectMarkdownFiles` prunes these by *basename at every depth*
-// (`repo-scan.ts`), so only a depth-agnostic glob faithfully mirrors what the scan skipped. The
-// earlier root-anchored `<name>/**` form silently under-delivered on this same promise in a monorepo
-// — `packages/foo/dist/**` was still linted (audit M-4). A leading `**/` matches zero leading
-// segments in picomatch, so root-level `node_modules/` stays pruned too.
-//
-// Accepted tradeoff: hand-written docs under a nested directory literally named `build`/`out`/
-// `vendor`/… are now pruned as well, and `exclude` wins over `include` (C1). `init` could never have
-// proposed such files anyway (same basename prune), and the written config is a starting point the
-// user is expected to edit.
-//
-// Sorted for a deterministic, set-like array (order is not meaningful here). A `merge` never touches
-// an existing `exclude`; this is only for the fresh/overwrite path.
-const DEFAULT_EXCLUDE_GLOBS = [
-  ...DEFAULT_NOISE_DIR_NAMES.map((name) => `**/${name}/**`),
-  HIDDEN_DIR_EXCLUDE_GLOB,
-].sort(compareStrings);
-
 // Canonical top-level key order, applied on every write rather than preserving an existing file's
 // original order — simpler and fully deterministic, at only the cosmetic cost of reordering a merged
 // file's keys. Any leftover unknown key is emitted after these, sorted, so it is never dropped.
@@ -157,6 +126,16 @@ const TOP_LEVEL_KEY_ORDER = [
   "rules",
   "compile",
 ] as const;
+
+// The `//` lines a fresh write puts above `exclude` (P14.03 / W-15). Without them the block reads
+// as this config's own exclusions, and the natural edit — delete the line you disagree with — does
+// nothing at all, because the same list is the lint-time default with or without a config. Stated
+// as data rather than prose so the writer's tests can pin the wording that makes it actionable.
+const EXCLUDE_KEY_COMMENT: readonly string[] = [
+  "These are wastech-mdlint's own defaults, written out so they are visible rather than implicit.",
+  "The same list applies with no config at all, and your entries EXTEND it rather than replace it —",
+  'so deleting a line here changes nothing. To lint one of these trees, negate it: "!**/vendor/**".',
+];
 
 // Single-quote a value for POSIX sh so spaces or shell metacharacters (`#`, `&`, …) in an otherwise
 // legal repo path can't split the argument or be reinterpreted. Embedded single quotes are closed,
@@ -173,11 +152,17 @@ function shellSingleQuote(value: string): string {
  *
  * GitHub loads workflows only from the repo-root `.github/workflows`, so when the config being wired
  * lives in a subdirectory the caller passes its repo-root-relative POSIX path here. The lint step
- * then scopes to that config's *directory* (`lint <dir>`) AND passes `--config <path>`: `lintFiles`
+ * then scopes to that config's *directory* (`lint <dir>`) AND passes `--config <file>`: `lintFiles`
  * resolves `include`/`exclude` relative to the command cwd, so without the directory arg the workflow
  * would lint the repo root against subdirectory-relative globs and match the wrong tree (or nothing).
  * It is a YAML literal block scalar (`run: |`) so the command is taken verbatim (no plain-scalar
  * `#`/split surprises) and each path is single-quoted for POSIX sh.
+ *
+ * The two arguments are anchored differently on purpose. `[path]` is repo-root-relative because the
+ * workflow runs from the repo root; `--config` is relative to *that* directory, because since P14.04
+ * the CLI resolves a relative `--config` against `[path]`. Emitting the repo-root-relative config
+ * path here — which is what this template did while the two bases disagreed — would now make every
+ * generated workflow look for `<dir>/<dir>/wastech-mdlint.config.json` and exit `2` on its first run.
  *
  * A line terminator in the path cannot be represented in the block scalar and would silently mis-run,
  * so it is rejected (the CLI declines the opt-in workflow rather than reach this) — an explicit
@@ -200,11 +185,12 @@ export function buildCiWorkflowYaml(configPath?: string): string {
 
   let lintStep = "      - run: npx wastech-mdlint lint --fail-on error";
   if (configPath !== undefined) {
-    // POSIX dirname of the (already POSIX-normalized) config path; the caller only passes a path for
-    // a subdirectory config, so a slash is expected, but default to "." defensively.
+    // POSIX dirname/basename of the (already POSIX-normalized) config path; the caller only passes a
+    // path for a subdirectory config, so a slash is expected, but default to "." defensively.
     const lastSlash = configPath.lastIndexOf("/");
     const configDir = lastSlash === -1 ? "." : configPath.slice(0, lastSlash);
-    const lintCommand = `npx wastech-mdlint lint ${shellSingleQuote(configDir)} --fail-on error --config ${shellSingleQuote(configPath)}`;
+    const configFile = configPath.slice(lastSlash + 1);
+    const lintCommand = `npx wastech-mdlint lint ${shellSingleQuote(configDir)} --fail-on error --config ${shellSingleQuote(configFile)}`;
     lintStep = `      - run: |\n          ${lintCommand}`;
   }
 
@@ -441,6 +427,10 @@ export function generateInitConfig(
   const schemaRef = useProjectSchema ? PROJECT_SCHEMA_REF : packageSchemaRef;
 
   const values = new Map<string, string>();
+  // `//` lines emitted immediately above a key, keyed the same way `values` is so the two stay in
+  // step through the ordering pass below. Only `exclude` uses it today; a map rather than a special
+  // case because the body build has to handle the general shape either way.
+  const leadingComments = new Map<string, readonly string[]>();
   values.set("$schema", JSON.stringify(schemaRef));
 
   let wroteEmptyInclude = false;
@@ -461,15 +451,24 @@ export function generateInitConfig(
       values.set("include", indentValue(JSON.stringify(include, null, 2)));
       wroteEmptyInclude = include.length === 0;
     }
-    // Always written so a fallback/root config never re-scans the noise trees the scanner pruned
-    // (deliverable 1 / C1), and `respectGitignore` is pinned explicitly to `true` rather than left
-    // at the loader's `false` default (C8): the scan already skipped gitignored trees, so a config
-    // that lints them would contradict the draft the user approved (audit L-7). Explicit in the file
-    // — not a changed loader default — so it stays a visible, editable decision.
+    // Both keys stay explicit in the written file so each remains a visible, editable decision.
+    // `respectGitignore: true` is still the load-bearing one: it is pinned rather than left at the
+    // resolver's `false` default (C8), because the scan already skipped gitignored trees and a
+    // config that lints them would contradict the draft the user approved (audit L-7).
+    //
+    // The written `exclude` is no longer the only thing in force — since P13.02 the same
+    // `DEFAULT_EXCLUDE_GLOBS` applies on every run and a config's own `exclude` *extends* it
+    // (`config/corpus-scope.ts`, and `docs/guide/configuration.md` for users), so writing it here
+    // discloses the default rather than establishing it. P14.03 (W-15) settled deliverable 4 in
+    // favor of keeping the list rather than omitting what the default already covers: extend is
+    // exactly what makes *deleting* one of these lines a no-op, and a bare list of a dozen globs
+    // invites that dead edit. The key must also exist for a user to write a negation into. So the
+    // duplication stays, and the comment below is what keeps it from being silent.
     values.set(
       "exclude",
       indentValue(JSON.stringify(DEFAULT_EXCLUDE_GLOBS, null, 2)),
     );
+    leadingComments.set("exclude", EXCLUDE_KEY_COMMENT);
     values.set("respectGitignore", "true");
   }
 
@@ -490,7 +489,15 @@ export function generateInitConfig(
   ];
 
   const body = orderedKeys
-    .map((key) => `  ${JSON.stringify(key)}: ${values.get(key)!}`)
+    .map((key) => {
+      // The comma from the previous entry has already been emitted by the join, so a key's own
+      // comment lines sit between that comma and the key — valid JSONC, and it reads as belonging
+      // to the key below it rather than trailing the value above.
+      const comment = (leadingComments.get(key) ?? [])
+        .map((line) => `  // ${line}\n`)
+        .join("");
+      return `${comment}  ${JSON.stringify(key)}: ${values.get(key)!}`;
+    })
     .join(",\n");
   const configText = `{\n${body}\n}\n`;
 

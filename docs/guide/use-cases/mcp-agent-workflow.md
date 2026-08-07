@@ -18,7 +18,7 @@ First register the server in the host (once):
 }
 ```
 
-Then the agent works through a task. Tool calls below show the exact arguments each tool accepts; all 6 tools are read-only. Optional `cwd`/`configPath` default to the process cwd and discovered config.
+Then the agent works through a task. Tool calls below show the exact arguments each tool accepts; all 6 tools are read-only. Optional `cwd`/`configPath` default to the process cwd and discovered config. A `cwd` you do pass has to be an existing directory: a mistyped one comes back as an [`INVALID_INPUT` error](../mcp-server.md#error-contract) rather than an empty-but-plausible answer, so an agent retries the path instead of concluding the repository is clean.
 
 **Step 1 — lint a draft before writing it to disk.** The agent drafted a section and checks it against explicit rules _without_ touching the filesystem (the `lint` tool takes literal content):
 
@@ -39,7 +39,7 @@ The agent fills in `Usage` and replaces the `TODO` before saving.
 
 An entry can also be a declarative [`custom`](../rules/custom.md) rule (`{ "rule": "custom", "id": "REQ-OWNER", "options": { "assert": … } }`), so the agent can check a project invariant on a draft even when no such rule is in the config yet — it is pure data, so nothing is loaded or executed to run it. Two things follow from `lint` taking literal content: the document is a single synthetic file named `content.md`, so an `options.files` glob aimed at a real directory matches nothing, and a corpus-wide assert like `columnUnique` can only see duplicates inside the submitted content. Use `lint-files` when the check has to span the repo.
 
-**Step 2 — lint the whole project after editing.** Uses the resolved config (or the zero-config `**/*.md` default):
+**Step 2 — lint the whole project after editing.** Uses the resolved config (or the zero-config `**/*.md` default). `patterns` stands in for `include`, not for the whole corpus scope: the [default `exclude`](../configuration.md#what-is-excluded-before-you-write-anything) still prunes `node_modules`, build output and dependency trees such as `.venv`, so a pattern pointed at one of those comes back empty rather than erroring.
 
 ```jsonc
 // tool: lint-files
@@ -64,7 +64,11 @@ Now the agent knows to update `login.md`/`session.md` too. (A file outside the c
 ```jsonc
 // tool: context-graph
 { "format": "summary" }
-// → { nodes:[{path,inDegree,outDegree}], edges:[...], components:[...], readingOrder:[...] }
+// → { nodes:[{path,inDegree,outDegree}], edges:[...], components:[...], readingOrder:[...],
+//     excluded:[...], coverage:{nodeCount,edgeCount,filesOutsideCorpus} }
+// (`excluded` is what a cycle kept out of readingOrder; `coverage.filesOutsideCorpus` names
+//  Markdown that is linked-to but outside `include`, so it is never linted. Omit `format`, or
+//  pass "raw", for the verbatim graph with its `cycles` list instead.)
 ```
 
 Or a focused forward slice from an entry point or ID (exact match only — ID, `#slug`, or path):

@@ -57,6 +57,22 @@ describe("handleCompileContext", () => {
     );
   });
 
+  // P14.01, the sibling of `lint-files`' case: this module also recomputed the `cwd` default outside
+  // the shared resolver. A bad `cwd` must be named as such rather than misattributed to a missing
+  // `config.compile`, which is what the zero-config fallthrough below used to report.
+  it("rejects a nonexistent cwd with INVALID_INPUT rather than COMPILE_CONFIG_MISSING", async () => {
+    const parent = await makeTempDir("mcp-cc-cwd-missing-");
+
+    const result = await handleCompileContext({
+      cwd: path.join(parent, "no-such-directory"),
+    });
+
+    expect(result.isError).toBe(true);
+    expect((result.structuredContent as { code: string }).code).toBe(
+      "INVALID_INPUT",
+    );
+  });
+
   it("passes the COMPILE_CONFIG_MISSING error through when config.compile is absent", async () => {
     const dir = await makeTempDir("mcp-cc-missing-");
     // No config file → zero-config default has no `compile`.

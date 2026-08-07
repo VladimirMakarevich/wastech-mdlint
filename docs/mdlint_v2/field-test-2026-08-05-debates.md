@@ -35,7 +35,7 @@ Facts checked by running the commands, not inferred. Re-derive these for a diffe
 | Local Node | `v24.8.0`, while `engines` requires `>=24.17.0` (`.nvmrc` pins 24.17.0); no version manager installed | See [Phase 0](#phase-0--decide-the-node-line) |
 | Engine enforcement | `npm i` emits `EBADENGINE` warnings only and exits `0` — no `.npmrc` sets `engine-strict`, and nothing checks the version at runtime | The pin is advisory in practice; worth recording as a finding candidate |
 | Local install of internal deps | `npm pack` of `cli` + `core` installed together in one `npm i` resolves `@wastech-mdlint/core@0.0.0` from the local tarball, links the `wastech-mdlint` bin, and runs — verified | Unblocks the whole plan; installing the `cli` tarball alone would try the registry and fail |
-| Target corpus | 202 tracked `.md`; 323 `.md` excluding `node_modules` | The gap is the discovery test |
+| Target corpus | 202 tracked `.md`; 323 `.md` excluding `node_modules` | The gap is the discovery test. 323 excludes `node_modules` **only** — the linter's default `exclude` prunes eleven more directory names (dependency and build trees, dot-prefixed or not), so re-derive this per target rather than reusing 323 as "what a zero-config run should report" |
 | Ignored Markdown | ~87 files under a root-`.gitignore` directory; 33 under `mobile/ios/App/Pods`, ignored by a **nested** `mobile/ios/.gitignore` | Exercises nested-ignore handling, not just the root file |
 | Largest documents | 96 KB, 86 KB, 66 KB, 63 KB, 54 KB | `SIZE-001` and `LLM-001` have real inputs |
 | Pre-existing tooling | The target already has `.markdownlint.json` and `.prettierrc.json` (`proseWrap: never`) | Findings should not simply restate what markdownlint already reports |
@@ -85,9 +85,15 @@ time "$MDLINT" lint . --format json > "$SB/00-zeroconfig.json"; echo "exit=$?"
 node -e 'const r=require(process.argv[1]);console.log(r.summary,"files:",r.files.length)' "$SB/00-zeroconfig.json"
 ```
 
-Expected: exit `0`, zero findings (the zero-config ruleset is empty), and **323 files** in the corpus — `.gitignore` is not honored by default.
+Expected: exit `0`, zero findings (the zero-config ruleset is empty), and **323 files minus any Markdown under a default-excluded tree** — `.gitignore` is still not honored by default. The 323 in the reconnaissance table excludes `node_modules` alone, while the [default `exclude`](../guide/configuration.md#what-is-excluded-before-you-write-anything) is 12 depth-agnostic globs (the noise directory names, dependency and build trees only), so treat 323 as the upper bound and subtract the target's own `build`/`dist`/`out`/`coverage`/`vendor`/`target`/`.next`/`.cache`/`.venv`/`.yarn` Markdown. That subtraction is target-specific, which is why the load-bearing assertion below is count-independent. Since [P14.03](P14-host-boundary/03-init-disclosure.md) resolved W-15, dot-directory Markdown is **not** subtracted: `.claude/`, `.agents/` and the two `.rules/` sets are in a zero-config corpus.
 
-Then look at _which_ files. `node_modules` is excluded by default and must not appear at any depth; vendored Markdown under build directories should appear, since nothing has excluded it yet. Record the wall-clock time over ~2.4 MB of Markdown.
+Then look at _which_ files. **No** default-excluded segment may appear at any depth — not `node_modules`, and not build or vendor output either:
+
+```bash
+node -e 'const r=require(process.argv[1]);const noise=["node_modules",".git","dist","build","out","coverage","vendor",".next",".cache",".venv",".yarn","target"];const bad=r.files.filter(f=>f.split("/").slice(0,-1).some(s=>noise.includes(s)));console.log("unpruned:",bad.length,bad.slice(0,5))' "$SB/00-zeroconfig.json"
+```
+
+Expected `unpruned: 0 []`. Only _directory_ segments are checked, mirroring the globs, which match a directory's contents and not a root dotfile such as `.README.md`. Record the wall-clock time over the Markdown that survives the prune — a number that is no longer comparable to the pre-P13.02 ~2.4 MB.
 
 Determinism: run it twice and `diff` the two JSON files. A byte difference is a finding.
 
@@ -111,7 +117,7 @@ Then the load-bearing corpus check:
 "$MDLINT" lint . --format json > "$SB/01-init.json"
 ```
 
-Expected **202 files** — 323 minus everything the root and nested `.gitignore` files exclude. Any third number points straight at nested-ignore or exclude-glob handling; capture the actual file list and diff it against `git ls-files '*.md'` to name the discrepancy precisely.
+Expected **202 files** — 323 minus everything the root and nested `.gitignore` files exclude. Any third number points straight at nested-ignore or exclude-glob handling; capture the actual file list and diff it against `git ls-files '*.md'` to name the discrepancy precisely. The run measured **139**, and that 63-file gap is not an ignore bug: it is `"**/.*/**"` dropping `.claude/`, `.agents/`, and two `.rules/` sets, silently. [P14.03](P14-host-boundary/03-init-disclosure.md) closed both halves — the glob is gone from the lint-time default (W-15), and `init` now discloses what its scan skipped, per reason (W-14) — so a re-run of this phase should measure the tracked 202 and the dot-directories should appear in Phase 3's corpus too.
 
 Idempotency and dispositions:
 

@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import {
   resolveToolContext,
+  toolCwdBase,
   type ToolFileInput,
 } from "../shared/tool-context.js";
 import {
@@ -54,6 +55,10 @@ const impactAnalysisOutputShape = {
 export async function handleImpactAnalysis(
   input: ImpactAnalysisToolInput,
 ): Promise<CallToolResult> {
+  // Outside the `try`: `resolveToolContext` is itself a throw site, so the catch needs the base
+  // independently of whether resolution got far enough to produce one.
+  const cwd = toolCwdBase(input);
+
   try {
     const { graph } = await resolveToolContext(input);
 
@@ -76,11 +81,14 @@ export async function handleImpactAnalysis(
     // Preserve the requested `file` while zeroing the graph-derived lists so the error remains
     // machine-parseable under the same required schema a successful impact result uses.
     return errorResult(error, {
-      file: input.file,
-      directlyAffected: [],
-      transitivelyAffected: [],
-      readingOrder: [],
-      excluded: [],
+      successFields: {
+        file: input.file,
+        directlyAffected: [],
+        transitivelyAffected: [],
+        readingOrder: [],
+        excluded: [],
+      },
+      cwd,
     });
   }
 }

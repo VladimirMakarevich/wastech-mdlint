@@ -85,7 +85,7 @@ npm run build
 
 Use `npm run lint` and `npm run format` when the touched scope or task requires style verification.
 
-Keep the four process-boundary guard categories intact — spawning the installed bin, a write failure, shared `exclude` scope, and determinism. They are the standing answer to the post-P9 audit's systemic cause, and the checklist plus its enforcing test live in `.agents/rules/testing.md` under "Process-Boundary Guards".
+Keep the five process-boundary guard categories intact — spawning the installed bin, a write failure, shared `exclude` scope, determinism, and host parity (added by P16.01: a human rendering against its structured payload, and each host's rendering against the other's). They are the standing answer to the post-P9 audit's systemic cause, and the checklist plus its enforcing test live in `.agents/rules/testing.md` under "Process-Boundary Guards".
 
 ## Repository Hygiene
 

@@ -1,4 +1,5 @@
 import { compareStrings } from "../deterministic-sort.js";
+import { formatCyclePath } from "../render-bounds.js";
 import type { ContextGraph } from "./context-graph-types.js";
 
 // P4.02 graph algorithms over the frozen `ContextGraph` read shape (G6): Kahn topo-sort with honest
@@ -176,13 +177,21 @@ export function formatContextGraphSummary(graph: ContextGraph): string {
     )
     .slice(0, TOP_HUB_LIMIT);
 
+  // Entry points are a header plus one indented path per line, matching `top hubs` below (W-26).
+  // Comma-joining them produced a 3497-character single line on a 139-node graph, in a format whose
+  // name promises a report readable in a terminal — and whose documented usage pipes it through
+  // `head`, which truncates by line and so never shortens a blob.
   const lines = [
     `nodes: ${graph.nodes.length}`,
     `edges: ${graph.edges.length}`,
     `cycles: ${graph.cycles.length}`,
-    `entry points (${entryPoints.length}): ${entryPoints.join(", ")}`,
-    "top hubs:",
+    `entry points (${entryPoints.length}):`,
   ];
+  for (const entryPoint of entryPoints) {
+    lines.push(`  ${entryPoint}`);
+  }
+
+  lines.push("top hubs:");
   for (const hub of hubs) {
     lines.push(`  ${hub.path} (${hub.inDegree + hub.outDegree})`);
   }
@@ -190,7 +199,7 @@ export function formatContextGraphSummary(graph: ContextGraph): string {
   if (graph.cycles.length > 0) {
     lines.push("cycles:");
     for (const cycle of graph.cycles) {
-      lines.push(`  ${cycle.join(" -> ")}`);
+      lines.push(`  ${formatCyclePath(cycle)}`);
     }
   }
   return lines.join("\n");

@@ -89,13 +89,22 @@ export type ColumnInSetOptions = {
   section?: string;
 };
 
+// The single source of truth for `columnInSet`'s case sensitivity (W-06). It used to be a bare `?? true`
+// here with no `.default()` in either Zod schema, so nothing recorded it: `schema.json` emitted a plain
+// boolean, one guide page documented the inverse, and the skill renderer treated "absent" as a third
+// state. Both option schemas (TBL-003's and the `columnInSet` assertion's) now default to this
+// constant, so a resolved option is never `undefined` in product code — the fallback below survives
+// only for direct primitive callers, which do not pass through Zod.
+export const DEFAULT_COLUMN_IN_SET_CASE_SENSITIVE = true;
+
 // columnInSet — cell values must be one of an allowed set (TBL-003).
 export function columnInSet(
   document: ParsedDocument,
   options: ColumnInSetOptions,
 ): PrimitiveFinding[] {
   const findings: PrimitiveFinding[] = [];
-  const caseSensitive = options.caseSensitive ?? true;
+  const caseSensitive =
+    options.caseSensitive ?? DEFAULT_COLUMN_IN_SET_CASE_SENSITIVE;
   const normalize = (value: string): string =>
     caseSensitive ? value : value.toLowerCase();
   const allowed = new Set(options.values.map(normalize));
@@ -239,9 +248,6 @@ export function crossColumn(
 export type ColumnUniqueOptions = {
   column: string;
   section?: string;
-  // Retained for callers' option shape; scope is actually enforced via the `fileMatches`
-  // callback below, which also honors `exclude`.
-  files?: string[];
   // Optional token validation: only cells matching this pattern are considered IDs.
   idPattern?: string;
 };
@@ -269,9 +275,9 @@ export function columnUnique(
   );
 
   for (const document of documents) {
-    // Always consult fileMatches — it applies both `files` and `exclude` (see the call sites in
-    // rules/tbl.ts and rules/custom.ts), so gating this on `options.files` being set would
-    // silently skip the exclude-only case.
+    // File scope is this callback and nothing else — it applies both `files` and `exclude` (see the
+    // call sites in rules/tbl.ts and rules/custom.ts). W-40 removed the unread `files` option that
+    // used to sit beside it: gating on it would have silently skipped the exclude-only case.
     if (!fileMatches(document.path)) {
       continue;
     }

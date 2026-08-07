@@ -10,6 +10,12 @@
 // - COMPILE_CONFIG_MISSING — config.compile absent for compile-context.
 // - INVALID_INPUT          — tool arguments failed semantic validation beyond the input schema.
 // - INTERNAL_ERROR         — unexpected failure; message is sanitized and never leaks a stack trace.
+//
+// Amended 2026-08-06 (P14.05 / W-21), with the decision log's entry updated in the same change:
+// - OPERATIONAL_ERROR      — the host's environment failed rather than the input: an errno (EACCES,
+//                            EISDIR, …) naming a path inside the analyzed directory. Split out of
+//                            INTERNAL_ERROR because errno-plus-path IS the actionable content, and
+//                            the CLI already prints exactly that before exiting 2.
 export const TOOL_ERROR_CODES = [
   "CONFIG_NOT_FOUND",
   "CONFIG_INVALID",
@@ -17,6 +23,7 @@ export const TOOL_ERROR_CODES = [
   "TARGET_NOT_FOUND",
   "COMPILE_CONFIG_MISSING",
   "INVALID_INPUT",
+  "OPERATIONAL_ERROR",
   "INTERNAL_ERROR",
 ] as const;
 
@@ -32,6 +39,11 @@ export interface StructuredErrorInfo {
 // Membership must be an allowlist against TOOL_ERROR_CODES, not "has a string `.code`": Node fs
 // errors (ENOENT, etc.) also carry a `.code`, and duck-typing them through would leak an unrelated
 // system error to an MCP client instead of falling through to a sanitized INTERNAL_ERROR.
+//
+// OPERATIONAL_ERROR does not weaken that: no error class carries it, and nothing throws it. A host
+// classifier produces the payload from a raw errno only after vetting the code and rewriting the
+// path (mcp-server's `toOperationalErrorInfo`), which is what keeps the allowlist's rationale intact
+// — an fs error still reaches this predicate as a non-member and still falls through.
 export function isStructuredError(
   error: unknown,
 ): error is Error & StructuredErrorInfo {

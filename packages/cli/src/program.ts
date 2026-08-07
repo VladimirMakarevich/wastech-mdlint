@@ -102,8 +102,10 @@ function routeDefaultCommand(argv: string[]): string[] {
  * Two defects in one helper. Without the existence check a nonexistent target simply globs an empty
  * corpus and reports `0 "No problems found."` — indistinguishable from a clean repository (M-7).
  * Without resolving against *this run's* `cwd` first the check would disagree with what core actually
- * reads: `loadConfiguration`/`lintFiles` resolve a relative argument against the real
- * `process.cwd()`, which is not the injected `cwd`.
+ * reads: a relative directory handed to `loadConfiguration`/`lintFiles` as their own `cwd` resolves
+ * against the real `process.cwd()`, which is not the injected `cwd`. (This is about the directory
+ * arguments only. A relative `--config` is core's to resolve, against whatever `cwd` it is given —
+ * P14.04 — so it is passed through as typed.)
  */
 async function resolveDirectoryArgument(
   cwd: string,

@@ -10,6 +10,7 @@ import { compareStrings } from "../src/deterministic-sort.js";
 import { lintFiles } from "../src/engine/lint-files.js";
 import type { Assertion } from "../src/engine/primitives/assert.js";
 import { ASSERTION_TARGETS } from "../src/engine/primitives/assert.js";
+import { CUSTOM_RULE_DOCS_URL } from "../src/engine/rule-docs-url.js";
 
 const tempDirs: string[] = [];
 
@@ -67,7 +68,11 @@ describe("declarative custom rule", () => {
       ruleId: "REQ-OWNER",
       severity: "error",
       filePath: "docs/reqs.md",
+      // W-35: `helpUri` used to be the rule id again. A user-chosen id has no page of its own, so a
+      // custom finding links the page documenting the mechanism — not `REQ-OWNER.md`, which is a 404.
+      helpUri: CUSTOM_RULE_DOCS_URL,
     });
+    expect(result.messages[0]!.helpUri).not.toBe("REQ-OWNER");
   });
 
   it("runs a project-scope custom rule (columnUnique) from config", async () => {
@@ -184,7 +189,7 @@ describe("declarative custom rule", () => {
     const error = await loadConfiguration({ cwd }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ConfigError);
     expect((error as ConfigError).code).toBe("CONFIG_INVALID");
-    expect((error as ConfigError).message).toMatch(/config\.rules\.0/);
+    expect((error as ConfigError).message).toMatch(/config\.rules\[0\]/);
     expect((error as ConfigError).message).toMatch(
       /"id" and "options\.assert"/,
     );
@@ -206,7 +211,7 @@ describe("declarative custom rule", () => {
     const error = await loadConfiguration({ cwd }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ConfigError);
     expect((error as ConfigError).code).toBe("CONFIG_INVALID");
-    expect((error as ConfigError).message).toMatch(/config\.rules\.0/);
+    expect((error as ConfigError).message).toMatch(/config\.rules\[0\]/);
   });
 
   it("rejects a custom entry with severity but no id (C7, not a crash)", async () => {
@@ -220,7 +225,7 @@ describe("declarative custom rule", () => {
     const error = await loadConfiguration({ cwd }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ConfigError);
     expect((error as ConfigError).code).toBe("CONFIG_INVALID");
-    expect((error as ConfigError).message).toMatch(/config\.rules\.0/);
+    expect((error as ConfigError).message).toMatch(/config\.rules\[0\]/);
   });
 
   it("rejects a custom entry with id but no options (still CONFIG_INVALID, not a new behavior)", async () => {
@@ -234,7 +239,7 @@ describe("declarative custom rule", () => {
     const error = await loadConfiguration({ cwd }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ConfigError);
     expect((error as ConfigError).code).toBe("CONFIG_INVALID");
-    expect((error as ConfigError).message).toMatch(/config\.rules\.0/);
+    expect((error as ConfigError).message).toMatch(/config\.rules\[0\]/);
   });
 });
 
@@ -462,5 +467,33 @@ describe("custom rule file scope (exclude)", () => {
     expect(
       await run({ exclude: ["drafts/**"], assertExclude: ["drafts/**"] }),
     ).toEqual(["docs/a.md:nope.md"]);
+  });
+
+  // W-08 (P13.05): the custom dispatcher hands `assert.exclude` straight to the same `linkResolves`
+  // primitive REF-001 uses, so the router branch dropping the option took this family with it —
+  // the family where the option is most likely hand-written, and the half no test reached.
+  it("honors assert.exclude on a root-relative target when a siteRouter is configured", async () => {
+    const run = async (settings: unknown) => {
+      const cwd = await repo({
+        "docs/a.md": "[gen](/generated/x.md)\n",
+        "wastech-mdlint.config.json": JSON.stringify({
+          settings,
+          rules: [
+            {
+              rule: "custom",
+              id: "SCOPE-CHECK",
+              options: {
+                assert: { kind: "linkResolves", exclude: ["generated/**"] },
+              },
+            },
+          ],
+        }),
+      });
+      const result = await lintWithConfig(cwd);
+      return result.messages.map((message) => String(message.data?.target));
+    };
+
+    expect(await run({})).toEqual([]);
+    expect(await run({ siteRouter: {} })).toEqual([]);
   });
 });

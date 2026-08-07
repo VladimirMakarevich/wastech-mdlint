@@ -161,8 +161,10 @@ function buildProfile(
 }
 
 /**
- * Profile many documents against one graph, keyed by `document.path`. Callers profiling a whole
- * corpus must use this rather than looping over `extractDocProfile`, so the graph is indexed once.
+ * Profile documents against one graph, keyed by `document.path`. The only entry point: it indexes
+ * the graph once per call, so a corpus costs one classifier pass and one edge pass rather than one
+ * of each per document. A single-document caller passes a one-element iterable — W-40 removed the
+ * `extractDocProfile` convenience wrapper, which was on the barrel with no caller at all.
  */
 export function extractDocProfiles(
   documents: Iterable<ParsedDocument>,
@@ -177,15 +179,4 @@ export function extractDocProfiles(
   }
 
   return profiles;
-}
-
-// Shares `indexGraph`/`buildProfile` with the batch entry point so the single-document and corpus
-// paths cannot drift. Single-shot cost is unchanged: one classifier pass and one edge pass either
-// way.
-export function extractDocProfile(
-  document: ParsedDocument,
-  graph: ContextGraph,
-  options: GraphAnalysisOptions = {},
-): DocumentProfile {
-  return buildProfile(document, indexGraph(graph, options));
 }

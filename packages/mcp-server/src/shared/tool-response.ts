@@ -1,13 +1,15 @@
 import {
   isStructuredError,
   TOOL_ERROR_CODES,
-  type ToolErrorCode,
+  type StructuredErrorInfo,
 } from "@wastech-mdlint/core";
 import type {
   CallToolResult,
   ToolAnnotations,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+
+import { toOperationalErrorInfo } from "./operational-error.js";
 
 // Output/error/annotation conventions (P7.01, task step 3) as reusable wrappers so every tool
 // renders the same success/error shape without re-deriving it.
@@ -36,32 +38,70 @@ export function successResult(params: {
 // fallthrough is redacted.
 const INTERNAL_ERROR_MESSAGE = "An unexpected internal error occurred.";
 
+/**
+ * The text block a host renders and a model reads. It carries the `hint` too (P14.05, W-19): the
+ * structured payload had the actionable sentence and the text did not, so a host that renders only
+ * `content[].text` — the common case — saw `Unknown rule "SIZE-002".` with the did-you-mean dropped,
+ * while the CLI prints both for the same typo.
+ *
+ * The `includes` test is not defensive noise, it is the whole reason this is a function. Some core
+ * errors already interpolate their hint INTO the message — `CompileConfigMissingError` and
+ * `ImpactAnalysisError` build theirs from it, and a `CONFIG_INVALID` `ConfigError`'s hint is the
+ * first of the issue lines its message lists — so a blind concatenation would print those sentences
+ * twice. Others do not (`CONFIG_NOT_FOUND`, `ToolInputError`), which is why the choice is per-error
+ * rather than per-class. Doing it here rather than at the one offending call site is what makes a
+ * newly added error path inherit the behavior.
+ */
+function renderErrorText(structured: StructuredErrorInfo): string {
+  if (
+    structured.hint === undefined ||
+    structured.message.includes(structured.hint)
+  ) {
+    return structured.message;
+  }
+  return `${structured.message} ${structured.hint}`;
+}
+
 // The error contract { code, message, hint } (M6), carried in `structuredContent` as the public
-// machine result (per M1's "carry a code with structured output"). Structured errors from core pass
-// through verbatim; everything else is wrapped as a sanitized INTERNAL_ERROR. The stack is never
-// included, so the human-readable `content` message and the structured payload only ever expose
-// vetted text.
+// machine result (per M1's "carry a code with structured output"). Three-way classification, in
+// order: a structured error from core (or `ToolInputError`) passes through verbatim; a raw errno
+// naming a path inside `options.cwd` becomes an OPERATIONAL_ERROR (P14.05, W-21); everything else is
+// wrapped as a sanitized INTERNAL_ERROR. The stack is never included, so the human-readable
+// `content` message and the structured payload only ever expose vetted text.
+//
+// `cwd` is optional because the classifier needs a base to render the failing path against and
+// cannot invent one — without it the errno branch is skipped and the old INTERNAL_ERROR behavior
+// stands, which is the safe direction.
 //
 // For this to round-trip over the wire on the five tools that declare an `outputSchema`, each such
 // error payload may need schema-compatible placeholder success fields attached to it: a
 // spec-compliant client validates any present `structuredContent` against the advertised schema,
 // even on `isError` results. `compile-context` has no `outputSchema`, so it passes no placeholders.
+// An options object rather than positional parameters so that tool — which supplies a `cwd` and no
+// placeholders — does not have to pass a mid-list `undefined`.
 export function errorResult(
   error: unknown,
-  successFields?: Readonly<Record<string, unknown>>,
+  options: {
+    successFields?: Readonly<Record<string, unknown>>;
+    cwd?: string;
+  } = {},
 ): CallToolResult {
-  const structured: { code: ToolErrorCode; message: string; hint?: string } =
-    isStructuredError(error)
-      ? { code: error.code, message: error.message, hint: error.hint }
-      : { code: "INTERNAL_ERROR", message: INTERNAL_ERROR_MESSAGE };
+  const structured: StructuredErrorInfo = isStructuredError(error)
+    ? { code: error.code, message: error.message, hint: error.hint }
+    : ((options.cwd === undefined
+        ? undefined
+        : toOperationalErrorInfo(error, options.cwd)) ?? {
+        code: "INTERNAL_ERROR",
+        message: INTERNAL_ERROR_MESSAGE,
+      });
 
   return {
     isError: true,
-    content: [{ type: "text", text: structured.message }],
-    structuredContent:
-      successFields === undefined
-        ? structured
-        : { ...successFields, ...structured },
+    content: [{ type: "text", text: renderErrorText(structured) }],
+    // Spread unconditionally, including when there are no placeholders: `structuredContent` is typed
+    // as an index-signature record, and a named interface does not satisfy one without being widened
+    // into a fresh object literal. Spreading `undefined` is a no-op, so this is also the shorter form.
+    structuredContent: { ...options.successFields, ...structured },
   };
 }
 

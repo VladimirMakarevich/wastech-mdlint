@@ -1,9 +1,25 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { compareStrings } from "../src/deterministic-sort.js";
+import {
+  CUSTOM_RULE_DOCS_URL,
+  RULE_DOCS_BASE_URL,
+  ruleDocsUrl,
+} from "../src/engine/rule-docs-url.js";
 import { BUILTIN_RULE_DEFINITIONS } from "../src/engine/rules/index.js";
 import type { RuleScope, Severity } from "../src/engine/types.js";
+
+// The on-disk directory `RULE_DOCS_BASE_URL` names, so a `helpUri` can be resolved back to the file
+// it promises. Same repo-root derivation `docs-sync.test.ts` uses.
+const RULE_DOCS_DIR = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../../docs/guide/rules",
+);
 
 // The documented shipped inventory (README rule table / glossary). Asserted here, against the
 // *real* `BUILTIN_RULE_DEFINITIONS`, so a dropped/renamed/re-categorized rule fails this one test
@@ -83,6 +99,55 @@ describe("BUILTIN_RULE_DEFINITIONS inventory (L-12)", () => {
       };
     }
     expect(actual).toEqual(EXPECTED);
+  });
+});
+
+// W-35/W-36: `docsUrl` is what makes a finding's `helpUri` a link instead of a restatement of
+// `ruleId`, so "the URL resolves" is the property that has to hold — a page renamed or a rule added
+// without one turns every one of its findings' `helpUri` into a 404 that nothing else would catch.
+describe("rule documentation URLs (W-35/W-36)", () => {
+  it("derives every built-in's docsUrl from its id by convention", () => {
+    for (const { metadata } of BUILTIN_RULE_DEFINITIONS) {
+      expect(metadata.docsUrl).toBe(ruleDocsUrl(metadata.id));
+    }
+  });
+
+  it("points every built-in's docsUrl at a guide page that exists on disk", () => {
+    for (const { metadata } of BUILTIN_RULE_DEFINITIONS) {
+      const relativePath = metadata.docsUrl!.slice(RULE_DOCS_BASE_URL.length);
+      expect(existsSync(path.join(RULE_DOCS_DIR, relativePath))).toBe(true);
+    }
+  });
+
+  // The mechanism page, not a page per user-chosen id — a custom rule's own id has none.
+  it("points a custom rule at the custom-rules page, which exists", () => {
+    expect(CUSTOM_RULE_DOCS_URL).toBe(ruleDocsUrl("custom"));
+    expect(
+      existsSync(
+        path.join(
+          RULE_DOCS_DIR,
+          CUSTOM_RULE_DOCS_URL.slice(RULE_DOCS_BASE_URL.length),
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  // P15.03 dropped `messages` (R6's other vacuous field: declared at one line, set by no rule, read
+  // by no generator). Asserted at runtime rather than as a `satisfies` constraint because no tsconfig
+  // includes `test/**`, so a type-level guard here would never be checked.
+  it("declares exactly the metadata fields something reads (no vacuous `messages`)", () => {
+    for (const { metadata } of BUILTIN_RULE_DEFINITIONS) {
+      expect(Object.keys(metadata).sort(compareStrings)).toEqual([
+        "category",
+        "defaultSeverity",
+        "description",
+        "docsUrl",
+        "fixable",
+        "id",
+        "optionsSchema",
+        "scope",
+      ]);
+    }
   });
 });
 

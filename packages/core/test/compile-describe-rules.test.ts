@@ -4,6 +4,7 @@ import type {
   CustomRuleConfigEntry,
   RuleConfigEntry,
 } from "../src/config/config-schema.js";
+import { customRuleEntrySchema } from "../src/config/config-schema.js";
 import { describeRules } from "../src/compile/describe-rules.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
 
@@ -200,6 +201,43 @@ describe("describeRules", () => {
               'Custom table rule: requires unique values in column "ID" across files.',
           },
         ],
+      },
+    ]);
+  });
+
+  // W-06: annotating only an explicit `true` made a committed skill render a case-sensitive custom
+  // rule identically to a case-insensitive one. Both entries are parsed through the real config schema
+  // so the test proves the default reaches the renderer from Zod, not from a literal written here.
+  it("distinguishes a default-cased columnInSet rule from one with caseSensitive disabled", () => {
+    const entryFor = (id: string, caseSensitive?: boolean) =>
+      customRuleEntrySchema.parse({
+        rule: "custom",
+        id,
+        options: {
+          assert: {
+            kind: "columnInSet",
+            column: "Status",
+            values: ["open", "done"],
+            ...(caseSensitive === undefined ? {} : { caseSensitive }),
+          },
+        },
+      });
+
+    const [group] = describeRules(
+      [entryFor("REQ-DEFAULT"), entryFor("REQ-LOOSE", false)],
+      ruleRegistry,
+    );
+
+    expect(group?.rules).toEqual([
+      {
+        id: "REQ-DEFAULT",
+        description:
+          'Custom table rule: requires values in column "Status" to be one of "open" and "done" (case-sensitive).',
+      },
+      {
+        id: "REQ-LOOSE",
+        description:
+          'Custom table rule: requires values in column "Status" to be one of "open" and "done" (case-insensitive).',
       },
     ]);
   });

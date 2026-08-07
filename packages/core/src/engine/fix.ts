@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { writeFilesAtomic } from "../atomic-write.js";
+import { resolveCorpusScope } from "../config/corpus-scope.js";
 import { compareStrings } from "../deterministic-sort.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
 import { loadDocuments } from "../markdown/load-documents.js";
@@ -84,10 +85,13 @@ export async function applyFixes(
   input: LintFilesInput,
 ): Promise<ApplyFixesResult> {
   const rootDir = path.resolve(input.cwd);
-  const loaded = await loadDocuments(input.config.include ?? ["**/*.md"], {
+  // Same resolved scope as `lintFiles` (P13.02) — a file the lint pass never read must not be one
+  // `--fix` rewrites.
+  const scope = resolveCorpusScope(input.config);
+  const loaded = await loadDocuments(scope.include, {
     cwd: rootDir,
-    exclude: input.config.exclude,
-    respectGitignore: input.config.respectGitignore,
+    exclude: scope.exclude,
+    respectGitignore: scope.respectGitignore,
   });
 
   const documents = new Map<string, ParsedDocument>();

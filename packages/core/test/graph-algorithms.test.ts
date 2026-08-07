@@ -146,12 +146,23 @@ describe("formatContextGraphSummary", () => {
         "nodes: 3",
         "edges: 3",
         "cycles: 0",
-        "entry points (1): index.md",
+        // W-26: one indented item per line, exactly like `top hubs` below it. Comma-joining these
+        // produced a 3497-character single line on the 139-node corpus.
+        "entry points (1):",
+        "  index.md",
         "top hubs:",
         "  a.md (2)",
         "  b.md (2)",
         "  index.md (2)",
       ].join("\n"),
+    );
+  });
+
+  it("renders an empty entry-point set as a bare header with no trailing space", () => {
+    const graph = graphOf({ "a.md": "[b](b.md)\n", "b.md": "[a](a.md)\n" });
+
+    expect(formatContextGraphSummary(graph).split("\n")).toContain(
+      "entry points (0):",
     );
   });
 
@@ -163,13 +174,30 @@ describe("formatContextGraphSummary", () => {
         "nodes: 2",
         "edges: 2",
         "cycles: 1",
-        "entry points (0): ",
+        "entry points (0):",
         "top hubs:",
         "  a.md (2)",
         "  b.md (2)",
         "cycles:",
         "  a.md -> b.md -> a.md",
       ].join("\n"),
+    );
+  });
+
+  it("bounds a long cycle path's hop count (render-bounds)", () => {
+    // A 10-node cycle is an 11-entry closed path, past CYCLE_PATH_HOP_LIMIT, so the summary's cycle
+    // line is elided rather than growing with the strongly connected component.
+    const entries: Record<string, string> = {};
+    for (let index = 0; index < 10; index += 1) {
+      entries[`n${index}.md`] = `[next](n${(index + 1) % 10}.md)\n`;
+    }
+
+    const cycleLine = formatContextGraphSummary(graphOf(entries))
+      .split("\n")
+      .find((line) => line.includes(" -> "));
+
+    expect(cycleLine).toBe(
+      "  n0.md -> n1.md -> n2.md -> n3.md -> n4.md -> n5.md -> n6.md -> ... -> n0.md (+3 more hops)",
     );
   });
 });

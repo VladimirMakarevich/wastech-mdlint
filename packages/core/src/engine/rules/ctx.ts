@@ -36,7 +36,7 @@ export const ctx001: RuleDefinition = defineRule({
       section: options.section,
       placeholders: options.placeholders,
     })) {
-      context.report({ ...finding, helpUri: "CTX-001" });
+      context.report(finding);
     }
   },
 });
@@ -61,7 +61,7 @@ export const ctx002: RuleDefinition = defineRule({
     for (const finding of allChecked(context.document!, {
       section: options.section,
     })) {
-      context.report({ ...finding, helpUri: "CTX-002" });
+      context.report(finding);
     }
   },
 });
@@ -165,7 +165,6 @@ export const ctx003: RuleDefinition = defineRule({
               line: baseLine + lineAt((match.index ?? 0) + match[1]!.length),
               filePath: document.path,
               data: { alias, canonical },
-              helpUri: "CTX-003",
             });
           }
         }

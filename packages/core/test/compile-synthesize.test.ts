@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { RuleDescriptionGroup } from "../src/compile/describe-rules.js";
 import type { DocumentProfile } from "../src/compile/doc-profile.js";
 import type { GraphAnalysis } from "../src/compile/graph-analysis.js";
+import type { ContextGraphEdge } from "../src/graph/context-graph-types.js";
 import { skillFrontmatterSchema } from "../src/compile/skill-frontmatter.js";
 import {
   synthesize,
@@ -275,10 +276,48 @@ describe("synthesize", () => {
 
     const result = synthesize(input({ documentPaths, profiles }));
 
-    expect(result.skillContent).toContain("| Path | Role | Type |");
-    expect(result.skillContent).toContain("| ref.md | entry | reference |");
-    expect(result.skillContent).toContain("| table.md | hub | tabular |");
-    expect(result.skillContent).toContain("| prose.md | leaf | narrative |");
+    expect(result.skillContent).toContain(
+      "| Path | Role | Type | Refs (in/out) |",
+    );
+    expect(result.skillContent).toContain(
+      "| ref.md | entry | reference | 0 / 0 |",
+    );
+    expect(result.skillContent).toContain(
+      "| table.md | hub | tabular | 0 / 0 |",
+    );
+    expect(result.skillContent).toContain(
+      "| prose.md | leaf | narrative | 0 / 0 |",
+    );
+  });
+
+  it("carries the degrees the Role bucket rounds off in a Refs column (W-28)", () => {
+    // The role vocabulary collapses at scale — `hub` and `isolated` hold 86% of the 139-document
+    // fixture — so the row must let a reader tell a 3-reference hub from a 124-reference one.
+    const edge = (from: string, to: string): ContextGraphEdge => ({
+      from,
+      to,
+      type: "link",
+      line: 1,
+    });
+    const result = synthesize(
+      input({
+        documentPaths: ["hub.md"],
+        profiles: new Map([
+          [
+            "hub.md",
+            profile({
+              role: "hub",
+              referencedBy: [edge("a.md", "hub.md"), edge("b.md", "hub.md")],
+              referencesTo: [edge("hub.md", "c.md")],
+            }),
+          ],
+        ]),
+      }),
+    );
+
+    expect(result.skillContent).toContain(
+      "| hub.md | hub | narrative | 2 / 1 |",
+    );
   });
 
   it("renders '(no documents found)' in Document Architecture for an empty corpus", () => {
@@ -292,6 +331,7 @@ describe("synthesize", () => {
 
     expect(architectureBlock).toContain("(no documents found)");
     expect(architectureBlock).not.toContain("| Path | Role | Type |");
+    expect(architectureBlock).not.toContain("| Path | Role | Type | Refs");
   });
 
   function workflowBlock(content: string): string {
@@ -351,9 +391,45 @@ describe("synthesize", () => {
 
     expect(result.skillContent).toContain("### Cycles");
     expect(result.skillContent).toContain("- `a.md -> b.md -> a.md`");
+    // One excluded path per bullet: the field test measured this as a 3702-character single line.
+    // Uncapped, unlike the fan-out — a document missing from reading order with no explanation is
+    // exactly the G6 dishonesty this block exists to prevent.
     expect(result.skillContent).toContain(
-      "Excluded from reading order: `a.md`, `b.md`",
+      ["Excluded from reading order (2):", "", "- `a.md`", "- `b.md`"].join(
+        "\n",
+      ),
     );
+  });
+
+  it("renders '(none)' inline when a cycle excludes nothing further", () => {
+    const result = synthesize(
+      input({
+        documentPaths: ["a.md", "b.md"],
+        analysis: analysis({ cycles: [["a.md", "b.md", "a.md"]] }),
+      }),
+    );
+
+    expect(result.skillContent).toContain(
+      "Excluded from reading order: (none)",
+    );
+  });
+
+  it("bounds a long cycle path in the Cycles block", () => {
+    const cycle = Array.from(
+      { length: 30 },
+      (_unused, index) => `n${index}.md`,
+    );
+    const result = synthesize(
+      input({
+        documentPaths: ["n0.md"],
+        analysis: analysis({ cycles: [cycle] }),
+      }),
+    );
+
+    expect(result.skillContent).toContain("(+22 more hops)");
+    expect(
+      result.skillContent.split("\n").every((line) => line.length <= 200),
+    ).toBe(true);
   });
 
   it("does not claim an empty corpus when every document is cycle-excluded (G6)", () => {
@@ -391,6 +467,143 @@ describe("synthesize", () => {
     );
 
     expect(readingOrderBlock).toContain("(no documents found)");
+  });
+
+  describe("bounded References section (W-27)", () => {
+    function inboundEdges(to: string, count: number): ContextGraphEdge[] {
+      return Array.from({ length: count }, (_unused, index) => ({
+        from: `docs/area-01/topic-${String(index).padStart(3, "0")}.md`,
+        to,
+        type: "link" as const,
+        line: 1,
+      }));
+    }
+
+    it("lists every edge and omits the 'showing' marker when under the fan-out cap", () => {
+      const result = synthesize(
+        input({
+          documentPaths: ["hub.md"],
+          profiles: new Map([
+            ["hub.md", profile({ referencedBy: inboundEdges("hub.md", 3) })],
+          ]),
+        }),
+      );
+
+      expect(result.skillContent).toContain("- from (3):");
+      expect(result.skillContent).not.toContain("showing");
+      expect(result.skillContent).toContain(
+        "  - `docs/area-01/topic-002.md` (link)",
+      );
+    });
+
+    it("caps the fan-out per direction, one edge per line, with the full count in the parent bullet", () => {
+      const result = synthesize(
+        input({
+          documentPaths: ["hub.md"],
+          profiles: new Map([
+            ["hub.md", profile({ referencedBy: inboundEdges("hub.md", 124) })],
+          ]),
+        }),
+      );
+      const lines = result.skillContent.split("\n");
+
+      // The count is the *total*, not the number shown — a truncated list that presents itself as
+      // complete is the failure this disclosure exists to prevent.
+      expect(lines).toContain("- from (124, showing 10):");
+      // The empty direction carries its count in the same position, so one scan finds both.
+      expect(lines).toContain("- to (0): (none)");
+      expect(
+        lines.filter((line) => line.startsWith("  - `docs/area-01/")),
+      ).toHaveLength(10);
+      // The 17 530-character single line W-27 measured is gone.
+      expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(
+        200,
+      );
+    });
+
+    it("always states the per-direction bound, and the document bound only when it engages", () => {
+      const small = synthesize(
+        input({
+          documentPaths: ["a.md"],
+          profiles: new Map([["a.md", profile()]]),
+        }),
+      );
+
+      expect(small.skillContent).toContain(
+        "Bounded summary: at most 10 references are listed per document per direction, and each bullet's count is the full total.",
+      );
+      expect(small.skillContent).toContain(
+        "Run `wastech-mdlint graph --format json` for the complete edge list",
+      );
+      expect(small.skillContent).not.toContain("documents are listed below");
+    });
+
+    it("selects the document set by rank, renders it in path order, and says how many were omitted", () => {
+      // 30 documents, each with a distinct reference count, so the ranking is unambiguous.
+      const documentPaths = Array.from(
+        { length: 30 },
+        (_unused, index) => `doc-${String(index).padStart(2, "0")}.md`,
+      );
+      const profiles = new Map(
+        documentPaths.map((documentPath, index) => [
+          documentPath,
+          profile({ referencedBy: inboundEdges(documentPath, index) }),
+        ]),
+      );
+
+      const skillContent = synthesize(
+        input({ documentPaths, profiles }),
+      ).skillContent;
+      const referencesBlock = skillContent.slice(
+        skillContent.indexOf("### References"),
+      );
+
+      expect(skillContent).toContain(
+        "The 25 most-referenced of 30 documents are listed below, in path order; the other 5 are omitted.",
+      );
+      // The five least-referenced documents are the ones dropped.
+      for (const dropped of documentPaths.slice(0, 5)) {
+        expect(referencesBlock).not.toContain(`\`${dropped}\``);
+      }
+      expect(referencesBlock).toContain("`doc-05.md`");
+      expect(referencesBlock).toContain("`doc-29.md`");
+      // Rank selects the set; the entries themselves are still in path order, so `doc-05` (the
+      // least-referenced survivor) comes first rather than last.
+      expect(referencesBlock.indexOf("`doc-05.md`")).toBeLessThan(
+        referencesBlock.indexOf("`doc-29.md`"),
+      );
+    });
+
+    it("ranks deterministically when totals tie", () => {
+      // 30 documents with identical reference counts: only the path tiebreaker decides which 25
+      // survive, so a comparator that fell back to input order would be caught here.
+      const documentPaths = Array.from(
+        { length: 30 },
+        (_unused, index) => `doc-${String(index).padStart(2, "0")}.md`,
+      );
+      const profiles = new Map(
+        documentPaths.map((documentPath) => [
+          documentPath,
+          profile({ referencedBy: inboundEdges(documentPath, 2) }),
+        ]),
+      );
+
+      const referencesBlock = (documents: string[]): string => {
+        const content = synthesize(
+          input({ documentPaths: documents, profiles }),
+        ).skillContent;
+        return content.slice(content.indexOf("### References"));
+      };
+
+      // Only the References block is compared: the Architecture table renders `documentPaths` in
+      // caller order by contract (`compileContext` sorts before calling), so reversing the input
+      // legitimately reorders it — the ranking is what must not move.
+      expect(referencesBlock([...documentPaths].reverse())).toBe(
+        referencesBlock(documentPaths),
+      );
+      expect(referencesBlock(documentPaths)).toContain("`doc-24.md`");
+      expect(referencesBlock(documentPaths)).not.toContain("`doc-25.md`");
+    });
   });
 
   it("renders over-budget entrypoints with their numbers", () => {

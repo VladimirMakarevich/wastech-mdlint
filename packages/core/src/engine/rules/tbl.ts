@@ -8,6 +8,7 @@ import {
   columnNotEmpty,
   columnUnique,
   crossColumn,
+  DEFAULT_COLUMN_IN_SET_CASE_SENSITIVE,
   requiredColumns,
 } from "../primitives/table.js";
 import { regexFlagsSchema, regexStringSchema } from "../regex.js";
@@ -42,7 +43,7 @@ export const tbl001: RuleDefinition = defineRule({
       columns: options.requiredColumns,
       section: options.section,
     })) {
-      context.report({ ...finding, helpUri: "TBL-001" });
+      context.report(finding);
     }
   },
 });
@@ -150,7 +151,7 @@ export const tbl002: RuleDefinition = defineRule({
       columns: options.columns,
       section: options.section,
     })) {
-      context.report({ ...finding, fixable: true, helpUri: "TBL-002" });
+      context.report({ ...finding, fixable: true });
     }
   },
   // The gate is repeated here because `applyFixes` (engine/fix.ts) applies none of its own: it walks
@@ -178,7 +179,9 @@ export const tbl003: RuleDefinition = defineRule({
     .object({
       column: z.string().min(1),
       values: z.array(z.string()).min(1),
-      caseSensitive: z.boolean().optional(),
+      // Same `.default()` as the `columnInSet` assertion (W-06) — the two shapes must agree, or a
+      // built-in and its declarative twin would compare cell values differently from one config.
+      caseSensitive: z.boolean().default(DEFAULT_COLUMN_IN_SET_CASE_SENSITIVE),
       section: z.string().optional(),
       ...fileScopeShape,
     })
@@ -193,7 +196,7 @@ export const tbl003: RuleDefinition = defineRule({
       caseSensitive: options.caseSensitive,
       section: options.section,
     })) {
-      context.report({ ...finding, helpUri: "TBL-003" });
+      context.report(finding);
     }
   },
 });
@@ -227,7 +230,7 @@ export const tbl004: RuleDefinition = defineRule({
       flags: options.flags,
       section: options.section,
     })) {
-      context.report({ ...finding, helpUri: "TBL-004" });
+      context.report(finding);
     }
   },
 });
@@ -259,7 +262,7 @@ export const tbl005: RuleDefinition = defineRule({
       then: options.then,
       section: options.section,
     })) {
-      context.report({ ...finding, helpUri: "TBL-005" });
+      context.report(finding);
     }
   },
 });
@@ -289,11 +292,10 @@ export const tbl006: RuleDefinition = defineRule({
         column: options.column,
         idPattern: options.idPattern,
         section: options.section,
-        files: options.files,
       },
       (filePath) => matchesFileScope(filePath, options),
     )) {
-      context.report({ ...finding, helpUri: "TBL-006" });
+      context.report(finding);
     }
   },
 });

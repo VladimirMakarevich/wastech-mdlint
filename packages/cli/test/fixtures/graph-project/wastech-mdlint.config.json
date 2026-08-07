@@ -8,7 +8,7 @@
     }
   },
   "rules": [
-    { "rule": "GRP-001" },
+    { "rule": "GRP-001", "options": { "minCycleLength": 2 } },
     { "rule": "GRP-002", "options": { "entryPoints": ["index.md"] } }
   ]
 }

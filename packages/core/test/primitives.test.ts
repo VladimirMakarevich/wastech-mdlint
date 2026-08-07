@@ -308,6 +308,28 @@ describe("reference primitives", () => {
     ).toHaveLength(0);
   });
 
+  // W-08 at the primitive itself: the router branch used to skip the `exclude` gate entirely, so a
+  // routed candidate the user had excluded was still probed and reported.
+  it("linkResolves applies `exclude` to routed candidates, not only unrouted ones", () => {
+    const source = doc("[gen](/generated/page)\n", "src/content/docs/index.md");
+    const documents = new Map([[source.path, source]]);
+    const settings = {
+      siteRouter: { preset: "starlight", contentDir: "src/content/docs" },
+    };
+    const context = {
+      documents,
+      rootDir: "/nonexistent-root",
+      settings,
+    };
+
+    expect(linkResolves(source, context, {})).toHaveLength(1);
+    expect(
+      linkResolves(source, context, {
+        exclude: ["src/content/docs/generated/**"],
+      }),
+    ).toHaveLength(0);
+  });
+
   it("imageResolves checks the filesystem and skips external images", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-img-"));
     tempDirs.push(root);

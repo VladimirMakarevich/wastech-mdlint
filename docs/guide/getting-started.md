@@ -4,7 +4,7 @@
 
 ## Requirements
 
-- **Node.js `>=24.17.0`** (the pinned 24 LTS line; see `.node-version`).
+- **Node.js `>=24.17.0`** (the pinned 24 LTS line; see `.node-version`). Installing a **published package** on an older Node prints a warning (`EBADENGINE`) and completes rather than failing — the floor is not enforced at the consumer. Building **from source** (below) is different: this repository's root `.npmrc` sets `engine-strict=true`, so `npm ci` fails hard below the floor instead of warning.
 - The tool ships as an npm-workspaces monorepo: [`@wastech-mdlint/core`](../../packages/core) owns the pipeline, [`@wastech-mdlint/cli`](../../packages/cli) is the `wastech-mdlint` binary, and [`@wastech-mdlint/mcp-server`](../../packages/mcp-server) is the `wastech-mdlint-mcp` stdio server.
 
 ## Install & build from source
@@ -18,7 +18,7 @@ npm run build     # tsc -b → each package's dist/
 
 ## Your first lint
 
-With no config file present, the CLI lints every `**/*.md` with an **empty ruleset** — a clean pass. Rules only run once you add a config.
+With no config file present, the CLI lints every `**/*.md` outside the [always-excluded trees](configuration.md#what-is-excluded-before-you-write-anything) — `node_modules`, build output, and dependency directories such as `.venv`, at any depth — with an **empty ruleset**, a clean pass. Rules only run once you add a config.
 
 ```bash
 node packages/cli/dist/index.js lint .              # text output, exit 0 on a clean repo

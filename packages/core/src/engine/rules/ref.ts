@@ -62,7 +62,7 @@ export const ref001: RuleDefinition = defineRule({
       },
       { exclude: options.exclude, siteRouter: options.siteRouter },
     )) {
-      context.report({ ...finding, helpUri: "REF-001" });
+      context.report(finding);
     }
   },
 });
@@ -146,7 +146,6 @@ export const ref002: RuleDefinition = defineRule({
           line: link.line,
           column: link.column,
           data: { anchor: link.anchor, targetPath: target.path },
-          helpUri: "REF-002",
         });
       }
     }
@@ -174,7 +173,7 @@ export const ref003: RuleDefinition = defineRule({
       },
       { exclude: options.exclude },
     )) {
-      context.report({ ...finding, helpUri: "REF-003" });
+      context.report(finding);
     }
   },
 });
@@ -275,7 +274,6 @@ export const ref004: RuleDefinition = defineRule({
         line: link.line,
         column: link.column,
         data: { fromZone: sourceZone, toZone: targetZone },
-        helpUri: "REF-004",
       });
     }
   },
@@ -336,7 +334,6 @@ export const ref005: RuleDefinition = defineRule({
           filePath: reference.filePath,
           severity: "error",
           data: { id: reference.id },
-          helpUri: "REF-005",
         });
       }
     }
@@ -350,7 +347,6 @@ export const ref005: RuleDefinition = defineRule({
           filePath: occurrence.filePath,
           severity: "warning",
           data: { id },
-          helpUri: "REF-005",
         });
       }
     }
@@ -454,7 +450,6 @@ export const ref006: RuleDefinition = defineRule({
                   referencedStability,
                   referencerStability,
                 },
-                helpUri: "REF-006",
               });
             }
           }

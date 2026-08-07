@@ -1,4 +1,4 @@
-import { existsSync, statSync, symlinkSync } from "node:fs";
+import { symlinkSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { assertBuilt } from "../../core/test/support/assert-built.js";
 
 // @boundary-guard installed-bin-spawn
 //
@@ -25,7 +27,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 //
 // PRECONDITION: `packages/mcp-server/dist/index.js` must already be built — same precondition, and
 // same reasoning, as `stdio-integration.test.ts`. `assertBuilt()` fails fast rather than letting a
-// stale/missing artifact look like a guard regression.
+// stale/missing artifact look like a guard regression. It is the shared helper since W-56 (P16.01),
+// because the remedy its message names has to be right in both copies at once.
 
 const DIST_INDEX = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -36,22 +39,7 @@ const SRC_INDEX = path.resolve(
   "../src/index.ts",
 );
 
-function assertBuilt(): void {
-  if (!existsSync(DIST_INDEX)) {
-    throw new Error(
-      `Expected ${DIST_INDEX} to exist. This suite spawns the compiled entrypoint, not the ` +
-        "TypeScript source — run `npm run build` (or `npm run typecheck`, which also emits) first.",
-    );
-  }
-  if (statSync(SRC_INDEX).mtimeMs > statSync(DIST_INDEX).mtimeMs) {
-    throw new Error(
-      `${DIST_INDEX} is older than ${SRC_INDEX}. This suite spawns the compiled entrypoint, not ` +
-        "the TypeScript source — run `npm run build` (or `npm run typecheck`, which also emits) " +
-        "first.",
-    );
-  }
-}
-assertBuilt();
+assertBuilt(DIST_INDEX, SRC_INDEX);
 
 // Mirrors `stdio-integration.test.ts`'s list; asserted sorted so the six-tool surface (M1) is
 // pinned independently of registration order.
@@ -102,8 +90,14 @@ describe("installed-entrypoint shape via symlink/junction (H-1 regression guard)
   }, 30_000);
 
   afterAll(async () => {
-    await client.close();
-    await rm(linkRoot, { recursive: true, force: true });
+    // `client?` and try/finally: `client` is assigned at the end of `beforeAll`, so a symlink or spawn
+    // failure leaves it `undefined` — and this suite's whole point is that a broken entrypoint fails
+    // *legibly*, which a TypeError in teardown (with `linkRoot` left behind) is not.
+    try {
+      await client?.close();
+    } finally {
+      await rm(linkRoot, { recursive: true, force: true });
+    }
   });
 
   // Explicit 30s timeout, not vitest's 5s default: a cold `process.execPath` start ESM-loads the

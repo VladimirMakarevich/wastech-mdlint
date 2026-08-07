@@ -115,7 +115,12 @@ function summarizeAssertion(assertion: Assertion): string {
     case "columnNotEmpty":
       return `requires non-empty cells in column ${quote(assertion.column)}${formatSection(assertion.section)}`;
     case "columnInSet":
-      return `requires values in column ${quote(assertion.column)}${formatSection(assertion.section)} to be one of ${formatList(assertion.values)}${assertion.caseSensitive === true ? " (case-sensitive)" : ""}`;
+      // Render from the *resolved* value (W-06): annotating only an explicit `true` made a
+      // default-cased rule read identically to a case-insensitive one in the committed skill.
+      // Tested against `=== false` rather than for a truthy value because `describeRules` is public
+      // API and can be handed entries that never passed through Zod, where the key is absent — and
+      // absent means the schema default, not a third state.
+      return `requires values in column ${quote(assertion.column)}${formatSection(assertion.section)} to be one of ${formatList(assertion.values)}${assertion.caseSensitive === false ? " (case-insensitive)" : " (case-sensitive)"}`;
     case "columnMatches":
       return `requires values in column ${quote(assertion.column)}${formatSection(assertion.section)} to match ${formatPattern(assertion.pattern, assertion.flags)}`;
     case "columnUnique":

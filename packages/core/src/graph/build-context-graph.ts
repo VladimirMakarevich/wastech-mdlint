@@ -22,6 +22,12 @@ import type {
 // graph edges never disagree with the REF rules on router/root-relative repos. Undefined when the
 // target is not (or does not resolve to) a node in the corpus — non-corpus and missing targets are
 // skipped per the taxonomy (audit 2.5).
+//
+// **Images are deliberately excluded from routing** (P13.05 / W-10): the caller passes `undefined`
+// for `siteRouter` on the image loop, matching REF-003, whose documented model is that a
+// root-relative image target resolves against the repository root. A router maps a URL to *Markdown
+// source*, so routing an image would only ever yield `.md`/`.mdx` candidates for an asset. One
+// model, claimed and implemented — the mirror above holds for links and imports.
 function resolveTarget(
   sourcePath: string,
   target: string,
@@ -181,10 +187,11 @@ export function buildContextGraph(
       if (imageTarget.length === 0 || hasScheme(imageTarget)) {
         continue;
       }
+      // No router here — see the note on `resolveTarget`.
       const target = resolveTarget(
         document.path,
         imageTarget,
-        siteRouter,
+        undefined,
         nodeSet,
       );
       if (target === undefined || target === document.path) {

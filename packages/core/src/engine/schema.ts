@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 import { compileConfigSchema } from "../config/config-schema.js";
-import { assertionSchema } from "./primitives/assert.js";
+import {
+  DEFAULT_EXCLUDE_GLOBS,
+  DEFAULT_RESPECT_GITIGNORE,
+} from "../config/corpus-scope.js";
+import { ASSERTION_TARGETS, assertionSchema } from "./primitives/assert.js";
 import { ruleRegistry } from "./rules/index.js";
 
 // `schema.json` generation from the single metadata source (P2.06 / R6). One function backs the
@@ -15,6 +19,14 @@ import { ruleRegistry } from "./rules/index.js";
 const JSON_SCHEMA_DIALECT = "https://json-schema.org/draft/2020-12/schema";
 const SEVERITY_ENUM = ["error", "warning", "off"] as const;
 
+// The custom-rule `target` vocabulary is the distinct set of `ASSERTION_TARGETS` values — the same
+// authority `resolveCustomRule` validates a declared `target` against (W-37). Derived rather than
+// spelled out so a new assert kind carrying a new target reaches this metadata-driven file on its
+// own. Sorted for determinism, like the reserved-prefix list below.
+const ASSERTION_TARGET_ENUM = [
+  ...new Set<string>(Object.values(ASSERTION_TARGETS)),
+].sort();
+
 // A custom-rule descriptor for the project-local schema (P6.04). Minimal now; extended as P6 needs.
 export type CustomRuleDefinition = { id: string; description?: string };
 
@@ -22,14 +34,27 @@ type JsonSchema = Record<string, unknown>;
 
 // z.toJSONSchema tags each sub-schema with its own `$schema`; strip it so only the root carries the
 // dialect declaration.
+//
+// `io: "input"` is load-bearing, not a preference. z.toJSONSchema defaults to `io: "output"`, where a
+// key carrying a Zod `.default()` is emitted as **`required`** — the parsed result always has it, so
+// the output shape demands it. This file describes the config a user *writes*, where such a key is by
+// definition optional, so the first `.default()` added to any options schema (P13.04 added two) would
+// otherwise have made `schema.json` reject every config omitting it. Nothing in the product validates
+// against this file, so an editor would have been the only thing to notice. The MCP SDK converts its
+// own tool schemas with `io: "input"` for the same reason
+// (`@modelcontextprotocol/sdk/.../zod-json-schema-compat.js`).
 function optionsToJsonSchema(schema: z.ZodType): JsonSchema {
-  const generated = z.toJSONSchema(schema) as JsonSchema;
+  const generated = z.toJSONSchema(schema, { io: "input" }) as JsonSchema;
   delete generated.$schema;
   return generated;
 }
 
 function severityProperty(): JsonSchema {
   return { enum: [...SEVERITY_ENUM] };
+}
+
+function targetProperty(): JsonSchema {
+  return { enum: [...ASSERTION_TARGET_ENUM] };
 }
 
 // One `rules[]` branch per built-in rule: the canonical id as a const plus its options schema.
@@ -85,7 +110,7 @@ function genericCustomBranch(idPattern: string): JsonSchema {
       id: { type: "string", pattern: idPattern },
       description: { type: "string" },
       severity: severityProperty(),
-      target: { enum: ["checklist", "content", "link", "section", "table"] },
+      target: targetProperty(),
       options: customOptionsSchema(),
     },
     required: ["rule", "id", "options"],
@@ -101,7 +126,7 @@ function knownCustomBranch(id: string): JsonSchema {
       id: { const: id },
       description: { type: "string" },
       severity: severityProperty(),
-      target: { enum: ["checklist", "content", "link", "section", "table"] },
+      target: targetProperty(),
       options: customOptionsSchema(),
     },
     required: ["rule", "id", "options"],
@@ -135,8 +160,19 @@ export function generateConfigSchema(opts?: {
     properties: {
       $schema: { type: "string" },
       include: { type: "array", items: { type: "string" } },
-      exclude: { type: "array", items: { type: "string" } },
-      respectGitignore: { type: "boolean" },
+      // Both defaults are declared so an editor can show them (P13.02, deliverable 3): before this,
+      // nothing in the schema hinted that a run excludes anything at all. A spread rather than the
+      // constant itself, so the generated JSON never aliases the shared array. `include` deliberately
+      // gets no `default` — nothing in the backlog asks for one and it would only widen the diff.
+      exclude: {
+        type: "array",
+        items: { type: "string" },
+        default: [...DEFAULT_EXCLUDE_GLOBS],
+      },
+      respectGitignore: {
+        type: "boolean",
+        default: DEFAULT_RESPECT_GITIGNORE,
+      },
       settings: {
         type: "object",
         additionalProperties: false,

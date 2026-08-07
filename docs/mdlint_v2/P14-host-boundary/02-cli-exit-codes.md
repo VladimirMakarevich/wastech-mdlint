@@ -1,6 +1,6 @@
 # P14.02 · CLI exit codes and out-of-repo path rendering
 
-> Phase: [P14 — Host boundary](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Not started**. Backlog: [W-13](../remediation-backlog-2026-08-05.md) (High), [W-17](../remediation-backlog-2026-08-05.md) (Low). Sources: field F-08 (major), F-23 (polish). Depends on [P13](../P13-correctness/index.md).
+> Phase: [P14 — Host boundary](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Done**. Backlog: [W-13](../remediation-backlog-2026-08-05.md) (High), [W-17](../remediation-backlog-2026-08-05.md) (Low). Sources: field F-08 (major), F-23 (polish). Depends on [P13](../P13-correctness/index.md).
 
 ## Goal
 
@@ -30,10 +30,21 @@ Any other exit code. The field test verified the contract in **all ten** other c
 
 ## Exit criteria
 
-- [ ] `init --yes --on-existing merge` against an unloadable existing config exits `2`, asserted on a spawned process, with the refusal message unchanged.
-- [ ] `--on-existing skip` still exits `0`; the deliberate-no-write versus operational-failure split is explicit in code.
-- [ ] The new guard carries `@boundary-guard installed-bin-spawn` and [`packages/core/test/boundary-guards.test.ts`](../../../packages/core/test/boundary-guards.test.ts) still passes.
-- [ ] `compile --outdir <path outside the repo>` prints a path a user can read.
-- [ ] Report paths inside `--format json` are unchanged (still repo-relative POSIX).
-- [ ] The path-rendering contract in the glossary and `docs/guide/output.md` describes the new fallback.
-- [ ] Gates green — and `npm run build` before `npm test`, or the spawn guard asserts against a stale `dist/`.
+- [x] `init --yes --on-existing merge` against an unloadable existing config exits `2`, asserted on a spawned process, with the refusal message unchanged.
+- [x] `--on-existing skip` still exits `0`; the deliberate-no-write versus operational-failure split is explicit in code. — `InitOutcome`'s six values, switched exhaustively in `initExitCode`.
+- [x] The new guard carries `@boundary-guard installed-bin-spawn` and [`packages/core/test/boundary-guards.test.ts`](../../../packages/core/test/boundary-guards.test.ts) still passes. — the guard lands in `bin.e2e.test.ts`, already inventoried under that category, so the inventory needed no edit.
+- [x] `compile --outdir <path outside the repo>` prints a path a user can read.
+- [x] Report paths inside `--format json` are unchanged (still repo-relative POSIX). — the fallback is reachable only from `handleCompile`; nothing in `formatLintResultJson` or `LintResult` was touched.
+- [x] The path-rendering contract in the glossary and `docs/guide/output.md` describes the new fallback.
+- [x] Gates green — and `npm run build` before `npm test`, or the spawn guard asserts against a stale `dist/`.
+
+## Implementation notes
+
+- **An enumerated outcome, not a second boolean.** `RunInitCommandResult` now carries `outcome: InitOutcome` — `written`, `skipped`, `declined`, `invalid-existing-config`, `write-failed`, `ci-workflow-write-failed` — and `commands.ts`'s `initExitCode` switches over it with the file's existing `const exhaustiveCheck: never` idiom, so a seventh outcome fails to compile until someone decides its code. Six values for a two-valued decision is the cost; the benefit is that deliverable 2's split is _stated_ where the old `writeFailed` boolean made it inferable and got it wrong. The dividing question is not "was anything written" — four of the six write nothing — but whether the user asked for no write. `wasConfirmed` went with the boolean: nothing outside `init-command.ts` read it, and `outcome` derives it.
+- **The refusal text is byte-identical.** `formatNotWrittenSummary` is untouched; only its caller's classification changed. The spawn guard asserts the full sentence as a **literal** rather than importing the formatter, since importing it would only prove the code agrees with itself — which is not what "unchanged byte for byte" means.
+- **The guard is a pair, not a single case.** Same unloadable fixture, `merge` → `2` and `skip` → `0`. One case alone pins an exit code; the pair pins the distinction, which is the actual deliverable. It nests inside `bin.e2e.test.ts`'s existing installed-bin `describe` so `linkedEntry` is in scope, and carries its own `@boundary-guard installed-bin-spawn` comment at the guard — the file-level tag at the top does not satisfy a criterion that asks for it _at_ the guard. `init.e2e.test.ts` was the alternative and was declined: it is inventoried only under `write-failure`, so using it would have meant editing the inventory to say something the tree already had.
+- **The five in-process expectations were flipped first.** `init.e2e.test.ts` pinned `EXIT_CODE_SUCCESS` for all five merge-abort shapes (unparseable, non-array `rules`, unidentifiable entry, unidentifiable `custom` entry, loader-rejected); all five failed with `expected 2, received 0` before `init-command.ts` was touched. One in-process case was added for `skip` over an _unloadable_ config — the existing skip test used a valid one, so nothing held the two halves of the split against the same input.
+- **`toWriteTargetPath` is scoped to the write target, and the asymmetry is recorded rather than left latent.** New helper beside `toRepoRelativePosix` in `operational-errors.ts`, delegating to it for the in-`cwd` case and returning the platform-native absolute path otherwise. Not widened to `formatOperationalError` or `resolveDirectoryArgument`: that would reverse [P11.10](../P11-remediation/10-cli-exit-contract.md)'s promise that a `[path]` passed absolutely is reported relatively, and loosen the "an error never prints an absolute host path" property `operational-errors.test.ts` pins. The residual is a row in [accepted-behaviors](../accepted-behaviors.md). The fallback stays un-POSIX-slashed deliberately: it is a location to paste into a shell, not a report path.
+- **The `..` test is on the first path segment, not a string prefix,** so `..\out` and `../out` both trigger the fallback while a sibling directory named `..foo` does not — pinned by its own case. The Windows-drive branch (`path.relative` answering an absolute path) is unreachable on POSIX, so it is covered by `it.runIf(process.platform === "win32")` and genuinely exercised on CI's windows runner rather than faked on a dev machine.
+- **`init`'s own path rendering was left alone,** both places. `toRepoRelative` anchors at a repository root found by walking _up_, so it can never produce a `..`; `relativeConfigPath` is target-directory-relative by design (H-3) and `init.e2e.test.ts` asserts a `../../` form for it. Applying the fallback to either would have been a change nothing asked for, and to the second a regression.
+- **Docs.** The glossary's `init` and exit-code entries, `docs/guide/cli.md` (the exit-code paragraph, the merge-abort bullet, and the deliberate-no-write list, which now names two outcomes instead of three), `docs/guide/output.md`, `docs/guide/compile.md`, `README.md`, and `skills/wastech-mdlint-init/SKILL.md` — the last because it instructs an agent to read that refusal, which the runner now also sees as a non-zero exit.

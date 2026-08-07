@@ -17,10 +17,25 @@
       "type": "array",
       "items": {
         "type": "string"
-      }
+      },
+      "default": [
+        "**/.cache/**",
+        "**/.git/**",
+        "**/.next/**",
+        "**/.venv/**",
+        "**/.yarn/**",
+        "**/build/**",
+        "**/coverage/**",
+        "**/dist/**",
+        "**/node_modules/**",
+        "**/out/**",
+        "**/target/**",
+        "**/vendor/**"
+      ]
     },
     "respectGitignore": {
-      "type": "boolean"
+      "type": "boolean",
+      "default": false
     },
     "settings": {
       "type": "object",
@@ -229,7 +244,14 @@
               },
               "options": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                  "minCycleLength": {
+                    "default": 3,
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 9007199254740991
+                  }
+                },
                 "additionalProperties": false
               }
             },
@@ -255,6 +277,12 @@
                 "type": "object",
                 "properties": {
                   "entryPoints": {
+                    "default": [
+                      "README.md",
+                      "CLAUDE.md",
+                      "AGENTS.md",
+                      "index.md"
+                    ],
                     "type": "array",
                     "items": {
                       "type": "string"
@@ -1121,6 +1149,7 @@
                     }
                   },
                   "caseSensitive": {
+                    "default": true,
                     "type": "boolean"
                   },
                   "section": {
@@ -1455,6 +1484,7 @@
                             }
                           },
                           "caseSensitive": {
+                            "default": true,
                             "type": "boolean"
                           },
                           "section": {

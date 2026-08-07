@@ -21,7 +21,7 @@ Preserve the current implementation's LLM context-hygiene features ([D3](../inde
 
 ## SIZE-001 — Configuration schema
 
-Each metric is optional; omitting it disables that check entirely.
+Each metric is optional; omitting it disables that check entirely. **Superseded in part by [P13.04](../P13-correctness/04-rule-option-defaults.md):** that per-metric optionality no longer extends to omitting _all_ of them — a config must set `bytes`, `lines`, or `tokens` somewhere (top level or inside an `overrides` entry), and each threshold object must carry a `warn` or an `error`, so the rule cannot be enabled into a silent no-op.
 
 ```jsonc
 {

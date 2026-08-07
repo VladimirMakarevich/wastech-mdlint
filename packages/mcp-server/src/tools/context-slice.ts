@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import {
   resolveToolContext,
+  toolCwdBase,
   type ToolFileInput,
 } from "../shared/tool-context.js";
 import {
@@ -53,6 +54,10 @@ const contextSliceOutputShape = {
 export async function handleContextSlice(
   input: ContextSliceToolInput,
 ): Promise<CallToolResult> {
+  // Outside the `try`: `resolveToolContext` is itself a throw site, so the catch needs the base
+  // independently of whether resolution got far enough to produce one.
+  const cwd = toolCwdBase(input);
+
   try {
     const { graph, documents, settings } = await resolveToolContext(input);
 
@@ -76,11 +81,14 @@ export async function handleContextSlice(
     // Preserve the caller's query on the error path so the payload still satisfies the required
     // success schema fields without inventing a misleading alternate lookup target.
     return errorResult(error, {
-      query: input.query,
-      matchKind: null,
-      starts: [],
-      files: [],
-      visited: [],
+      successFields: {
+        query: input.query,
+        matchKind: null,
+        starts: [],
+        files: [],
+        visited: [],
+      },
+      cwd,
     });
   }
 }

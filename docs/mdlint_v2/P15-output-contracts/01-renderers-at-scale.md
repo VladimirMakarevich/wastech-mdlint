@@ -1,6 +1,6 @@
 # P15.01 · Renderers at real scale
 
-> Phase: [P15 — Output contracts](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**. Backlog: [W-26](../remediation-backlog-2026-08-05.md) (High), [W-27](../remediation-backlog-2026-08-05.md) (High), [W-28](../remediation-backlog-2026-08-05.md) (Medium, **decision**). Sources: field F-19 (minor, raised), F-21 (major), F-22 (minor). Depends on [P14](../P14-host-boundary/index.md).
+> Phase: [P15 — Output contracts](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Done**. Backlog: [W-26](../remediation-backlog-2026-08-05.md) (High), [W-27](../remediation-backlog-2026-08-05.md) (High), [W-28](../remediation-backlog-2026-08-05.md) (Medium, **decision**). Sources: field F-19 (minor, raised), F-21 (major), F-22 (minor). Depends on [P14](../P14-host-boundary/index.md).
 
 ## Goal
 
@@ -35,11 +35,37 @@ Changing the token heuristic — [P15.03](03-lint-output-contract.md) owns its d
 
 ## Exit criteria
 
-- [ ] A large-corpus fixture exists, with a stated node count and a high-in-degree hub, and is reused rather than duplicated by [P15.02](02-graph-output-contract.md).
-- [ ] At that corpus size, no line in `graph --format human` exceeds a stated width; the four named sections are line-oriented like `top hubs`.
-- [ ] `json`, `mermaid` and `dot` are asserted byte-identical across two runs and unchanged by this task.
-- [ ] The MCP `context-graph` text block inherits the fix (it is the same report).
-- [ ] At 139 documents the compiled `SKILL.md` has a bounded dependency section, no line above a stated cap, and the bound is disclosed in the artifact.
-- [ ] Two `compile --dry-run` runs remain byte-identical and the content hash remains stable.
-- [ ] No single role holds a near-majority of the fixture corpus, **or** the coarseness is documented and registered.
-- [ ] Gates green.
+- [x] A large-corpus fixture exists, with a stated node count and a high-in-degree hub, and is reused rather than duplicated by [P15.02](02-graph-output-contract.md).
+- [x] At that corpus size, no line in `graph --format human` exceeds a stated width; the four named sections are line-oriented like `top hubs`.
+- [x] `json`, `mermaid` and `dot` are asserted byte-identical across two runs and unchanged by this task.
+- [x] The MCP `context-graph` text block inherits the fix (it is the same report).
+- [x] At 139 documents the compiled `SKILL.md` has a bounded dependency section, no line above a stated cap, and the bound is disclosed in the artifact.
+- [x] Two `compile --dry-run` runs remain byte-identical and the content hash remains stable.
+- [x] No single role holds a near-majority of the fixture corpus, **or** the coarseness is documented and registered.
+- [x] Gates green.
+
+## Implementation notes
+
+**The W-26 fix spans two files, not one.** Deliverable 2 above says the four blob sections are "a consistency fix within one file," `graph-render.ts`. They are not: `clusters`, `reading order` and `excluded from reading order` live there, but `entry points` is emitted by `formatContextGraphSummary` in [`graph/graph-algorithms.ts`](../../../packages/core/src/graph/graph-algorithms.ts), which `renderContextGraphText` embeds. That distinction is load-bearing for the MCP criterion: [`context-graph`](../../../packages/mcp-server/src/tools/context-graph.ts) calls `formatContextGraphSummary` **directly** and never calls `renderContextGraphText`, so "the MCP text block inherits the fix" is satisfiable only by fixing `entry points` in the algorithms module. The two-file span is required, not scope creep.
+
+Two further sites the problem statement's own evidence names but its file list omits, both fixed here for the same reason ("_no_ line exceeds a stated width" is unconditional):
+
+- `coverage:` → `files outside corpus (N): a, b, c` was comma-joined too. The backlog called coverage line-oriented because the field corpus had only 12 such files.
+- `renderImpactSummary` carries the identical `reading order` / `excluded from reading order` pair, over a subgraph that is the whole corpus when the changed file is a hub. Fixing three of four instances of one defect would have recreated the inconsistency W-26 is about.
+- `renderContextSliceSummary` comma-joined `starts` on one line. `starts` looks like a singleton and is not: an `#anchor`, heading, or ID query resolves to _every_ file carrying that slug, so it grows with the corpus exactly as the four named sections do. `matched: <kind>` is now its own line and `starts (N):` is a list, matching `files (N):` directly below it.
+
+Inside `SKILL.md`, W-27 likewise had three line-shape sites, not one: the `- to:`/`- from:` fan-out, the `Excluded from reading order:` line (3702 characters in the field), and a cycle path. The fan-out bullet keeps the count in the same position in both branches — `- to (0): (none)` rather than `- to: (none)` — so one `^- (to|from) \((\d+)` scan over the artifact sees the empty direction too.
+
+**What the cycle elision costs, and where it is recorded.** Eliding the middle of a long cycle path makes it unreadable from any CLI output: `graph --format json` is `summarizeContextGraph`, which has no `cycles` field, and this task's own constraint is to leave the machine formats byte-identical — [P15.02](02-graph-output-contract.md) owns that contract. The MCP `context-graph` tool's `format: "json"` does return `cycles` in full, and the CLI JSON's edge list is complete, so the cycle is re-derivable rather than gone. Registered in [`accepted-behaviors.md`](../accepted-behaviors.md) and stated in [`context-graph.md`](../../guide/context-graph.md#graph).
+
+**Constants that shipped.** A new [`packages/core/src/render-bounds.ts`](../../../packages/core/src/render-bounds.ts) holds `CYCLE_PATH_HOP_LIMIT` (8) and `formatCyclePath`, shared by both renderers — a helper inside either one would make the other import across a layer it never otherwise crosses. `synthesize.ts` holds `REFERENCE_FANOUT_LIMIT` (10) and `REFERENCE_DOCUMENT_LIMIT` (25). All three are **fixed**, never corpus-relative: a corpus-relative cap cannot be stated in the artifact as a rule a reader can apply — "eight hops" means the same thing in every repository, "one tenth of the nodes" does not — and it would make an already-elided line re-render when an unrelated file is added. Two limits of that property, both stated in [`compile.md`](../../guide/compile.md#the-dependency-section-is-bounded-and-says-so) rather than left for a reader to discover from a diff. It is **not** backward byte-compatibility: the `Refs` column, the always-on disclosure and the one-edge-per-line fan-out change every generated `SKILL.md`'s bytes and content hash once, at any corpus size, so a committed artifact must be regenerated. And `REFERENCE_DOCUMENT_LIMIT` is a top-N _selection_, so adding a well-referenced document elsewhere can evict an existing document's whole entry and move the omitted count.
+
+`REFERENCE_FANOUT_LIMIT` counts edges, not distinct referencing documents, and that is left as it stands: the graph builder keeps one edge per source construct (dedup-with-count is still a G7 backlog item), so deduping here would make the bullet's count and its bullets speak about different units, and the cap's job — a fixed ceiling on the block — is met either way. Registered in [`accepted-behaviors.md`](../accepted-behaviors.md) and stated in [`compile.md`](../../guide/compile.md#the-dependency-section-is-bounded-and-says-so), with `impact <file>` named as the per-file view.
+
+`REFERENCE_DOCUMENT_LIMIT` is the dial the section-share bars were tuned against, and 25 rather than the 40 first proposed: `Document Architecture` is ~32% of the artifact at 139 documents and is legitimately the inventory, so References is the only block with slack. Measured on the fixture: **26 123 bytes** (from 110 789), `Document Dependencies` **62.8%** (from 89.7%), `Document Rules` + `Workflow` **4.0%** (from 0.7%), longest line **122** characters (from 17 530).
+
+**W-28 — accepted, with the rounding-off made visible.** Neither lever works. Raising `DEFAULT_HUB_MIN_IN_DEGREE` leaves `isolated` untouched, and that bucket is a true signal about the corpus rather than an artifact of the threshold; an absolute in-degree threshold cannot be scale-free (3 is right at 10 documents, noise at 1000), and a relative one would make a document's role depend on the rest of the corpus, breaking the local deterministic meaning the option advertises and changing every existing user's content hash. What ships instead is a `Refs (in/out)` column on every `Document Architecture` row, so the row carries the degrees the bucket discards. Registered in [`accepted-behaviors.md`](../accepted-behaviors.md) with the fixture's **measured** histogram (`hub` 73, `isolated` 46, `entry` 11, `bridge` 5, `leaf` 4 — 86% in two buckets, against the field's 83%), which [`large-corpus.test.ts`](../../../packages/core/test/large-corpus.test.ts) asserts so the register row cannot go quietly stale.
+
+**The fixture.** [`packages/core/test/support/large-corpus.ts`](../../../packages/core/test/support/large-corpus.ts) generates the 139 documents and materializes them (plus a config with a `compile` section) on demand. It imports nothing from `../../src`, which is what lets `packages/cli` and `packages/mcp-server` import it directly across the workspace — verified to need no `resolve.alias` — with the graph-dependent helpers isolated in `large-corpus-graph.ts`. It is a plain module rather than a `.test.ts` exporting constants (the P14.03 precedent), because importing a test file re-registers its suites inside the importer. [P15.02](02-graph-output-contract.md) and [P16.01](../P16-release-readiness/01-test-debt.md) should adopt it rather than build a second one; `graph-render.test.ts` pins the `json`/`mermaid`/`dot` digests, and P15.02 is the expected next deliberate updater of the `json` one.
+
+No new `@boundary-guard` category: these are rendering bounds, not a process-boundary class.
