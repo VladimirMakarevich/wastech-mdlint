@@ -41,4 +41,4 @@
 
 - **Core (P2–P5):** must expose typed result objects (M1) and a structured error type (M6); these are shared with the CLI.
 - **CLI (P4–P6):** the `fix`/`schema` capabilities ship in the CLI first (R2, C9); MCP adopts them later (M5 backlog).
-- **Docs/CI (P9):** tool inventory is generated (M3); integration tests run in CI (M4).
+- **Docs/CI (P7):** tool inventory is generated (M3); integration tests run in CI (M4) — shipped at [P7.05](../P7-mcp-server/05-integration-tests-docs.md).

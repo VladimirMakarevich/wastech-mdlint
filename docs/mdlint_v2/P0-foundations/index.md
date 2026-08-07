@@ -49,4 +49,4 @@ P0.05 (cli) and P0.06 (mcp-server) both depend only on P0.04 and can run in para
 - **P1** — extend the relocated parser into `ParsedDocument` (in `core`).
 - **P2** — build the rule engine + new config model (in `core`).
 - **P7** — fill the `mcp-server` stub with real tools.
-- **P9** — turn the packaging baseline into the single-tag release workflow.
+- **P-release** — turn the packaging baseline into the single-tag release workflow.

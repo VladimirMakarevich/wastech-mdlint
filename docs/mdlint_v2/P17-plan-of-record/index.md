@@ -47,7 +47,7 @@ Two of these sit in the **precedence tiers a contributor is told to obey** rathe
 - [x] Decision entry 4.2 is narrowed to what shipped, and 4.3 agrees with the barrel comment that cites it (W-47).
 - [x] No phase index reads `Not started` above task files that are all Done; the permanently unverifiable P0 parity criterion is retired or registered; the per-task checkbox question is **decided**, not just actioned (W-42).
 - [x] The orchestrator task file is listed in its index or moved out of the phase directory (W-50).
-- [ ] Every stale release-sense `P9` is swept from the requirements, the phase indexes, and the four surviving artifact lines — **without** touching the correct remediation-sense references in the governance and rules files (W-45, W-46).
+- [x] Every stale release-sense `P9` is swept from the requirements, the phase indexes, and the four surviving artifact lines — **without** touching the correct remediation-sense references in the governance and rules files (W-45, W-46).
 - [ ] The accepted-behaviors register satisfies its own three rules, including the row it flags against itself (W-48).
 - [ ] The live Prettier corruption is retyped; the roadmap lists seven CLI commands and diagrams `schema.json` where it lives; the frozen audits' language is stated (W-49, W-51, W-52).
 - [ ] The glossary's **Milestone** entry names P13–P17, its `Status` header and **Maintenance rule** are back, and `CLAUDE.md`'s pointer to that rule resolves (W-51a, W-52a).

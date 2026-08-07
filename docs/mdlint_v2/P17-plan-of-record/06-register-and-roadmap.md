@@ -1,6 +1,6 @@
 # P17.06 · Register contract and roadmap accuracy
 
-> Phase: [P17 — Plan of record](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Not started**. Backlog: [W-48](../remediation-backlog-2026-08-05.md) (Medium), [W-49](../remediation-backlog-2026-08-05.md) (Low), [W-51](../remediation-backlog-2026-08-05.md) (Low), [W-52](../remediation-backlog-2026-08-05.md) (Note), plus **W-51a** and **W-52a** from the backlog's [pre-implementation addendum](../remediation-backlog-2026-08-05.md#addendum--pre-implementation-audit-of-p13p17) (drift created after the backlog was written). Sources: audit F20, F34, F36, F37, F41. Depends on [P17.04](04-completion-surface.md).
+> Phase: [P17 — Plan of record](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Not started**. Depends on [P17.04](04-completion-surface.md).
 
 ## Goal
 

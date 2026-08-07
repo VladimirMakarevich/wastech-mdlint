@@ -1,6 +1,6 @@
 # v2 Requirements — 06 · Installation & Distribution
 
-> **Status:** Locked 2026-06-21 · Part of the [v2 roadmap](../index.md) (Phases **P6** init, **P9** release).
+> **Status:** Locked 2026-06-21 · Part of the [v2 roadmap](../index.md) (Phases **P6** init, **P-release** release).
 >
 > Locked v2 requirement; authoritative where the plan is otherwise ambiguous.
 
