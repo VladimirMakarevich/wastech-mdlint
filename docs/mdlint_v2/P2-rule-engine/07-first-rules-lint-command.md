@@ -32,10 +32,12 @@ Prove the engine end-to-end by porting a few existing checks as real rules, and 
 
 ## Exit criteria
 
-- [ ] `wastech-mdlint lint` runs the new engine on the proof rules with correct exit codes.
-- [ ] A reference rule and an LLM rule both produce structured findings.
-- [ ] Coexistence/alias plan for `scan` recorded for P3 to finish.
-- [ ] Phase P2 [exit criteria](index.md) satisfied.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- `wastech-mdlint lint` runs the new engine on the proof rules with correct exit codes.
+- A reference rule and an LLM rule both produce structured findings.
+- Coexistence/alias plan for `scan` recorded for P3 to finish.
+- Phase P2 [exit criteria](index.md) satisfied.
 
 ## Hand-off to next
 

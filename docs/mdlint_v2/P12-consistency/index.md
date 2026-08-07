@@ -1,6 +1,6 @@
 # Phase P12 — Post-P9 Consistency & Coverage (tests, docs, accepted behaviors)
 
-> Roadmap: [v2 Index](../index.md) · Phase **P12** · Size **S–M** · Status **Not started** · Depends on [P11](../P11-remediation/index.md) (code remediation landed).
+> Roadmap: [v2 Index](../index.md) · Phase **P12** · Size **S–M** · Status **Done** · Depends on [P11](../P11-remediation/index.md) (code remediation landed).
 >
 > **Goal:** close the **test-boundary**, **performance**, **docs-vs-code**, and **decision** findings from the [post-P9 audit](../audit-2026-07-25-post-p9.md) and the `p9-09` deep audit, so the coverage and the words describe the _current_ product — and so the class of defect that let P11's findings ship cannot recur silently. [P11](../P11-remediation/index.md) fixed the behavior; this phase hardens the tests and reconciles the contracts.
 
@@ -34,12 +34,12 @@ The post-P9 audit's [§4](../audit-2026-07-25-post-p9.md) traces the missed defe
 
 ## Phase exit criteria
 
-- [ ] The shared `exclude` option has end-to-end coverage on every rule family that accepts it — the root-cause backstop for M-2 (L-4).
-- [ ] `glossary.md` states `custom.target` is optional, agreeing with code, schema, and the guide (L-2).
-- [ ] The quadratic hot paths are fixed or the corpus-size assumption is documented (L-5).
-- [ ] The MCP `lint` custom-rule boundary is decided and reflected in both the requirement and the tool description (OG-1).
-- [ ] The recursive-DFS corpus bound is documented (or the hottest traversal is made iterative) (SC-3).
-- [ ] A standing "tests at the process boundary" checklist exists (bin spawn, write-failure, exclude, determinism), and the format gate runs before publishing docs deliverables (§4, §1).
+- [x] The shared `exclude` option has end-to-end coverage on every rule family that accepts it — the root-cause backstop for M-2 (L-4).
+- [x] `glossary.md` states `custom.target` is optional, agreeing with code, schema, and the guide (L-2).
+- [x] The quadratic hot paths are fixed or the corpus-size assumption is documented (L-5).
+- [x] The MCP `lint` custom-rule boundary is decided and reflected in both the requirement and the tool description (OG-1).
+- [x] The recursive-DFS corpus bound is documented (or the hottest traversal is made iterative) (SC-3).
+- [x] A standing "tests at the process boundary" checklist exists (bin spawn, write-failure, exclude, determinism), and the format gate runs before publishing docs deliverables (§4, §1).
 
 ## What P12 unblocks
 

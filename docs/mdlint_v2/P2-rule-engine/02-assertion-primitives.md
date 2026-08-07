@@ -37,9 +37,11 @@ Implement the closed, Zod-validated set of assertion **primitives** over `Parsed
 
 ## Exit criteria
 
-- [ ] Every primitive has a Zod options schema + unit tests over `ParsedDocument` fixtures.
-- [ ] Primitives emit structured `LintMessage`s with positions and `data`.
-- [ ] Shared `files`/`exclude` scoping behaves identically across primitives.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- Every primitive has a Zod options schema + unit tests over `ParsedDocument` fixtures.
+- Primitives emit structured `LintMessage`s with positions and `data`.
+- Shared `files`/`exclude` scoping behaves identically across primitives.
 
 ## Hand-off to next
 

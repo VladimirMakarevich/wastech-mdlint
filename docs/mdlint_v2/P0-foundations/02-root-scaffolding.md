@@ -31,10 +31,12 @@ Convert the repo root into an npm workspace and provide the shared config every 
 
 ## Exit criteria
 
-- [ ] `npm install` at the root links the (soon-to-exist) workspace packages.
-- [ ] Root scripts fan out to packages.
-- [ ] `postinstall` is gone; install no longer writes a config file.
-- [ ] `tsconfig.base.json`, shared ESLint/Prettier, and Vitest workspace exist.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- `npm install` at the root links the (soon-to-exist) workspace packages.
+- Root scripts fan out to packages.
+- `postinstall` is gone; install no longer writes a config file.
+- `tsconfig.base.json`, shared ESLint/Prettier, and Vitest workspace exist.
 
 ## Hand-off to next
 

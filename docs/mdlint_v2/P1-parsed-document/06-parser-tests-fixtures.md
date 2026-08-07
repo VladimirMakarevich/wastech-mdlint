@@ -30,10 +30,12 @@ Lock the parser behavior with focused fixtures and unit tests so P2+ build on a 
 
 ## Exit criteria
 
-- [ ] Each extractor has unit coverage; loader has an integration test.
-- [ ] CJK fixture passes (slugs/anchors/content).
-- [ ] Determinism test green.
-- [ ] Phase P1 [exit criteria](index.md) fully satisfied.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- Each extractor has unit coverage; loader has an integration test.
+- CJK fixture passes (slugs/anchors/content).
+- Determinism test green.
+- Phase P1 [exit criteria](index.md) fully satisfied.
 
 ## Hand-off to next
 

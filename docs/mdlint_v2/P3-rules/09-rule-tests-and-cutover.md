@@ -32,10 +32,12 @@ Close the lint-parity milestone: full test coverage, generated docs/schema, and 
 
 ## Exit criteria
 
-- [ ] All 22 built-in + LLM + custom rules covered by tests; integration test green.
-- [ ] README rule table + `schema.json` generated and in sync.
-- [ ] `scan` is a hidden alias of `lint`; legacy pipeline removed; no dead code.
-- [ ] **Milestone M2 (lint parity+) reached.**
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- All 22 built-in + LLM + custom rules covered by tests; integration test green.
+- README rule table + `schema.json` generated and in sync.
+- `scan` is a hidden alias of `lint`; legacy pipeline removed; no dead code.
+- **Milestone M2 (lint parity+) reached.**
 
 ## Hand-off to next
 

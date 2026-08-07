@@ -30,9 +30,11 @@ Make the workspace continuously verified and publish-ready in shape (not yet aut
 
 ## Exit criteria
 
-- [ ] CI runs typecheck/test/build/lint over the whole workspace on Node 24 and is green.
-- [ ] `npm pack --dry-run` is clean for each package and includes only intended files.
-- [ ] Provenance/engines/files set on every package.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- CI runs typecheck/test/build/lint over the whole workspace on Node 24 and is green.
+- `npm pack --dry-run` is clean for each package and includes only intended files.
+- Provenance/engines/files set on every package.
 
 ## Hand-off to next
 

@@ -35,9 +35,11 @@ Implement checklist completeness and content-quality rules over the checklist/co
 
 ## Exit criteria
 
-- [ ] CTX-001, CTX-002, CTX-003 pass unit + fixture tests.
-- [ ] CTX-001 flags empty + whole-body placeholder sections (case-insensitive), does not flag prose that only mentions a token, and unions `placeholders` with the locked default set.
-- [ ] CTX-003 reports canonical replacement for each alias usage.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- CTX-001, CTX-002, CTX-003 pass unit + fixture tests.
+- CTX-001 flags empty + whole-body placeholder sections (case-insensitive), does not flag prose that only mentions a token, and unions `placeholders` with the locked default set.
+- CTX-003 reports canonical replacement for each alias usage.
 
 ## Hand-off to next
 

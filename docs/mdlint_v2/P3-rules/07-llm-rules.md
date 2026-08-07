@@ -82,8 +82,10 @@ Threshold semantics:
 
 ## Exit criteria
 
-- [ ] SIZE-001 and LLM-001 pass unit + fixture tests (overrides, budgets, cycles).
-- [ ] The current implementation's size / eager-import / context-budget behavior is fully represented.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- SIZE-001 and LLM-001 pass unit + fixture tests (overrides, budgets, cycles).
+- The current implementation's size / eager-import / context-budget behavior is fully represented.
 
 ## Hand-off to next
 

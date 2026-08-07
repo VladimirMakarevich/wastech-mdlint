@@ -30,10 +30,12 @@ Prove P0 is complete and behavior-neutral, and document the new layout so P1+ co
 
 ## Exit criteria
 
-- [ ] Workspace-wide typecheck/test/build green.
-- [ ] `scan`/`graph` output parity with the current implementation confirmed.
-- [ ] Layout documented; AGENTS.md pointer updated (with approval).
-- [ ] [Phase index](index.md) exit checklist fully ticked.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- Workspace-wide typecheck/test/build green.
+- **Retired — permanently unverifiable.** `scan`/`graph` output parity with the current implementation confirmed. The implementation this compares against was removed at the P3.09 cutover and no test stands in for it, so the diff can no longer be produced by anyone; retired at all three of its phase-/verification-level sites rather than ticked ([P0.05](05-cli-package-commander.md) states the same check as a delivery criterion and is stripped with the rest of P0–P3 instead — see the [completion surface](../completion-surface.md)).
+- Layout documented; AGENTS.md pointer updated (with approval).
+- [Phase index](index.md) exit checklist fully ticked.
 
 ## Hand-off to next
 

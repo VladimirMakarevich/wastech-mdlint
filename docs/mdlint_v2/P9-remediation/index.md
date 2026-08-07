@@ -1,6 +1,6 @@
 # Phase P9 — Post-Audit Remediation (code, cross-platform, tooling)
 
-> Roadmap: [v2 Index](../index.md) · Phase **P9** · Size **M** · Status **Not started** · Depends on [P8](../P8-skills/index.md) (full product surface shipped).
+> Roadmap: [v2 Index](../index.md) · Phase **P9** · Size **M** · Status **Done** · Depends on [P8](../P8-skills/index.md) (full product surface shipped).
 >
 > **Goal:** close the code-level **correctness**, **cross-platform**, and **tooling** gaps found in the [P0–P8 audit](../audit-2026-07-23-p0-p8.md) — before the product is packaged for release. Every task here maps to a MEDIUM (or a code-level LOW) finding from that report.
 
@@ -19,7 +19,7 @@ The P0–P8 audit confirmed the architecture is sound and all 24 rules ship, but
 | [P9.05](05-custom-heading-target.md) | Resolve the `custom` `target: "heading"` mismatch | M-2 | MEDIUM | S–M | P8 |
 | [P9.06](06-format-gate.md) | Fix and enforce the Prettier format gate | M-6 | MEDIUM | S | P8 |
 | [P9.07](07-init-ci-package-manager.md) | `init` CI workflow respects the detected package manager | L-7 | LOW | S | P8 |
-| [P9.08](08-idref-prose-scan.md) | (Stretch) Scope the id-ref scan to prose, not code fences | L-6 | LOW | M | P1 parser |
+| [P9.08](08-idref-prose-scan.md) | (Stretch) Scope the id-ref scan to prose, not code fences — **deferred to the backlog (2026-07-25)** | L-6 | LOW | M | P1 parser |
 
 ## Sequence
 
@@ -34,17 +34,19 @@ The P0–P8 audit confirmed the architecture is sound and all 24 rules ship, but
        P9.08  (stretch / backlog — gated on a P1 parser change)
 ```
 
-> The seven core tasks are independent and can be done in parallel; none blocks another. P9.08 is a stretch item (accepted v2 limitation) and may be deferred to the backlog.
+> The seven core tasks are independent and can be done in parallel; none blocks another. P9.08 is a stretch item (accepted v2 limitation) and **was deferred to the backlog on 2026-07-25**, with a dated note in its own file recording that the parser change it is gated on has still not landed. That disposition is why this phase reads `Done` with seven of eight task files complete.
 
 ## Phase exit criteria
 
-- [ ] Multi-line `@import` blocks report correct `line`/`column` per import, with a regression test.
-- [ ] Document load order is deterministic across locales/environments (code-point or pinned-locale sort).
-- [ ] CI runs the full gate on `windows-latest` (and ideally `macos-latest`), exercising POSIX-path normalization.
-- [ ] Every shipped MCP tool description matches its real filesystem/config behavior (M2 honesty).
-- [ ] `custom` `target` set is consistent across requirements, glossary, schema, and primitives.
-- [ ] `npm run format` is green and enforced in CI (or the gate is explicitly retired in the rules).
-- [ ] `init`-generated CI uses the detected package manager (or explicitly documents npm-universal by design).
+These seven are the phase's **core** criteria and never included P9.08: the stretch task's subject appears in none of them, which is what made deferring it an acceptable close rather than an open gap.
+
+- [x] Multi-line `@import` blocks report correct `line`/`column` per import, with a regression test.
+- [x] Document load order is deterministic across locales/environments (code-point or pinned-locale sort).
+- [x] CI runs the full gate on `windows-latest` (and ideally `macos-latest`), exercising POSIX-path normalization.
+- [x] Every shipped MCP tool description matches its real filesystem/config behavior (M2 honesty).
+- [x] `custom` `target` set is consistent across requirements, glossary, schema, and primitives.
+- [x] `npm run format` is green and enforced in CI (or the gate is explicitly retired in the rules).
+- [x] `init`-generated CI uses the detected package manager (or explicitly documents npm-universal by design).
 
 ## What P9 unblocks
 
