@@ -22,6 +22,7 @@ The full user guide — capabilities grouped by area, a page per rule with examp
 
 - Node.js `24.17.0` LTS
 - `package.json` engines: `>=24.17.0` (no upper bound; CI validates on the Node 24 LTS line)
+- This repository's own installs enforce the floor (`engine-strict=true` in the root `.npmrc`), so `npm ci` below `24.17.0` fails instead of warning; a consumer installing the published packages still only gets the warning, since `engine-strict` is the installer's config, not the package's
 
 ## Workspace layout
 

@@ -1,6 +1,6 @@
 # P16.03 · The published payload: maps, `release:check`, engines
 
-> Phase: [P16 — Release readiness](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**. Backlog: [W-31](../remediation-backlog-2026-08-05.md) (Medium), [W-30](../remediation-backlog-2026-08-05.md) (Medium), [W-32](../remediation-backlog-2026-08-05.md) (Low, **decision**), [W-33](../remediation-backlog-2026-08-05.md) (Note). Sources: field F-05, F-01, F-03; audit F23, F21. Depends on [P16.02](02-package-metadata.md). Feeds [PR.01](../P-release/01-package-metadata.md), [PR.05](../P-release/05-release-verification.md).
+> Phase: [P16 — Release readiness](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Done**. Backlog: [W-31](../remediation-backlog-2026-08-05.md) (Medium), [W-30](../remediation-backlog-2026-08-05.md) (Medium), [W-32](../remediation-backlog-2026-08-05.md) (Low, **decision**), [W-33](../remediation-backlog-2026-08-05.md) (Note). Sources: field F-05, F-01, F-03; audit F23, F21. Depends on [P16.02](02-package-metadata.md). Feeds [PR.01](../P-release/01-package-metadata.md), [PR.05](../P-release/05-release-verification.md).
 
 ## Goal
 
@@ -34,10 +34,24 @@ Automating publish — `PR.02` owns that, and the publish workflow deliberately 
 
 ## Exit criteria
 
-- [ ] Every shipped source map resolves at the consumer, **or** no maps ship; the choice is recorded with its reason.
-- [ ] `release:check` and the CI pack step check the same thing, with `npm run build` still ahead of the pack.
-- [ ] The glossary's `release:check` entry describes actual behavior.
-- [ ] No packed-file **count** is used as a regression baseline; any assertion is a property.
-- [ ] The `engines` question is decided in one place, jointly with the WSL wrapper's `--engine-strict=false`.
-- [ ] The dev-chain advisory evidence is recorded at `PR.05` as a note.
-- [ ] Gates green.
+- [x] Every shipped source map resolves at the consumer, **or** no maps ship; the choice is recorded with its reason.
+- [x] `release:check` and the CI pack step check the same thing, with `npm run build` still ahead of the pack.
+- [x] The glossary's `release:check` entry describes actual behavior.
+- [x] No packed-file **count** is used as a regression baseline; any assertion is a property.
+- [x] The `engines` question is decided in one place, jointly with the WSL wrapper's `--engine-strict=false`.
+- [x] The dev-chain advisory evidence is recorded at `PR.05` as a note.
+- [x] Gates green.
+
+## Implementation notes
+
+**W-31 — maps off.** `tsconfig.base.json` sets `declarationMap: false, sourceMap: false`, the third of the three options and the only one that does not grow the payload. Every map already pointed at a `../src` no tarball ships (`"sources":["../src/index.ts"]`, no `sourcesContent`), so removing them removes cost without removing a benefit — and `cli`/`mcp-server` are bin-only apps that could not use `inlineSources` either way. `repository.directory` (P16.02) already gives a consumer who wants source a link to the exact subtree. No `files` allowlist edit was needed under this choice. One-time measurement, not a baseline: `npm pack --dry-run --workspaces` on 2026-08-07 packed core 337 → 159, cli 26 → 16, mcp-server 49 → 31. Local DX cost, stated rather than left implicit: cross-package go-to-definition still lands in source for a file inside a referencing project's `include` (`cli`/`mcp-server` reference `core` via `tsconfig.json`, so the project-reference redirect still resolves those), but a file in **no** tsconfig — any test file, per `.agents/rules/testing.md` — now resolves `@wastech-mdlint/core` to `dist/index.d.ts` instead of source. That is the accepted cost.
+
+**Stale-`dist` trap.** Flipping the flags does not delete already-emitted `.map` files, and neither `tsc -b` (content-aware up-to-dateness) nor `assertBuilt()` (mtime comparison against `src/index.ts`) can see leftover maps. The fix required `rm -rf packages/*/dist && npx tsc -b --force` before the payload suite could pass; the map assertion's failure message names that remedy directly rather than pointing at `npm run build`, which does not clear it.
+
+**W-30 — `--workspaces`.** `release:check` gained the flag; `npm run build` stays ahead of the pack because `--workspaces` runs no lifecycle script. `lint`/`format` stay out of the script deliberately — `PR.05` deliverable 1 owns that omission — and the glossary entry now names it. The **Single-tag release** entry, the deliverable's other named neighbour, was checked and needs no change: it describes I4 tag mechanics, which this task does not touch.
+
+**W-32 — `engine-strict=true`.** Decided and delivered here: root `.npmrc` sets `engine-strict=true`; `engines.node` stays at `>=24.17.0`; no runtime guard. Lowering the pin would contradict I5 plus `.node-version`/`.nvmrc`/README/getting-started; a runtime guard would reject a Node the field test showed works (`v24.8.0`) and duplicate the floor in a second, driftable place. `engine-strict` is the only lever that binds **our own** installs — it cannot bind a consumer's, since that is the installer's config, not the package's, which is why the consumer-side half is accepted rather than fixed (one row in `docs/mdlint_v2/accepted-behaviors.md`, stated for users in `docs/guide/getting-started.md` and `README.md`). Joint with [P16.04](04-dev-tooling-safety.md): that task drops `scripts/run-npm-windows.sh`'s `--engine-strict=false` and defers to this decision rather than re-deciding it.
+
+**W-33 — evidence, not a bump.** Recorded at [`PR.05`](../P-release/05-release-verification.md): 9 workspace vulnerabilities, 0 in the sandbox install of the three tarballs, dev-chain-only, no dependency bumped.
+
+**Sixth `@boundary-guard` category declined.** P16.02 deferred the question of whether this task's payload-shape guards need a sixth process-boundary category to this task. They don't: the five categories in `.agents/rules/testing.md` answer one systemic cause (nothing tested the process boundary), and this task's guards are in-process assertions over a tarball the same test process created — no new boundary is crossed. Adding one would mean editing both that file and `packages/core/test/boundary-guards.test.ts` for a distinction the existing categories don't need.

@@ -14,7 +14,7 @@ Prove the whole release works end-to-end across all three channels before taggin
 
 ## Deliverables / steps
 
-1. Full workspace gate green: run the existing root `release:check` script (`npm run typecheck && npm test && npm run build && npm pack --dry-run`); it currently omits `lint`, `format`, and the schema-sync/skill-frontmatter checks, so either extend the script or also run `npm run lint`, `npm run format`, and those tests explicitly on the pinned Node 24 line. (`publish.yml`'s `publish-readiness` job runs `lint` and `format` as of [P12.06](../P12-consistency/06-process-boundary-tests.md), but `release:check` still does not — so a local pre-tag run has to add them by hand.)
+1. Full workspace gate green: run the existing root `release:check` script (`npm run typecheck && npm test && npm run build && npm pack --dry-run --workspaces`); it currently omits `lint`, `format`, and the schema-sync/skill-frontmatter checks, so either extend the script or also run `npm run lint`, `npm run format`, and those tests explicitly on the pinned Node 24 line. (`publish.yml`'s `publish-readiness` job runs `lint` and `format` as of [P12.06](../P12-consistency/06-process-boundary-tests.md), but `release:check` still does not — so a local pre-tag run has to add them by hand.) The `--workspaces` flag arrived in [P16.03](../P16-release-readiness/03-published-payload.md); before it the pack step ran against the `private: true` root and exercised none of the three allowlists. `npm run build` stays ahead of the pack because that pack path runs no lifecycle script — do not reorder the chain when extending it.
 2. **End-to-end smoke** across the three channels:
    - CLI: install the packed `cli`, run `init` → `lint` → `graph`/`slice`/`impact` → `compile`;
    - MCP: boot `wastech-mdlint-mcp`, call each of the 6 tools;
@@ -25,6 +25,17 @@ Prove the whole release works end-to-end across all three channels before taggin
 3. Dry-run the single-tag release ([PR.02](02-single-tag-release.md)) without publishing. The existing `.github/workflows/publish.yml` `publish-readiness` job already runs the gate + `npm pack --dry-run --workspaces` on `v*` tags; PR.02 upgrades it to real publishing, so verify against that job rather than reinventing the dry-run.
 4. Walk the two registers P12.06 established, since neither is enforced by the gate above: the [process-boundary guard checklist](../../../.agents/rules/testing.md) (confirm each of the five categories still has a guard — `packages/core/test/boundary-guards.test.ts` proves the tags survive, but only a reader can confirm a _new_ subsystem did not ship without one), and the [accepted-behaviors register](../accepted-behaviors.md) (confirm every user-reachable row still has its `README.md` / `docs/guide/` home, and that no row was silently fixed without being removed). Both are launch-facing: they are what a first-time user's surprise gets checked against.
 5. Tick the Phase P-release [exit criteria](index.md); confirm **Milestone M4 (launch)**.
+
+### Note — dev-chain advisories (W-33, recorded by [P16.03](../P16-release-readiness/03-published-payload.md))
+
+Measured on 2026-08-05 (field F-03), and recorded here because this is the step that would otherwise re-discover it:
+
+- `npm audit` on the **workspace** reported `9 vulnerabilities (1 low, 3 moderate, 5 high)`.
+- Installing the three packed tarballs into a **bare sandbox** reported `found 0 vulnerabilities` across 196 packages.
+
+Every advisory is therefore in the dev chain — the tooling that builds and tests the packages, none of which ships. **No dependency was bumped on this evidence**, deliberately: a bump justified by an advisory a consumer cannot reach buys nothing and moves the lockfile the CI matrix is pinned to.
+
+These are two numbers from one date, not a baseline. Re-take both at release time; the conclusion to re-establish is "the shipped tree installs clean", not "the counts still match".
 
 ## Decisions applied
 

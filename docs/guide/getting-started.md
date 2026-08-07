@@ -4,7 +4,7 @@
 
 ## Requirements
 
-- **Node.js `>=24.17.0`** (the pinned 24 LTS line; see `.node-version`).
+- **Node.js `>=24.17.0`** (the pinned 24 LTS line; see `.node-version`). Installing a **published package** on an older Node prints a warning (`EBADENGINE`) and completes rather than failing — the floor is not enforced at the consumer. Building **from source** (below) is different: this repository's root `.npmrc` sets `engine-strict=true`, so `npm ci` fails hard below the floor instead of warning.
 - The tool ships as an npm-workspaces monorepo: [`@wastech-mdlint/core`](../../packages/core) owns the pipeline, [`@wastech-mdlint/cli`](../../packages/cli) is the `wastech-mdlint` binary, and [`@wastech-mdlint/mcp-server`](../../packages/mcp-server) is the `wastech-mdlint-mcp` stdio server.
 
 ## Install & build from source

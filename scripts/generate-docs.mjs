@@ -19,6 +19,8 @@ import { generateConfigSchema, generateRuleDocs } from "@wastech-mdlint/core";
 
 import { generateToolInventory } from "../packages/mcp-server/dist/tool-docs.js";
 
+import { replaceGeneratedBlock } from "./generated-block.mjs";
+
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -29,17 +31,27 @@ writeFileSync(schemaPath, generateConfigSchema(), "utf8");
 
 const readmePath = path.join(repoRoot, "README.md");
 const readme = readFileSync(readmePath, "utf8");
-// `<!-- prettier-ignore -->` plus the trailing blank line keep `npm run format` (P9.06) from
-// re-wrapping these machine-generated tables into padded columns, which would desync them from
-// the raw, unpadded strings generateRuleDocs()/generateToolInventory() return; the docs-sync
-// tests' extraction regexes mirror this exact wrapper shape.
-const withRules = readme.replace(
-  /(<!-- BEGIN GENERATED RULES -->)[\s\S]*?(<!-- END GENERATED RULES -->)/,
-  `$1\n<!-- prettier-ignore -->\n${generateRuleDocs()}\n\n$2`,
+const RULE_MARKERS =
+  /(<!-- BEGIN GENERATED RULES -->)[\s\S]*?(<!-- END GENERATED RULES -->)/;
+const MCP_TOOL_MARKERS =
+  /(<!-- BEGIN GENERATED MCP TOOLS -->)[\s\S]*?(<!-- END GENERATED MCP TOOLS -->)/;
+
+// The `<!-- prettier-ignore -->` line and the trailing blank line that replaceGeneratedBlock emits
+// keep `npm run format` (P9.06) from re-wrapping these machine-generated tables into padded
+// columns, which would desync them from the raw, unpadded strings
+// generateRuleDocs()/generateToolInventory() return; the docs-sync tests' extraction regexes mirror
+// that exact wrapper shape. Both splices go through the helper rather than String.prototype.replace
+// with an interpolated replacement string, because a `$` in a description would otherwise expand
+// instead of being written (W-55).
+const withRules = replaceGeneratedBlock(
+  readme,
+  RULE_MARKERS,
+  generateRuleDocs(),
 );
-const updated = withRules.replace(
-  /(<!-- BEGIN GENERATED MCP TOOLS -->)[\s\S]*?(<!-- END GENERATED MCP TOOLS -->)/,
-  `$1\n<!-- prettier-ignore -->\n${await generateToolInventory()}\n\n$2`,
+const updated = replaceGeneratedBlock(
+  withRules,
+  MCP_TOOL_MARKERS,
+  await generateToolInventory(),
 );
 writeFileSync(readmePath, updated, "utf8");
 

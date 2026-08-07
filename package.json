@@ -35,7 +35,7 @@
     "lint": "eslint .",
     "format": "prettier --check .",
     "prepack": "npm run build",
-    "release:check": "npm run typecheck && npm test && npm run build && npm pack --dry-run"
+    "release:check": "npm run typecheck && npm test && npm run build && npm pack --dry-run --workspaces"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

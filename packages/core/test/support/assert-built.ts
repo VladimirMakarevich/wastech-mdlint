@@ -7,6 +7,11 @@ import { existsSync, statSync } from "node:fs";
 // both). On a checkout whose source moved since the last build a stale artifact would otherwise
 // surface as a confusing behavioral diff instead of "you did not build".
 //
+// P16.03 added a fifth caller that spawns nothing: `packages/core/test/package-payload.test.ts`
+// packs a tree it does not build (`npm pack --workspaces` runs no lifecycle script), and now asserts
+// on what `dist` contains. Same precondition, arrived at from the other direction — the artifact is
+// the subject rather than the runner.
+//
 // W-56 (P16.01) is why the two near-identical copies became one helper. The defect was in the
 // *message*, not the check: both told the reader to run `npm run build` / `npm run typecheck`, and
 // both of those are `tsc -b`, whose up-to-date decision is content-aware. So when a source file's
@@ -25,9 +30,9 @@ import { existsSync, statSync } from "node:fs";
 // Lives in core's test support directory for the same reason `large-corpus.ts` does: it is imported
 // across the workspace, so it must import nothing from any package's `src`.
 
-// One string, so the two suites cannot drift on the remedy again.
+// One string, so the callers cannot drift on the remedy again.
 const REMEDY =
-  "This suite spawns the compiled output, not the TypeScript source — run `npm run build` first. " +
+  "This suite runs against the compiled output, not the TypeScript source — run `npm run build` first. " +
   "If that does not clear this message, run `npx tsc -b --force`: `tsc -b` decides up-to-dateness " +
   "from content, so a source file whose timestamp moved without its content changing leaves " +
   "`dist/` untouched and this check still failing.";
@@ -35,7 +40,7 @@ const REMEDY =
 /**
  * Throw unless `distPath` exists and is at least as new as `srcPath`.
  *
- * Called at module scope by both spawn suites so the failure arrives before any test runs, rather
+ * Called at module scope by every caller so the failure arrives before any test runs, rather
  * than as a per-test spawn error.
  */
 export function assertBuilt(distPath: string, srcPath: string): void {
