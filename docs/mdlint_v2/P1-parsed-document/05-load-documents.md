@@ -34,9 +34,11 @@ Provide the deterministic entry point the whole pipeline uses: glob → read →
 
 ## Exit criteria
 
-- [ ] `loadDocuments` returns a deterministic, sorted `Map<absPath, ParsedDocument>`.
-- [ ] `exclude` and `respectGitignore` parameters are honored when passed explicitly.
-- [ ] Windows paths normalized to POSIX in keys.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- `loadDocuments` returns a deterministic, sorted `Map<absPath, ParsedDocument>`.
+- `exclude` and `respectGitignore` parameters are honored when passed explicitly.
+- Windows paths normalized to POSIX in keys.
 
 ## Hand-off to next
 

@@ -897,6 +897,17 @@ describe("init command · writing the config", () => {
       expect(result.stdout).toContain(
         "Wrote project-local schema schema.json (no installed package schema to point at).",
       );
+      // The draft names it too, not just the write summary: this file did not exist before the run,
+      // and a disclosure that only arrives afterwards cannot be declined. Asserted by position
+      // because `--yes` prints both documents — the draft has to come first.
+      const draftMention = result.stdout.indexOf(
+        "init will also write schema.json beside the config",
+      );
+      const writeMention = result.stdout.indexOf(
+        "Wrote project-local schema schema.json",
+      );
+      expect(draftMention).toBeGreaterThan(-1);
+      expect(draftMention).toBeLessThan(writeMention);
       // Still a local ref, never a remote URL — schema resolution stays offline.
       expect(written.$schema).not.toMatch(/https?:\/\//);
     });
@@ -2323,6 +2334,10 @@ describe("formatDraftSummary", () => {
       clustersWereOffered: false,
       existingConfigHasComments: false,
       pruning: { directories: [] },
+      // The installed-package case by default, so a test that cares about the project-local schema
+      // has to say so — the opposite default would make every unrelated assertion carry the extra
+      // disclosure line.
+      schema: { ref: "./node_modules/@wastech-mdlint/cli/schema.json" },
       ...overrides,
     };
   }
@@ -2429,6 +2444,54 @@ describe("formatDraftSummary", () => {
       expect(summary).toContain("docs/guide/rules/LLM-001.md");
     },
   );
+
+  // A file the run creates in the user's repository has to be visible while declining is still
+  // possible. The write summary named the project-local schema.json on its own for a while, which
+  // put the only mention of it after the fact.
+  it("names the $schema it will write, and the schema file it has to create for it", () => {
+    const installed = formatDraftSummary(buildSelections(), undefined);
+    expect(installed).toContain(
+      "Schema: ./node_modules/@wastech-mdlint/cli/schema.json",
+    );
+    expect(installed).not.toContain("init will also write");
+
+    const projectLocal = formatDraftSummary(
+      buildSelections({
+        schema: {
+          ref: "./schema.json",
+          projectSchema: {
+            fileName: "schema.json",
+            reason: "no-installed-package",
+          },
+        },
+      }),
+      undefined,
+    );
+    expect(projectLocal).toContain("Schema: ./schema.json");
+    expect(projectLocal).toContain(
+      "init will also write schema.json beside the config " +
+        "(no installed package schema to point at)",
+    );
+    expect(projectLocal).toContain("reported and kept rather than replaced");
+  });
+
+  // Unconditional rather than fresh-write-only: `merge` rewires `$schema` too, and a custom rule in
+  // the existing config is exactly the other reason a schema.json gets generated.
+  it("names the schema on a merge, whose custom rules are the other reason one is written", () => {
+    const summary = formatDraftSummary(
+      buildSelections({
+        existingConfigAction: "merge",
+        schema: {
+          ref: "./schema.json",
+          projectSchema: { fileName: "schema.json", reason: "custom-rules" },
+        },
+      }),
+      "wastech-mdlint.config.json",
+    );
+
+    expect(summary).toContain("Schema: ./schema.json");
+    expect(summary).toContain("(custom rules present)");
+  });
 
   // The two rules are absent from inference, not from the product: a note claiming a rule id the
   // registry does not carry would send the reader to a page that does not exist.

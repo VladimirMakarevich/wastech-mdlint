@@ -401,7 +401,7 @@ describe("synthesize", () => {
     );
   });
 
-  it("renders '(none)' inline when a cycle excludes nothing further", () => {
+  it("renders '(none)' inline with the count when a cycle excludes nothing further", () => {
     const result = synthesize(
       input({
         documentPaths: ["a.md", "b.md"],
@@ -409,8 +409,11 @@ describe("synthesize", () => {
       }),
     );
 
+    // The count is in the same position as the populated branch's, so one scan over the artifact
+    // reads both cases. Asserted here rather than only in the populated test because the empty
+    // branch is the one that carried a different shape.
     expect(result.skillContent).toContain(
-      "Excluded from reading order: (none)",
+      "Excluded from reading order (0): (none)",
     );
   });
 

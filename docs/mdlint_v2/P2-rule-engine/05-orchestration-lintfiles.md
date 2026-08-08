@@ -35,10 +35,12 @@ Wire the whole lint pipeline: load documents from config, split rules by scope, 
 
 ## Exit criteria
 
-- [ ] `lintFiles` runs document + project rules with correct file attribution.
-- [ ] `"off"` rules skipped; per-rule severity overrides applied.
-- [ ] Inline-disable suppresses exactly the targeted `(rule, line)` messages, including `disable`→`enable` ranges, `disable` to EOF, and bare (all-rules) directives.
-- [ ] Missing `documents` for a project rule throws.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- `lintFiles` runs document + project rules with correct file attribution.
+- `"off"` rules skipped; per-rule severity overrides applied.
+- Inline-disable suppresses exactly the targeted `(rule, line)` messages, including `disable`→`enable` ranges, `disable` to EOF, and bare (all-rules) directives.
+- Missing `documents` for a project rule throws.
 
 ## Hand-off to next
 

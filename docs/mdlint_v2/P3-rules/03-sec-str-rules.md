@@ -54,9 +54,11 @@ Implement section-presence/order and project-structure rules over the section pr
 
 ## Exit criteria
 
-- [ ] SEC-001/002 and STR-001 pass unit + fixture tests.
-- [ ] Order checks honor `level`/`section` constraints.
-- [ ] SEC-003 passes unit + fixture tests: conformance pass, missing heading, missing template (skip), `level` cap, `exclude` list.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- SEC-001/002 and STR-001 pass unit + fixture tests.
+- Order checks honor `level`/`section` constraints.
+- SEC-003 passes unit + fixture tests: conformance pass, missing heading, missing template (skip), `level` cap, `exclude` list.
 
 ## Hand-off to next
 

@@ -75,7 +75,7 @@ For logic the primitives can't express (`plugins: ["./rules/my-rule.mjs"]`). **D
 ## Deferred / out of scope for v2
 
 - **Tier 2 code-plugins** (above) — interface-ready, not shipped.
-- **Async rules / external HTTP checks** — conflicts with the core-hosts-the-pipeline decision (sync pipeline) and determinism.
+- **Async rules / external HTTP checks** — conflicts with the core-hosts-the-pipeline decision's synchronous **rule** contract (`check(context): void`, run inside `lintCorpus`'s step order) and with determinism. The **discovery** entry points around it (`lintFiles`, `loadConfiguration`, `compileContext`) are async; `lintContent` stays synchronous because its caller already holds the corpus and resolved rules.
 - **`info`/`hint` severity** — keep two actionable levels + `"off"` (C2).
 
 ## Downstream impact

@@ -29,9 +29,11 @@ Create an empty-but-buildable `@wastech-mdlint/core` package that the CLI and MC
 
 ## Exit criteria
 
-- [ ] `packages/core` builds to `dist` with `tsc`.
-- [ ] An empty Vitest run for the package passes.
-- [ ] The package resolves under the workspace (other packages can `import` it).
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- `packages/core` builds to `dist` with `tsc`.
+- An empty Vitest run for the package passes.
+- The package resolves under the workspace (other packages can `import` it).
 
 ## Hand-off to next
 

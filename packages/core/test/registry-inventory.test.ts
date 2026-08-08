@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -16,10 +16,19 @@ import type { RuleScope, Severity } from "../src/engine/types.js";
 
 // The on-disk directory `RULE_DOCS_BASE_URL` names, so a `helpUri` can be resolved back to the file
 // it promises. Same repo-root derivation `docs-sync.test.ts` uses.
-const RULE_DOCS_DIR = path.resolve(
+const REPO_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  "../../../docs/guide/rules",
+  "../../..",
 );
+const RULE_DOCS_DIR = path.join(REPO_ROOT, "docs/guide/rules");
+
+// The other half of the same URL. `RULE_DOCS_BASE_URL` restates the repository the root manifest
+// already names, and nothing but this reads them together.
+const rootRepositoryUrl = (
+  JSON.parse(readFileSync(path.join(REPO_ROOT, "package.json"), "utf8")) as {
+    repository: { url: string };
+  }
+).repository.url;
 
 // The documented shipped inventory (README rule table / glossary). Asserted here, against the
 // *real* `BUILTIN_RULE_DEFINITIONS`, so a dropped/renamed/re-categorized rule fails this one test
@@ -130,6 +139,19 @@ describe("rule documentation URLs", () => {
         ),
       ),
     ).toBe(true);
+  });
+
+  it("builds those URLs against the repository the root manifest declares", () => {
+    // The assertions above strip `RULE_DOCS_BASE_URL` and check the filename half on disk, so the
+    // owner/repo half of the constant was pinned by nothing — and it is a second spelling of the
+    // root manifest's `repository.url`. A rename that updates the manifest and misses the constant
+    // turns every finding's `helpUri` and all 24 README table links into 404s with the suite green,
+    // which no on-disk check can see because the path half stays correct.
+    const origin = rootRepositoryUrl
+      .replace(/^git\+/, "")
+      .replace(/\.git$/, "");
+
+    expect(RULE_DOCS_BASE_URL.startsWith(`${origin}/blob/`)).toBe(true);
   });
 
   // `messages` was dropped as a vacuous field (declared at one line, set by no rule, read

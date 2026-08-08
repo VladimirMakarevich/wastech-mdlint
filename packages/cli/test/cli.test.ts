@@ -162,7 +162,7 @@ describe("version and errors", () => {
 });
 
 describe("graph command", () => {
-  it("prints { nodes, edges, components, readingOrder } as JSON to stdout", async () => {
+  it("prints { nodes, edges, components, readingOrder, excluded, coverage } as JSON to stdout", async () => {
     const cwd = await fixtureRepo({ "a.md": "[b](b.md)\n", "b.md": "# B\n" });
 
     const result = await run(["graph", cwd, "--format", "json"], cwd);

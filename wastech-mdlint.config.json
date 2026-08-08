@@ -1,0 +1,31 @@
+{
+  // A relative path to the schema the installed CLI package ships, never a URL: schema resolution
+  // stays offline and version-matched, so an editor validates this file against the schema of the
+  // version actually installed here instead of one fetched from the network. This is the same value
+  // the tool writes for any repository that has the package installed.
+  "$schema": "./node_modules/@wastech-mdlint/cli/schema.json",
+
+  // This repository lints its own documentation and nothing else. Whatever a pattern selects is
+  // parsed as Markdown regardless of extension, so the `*.md` tail is load-bearing rather than
+  // decoration — a bare `docs/**` would hand the JSON data files under the docs tree to the Markdown
+  // parser. `./README.md` is anchored on purpose: a pattern with no slash matches at any depth, so
+  // the bare name would also pull in each package's own README, outside the tree this scope covers.
+  //
+  // No `exclude` key, deliberately. Dependency and build trees are already pruned by a lint-time
+  // default that applies on every run; a list here would EXTEND that default rather than replace it,
+  // so restating those directories would be duplication and deleting an entry would change nothing.
+  // No `respectGitignore` either: it is off unless asked for, nothing under the docs tree is
+  // ignored, and a key that changes no behavior is one a later reader has to prove is inert.
+  "include": ["docs/**/*.md", "./README.md"],
+
+  // Two rules, deliberately, not the full set. A gate that reports hundreds of findings on the day
+  // it lands gets ignored and then disabled; these two report zero over this corpus today, so a red
+  // build here means a genuinely broken link or anchor and nothing else. Starting narrow also lets
+  // the gate prove itself before it is asked to carry more.
+  //
+  // How this list grows: a rule joins only once a full run over this corpus already reports zero for
+  // it, so the gate is never red on the day it changes, and whoever brings it to zero — or any
+  // contributor, where it already is — is the one who adds it here. Next candidate is REF-003
+  // (image targets resolve), which measures zero over this corpus already.
+  "rules": [{ "rule": "REF-001" }, { "rule": "REF-002" }]
+}

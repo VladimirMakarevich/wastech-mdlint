@@ -64,8 +64,11 @@ export async function handleLintFiles(
     const loaded = await resolveToolConfiguration(input);
 
     // An explicit `patterns` arg *replaces* `config.include` (not merges). When it's absent we leave
-    // `config.include` untouched so core's own `include ?? ["**/*.md"]` fallback applies — that
-    // "fallback patterns" behavior stays core's job, not reimplemented here.
+    // `config.include` untouched so core's own defaults apply — `resolveCorpusScope`
+    // (`config/corpus-scope.ts`) supplies both `DEFAULT_INCLUDE_GLOBS` and the default `exclude`.
+    // That "what is the corpus when the config is silent" decision stays core's job, not
+    // reimplemented here — which also means an explicit `patterns` naming a path under a
+    // default-excluded tree still resolves to nothing.
     const config =
       input.patterns === undefined
         ? loaded.config

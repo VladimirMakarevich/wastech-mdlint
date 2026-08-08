@@ -20,15 +20,16 @@ The current implementation is a single package with a hand-rolled CLI. The targe
 | [P0.06](06-mcp-server-skeleton.md) | `@wastech-mdlint/mcp-server` package skeleton (stub) | S | P0.04 |
 | [P0.07](07-ci-packaging-baseline.md) | CI matrix & packaging/publish baseline | M | P0.05, P0.06 |
 | [P0.08](08-exit-verification.md) | Phase exit verification & layout docs | S | all above |
+| [P0.09](09-audit-remediation.md) | Phase P0 audit & remediation (requirements + codebase) | M | P0.08 |
 
 ## Sequence
 
 ```
 P0.01 ─► P0.02 ─► P0.03 ─► P0.04 ─┬─► P0.05 ─┐
-                                  └─► P0.06 ─┴─► P0.07 ─► P0.08 ─► (Phase P1)
+                                  └─► P0.06 ─┴─► P0.07 ─► P0.08 ─► P0.09 ─► (Phase P1)
 ```
 
-P0.05 (cli) and P0.06 (mcp-server) both depend only on P0.04 and can run in parallel.
+P0.05 (cli) and P0.06 (mcp-server) both depend only on P0.04 and can run in parallel. P0.09 re-audits the phase after P0.08 declares it complete; it was run as an orchestrator task and went unlisted here until the [completion surface](../completion-surface.md) was reconciled.
 
 ## Decisions applied
 
@@ -38,7 +39,7 @@ P0.05 (cli) and P0.06 (mcp-server) both depend only on P0.04 and can run in para
 
 - [x] `npm run typecheck && npm test && npm run build` are green across the whole workspace.
 - [x] `packages/{core,cli,mcp-server}` exist with correct names, bins, and `publishConfig`.
-- [x] Current behavior preserved: `wastech-mdlint scan` and `graph` produce the same output as before the migration (parity check).
+- **Retired — permanently unverifiable.** Current behavior preserved: `wastech-mdlint scan` and `graph` produce the same output as before the migration (parity check). The pre-migration implementation this diffs against was removed at the P3.09 cutover and no test stands in for it, so nobody can run the comparison again. It was ticked here while the same criterion sat open in [P0.08](08-exit-verification.md) and [P0.09](09-audit-remediation.md); the tick was the false claim, and all three phase-/verification-level sites are retired rather than swept ([P0.05](05-cli-package-commander.md) states the same check as a delivery criterion and is stripped with the rest of P0–P3 instead — see the [completion surface](../completion-surface.md)).
 - [x] The current `postinstall` auto-config is removed (I1).
 - [x] CI runs the workspace matrix on Node 24; `npm pack --dry-run` is clean per package.
 - [x] No new product features were added (P0 is structural only).
@@ -48,4 +49,4 @@ P0.05 (cli) and P0.06 (mcp-server) both depend only on P0.04 and can run in para
 - **P1** — extend the relocated parser into `ParsedDocument` (in `core`).
 - **P2** — build the rule engine + new config model (in `core`).
 - **P7** — fill the `mcp-server` stub with real tools.
-- **P9** — turn the packaging baseline into the single-tag release workflow.
+- **P-release** — turn the packaging baseline into the single-tag release workflow.

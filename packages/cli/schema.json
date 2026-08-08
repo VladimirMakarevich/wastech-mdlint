@@ -31,7 +31,8 @@
         "**/out/**",
         "**/target/**",
         "**/vendor/**"
-      ]
+      ],
+      "description": "Extra globs to exclude. Entries are APPENDED to the default shown here rather than replacing it, so deleting one of the defaults from your own list changes nothing — negate it instead (\"!**/vendor/**\", or \"!**\" for all of them)."
     },
     "respectGitignore": {
       "type": "boolean",

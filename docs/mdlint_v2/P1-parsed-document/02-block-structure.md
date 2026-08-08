@@ -35,10 +35,12 @@ Implement the block-level extractors that fill the structural part of `ParsedDoc
 
 ## Exit criteria
 
-- [ ] Tables expose keyed cells, header order, line, and enclosing section.
-- [ ] Headings carry correct GitHub slugs (incl. duplicates → `-1`, `-2`, in document order) and CJK/Unicode headings, per github-slugger verbatim.
-- [ ] Checklist items report checked state + section.
-- [ ] Single-pass extraction (no duplicate parsing).
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- Tables expose keyed cells, header order, line, and enclosing section.
+- Headings carry correct GitHub slugs (incl. duplicates → `-1`, `-2`, in document order) and CJK/Unicode headings, per github-slugger verbatim.
+- Checklist items report checked state + section.
+- Single-pass extraction (no duplicate parsing).
 
 ## Hand-off to next
 

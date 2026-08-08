@@ -484,14 +484,23 @@ describe("the ad-hoc lint step order lives in core, not in this handler", () => 
     "utf8",
   );
 
+  // The absence assertions run against the import statements alone, not the whole module text. What
+  // this guard is about is what the handler *pulls in*, and a comment naming a step is not that —
+  // the handler's current comment paraphrases all three ("parse, corpus of one, scope split,
+  // inline-disable, counts") precisely to stay out of a haystack that included prose, which is a
+  // constraint the guard should not be imposing on a future writer at all.
+  const imports = [...source.matchAll(/^import[\s\S]*?from\s+"[^"]+";$/gm)]
+    .map((match) => match[0])
+    .join("\n");
+
   it("imports the core entry point and none of the steps it composes", () => {
-    expect(source).toContain("lintContent");
+    expect(imports).toContain("lintContent");
     // `parseDocument` + `runRules` + `createSuppressionChecker` were the hand-assembled sequence.
     // Asserted as one object so a failure names every primitive that came back, not just the first.
     const named = Object.fromEntries(
       ["parseDocument", "runRules", "createSuppressionChecker"].map((step) => [
         step,
-        source.includes(step),
+        imports.includes(step),
       ]),
     );
 

@@ -36,9 +36,11 @@ Extract everything reference-like into `ParsedDocument`: Markdown links (with la
 
 ## Exit criteria
 
-- [ ] Links carry label text, anchor, kind, and position.
-- [ ] Images and eager imports extracted with positions.
-- [ ] Reference-style definitions and non-ASCII anchors handled (current-behavior parity or better).
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- Links carry label text, anchor, kind, and position.
+- Images and eager imports extracted with positions.
+- Reference-style definitions and non-ASCII anchors handled (current-behavior parity or better).
 
 ## Hand-off to next
 

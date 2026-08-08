@@ -1,6 +1,6 @@
 # Phase P17 — Plan of record & self-linting
 
-> Roadmap: [v2 Index](../index.md) · Phase **P17** · Size **S–M** · Status **Not started** · Depends on [P16](../P16-release-readiness/index.md) (release readiness landed).
+> Roadmap: [v2 Index](../index.md) · Phase **P17** · Size **S–M** · Status **Done** · Depends on [P16](../P16-release-readiness/index.md) (release readiness landed).
 >
 > **Goal:** make the plan of record describe the product that shipped, and make this repository run its own linter on its own documentation so the next round of drift is a build failure instead of an audit finding. Sourced from the [consolidated remediation backlog](../remediation-backlog-2026-08-05.md), batches **B12–B13**.
 
@@ -35,21 +35,23 @@ Two of these sit in the **precedence tiers a contributor is told to obey** rathe
                                    └─► (P-release)
 ```
 
-> **P17.01 strictly before P17.02.** A CI step that lints `docs/` is red on arrival if the existing 17 dead links are still there, and a gate that is red the day it lands gets disabled. **P17.02 also depends on [P13](../P13-correctness/index.md)**: `include`/`exclude` had to start meaning what they say before a config could be written against them. **P17.03 before P17.04** is the one ranking change the QA pass asked for — a stale enforced ADR makes the next contributor write wrong code, while unchecked boxes only mislead. **P17.06 after P17.04**, because the register work overlaps what the completion decision produces.
+> **P17.01 strictly before P17.02.** A CI step that lints `docs/` is red on arrival if the existing 17 dead links are still there, and a gate that is red the day it lands gets disabled. **P17.02 also depends on [P13](../P13-correctness/index.md)**, which has landed: `include`/`exclude` had to start meaning what they say before a config could be written against them, and now they do. **P17.03 before P17.04** is the one ranking change the QA pass asked for — a stale enforced ADR makes the next contributor write wrong code, while unchecked boxes only mislead. **P17.06 after P17.04**, because the register work overlaps what the completion decision produces.
+
+> **Re-derived against the tree after P13–P16 landed.** Three of this phase's inputs moved and the task files carry the corrected figures: the artifact half of the rename sweep shrank from eleven lines to four (the self-contained-comment rule deleted the seven that were comments), the completion surface's P13–P16 half was reconciled ahead of [P17.04](04-completion-surface.md) so its five indexes stay five rather than becoming nine, and the glossary half of the ADR contradiction was already corrected by [P16.01](../P16-release-readiness/01-test-debt.md), leaving the ADR as the only site and a register residual for [P17.03](03-adr-and-dependency-register.md) to delete. Unchanged and re-verified: the dead-link count is still exactly **17**, at the same sites.
 
 ## Phase exit criteria
 
-- [ ] The 11 citations of the deleted report are repointed and the four `tasks/pending/` links dropped or re-targeted; `PLAN.md`/`docs/plan/` references are gone (W-43, W-44).
-- [ ] CI fails on a dead link inside `docs/`, run by the product's own `REF-001` against a repository configuration that exists (W-53).
-- [ ] The enforced ADR's three nonexistent API names are corrected and its synchronicity clause replaced with the real constraint; the glossary's **`lintFiles`**, **LSP server** and **Async rules** entries are fixed in the same change (W-41).
-- [ ] Decision entries 4.2 and 4.3 are narrowed to what shipped, or the two unconsumed exports are recorded as intended surface (W-47).
-- [ ] No phase index reads `Not started` above task files that are all Done; the permanently unverifiable P0 parity criterion is retired or registered; the per-task checkbox question is **decided**, not just actioned (W-42).
-- [ ] The orchestrator task file is listed in its index or moved out of the phase directory (W-50).
-- [ ] Every stale release-sense `P9` is swept from the requirements, the phase indexes, and the shipped artifacts — **without** touching the correct `P9.04/06/07` references (W-45, W-46).
-- [ ] The accepted-behaviors register satisfies its own three rules, including the row it flags against itself (W-48).
-- [ ] The live Prettier corruption is retyped; the roadmap lists seven CLI commands and diagrams `schema.json` where it lives; the frozen audits' language is stated (W-49, W-51, W-52).
-- [ ] The glossary's **Milestone** entry names P13–P17, its `Status` header and **Maintenance rule** are back, and `CLAUDE.md`'s pointer to that rule resolves (W-51a, W-52a).
-- [ ] `npm run format` green — this phase is almost entirely Markdown, so the format gate is the gate that matters.
+- [x] The 11 citations of the deleted report are repointed and the four `tasks/pending/` links dropped or re-targeted; `PLAN.md`/`docs/plan/` references are gone (W-43, W-44).
+- [x] CI fails on a dead link inside `docs/`, run by the product's own `REF-001` against a repository configuration that exists (W-53).
+- [x] The enforced ADR's three nonexistent API names are corrected and its synchronicity clause replaced with the real constraint; the glossary's **LSP server** and **Async rules** entries say which layer they mean, and the register residual recording the ADR's divergence is deleted (W-41).
+- [x] Decision entry 4.2 is narrowed to what shipped, and 4.3 agrees with the barrel comment that cites it (W-47).
+- [x] No phase index reads `Not started` above task files that are all Done; the permanently unverifiable P0 parity criterion is retired or registered; the per-task checkbox question is **decided**, not just actioned (W-42).
+- [x] The orchestrator task file is listed in its index or moved out of the phase directory (W-50).
+- [x] Every stale release-sense `P9` is swept from the requirements, the phase indexes, and the four surviving artifact lines — **without** touching the correct remediation-sense references in the governance and rules files (W-45, W-46).
+- [x] The accepted-behaviors register satisfies its own three rules, including the row it flags against itself (W-48).
+- [x] The live Prettier corruption is retyped; the roadmap lists seven CLI commands and diagrams `schema.json` where it lives; the frozen audits' language is stated (W-49, W-51, W-52).
+- [x] The glossary's **Milestone** entry names P13–P17, its `Status` header and **Maintenance rule** are back, and `CLAUDE.md`'s pointer to that rule resolves (W-51a, W-52a).
+- [x] `npm run format` green — this phase is almost entirely Markdown, so the format gate is the gate that matters.
 
 ## What P17 unblocks
 

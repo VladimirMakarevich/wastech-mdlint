@@ -42,4 +42,4 @@ Agents need the same deterministic operations the CLI has, over MCP. v2 applies 
 ## What P7 unblocks
 
 - **P8** — skills reference the MCP tools (e.g. `-impact` prefers `impact-analysis`).
-- **P9** — the package ships with its README + host-config snippet.
+- **P-release** — the package ships with its README + host-config snippet.

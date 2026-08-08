@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -20,7 +20,9 @@ async function fixtureRepo(files: Record<string, string>): Promise<string> {
   );
   tempDirs.push(root);
   for (const [relativePath, content] of Object.entries(files)) {
-    await writeFile(path.join(root, relativePath), content, "utf8");
+    const absolutePath = path.join(root, relativePath);
+    await mkdir(path.dirname(absolutePath), { recursive: true });
+    await writeFile(absolutePath, content, "utf8");
   }
   return root;
 }
@@ -43,6 +45,21 @@ describe("loadContext", () => {
     expect(context.graph.edges).toEqual([
       expect.objectContaining({ from: "a.md", to: "b.md", type: "link" }),
     ]);
+  });
+
+  it("applies the default exclude to a config that names none", async () => {
+    // `graph`, `slice` and `impact` all answer over this corpus, so a default that reached
+    // `lintFiles` but not here would make them report a blast radius spanning every dependency
+    // tree in the repository. The behavior was carried only by a comment naming `lintFiles`;
+    // `lintFiles` itself is covered at two layers, this call site at none.
+    const root = await fixtureRepo({
+      "docs/a.md": "# A\n",
+      "node_modules/pkg/README.md": "# pkg\n",
+    });
+
+    const context = await loadContext({ cwd: root, config: {}, settings: {} });
+
+    expect([...context.documents.keys()]).toEqual(["docs/a.md"]);
   });
 
   it("respects config include/exclude when loading the corpus", async () => {

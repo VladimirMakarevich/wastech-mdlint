@@ -39,7 +39,6 @@ export type { AtomicFileWrite, AtomicWriteResult } from "./atomic-write.js";
 
 // Repo scan
 export {
-  classifyPrunedDirName,
   DEFAULT_KNOWN_CLUSTER_NAMES,
   DEFAULT_MIN_CLUSTER_SIZE,
   DEFAULT_NOISE_DIR_NAMES,
@@ -112,10 +111,17 @@ export {
   topologicalSort,
 } from "./graph/graph-algorithms.js";
 export type { TopologicalSortResult } from "./graph/graph-algorithms.js";
-// `query` has no host caller of its own (the graph commands and MCP tools reach it through
-// `getContextSlice` / `impact` / compile). Four other exports in that position were removed as
-// unused; this one and `getImpactSet` below stay because the MCP graph tools are documented as
-// reusing them, which makes them a stated expectation rather than dead API.
+// `query` and `getImpactSet` (below) have no host caller: the graph commands and MCP tools reach
+// traversal through `getContextSlice` / `impact` / compile, and `query`'s only cross-module callers
+// are core's own `graph/search-index.ts` and `compile/compile-context.ts` (besides `impact()` in the
+// same module). They stay exported as deliberate library surface all the same. `query` is the
+// single traversal every graph feature composes, so a consumer builds on it rather than writing a
+// second walk with different visited-set and depth semantics — the "no parallel traversal" property
+// the whole graph layer rests on. `getImpactSet` is the raw affected-set closure that
+// `classifyImpact` projects into its directly/transitively/reading-order buckets, so it is the
+// useful form for a consumer that wants its own classification. Four neighbouring exports in the
+// same position were removed for having neither property; these two are an exception on purpose,
+// not an oversight.
 export { impact, query } from "./graph/query.js";
 export type {
   QueryDirection,

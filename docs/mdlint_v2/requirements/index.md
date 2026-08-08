@@ -11,7 +11,7 @@ These documents are the locked outcome of a point-by-point requirements pass (20
 | [03](03-context-graph.md) | Context graph & search | P1, P4 | **Semantic edges (ID/anchor/import)**, unified query layer, edge metadata, honest deterministic search, coverage signal, explicit cycles, Mermaid/DOT export. |
 | [04](04-skills-compile.md) | Skills & compile | P5, P8 | Frontmatter schema, **host-neutral generated commands**, deterministic output, unified skill model, context-budget in skill, host-neutral static skills, `-fix` delegates to `--fix`. |
 | [05](05-mcp-server.md) | MCP server | P7 | **Structured output**, honest descriptions, modular server, stdio integration tests, error contract, safety annotations, stdio-only + no code-plugins. |
-| [06](06-installation.md) | Installation & distribution | P6, P9 | No `postinstall`, **smart CLI `init`**, local schema wiring, single-tag release, supply chain, first-class GitHub Action, skill pinning. |
+| [06](06-installation.md) | Installation & distribution | P6, P-release | No `postinstall`, **smart CLI `init`**, local schema wiring, single-tag release, supply chain, first-class GitHub Action, skill pinning. |
 
 ## Deferred / backlog (recorded, not in v2)
 

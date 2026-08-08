@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { RULE_DOCS_BASE_URL } from "../src/engine/rule-docs-url.js";
 import { assertBuilt } from "./support/assert-built.js";
 import { readTarball } from "./support/read-tarball.js";
 
@@ -128,7 +129,23 @@ const rootLicense = readFileSync(
   "utf8",
 ).replace(/\r\n/g, "\n");
 
-let packDir: string;
+// The `…/blob/main/` prefix every in-repository link in a published README is written against,
+// taken from the constant that already spells the repository once rather than spelled a second
+// time here — `registry-inventory.test.ts` pins that constant against the root manifest, so this
+// inherits the same anchor.
+const blobPrefix = /^https:\/\/[^/]+\/[^/]+\/[^/]+\/blob\/main\//.exec(
+  RULE_DOCS_BASE_URL,
+)?.[0];
+if (blobPrefix === undefined) {
+  // Module-scope fail-fast, the same shape the `npm_execpath` guard above uses: a silently
+  // unmatched prefix would make the README link assertion below find nothing and pass vacuously.
+  throw new Error(
+    `RULE_DOCS_BASE_URL (${RULE_DOCS_BASE_URL}) is no longer a \`https://<host>/<owner>/<repo>/blob/main/\` ` +
+      "URL, so the packed-README link guard cannot derive the repository prefix it resolves against.",
+  );
+}
+
+let packDir: string | undefined;
 const payloads = new Map<string, Map<string, Buffer>>();
 
 beforeAll(async () => {
@@ -165,7 +182,11 @@ beforeAll(async () => {
 }, 120_000);
 
 afterAll(async () => {
-  await rm(packDir, { recursive: true, force: true });
+  // `packDir` is assigned by the first statement of `beforeAll`, so an `mkdtemp` that fails leaves
+  // it undefined and an unguarded `rm` throws a `TypeError` over the error that actually matters.
+  if (packDir !== undefined) {
+    await rm(packDir, { recursive: true, force: true });
+  }
 });
 
 describe.each(PUBLISHED_PACKAGES)(
@@ -193,6 +214,36 @@ describe.each(PUBLISHED_PACKAGES)(
       expect(readme.trim()).not.toBe("");
       // Cheap guard against three copies of one file, or of the root README.
       expect(readme).toContain(name);
+    });
+
+    it("links only to files that exist in the repository", () => {
+      // The README's links to guide pages and to the sibling packages are absolute URLs, which is
+      // what makes them work on the npm page — and also what makes the REF rules skip them, so a
+      // renamed guide page rots them silently on the one surface this payload exists to make
+      // readable. `registry-inventory.test.ts` already guards this class for rule doc pages;
+      // resolving the path half back to disk is the same check for the prose half.
+      const targets = [
+        ...new Set(
+          [
+            ...text("README.md").matchAll(
+              new RegExp(
+                // The prefix is data, not a pattern: `github.com`'s dots must match themselves.
+                `${blobPrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^)\\s"'#]+)`,
+                "g",
+              ),
+            ),
+          ].map((match) => match[1]!),
+        ),
+      ].sort();
+
+      // Non-vacuous: a README that lost every link (or a prefix that stopped matching) would
+      // otherwise satisfy "no dead link" perfectly.
+      expect(targets.length).toBeGreaterThan(0);
+      expect(
+        targets.filter((target) => !existsSync(path.join(repoRoot, target))),
+        `${name}'s README links to repository paths that do not exist. A moved or renamed page ` +
+          "has to be followed here, in the published README, or the npm page ships a 404.",
+      ).toEqual([]);
     });
 
     it("ships readable MIT license text", () => {
@@ -294,7 +345,10 @@ describe("release:check", () => {
   });
 });
 
-describe("published payload of @wastech-mdlint/cli", () => {
+describe("published payload of @wastech-mdlint/cli — allowlist-only files (W-29)", () => {
+  // Named for its subject rather than for its package: `describe.each` above generates a suite
+  // called `published payload of @wastech-mdlint/cli (W-29)` for the same package, and a title that
+  // is a prefix of that one cannot be selected alone with `-t`.
   it("still ships schema.json", () => {
     // The one payload file that ships *only* because `files` lists it — README and LICENSE are
     // force-included by npm regardless. So this is where the suite has real allowlist sensitivity,

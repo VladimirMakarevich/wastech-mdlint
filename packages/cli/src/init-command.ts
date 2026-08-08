@@ -107,6 +107,25 @@ export type ConfirmedInitSelections = {
   // `clustersWereOffered` is: the draft has to disclose it, and an optional field would let a
   // new call site drop the disclosure silently — which is the exact defect this closes.
   pruning: ScanPruning;
+  // Which `$schema` the write will point at, and whether reaching it means creating a second file.
+  // Required for the same reason `pruning` is: warn-before-confirming covers what a run *creates*,
+  // not only what it replaces, and the schema file used to appear in the after-the-fact write
+  // summary alone.
+  schema: DraftSchemaPlan;
+};
+
+/**
+ * What the draft says about `$schema` before the user confirms. `ref` is the value the config will
+ * carry; `projectSchema` is present only when `init` must also generate a schema file beside the
+ * config for that ref to resolve — the ordinary `npx` case, where nothing is installed to point at,
+ * or a config whose custom rules the built-in schema cannot describe.
+ *
+ * Both fields come straight from `generateInitConfig`, so the draft and the write summary cannot
+ * disagree about which file the config points at or about why it is there.
+ */
+export type DraftSchemaPlan = {
+  ref: string;
+  projectSchema?: { fileName: string; reason: ProjectSchemaReason };
 };
 
 export type ConfigPreview = {
@@ -308,6 +327,32 @@ export async function readExistingConfigDocument(
  * validated against `lintConfigSchema` only in tests (a forward-compat smoke check, not a runtime
  * dependency on the schema).
  */
+/**
+ * The `include` value a fresh write will use — the one place this three-valued rule is decided.
+ *
+ * Three values, because an empty selection and an empty scan need opposite files: a literal `[]` is
+ * written only when clusters were offered and turned down (lints nothing, as asked), while a scan
+ * that found none omits the key so the tool's own dot-matching default `include` applies. Inverting a
+ * deliberate "none of these" into that default is the bug this shape exists to prevent. (The default
+ * glob is not spelled here for the reason the comment on `formatScanExclusions` gives: it contains a
+ * sequence that would close this block comment early.)
+ *
+ * It is one function because two callers need the same answer in different forms: the writer needs the
+ * value, and the draft's scan-exclusion disclosure needs to know whether the key will be written at
+ * all (`resolveIncludeToWrite(...) !== undefined`) — the case where the skipped hidden files end up
+ * linted by the default rather than excluded. Derived twice, they could disagree, and the disclosure
+ * would then claim the opposite of what was written.
+ */
+export function resolveIncludeToWrite(
+  previewInclude: readonly string[],
+  clustersWereOffered: boolean,
+): string[] | undefined {
+  if (previewInclude.length > 0) {
+    return [...previewInclude];
+  }
+  return clustersWereOffered ? [] : undefined;
+}
+
 export function buildConfigPreview(
   clusters: DocCluster[],
   rules: InferredRule[],
@@ -479,8 +524,9 @@ export function formatScanExclusions(
 /**
  * Deterministic, human-readable preview of the confirmed draft: existing-config disposition,
  * package manager, include globs (from `buildConfigPreview`, so the printed list matches exactly
- * what the writer will serialize), the scan-exclusion disclosure, rules grouped by category with their
- * per-rule rationale, and the two rules inference will never reach (`NOT_INFERRED_NOTE`).
+ * what the writer will serialize), the scan-exclusion disclosure, the `$schema` the write will point
+ * at and any schema file it has to create for that, rules grouped by category with their per-rule
+ * rationale, and the two rules inference will never reach (`NOT_INFERRED_NOTE`).
  *
  * `merge` is additive and existing-wins: it only ever appends new `rules[]`
  * entries and must never touch `include`/`exclude`/`settings`. So a merge preview omits the
@@ -526,16 +572,33 @@ export function formatDraftSummary(
     // merge path is not making. Under `--yes` this reaches stdout via `composeOutput`; interactively
     // `confirmDraft` shows it while the user can still decline, which is where the warn-before-
     // confirming discipline wants it.
-    // Same three-valued `include` decision `runInitCommand` makes before writing: the key is omitted
-    // only when nothing was selected *and* nothing was offered, and that is the one case where the
-    // hidden files end up linted by the default rather than skipped.
+    // Asks the writer's own decision function rather than re-deriving it: the key is omitted only
+    // when nothing was selected *and* nothing was offered, and that is the one case where the hidden
+    // files end up linted by the default rather than skipped.
     const exclusions = formatScanExclusions(
       selections.pruning,
-      preview.include.length > 0 || selections.clustersWereOffered,
+      resolveIncludeToWrite(preview.include, selections.clustersWereOffered) !==
+        undefined,
     );
     if (exclusions.length > 0) {
       lines.push("", ...exclusions);
     }
+  }
+
+  // The same `Schema:` line the write summary carries, shown here as well rather than only there:
+  // the `npx` path generates a schema.json beside the config, and a file the run *creates* in the
+  // user's repository has to be on screen while declining is still possible — the write summary
+  // alone puts it after the fact. Unconditional (including on `merge`, which always rewires
+  // `$schema`) so the two summaries can never describe different files.
+  lines.push("", `Schema: ${selections.schema.ref}`);
+  const { projectSchema } = selections.schema;
+  if (projectSchema !== undefined) {
+    lines.push(
+      `  init will also write ${projectSchema.fileName} beside the config ` +
+        `(${describeProjectSchemaReason(projectSchema.reason)}), so that $schema resolves. ` +
+        `A ${projectSchema.fileName} already at that path is reported and kept rather than ` +
+        "replaced, unless it is init's own and you passed --on-existing overwrite.",
+    );
   }
   lines.push("");
 
@@ -1169,6 +1232,43 @@ export async function runInitCommand(
   const existingConfigHasComments =
     existingConfigAction === "merge" && existingDocument?.hasComments === true;
 
+  const action: InitConfigAction =
+    existingConfigAction === "merge" ? "merge" : "fresh";
+
+  // Reuse the snapshot read above. On a merge that survives the unreadable-config abort below,
+  // `existingDocument.raw` is defined (parsed + additively mergeable) — no second read, no window
+  // for a fresh-overwrite that drops the existing keys.
+  const existing: ExistingConfigDocument | undefined =
+    action === "merge" && existingDocument?.raw !== undefined
+      ? { raw: existingDocument.raw }
+      : undefined;
+
+  // The package `$schema` ref is computed relative to the config's own directory (not a fixed
+  // literal), anchored on the *actual* installed schema, so a subdirectory config wires
+  // `../node_modules/...` instead of a dead path nested under it. When nothing is installed — the
+  // ordinary `npx` case — there is no anchor and no ref: the previous project-root fallback emitted
+  // `./node_modules/@wastech-mdlint/cli/schema.json` for a file that does not exist.
+  // `undefined` tells `generateInitConfig` to generate and point at a project-local `./schema.json`.
+  const schemaAnchor = await findInstalledSchemaDir(cwd);
+  const preview = buildConfigPreview(confirmedClusters, selectedRules);
+  // `include` is only meaningful for a fresh write; generateInitConfig ignores it under "merge".
+  // Three-valued; the rule and its reasons live in `resolveIncludeToWrite`.
+  const include = resolveIncludeToWrite(preview.include, clustersWereOffered);
+  // Generated *before* the draft, not at write time, because the draft has to name the schema file
+  // this run would create — and generation is pure, so the only observable difference is that the
+  // one anchor lookup above now also happens on a run the user goes on to decline. The same `result`
+  // is what gets written below, so no second generation can disagree with what was confirmed.
+  const result = generateInitConfig({
+    action,
+    existing,
+    include,
+    newRules: selectedRules,
+    packageSchemaRef:
+      schemaAnchor === undefined
+        ? undefined
+        : resolvePackageSchemaRef(cwd, schemaAnchor),
+  });
+
   const selections: ConfirmedInitSelections = {
     existingConfigAction,
     packageManager,
@@ -1179,6 +1279,17 @@ export async function runInitCommand(
     clustersWereOffered,
     existingConfigHasComments,
     pruning: scanResult.pruned,
+    schema: {
+      ref: result.schemaRef,
+      ...(result.projectSchema === undefined
+        ? {}
+        : {
+            projectSchema: {
+              fileName: result.projectSchema.fileName,
+              reason: result.projectSchema.reason,
+            },
+          }),
+    },
   };
 
   const summary = formatDraftSummary(selections, relativeConfigPath);
@@ -1224,48 +1335,7 @@ export async function runInitCommand(
     };
   }
 
-  const action: InitConfigAction =
-    existingConfigAction === "merge" ? "merge" : "fresh";
-
-  // Reuse the snapshot read above. The unreadable-merge abort has already returned, so on a merge
-  // that reaches here `existingDocument.raw` is guaranteed defined (parsed + additively mergeable) —
-  // no second read, no window for a fresh-overwrite that drops the existing keys.
-  const existing: ExistingConfigDocument | undefined =
-    action === "merge" && existingDocument?.raw !== undefined
-      ? { raw: existingDocument.raw }
-      : undefined;
-
   const configPath = path.join(cwd, CONFIG_FILE_NAME);
-
-  // The package `$schema` ref is computed relative to the config's own directory (not a fixed
-  // literal), anchored on the *actual* installed schema, so a subdirectory config wires
-  // `../node_modules/...` instead of a dead path nested under it. When nothing is installed — the
-  // ordinary `npx` case — there is no anchor and no ref: the previous project-root fallback emitted
-  // `./node_modules/@wastech-mdlint/cli/schema.json` for a file that does not exist.
-  // `undefined` tells `generateInitConfig` to generate and point at a project-local `./schema.json`.
-  const schemaAnchor = await findInstalledSchemaDir(cwd);
-  const preview = buildConfigPreview(confirmedClusters, selectedRules);
-  // `include` is only meaningful for a fresh write; generateInitConfig ignores it under "merge".
-  // Three-valued: an empty selection is written as a literal `[]` only when clusters
-  // were actually offered and turned down. When the scan found none, the key is omitted so the
-  // tool's own `**/*.md` default applies, which is what a repo with no recognizable doc cluster
-  // wants — inverting a deliberate "none of these" into that same default is the bug.
-  const include =
-    preview.include.length > 0
-      ? preview.include
-      : clustersWereOffered
-        ? []
-        : undefined;
-  const result = generateInitConfig({
-    action,
-    existing,
-    include,
-    newRules: selectedRules,
-    packageSchemaRef:
-      schemaAnchor === undefined
-        ? undefined
-        : resolvePackageSchemaRef(cwd, schemaAnchor),
-  });
 
   // Staged as one batch and committed schema-first, config-last. The order is
   // load-bearing: the config is what points at the schema, so if the schema rename fails the old

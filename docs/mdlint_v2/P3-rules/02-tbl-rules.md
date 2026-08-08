@@ -35,8 +35,10 @@ Implement the six table rules as presets over the table primitives from [P2.02](
 
 ## Exit criteria
 
-- [ ] All six TBL rules pass unit + fixture tests with correct severities.
-- [ ] TBL-006 attributes duplicates to the right file/line (project scope).
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- All six TBL rules pass unit + fixture tests with correct severities.
+- TBL-006 attributes duplicates to the right file/line (project scope).
 
 ## Hand-off to next
 

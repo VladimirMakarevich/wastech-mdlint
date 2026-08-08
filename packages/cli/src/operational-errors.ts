@@ -6,13 +6,19 @@ import { normalizeRelativePath } from "@wastech-mdlint/core";
 // deliberately no import from `commands.js`: that module imports *from* here for its write handlers,
 // so a back-import would close a cycle.
 //
-// The shared constraint behind all three functions: a Node fs error's `message` embeds absolute,
+// The shared constraint behind these four functions: a Node fs error's `message` embeds absolute,
 // platform-native paths (and, for a `rename` through `writeFileAtomic`, the random temp file name
 // too). Printing that verbatim leaks the checkout location into CLI stderr and breaks the
 // relative-POSIX-path convention every other user-visible path in the product follows, so such a
 // message is replaced by the errno `code` plus a path normalized here. Only *such* a message: an
 // error that names no path has none to leak, and dropping its text costs the caller the diagnosis
 // (see `formatOperationalError`).
+//
+// `toWriteTargetPath` is the one deliberate exception, added by P14.02: a file the command *wrote*
+// outside `cwd` is named by its absolute platform-native path, because the user has to be able to
+// open it and a chain of `../` hops — or, across Windows drives, no relative form at all — is not a
+// location anyone can read back. So the convention above is the rule for what a failure *blames*,
+// not for what a command reports having *produced*.
 
 /**
  * A host path rendered the way the rest of the product renders paths: relative to this run's `cwd`
@@ -112,12 +118,13 @@ export function formatOperationalError(error: unknown, cwd: string): string {
  * A failed product-file write, named by the path the caller already computed for its *success*
  * message rather than by the errno's own path — under `writeFileAtomic` the latter is the staged
  * temp file, which is meaningless to the user.
+ *
+ * That path may be relative or absolute, which is why the parameter is not called `relativePath`:
+ * `handleCompile` passes the same value it would print on success, and `toWriteTargetPath` renders an
+ * out-of-`cwd` target absolutely on purpose.
  */
-export function formatWriteFailure(
-  relativePath: string,
-  error: unknown,
-): string {
+export function formatWriteFailure(targetPath: string, error: unknown): string {
   const code = errnoCode(error);
   const reason = code === undefined ? "" : ` (${code})`;
-  return `Could not write ${relativePath}${reason}.`;
+  return `Could not write ${targetPath}${reason}.`;
 }

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { ConfigError } from "../src/config/config-error.js";
+import { flattenConfigIssues } from "../src/config/config-issues.js";
 import { findConfig } from "../src/config/find-config.js";
 import { loadConfiguration } from "../src/config/load-config.js";
 import { defineRule, RuleRegistry } from "../src/engine/registry.js";
@@ -420,6 +421,82 @@ describe("config diagnostics", () => {
 
     expect(message).toContain("config.rules[0].options.maxBytes");
     expect(message).toContain('config.rules[1]: Unknown rule "REF-009"');
+  });
+});
+
+// `selectBranch`'s two halves are reachable from very different distances. The discriminated half —
+// a `rules[]` entry, `rule: "custom"` or not — runs on every union failure the cases above produce.
+// The fallback beneath it does not: the root schema's only other union is `assertionSchema`, a
+// discriminated union whose no-match issue carries `errors: []` and is short-circuited before
+// `selectBranch` is reached, so no config a user can write enters it. That makes it code the loader
+// carries and nothing exercises, which is how it would break silently under a schema edit — so it is
+// driven directly, with issues shaped the way Zod reports them rather than produced by a config.
+describe("flattenConfigIssues", () => {
+  // Cast because these are hand-built: constructing a genuine `$ZodIssue` would mean finding a
+  // schema that produces the shape, which is precisely what does not exist here.
+  function issues(...raw: unknown[]): z.core.$ZodIssue[] {
+    return raw as z.core.$ZodIssue[];
+  }
+
+  it("picks the fewest-issues branch where the schema offers no discriminator", () => {
+    // Two branches describing the same input, at a path that is not `["rules", n]`. Every branch's
+    // issues are about the same value, so the shortest is the closest reading of what was meant —
+    // a guess, but one with a floor, and better than the union's own `Invalid input`.
+    const flattened = flattenConfigIssues(
+      issues({
+        code: "invalid_union",
+        path: ["settings"],
+        message: "Invalid input",
+        errors: [
+          [
+            {
+              code: "invalid_type",
+              path: ["idRef", "idPattern"],
+              message: "Expected string",
+            },
+            {
+              code: "unrecognized_keys",
+              path: ["idRef"],
+              message: 'Unrecognized key: "patern"',
+            },
+          ],
+          [
+            {
+              code: "invalid_type",
+              path: ["idRef"],
+              message: "Expected object",
+            },
+          ],
+        ],
+      }),
+      { settings: { idRef: 7 } },
+    );
+
+    expect(flattened).toEqual([
+      { path: ["settings", "idRef"], message: "Expected object" },
+    ]);
+  });
+
+  it("passes a discriminated union's no-match issue through with its own message", () => {
+    // The `errors: []` case — `assertionSchema`'s `kind`. Its message already lists the allowed
+    // values, so there is nothing to expand; expanding it would reduce over an empty array and
+    // throw, which is what the `errors.length > 0` guard is for.
+    expect(
+      flattenConfigIssues(
+        issues({
+          code: "invalid_union",
+          path: ["rules", 0, "options", "assert"],
+          message: 'Invalid input: expected one of "requiredColumns"',
+          errors: [],
+        }),
+        {},
+      ),
+    ).toEqual([
+      {
+        path: ["rules", 0, "options", "assert"],
+        message: 'Invalid input: expected one of "requiredColumns"',
+      },
+    ]);
   });
 });
 

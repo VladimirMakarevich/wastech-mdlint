@@ -28,7 +28,7 @@ Make every package correctly publishable, building on the [P0.07 baseline](../P0
 - [ ] All three packages' publish metadata + provenance verified (`core` has `exports`; `cli`/`mcp-server` are bin-only, no `exports`).
 - [ ] Every tarball carries a per-package `README.md` and readable MIT `LICENSE` text, and every manifest declares `repository` with its own `directory` — **delivered by [P16.02](../P16-release-readiness/02-package-metadata.md)** and asserted by `packages/core/test/package-payload.test.ts`, so this criterion is measured by running the gate rather than re-tracked here.
 - [ ] Package version + internal `@wastech-mdlint/*` pins bump in lockstep — no stale `0.0.0` dependency ships.
-- [ ] `npm pack --dry-run` clean per package; `cli` ships `schema.json`.
+- [ ] `cli` ships `schema.json`. The pack-clean half is **delivered by [P16.03](../P16-release-readiness/03-published-payload.md)** — `release:check` ends in `npm pack --dry-run --workspaces` and `ci.yml`'s `pack` job matrixes the same check per package — so it is measured by running the gate rather than re-tracked here.
 - [ ] No tarball carries a source map, and no tarball carries a top-level entry outside its own allowlist — **decided and delivered by [P16.03](../P16-release-readiness/03-published-payload.md)** (maps off in `tsconfig.base.json`, reasons in deliverable 4 above) and asserted by `packages/core/test/package-payload.test.ts`, so this criterion is measured by running the gate rather than re-tracked here.
 
 ## Hand-off to next

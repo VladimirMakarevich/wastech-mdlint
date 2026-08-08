@@ -37,9 +37,11 @@ Replace the current implementation sectioned config with the new rule-driven mod
 
 ## Exit criteria
 
-- [ ] New config parses (JSONC), validates two-stage, rejects unknown keys with clear errors.
-- [ ] `exclude` wins over `include`; `settings` inheritance works with per-rule override.
-- [ ] `findConfig` walk-up + `--config` override covered by tests.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- New config parses (JSONC), validates two-stage, rejects unknown keys with clear errors.
+- `exclude` wins over `include`; `settings` inheritance works with per-rule override.
+- `findConfig` walk-up + `--config` override covered by tests.
 
 ## Hand-off to next
 

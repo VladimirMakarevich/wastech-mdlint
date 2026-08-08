@@ -38,8 +38,10 @@ Implement the six reference-integrity rules — link/anchor/image resolution and
 
 ## Exit criteria
 
-- [ ] All six REF rules pass unit + fixture tests.
-- [ ] REF-002 anchor slugs match GitHub semantics; REF-005 reports dangling vs orphan correctly.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- All six REF rules pass unit + fixture tests.
+- REF-002 anchor slugs match GitHub semantics; REF-005 reports dangling vs orphan correctly.
 
 ## Hand-off to next
 

@@ -30,9 +30,11 @@ Create the `@wastech-mdlint/mcp-server` package shell so the 3-package workspace
 
 ## Exit criteria
 
-- [ ] `packages/mcp-server` builds to `dist`.
-- [ ] The stub server starts over stdio and exits cleanly (smoke check).
-- [ ] Package name/bin/publishConfig match the requirements.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- `packages/mcp-server` builds to `dist`.
+- The stub server starts over stdio and exits cleanly (smoke check).
+- Package name/bin/publishConfig match the requirements.
 
 ## Hand-off to next
 

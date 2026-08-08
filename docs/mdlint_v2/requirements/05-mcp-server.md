@@ -23,7 +23,7 @@
 
 - **M2 — honest descriptions.** Both the graph spec and MCP spec flag that `context-slice`'s description ("ID, keyword, or file path") is wider than the implementation. With [G4](03-context-graph.md) it becomes a real deterministic ID/anchor/heading/path index, so the description states exactly that — no fuzzy/LLM promise.
 
-- **M3 — modular + shared + generated docs.** The spec notes the whole server lives in one `index.ts` and duplicates config find/load that CLI already centralizes. v2 splits tools into modules, adds a shared `resolveConfig` / `loadContext` helper, and **generates the tool inventory from registration** so docs can't drift (the spec's "site docs say 5, code has 6"). Same single-source principle as [R6](02-rules-engine.md).
+- **M3 — modular + shared + generated docs.** The spec notes the whole server lives in one `index.ts` and duplicates config find/load that CLI already centralizes. v2 splits tools into modules, adds a shared config/context helper, and **generates the tool inventory from registration** so docs can't drift (the spec's "site docs say 5, code has 6"). Same single-source principle as [R6](02-rules-engine.md). **Amended 2026-08-08 ([P18.09](../P18-followup-burndown/09-doc-citation-guard.md)):** this named the helper `resolveConfig` / `loadContext`. It shipped as `resolveToolConfiguration` and `resolveToolContext` (`packages/mcp-server/src/shared/tool-context.ts`), which also own the `cwd` default and its validation; `loadContext` is core's own and is the one name that stuck. The requirement is unchanged — a planning name is corrected here rather than left for a reader to grep for.
 
 - **M4 — stdio integration tests.** The spec's tests cover the computational layer, not the wire protocol. v2 adds tests that boot the server over `StdioServerTransport` and assert tool registration + error shapes.
 
@@ -41,4 +41,4 @@
 
 - **Core (P2–P5):** must expose typed result objects (M1) and a structured error type (M6); these are shared with the CLI.
 - **CLI (P4–P6):** the `fix`/`schema` capabilities ship in the CLI first (R2, C9); MCP adopts them later (M5 backlog).
-- **Docs/CI (P9):** tool inventory is generated (M3); integration tests run in CI (M4).
+- **Docs/CI (P7):** tool inventory is generated (M3); integration tests run in CI (M4) — shipped at [P7.05](../P7-mcp-server/05-integration-tests-docs.md).

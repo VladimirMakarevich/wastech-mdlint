@@ -43,7 +43,7 @@ These are two numbers from one date, not a baseline. Re-take both at release tim
 
 ## Exit criteria
 
-- [ ] Full gate green; pack dry-run clean; release dry-run succeeds.
+- [ ] Full gate green; release dry-run succeeds. The pack-dry-run half is **delivered by [P16.03](../P16-release-readiness/03-published-payload.md)** — `release:check` ends in `npm pack --dry-run --workspaces` and `ci.yml`'s `pack` job matrixes the same check per package — so it is measured by running the gate rather than re-tracked here.
 - [ ] End-to-end smoke passes for CLI, MCP, and skills.
 - [ ] **Milestone M4 reached — v2 is ready to tag and publish.**
 

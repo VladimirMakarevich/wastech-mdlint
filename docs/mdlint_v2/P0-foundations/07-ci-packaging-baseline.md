@@ -4,7 +4,7 @@
 
 ## Goal
 
-Make the workspace continuously verified and publish-ready in shape (not yet auto-publishing). Establishes the supply-chain baseline ([I5](../requirements/06-installation.md)); full single-tag release automation is [P9](../index.md).
+Make the workspace continuously verified and publish-ready in shape (not yet auto-publishing). Establishes the supply-chain baseline ([I5](../requirements/06-installation.md)); full single-tag release automation is [P-release](../P-release/index.md).
 
 ## Sequence
 
@@ -21,19 +21,21 @@ Make the workspace continuously verified and publish-ready in shape (not yet aut
 
 1. Update `.github/workflows/ci.yml` to run **across the workspace** on Node 24: `typecheck`, `test`, `build`, `lint`, plus `npm pack --dry-run` per package.
 2. Per-package packaging baseline: `engines.node` (`>=24.17.0`, no upper bound — audit P9 engines gap), `files` allowlists, `publishConfig.access: "public"`, and **npm provenance** on all three (I5).
-3. Keep `publish.yml` as a placeholder; note that **single-tag release** publishing core+cli+mcp and tagging skills together is wired in [P9](../index.md) ([I4](../requirements/06-installation.md)).
+3. Keep `publish.yml` as a placeholder; note that **single-tag release** publishing core+cli+mcp and tagging skills together is wired in [P-release](../P-release/index.md) ([I4](../requirements/06-installation.md)).
 4. Ensure lockfile-based install in CI for reproducibility.
 
 ## Decisions applied
 
-- [I5](../requirements/06-installation.md) supply chain · [I4](../requirements/06-installation.md) release coupling (deferred to P9) · [D1](../index.md) workspace CI.
+- [I5](../requirements/06-installation.md) supply chain · [I4](../requirements/06-installation.md) release coupling (deferred to P-release) · [D1](../index.md) workspace CI.
 
 ## Exit criteria
 
-- [ ] CI runs typecheck/test/build/lint over the whole workspace on Node 24 and is green.
-- [ ] `npm pack --dry-run` is clean for each package and includes only intended files.
-- [ ] Provenance/engines/files set on every package.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- CI runs typecheck/test/build/lint over the whole workspace on Node 24 and is green.
+- `npm pack --dry-run` is clean for each package and includes only intended files.
+- Provenance/engines/files set on every package.
 
 ## Hand-off to next
 
-P0.08 can assert the green workspace-wide check as the phase gate, and P9 inherits a publish-ready package set needing only the release automation.
+P0.08 can assert the green workspace-wide check as the phase gate, and P-release inherits a publish-ready package set needing only the release automation.

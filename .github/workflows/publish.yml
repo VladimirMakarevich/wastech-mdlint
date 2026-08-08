@@ -40,4 +40,4 @@ jobs:
       # --workspaces packs every publishable package (core, cli, mcp-server) in dry-run mode.
       - run: npm pack --dry-run --workspaces
       - name: Release automation pending
-        run: echo "Publish is not automated yet. Single-tag release (core+cli+mcp + skills) lands in P9 (I4)."
+        run: echo "Publish is not automated yet. The single-tag release that publishes core+cli+mcp and tags the skills together is not wired up."

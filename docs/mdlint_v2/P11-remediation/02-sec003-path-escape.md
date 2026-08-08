@@ -1,6 +1,6 @@
 # P11.02 · Stop `SEC-003` reading files outside the analyzed root
 
-> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Done**. Audit finding **H-2** (release-blocking, security, [post-P9 audit](../audit-2026-07-25-post-p9.md)). Staged as [`tasks/pending/p11-02-sec003-path-escape.md`](../../../tasks/pending/p11-02-sec003-path-escape.md).
+> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Done**. Audit finding **H-2** (release-blocking, security, [post-P9 audit](../audit-2026-07-25-post-p9.md)). Staged as `tasks/pending/p11-02-sec003-path-escape.md` (gitignored, so not present in a clone).
 
 ## Goal
 

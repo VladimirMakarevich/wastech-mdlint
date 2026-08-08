@@ -31,9 +31,11 @@ Provide the registry that resolves a config entry into a runnable `Rule`, backed
 
 ## Exit criteria
 
-- [ ] `resolveRule` accepts all ID spellings, emits canonical, validates options.
-- [ ] One metadata object per rule drives registry + (later) schema + docs.
-- [ ] Unknown rule → did-you-mean; bad options → path-prefixed error.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- `resolveRule` accepts all ID spellings, emits canonical, validates options.
+- One metadata object per rule drives registry + (later) schema + docs.
+- Unknown rule → did-you-mean; bad options → path-prefixed error.
 
 ## Hand-off to next
 

@@ -30,9 +30,11 @@ Define the rule-engine contracts that every rule, primitive, and host depends on
 
 ## Exit criteria
 
-- [ ] All engine types compile and are exported from core.
-- [ ] `runRules` throws (not no-ops) on missing `documents` for project rules.
-- [ ] `LintMessage` is a strict superset of the current `Finding` shape.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- All engine types compile and are exported from core.
+- `runRules` throws (not no-ops) on missing `documents` for project rules.
+- `LintMessage` is a strict superset of the current `Finding` shape.
 
 ## Hand-off to next
 

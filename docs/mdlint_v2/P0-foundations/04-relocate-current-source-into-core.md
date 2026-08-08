@@ -30,9 +30,11 @@ Modules to relocate from the current implementation (all currently clean and reu
 
 ## Exit criteria
 
-- [ ] All migrated unit tests pass inside `packages/core`.
-- [ ] `packages/core` builds and exports the public types/functions.
-- [ ] No behavior change vs the current implementation modules (same outputs for same inputs).
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- All migrated unit tests pass inside `packages/core`.
+- `packages/core` builds and exports the public types/functions.
+- No behavior change vs the current implementation modules (same outputs for same inputs).
 
 ## Hand-off to next
 

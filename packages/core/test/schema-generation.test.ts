@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_EXCLUDE_GLOBS } from "../src/config/corpus-scope.js";
+import { DEFAULT_GRP002_ENTRY_POINTS } from "../src/engine/rules/grp.js";
 import { ASSERTION_TARGETS } from "../src/engine/primitives/assert.js";
 import { generateConfigSchema } from "../src/engine/schema.js";
 
@@ -71,11 +72,56 @@ describe("generateConfigSchema", () => {
     );
 
     expect(branch?.properties?.options?.properties?.[key]?.default).toEqual(
-      id === "GRP-002"
-        ? ["README.md", "CLAUDE.md", "AGENTS.md", "index.md"]
-        : true,
+      // Read from the constant rather than re-spelled: the list existed twice, and a test that
+      // restates the value it guards cannot catch the value changing.
+      id === "GRP-002" ? [...DEFAULT_GRP002_ENTRY_POINTS] : true,
     );
     expect(branch?.properties?.options?.required ?? []).not.toContain(key);
+  });
+
+  // The `it.each` above names two of the keys the trap can reach; this covers every one of them,
+  // including `GRP-001.minCycleLength` and the `columnInSet.caseSensitive` that appears under both
+  // the known-custom and generic-custom `assert` branches. Without it, a regression to
+  // `io: "output"` on an unnamed path would surface only as a byte-sync diff — which a regeneration
+  // absorbs without anyone reading it.
+  it("never lists a defaulted property as required, anywhere in the schema", () => {
+    const offenders: string[] = [];
+
+    function walk(node: unknown, pointer: string): void {
+      if (Array.isArray(node)) {
+        node.forEach((item, index) => walk(item, `${pointer}/${index}`));
+        return;
+      }
+      if (node === null || typeof node !== "object") {
+        return;
+      }
+      const record = node as Record<string, unknown>;
+      const properties = record.properties;
+      const required = record.required;
+      if (
+        properties !== null &&
+        typeof properties === "object" &&
+        Array.isArray(required)
+      ) {
+        for (const [name, definition] of Object.entries(
+          properties as Record<string, unknown>,
+        )) {
+          const hasDefault =
+            definition !== null &&
+            typeof definition === "object" &&
+            "default" in (definition as Record<string, unknown>);
+          if (hasDefault && required.includes(name)) {
+            offenders.push(`${pointer}/properties/${name}`);
+          }
+        }
+      }
+      for (const [key, value] of Object.entries(record)) {
+        walk(value, `${pointer}/${key}`);
+      }
+    }
+
+    walk(JSON.parse(generateConfigSchema()), "#");
+    expect(offenders).toEqual([]);
   });
 
   it("declares the JSON Schema dialect but no remote config-schema URL", () => {

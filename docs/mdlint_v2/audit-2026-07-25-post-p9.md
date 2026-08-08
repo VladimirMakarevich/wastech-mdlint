@@ -1,6 +1,8 @@
 # Аудит после P9/P10 — находки, пропущенные отчётом `p9-09`
 
-> **Дата:** 2026-07-25 · **Ветка:** `feat/p9-remediation` · **Охват:** выборочный перепроход по подсистемам, которые отчёт [`docs/research/p9-09-full-solution-deep-audit/report.md`](../research/p9-09-full-solution-deep-audit/report.md) пометил как пройденные, но фактически не читал · **Метод:** независимый разбор прогона `deep_research` + повторный аудит кода с воспроизведением дефектов запуском собранного CLI и движка.
+> **Language / Язык:** this report is in **Russian**, and it is **frozen as written** — it is the definition site for the finding IDs (`H-1` … `L-11`) the [P11](P11-remediation/index.md) and [P12](P12-consistency/index.md) task files are written in, and section 4 is where the four process-boundary guard categories in [`.agents/rules/testing.md`](../../.agents/rules/testing.md) get their justification. Re-wording either would move the vocabulary out from under the plan and the testing rules at once. For readers who need this in English, [Appendix A](#appendix-a-english-finding-index) glosses every finding ID **and** section 4's systemic cause; the Russian body above it is untouched.
+
+> **Дата:** 2026-07-25 · **Ветка:** `feat/p9-remediation` · **Охват:** выборочный перепроход по подсистемам, которые отчёт `docs/research/p9-09-full-solution-deep-audit/report.md` пометил как пройденные, но фактически не читал · **Метод:** независимый разбор прогона `deep_research` + повторный аудит кода с воспроизведением дефектов запуском собранного CLI и движка.
 
 ---
 
@@ -242,3 +244,46 @@ Severity: **HIGH** — ломает поведение/релиз · **MEDIUM** 
 **Потом (MEDIUM):** **M-2** и **M-1** первыми (ложные `error`-findings и краш прогона), затем **M-3**, **M-4**, **M-5**, и парой — **M-6**/**M-7** (контракт кодов возврата и поглощение неизвестной подкоманды; обе бьют по CI одинаково).
 
 **LOW:** брать вместе с соседним MEDIUM в той же подсистеме. Отдельно стоит **L-4** — нулевое e2e-покрытие `exclude` по ~15 правилам; это корень M-2 и самая дешёвая профилактика того же класса.
+
+---
+
+## Appendix A: English finding index
+
+Added by [P17.06](P17-plan-of-record/06-register-and-roadmap.md) so a reader without Russian can resolve an ID the P11/P12 task files cite, and so the systemic cause the testing rules rest on is readable in the language those rules are written in. **This is an index, not a translation:** each row is a one-line gloss, and the Russian entry stays authoritative wherever the two could be read differently. Confidence verdicts, evidence, and file/line citations are in the body.
+
+| ID | Severity | Finding (gloss) |
+| --- | --- | --- |
+| H-1 | HIGH, release-blocking | The published `bin` is a silent no-op through an npm symlink: the entrypoint guard compares `import.meta.url` against an unresolved `process.argv[1]`, so `npx` and a global install do nothing and exit `0`. |
+| H-2 | HIGH, release-blocking + security | `SEC-003` reads arbitrary files outside the analyzed root: an absolute or `..`-climbing `template` is probed on disk, making the option a host file-existence oracle. |
+| H-3 | HIGH, `init` data loss | `findConfig` walks up to the filesystem root, so `init` can adopt and overwrite an unrelated ancestor's config. |
+| H-4 | HIGH, `init` data loss | `init` overwrites an existing `schema.json` with no check and no warning — a filename that collides easily. |
+| M-1 | MEDIUM | `REF-004` substitutes a directory name into a `RegExp` unescaped: an unhandled crash on a name carrying regex metacharacters. |
+| M-2 | MEDIUM | `columnUnique` ignores `exclude` whenever `files` is unset, producing false findings at `error` severity. |
+| M-3 | MEDIUM | `{"rule":"custom"}` with no `id` crashes the config loader with a bare `TypeError`. |
+| M-4 | MEDIUM | The `exclude` `init` writes is root-anchored, so it prunes only the noise at the repository root and leaves a monorepo's nested `dist`/`node_modules` in the corpus. |
+| M-5 | MEDIUM | `init` writes are non-atomic: a failure partway leaves a half-written, undeclared state. |
+| M-6 | MEDIUM | Operational failures exit `1` instead of `2` and print absolute host paths. |
+| M-7 | MEDIUM | An unknown subcommand or a nonexistent path exits `0` with `"No problems found."`. |
+| L-1 | LOW | `CTX-003` loses adjacent alias occurrences: its pattern consumes the boundary characters, so two occurrences one character apart cannot both match, while the guide promises every occurrence. |
+| L-2 | LOW | The glossary makes `custom`'s `target` required; the code, the generated schema, and the guide all treat it as optional. |
+| L-3 | LOW | `LLM-001` emits byte-identical duplicate findings — one per entrypoint — because each traversal reports `missing`/`cycles` independently and nothing deduplicates. |
+| L-4 | LOW | The shared `exclude` option has **zero** end-to-end coverage across eight rule-family test files; the one unit test exercises it only together with `files`. The root cause of M-2. |
+| L-5 | LOW | Quadratic hot paths: `classifyNodes` is called per document and `graph.edges` filtered twice inside it, and `findLineNumber` rescans from offset zero on every match. |
+| L-6 | LOW | `--fix` writes non-atomically and LF-only, so a crash mid-write corrupts a user's Markdown and a CRLF tree ends up with mixed endings. |
+| L-7 | LOW | `init` proposes hidden and **gitignored** trees as doc clusters; `.gitignore` is read nowhere, and the config it writes leaves `respectGitignore` at `false`, so they get linted. |
+| L-8 | LOW | `merge` silently destroys every JSONC comment — acknowledged in a source comment, reported to nobody, while the configuration guide advertises comments as a feature. |
+| L-9 | LOW | Deselecting every cluster interactively inverts into "lint the whole repository": the empty `include` is omitted from the file and the `**/*.md` default applies. The fake prompter always returned every cluster, so the case was untested. |
+| L-10 | LOW | The written `$schema` is a dangling path in the ordinary `npx` case; six tests assert the string and none that its target exists. |
+| L-11 | LOW | A cluster of small ones: `schema --out <relative>` resolves against `process.cwd()` rather than the io-seam `cwd`; `pnpm-workspace.yaml` is truncated at the first blank line; `detectPackageManager` looks only at the root; a helper with no production caller; two CI-workflow refusal paths return `undefined` silently; no top-level rejection handler in `bin`. |
+
+### Section 4 in English — the systemic cause
+
+The `p9-09` report treated each finding as a one-off instead of as a class to sweep, and stopped at the first instance of each:
+
+- it found one inert option (`SC-1`) and stopped — the worse one was in `table.ts` (**M-2**);
+- it found one duplicate-findings problem (`SC-2`) and stopped — the exact duplicates were in `llm.ts` (**L-3**);
+- it found one regex problem (`TP-1`) and stopped — the crash from unescaped substitution was in `ref.ts` (**M-1**), and the lost adjacent matches in `ctx.ts` (**L-1**).
+
+Plus a class of its own: **nothing tested the process boundary.** `src/index.ts` had no coverage at all (H-1), `exclude` had not one end-to-end test (L-4, the root of M-2), no `init` test exercised a write-failure scenario (M-5), and no test spawned the binary. That paragraph is what the four guard categories in [`.agents/rules/testing.md`](../../.agents/rules/testing.md) are the standing answer to.
+
+> `SC-1`, `SC-2`, `TP-1` — and `BL-1`, `OG-1`, `SC-3` where P11/P12 cite them — are defined in the `p9-09` deep-audit report, which was removed from the tree in `d96b64c` and is recoverable from git history. They are not findings of this report; it references them only to show what its predecessor stopped short of.

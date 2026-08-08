@@ -1,6 +1,6 @@
 # Phase P14 — Host boundary remediation (exit codes, validation, error contract)
 
-> Roadmap: [v2 Index](../index.md) · Phase **P14** · Size **M** · Status **Not started** · Depends on [P13](../P13-correctness/index.md) (corpus and rule correctness landed).
+> Roadmap: [v2 Index](../index.md) · Phase **P14** · Size **M** · Status **Done** · Depends on [P13](../P13-correctness/index.md) (corpus and rule correctness landed).
 >
 > **Goal:** close every defect where a **host** — the CLI or the MCP server — turns a real failure into an apparent success, or drops the actionable half of a diagnostic on its way to the surface a human or a model reads. Sourced from the [consolidated remediation backlog](../remediation-backlog-2026-08-05.md), batches **B6–B7**.
 
@@ -44,16 +44,16 @@ Three tasks carry a genuine fork rather than a fix, and each terminates either i
 
 ## Phase exit criteria
 
-- [ ] All five file-based MCP tools reject a nonexistent `cwd` with `INVALID_INPUT` over real stdio (W-18).
-- [ ] `init --on-existing merge`'s refusal exits `2`, proven by a spawned process and tagged `@boundary-guard installed-bin-spawn` (W-13).
-- [ ] An out-of-repo `--outdir` prints something a user can read (W-17).
-- [ ] `init` names, in its summary, how many Markdown files its excludes dropped and why (W-14).
-- [ ] The lint-time hidden-directory exclude is either separated from the scan prune or recorded in [`accepted-behaviors.md`](../accepted-behaviors.md) with W-14's disclosure as its condition (W-15).
-- [ ] All six `--config` call sites agree on one resolution base, or the divergence is in the register **and** in the guide (W-16).
-- [ ] Every MCP error path that carries a `hint` includes it in the text block (W-19).
-- [ ] Schema-level rejections either carry `{code, message}` or the exemption is stated where the contract is documented (W-20).
-- [ ] The operational-error asymmetry between CLI and MCP is closed in the taxonomy or registered, with the caller-visible consequence stated (W-21).
-- [ ] Gates green.
+- [x] All five file-based MCP tools reject a nonexistent `cwd` with `INVALID_INPUT` over real stdio (W-18).
+- [x] `init --on-existing merge`'s refusal exits `2`, proven by a spawned process and tagged `@boundary-guard installed-bin-spawn` (W-13).
+- [x] An out-of-repo `--outdir` prints something a user can read (W-17).
+- [x] `init` names, in its summary, how many Markdown files its excludes dropped and why (W-14).
+- [x] The lint-time hidden-directory exclude is either separated from the scan prune or recorded in [`accepted-behaviors.md`](../accepted-behaviors.md) with W-14's disclosure as its condition (W-15).
+- [x] All six `--config` call sites agree on one resolution base, or the divergence is in the register **and** in the guide (W-16).
+- [x] Every MCP error path that carries a `hint` includes it in the text block (W-19).
+- [x] Schema-level rejections either carry `{code, message}` or the exemption is stated where the contract is documented (W-20).
+- [x] The operational-error asymmetry between CLI and MCP is closed in the taxonomy or registered, with the caller-visible consequence stated (W-21).
+- [x] Gates green.
 
 ## What P14 unblocks
 

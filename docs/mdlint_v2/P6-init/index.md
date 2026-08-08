@@ -44,4 +44,4 @@ The deterministic computation — repo scan (P6.01), rule inference (P6.02), and
 ## What P6 unblocks
 
 - **P8** — the `-init` skill orchestrates this CLI `init` and adds GitHub Actions/README.
-- **P9** — the optional workflow file references the published GitHub Action.
+- **P-release** — the optional workflow file references the published GitHub Action.

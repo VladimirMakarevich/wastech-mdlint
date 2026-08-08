@@ -36,7 +36,7 @@ These five categories are the standing answer. Each names a class of defect that
 | `write-failure` | A write that fails partway leaves no temp file and no half-written target, and the command reports it and exits non-zero instead of claiming success | `packages/core/test/atomic-write.test.ts`, `packages/cli/test/init.e2e.test.ts` |
 | `shared-exclude` | The shared `files`/`exclude` scope stays covered as rules and assert kinds are added, rather than a new one shipping unscoped — and the corpus a resolved scope produces is compared against a tracked-file list in **both** directions, since a total alone cannot see one file dropped and another gained | `packages/cli/test/init.e2e.test.ts`, `packages/cli/test/lint.e2e.test.ts`, `packages/core/test/registry-inventory.test.ts`, `packages/core/test/rules-custom.test.ts` |
 | `determinism` | Output does not depend on evaluation order or on state carried between calls — a `g`-flagged `RegExp`'s `lastIndex` being the case that shipped | `packages/core/test/primitives.test.ts` |
-| `host-parity` | A surface's human rendering and its structured payload describe the same run, and each host's rendering matches the other's. The two sides must come from **different formulations** — the human text parsed back into rows, not recomputed with the renderer's own helper — or the assertion agrees with itself. Added by P16.01: three missed defects (a dropped `hint`, a `--format json` word collision, a summary key present in one format only) all lived where nothing diffed the two documents a single call returns | `packages/cli/test/lint.e2e.test.ts`, `packages/mcp-server/test/context-graph.test.ts`, `packages/mcp-server/test/host-parity.test.ts`, `packages/mcp-server/test/lint-files.test.ts`, `packages/mcp-server/test/lint.test.ts` (readers: `packages/core/test/support/output-parity.ts`) |
+| `host-parity` | A surface's human rendering and its structured payload describe the same run, and each host's rendering matches the other's. The two sides must come from **different formulations** — the human text parsed back into rows, not recomputed with the renderer's own helper — or the assertion agrees with itself. Added by P16.01: three missed defects (a dropped `hint`, a `--format json` word collision, a summary key present in one format only) all lived where nothing diffed the two documents a single call returns | `packages/cli/test/graph.e2e.test.ts`, `packages/cli/test/lint.e2e.test.ts`, `packages/mcp-server/test/context-graph.test.ts`, `packages/mcp-server/test/host-parity.test.ts`, `packages/mcp-server/test/lint-files.test.ts`, `packages/mcp-server/test/lint.test.ts` (readers: `packages/core/test/support/output-parity.ts`) |
 
 Rules for keeping this honest:
 
@@ -44,6 +44,18 @@ Rules for keeping this honest:
 - That marker is the carve-out to the self-contained-comment rule in `.agents/rules/coding-style.md`, not an exception to it: it is parsed by a test, so it is program input that happens to use comment syntax. Everything else a test's comments say obeys the same rule as product code — describe the defect the guard exists to catch and what a green run therefore proves, never the audit round, backlog item, or task file that asked for it.
 - Adding a category here means adding it to that inventory too, and vice versa. Be aware which half of that pairing a test can hold: the inventory pins its own category set, so growing it fails until the author updates that list — which points back at this table — but the inventory does not parse this file, so a row added here alone fails nothing. Keeping this table honest is discipline, not enforcement, and it is the direction in which the table could start claiming coverage the tree no longer has.
 - Behaviors a task decides to accept rather than guard belong in the [accepted behaviors register](../../docs/mdlint_v2/accepted-behaviors.md), not in an untested gap.
+
+## Guards over the repository's own documents
+
+Three suites read this repository's Markdown rather than a fixture, and each answers a question no product test can. They are not process-boundary guards — the five categories above are a closed set about the process boundary — but they follow the same rule: a document that drifts fails a test rather than being noticed a phase later.
+
+| Guard | What it proves |
+| --- | --- |
+| `packages/core/test/docs-sync.test.ts` | Generated documentation (the README rule table, the schema) still matches what the registry declares. |
+| `packages/core/test/plan-completion-surface.test.ts` | A phase index's status is the one its task files add up to, and no `Done` file leaves an open checkbox. Status is read from the header blockquote only, so a prose quotation cannot supply one. |
+| `packages/core/test/doc-citations.test.ts` | A precedence-tier document does not cite a function, export or constant that is absent from `packages/*/src`. Scoped to `docs/mdlint_v2/decisions/` and `docs/mdlint_v2/requirements/`; a document joins that corpus once a run over it already reports zero, the same way a rule joins the self-lint config. Citations that name something absent on purpose live in one allowlist and each carry a reason. |
+
+`npm run lint:docs` is the fourth, and the only one outside Vitest: it runs this tool over its own docs corpus and catches a broken link or anchor.
 
 ## Cross-Platform Expectations
 

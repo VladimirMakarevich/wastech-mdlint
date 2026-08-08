@@ -1,6 +1,6 @@
 # P11.01 · Fix the CLI `bin` no-op through the npm symlink
 
-> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Done**. Audit finding **H-1** (release-blocking, [post-P9 audit](../audit-2026-07-25-post-p9.md)). Staged as [`tasks/pending/p11-01-cli-bin-noop.md`](../../../tasks/pending/p11-01-cli-bin-noop.md).
+> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Done**. Audit finding **H-1** (release-blocking, [post-P9 audit](../audit-2026-07-25-post-p9.md)). Staged as `tasks/pending/p11-01-cli-bin-noop.md` (gitignored, so not present in a clone).
 
 ## Goal
 

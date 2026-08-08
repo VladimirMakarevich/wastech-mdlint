@@ -34,9 +34,9 @@ P-release turns three working packages + three skills into a shippable release. 
 
 - [ ] Each package has correct bins/exports/`files`/`engines`/`publishConfig` + provenance (I5).
 - [ ] One `vX.Y.Z` tag publishes core+cli+mcp and tags the skills together (I4); skill `compatibility` matches the CLI version (I7).
-- [ ] A reusable GitHub Action is published on top of the existing `ci.yml`/`publish.yml` baseline; CI runs the full workspace gate on the pinned Node 24 line (single version via `.node-version`; the `pack` job matrixes the three packages) (I6).
+- [ ] A reusable GitHub Action is published on top of the existing `ci.yml`/`publish.yml` baseline (I6). **The workspace gate half is already delivered and not re-tracked here** — `ci.yml`'s `verify` job runs the full gate on the pinned Node 24 line via `.node-version`, and its `pack` job matrixes `npm pack --dry-run` over the three packages; that half sits ticked at [P0](../P0-foundations/index.md) and is measured by running the gate. Only the composite Action itself ([P-release/03](03-github-action.md)) is open.
 - [ ] README documents the three install paths; the rule table is generated (already) and a new generated MCP tool list is added.
-- [ ] `npm pack --dry-run` clean per package; end-to-end smoke (CLI + MCP + skill) passes.
+- [ ] End-to-end smoke (CLI + MCP + skill) passes. **Pack-clean per package is no longer asserted here** — [P16.03](../P16-release-readiness/03-published-payload.md) put `npm pack --dry-run --workspaces` at the end of `release:check` and gave `ci.yml` a `pack` job that matrixes `npm pack --dry-run -w <package>` over all three, so it is measured by running the gate. Leaving it in this row kept it reading as open work while the same subject sat ticked at [P0](../P0-foundations/index.md), which is exactly the two-levels-disagreeing failure the [completion surface](../completion-surface.md) exists to stop.
 - [ ] **Milestone M4 (launch) reached.**
 
 ## What P-release unblocks

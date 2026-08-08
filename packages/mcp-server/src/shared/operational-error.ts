@@ -46,11 +46,13 @@ function errnoPath(error: unknown): string | undefined {
  * machine contract.
  *
  * **Containment is stricter than the CLI's.** A `../` chain or (across Windows drives) an outright
- * absolute path is refused here instead of rendered, because "no payload names a host path *outside*
- * the analyzed directory" is the property MCP's sanitization exists for, and it outweighs naming a
- * file outside the analyzed root. That directory itself is the one absolute path any payload carries,
- * and only in the `INVALID_INPUT` message (`tool-context.ts`), where the value is the caller's
- * own `cwd` and is the broken thing being reported. The CLI keeps the `../` form on purpose (see
+ * absolute path is refused here instead of rendered, because "no payload names a host path the
+ * caller did not itself *supply*" is the property MCP's sanitization exists for, and it outweighs
+ * naming a file outside the analyzed root. Two caller-supplied paths do come back: the `cwd`, in the
+ * `INVALID_INPUT` message (`tool-context.ts`), where the value is the caller's own and is the broken
+ * thing being reported; and a `configPath`, which core renders relative to `cwd` with no containment
+ * check of its own. What this function must not do is add a *third* — a path the run discovered
+ * rather than the caller named. The CLI keeps the `../` form on purpose (see
  * `operational-errors.ts`); the two hosts differ here by decision, which is why this is not that
  * function.
  *

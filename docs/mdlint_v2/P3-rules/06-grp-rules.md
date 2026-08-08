@@ -33,8 +33,10 @@ Implement the three graph-integrity rules to reach lint parity. GRP-001/002 **co
 
 ## Exit criteria
 
-- [ ] GRP-001/002/003 pass unit + fixture tests (cycles, orphans, broken chains).
-- [ ] Cycle reports are de-duplicated and attributed.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- GRP-001/002/003 pass unit + fixture tests (cycles, orphans, broken chains).
+- Cycle reports are de-duplicated and attributed.
 
 ## Hand-off to next
 

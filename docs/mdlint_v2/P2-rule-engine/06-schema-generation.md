@@ -45,9 +45,11 @@ Freeze the name, parameters, and return type before P6.04 starts; changes after 
 
 ## Exit criteria
 
-- [ ] `schema.json` is generated, not hand-written; sync test green.
-- [ ] Schema validates built-in rules and the generic `custom` shape.
-- [ ] `wastech-mdlint schema` writes a local project schema; no remote URL anywhere.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- `schema.json` is generated, not hand-written; sync test green.
+- Schema validates built-in rules and the generic `custom` shape.
+- `wastech-mdlint schema` writes a local project schema; no remote URL anywhere.
 
 ## Hand-off to next
 

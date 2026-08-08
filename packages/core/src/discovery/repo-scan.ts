@@ -42,6 +42,12 @@ export type DocCluster = {
 /**
  * Why the Markdown walk refused to descend into a directory. `"noise"` and `"hidden"` come straight
  * from `classifyPrunedDirName`; `"gitignored"` is the third prune the walk applies itself.
+ *
+ * Exactly one reason per directory, and the order the walk tests them is the tie-break: `"noise"`
+ * first (never descended into, in either mode), then `"gitignored"`, then `"hidden"`. So a directory
+ * that is both gitignored and hidden is disclosed as gitignored — the class whose remedy actually
+ * works, since the include pattern the hidden line suggests is defeated by the `respectGitignore:
+ * true` a fresh `init` config writes.
  */
 export type PrunedDirectoryReason = "hidden" | "noise" | "gitignored";
 
@@ -188,6 +194,19 @@ async function collectMarkdownFiles(
           continue;
         }
 
+        // Before the `hidden` branch, so a directory that is *both* is disclosed as `gitignored`.
+        // The other order classified it as `hidden` and offered the include pattern that fits that
+        // class — advice a fresh `init` config defeats, because it writes `respectGitignore: true`,
+        // and the directory was then never named on the gitignored line either, so the user was not
+        // told why the pattern did nothing. It also tightens the count walk's bound: a gitignored
+        // hidden tree is skipped rather than recursively sized.
+        if (isGitIgnored(relPath, true, layers)) {
+          if (mode === "collect") {
+            pruned.push({ path: relPath, reason: "gitignored" });
+          }
+          continue;
+        }
+
         if (classification === "hidden") {
           const hiddenCount = await walk(childPath, relPath, layers, "count");
           if (mode === "collect") {
@@ -200,13 +219,6 @@ async function collectMarkdownFiles(
             // Already inside a recorded hidden root: this subtree is part of that root's total, not
             // a second entry to disclose.
             markdownCount += hiddenCount;
-          }
-          continue;
-        }
-
-        if (isGitIgnored(relPath, true, layers)) {
-          if (mode === "collect") {
-            pruned.push({ path: relPath, reason: "gitignored" });
           }
           continue;
         }

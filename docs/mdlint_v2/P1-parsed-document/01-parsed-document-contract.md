@@ -41,9 +41,11 @@ Document which field feeds which consumer (rule primitive / graph edge / directi
 
 ## Exit criteria
 
-- [ ] `ParsedDocument` type exported from core and compiles.
-- [ ] Every consumer field above is present with positions.
-- [ ] A short field→consumer mapping is documented (in code comments or this file).
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- `ParsedDocument` type exported from core and compiles.
+- Every consumer field above is present with positions.
+- A short field→consumer mapping is documented (in code comments or this file).
 
 ## Hand-off to next
 

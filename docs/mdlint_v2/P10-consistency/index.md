@@ -1,6 +1,6 @@
 # Phase P10 — Post-Audit Consistency (docs, contracts, tests)
 
-> Roadmap: [v2 Index](../index.md) · Phase **P10** · Size **S–M** · Status **Not started** · Depends on [P9](../P9-remediation/index.md) (code remediation landed).
+> Roadmap: [v2 Index](../index.md) · Phase **P10** · Size **S–M** · Status **Done** · Depends on [P9](../P9-remediation/index.md) (code remediation landed).
 >
 > **Goal:** close the **documentation drift**, **contract-text**, and **test-guard** findings from the [P0–P8 audit](../audit-2026-07-23-p0-p8.md), so governance docs, the glossary, requirements, and the test suite describe the _current_ product — before release.
 
@@ -38,13 +38,13 @@ The audit found no HIGH defects, but several docs and rule-docs describe an earl
 
 ## Phase exit criteria
 
-- [ ] `AGENTS.md` / `.agents/rules/architecture.md` describe the post-P3.09 layout (no root `src/`/`test/`); typo fixed.
-- [ ] `glossary.md` phase-status markers reflect that P6/P7/P8 shipped.
-- [ ] No stale `CHK-*` reference or "not yet config-driven — P2 wires" comment remains in source.
-- [ ] A single test pins the shipped registry to the documented 24 rule IDs / 8 categories.
-- [ ] Parser (P1.06) and thin per-rule test gaps are filled.
-- [ ] Requirement texts (R7, M1 table, P5.04 schema-location) agree with the shipped code.
-- [ ] Accepted behaviors (dangling reference links; skill `compatibility` coupling) are documented, with the version check tracked for P-release.
+- [x] `AGENTS.md` / `.agents/rules/architecture.md` describe the post-P3.09 layout (no root `src/`/`test/`); typo fixed.
+- [x] `glossary.md` phase-status markers reflect that P6/P7/P8 shipped.
+- [x] No stale `CHK-*` reference or "not yet config-driven — P2 wires" comment remains in source.
+- [x] A single test pins the shipped registry to the documented 24 rule IDs / 8 categories.
+- [x] Parser (P1.06) and thin per-rule test gaps are filled.
+- [x] Requirement texts (R7, M1 table, P5.04 schema-location) agree with the shipped code.
+- [x] Accepted behaviors (dangling reference links; skill `compatibility` coupling) are documented, with the version check tracked for P-release.
 
 ## What P10 unblocks
 

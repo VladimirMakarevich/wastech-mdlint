@@ -157,6 +157,38 @@ describe("renderContextGraphText", () => {
     expect(lines).toContain("excluded from reading order (2):");
     expect(lines).toContain("  a.md");
     expect(lines).toContain("  b.md");
+    // Both members are the cycle, so the split degrades to the whole-set sentence rather than
+    // claiming "2 of the 2 … the other 0".
+    expect(lines).toContain("all 2 documents below sit in a cycle.");
+  });
+
+  it("separates the documents in a cycle from the ones only downstream of it", () => {
+    // The ratio is what a reader acts on, and it is the opposite of what the flat list suggests:
+    // one mutual link between `a` and `b` excludes four documents, of which two are the cycle and
+    // two are hostages that come back the moment the link is broken. Measured on this repository's
+    // own corpus the same shape reads 2 against 228.
+    const graph = graphOf({
+      "a.md": "[b](b.md)\n",
+      "b.md": "[a](a.md)\n[c](c.md)\n",
+      "c.md": "[d](d.md)\n",
+      "d.md": "# D\n",
+    });
+
+    const lines = renderContextGraphText(graph).split("\n");
+
+    expect(lines).toContain("excluded from reading order (4):");
+    expect(lines).toContain(
+      "2 of the 4 documents below sit in a cycle; the other 2 are reachable only through one, " +
+        "so breaking the cycles places them all.",
+    );
+  });
+
+  it("says nothing about causes when nothing is excluded", () => {
+    const rendered = renderContextGraphText(
+      graphOf({ "a.md": "[b](b.md)\n", "b.md": "# B\n" }),
+    );
+
+    expect(rendered).not.toContain("sit in a cycle");
   });
 
   it("appends the coverage signal when a GraphCoverage is supplied", () => {

@@ -2,19 +2,19 @@
 
 > **Status:** Draft for review · **Owner:** TBD · **Created:** 2026-06-21
 >
-> This document is the top-level roadmap for turning the current single-package implementation into the production-ready target product. It defines the gap, the target architecture, the phased plan, and the decisions we confirmed before deep work. Each phase has its own detailed folder under `docs/mdlint_v2/` (meta `index.md` + numbered task files), the same way [docs/plan/](../plan/00-meta-plan.md) broke v1 into 16 tasks.
+> This document is the top-level roadmap for turning the current single-package implementation into the production-ready target product. It defines the gap, the target architecture, the phased plan, and the decisions we confirmed before deep work. Each phase has its own detailed folder under `docs/mdlint_v2/` (meta `index.md` + numbered task files).
 
 ---
 
 ## 1. TL;DR
 
-The current implementation ([PLAN.md](../PLAN.md)) shipped a **single-package CLI** with two commands (`scan`, `graph`) and five hardcoded checks (size, broken links, orphan docs, eager imports, context budget). It is clean and well-factored, but its config model and rule model are **fundamentally different** from the target product.
+The current implementation — v1, described by a root `PLAN.md` that was deleted in `957a1ca` and is recoverable from git history — shipped a **single-package CLI** with two commands (`scan`, `graph`) and five hardcoded checks (size, broken links, orphan docs, eager imports, context budget). It is clean and well-factored, but its config model and rule model are **fundamentally different** from the target product.
 
 The target is a substantially larger product (**`wastech-mdlint`**):
 
 - a **`@wastech-mdlint/core`** engine with a **registry of 22 built-in schema-validated doc-integrity rules** across 6 categories (`TBL`, `SEC`, `STR`, `REF`, `CTX`, `GRP`), plus `SIZE-001` and `LLM-001` (their own categories) and the declarative `custom` rule — **24 registered built-ins across 8 categories** in total (there is no `CHK` category; checklist completeness is `CTX-002`);
 - a richer **`ParsedDocument`** (tables, sections, checklists, images) and a **`ContextGraph`** with `slice` / `impact` / `topological-sort` / `components`;
-- a **`@wastech-mdlint/cli`** with `lint` (default) · `init` · `graph` · `slice` · `impact` · `compile`;
+- a **`@wastech-mdlint/cli`** with `lint` (default) · `init` · `graph` · `slice` · `impact` · `compile` · `schema` — seven, including the `schema` command that writes the config JSON schema to a local file, mandated by [P2.06](P2-rule-engine/06-schema-generation.md) deliverable 4 and by requirement [C9](requirements/01-configuration.md);
 - a **`@wastech-mdlint/mcp-server`** exposing 6 deterministic tools over stdio;
 - a **context compiler** that generates a project-specific `SKILL.md`;
 - **3 hand-authored Agent Skills** (`-init`, `-fix`, `-impact`) distributed via agentskills.io;
@@ -80,11 +80,13 @@ Adopt the **core-hosts-the-pipeline** model ([core-hosts-the-pipeline](decisions
 @wastech-mdlint/core        ← parser, ParsedDocument, ContextGraph, rule engine,
                                  registry (22 built-in rules + SIZE/LLM + custom), config,
                                  compiler, formatters
-        ├── @wastech-mdlint/cli         ← commander: lint|init|graph|slice|impact|compile
+        ├── @wastech-mdlint/cli         ← commander: lint|init|graph|slice|impact|compile|schema
+        │      └── schema.json          ← JSON Schema mirror of the config (editor + CI sync test),
+        │                                  shipped inside the CLI package so `$schema` can be a
+        │                                  relative local path into node_modules (C9)
         ├── @wastech-mdlint/mcp-server  ← stdio: 6 tools
         └── (optional) @wastech-mdlint/lsp-server   ← stretch / out of v2 scope
 skills/                       ← wastech-mdlint-{init,fix,impact}/SKILL.md (agentskills.io)
-schema.json                   ← JSON Schema mirror of the config (editor + CI sync test)
 ```
 
 This requires moving from a single package to a **workspace/monorepo** (npm workspaces). See Decision D1. Naming throughout: bins `wastech-mdlint` and `wastech-mdlint-mcp`, config `wastech-mdlint.config.json`, org/repo `VladimirMakarevich/wastech-mdlint` (replace any leftover `contextlint` or placeholder-org strings from early drafts).
@@ -103,7 +105,7 @@ Pivotal forks that shape the roadmap. **D1–D3 and the milestone order were con
 | **Order** ✅ | **What ships first after the foundation.** | **Lint parity first** — P3 (all 22 built-in rules + the LLM rules) before graph/agents. M1→M2 is the priority path. |
 | **D4** ✅ | **`scan` command.** The current CLI uses `scan`; target uses `lint` (default). | **Default to `lint`, keep `scan` as a hidden alias** for one minor version, then deprecate. |
 | **D5** ✅ | **CLI framework.** | **Adopt `commander` + `@inquirer/prompts`** (matches reference, needed for `init`'s interactive flow). |
-| **D6** ✅ | **LSP server** (`lsp-server/config-loader.ts` in the spec). | **Out of v2 scope** (stretch). Keep `core` LSP-friendly (sync, no `process.exit` in library code). |
+| **D6** ✅ | **LSP server** (`lsp-server/config-loader.ts` in the spec). | **Out of v2 scope** (stretch). Keep `core` LSP-friendly (no `process.exit` in library code, typed errors, one awaited pipeline). |
 | **D7** ✅ | **Docs site** (reference ships Astro/Starlight). | **Out of v2 core scope**; README + schema + skills suffice for launch. |
 
 ---
@@ -116,9 +118,9 @@ A point-by-point requirements pass (2026-06-21) locked the v2 improvements. Thes
 
 Each phase is an epic detailed in its own folder (meta `index.md` + numbered task files, each with an explicit prev/next/depends/blocks chain). Effort is a rough T-shirt size (S < 2d, M ≈ 2–5d, L > 5d). "Reuse" = how much current implementation code carries over.
 
-**Detailed task plans:** [P0 Foundations](P0-foundations/index.md) · [P1 ParsedDocument](P1-parsed-document/index.md) · [P2 Rule engine](P2-rule-engine/index.md) · [P3 Rules](P3-rules/index.md) · [P4 Graph](P4-graph/index.md) · [P5 Compile](P5-compile/index.md) · [P6 init](P6-init/index.md) · [P7 MCP server](P7-mcp-server/index.md) · [P8 Skills](P8-skills/index.md) · [P9 Remediation](P9-remediation/index.md) · [P10 Consistency](P10-consistency/index.md) · [P11 Post-P9 Remediation](P11-remediation/index.md) · [P12 Post-P9 Consistency](P12-consistency/index.md) · [P13 Correctness](P13-correctness/index.md) · [P14 Host boundary](P14-host-boundary/index.md) · [P15 Output contracts](P15-output-contracts/index.md) · [P16 Release readiness](P16-release-readiness/index.md) · [P17 Plan of record](P17-plan-of-record/index.md) · [P-release Release](P-release/index.md)
+**Detailed task plans:** [P0 Foundations](P0-foundations/index.md) · [P1 ParsedDocument](P1-parsed-document/index.md) · [P2 Rule engine](P2-rule-engine/index.md) · [P3 Rules](P3-rules/index.md) · [P4 Graph](P4-graph/index.md) · [P5 Compile](P5-compile/index.md) · [P6 init](P6-init/index.md) · [P7 MCP server](P7-mcp-server/index.md) · [P8 Skills](P8-skills/index.md) · [P9 Remediation](P9-remediation/index.md) · [P10 Consistency](P10-consistency/index.md) · [P11 Post-P9 Remediation](P11-remediation/index.md) · [P12 Post-P9 Consistency](P12-consistency/index.md) · [P13 Correctness](P13-correctness/index.md) · [P14 Host boundary](P14-host-boundary/index.md) · [P15 Output contracts](P15-output-contracts/index.md) · [P16 Release readiness](P16-release-readiness/index.md) · [P17 Plan of record](P17-plan-of-record/index.md) · [P18 Follow-up burn-down](P18-followup-burndown/index.md) · [P-release Release](P-release/index.md)
 
-**Reference:** [Glossary](glossary.md) — the canonical vocabulary (public types, config keys, CLI/MCP surfaces, rule IDs, and this planning taxonomy) used across these docs · [Accepted behaviors](accepted-behaviors.md) — the register of behaviors deliberately documented rather than fixed, and the residuals recorded rather than closed.
+**Reference:** [Glossary](glossary.md) — the canonical vocabulary (public types, config keys, CLI/MCP surfaces, rule IDs, and this planning taxonomy) used across these docs · [Accepted behaviors](accepted-behaviors.md) — the register of behaviors deliberately documented rather than fixed, and the residuals recorded rather than closed · [Completion surface](completion-surface.md) — how "done" is recorded: who ticks a task's exit criteria and a phase index's status, and when a criterion is retired instead.
 
 ### Phase 0 — Workspace & foundations · `M` · depends on: D1, D5
 
@@ -235,7 +237,7 @@ Each phase is an epic detailed in its own folder (meta `index.md` + numbered tas
 
 ### Phase 11 — Post-P9 audit remediation (code) · `M–L` · depends on: P10 · reuse: n/a
 
-**Goal:** close the code-level **release-blocking**, **security**, **correctness**, and **data-loss** defects from the [post-P9 audit](audit-2026-07-25-post-p9.md) and the confirmed rule defects from the [`p9-09` deep audit](../research/p9-09-full-solution-deep-audit/report.md). See [P11 tasks](P11-remediation/index.md).
+**Goal:** close the code-level **release-blocking**, **security**, **correctness**, and **data-loss** defects from the [post-P9 audit](audit-2026-07-25-post-p9.md) and the confirmed rule defects from the `p9-09` deep audit, whose report was removed from the tree in `d96b64c`. See [P11 tasks](P11-remediation/index.md).
 
 - Two **release-blockers first**: the CLI `bin` no-op through the npm symlink (H-1) and `SEC-003` reading files outside the analyzed root (H-2).
 - `init` data-loss guards: bounded `findConfig` walk-up (H-3) and an existing-`schema.json` guard (H-4).
@@ -302,9 +304,19 @@ Each phase is an epic detailed in its own folder (meta `index.md` + numbered tas
 - **The highest-leverage item in the backlog:** this repository has no configuration of its own, so nothing runs the product on its own corpus. The 17 dead links below were all found by `REF-001` in one run, once a config was supplied from outside the repo — and adding one closes a plan expectation (I8) rather than reversing a decision.
 - Precedence-tier defects first: the one "Accepted (enforced)" ADR names three APIs that do not exist and prohibits the async pipeline that shipped, with the glossary repeating the load-bearing half; two dependency-register entries claim more than the code delivers.
 - Completion surface: 92 unchecked criteria across 30 `Done` task files while their indexes are ticked, and 33 unchecked index criteria across five phases whose task files all read Done — one of those boxes being permanently unverifiable.
-- Sweeps: 17 dead links, `PLAN.md`/`docs/plan/` referenced but absent, 19 stale release-sense `P9` lines (7 in the plan, 11 in shipped artifacts and CI — three of them published skill frontmatter — plus `README.md:34`), and the register's own three contract breaches.
+- Sweeps: 17 dead links, `PLAN.md`/`docs/plan/` referenced but absent, every stale release-sense `P9` line — across the plan, three published skill frontmatter strings, and a CI log line users read — and the register's own three contract breaches.
 - **Maps to:** backlog batches B12–B13 (W-41 – W-53).
 - **Exit:** CI fails on a dead link in `docs/`; every precedence tier describes the shipped code; the completion-surface question is decided, not just actioned.
+
+### Phase 18 — Follow-up burn-down · `M` · depends on: P17 · reuse: n/a
+
+**Goal:** close the small defects the P13–P17 rounds recorded rather than fixed, and stop the class that produced them. See [P18 tasks](P18-followup-burndown/index.md).
+
+- **Not a new audit.** The source is the orchestrator's own accumulated follow-up file, which twenty finished tasks appended to as they ran: 95 entries, deduplicated to 75 distinct items and each checked against the tree on 2026-08-07. Thirty-three were already closed by a later round's docs pass — recorded in the phase index so nobody re-opens them — and 42 are live.
+- Grouped by the surface each item touches rather than by the task that found it: nine entries named the glossary, five `compile/synthesize.ts`, four `config-reference.md`. Cutting by origin would open one file in six tasks.
+- Fifty-five of the 75 items are one defect class — a documentation claim that outran the code, written by the very task that wrote the document. [P18.09](P18-followup-burndown/09-doc-citation-guard.md) is the only item that addresses the cause: a guard for a code span naming an export that does not exist, which the dead-link gate cannot see.
+- Two items were deferred to tasks that have since closed without them, which is why the queue needed a tracked home at all rather than a second deferral.
+- **Exit:** every live item is fixed or recorded as deliberate; the queue file holds only open entries; the citation guard reports zero over its declared corpus and is blocking.
 
 ### Phase P-release — Distribution, CI & release · `M` · depends on: all (incl. P9–P17) · reuse: Medium
 
@@ -368,12 +380,14 @@ Recommended milestones:
 - Incremental/cached graph rebuilds.
 - Runtime TypeScript config files.
 
+Work that is shaped and measured but deliberately not scheduled lives in [`backlog/`](backlog/index.md), one file per item, with the rule for what goes in and how an item leaves stated there. It is not this list: out of scope means "not this product version", backlog means "decided, costed, waiting".
+
 ---
 
 ## 10. Next steps
 
 1. ✅ **Decisions D1–D3 + milestone order confirmed** (§5). D4–D7 default-resolved.
-2. **Expand the critical-path phases into `docs/mdlint_v2/NN-*.md` task files** (mirroring the v1 `docs/plan/` granularity), in this order:
+2. ✅ **Expand the critical-path phases into per-task files** — what shipped is one file per task inside the phase's own directory, `docs/mdlint_v2/P<N>-<name>/NN-<task>.md`, beside its `index.md`. This item read "mirroring the v1 `docs/plan/` granularity" until [P18.06](P18-followup-burndown/06-plan-residue.md): `docs/plan/` was never tracked in this repository (`git log --all -- docs/plan` is empty), so there was no granularity to mirror. The order the expansion followed:
    - **P0** — workspace/monorepo bootstrap (gates everything);
    - **P2** — rule engine + new config model (the engine core);
    - **P3** — the 22 built-in rules + the two preserved LLM rules (the lint-parity milestone, M2). P1/P4 can be detailed in parallel once P0 is drafted.

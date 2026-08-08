@@ -157,11 +157,22 @@ describe("lintFiles orchestration", () => {
 
   // The corpus half, one layer below the CLI guard: `lintFiles` resolves the lint-time
   // default `exclude` itself, so no host has to remember to pass one.
+  // The end-to-end half of what `corpus-scope.test.ts` pins at the matcher. Both directions of the
+  // default are here, because they are one decision read two ways: a dependency or build tree is
+  // pruned by *name* at any depth, and a dot-directory that is neither is linted — dot-directories
+  // held 31% of a real target's tracked Markdown, which is why excluding by shape was rejected for
+  // the lint corpus while the `init` scan keeps it. A matcher-level assertion cannot see the wiring
+  // between `resolveCorpusScope` and the walk, so a shape-based default reintroduced there would
+  // have been caught for `node_modules` alone.
   it("prunes the default noise trees when the config names no exclude", async () => {
     const cwd = await fixtureRepo({
       "docs/a.md": "# A\n",
       "mobile/node_modules/leftpad/README.md": "# leftpad\n",
       "node_modules/rightpad/README.md": "# rightpad\n",
+      // Hidden and a dependency tree: excluded, but for the second reason.
+      ".venv/lib/site-packages/README.md": "# venv\n",
+      // Hidden and neither: linted.
+      ".github/PR.md": "# PR\n",
     });
 
     const result = await lintFiles({
@@ -171,7 +182,7 @@ describe("lintFiles orchestration", () => {
       settings: {},
     });
 
-    expect(result.files).toEqual(["docs/a.md"]);
+    expect(result.files).toEqual([".github/PR.md", "docs/a.md"]);
   });
 
   // The case that would silently regress if a user `exclude` *replaced* the default instead of
