@@ -47,4 +47,4 @@
 - **Rule engine (R2/R6):** `--fix` powers S8; `describeRules` reads the rule-metadata source and must describe custom rules too.
 - **Budget (D3):** estimator feeds S6.
 - **MCP (P7):** `compile-context` returns the same deterministic content (S4) and respects the command preset (S2).
-- **CI (P9):** validates static skills against the frontmatter schema (S1) and the unified skill model (S5).
+- **CI (P8):** validates static skills against the frontmatter schema (S1) and the unified skill model (S5) — shipped at [P8.05](../P8-skills/05-skills-validation.md).

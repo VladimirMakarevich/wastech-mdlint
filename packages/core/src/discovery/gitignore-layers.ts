@@ -18,6 +18,16 @@ import ignore, { type Ignore } from "ignore";
  * reverse — the reversal *is* git's precedence rule, so a caller that hands over a differently
  * ordered array gets a differently ordered precedence.
  */
+/**
+ * One `.gitignore` file's rules, plus the repo-relative directory they are anchored to.
+ *
+ * Two constraints on a producer, both relied on by `isGitIgnored`. The array of layers must be
+ * ordered shallowest-first, because precedence is resolved by walking it from the end. And a layer's
+ * `ig` must not be mutated — via `ig.add(...)` or otherwise — after the layer is first queried:
+ * ancestor-neutralized copies of it are memoized under its object identity, so later additions would
+ * be invisible to every cached answer. Both current producers build a fresh `Ignore` per directory
+ * per walk, which satisfies this by construction.
+ */
 export type IgnoreLayer = { baseRel: string; ig: Ignore };
 
 /**

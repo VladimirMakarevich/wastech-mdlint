@@ -30,9 +30,11 @@ Build the shared utilities every rule reuses, so the rule tasks (P3.02–P3.07) 
 
 ## Exit criteria
 
-- [ ] Each util has unit tests.
-- [ ] `site-router` resolves Starlight routes (locales, urlPrefix, indexFile) to file paths.
-- [ ] `glob-match` honors `dot: true` and the shared scoping semantics.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- Each util has unit tests.
+- `site-router` resolves Starlight routes (locales, urlPrefix, indexFile) to file paths.
+- `glob-match` honors `dot: true` and the shared scoping semantics.
 
 ## Hand-off to next
 

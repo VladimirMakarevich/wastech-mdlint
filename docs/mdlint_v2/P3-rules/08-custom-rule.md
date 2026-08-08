@@ -32,9 +32,11 @@ Expose the primitive vocabulary directly to config as a `custom` rule so teams a
 
 ## Exit criteria
 
-- [ ] A `custom` rule defined purely in config runs and reports findings, no rebuild.
-- [ ] Custom IDs are validated and cannot shadow built-ins.
-- [ ] `custom` validates against the generated schema.
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- A `custom` rule defined purely in config runs and reports findings, no rebuild.
+- Custom IDs are validated and cannot shadow built-ins.
+- `custom` validates against the generated schema.
 
 ## Hand-off to next
 

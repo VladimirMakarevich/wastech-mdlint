@@ -88,6 +88,45 @@ function pushPathList(
   }
 }
 
+/**
+ * One prose line above the excluded list, splitting it into the two documented causes by count.
+ *
+ * The list alone is close to unreadable at scale, and not because it is long: on this repository's
+ * own 231-document corpus a single two-file mutual link excludes 230, of which **two** are the cycle
+ * and 228 are only downstream of it. A reader who cannot see that ratio has 230 candidates to act on
+ * instead of one link to fix, and the actionable pair is the part that gets lost.
+ *
+ * Counts rather than a per-node label, and on its own line rather than inside the header. The header
+ * is `label (N):` with a bare count, which is the contract the human-versus-structured parity reader
+ * parses — text inside those parentheses would make the section invisible to it, and a section that
+ * silently drops out of the parity comparison is the exact drift that guard exists to catch. Per-node
+ * attribution is a wider change (it feeds four surfaces including a byte-contract artifact) and is
+ * scoped separately in `docs/mdlint_v2/backlog/`.
+ *
+ * Cycle membership comes from the Tarjan pass the graph already ran, so this costs a set build and a
+ * filter — no second traversal, and no widening of `topologicalSort`'s result.
+ */
+function summarizeExclusionCauses(
+  graph: ContextGraph,
+  excluded: readonly string[],
+): string {
+  const inCycle = new Set(graph.cycles.flat());
+  const cycleMembers = excluded.filter((path) => inCycle.has(path)).length;
+  const downstream = excluded.length - cycleMembers;
+  const total = String(excluded.length);
+
+  if (downstream === 0) {
+    return `all ${total} documents below sit in a cycle.`;
+  }
+  // "breaking the cycles places them all" is exact rather than encouraging: an acyclic graph sorts
+  // completely, so every excluded document is placed once no cycle remains.
+  return (
+    `${String(cycleMembers)} of the ${total} documents below sit in a cycle; ` +
+    `the other ${String(downstream)} are reachable only through one, ` +
+    "so breaking the cycles places them all."
+  );
+}
+
 // `renderContextGraphText` builds on `formatContextGraphSummary` (nodes/edges/cycles/entry
 // points/hubs) rather than re-deriving those fields, then appends the three signals that summary
 // does not already cover: clusters, reading order, and (optionally) coverage.
@@ -114,6 +153,7 @@ export function renderContextGraphText(
   const { order, excluded } = topologicalSort(graph);
   pushPathList(lines, "reading order", order);
   if (excluded.length > 0) {
+    lines.push(summarizeExclusionCauses(graph, excluded));
     pushPathList(lines, "excluded from reading order", excluded);
   }
 

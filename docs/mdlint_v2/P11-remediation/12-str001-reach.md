@@ -1,6 +1,6 @@
 # P11.12 · `STR-001` filesystem reach vs corpus-only (+ guide)
 
-> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Done**. Finding **BL-1** ([`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md), Medium, confirmed).
+> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Done**. Finding **BL-1** (Medium, confirmed) from the `p9-09` deep audit, whose report was removed from the tree in `d96b64c`. Neither surviving audit restates it, so the Problem section below is its record.
 
 ## Goal
 
@@ -26,7 +26,7 @@ Either way, add a regression fixture with a **present non-`.md` required file** 
 - [x] `STR-001`, its guide (`STR-001.md`), the relevant requirement, and the test tell one story.
 - [x] A present non-`.md` required file is either satisfied (A) or explicitly out of scope (B), with a fixture.
 - [x] If (A): the filesystem probe cannot read/resolve outside the analyzed root.
-- [ ] ~~If (B): the `LICENSE` example and "literal paths must match exactly" claim are removed.~~ Not applicable — direction **(A)** was chosen, so both claims became true and were kept.
+- ~~If (B): the `LICENSE` example and "literal paths must match exactly" claim are removed.~~ Not applicable — direction **(A)** was chosen, so both claims became true and were kept. Carries no box because there is nothing here to tick or to owe: the criterion was retired by the direction the task took, not left open.
 - [x] `npm run typecheck && npm run lint && npm run format && npm test && npm run build` green.
 
 ## Implementation notes

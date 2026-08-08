@@ -4,6 +4,10 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import {
+  DEFAULT_EXCLUDE_GLOBS,
+  DEFAULT_INCLUDE_GLOBS,
+} from "../src/config/corpus-scope.js";
 import { matchesConfigGlob } from "../src/discovery/globs.js";
 import { DEFAULT_NOISE_DIR_NAMES } from "../src/discovery/repo-scan-constants.js";
 import { scanRepository } from "../src/discovery/repo-scan.js";
@@ -597,6 +601,27 @@ describe("scanRepository · the pruning record", () => {
     ]);
   });
 
+  it("discloses a gitignored hidden directory as gitignored, not as hidden", async () => {
+    // Both classes apply, and only one of them has advice that works: the hidden line suggests an
+    // `include` pattern, which a fresh `init` config defeats by writing `respectGitignore: true`.
+    // Classified as hidden, the directory was also never named on the gitignored line, so the user
+    // was not told why their pattern did nothing. Uncounted for the same reason every gitignored
+    // directory is: the walk does not descend into it.
+    const root = await createFixtureTree({
+      ".gitignore": ".scratch/\n",
+      "docs/one.md": "# One\n",
+      ".scratch/notes.md": "# Notes\n",
+      ".github/PR.md": "# PR\n",
+    });
+
+    const result = await scanRepository({ cwd: root });
+
+    expect(result.pruned.directories).toEqual([
+      { path: ".github", reason: "hidden", markdownFileCount: 1 },
+      { path: ".scratch", reason: "gitignored" },
+    ]);
+  });
+
   it("counts only MARKDOWN_EXTENSIONS files inside a hidden directory", async () => {
     const root = await createFixtureTree({
       "docs/one.md": "# One\n",
@@ -633,6 +658,50 @@ describe("scanRepository · the pruning record", () => {
       "zeta/node_modules",
     ]);
     expect(first.pruned).toEqual(second.pruned);
+  });
+
+  it("counts a hidden tree the same way a scan rooted at it would collect one", async () => {
+    // The disclosed number and the corpus are produced by one function under two modes, so today
+    // they cannot disagree about noise, gitignore or extensions. The tests above assert the count
+    // against hand-written expectations, which would keep passing if the count branch were ever
+    // split into a walk of its own — and a divergence there is invisible: two plausible numbers,
+    // both green. This compares the count against a real collect walk over the same directory, so
+    // the day the branches separate is the day it fails.
+    //
+    // The ignore rules live *inside* the hidden tree deliberately: a `.gitignore` above it is read
+    // by the outer walk and not by one rooted at it, and this has to compare the same tree.
+    const root = await createFixtureTree({
+      "docs/one.md": "# One\n",
+      ".tooling/.gitignore": "generated/\n",
+      ".tooling/a.md": "# A\n",
+      ".tooling/nested/b.md": "# B\n",
+      ".tooling/nested/notes.txt": "notes\n",
+      ".tooling/generated/c.md": "# C\n",
+      ".tooling/node_modules/pkg/README.md": "# Pkg\n",
+    });
+
+    const disclosed = (await scanRepository({ cwd: root })).pruned.directories;
+
+    // The corpus loader over the same directory, under the lint-time defaults — a different
+    // implementation of the same three rules, which is what makes this a comparison rather than a
+    // restatement. It follows the precedent above of resolving a scan result against a real
+    // `loadDocuments` walk.
+    const documents = await loadDocuments([...DEFAULT_INCLUDE_GLOBS], {
+      cwd: path.join(root, ".tooling"),
+      exclude: [...DEFAULT_EXCLUDE_GLOBS],
+      respectGitignore: true,
+    });
+
+    // Non-vacuous on both sides, and the value is what makes the comparison mean something: all
+    // three rules had to fire to reach 2 — `generated/` gitignored, `notes.txt` not Markdown,
+    // `node_modules` noise — so a count that dropped any one of them would differ.
+    expect(disclosed).toEqual([
+      { path: ".tooling", reason: "hidden", markdownFileCount: 2 },
+    ]);
+    expect(
+      [...documents.values()].map((document) => document.path).sort(),
+    ).toEqual(["a.md", "nested/b.md"]);
+    expect(disclosed[0]!.markdownFileCount).toBe(documents.size);
   });
 
   it("records nothing for a tree with no pruned directory at all", async () => {

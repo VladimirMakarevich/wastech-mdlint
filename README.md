@@ -32,7 +32,7 @@ The full user guide — capabilities grouped by area, a page per rule with examp
 | --- | --- | --- |
 | [`@wastech-mdlint/core`](packages/core) | Parsing, config, rule engine, graph, and formatting — the whole pipeline. | — |
 | [`@wastech-mdlint/cli`](packages/cli) | commander CLI host: argument parsing, command dispatch, exit codes. | `wastech-mdlint` |
-| [`@wastech-mdlint/mcp-server`](packages/mcp-server) | stdio MCP host; `lint`/`lint-files` ship in P7.02, `context-graph`/`context-slice`/`impact-analysis` in P7.03, `compile-context` in P7.04. | `wastech-mdlint-mcp` |
+| [`@wastech-mdlint/mcp-server`](packages/mcp-server) | stdio MCP host: six read-only tools — `lint`, `lint-files`, `context-graph`, `context-slice`, `impact-analysis`, `compile-context`. | `wastech-mdlint-mcp` |
 
 Build and test the whole workspace from the repo root:
 
@@ -43,6 +43,7 @@ npm run build     # tsc -b -> each package's dist/
 npm test          # vitest across all packages
 npm run lint      # eslint across the workspace
 npm run format    # prettier --check . (CI-enforced; run before pushing)
+npm run lint:docs # wastech-mdlint over docs/ + README (CI-enforced; needs npm run build first)
 ```
 
 ## Quick start

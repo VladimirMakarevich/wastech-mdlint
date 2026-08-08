@@ -32,9 +32,11 @@ Create the `@wastech-mdlint/cli` package, adopt `commander` ([D5](../index.md)),
 
 ## Exit criteria
 
-- [ ] `wastech-mdlint scan` and `graph` produce byte-identical output to the current implementation (parity).
-- [ ] Exit codes unchanged.
-- [ ] CLI imports only from `@wastech-mdlint/core` (no duplicated pipeline logic).
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- `wastech-mdlint scan` and `graph` produce byte-identical output to the current implementation (parity).
+- Exit codes unchanged.
+- CLI imports only from `@wastech-mdlint/core` (no duplicated pipeline logic).
 
 ## Hand-off to next
 

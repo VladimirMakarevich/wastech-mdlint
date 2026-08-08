@@ -1,8 +1,8 @@
 # Phase P11 — Post-P9 Audit Remediation (code)
 
-> Roadmap: [v2 Index](../index.md) · Phase **P11** · Size **M–L** · Status **Not started** · Depends on [P10](../P10-consistency/index.md) (first-audit consistency landed).
+> Roadmap: [v2 Index](../index.md) · Phase **P11** · Size **M–L** · Status **Done** · Depends on [P10](../P10-consistency/index.md) (first-audit consistency landed).
 >
-> **Goal:** close the code-level **release-blocking**, **security**, **correctness**, and **data-loss** defects surfaced by the [post-P9 audit](../audit-2026-07-25-post-p9.md) and the confirmed rule defects from the [`p9-09` deep audit](../../research/p9-09-full-solution-deep-audit/report.md) — before the product is packaged for release. Every task here maps to a HIGH/MEDIUM (or a code-level LOW) finding from those two reports. [P12](../P12-consistency/index.md) handles the coverage/docs/accepted-behavior findings.
+> **Goal:** close the code-level **release-blocking**, **security**, **correctness**, and **data-loss** defects surfaced by the [post-P9 audit](../audit-2026-07-25-post-p9.md) and the confirmed rule defects from the `p9-09` deep audit — before the product is packaged for release. Every task here maps to a HIGH/MEDIUM (or a code-level LOW) finding from those two reports. [P12](../P12-consistency/index.md) handles the coverage/docs/accepted-behavior findings.
 
 ## Why this phase exists
 
@@ -29,7 +29,7 @@ The audit's [§4](../audit-2026-07-25-post-p9.md) reframes several findings as *
 | [P11.13](13-grp-size-hygiene.md) | Retire dead `GRP` options; collapse duplicate `SIZE-001` | SC-1, SC-2 | LOW | S | P10 |
 | [P11.14](14-init-cli-lows.md) | `init`-scan honesty + CLI-plumbing micro-fixes | L-7…L-11 | LOW | S–M | P11.08 |
 
-> **Finding key.** `H-*`/`M-*`/`L-*` are from the [post-P9 audit](../audit-2026-07-25-post-p9.md); `BL-*`/`TP-*`/`SC-*` are the confirmed defects from the [`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md). `OG-1` and `SC-3` from `p9-09` are decisions/documentation and live in [P12](../P12-consistency/index.md).
+> **Finding key.** `H-*`/`M-*`/`L-*` are from the [post-P9 audit](../audit-2026-07-25-post-p9.md); `BL-*`/`TP-*`/`SC-*` are the confirmed defects from the `p9-09` report, which was removed from the tree in `d96b64c` — each task file restates the finding it closes, so the evidence stays reachable without it. `OG-1` and `SC-3` from `p9-09` are decisions/documentation and live in [P12](../P12-consistency/index.md).
 
 ## Sequence
 
@@ -47,17 +47,17 @@ The audit's [§4](../audit-2026-07-25-post-p9.md) reframes several findings as *
 
 ## Execution note
 
-The two release-blockers are already staged as runnable orchestrator tasks: [`tasks/pending/p11-01-cli-bin-noop.md`](../../../tasks/pending/p11-01-cli-bin-noop.md) (P11.01) and [`tasks/pending/p11-02-sec003-path-escape.md`](../../../tasks/pending/p11-02-sec003-path-escape.md) (P11.02). Promote the remaining tasks per-task via the `worc-task` flow as execution starts; keep the orchestrator task and its phase file in sync.
+The two release-blockers were staged as runnable orchestrator tasks — `tasks/pending/p11-01-cli-bin-noop.md` (P11.01) and `tasks/pending/p11-02-sec003-path-escape.md` (P11.02) — and both have landed. `tasks/` is gitignored, so those files are not part of a clone and cannot be linked to from here. Promote each remaining task per-task via the `worc-task` flow, keeping the orchestrator task and its phase file in sync.
 
 ## Phase exit criteria
 
-- [ ] `./node_modules/.bin/wastech-mdlint` and `npx wastech-mdlint` run and set correct exit codes; a process-level test spawns the installed bin (H-1).
-- [ ] `SEC-003` (and every other rule/primitive that reaches the filesystem) cannot read outside the analyzed root; the MCP `lint` description matches (H-2).
-- [ ] `init` never overwrites an out-of-target config or an existing `schema.json` without a guard and an explicit summary line (H-3, H-4).
-- [ ] No rule crashes the run on a legal directory name or config; no rule emits false `error` findings from an ignored `exclude` or a stateful regex (M-1, M-2, TP-1, M-3).
-- [ ] Operational/usage failures exit `2`, print repo-relative paths, and an unknown subcommand or a missing path never exits `0 "No problems found."` (M-6, M-7).
-- [ ] `init`/`--fix` writes are atomic and newline-preserving; a mid-write failure leaves no half-written config (M-5, L-6).
-- [ ] `STR-001` reach and its guide agree; duplicate/no-op behaviors (L-3, SC-1, SC-2) are fixed or explicitly retired.
+- [x] `./node_modules/.bin/wastech-mdlint` and `npx wastech-mdlint` run and set correct exit codes; a process-level test spawns the installed bin (H-1).
+- [x] `SEC-003` (and every other rule/primitive that reaches the filesystem) cannot read outside the analyzed root; the MCP `lint` description matches (H-2).
+- [x] `init` never overwrites an out-of-target config or an existing `schema.json` without a guard and an explicit summary line (H-3, H-4).
+- [x] No rule crashes the run on a legal directory name or config; no rule emits false `error` findings from an ignored `exclude` or a stateful regex (M-1, M-2, TP-1, M-3).
+- [x] Operational/usage failures exit `2`, print repo-relative paths, and an unknown subcommand or a missing path never exits `0 "No problems found."` (M-6, M-7).
+- [x] `init`/`--fix` writes are atomic and newline-preserving; a mid-write failure leaves no half-written config (M-5, L-6).
+- [x] `STR-001` reach and its guide agree; duplicate/no-op behaviors (L-3, SC-1, SC-2) are fixed or explicitly retired.
 
 ## What P11 unblocks
 

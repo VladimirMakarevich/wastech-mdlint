@@ -1,6 +1,6 @@
 # P11.13 · Retire dead `GRP` options; collapse duplicate `SIZE-001`
 
-> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Done**. Findings **SC-1** and **SC-2** ([`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md), Low, confirmed).
+> Phase: [P11 — Post-P9 remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Done**. Findings **SC-1** and **SC-2** (Low, confirmed) from the `p9-09` deep audit, whose report was removed from the tree in `d96b64c`. The [post-P9 audit](../audit-2026-07-25-post-p9.md) names both in its systemic-cause section — SC-1 as the one inert option that audit stopped at, SC-2 as the one duplicate-findings problem it stopped at — without restating either defect, so the Problem section below is their record.
 
 ## Goal
 

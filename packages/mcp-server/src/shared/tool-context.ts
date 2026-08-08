@@ -21,6 +21,13 @@ import { ToolInputError } from "./tool-input-error.js";
 // validated below, the same base the CLI's handlers get; `cwd` maps straight through.
 export type ToolFileInput = { cwd?: string; configPath?: string };
 
+// `path.sep` -> `/` for a message only; the returned value stays platform-native so callers keep
+// handing core a real path. One line, local: core's `normalizeRelativePath` also strips a leading
+// `./`, which is meaningless for an absolute path and would misdescribe what was stat'ed.
+function toPosixPath(value: string): string {
+  return value.split(path.sep).join("/");
+}
+
 /**
  * The resolved `cwd` a call will use, computed without touching the filesystem.
  *
@@ -53,17 +60,30 @@ export function toolCwdBase(input: ToolFileInput): string {
  * is a real failure worth naming.
  */
 export async function resolveToolCwd(input: ToolFileInput): Promise<string> {
-  const resolved = toolCwdBase(input);
-
   // Always present: the stdio error contract carries `hint` as the actionable half of `{ code,
   // message, hint }`, and there is exactly one useful remedy here.
   const hint =
     'Pass an absolute path to an existing directory, or omit "cwd" to analyze the server\'s working directory.';
 
+  // Rejected before `path.resolve`, because it cannot be caught after: `path.resolve("")` returns
+  // `process.cwd()`, so an explicit empty (or blank) `cwd` would pass every check below and silently
+  // analyze the server's own working directory — a plausible answer to a different question, which is
+  // the exact failure this guard exists to name. Not expressed as `.min(1)` on the tools'
+  // `inputSchema`s: a schema rejection is refused before the handler runs, arriving as a bare
+  // `InvalidParams` with no `structuredContent` and no `hint`.
+  if (input.cwd !== undefined && input.cwd.trim() === "") {
+    throw new ToolInputError("cwd must not be empty", hint);
+  }
+
+  const resolved = toolCwdBase(input);
+
   // The message names the RESOLVED absolute path, unlike the CLI's repo-relative rendering. The CLI
   // has a known-good cwd to anchor against; here the cwd *is* the anchor and it is the broken thing,
   // so a relative form would have nothing to mean. The value is derived from caller input and is
-  // exactly what was stat'ed, so it exposes no unrelated host state.
+  // exactly what was stat'ed, so it exposes no unrelated host state. Rendered with `/` separators
+  // even on Windows: absolute-versus-relative is the deliberate part, the separator is not, and every
+  // other user-visible path in the product is POSIX-normalized.
+  const shown = toPosixPath(resolved);
   const stats = await stat(resolved).catch((error: unknown) => {
     // Mirrors the CLI's `resolveDirectoryArgument`: only these two errnos mean "no usable directory
     // here". Anything else (EACCES, ELOOP, …) is a *different* operational failure and must not be
@@ -73,16 +93,16 @@ export async function resolveToolCwd(input: ToolFileInput): Promise<string> {
     const code =
       error instanceof Error && "code" in error ? error.code : undefined;
     if (code === "ENOENT") {
-      throw new ToolInputError(`cwd does not exist: ${resolved}`, hint);
+      throw new ToolInputError(`cwd does not exist: ${shown}`, hint);
     }
     if (code === "ENOTDIR") {
-      throw new ToolInputError(`cwd is not a directory: ${resolved}`, hint);
+      throw new ToolInputError(`cwd is not a directory: ${shown}`, hint);
     }
     throw error;
   });
 
   if (!stats.isDirectory()) {
-    throw new ToolInputError(`cwd is not a directory: ${resolved}`, hint);
+    throw new ToolInputError(`cwd is not a directory: ${shown}`, hint);
   }
 
   return resolved;

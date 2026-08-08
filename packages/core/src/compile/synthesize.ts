@@ -161,8 +161,12 @@ function renderBudget(budget: CompileBudget): string {
   } else if (budget.entrypointsOverBudget.length === 0) {
     lines.push("All configured entrypoints are within budget.");
   } else {
-    // Phrasing mirrors LLM-001's own report (engine/rules/llm.ts) so the same budget breach reads
-    // identically whether seen as a lint finding or in the compiled skill.
+    // Phrasing mirrors LLM-001's own report (engine/rules/llm.ts), with one deliberate divergence:
+    // the finding appends `TOKEN_ESTIMATE_NOTE` and this line does not. The calibration belongs with
+    // the number a reader can act on, and appending it here would move the bytes and content hash of
+    // every generated `SKILL.md` — so the artifact states its token numbers uncalibrated instead, and
+    // the register row (accepted-behaviors.md, the Context Budget block) is the disclosure. Do not
+    // append the note here to close the gap; that is the trade this comment records.
     for (const entrypoint of budget.entrypointsOverBudget) {
       const percentOver = (
         ((entrypoint.totalTokens - entrypoint.maxTokens) /
@@ -284,7 +288,10 @@ function renderCyclesBlock(analysis: GraphAnalysis): string {
   // missing from the reading order with no explanation is exactly the silence this block exists to break.
   const excluded = analysis.excludedFromReadingOrder;
   if (excluded.length === 0) {
-    lines.push("", "Excluded from reading order: (none)");
+    // `(0):` rather than a bare `:`, for the reason `renderEdgeBullets` states below: the count
+    // belongs in the same position in both branches, so a `^Excluded from reading order \((\d+)\)`
+    // scan over the artifact sees the empty case too.
+    lines.push("", "Excluded from reading order (0): (none)");
     return lines.join("\n");
   }
 

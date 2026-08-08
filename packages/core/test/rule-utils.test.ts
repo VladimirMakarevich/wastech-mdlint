@@ -107,7 +107,7 @@ describe("matchesConfigGlob ordered negation", () => {
     expect(matchesConfigGlob("notes.txt", ["**/*.md", "!docs/**"])).toBe(false);
   });
 
-  it("strips a `./` that a negation prefix hides", () => {
+  it("anchors a negated `./`-prefixed pattern to the root, like the same pattern without it", () => {
     // picomatch's `./` strip is relative to the pattern start it advances past for a negation, so
     // `!./docs/**` anchors like `!docs/**` with no help from normalizeConfigGlob.
     const include = ["**/*.md", "!./docs/**"];

@@ -38,6 +38,13 @@ jobs:
       - run: npm run format
       - run: npm test
       - run: npm run build
+      # Run the product against this repository's own documentation, so a dead link or a broken
+      # heading anchor under docs/ fails the build instead of surviving until someone reads the page.
+      # It must come after the build for two reasons: the script spawns the compiled entrypoint by
+      # path, and `node_modules/.bin/wastech-mdlint` does not exist to spawn instead — npm skips
+      # creating a bin link whose target file is absent at install time, and `npm ci` runs long
+      # before dist/ is emitted.
+      - run: npm run lint:docs
 
   pack:
     # Publish-readiness in *shape* only: prove each package's `files` allowlist yields a clean

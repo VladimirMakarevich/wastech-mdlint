@@ -273,6 +273,30 @@ describe("TBL-002 --fix", () => {
     ).resolves.toBe(TABLE);
   });
 
+  // The other scope gate on this path, and the one no rule option controls: the corpus default.
+  // `applyFixes` resolves it so a file the lint pass never read is not one `--fix` rewrites —
+  // otherwise a zero-config run would rewrite vendored Markdown inside `node_modules`, an edit to
+  // files the user does not own and never saw reported. Carried only by a comment naming
+  // `lintFiles` until this pinned it.
+  it("leaves a document under a default-excluded tree byte-unchanged on the --fix path", async () => {
+    const cwd = await fixtureRepo({
+      "docs/a.md": TABLE,
+      "node_modules/pkg/b.md": TABLE,
+    });
+
+    const written = await applyFixes({
+      cwd,
+      config: { rules: [] },
+      rules: [rule("TBL-002", { columns: ["Owner"] })],
+      settings: {},
+    });
+    expect(written.fixedFiles).toEqual(["docs/a.md"]);
+
+    await expect(
+      readFile(path.join(cwd, "node_modules", "pkg", "b.md"), "utf8"),
+    ).resolves.toBe(TABLE);
+  });
+
   // `emptyCellEdits` only ever edits *between* a row's pipes, so its offsets were already CRLF-safe
   // (`content.split("\n")` leaves the `\r` outside the cell range) — this pins that down so the
   // newline normalization on the write path cannot regress it in the other direction.

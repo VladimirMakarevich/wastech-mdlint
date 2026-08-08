@@ -1,6 +1,6 @@
 # P12.05 · Recursive DFS depth — document the bound or guard it
 
-> Phase: [P12 — Post-P9 consistency](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Done**. Finding **SC-3** ([`p9-09` report](../../research/p9-09-full-solution-deep-audit/report.md), Low, needs confirmation).
+> Phase: [P12 — Post-P9 consistency](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Done**. Finding **SC-3** (Low, needs confirmation) from the `p9-09` deep audit, whose report was removed from the tree in `d96b64c`. Neither surviving audit restates it, so the Problem section below is its record.
 
 ## Goal
 

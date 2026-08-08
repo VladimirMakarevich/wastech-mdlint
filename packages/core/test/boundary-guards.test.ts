@@ -42,6 +42,7 @@ const BOUNDARY_GUARDS: Record<string, string[]> = {
   // nothing ever diffing those against each other: they agree by construction in a handler test, and
   // diverge only in what a reader or a client actually receives.
   "host-parity": [
+    "packages/cli/test/graph.e2e.test.ts",
     "packages/cli/test/lint.e2e.test.ts",
     "packages/mcp-server/test/context-graph.test.ts",
     "packages/mcp-server/test/host-parity.test.ts",

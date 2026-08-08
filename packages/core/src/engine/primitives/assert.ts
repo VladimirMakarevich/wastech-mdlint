@@ -136,7 +136,12 @@ export const assertionSchema = z.discriminatedUnion("kind", [
     .strict(),
 ]);
 
-export type Assertion = z.infer<typeof assertionSchema>;
+// The **input** type, deliberately: `columnInSet.caseSensitive` carries a `.default()`, so `z.infer`
+// would make it a *required* property of every hand-written `columnInSet` assertion — breaking a
+// consumer that builds one as a literal, and contradicting `describe-rules.ts`, which is documented
+// as receiving entries that never passed through Zod. Reading a defaulted key off this type therefore
+// yields `boolean | undefined`, which every reader already handles (`?? DEFAULT_…`, or `=== false`).
+export type Assertion = z.input<typeof assertionSchema>;
 
 // The target collection a `kind` operates on — drives the custom rule's scope (columnUnique is the
 // only project-scoped kind) and lets custom-rule resolution validate the declared `target` against

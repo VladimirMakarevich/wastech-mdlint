@@ -6,6 +6,7 @@ import { matchesConfigGlob } from "./globs.js";
 import { filePart, resolveTargetCandidates } from "../engine/path-resolve.js";
 import { noPlaceholders } from "../engine/primitives/content.js";
 import type { RuleMetadata, RuleRegistry } from "../engine/registry.js";
+import { DEFAULT_GRP001_MIN_CYCLE_LENGTH } from "../engine/rules/grp.js";
 import type { RuleCategory, Severity } from "../engine/types.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
 import { parseDocument } from "../markdown/parse-document.js";
@@ -341,6 +342,12 @@ const PATTERN_GATES: Record<
       patterns: DetectedPatterns,
       cycle: SampleCycle | undefined,
     ) => string;
+    // Options derivable from the same sampled evidence the rationale cites, for the one case where
+    // omitting them would make the proposed entry contradict its own comment. Only `GRP-001` needs
+    // it; every other gate's rationale describes something its rule reports at the default.
+    options?: (
+      cycle: SampleCycle | undefined,
+    ) => Record<string, unknown> | undefined;
   }
 > = {
   "REF-001": {
@@ -379,6 +386,17 @@ const PATTERN_GATES: Record<
       cycle === undefined
         ? `Sampled files contain ${patterns.localLinkCount} relative link(s) forming a reference graph; GRP-001 checks the full corpus for circular references.`
         : `Sampled files form a reference chain that loops back on itself (${[...cycle, cycle[0]].join(" -> ")}); GRP-001 checks the full corpus for circular references.`,
+    // The rationale above may cite a cycle shorter than the rule's own `minCycleLength` floor
+    // (default 3), and an entry with no options would then be annotated with a finding the run it
+    // proposes will never produce — the sampling-fidelity discipline forbids describing a cycle the
+    // real `ContextGraph` would not surface. Lowering the floor to the cited cycle's own length keeps
+    // the evidence concrete AND makes the config report it, rather than closing the gap by deleting
+    // the more useful half of the disclosure. Above the floor nothing is emitted, so the common case
+    // still proposes `GRP-001` with no options.
+    options: (cycle) =>
+      cycle !== undefined && cycle.length < DEFAULT_GRP001_MIN_CYCLE_LENGTH
+        ? { minCycleLength: cycle.length }
+        : undefined,
   },
 };
 
@@ -527,7 +545,11 @@ export async function inferRuleSet(params: {
       continue;
     }
     rules.push(
-      toInferredRule(metadata, definition.rationale(globalPatterns, cycle)),
+      toInferredRule(
+        metadata,
+        definition.rationale(globalPatterns, cycle),
+        definition.options?.(cycle),
+      ),
     );
   }
 

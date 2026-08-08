@@ -1,6 +1,6 @@
 # P17.02 · Self-linting configuration and CI
 
-> Phase: [P17 — Plan of record](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Not started**. Backlog: [W-53](../remediation-backlog-2026-08-05.md) (High — audit F35 graded it LOW; **raised on leverage**, which the audit's own recommendation section argues for). Depends on [P17.01](01-dead-links.md), [P13](../P13-correctness/index.md).
+> Phase: [P17 — Plan of record](index.md) · Roadmap: [v2 Index](../index.md) · Size **S–M** · Status **Done**. Backlog: [W-53](../remediation-backlog-2026-08-05.md) (High — audit F35 graded it LOW; **raised on leverage**, which the audit's own recommendation section argues for). Depends on [P17.01](01-dead-links.md), [P13](../P13-correctness/index.md).
 
 ## Goal
 
@@ -8,19 +8,19 @@ Give this repository a configuration of its own and a CI step that runs it, so t
 
 ## Problem
 
-`wastech-mdlint.config.json` does not exist at the root, and no v2-shaped config exists anywhere outside four test fixtures. CI runs ESLint, Prettier, Vitest, `tsc -b`, and `npm pack --dry-run` — **and nothing runs the product.** This is a Markdown analyzer whose own 132+ plan files, 51 guide pages, and README are never analyzed.
+`wastech-mdlint.config.json` does not exist at the root, and no v2-shaped config exists anywhere outside four test fixtures. CI runs ESLint, Prettier, Vitest, `tsc -b`, and `npm pack --dry-run` — **and nothing runs the product.** Re-verified after P13–P16: still true on every count, and the corpus has grown — **165** plan files under `docs/mdlint_v2/`, 51 guide pages, and the README, none of them ever analyzed.
 
-**The demonstration is [P17.01](01-dead-links.md).** Its seventeen dead links were all found by `REF-001` in a **single run**, once a configuration was supplied from outside the repository — a run this repository cannot perform on itself. Every finding in that task was reachable by the tool this repository ships.
+**The demonstration is [P17.01](01-dead-links.md).** Its seventeen dead links were all found by `REF-001` in a **single run**, once a configuration was supplied from outside the repository — a run this repository cannot perform on itself. Re-run in the current tree with an out-of-tree config over `docs/**/*.md` + `README.md`: still exactly **17 problems**, all `REF-001`. Every finding in that task was reachable by the tool this repository ships.
 
 **Adding one closes a plan expectation rather than reversing a decision.** Requirement **I8** (precedence tier 2) states that "the repo's own config is simply rewritten in the new shape", and the **`migrate` command (I8)** entry in [`glossary.md`](../glossary.md) repeats it (cited as `:305` in the backlog, shifted since — find it by entry name) — both written as though the artifact already exists. Nothing records a decision against one in either direction. The audit checked this specifically: an earlier draft read `P0-foundations/09-audit-remediation.md:25` as a decision rejecting a repository configuration, re-read it, and found it is a remediation clause about removing the pre-v2 package's leftovers. So there is no decision to reverse.
 
 ## Deliverables / steps
 
 1. **Add a narrow, docs-only configuration.** `include` over `docs/**` and `README.md`. Start with the reference rules that pay for themselves immediately — `REF-001`, `REF-002` — rather than enabling everything: a config that reports 461 warnings on day one gets ignored, and the field test measured exactly that shape on `CTX-002`.
-2. **Pick the config shape after [P13](../P13-correctness/index.md).** [P13.01](../P13-correctness/01-glob-semantics.md) changes what a glob means and [P13.02](../P13-correctness/02-default-exclude.md) introduces lint-time defaults, so a config written before them would encode semantics that are about to change. This is why the dependency is on the phase and not just on P17.01.
+2. **Write the globs against the semantics P13 shipped.** That phase has landed, so the dependency is satisfied and the semantics to encode are knowable rather than pending: [P13.01](../P13-correctness/01-glob-semantics.md) made each glob list **ordered**, with a leading `!` subtracting from what earlier entries selected and the last matching entry winning, matching on picomatch with `{ dot: true }`, and a pattern containing a `/` anchored to the repository root while a slash-free one matches at any depth. [P13.02](../P13-correctness/02-default-exclude.md) made `include` and `exclude` carry **lint-time defaults** applied on every run, with a user `exclude` **extending** the default rather than replacing it. Consequences for this config specifically: `docs/**/*.md` is root-anchored as written, `README.md` is not (it would match at any depth) so anchor it if that matters, and there is no need to restate any noise directory — the default `exclude` already prunes them and `[]` would not opt out.
 3. **Add the CI step.** It must fail the build on a dead link in `docs/`. Run it in the existing `verify` job rather than a new workflow, so it shares the build the other gates already produce.
 4. **Land it after [P17.01](01-dead-links.md) clears the existing 17.** A gate that is red the day it lands gets disabled, and then the finding recurs with a disabled gate on top of it.
-5. **Wire `$schema` locally**, per the v2 config contract — no remote URL. The repository has the CLI in-tree, so the installed-package schema path applies rather than a generated project-local copy; verify which one `init` would produce here and use that, so the repo's own config is an example of the documented behavior rather than a special case.
+5. **Wire `$schema` locally**, per the v2 config contract — no remote URL. The repository has the CLI in-tree and its schema is a tracked file at `packages/cli/schema.json` (regenerated by `scripts/generate-docs.mjs` and byte-checked by a sync test), so the installed-package schema path applies rather than a generated project-local copy; verify which one `init` would produce here and use that, so the repo's own config is an example of the documented behavior rather than a special case.
 6. **Decide the growth path and say it.** Once `REF-001`/`REF-002` are green, which rule joins next, and who decides? A config that never grows is a one-time fix; one that grows without a stated rule becomes noise. One sentence in the config's own comments is enough.
 7. **Update I8 and the glossary** so the tier-2 requirement and its glossary echo describe a config that now exists, rather than presuming one.
 8. **Consider what this makes measurable.** With the config in place, `graph`/`slice`/`impact` and `compile` can run on this repository's own docs — which is also the most realistic large corpus available for [P15.01](../P15-output-contracts/01-renderers-at-scale.md)'s bounds. Worth noting, not worth blocking on.
@@ -31,9 +31,35 @@ Enabling the full rule set. Fixing whatever the new gate finds beyond `REF-001`/
 
 ## Exit criteria
 
-- [ ] A root `wastech-mdlint.config.json` exists, JSONC, with a local `$schema`, scoped to `docs/**` and `README.md`.
-- [ ] CI fails on a dead link inside `docs/`, in the existing `verify` job.
-- [ ] The first CI run is **green**, verified against P17.01's stated baseline of zero.
-- [ ] The config's rule set is deliberately narrow, and the growth path is stated in the config itself.
-- [ ] Requirement I8 and the glossary describe a config that exists.
-- [ ] `npm run format` green — the new config file is inside the format gate too.
+- [x] A root `wastech-mdlint.config.json` exists, JSONC, with a local `$schema`, scoped to `docs/**` and `README.md`.
+- [x] CI fails on a dead link inside `docs/`, in the existing `verify` job.
+- [x] The first CI run is **green**, verified against P17.01's stated baseline of zero.
+- [x] The config's rule set is deliberately narrow, and the growth path is stated in the config itself.
+- [x] Requirement I8 and the glossary describe a config that exists.
+- [x] `npm run format` green — the new config file is inside the format gate too.
+
+## Implementation notes
+
+**The config is three keys and a paragraph of rationale.** `$schema`, `include`, `rules`, and nothing else:
+
+```jsonc
+"$schema": "./node_modules/@wastech-mdlint/cli/schema.json",
+"include": ["docs/**/*.md", "./README.md"],
+"rules": [{ "rule": "REF-001" }, { "rule": "REF-002" }]
+```
+
+Each decision carries its own `//` comment in the file, none of which names a task, a backlog item, or a document — the self-contained-comment rule covers JSONC, and `//` line comments are used throughout because a glob containing `*` `*` `/` would close a `/* */` block early.
+
+**The `$schema` value was verified rather than assumed, by running `init` and reading what it wrote.** `node packages/cli/dist/index.js init .tmp-init-check --yes --on-existing skip` in a scratch subdirectory emitted `../node_modules/@wastech-mdlint/cli/schema.json` — the installed-package path anchored on the repository root, one `../` up from the config's own directory. `init` was deliberately never run at the root itself, where it would have overwritten this config with its full inferred rule set; the root value is the same anchor with a zero-length relative prefix, which `resolvePackageSchemaRef(root, root)` renders as `./node_modules/@wastech-mdlint/cli/schema.json`. The installed-package branch applies here rather than a generated project-local `./schema.json` because `findInstalledSchemaDir` probes with `stat`, which follows the workspace symlink `node_modules/@wastech-mdlint/cli` → `packages/cli`, where the tracked `schema.json` lives. The scratch directory was deleted.
+
+**Corpus: 220 files, and the `*.md` tail is what keeps it at 220.** 219 tracked `.md` files under `docs/` plus the root `README.md`. `include` patterns are the only Markdown filter the loader applies — it parses whatever the patterns select, regardless of extension — and the one tracked non-Markdown file in the tree, `docs/research/audit-v2-implementation/sources.json`, is exactly what a bare `docs/**` would have handed to the Markdown parser. The `./` on `README.md` is equally load-bearing in the other direction: a slash-free pattern matches at any depth, so the bare name would have pulled the three `packages/*/README.md` files into a scope that is supposed to stop at the docs tree.
+
+**First run green, and green in a clean clone too.** `npm run lint:docs` reports `No problems found.`, exit `0` — `{"files": 220, "errors": 0, "warnings": 0}` in JSON. Because `REF-001` falls back to `existsSync` against the real filesystem, an in-tree green run can hide a link to a path that exists locally but is untracked, so the run was repeated against a tracked-files-only extraction (`git ls-files -z | tar --null -T - -cf - | tar -xf - -C "$tmp"`), which produced an identical 220/0/0. The one link at risk was the glossary's `.worc/flows/implementation/documentation.md`, which `.gitignore` un-ignores and which `git ls-files --error-unmatch` confirms is tracked; no delinking was needed.
+
+**`REF-003` measures zero over this corpus already, and is still not enabled.** Naming the next candidate is what the growth path asked for; enabling a third rule is explicitly out of scope for this task, so the measurement is recorded here and the config names `REF-003` as next. The growth rule itself lives in the config's comments: a rule joins only once a full run over this corpus already reports zero for it — so the gate is never red on the day it changes — and whoever brings it to zero, or any contributor where it already is, is the one who adds it.
+
+**The CI step is one line in the existing `verify` job, after `npm run build`.** `npm run lint:docs` is `node packages/cli/dist/index.js lint . --fail-on error`. It spawns the built entrypoint by path rather than through `node_modules/.bin/wastech-mdlint`, which does not exist: npm skips creating a bin link whose target file is absent at install time, and `npm ci` runs long before `dist/` is emitted. Running it in `verify` rather than a new workflow means it inherits the ubuntu/windows/macOS matrix and reuses the build the job already produces. A named script also makes the gate reproducible locally by the identical command.
+
+**One test, guarding the failure CI structurally cannot see.** `packages/core/test/repo-self-lint-scope.test.ts` composes the real path — `loadConfiguration` → `resolveCorpusScope` → `loadDocuments` — and compares the resulting corpus against `git ls-files` in both directions, because a narrowed `include` leaves the gate green while it analyzes nothing. The widening direction is checked structurally rather than against git, so an untracked draft under `docs/` does not fail a contributor's local run. It also asserts `$schema` is not a URL and resolves to a file that exists. Not tagged `@boundary-guard`: its subject overlaps the `shared-exclude` category, but that inventory is a paired set whose category list belongs to a task that owns it.
+
+**Side effect worth stating.** With a config at the root, `graph`/`slice`/`impact` run from inside this repository now resolve to the docs-only corpus — `graph .` reports 220 nodes, 2696 edges, and one cycle, which is the most realistic large corpus available for renderer bounds work. `compile` remains unconfigured and says so (`config.compile is missing`); adding a `compile.skill` section was beyond this task.

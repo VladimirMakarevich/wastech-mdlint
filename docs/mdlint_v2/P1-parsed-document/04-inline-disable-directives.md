@@ -38,10 +38,12 @@ Capture inline suppression directives written as HTML comments, with positions a
 
 ## Exit criteria
 
-- [ ] `disable`, `enable`, and `disable-next-line` comments are extracted with kind + line + rule IDs.
-- [ ] A directive with no rule IDs is recorded as "all rules" (empty `ruleIds`).
-- [ ] Rule IDs normalized to canonical form.
-- [ ] Malformed/unknown directives are tolerated (ignored, not fatal).
+Recorded rather than tracked: this task predates the convention that the landing change ticks its own criteria, so the lines below are the bar it was written against, not a live checklist. Phase completion is carried by the [phase index](index.md); the reasoning is in the [completion surface](../completion-surface.md).
+
+- `disable`, `enable`, and `disable-next-line` comments are extracted with kind + line + rule IDs.
+- A directive with no rule IDs is recorded as "all rules" (empty `ruleIds`).
+- Rule IDs normalized to canonical form.
+- Malformed/unknown directives are tolerated (ignored, not fatal).
 
 ## Hand-off to next
 
