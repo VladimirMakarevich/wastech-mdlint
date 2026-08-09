@@ -10,6 +10,10 @@ The default (`--format text`) groups findings by file, listing each rule ID, sev
 wastech-mdlint lint .
 ```
 
+The layout is line-oriented, and that is a contract you can parse against: an **unindented line names a file**, and every **indented line below it is one finding** in that file (`  <location>  <severity>  <message>  <rule ID>`, two spaces between fields). One finding is always exactly one line — so the number of unindented lines is the number of files with findings, which is what makes a CI annotator, an editor problem matcher, or a per-file count over this output correct.
+
+Keeping that true costs something: a message quotes source text, and source text wraps. Whitespace runs inside a message are collapsed to a single space here, so a checklist item written across two lines is reported on one. The verbatim text is not lost — use [JSON output](#json-output), where `message` keeps its line breaks (escaped) and `data` carries the quoted value as its own field.
+
 ## JSON output
 
 `lint --format json` emits a structured, deterministic `{ summary, messages, files }` document for machine consumption (CI, dashboards, AI agents):

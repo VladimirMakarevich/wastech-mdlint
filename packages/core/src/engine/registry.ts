@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 
 import { compareStrings } from "../deterministic-sort.js";
 import { canonicalizeRuleId } from "../rule-id.js";
@@ -128,6 +128,47 @@ function editDistance(left: string, right: string): number {
   return distances[rows - 1]![cols - 1]!;
 }
 
+// The option keys a rule declares, read the way the config schema generator reads them (`schema.ts`,
+// `z.toJSONSchema(schema, { io: "input" })`) so a diagnostic derived from this agrees with the
+// `schema.json` an editor is validating against, rather than with a second reading of the Zod object.
+function declaredOptionKeys(schema: z.ZodType): Set<string> {
+  const generated = z.toJSONSchema(schema, { io: "input" }) as {
+    properties?: Record<string, unknown>;
+  };
+  return new Set(Object.keys(generated.properties ?? {}));
+}
+
+/**
+ * The sentence to add when a config sets `files` on a rule that has no such option.
+ *
+ * `Unrecognized key: "files"` is correct and arrives exactly when the user's model of the rule is
+ * wrong, which is the moment it explains nothing. Most rules scope themselves with `files`/`exclude`,
+ * so a rule without them is the exception, and the reader has no way to tell from the rejection
+ * whether they mistyped a key or misunderstood the rule.
+ *
+ * The two mistakes are not equally forgiving, which is why the second sentence exists. `files` is a
+ * hard error and therefore safe. On the two rules whose `exclude` filters the link or image *target*
+ * being probed rather than the source document, spelling `exclude` and meaning "skip these files"
+ * type-checks, runs, and silently filters something else — so a user who reaches for file scope here
+ * has to be told what the key beside it actually does. That pair is derived from the schema rather
+ * than listed: declaring `exclude` without `files` is what makes a rule one of them, and
+ * `registry-inventory.test.ts` pins which rules that currently is.
+ */
+function fileScopeHint(
+  canonical: string,
+  optionKeys: Set<string>,
+): string | undefined {
+  if (optionKeys.has("files")) {
+    return undefined;
+  }
+
+  const targetExclude = optionKeys.has("exclude")
+    ? ` Its "exclude" filters the link and image targets this rule probes, not the source documents it runs on.`
+    : "";
+
+  return `Rule "${canonical}" takes no "files" option.${targetExclude} Use the top-level "include"/"exclude" to choose which files are linted.`;
+}
+
 export class RuleRegistry {
   private readonly byId = new Map<string, RuleDefinition>();
 
@@ -203,6 +244,20 @@ export class RuleRegistry {
     );
 
     if (!parsed.success) {
+      // Zod reports every rejected key of one object as a single issue, so the hint is attached to
+      // that issue's message rather than carried separately: both hosts render an issue as one line
+      // (the CLI prints the config error's message and drops the structured `hint` entirely), which
+      // is the same place the unknown-rule "Did you mean …?" suffix lands.
+      const hint = parsed.error.issues.some(
+        (issue) =>
+          issue.code === "unrecognized_keys" && issue.keys.includes("files"),
+      )
+        ? fileScopeHint(
+            canonical,
+            declaredOptionKeys(definition.metadata.optionsSchema),
+          )
+        : undefined;
+
       throw new RuleResolutionError({
         code: "INVALID_OPTIONS",
         ruleName: canonical,
@@ -210,7 +265,10 @@ export class RuleRegistry {
         // uniformly for built-in and custom entries.
         issues: parsed.error.issues.map((issue) => ({
           path: ["options", ...issue.path],
-          message: issue.message,
+          message:
+            hint !== undefined && issue.code === "unrecognized_keys"
+              ? `${issue.message}. ${hint}`
+              : issue.message,
         })),
         message: `Invalid options for rule "${canonical}".`,
       });

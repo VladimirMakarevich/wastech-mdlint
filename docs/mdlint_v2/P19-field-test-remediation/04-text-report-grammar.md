@@ -1,6 +1,6 @@
 # P19.04 — The text report's line grammar survives any message
 
-> Phase: [P19 — Field-test remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Not started**.
+> Phase: [P19 — Field-test remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **S** · Status **Done**.
 >
 > Closes [F-11](../field-test-2026-08-09-debates.md#f-11--a-message-containing-a-newline-breaks-the-text-report-into-phantom-files).
 
@@ -29,9 +29,17 @@ This is also the class the `host-parity` guard exists to catch. It survived beca
 2. **Decide what happens to the information in the newline.** Collapsing loses the source's line structure inside the quoted text; indenting keeps it and makes rows multi-line. Say which, and why, next to the code.
 3. **Add a parity guard that parses the rendered text** back into rows and compares against the JSON messages, tagged `@boundary-guard host-parity`. Its fixture is the minimal one from the field test: a checklist item wrapped onto a second line.
 
+## Outcome
+
+**Collapse, not indent.** `formatLintResultText` flattens whitespace runs to a single space before interpolation. Indenting the continuation would have preserved the quoted text's line structure, but a row spanning two lines still defeats everything that reads this format one line at a time — a CI annotator, an editor problem matcher, a per-file count — which is the audience the human report has. Collapsing runs rather than only line breaks additionally keeps the two-space field separator unambiguous, so a row can be split back into its four fields. Nothing is lost from the product: the JSON projection keeps `message` verbatim with its newlines escaped, and rules that quote source text keep the raw value in `data`.
+
+The same flattening applies to the **file heading**, which is not a theoretical case: a finding attributed to a config entry rather than to a location (a missing `STR-001` required file, an unresolvable `SEC-003` template) reports the unnormalized path the user wrote, so the one line the whole grammar rests on is a user-supplied string. Grouping still compares the raw `filePath`, so the heading count cannot fall below the number of distinct files.
+
+The guard is the shared parity corpus rather than a sixth tagged test: `PARITY_LINT_FIXTURE` gained the field test's own reproduction — an unchecked checklist item wrapped onto a second source line, under `CTX-002` — so the three existing `host-parity` guards that consume it now exercise it. Reverting the renderer fails five assertions across `packages/cli/test/lint.e2e.test.ts`, `packages/mcp-server/test/lint-files.test.ts`, and `packages/core/test/format-lint-result.test.ts`. `lintMessagesAsRows` restates the one-line projection independently, the same second-formulation discipline it already applies to the location rule; `readLintFindingLines` and its regex needed no change.
+
 ## Exit criteria
 
-- [ ] A corpus whose findings quote multi-line source text renders one finding per line.
-- [ ] In any report, the count of unindented lines equals the count of distinct files with findings.
-- [ ] The parity guard parses the text rather than recomputing it, and fails without the fix.
-- [ ] The choice made in step 2 is stated where the renderer is read, not only in this file.
+- [x] A corpus whose findings quote multi-line source text renders one finding per line.
+- [x] In any report, the count of unindented lines equals the count of distinct files with findings.
+- [x] The parity guard parses the text rather than recomputing it, and fails without the fix.
+- [x] The choice made in step 2 is stated where the renderer is read, not only in this file.

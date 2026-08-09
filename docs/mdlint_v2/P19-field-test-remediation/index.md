@@ -50,8 +50,8 @@ The other three — F-11 (output rendering), F-13 (compile bounds), F-01 (releas
 | [P19.01](01-inference-scope.md)       | Done        | F-03, F-04, F-10 |
 | [P19.02](02-scan-disclosure.md)       | Done        | F-05, F-06       |
 | [P19.03](03-silent-configurations.md) | Done        | F-07, F-09       |
-| [P19.04](04-text-report-grammar.md)   | Not started | —                |
-| [P19.05](05-message-scope.md)         | Not started | —                |
+| [P19.04](04-text-report-grammar.md)   | Done        | F-11             |
+| [P19.05](05-message-scope.md)         | Done        | F-02, F-08       |
 | [P19.06](06-reporting-surfaces.md)    | Not started | —                |
 | [P19.07](07-host-and-release.md)      | Not started | —                |
 
