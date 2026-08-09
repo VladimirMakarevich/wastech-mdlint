@@ -331,4 +331,11 @@ export type {
 // Public because `init` has to measure the same corpus the config it writes will lint, and the
 // `exclude` that config carries is this list. A host re-deriving it would be a second copy, free to
 // disagree with the lint path about which files the counts in the written rationale describe.
-export { DEFAULT_EXCLUDE_GLOBS } from "./config/corpus-scope.js";
+//
+// `DEFAULT_INCLUDE_GLOBS` for the same reason on the other side: when a draft omits the `include`
+// key, this is the scope its files will actually be selected by, and `init`'s disclosure has to
+// judge each skipped file against it rather than assume the key it is not writing.
+export {
+  DEFAULT_EXCLUDE_GLOBS,
+  DEFAULT_INCLUDE_GLOBS,
+} from "./config/corpus-scope.js";

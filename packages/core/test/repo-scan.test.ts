@@ -553,15 +553,25 @@ describe("scanRepository · the pruning record", () => {
 
     const result = await scanRepository({ cwd: root });
 
-    // Only the hidden *roots* are recorded — a nested `.a/b` is part of `.a`'s total,
-    // not a second entry, so the counts can never be double-read.
+    // Only the hidden *roots* are recorded — a nested `.a/b` is part of `.a`'s own list,
+    // not a second entry, so the files can never be double-read. The paths are repo-relative rather
+    // than relative to the hidden root, because the disclosure has to match them against the
+    // repo-relative `include` the config will carry.
     expect(result.pruned.directories).toEqual([
-      { path: ".agents", reason: "hidden", markdownFileCount: 2 },
-      { path: ".claude", reason: "hidden", markdownFileCount: 1 },
+      {
+        path: ".agents",
+        reason: "hidden",
+        markdownFiles: [".agents/rules/a.md", ".agents/rules/b.md"],
+      },
+      {
+        path: ".claude",
+        reason: "hidden",
+        markdownFiles: [".claude/skills/x/SKILL.md"],
+      },
     ]);
   });
 
-  it("classifies a hidden dependency tree as noise and never counts it", async () => {
+  it("classifies a hidden dependency tree as noise and never lists it", async () => {
     // The bound on the count walk: `.venv`/`.yarn` are in DEFAULT_NOISE_DIR_NAMES precisely so
     // sizing the hidden class never descends into a virtualenv or a Yarn Berry cache.
     const root = await createFixtureTree({
@@ -577,11 +587,11 @@ describe("scanRepository · the pruning record", () => {
       { path: "mobile/node_modules", reason: "noise" },
     ]);
     for (const entry of result.pruned.directories) {
-      expect(entry.markdownFileCount).toBeUndefined();
+      expect(entry.markdownFiles).toBeUndefined();
     }
   });
 
-  it("records a gitignored directory without counting it, and honors ignores inside a hidden one", async () => {
+  it("records a gitignored directory without listing it, and honors ignores inside a hidden one", async () => {
     const root = await createFixtureTree({
       ".gitignore": "generated-docs/\n.claude/drafts/\n",
       "docs/one.md": "# One\n",
@@ -594,9 +604,9 @@ describe("scanRepository · the pruning record", () => {
     const result = await scanRepository({ cwd: root });
 
     expect(result.pruned.directories).toEqual([
-      // The hidden count runs the same gitignore layers the corpus walk does, so the number agrees
+      // The hidden walk runs the same gitignore layers the corpus walk does, so the list agrees
       // with `git ls-files` rather than with a raw directory listing.
-      { path: ".claude", reason: "hidden", markdownFileCount: 1 },
+      { path: ".claude", reason: "hidden", markdownFiles: [".claude/keep.md"] },
       { path: "generated-docs", reason: "gitignored" },
     ]);
   });
@@ -605,7 +615,7 @@ describe("scanRepository · the pruning record", () => {
     // Both classes apply, and only one of them has advice that works: the hidden line suggests an
     // `include` pattern, which a fresh `init` config defeats by writing `respectGitignore: true`.
     // Classified as hidden, the directory was also never named on the gitignored line, so the user
-    // was not told why their pattern did nothing. Uncounted for the same reason every gitignored
+    // was not told why their pattern did nothing. Unlisted for the same reason every gitignored
     // directory is: the walk does not descend into it.
     const root = await createFixtureTree({
       ".gitignore": ".scratch/\n",
@@ -617,12 +627,12 @@ describe("scanRepository · the pruning record", () => {
     const result = await scanRepository({ cwd: root });
 
     expect(result.pruned.directories).toEqual([
-      { path: ".github", reason: "hidden", markdownFileCount: 1 },
+      { path: ".github", reason: "hidden", markdownFiles: [".github/PR.md"] },
       { path: ".scratch", reason: "gitignored" },
     ]);
   });
 
-  it("counts only MARKDOWN_EXTENSIONS files inside a hidden directory", async () => {
+  it("lists only MARKDOWN_EXTENSIONS files inside a hidden directory", async () => {
     const root = await createFixtureTree({
       "docs/one.md": "# One\n",
       ".claude/a.md": "# A\n",
@@ -634,7 +644,11 @@ describe("scanRepository · the pruning record", () => {
     const result = await scanRepository({ cwd: root });
 
     expect(result.pruned.directories).toEqual([
-      { path: ".claude", reason: "hidden", markdownFileCount: 2 },
+      {
+        path: ".claude",
+        reason: "hidden",
+        markdownFiles: [".claude/a.md", ".claude/b.mdx"],
+      },
     ]);
   });
 
@@ -660,13 +674,14 @@ describe("scanRepository · the pruning record", () => {
     expect(first.pruned).toEqual(second.pruned);
   });
 
-  it("counts a hidden tree the same way a scan rooted at it would collect one", async () => {
-    // The disclosed number and the corpus are produced by one function under two modes, so today
-    // they cannot disagree about noise, gitignore or extensions. The tests above assert the count
+  it("lists a hidden tree the same way a scan rooted at it would collect one", async () => {
+    // The disclosed files and the corpus are produced by one function under two modes, so today
+    // they cannot disagree about noise, gitignore or extensions. The tests above assert the list
     // against hand-written expectations, which would keep passing if the count branch were ever
-    // split into a walk of its own — and a divergence there is invisible: two plausible numbers,
-    // both green. This compares the count against a real collect walk over the same directory, so
-    // the day the branches separate is the day it fails.
+    // split into a walk of its own — and a divergence there is invisible: two plausible results,
+    // both green. This compares the list against a real collect walk over the same directory, so
+    // the day the branches separate is the day it fails. Compared as sets in both directions rather
+    // than by size, because a walk that dropped one file and gained another agrees on the total.
     //
     // The ignore rules live *inside* the hidden tree deliberately: a `.gitignore` above it is read
     // by the outer walk and not by one rooted at it, and this has to compare the same tree.
@@ -693,15 +708,26 @@ describe("scanRepository · the pruning record", () => {
     });
 
     // Non-vacuous on both sides, and the value is what makes the comparison mean something: all
-    // three rules had to fire to reach 2 — `generated/` gitignored, `notes.txt` not Markdown,
-    // `node_modules` noise — so a count that dropped any one of them would differ.
+    // three rules had to fire to leave these two — `generated/` gitignored, `notes.txt` not
+    // Markdown, `node_modules` noise — so a walk that dropped any one of them would differ.
     expect(disclosed).toEqual([
-      { path: ".tooling", reason: "hidden", markdownFileCount: 2 },
+      {
+        path: ".tooling",
+        reason: "hidden",
+        markdownFiles: [".tooling/a.md", ".tooling/nested/b.md"],
+      },
     ]);
     expect(
       [...documents.values()].map((document) => document.path).sort(),
     ).toEqual(["a.md", "nested/b.md"]);
-    expect(disclosed[0]!.markdownFileCount).toBe(documents.size);
+
+    // The loader is rooted *at* the hidden directory, so its paths are relative to it while the
+    // record's are repo-relative; re-rooting one side is what lets the two be compared as sets.
+    expect(disclosed[0]!.markdownFiles).toEqual(
+      [...documents.values()]
+        .map((document) => `.tooling/${document.path}`)
+        .sort(),
+    );
   });
 
   it("records nothing for a tree with no pruned directory at all", async () => {

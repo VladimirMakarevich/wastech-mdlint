@@ -54,17 +54,23 @@ export type PrunedDirectoryReason = "hidden" | "noise" | "gitignored";
 /**
  * One directory the scan skipped, as a repo-relative POSIX path.
  *
- * `markdownFileCount` is populated for `"hidden"` only, and that asymmetry is the point rather than
+ * `markdownFiles` is populated for `"hidden"` only, and that asymmetry is the point rather than
  * an omission: a hidden directory is the one class whose contents a user plausibly wants linted
  * (agent-instruction and skill trees live under dot-directories), so `init` has to be able to say
- * how much is in there.
- * Counting a `"noise"` or `"gitignored"` tree would mean walking `node_modules` — the exact cost
+ * what is in there.
+ * Listing a `"noise"` or `"gitignored"` tree would mean walking `node_modules` — the exact cost
  * pruning exists to avoid — for a number nobody acts on.
+ *
+ * The paths themselves rather than a total, because a count cannot answer the question the
+ * disclosure actually has to answer: a glob proposed for an ancestor directory matches dot-segments
+ * nested under it, so some of these files are in the corpus the drafted config produces and some are
+ * not. Deciding that needs each path matched against the include being written. Sorted, repo-relative
+ * POSIX, so the disclosed order does not depend on directory-entry order.
  */
 export type PrunedDirectory = {
   path: string;
   reason: PrunedDirectoryReason;
-  markdownFileCount?: number;
+  markdownFiles?: string[];
 };
 
 /**
@@ -150,9 +156,9 @@ function isOwnedByPackageScope(
 //
 // The walk also records *what* it pruned, which is what lets `init` disclose the gap between the
 // tracked tree and the proposed corpus. `"count"` mode is the same function re-entered under
-// a pruned hidden root purely to size it, rather than a second traversal — so the disclosed number
-// is produced by the same noise, gitignore and Markdown-extension rules as the corpus itself, by
-// construction and not by two implementations agreeing.
+// a pruned hidden root purely to list its contents, rather than a second traversal — so the
+// disclosed files are produced by the same noise, gitignore and Markdown-extension rules as the
+// corpus itself, by construction and not by two implementations agreeing.
 async function collectMarkdownFiles(
   cwd: string,
   noiseDirNames: readonly string[],
@@ -160,13 +166,16 @@ async function collectMarkdownFiles(
   const results: string[] = [];
   const pruned: PrunedDirectory[] = [];
 
-  // Returns the number of Markdown files this subtree contributes, which only `"count"` mode reads.
+  // Every Markdown file this subtree contributes is pushed to `sink`. The two modes differ only in
+  // where that sink points and in whether pruned directories are recorded: `"collect"` fills the
+  // corpus list, `"count"` fills one hidden root's own list.
   async function walk(
     directoryPath: string,
     relDirectory: string,
     parentLayers: IgnoreLayer[],
     mode: "collect" | "count",
-  ): Promise<number> {
+    sink: string[],
+  ): Promise<void> {
     const localLayer = await readIgnoreLayer(directoryPath, relDirectory);
     const layers =
       localLayer === undefined ? parentLayers : [...parentLayers, localLayer];
@@ -174,8 +183,6 @@ async function collectMarkdownFiles(
     const entries = await readdir(directoryPath, { withFileTypes: true }).catch(
       () => [],
     );
-
-    let markdownCount = 0;
 
     for (const entry of entries) {
       const relPath =
@@ -208,22 +215,26 @@ async function collectMarkdownFiles(
         }
 
         if (classification === "hidden") {
-          const hiddenCount = await walk(childPath, relPath, layers, "count");
           if (mode === "collect") {
+            const hiddenFiles: string[] = [];
+            await walk(childPath, relPath, layers, "count", hiddenFiles);
+            // Sorted here rather than at the disclosure: `readdir` order is filesystem-dependent, and
+            // this list is public API that a caller may render directly.
+            hiddenFiles.sort(compareStrings);
             pruned.push({
               path: relPath,
               reason: "hidden",
-              markdownFileCount: hiddenCount,
+              markdownFiles: hiddenFiles,
             });
           } else {
-            // Already inside a recorded hidden root: this subtree is part of that root's total, not
-            // a second entry to disclose.
-            markdownCount += hiddenCount;
+            // Already inside a recorded hidden root: this subtree is part of that root's own list,
+            // not a second entry to disclose, so it keeps writing into the same sink.
+            await walk(childPath, relPath, layers, "count", sink);
           }
           continue;
         }
 
-        markdownCount += await walk(childPath, relPath, layers, mode);
+        await walk(childPath, relPath, layers, mode, sink);
         continue;
       }
 
@@ -232,17 +243,12 @@ async function collectMarkdownFiles(
         isMarkdownFile(entry.name) &&
         !isGitIgnored(relPath, false, layers)
       ) {
-        markdownCount += 1;
-        if (mode === "collect") {
-          results.push(relPath);
-        }
+        sink.push(relPath);
       }
     }
-
-    return markdownCount;
   }
 
-  await walk(cwd, "", [], "collect");
+  await walk(cwd, "", [], "collect", results);
   // `readdir` order is filesystem-dependent, so the record is only deterministic once sorted.
   pruned.sort((left, right) => compareStrings(left.path, right.path));
   return { files: results, pruned };

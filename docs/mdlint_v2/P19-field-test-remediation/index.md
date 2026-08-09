@@ -48,7 +48,7 @@ The other three — F-11 (output rendering), F-13 (compile bounds), F-01 (releas
 | Task                                  | Status      | Findings closed  |
 | ------------------------------------- | ----------- | ---------------- |
 | [P19.01](01-inference-scope.md)       | Done        | F-03, F-04, F-10 |
-| [P19.02](02-scan-disclosure.md)       | Not started | —                |
+| [P19.02](02-scan-disclosure.md)       | Done        | F-05, F-06       |
 | [P19.03](03-silent-configurations.md) | Not started | —                |
 | [P19.04](04-text-report-grammar.md)   | Not started | —                |
 | [P19.05](05-message-scope.md)         | Not started | —                |

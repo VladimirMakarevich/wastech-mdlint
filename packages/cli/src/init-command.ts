@@ -11,12 +11,14 @@ import {
   CONFIG_FILE_NAME,
   containsJsoncComments,
   DEFAULT_EXCLUDE_GLOBS,
+  DEFAULT_INCLUDE_GLOBS,
   findConfig,
   generateInitConfig,
   identifyExistingRule,
   inferRuleSet,
   loadConfiguration,
   MARKDOWN_GLOB_SUFFIX,
+  matchesConfigGlob,
   normalizeRelativePath,
   PACKAGE_SCHEMA_SEGMENTS,
   resolvePackageSchemaRef,
@@ -439,53 +441,116 @@ function formatExistingConfigLine(
   }
 }
 
-// How many directories one exclusion line names before it collapses into `+N more`. A monorepo can
+// How many entries one exclusion line names before it collapses into a `+N more` tail. A monorepo can
 // prune dozens of `node_modules` copies, and a wall of paths is what makes a disclosure ignorable —
 // a disclosure nobody reads. The input is sorted, so which entries survive the cap is stable.
 const EXCLUSION_LIST_CAP = 5;
 
-function formatCappedList(items: string[]): string {
-  if (items.length <= EXCLUSION_LIST_CAP) {
-    return items.join(", ");
+// One named thing on an exclusion line, with however many of it there are: Markdown files under a
+// hidden directory, or pruned directories sharing a basename.
+type CountedEntry = { name: string; count: number };
+
+function sumCounts(entries: readonly CountedEntry[]): number {
+  return entries.reduce((total, entry) => total + entry.count, 0);
+}
+
+// Renders `name (count)` pairs, and the elided tail carries the total it drops.
+//
+// Both halves exist so the line's leading total is arithmetic the reader can perform against the list
+// beside it. Printing a count of directories next to a deduplicated list of names is what made
+// `3 directories skipped by name — .git, node_modules` unreconcilable: two correct numbers, no stated
+// relationship, and a reader left to guess whether the disclosure or their own arithmetic is wrong.
+// The tail is the same failure at the cap — `+6 more` names says nothing about how many of the total
+// those six account for.
+function formatCountedList(entries: readonly CountedEntry[]): string {
+  const render = (entry: CountedEntry): string =>
+    `${entry.name} (${entry.count})`;
+
+  if (entries.length <= EXCLUSION_LIST_CAP) {
+    return entries.map(render).join(", ");
   }
-  const shown = items.slice(0, EXCLUSION_LIST_CAP).join(", ");
-  return `${shown}, +${items.length - EXCLUSION_LIST_CAP} more`;
+
+  const shown = entries.slice(0, EXCLUSION_LIST_CAP).map(render).join(", ");
+  const elided = entries.slice(EXCLUSION_LIST_CAP);
+  return `${shown}, +${elided.length} more (${sumCounts(elided)})`;
 }
 
 function pluralize(count: number, singular: string, plural: string): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
-// Deduped, sorted basenames of a pruned set — `mobile/node_modules` and `node_modules` are one fact
-// to report, not two.
-function prunedBaseNames(directories: readonly { path: string }[]): string[] {
-  return [
-    ...new Set(directories.map((entry) => path.posix.basename(entry.path))),
-  ].sort(compareStrings);
+// Deduped, sorted basenames of a pruned set with their occurrence counts — `mobile/node_modules` and
+// `node_modules` are one name to report, and the count is what keeps the line's own total derivable.
+function prunedNameCounts(
+  directories: readonly { path: string }[],
+): CountedEntry[] {
+  const counts = new Map<string, number>();
+  for (const entry of directories) {
+    const name = path.posix.basename(entry.path);
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return [...counts]
+    .map(([name, count]) => ({ name, count }))
+    .sort((left, right) => compareStrings(left.name, right.name));
+}
+
+// Splits one pruned hidden directory's Markdown files by whether the drafted config will lint them.
+//
+// A hidden directory is skipped by the *scan*, which is a separate question from whether the config
+// the scan led to selects its files — and the two answers routinely differ. Config globs are matched
+// with dot-segments enabled, so a cluster proposed for an ancestor directory (`backend`) covers a
+// dot-directory nested under it (`backend/.rules`) without ever naming it. A directory can therefore
+// land on both sides at once, when the include reaches part of its tree and not the rest.
+//
+// Judged per file rather than per directory for that reason, and against the same patterns the write
+// will emit, so the block cannot claim a file is out of the corpus that the config beside it pulls in.
+function partitionHiddenFiles(
+  files: readonly string[],
+  include: readonly string[],
+  exclude: readonly string[],
+): { linted: string[]; notLinted: string[] } {
+  const linted: string[] = [];
+  const notLinted: string[] = [];
+
+  for (const file of files) {
+    const selected =
+      matchesConfigGlob(file, [...include]) &&
+      !matchesConfigGlob(file, [...exclude]);
+    (selected ? linted : notLinted).push(file);
+  }
+
+  return { linted, notLinted };
 }
 
 /**
- * The scan-exclusion disclosure: what the scan refused to walk, and why. Pure and
- * exported so the wording is asserted directly, mirroring `formatDraftSummary`/`formatWriteSummary`.
+ * The scan-exclusion disclosure: what the scan refused to walk, why, and — for the one class where
+ * the two can differ — whether the drafted config lints those files anyway. Pure and exported so the
+ * wording is asserted directly, mirroring `formatDraftSummary`/`formatWriteSummary`.
  *
- * **One line per reason, never one total.** The three classes are not one class: a pruned
- * `node_modules` is unsurprising, and a `.claude/skills/` dropped because its parent starts with a
- * dot is the finding. A single aggregate count is precisely what invites a user to skim past it.
+ * **One line per reason, never one total.** The classes are not one class: a pruned `node_modules` is
+ * unsurprising, and a `.claude/skills/` dropped because its parent starts with a dot is the finding.
+ * A single aggregate count is precisely what invites a user to skim past it.
  *
- * Only the hidden class carries a file count, and the asymmetry is deliberate — it is the one class
- * whose contents are plausibly documentation the user wants linted, and it is also the only one
- * cheap to size (`scanRepository` counts it while pruning; counting a dependency tree would mean
- * walking the tree that pruning exists to avoid). The other two say "contents not counted" out loud
- * rather than implying a zero.
+ * **Every count is derivable from the list printed beside it.** Each line states a total and then
+ * names its parts with their own counts, so a reader can add them up rather than take the total on
+ * faith; an elided tail carries the total it drops for the same reason.
+ *
+ * Only the hidden class names files, and the asymmetry is deliberate — it is the one class whose
+ * contents are plausibly documentation the user wants linted, and it is also the only one cheap to
+ * enumerate (`scanRepository` lists it while pruning; listing a dependency tree would mean walking the
+ * tree that pruning exists to avoid). The other two say "contents not counted" out loud rather than
+ * implying a zero.
  *
  * Returns `[]` when there is nothing to disclose, so the caller can omit the block entirely.
  *
- * `includeWillBeWritten` decides the hidden line's actionable half, and it has to be passed in
- * because the two answers are opposites: with an `include` written, a dot-directory is outside the
- * corpus and the user needs a pattern to add. With the key omitted — the scan found no cluster at
- * all, which is exactly the shape of a repo whose only Markdown *is* in dot-directories — the
- * dot-matching default `include` is in force and those files are already linted. Claiming otherwise
- * in that branch would contradict the `Include (…)` line printed two lines above it.
+ * `includeToWrite` is the exact value the write will put in the `include` key — the patterns, not a
+ * flag — because the hidden class needs both of the questions it answers. *Which* patterns decides
+ * per file whether a skipped file is nonetheless in the corpus, which is the difference between a
+ * true sentence and a misleading one when a cluster glob covers a dot-directory nested under it.
+ * *Whether* the key is written at all (`undefined`) decides the actionable half: with an include, a
+ * file outside it needs a pattern added; with the key omitted — the scan found no cluster, which is
+ * exactly the shape of a repo whose only Markdown *is* in dot-directories — the dot-matching default
+ * is in force instead, and saying otherwise would contradict the `Include (…)` line above.
  *
  * (No default glob is spelled out in this block comment on purpose: a depth-agnostic prefix contains
  * `*` `*` `/`, which would close the comment early — the same reason `config/corpus-scope.ts` uses
@@ -493,59 +558,95 @@ function prunedBaseNames(directories: readonly { path: string }[]): string[] {
  */
 export function formatScanExclusions(
   pruning: ScanPruning,
-  includeWillBeWritten: boolean,
+  includeToWrite: readonly string[] | undefined,
 ): string[] {
+  // The scope the drafted config will actually lint by. `exclude` and `respectGitignore` are pinned
+  // by the fresh write, and this is the same `exclude` it emits — the hidden files were already
+  // walked under the scan's own noise and gitignore pruning, so applying it here is what keeps the
+  // two definitions from drifting apart rather than a second filter.
+  const include = includeToWrite ?? DEFAULT_INCLUDE_GLOBS;
+
   // Sorted here rather than trusted from the caller: `ScanPruning` is public core API and this
   // formatter is exported, so an unsorted record would otherwise render in input order and shift
   // which entries the cap keeps. Sorting belongs at the rendering site, not at the caller.
   const hidden = pruning.directories
-    .filter(
-      (entry) =>
-        entry.reason === "hidden" && (entry.markdownFileCount ?? 0) > 0,
-    )
+    .filter((entry) => entry.reason === "hidden")
     .sort((left, right) => compareStrings(left.path, right.path));
   const noise = pruning.directories.filter((entry) => entry.reason === "noise");
   const gitignored = pruning.directories.filter(
     (entry) => entry.reason === "gitignored",
   );
 
+  const notLinted: CountedEntry[] = [];
+  const lintedAnyway: CountedEntry[] = [];
+  for (const entry of hidden) {
+    const split = partitionHiddenFiles(
+      entry.markdownFiles ?? [],
+      include,
+      DEFAULT_EXCLUDE_GLOBS,
+    );
+    // A directory holding no Markdown at all contributes to neither, and is therefore never
+    // disclosed: reporting an empty `.husky` would train the reader to skim the line that matters.
+    if (split.notLinted.length > 0) {
+      notLinted.push({ name: entry.path, count: split.notLinted.length });
+    }
+    if (split.linted.length > 0) {
+      lintedAnyway.push({ name: entry.path, count: split.linted.length });
+    }
+  }
+
   const lines: string[] = [];
 
-  if (hidden.length > 0) {
-    const total = hidden.reduce(
-      (sum, entry) => sum + (entry.markdownFileCount ?? 0),
-      0,
-    );
-    const named = formatCappedList(
-      hidden.map((entry) => `${entry.path} (${entry.markdownFileCount})`),
-    );
-    // The suggested pattern splices MARKDOWN_GLOB_SUFFIX rather than a literal `*.md`, because the
-    // count beside it was produced with MARKDOWN_EXTENSIONS: a hardcoded `.md` tail would advertise
-    // a pattern that lints fewer files than the number in the same sentence.
-    const advice = includeWillBeWritten
-      ? `The scan never proposes a dot-directory as a doc cluster, so no include pattern above ` +
-        `names one; add a pattern such as "${hidden[0]!.path}/**/${MARKDOWN_GLOB_SUFFIX}" to lint it.`
-      : `The scan never proposes a dot-directory as a doc cluster, but no include will be written ` +
-        `either, so the dot-matching **/*.md default stays in force and the .md files among these ` +
-        `are linted.`;
+  const describeHidden = (entries: readonly CountedEntry[]): string =>
+    `${pluralize(sumCounts(entries), "Markdown file", "Markdown files")} in ` +
+    `${pluralize(entries.length, "directory", "directories")} whose name starts with a dot — ` +
+    `${formatCountedList(entries)}.`;
+
+  if (notLinted.length > 0) {
+    // The suggested pattern splices MARKDOWN_GLOB_SUFFIX rather than a literal `.md` tail, because
+    // the count beside it was produced with MARKDOWN_EXTENSIONS: a hardcoded tail would advertise a
+    // pattern that lints fewer files than the number in the same sentence. The directory it names is
+    // taken from this group, so the advice can never point at one an include already covers — which
+    // is the whole reason the two groups are separate lines.
+    const advice =
+      includeToWrite === undefined
+        ? `The scan never proposes a dot-directory as a doc cluster, and no include will be ` +
+          `written either, so the dot-matching default is in force — it selects .md only, so these ` +
+          `are not linted.`
+        : `The scan never proposes a dot-directory as a doc cluster, and no include pattern above ` +
+          `matches these; add a pattern such as "${notLinted[0]!.name}/**/${MARKDOWN_GLOB_SUFFIX}" ` +
+          `to lint them.`;
     lines.push(
-      `  hidden directories: ${pluralize(total, "Markdown file", "Markdown files")} in ` +
-        `${pluralize(hidden.length, "directory", "directories")} whose name starts with a dot — ` +
-        `${named}. ${advice}`,
+      `  hidden directories, not linted: ${describeHidden(notLinted)} ${advice}`,
+    );
+  }
+
+  if (lintedAnyway.length > 0) {
+    // Reported rather than dropped, because the surprise runs in this direction too: a finding in a
+    // file the same screen has just listed under "Excluded from the scan" reads as a bug in the tool.
+    // No advice here — there is nothing to add.
+    const note =
+      includeToWrite === undefined
+        ? `The scan never proposes a dot-directory as a doc cluster, but no include will be ` +
+          `written either, so the dot-matching default stays in force and these are linted.`
+        : `The scan never proposed these as doc clusters, but an include pattern above matches ` +
+          `them anyway, so they are in the corpus.`;
+    lines.push(
+      `  hidden directories, linted anyway: ${describeHidden(lintedAnyway)} ${note}`,
     );
   }
 
   if (noise.length > 0) {
     lines.push(
       `  build and dependency directories: ${pluralize(noise.length, "directory", "directories")} ` +
-        `skipped by name, contents not counted — ${formatCappedList(prunedBaseNames(noise))}.`,
+        `skipped by name, contents not counted — ${formatCountedList(prunedNameCounts(noise))}.`,
     );
   }
 
   if (gitignored.length > 0) {
     lines.push(
       `  gitignored directories: ${pluralize(gitignored.length, "directory", "directories")} ` +
-        `skipped, contents not counted — ${formatCappedList(prunedBaseNames(gitignored))}.`,
+        `skipped, contents not counted — ${formatCountedList(prunedNameCounts(gitignored))}.`,
     );
   }
 
@@ -603,13 +704,14 @@ export function formatDraftSummary(
     // merge path is not making. Under `--yes` this reaches stdout via `composeOutput`; interactively
     // `confirmDraft` shows it while the user can still decline, which is where the warn-before-
     // confirming discipline wants it.
-    // Asks the writer's own decision function rather than re-deriving it: the key is omitted only
-    // when nothing was selected *and* nothing was offered, and that is the one case where the hidden
-    // files end up linted by the default rather than skipped.
+    // Asks the writer's own decision function rather than re-deriving it, and hands over the value
+    // itself: the disclosure judges each skipped file against the patterns the config will carry, so
+    // a second derivation here could describe a boundary the written file does not have. The omitted
+    // case (nothing selected *and* nothing offered) is carried by `undefined` rather than flattened,
+    // because that is the one case where the hidden files end up linted by the default.
     const exclusions = formatScanExclusions(
       selections.pruning,
-      resolveIncludeToWrite(preview.include, selections.clustersWereOffered) !==
-        undefined,
+      resolveIncludeToWrite(preview.include, selections.clustersWereOffered),
     );
     if (exclusions.length > 0) {
       lines.push("", ...exclusions);
