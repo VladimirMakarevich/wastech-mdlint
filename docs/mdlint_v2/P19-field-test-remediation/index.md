@@ -1,6 +1,6 @@
 # Phase P19 — Field-test remediation
 
-> Roadmap: [v2 Index](../index.md) · Phase **P19** · Size **M** · Status **Not started** · Depends on [P18](../P18-followup-burndown/index.md) (the follow-up queue is empty, so this phase starts from a clean backlog).
+> Roadmap: [v2 Index](../index.md) · Phase **P19** · Size **M** · Status **In progress** · Depends on [P18](../P18-followup-burndown/index.md) (the follow-up queue is empty, so this phase starts from a clean backlog).
 >
 > **Goal:** close the fourteen findings from the [2026-08-09 field test](../field-test-2026-08-09-debates.md) — the first run in which the packed artifacts were installed **into** an external repository rather than beside it.
 
@@ -45,15 +45,15 @@ The other three — F-11 (output rendering), F-13 (compile bounds), F-01 (releas
 
 ## Progress
 
-| Task                                  | Status      | Findings closed |
-| ------------------------------------- | ----------- | --------------- |
-| [P19.01](01-inference-scope.md)       | Not started | —               |
-| [P19.02](02-scan-disclosure.md)       | Not started | —               |
-| [P19.03](03-silent-configurations.md) | Not started | —               |
-| [P19.04](04-text-report-grammar.md)   | Not started | —               |
-| [P19.05](05-message-scope.md)         | Not started | —               |
-| [P19.06](06-reporting-surfaces.md)    | Not started | —               |
-| [P19.07](07-host-and-release.md)      | Not started | —               |
+| Task                                  | Status      | Findings closed  |
+| ------------------------------------- | ----------- | ---------------- |
+| [P19.01](01-inference-scope.md)       | Done        | F-03, F-04, F-10 |
+| [P19.02](02-scan-disclosure.md)       | Not started | —                |
+| [P19.03](03-silent-configurations.md) | Not started | —                |
+| [P19.04](04-text-report-grammar.md)   | Not started | —                |
+| [P19.05](05-message-scope.md)         | Not started | —                |
+| [P19.06](06-reporting-surfaces.md)    | Not started | —                |
+| [P19.07](07-host-and-release.md)      | Not started | —                |
 
 ## Exit criteria
 

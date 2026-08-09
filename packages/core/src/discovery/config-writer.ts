@@ -247,9 +247,14 @@ export function containsJsoncComments(text: string): boolean {
 // existing entry — merge keeps those verbatim without inventing a comment).
 type RuleItem = { entry: unknown; comment?: string };
 
+// `severity` is emitted only when the proposal differs from the rule's registry default, so an
+// ordinary entry stays the two-word `{ "rule": "REF-001" }` a reader can scan, and a key that *is*
+// present is a decision somebody made rather than a restatement of the default. It sits before
+// `options` because it is the field that changes whether the entry runs at all.
 function toRuleEntry(rule: InferredRule): Record<string, unknown> {
   return {
     rule: rule.rule,
+    ...(rule.severity === undefined ? {} : { severity: rule.severity }),
     ...(rule.options === undefined ? {} : { options: rule.options }),
   };
 }

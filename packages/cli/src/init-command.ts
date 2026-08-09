@@ -10,6 +10,7 @@ import {
   compareStrings,
   CONFIG_FILE_NAME,
   containsJsoncComments,
+  DEFAULT_EXCLUDE_GLOBS,
   findConfig,
   generateInitConfig,
   identifyExistingRule,
@@ -27,8 +28,10 @@ import {
   type DocCluster,
   type ExistingConfigDocument,
   type GeneratedInitConfig,
+  type InferenceScope,
   type InferredRule,
   type InitConfigAction,
+  type LoadedConfiguration,
   type ProjectSchemaReason,
   type RuleCategory,
   type RuleConfigEntry,
@@ -166,16 +169,17 @@ const COMMENT_LOSS_NOTE =
   "merge rebuilds the config from its parsed values, so the JSONC comments in the existing file " +
   "are not preserved.";
 
-// The two rules the README leads with are the two `init` can never propose: both require a
-// budget, and inference sees 3–5 sampled files per cluster — not a corpus — so any threshold it
-// derived would be invented rather than measured. That is a scope choice, and an unstated one is
-// what turns into a finding a second time, so the draft says it out loud rather than leaving the
-// user to notice the absence. Same disclosure discipline as the scan-exclusion block above it.
+// The two rules the README leads with are the two `init` can never propose, and measuring the whole
+// corpus rather than a sample does not change that: both require a budget, and a budget is a choice
+// rather than a measurement — knowing how large every document is says nothing about how large one
+// ought to be. That is a scope choice, and an unstated one is what turns into a finding a second
+// time, so the draft says it out loud rather than leaving the user to notice the absence. Same
+// disclosure discipline as the scan-exclusion block above it.
 const NOT_INFERRED_NOTE = [
   "Not proposed by init:",
   "  SIZE-001 (byte / line / token budgets) and LLM-001 (eager-import token budget) are never " +
-    "inferred — both need a budget only you can choose, and no honest threshold follows from a " +
-    "3–5 file sample. Add them by hand: see docs/guide/rules/SIZE-001.md and " +
+    "inferred — both need a budget only you can choose, and measuring your corpus cannot supply " +
+    "one. Add them by hand: see docs/guide/rules/SIZE-001.md and " +
     "docs/guide/rules/LLM-001.md.",
 ];
 
@@ -322,12 +326,6 @@ export async function readExistingConfigDocument(
 }
 
 /**
- * Shapes the confirmed clusters/rules into the `{ include, rules }` slice of `LintConfig` the
- * writer later serializes. Structural-only — no `$schema`/comments/severity here, and
- * validated against `lintConfigSchema` only in tests (a forward-compat smoke check, not a runtime
- * dependency on the schema).
- */
-/**
  * The `include` value a fresh write will use — the one place this three-valued rule is decided.
  *
  * Three values, because an empty selection and an empty scan need opposite files: a literal `[]` is
@@ -353,6 +351,38 @@ export function resolveIncludeToWrite(
   return clustersWereOffered ? [] : undefined;
 }
 
+/**
+ * The corpus a fresh write's config will lint, so inference can measure exactly it.
+ *
+ * Every value here has to be the one `generateInitConfig`'s fresh branch emits, not an approximation
+ * of it: the counts inference writes into the rationale comments are a promise that running `lint`
+ * against the file reproduces them, and a scope assembled from different defaults would break that
+ * promise silently — the config would still be valid and the numbers beside each rule simply wrong.
+ * That is why `include` comes from the same three-valued helper the writer uses rather than from the
+ * cluster list directly, and why `respectGitignore` is pinned `true` here as it is there.
+ */
+function freshInferenceScope(
+  clusters: DocCluster[],
+  clustersWereOffered: boolean,
+): InferenceScope {
+  const include = resolveIncludeToWrite(
+    buildConfigPreview(clusters, []).include,
+    clustersWereOffered,
+  );
+  return {
+    ...(include === undefined ? {} : { include }),
+    exclude: [...DEFAULT_EXCLUDE_GLOBS],
+    respectGitignore: true,
+  };
+}
+
+/**
+ * Shapes the confirmed clusters/rules into the `{ include, rules }` slice of `LintConfig` the
+ * writer later serializes. Structural-only — no `$schema` and no rationale comments here — and
+ * validated against `lintConfigSchema` only in tests (a forward-compat smoke check, not a runtime
+ * dependency on the schema). A proposal's `severity` *is* carried, because it decides whether the
+ * entry runs; a preview that dropped it would show the user a rule the write then disables.
+ */
 export function buildConfigPreview(
   clusters: DocCluster[],
   rules: InferredRule[],
@@ -363,6 +393,7 @@ export function buildConfigPreview(
 
   const ruleEntries: RuleConfigEntry[] = rules.map((rule) => ({
     rule: rule.rule,
+    ...(rule.severity === undefined ? {} : { severity: rule.severity }),
     ...(rule.options === undefined ? {} : { options: rule.options }),
   }));
 
@@ -1176,19 +1207,76 @@ export async function runInitCommand(
       ? await prompter.choosePackageManager()
       : scanResult.packageManager;
 
-  // Re-run inference against the confirmed cluster subset, not a post-hoc filter of one
-  // full-corpus run, so global gate sums / the cross-cluster cycle heuristic / SEC-001's `files`
-  // scoping stay correct for exactly what the user kept.
+  let existingConfigUnreadable = false;
+  // The single parsed snapshot of the existing config, read once and reused by the inference scope
+  // below, the rule diff, and the merge write — re-reading after confirmation could race with a
+  // concurrent edit and (on a second-read failure) silently drop the very entries a merge must
+  // preserve.
+  let existingDocument: ParsedExistingConfig | undefined;
+  let existingRuleIds: string[] = [];
+  let existingConfiguration: LoadedConfiguration | undefined;
+
+  // Read before inference rather than after it, because a merge's inference scope *is* this file's
+  // `include`/`exclude`/`settings`. Inferring first and filtering afterwards was what let a merge
+  // append a rule whose only evidence sat in files the preserved `include` never selects, and then
+  // write the measurement that justified it into the config as a permanent comment.
+  if (existingConfigPath !== undefined && existingConfigAction === "merge") {
+    existingDocument = await readExistingConfigDocument(
+      cwd,
+      existingConfigPath,
+    );
+    const { ruleIds, mergeable } = extractExistingRuleIds(existingDocument.raw);
+    existingRuleIds = ruleIds;
+    // Additive merge preserves the existing content verbatim, so the written config is only valid if
+    // the existing one already loads (append-only adds registry-valid inferred rules). Validate it
+    // through the real loader — an unknown top-level key, unknown rule id, or invalid preserved
+    // options must abort the merge, never be reported as a successful write of a config that
+    // `loadConfiguration` would then reject.
+    existingConfiguration = await loadExistingConfiguration(
+      cwd,
+      existingConfigPath,
+    );
+    existingConfigUnreadable =
+      !existingDocument.parsed ||
+      !mergeable ||
+      existingConfiguration === undefined;
+  }
+
+  // Inference measures the corpus the config being written will lint, so this has to describe that
+  // config and not the repository. A merge keeps every existing scope key untouched, so its own
+  // values are the scope; anything else writes the cluster globs the user just confirmed. An
+  // unreadable merge falls through to the fresh scope on purpose: that run aborts without writing,
+  // and the draft it still prints should describe clusters rather than a file it could not parse.
+  const scope: InferenceScope =
+    existingConfiguration !== undefined && !existingConfigUnreadable
+      ? {
+          ...(existingConfiguration.config.include === undefined
+            ? {}
+            : { include: existingConfiguration.config.include }),
+          ...(existingConfiguration.config.exclude === undefined
+            ? {}
+            : { exclude: existingConfiguration.config.exclude }),
+          ...(existingConfiguration.config.respectGitignore === undefined
+            ? {}
+            : {
+                respectGitignore: existingConfiguration.config.respectGitignore,
+              }),
+          settings: existingConfiguration.settings,
+        }
+      : freshInferenceScope(confirmedClusters, clustersWereOffered);
+
   const inference = await inferRuleSet({
     cwd,
     clusters: confirmedClusters,
     registry: ruleRegistry,
+    scope,
   });
 
   const groupedByCategory = groupInferredRulesByCategory(inference.rules);
   // Only categories with >=1 inferred rule are offered — the other built-ins have a required
-  // option with no safe way to derive it from sampled files (see rule-inference.ts's own note on
-  // the 7 gated ids), so a category with nothing to add would be a dead, confusing checkbox entry.
+  // option with no safe way to derive from a corpus without inventing a threshold (see
+  // rule-inference.ts's own note on the 7 gated ids), so a category with nothing to add would be a
+  // dead, confusing checkbox entry.
   const categoriesWithRules = (
     Object.keys(groupedByCategory) as RuleCategory[]
   ).sort(compareStrings);
@@ -1203,28 +1291,12 @@ export async function runInitCommand(
   let selectedRules = inference.rules.filter((rule) =>
     selectedCategorySet.has(rule.category),
   );
-  let existingConfigUnreadable = false;
-  // The single parsed snapshot of the existing config, read once and reused by both the diff below
-  // and the merge write later — re-reading after confirmation could race with a concurrent edit and
-  // (on a second-read failure) silently drop the very entries a merge must preserve.
-  let existingDocument: ParsedExistingConfig | undefined;
 
-  if (existingConfigPath !== undefined && existingConfigAction === "merge") {
-    existingDocument = await readExistingConfigDocument(
-      cwd,
-      existingConfigPath,
-    );
-    const { ruleIds, mergeable } = extractExistingRuleIds(existingDocument.raw);
-    // Additive merge preserves the existing content verbatim, so the written config is only valid if
-    // the existing one already loads (append-only adds registry-valid inferred rules). Validate it
-    // through the real loader — an unknown top-level key, unknown rule id, or invalid preserved
-    // options must abort the merge, never be reported as a successful write of a config that
-    // `loadConfiguration` would then reject.
-    existingConfigUnreadable =
-      !existingDocument.parsed ||
-      !mergeable ||
-      !(await existingConfigLoads(cwd, existingConfigPath));
-    selectedRules = diffAgainstExistingRuleIds(ruleIds, selectedRules).newRules;
+  if (existingConfigAction === "merge" && existingDocument !== undefined) {
+    selectedRules = diffAgainstExistingRuleIds(
+      existingRuleIds,
+      selectedRules,
+    ).newRules;
   }
 
   // Only a merge rebuilds an existing file, so only a merge can lose its comments; an `overwrite`
@@ -1435,18 +1507,21 @@ async function fileExists(absolutePath: string): Promise<boolean> {
   }
 }
 
-// True when the existing config fully loads (root schema + rule resolution) — the same validation
-// `loadConfiguration` runs at lint time. A `merge` gates on this so it never rewrites a config that
-// preserves an already-invalid key/rule/options and then reports success (acceptance: init writes a
-// valid config). Any thrown ConfigError (or other read failure) counts as "does not load".
-async function existingConfigLoads(
+// The existing config as the lint pipeline itself resolves it (root schema + rule resolution),
+// or `undefined` when it does not load at all. A `merge` gates on this so it never rewrites a config
+// that preserves an already-invalid key/rule/options and then reports success (acceptance: init
+// writes a valid config). Any thrown ConfigError (or other read failure) counts as "does not load".
+//
+// It returns the loaded configuration rather than a boolean because the merge scope is read off it:
+// deriving `include`/`exclude`/`settings` from the raw parsed object instead would be a second
+// implementation of defaulting rules that the loader already owns, free to disagree with the run.
+async function loadExistingConfiguration(
   cwd: string,
   configPath: string,
-): Promise<boolean> {
+): Promise<LoadedConfiguration | undefined> {
   try {
-    await loadConfiguration({ cwd, explicitConfigPath: configPath });
-    return true;
+    return await loadConfiguration({ cwd, explicitConfigPath: configPath });
   } catch {
-    return false;
+    return undefined;
   }
 }

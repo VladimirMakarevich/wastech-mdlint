@@ -486,6 +486,61 @@ describe("init command · existing config handling", () => {
     );
   });
 
+  it("--on-existing merge appends no rule whose only evidence sits outside the preserved include", async () => {
+    // Two correct behaviors used to meet badly here. A merge preserves `include` exactly, and it
+    // says so; inference read the whole repository scan. So the merge appended REF-003 and TBL-002
+    // justified by an `assets/` tree the config will never read, and wrote that measurement into the
+    // file as a permanent comment — false of every run the config would ever perform. Any repository
+    // whose `include` is narrower than its Markdown hit this on the first merge.
+    // `guides/` is a directory the scan does cluster, so it is offered and confirmed like any other
+    // — the existing `include` is the only thing keeping it out of the run, which is precisely the
+    // mechanism under test.
+    const cwd = await fixtureRepo(
+      withInstalledSchema({
+        "docs/a.md": "# A\n\n## Overview\n\nSee [B](b.md).\n",
+        "docs/b.md": "# B\n\n## Overview\n\nOrdinary prose.\n",
+        "guides/gallery.md": [
+          "# Gallery",
+          "",
+          "## Pictures",
+          "",
+          "![diagram](diagram.png)",
+          "",
+          "| Name | Value |",
+          "| --- | --- |",
+          "| a | b |",
+          "",
+        ].join("\n"),
+        "wastech-mdlint.config.json": `${JSON.stringify(
+          { include: ["docs/**/*.md"], rules: [] },
+          null,
+          2,
+        )}\n`,
+      }),
+    );
+
+    const result = await run(
+      ["init", cwd, "--yes", "--on-existing", "merge"],
+      cwd,
+    );
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const written = readConfig(
+      await readFile(path.join(cwd, CONFIG_FILE), "utf8"),
+    );
+    expect(written.include).toEqual(["docs/**/*.md"]);
+    const ruleIds = (written.rules as { rule: string }[]).map(
+      (entry) => entry.rule,
+    );
+    expect(ruleIds).not.toContain("REF-003");
+    expect(ruleIds).not.toContain("TBL-002");
+    // The rules that *are* appended come from the two documents the config selects, and no rationale
+    // may name a file outside them — the comment has to stay true of every run of this config.
+    expect(ruleIds).toEqual(["GRP-001", "REF-001"]);
+    const configText = await readFile(path.join(cwd, CONFIG_FILE), "utf8");
+    expect(configText).not.toContain("guides/");
+  });
+
   it("--on-existing skip previews the skip message and leaves the file untouched", async () => {
     const cwd = await fixtureRepo({
       ...CROSS_LINKED_DOCS_FIXTURE,
@@ -1362,13 +1417,14 @@ describe("init command · writing the config", () => {
   });
 
   it("writes a nested config whose workflow lint command actually lints that subtree", async () => {
-    // docs/ has a broken local link (REF-001 evidence + a real violation). The workflow scopes lint
-    // to the config directory, so running that same command must load the nested config and scan the
-    // nested tree — not lint the repo root against docs-relative globs and find nothing.
+    // docs/ starts clean, so REF-001 is proposed enabled, and the link is broken *afterwards* — the
+    // sequence a repository actually lives through, and the only one that can prove this workflow
+    // scans the nested tree. A tree broken before `init` would have the rule written disabled and
+    // report nothing, which is indistinguishable from linting the wrong directory.
     const cwd = await fixtureRepo({
       ".git/HEAD": "ref: refs/heads/main\n",
-      "docs/a.md": "# A\n\nSee [missing](nope.md).\n",
-      "docs/b.md": "# B\n\nSee [A](a.md).\n",
+      "docs/a.md": "# A\n\nSee [B](b.md).\n",
+      "docs/b.md": "# B\n\nJust prose.\n",
     });
 
     const initResult = await run(
@@ -1376,6 +1432,12 @@ describe("init command · writing the config", () => {
       cwd,
     );
     expect(initResult.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    await writeFile(
+      path.join(cwd, "docs", "a.md"),
+      "# A\n\nSee [missing](nope.md).\n",
+      "utf8",
+    );
 
     // Run the emitted argv *verbatim*, from the repo root where GitHub runs the workflow. This test
     // used to mirror the command with hand-written absolute paths, which is precisely why the
@@ -3320,6 +3382,75 @@ describe("init command · clean fixture lints clean", () => {
     expect(lintResult.exitCode).toBe(EXIT_CODE_SUCCESS);
     expect(lintResult.stdout).toBe("No problems found.\n");
     await expect(loadConfiguration({ cwd })).resolves.toBeDefined();
+  });
+});
+
+describe("init command · a messy repository still lints clean on the first run", () => {
+  // The measured defect: `init --yes` then `lint` reported 24 errors and 435 warnings over 151
+  // files, 433 of them from one rule whose written justification claimed 29 checklist items for a
+  // corpus holding 433. Eighteen of the 459 were worth acting on. A gate that red on the day it
+  // lands is ignored and then disabled, taking the rules that were clean with it — and the same run
+  // offers a CI workflow that would fail on the first push.
+  //
+  // Every rule below has something to report in this fixture, so under the old presence gate the
+  // first lint reported all of it. The property now: a rule joins enabled only when the corpus it
+  // will lint already reports nothing for it.
+  const MESSY_FIXTURE: Record<string, string> = {
+    "docs/checklist.md": `# Checklist\n\n## Tasks\n\n${Array.from(
+      { length: 40 },
+      (_unused, index) => `- [ ] task ${index + 1}`,
+    ).join("\n")}\n`,
+    "docs/links.md":
+      "# Links\n\n## Overview\n\nSee [gone](nowhere.md) and [anchored](checklist.md#no-such-heading).\n",
+    "docs/tables.md":
+      "# Tables\n\n## Data\n\n| Name | Value |\n| --- | --- |\n| a | |\n",
+    "docs/placeholder.md": "# Placeholder\n\n## Notes\n\nTBD\n",
+    "docs/index.md": "# Index\n\n## Members\n\nSee [member](member.md).\n",
+    "docs/member.md":
+      "# Member\n\n## Overview\n\nBack to the [index](index.md).\n",
+  };
+
+  it("init --yes then lint reports nothing and exits 0", async () => {
+    const cwd = await fixtureRepo(MESSY_FIXTURE);
+
+    const initResult = await run(["init", cwd, "--yes"], cwd);
+    expect(initResult.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const lintResult = await run(["lint", cwd], cwd);
+    // The exact zero-messages string, not just exit 0: CTX-002 and TBL-002 default to `warning`, so
+    // a run still reporting them would exit 0 under the default `--fail-on error` and hide the very
+    // volume this asserts against.
+    expect(lintResult.stdout).toBe("No problems found.\n");
+    expect(lintResult.exitCode).toBe(EXIT_CODE_SUCCESS);
+  });
+
+  it("writes each unsatisfied rule down as a disabled entry carrying its real count", async () => {
+    const cwd = await fixtureRepo(MESSY_FIXTURE);
+
+    await run(["init", cwd, "--yes"], cwd);
+    const configText = await readFile(path.join(cwd, CONFIG_FILE), "utf8");
+    const written = readConfig(configText);
+    const entries = written.rules as { rule: string; severity?: string }[];
+
+    // Disabled is not the same as omitted. The config is the work list: every rule the corpus makes
+    // relevant is present, and the ones it does not satisfy carry the number that disabled them.
+    expect(
+      entries
+        .filter((entry) => entry.severity === "off")
+        .map((entry) => entry.rule),
+    ).toEqual(["CTX-001", "CTX-002", "REF-001", "REF-002", "TBL-002"]);
+    // GRP-001 stays enabled: the only loop here spans two documents, which is below its floor, so
+    // the rule reports nothing and the entry is a live gate rather than a deferred one.
+    expect(
+      entries.find((entry) => entry.rule === "GRP-001")?.severity,
+    ).toBeUndefined();
+
+    // The count in the comment is the corpus count, not a sample's — the number a reader reproduces
+    // by turning the rule on and running lint.
+    expect(configText).toContain("40 checklist item(s)");
+    expect(configText).toContain("6 file(s) this config lints");
+    // And the cycle GRP-001 cites is named together with the reason this config leaves it alone.
+    expect(configText).toContain("will NOT report");
   });
 });
 

@@ -68,6 +68,7 @@ export { inferRuleSet } from "./discovery/rule-inference.js";
 export type {
   ClusterRuleInference,
   DetectedPatterns,
+  InferenceScope,
   InferredRule,
   RuleInferenceResult,
 } from "./discovery/rule-inference.js";
@@ -327,3 +328,7 @@ export type {
   ConfiguredRule,
   LoadedConfiguration,
 } from "./config/load-config.js";
+// Public because `init` has to measure the same corpus the config it writes will lint, and the
+// `exclude` that config carries is this list. A host re-deriving it would be a second copy, free to
+// disagree with the lint path about which files the counts in the written rationale describe.
+export { DEFAULT_EXCLUDE_GLOBS } from "./config/corpus-scope.js";

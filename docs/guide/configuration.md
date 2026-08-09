@@ -163,7 +163,7 @@ Each entry names a `rule` and may set `severity` and `options`:
 ```
 
 - **Rule IDs are case-insensitive and dash-optional** — `ref-001` and `REF001` both canonicalize to `REF-001`.
-- `severity` is `"error" | "warning" | "off"`. `"off"` documents but disables a rule. Omitting `severity` uses the rule's built-in default (see each rule page).
+- `severity` is `"error" | "warning" | "off"`. `"off"` documents but disables a rule. Omitting `severity` uses the rule's built-in default (see each rule page). A config written by [`init`](cli.md#the-rule-set-init-proposes-and-why-your-first-lint-is-green) uses both spellings deliberately: a rule your corpus already satisfies is written with no `severity` at all, and one it does not is written `"off"` with the finding count in the comment beside it, so the first run is green and the work is still on the page.
 - `options` must match that rule's schema; unknown option keys are rejected.
 - The **same rule can appear multiple times** with different `files`/`exclude`/options — e.g. one [TBL-001](rules/TBL-001.md) column set for `docs/requirements/**` and another elsewhere.
 - Most document-scope rules accept `files` and `exclude` to narrow which files that instance applies to. Some project/identity rules intentionally omit them (see the rule's page). Where a rule takes both, `exclude` wins over `files`, mirroring the top-level pair — and the scope also bounds `--fix`, so an excluded file is never rewritten either.
