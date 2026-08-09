@@ -318,6 +318,16 @@ Each phase is an epic detailed in its own folder (meta `index.md` + numbered tas
 - Two items were deferred to tasks that have since closed without them, which is why the queue needed a tracked home at all rather than a second deferral.
 - **Exit:** every live item is fixed or recorded as deliberate; the queue file holds only open entries; the citation guard reports zero over its declared corpus and is blocking.
 
+### Phase 19 — Field-test remediation · `M` · depends on: P18 · reuse: n/a
+
+**Goal:** close the fourteen findings from the [2026-08-09 field test](field-test-2026-08-09-debates.md) — the first run in which the packed artifacts were installed **into** an external repository rather than run beside it. See [P19 tasks](P19-field-test-remediation/index.md).
+
+- **What the installation changed.** Reading `npm audit` from inside this checkout says we ship known-vulnerable transitive dependencies; installing the packed tarballs elsewhere resolves the declared range clean. F-01 is that correction, and it is the kind only a consumer-side install produces.
+- **Every zero was backed by a negative control** — twenty rule configurations that reported nothing were re-run deliberately broken and each fired. F-07 is the one zero that survived: `CTX-003` is silent and green when its glossary path matches no file.
+- Cut along three seams rather than by finding number: inference sampling three-to-five files for a config that runs over the whole corpus (F-03, F-04, F-10); five surfaces stating what a reader disproves with one `grep` (F-02, F-06, F-08, F-12, F-14); and two configurations accepted without a word that cannot do what they claim (F-07, F-09).
+- No blockers: four majors, seven minors, three polish. Twelve of the fourteen reproduce on throwaway trees.
+- **Exit:** every finding fixed or registered as deliberate, each with a test written from the field test's own reproduction; a re-run of the [playbook](field-test-playbook.md) reports none of them.
+
 ### Phase P-release — Distribution, CI & release · `M` · depends on: all (incl. P9–P17) · reuse: Medium
 
 **Goal:** production packaging.
@@ -348,7 +358,9 @@ CLI/MCP surface stable. P9/P10 close the first (P0–P8) audit; P11 (post-P9 cod
 remediation) and P12 (post-P9 consistency/coverage) close the second audit.
 P13–P17 close the third round — the 2026-08-05 audit + field test — in order of
 depth: corpus correctness, host boundary, output contracts, release readiness
-and test debt, then the plan of record. P-release ships it.
+and test debt, then the plan of record. P18 burns down the follow-up queue those
+rounds accumulated, and P19 closes the 2026-08-09 field test, the first run to
+install the packed artifacts into an external repository. P-release ships it.
 ```
 
 Recommended milestones:
@@ -356,7 +368,7 @@ Recommended milestones:
 - **M1 "Engine":** P0–P2 — workspace + new config + rule engine + first rules runnable.
 - **M2 "Lint parity+":** P3 — all 22 built-in rules + current LLM rules; this is a usable linter.
 - **M3 "Graph & agents":** P4–P5 + P7 — slice/impact/compile + MCP.
-- **M4 "Launch":** P6, P8, then P9/P10, P11/P12 and P13–P17 (three post-audit remediation rounds), then P-release — init, skills, audit fixes, packaging, release.
+- **M4 "Launch":** P6, P8, then P9/P10, P11/P12 and P13–P17 (three post-audit remediation rounds), P18 (follow-up burn-down) and P19 (field-test remediation), then P-release — init, skills, audit fixes, packaging, release.
 
 ---
 
