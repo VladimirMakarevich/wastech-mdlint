@@ -203,7 +203,7 @@ All three `idRef` fields (`idPattern`, `definitions`, `idColumn`) are required w
 
 ## The `custom` rule
 
-The declarative [`custom`](rules/custom.md) rule composes a closed assertion vocabulary from config — no rebuild, no code. Its `id` must be namespaced and must not shadow a built-in prefix (`CTX/GRP/LLM/REF/SEC/SIZE/STR/TBL`). See its page for the full list of assertion kinds.
+The declarative [`custom`](rules/custom.md) rule composes a closed assertion vocabulary from config — no rebuild, no code. Its `id` must be namespaced, must not shadow a built-in prefix (`CTX/GRP/LLM/REF/SEC/SIZE/STR/TBL`), and [must not repeat another `custom` entry's id](rules/custom.md#each-custom-id-must-be-unique) — an id is how a finding is attributed and how a disable comment names what to silence, so two entries under one cannot both work. Listing the same **built-in** rule twice under different `files` scopes is unaffected. See its page for the full list of assertion kinds.
 
 ## `compile`
 

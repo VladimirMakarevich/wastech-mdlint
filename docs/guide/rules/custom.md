@@ -36,6 +36,21 @@ A `custom` entry is a `rules[]` object — in your config, or inline in an MCP [
 
 In words: uppercase, dash-separated, with at least one dash (e.g. `REQ-OWNER`, `REQ-100`, `ACME-DOC-1`), **and** its prefix must **not** shadow a shipped built-in prefix. The negative lookahead reserves `CTX`, `GRP`, `LLM`, `REF`, `SEC`, `SIZE`, `STR`, and `TBL`. A `custom` rule that tries to call itself `TBL-100` or `REF-XYZ` is rejected at config resolution with a clear error — pick your own namespace instead. (The reserved set is derived from the registry at runtime, so this list stays in sync with the actual built-ins.)
 
+### Each `custom` id must be unique
+
+Two `custom` entries may not share an `id`, and ids are compared case-insensitively — `proj-dup` and `PROJ-DUP` are the same id. The second entry is rejected at config load with a diagnostic naming both entries:
+
+```text
+Invalid config at wastech-mdlint.config.json:
+- config.rules[3].id: id "PROJ-DUP": already used by config.rules[1] — a custom rule id must identify exactly one rule, so give this entry its own (e.g. "PROJ-DUP-2").
+```
+
+An id is how a finding is attributed, how a `severity` is targeted, and how [`wastech-mdlint-disable`](../configuration.md) names what to silence. Under a shared id, none of those work: two entries both run, their findings are indistinguishable, a `severity` set on one applies to the other's findings with no way to tell which, and one inline disable comment silences both — including the entry you meant to keep. A config that grows by copy-paste is the usual way two entries end up sharing one.
+
+This applies to `custom` entries only. Listing the **same built-in rule** twice is supported and useful — one `CTX-002` scoped to `docs/**` and another scoped to `spec/**` with a different `severity` is a normal configuration, and its findings stay attributable because the rule really is one rule.
+
+The MCP ad-hoc [`lint`](../mcp-server.md) tool enforces the same constraint on its `rules` array, refusing the whole request rather than one entry of it.
+
 ## Assertion kinds
 
 `options.assert.kind` selects one assertion. Each kind operates on a fixed target and mirrors a built-in rule's behavior, calling the same underlying primitive. Fields marked **req** are required; the rest are optional.

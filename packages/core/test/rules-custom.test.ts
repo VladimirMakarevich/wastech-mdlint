@@ -134,6 +134,93 @@ describe("declarative custom rule", () => {
     await expect(loadConfiguration({ cwd })).rejects.toThrow(/dash-separated/);
   });
 
+  // The third way to end up with an id that does not identify one rule, and the only one that used
+  // to pass: two entries under `PROJ-DUP` both loaded and both ran, so no consumer could attribute
+  // a finding, a `severity` on one silently governed findings from the other, and one inline
+  // `wastech-mdlint-disable PROJ-DUP` silenced both.
+  it("rejects two custom entries sharing an id, naming both", async () => {
+    const cwd = await repo({
+      "a.md": "# A\n| ID |\n| --- |\n| X-1 |\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [
+          {
+            rule: "custom",
+            id: "PROJ-DUP",
+            options: { assert: { kind: "allChecked" } },
+          },
+          {
+            rule: "custom",
+            id: "PROJ-DUP",
+            options: { assert: { kind: "columnUnique", column: "ID" } },
+          },
+        ],
+      }),
+    });
+
+    const error = await loadConfiguration({ cwd }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ConfigError);
+    expect((error as ConfigError).code).toBe("CONFIG_INVALID");
+    // Both indices: the diagnostic is anchored at the offending entry and its message names the
+    // earlier claimant, because a rule list is edited by index and finding the other entry in a
+    // long config is otherwise a search.
+    expect((error as ConfigError).message).toMatch(/config\.rules\[1\]\.id/);
+    expect((error as ConfigError).message).toMatch(/config\.rules\[0\]/);
+  });
+
+  it("treats ids differing only in case as the same id", async () => {
+    // `canonicalizeRuleId` upper-cases, so these resolve to one rule id — the same comparison the
+    // reserved-prefix check makes against the registry. A case-sensitive check would let the
+    // duplicate straight back in.
+    const cwd = await repo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [
+          {
+            rule: "custom",
+            id: "PROJ-DUP",
+            options: { assert: { kind: "allChecked" } },
+          },
+          {
+            rule: "custom",
+            id: "proj-dup",
+            options: { assert: { kind: "allChecked" } },
+          },
+        ],
+      }),
+    });
+
+    await expect(loadConfiguration({ cwd })).rejects.toThrow(
+      /already used by config\.rules\[0\]/,
+    );
+  });
+
+  it("still accepts two entries for the same built-in rule with different scopes", async () => {
+    // Uniqueness is a custom-id constraint only. Applying one built-in rule differently to two
+    // parts of a repository is a supported configuration, and its findings stay attributable
+    // because the rule really is the same rule.
+    const cwd = await repo({
+      "docs/a.md": "- [ ] todo\n",
+      "spec/b.md": "- [ ] todo\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [
+          { rule: "CTX-002", options: { files: ["docs/**/*.md"] } },
+          {
+            rule: "CTX-002",
+            severity: "error",
+            options: { files: ["spec/**/*.md"] },
+          },
+        ],
+      }),
+    });
+
+    const result = await lintWithConfig(cwd);
+    expect(
+      result.messages.map(
+        (message) => `${message.filePath}:${message.severity}`,
+      ),
+    ).toEqual(["docs/a.md:warning", "spec/b.md:error"]);
+  });
+
   it("rejects an invalid assert shape via the primitive schema", async () => {
     const cwd = await repo({
       "a.md": "# A\n",

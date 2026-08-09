@@ -293,8 +293,15 @@ export {
 } from "./engine/rules/index.js";
 export { fileScopeShape, matchesFileScope } from "./engine/rules/scope.js";
 export type { FileScope } from "./engine/rules/scope.js";
-export { resolveCustomRule } from "./engine/rules/custom.js";
-export type { CustomRuleEntry } from "./engine/rules/custom.js";
+export {
+  duplicateCustomIdMessage,
+  findDuplicateCustomIds,
+  resolveCustomRule,
+} from "./engine/rules/custom.js";
+export type {
+  CustomIdCollision,
+  CustomRuleEntry,
+} from "./engine/rules/custom.js";
 
 // Schema + docs generation
 export { generateConfigSchema } from "./engine/schema.js";
