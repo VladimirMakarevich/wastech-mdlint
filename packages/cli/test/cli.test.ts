@@ -319,7 +319,7 @@ describe("impact command", () => {
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
 
     const payload = JSON.parse(result.stdout) as {
-      changedFile: string;
+      file: string;
       directlyAffected: { path: string; references: number }[];
       transitivelyAffected: unknown[];
       readingOrder: string[];
@@ -331,7 +331,7 @@ describe("impact command", () => {
     };
     expect(Object.keys(payload).sort()).toEqual(
       [
-        "changedFile",
+        "file",
         "directlyAffected",
         "transitivelyAffected",
         "readingOrder",
@@ -339,7 +339,7 @@ describe("impact command", () => {
         "lint",
       ].sort(),
     );
-    expect(payload.changedFile).toBe("a.md");
+    expect(payload.file).toBe("a.md");
     expect(payload.directlyAffected).toEqual([{ path: "b.md", references: 1 }]);
     expect(payload.transitivelyAffected).toEqual([]);
     expect(payload.readingOrder).toEqual(["b.md", "a.md"]);

@@ -319,6 +319,49 @@ describe("config diagnostics", () => {
     expect(message).toContain("bogus");
   });
 
+  // A rejection that arrives exactly when the user's model of the rule is wrong, and explains only
+  // that a key is unknown, leaves them unable to tell a typo from a misunderstanding. These assert on
+  // the text because that is the whole defect: the finding count is identical either way.
+  it("says why a rule that takes no file scope has no `files`, and where to scope instead", async () => {
+    const message = await rejectedConfig({
+      rules: [
+        { rule: "SIZE-001", options: { maxBytes: 10, files: ["docs/**"] } },
+      ],
+    });
+
+    expect(message).toContain("config.rules[0].options");
+    expect(message).toContain('Rule "SIZE-001" takes no "files" option');
+    expect(message).toContain('top-level "include"/"exclude"');
+    // This rule declares no `exclude` either, so there is nothing to mistake for file scope and the
+    // hint must not invent one.
+    expect(message).not.toContain("link and image targets");
+  });
+
+  it("warns that a link-target rule's `exclude` is not the file scope being reached for", async () => {
+    // The two mistakes are not equally forgiving: `files` is a hard error and therefore safe, while
+    // `exclude` meaning "skip these source files" type-checks, runs, and silently filters link and
+    // image targets instead. A user rejected for the first is about to make the second.
+    const message = await rejectedConfig({
+      rules: [{ rule: "REF-001", options: { files: ["docs/**"] } }],
+    });
+
+    expect(message).toContain('Rule "REF-001" takes no "files" option');
+    expect(message).toContain(
+      'Its "exclude" filters the link and image targets this rule probes, not the source documents it runs on.',
+    );
+  });
+
+  it("leaves an unrecognized key that is not `files` unexplained", async () => {
+    // The hint answers one specific wrong model. Appending it to every option typo would make it
+    // noise, and would claim a cause for a mistake nobody made.
+    const message = await rejectedConfig({
+      rules: [{ rule: "REF-001", options: { bogus: 1 } }],
+    });
+
+    expect(message).toContain("bogus");
+    expect(message).not.toContain("takes no");
+  });
+
   it("names a typo'd key inside a custom rule's assert block", async () => {
     const message = await rejectedConfig({
       rules: [

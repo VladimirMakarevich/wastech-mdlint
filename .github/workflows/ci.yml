@@ -46,6 +46,34 @@ jobs:
       # before dist/ is emitted.
       - run: npm run lint:docs
 
+  audit:
+    # The production dependency tree only — the packages a consumer of the published tarballs
+    # actually installs. Split from the full audit deliberately, because the two answer different
+    # questions and the workspace one is dominated by the toolchain that builds and tests the
+    # packages and ships in nothing. Without the split the production signal is invisible: the
+    # lockfile once pinned an SDK at the top of a vulnerable range for months while the range we
+    # publish resolved clean, so CI, every packed artifact and every contributor's machine exercised
+    # versions no user received. Nothing caught it, because the only audit anyone ran mixed the two
+    # trees together and was noisy either way.
+    #
+    # Ubuntu alone: the resolved tree comes from the lockfile, so a second and third OS would
+    # re-audit identical package versions.
+    #
+    # `--audit-level=high` rather than the default `low`: advisories are published on a schedule
+    # nobody here controls, so a stricter gate turns a red build into a routine event on pull
+    # requests that changed nothing about dependencies — and a gate people learn to ignore protects
+    # less than one that fires rarely. Moderate and low findings still print in the job log for
+    # anyone reading it; only high and critical stop the build.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: ".node-version"
+          cache: "npm"
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+
   pack:
     # Publish-readiness in *shape* only: prove each package's `files` allowlist yields a clean
     # tarball. Actually publishing core+cli+mcp under one tag is the release workflow's job, not this one.

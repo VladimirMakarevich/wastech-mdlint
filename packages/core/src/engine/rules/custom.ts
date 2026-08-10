@@ -29,6 +29,75 @@ export type CustomRuleEntry = {
   options: { files?: string[]; exclude?: string[]; assert: Assertion };
 };
 
+// One entry's position and the earlier entry it collides with. Indices rather than a boolean
+// because a rule list is edited by index and both entries have to be named to be found: told only
+// that "PROJ-DUP" is duplicated, a reader of a forty-entry config still has to search it.
+export type CustomIdCollision = {
+  index: number;
+  firstIndex: number;
+  id: string;
+};
+
+/**
+ * Find `custom` entries that reuse an id an earlier `custom` entry already claimed.
+ *
+ * Uniqueness is not decorative. Two entries under one id both load and both run: their findings are
+ * indistinguishable in every report, a `severity` set on one of them applies to findings the other
+ * produced with no way to tell which, and a single inline `wastech-mdlint-disable PROJ-DUP` silences
+ * both — including the one the author meant to keep. Duplication is the third way to end up with an
+ * id that does not identify one rule, alongside a malformed id and one shadowing a built-in prefix,
+ * and it was the only one that passed.
+ *
+ * Deliberately scoped to `custom` entries. Repeating a **built-in** rule is a supported
+ * configuration — two `REF-001` entries with different `files` scopes is the way to apply one rule
+ * differently to two parts of a repository — and those findings stay attributable because the rule
+ * is the same rule.
+ *
+ * Ids are compared in canonical form, so `proj-dup` and `PROJ-DUP` collide: they resolve to one
+ * rule id, which is the same comparison the reserved-prefix check performs against the registry.
+ * Entries whose `id` is absent or not a string are skipped — shape is the schema's to reject, and
+ * reporting a collision between two entries that are already invalid buries the real diagnostic.
+ *
+ * Returns one collision per offending entry, in entry order, each naming the first claimant.
+ */
+export function findDuplicateCustomIds(
+  entries: readonly { rule?: unknown; id?: unknown }[],
+): CustomIdCollision[] {
+  const firstIndexById = new Map<string, number>();
+  const collisions: CustomIdCollision[] = [];
+
+  entries.forEach((entry, index) => {
+    if (entry.rule !== "custom" || typeof entry.id !== "string") {
+      return;
+    }
+    const id = canonicalizeRuleId(entry.id);
+    const firstIndex = firstIndexById.get(id);
+    if (firstIndex === undefined) {
+      firstIndexById.set(id, index);
+      return;
+    }
+    collisions.push({ index, firstIndex, id });
+  });
+
+  return collisions;
+}
+
+/**
+ * The message for a duplicate id, in the register the other two id diagnostics use: the offending
+ * id, the constraint stated positively, then a remedy with a concrete example.
+ *
+ * `siblingPath` is rendered by the caller because the two hosts root their paths differently — the
+ * config loader anchors every diagnostic at `config`, the MCP tool at the request's own `rules`
+ * array — and a cross-reference the reader cannot paste back into the thing they are editing is
+ * worse than no cross-reference.
+ */
+export function duplicateCustomIdMessage(params: {
+  id: string;
+  siblingPath: string;
+}): string {
+  return `id "${params.id}": already used by ${params.siblingPath} — a custom rule id must identify exactly one rule, so give this entry its own (e.g. "${params.id}-2").`;
+}
+
 function invalid(
   path: (string | number)[],
   message: string,

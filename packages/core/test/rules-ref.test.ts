@@ -374,6 +374,42 @@ describe("REF-005 ID traceability", () => {
     });
   });
 
+  it("states the lookup each branch performed rather than a claim about the corpus", async () => {
+    // An id mentioned in prose, in a link, or in a filename is not in an `idColumn`, and the rule
+    // never looked there — so a bare "is never referenced" is refuted by one grep, and a reader who
+    // catches it that way stops trusting the findings that were real. Asserted on the text, because a
+    // count-based assertion reads identically before and after the wording is fixed.
+    const cwd = await fixtureRepo({
+      "reqs.md": "| ID |\n| --- |\n| REQ-1 |\n| REQ-2 |\n",
+      "design.md":
+        "| ID |\n| --- |\n| REQ-1 |\n| REQ-9 |\n\nREQ-2 is discussed in prose here.\n",
+    });
+    const result = await lint(cwd, [
+      rule("REF-005", {
+        definitions: ["reqs.md", "spec/**/*.md"],
+        references: ["design.md"],
+        idColumn: "ID",
+        idPattern: "^REQ-\\d+$",
+      }),
+    ]);
+
+    // The orphan names the column and the reference globs it searched, and nothing else: references
+    // are column-only, so it must not offer headings as a place the id could have been found.
+    expect(
+      result.messages.find((message) => message.severity === "warning")
+        ?.message,
+    ).toBe(
+      'Definition "REQ-2" is not referenced: it is not in the "ID" column of any table in "design.md".',
+    );
+    // The dangling branch searched the definition globs, and definitions are column *plus* heading
+    // tokens — the asymmetry is real, so the two messages must not be interchangeable.
+    expect(
+      result.messages.find((message) => message.severity === "error")?.message,
+    ).toBe(
+      'Reference "REQ-9" has no definition: it is not in the "ID" column of any table, or in a heading, in "reqs.md", "spec/**/*.md".',
+    );
+  });
+
   it("treats a matching heading token as a definition too, not just a table row", async () => {
     const cwd = await fixtureRepo({
       "reqs.md": "# REQ-1\n\nIntroductory requirement.\n",

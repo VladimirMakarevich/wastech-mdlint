@@ -6,6 +6,7 @@ import {
   DEFAULT_HUB_MIN_IN_DEGREE,
 } from "../src/compile/graph-analysis.js";
 import { buildContextGraph } from "../src/graph/build-context-graph.js";
+import { formatContextGraphSummary } from "../src/graph/graph-algorithms.js";
 import type { ParsedDocument } from "../src/markdown/document-types.js";
 import { parseDocument } from "../src/markdown/parse-document.js";
 
@@ -110,6 +111,64 @@ describe("classifyNodes", () => {
     });
 
     expect(classifyNodes(graph)).toEqual(classifyNodes(graph));
+  });
+});
+
+describe("hub agreement between the graph report and the skill's roles", () => {
+  // Two shipped surfaces answer "is this document a hub": the graph summary's `top hubs` list and
+  // the role this module assigns. They once answered it differently — the list ranked by
+  // `inDegree + outDegree`, so an index referencing many documents and referenced by one led the
+  // list while this classifier called it a `bridge`. Reading the list back out of the rendered text
+  // (rather than re-deriving it) is what makes this a comparison of two documents instead of one
+  // formula agreeing with itself.
+  function listedHubs(summary: string): string[] {
+    const lines = summary.split("\n");
+    const start = lines.indexOf("top hubs:") + 1;
+    const end = lines.findIndex(
+      (line, index) => index >= start && !line.startsWith("  "),
+    );
+    return lines
+      .slice(start, end === -1 ? lines.length : end)
+      .map((line) => line.slice(2).replace(/ \(\d+\/\d+\)$/, ""))
+      .filter((path) => !path.startsWith("(none"));
+  }
+
+  // An index (in 1 / out 6) alongside the document five others reference: the exact inversion, at a
+  // scale small enough to read.
+  const graph = graphOf({
+    "index.md": "[audit](audit.md)\n",
+    "audit.md":
+      "[api](api.md)\n[a](a.md)\n[b](b.md)\n[c](c.md)\n[d](d.md)\n[e](e.md)\n",
+    "a.md": "[api](api.md)\n",
+    "b.md": "[api](api.md)\n",
+    "c.md": "[api](api.md)\n",
+    "d.md": "[api](api.md)\n",
+    "e.md": "# E\n",
+    "api.md": "# API\n",
+  });
+
+  it("never lists a document the classifier calls a non-hub", () => {
+    for (const hubMinInDegree of [1, 2, 3, 5, 6]) {
+      const roles = new Map(
+        classifyNodes(graph, { hubMinInDegree }).map((entry) => [
+          entry.path,
+          entry.role,
+        ]),
+      );
+
+      for (const listed of listedHubs(
+        formatContextGraphSummary(graph, { hubMinInDegree }),
+      )) {
+        expect(roles.get(listed)).toBe("hub");
+      }
+    }
+  });
+
+  it("leads with the document the corpus depends on, not the one that depends on it", () => {
+    expect(listedHubs(formatContextGraphSummary(graph))).toEqual(["api.md"]);
+    expect(
+      classifyNodes(graph).find((entry) => entry.path === "audit.md")?.role,
+    ).toBe("bridge");
   });
 });
 

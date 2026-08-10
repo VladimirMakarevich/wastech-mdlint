@@ -11,6 +11,7 @@ import { handleContextGraph } from "../src/tools/context-graph.js";
 import {
   LARGE_CORPUS_DOCUMENT_COUNT,
   LARGE_CORPUS_ENTRY_POINT_COUNT,
+  LARGE_CORPUS_HUB_PATH,
   LARGE_CORPUS_LINE_WIDTH_BOUND,
   writeLargeCorpus,
 } from "../../core/test/support/large-corpus.js";
@@ -221,10 +222,13 @@ describe("handleContextGraph at corpus scale", () => {
   // hold is that where they overlap they agree — the narrower one being *stale* rather than narrow is
   // the failure, and reading the code cannot tell those apart.
   //
-  // `entry points` is the whole overlap, which is itself the finding: the reading order and the set a
-  // cycle excluded from it reach a model only through `structuredContent`. Stated in the tool's own
-  // description, and worth pinning as a decision rather than rediscovering as an omission.
-  it("agrees with its own structured payload on the text block's one path section", async () => {
+  // `entry points` is the only *section* the shared reader can see — its header carries a count,
+  // which `top hubs` deliberately does not, since the structured payload has no hub array to diff a
+  // count against. The hub lines are still checkable, though, because each now prints the two degrees
+  // its node carries; those are compared below. The reading order and the set a cycle excluded from
+  // it remain reachable only through `structuredContent`, which is stated in the tool's own
+  // description and pinned here as a decision rather than rediscovered as an omission.
+  it("agrees with its own structured payload on the text block's path section and hub degrees", async () => {
     const result = await handleContextGraph({ cwd: root, format: "summary" });
 
     expect(result.isError).toBeFalsy();
@@ -242,9 +246,31 @@ describe("handleContextGraph at corpus scale", () => {
     expect(sections["entry points"]).toHaveLength(
       LARGE_CORPUS_ENTRY_POINT_COUNT,
     );
-    // The overlap is exactly one section: everything else the structured payload carries is absent
-    // from the text, so a caller that reads only `content` sees no reading order at all.
+    // The overlap is exactly one counted section: everything else the structured payload carries is
+    // absent from the text, so a caller that reads only `content` sees no reading order at all.
     expect(Object.keys(sections)).toEqual(["entry points"]);
     expect(summary.excluded.length).toBeGreaterThan(0);
+
+    // Hub lines carry two numbers each, parsed back out of the text rather than recomputed with the
+    // renderer's own helper, and checked against the node the structured payload reports. A text
+    // block that had gone stale — or that summed the degrees, which cannot distinguish the document
+    // everything depends on from the one that depends on everything — fails here.
+    const lines = text.split("\n");
+    const hubLines = lines.slice(
+      lines.indexOf("top hubs:") + 1,
+      lines.indexOf("cycles:"),
+    );
+    expect(hubLines[0]).toBe(`  ${LARGE_CORPUS_HUB_PATH} (124/0)`);
+    for (const line of hubLines) {
+      const [, hubPath, inDegree, outDegree] =
+        /^ {2}(.+) \((\d+)\/(\d+)\)$/.exec(line) ?? [];
+      const node = summary.nodes.find(
+        (candidate) => candidate.path === hubPath,
+      );
+      expect(node).toBeDefined();
+      expect(`${inDegree}/${outDegree}`).toBe(
+        `${node?.inDegree}/${node?.outDegree}`,
+      );
+    }
   }, 60_000);
 });

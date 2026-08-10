@@ -279,10 +279,23 @@ export const ref004: RuleDefinition = defineRule({
   },
 });
 
+// Render the globs a lookup searched, quoted so a brace list's own commas cannot be read as the
+// separator between two globs.
+function describeScope(globs: readonly string[]): string {
+  return globs.map((glob) => `"${glob}"`).join(", ");
+}
+
 // REF-005 — ID traceability: every referenced ID has a definition (dangling ref = error) and every
 // defined ID is referenced (orphan def = warning). Definitions go through the shared
 // `extractDefinedIds` (column + heading discovery) so this rule and the graph's id-ref
 // edges agree on what counts as a defined ID; references stay column-only via `extractColumnIds`.
+//
+// Both messages name the lookup rather than asserting about the corpus. "Is never referenced" is a
+// claim about the world that a reader disproves with one grep — an id mentioned in prose, in a link,
+// or in a filename is not in an `idColumn`, and the rule never looked there. Being told the rule is
+// wrong about five ids is what makes a reader stop trusting the sixth, which was the real one. The
+// two branches search different things and must say so: references are column-only, definitions are
+// that column plus heading tokens.
 export const ref005: RuleDefinition = defineRule({
   metadata: {
     id: "REF-005",
@@ -329,7 +342,7 @@ export const ref005: RuleDefinition = defineRule({
     for (const reference of references) {
       if (!definitions.has(reference.id)) {
         context.report({
-          message: `Reference "${reference.id}" has no definition.`,
+          message: `Reference "${reference.id}" has no definition: it is not in the "${options.idColumn}" column of any table, or in a heading, in ${describeScope(options.definitions)}.`,
           line: reference.line,
           filePath: reference.filePath,
           severity: "error",
@@ -342,7 +355,7 @@ export const ref005: RuleDefinition = defineRule({
     for (const [id, occurrence] of definitions) {
       if (!referencedIds.has(id)) {
         context.report({
-          message: `Definition "${id}" is never referenced.`,
+          message: `Definition "${id}" is not referenced: it is not in the "${options.idColumn}" column of any table in ${describeScope(options.references)}.`,
           line: occurrence.line,
           filePath: occurrence.filePath,
           severity: "warning",

@@ -159,11 +159,35 @@ export function getComponents(graph: ContextGraph): string[][] {
   return components;
 }
 
-// Hubs are ranked by total degree (`inDegree + outDegree`): the most-connected documents, which a
-// reader or maintainer most needs to know about. Capped so the summary stays bounded on large corpora.
+// Capped so the summary stays bounded on large corpora.
 const TOP_HUB_LIMIT = 5;
 
-export function formatContextGraphSummary(graph: ContextGraph): string {
+/**
+ * In-degree at or above which a document counts as a hub.
+ *
+ * Defined here rather than beside the skill's node classifier because two surfaces answer "is this a
+ * hub" and they must answer it the same way: this summary's `top hubs` list and the generated
+ * skill's `Role` column. They once disagreed — the list ranked by `inDegree + outDegree`, so an index
+ * referencing 67 documents and referenced by one ranked third while the corpus's real hub, at
+ * in-degree 45, ranked fourth, and the classifier called that same index a `bridge`. A reader opening
+ * the graph report to find what must not break was handed the document that depends on everything
+ * else. One threshold, applied by both, is what keeps the word meaning one thing.
+ */
+export const DEFAULT_HUB_MIN_IN_DEGREE = 3;
+
+export type ContextGraphSummaryOptions = {
+  // The resolved `compile.hubMinInDegree`, when the caller has a config. Threading it (rather than
+  // always using the default) is what keeps a repository that tunes the threshold from getting a
+  // `top hubs` list its own generated skill contradicts.
+  hubMinInDegree?: number;
+};
+
+export function formatContextGraphSummary(
+  graph: ContextGraph,
+  options: ContextGraphSummaryOptions = {},
+): string {
+  const hubMinInDegree = options.hubMinInDegree ?? DEFAULT_HUB_MIN_IN_DEGREE;
+
   // Entry points use the retained-multiplicity `inDegree`; the zero test is identical under dedup, so
   // no deduped view is needed here.
   const entryPoints = graph.nodes
@@ -171,10 +195,16 @@ export function formatContextGraphSummary(graph: ContextGraph): string {
     .map((node) => node.path)
     .sort(byPath);
 
-  const hubs = [...graph.nodes]
+  // Ranked by in-degree — how heavily a document is *referenced* — because that is what the word
+  // "hub" denotes everywhere else in this product. Out-degree breaks ties ahead of path so that among
+  // equally-referenced documents the more connected one leads; both keys are needed for a stable
+  // order, since a tie broken by `graph.nodes` order would be deterministic only by accident.
+  const hubs = graph.nodes
+    .filter((node) => node.inDegree >= hubMinInDegree)
     .sort(
       (left, right) =>
-        right.inDegree + right.outDegree - (left.inDegree + left.outDegree) ||
+        right.inDegree - left.inDegree ||
+        right.outDegree - left.outDegree ||
         byPath(left.path, right.path),
     )
     .slice(0, TOP_HUB_LIMIT);
@@ -194,8 +224,20 @@ export function formatContextGraphSummary(graph: ContextGraph): string {
   }
 
   lines.push("top hubs:");
+  if (hubs.length === 0) {
+    // An empty list is a fact about the corpus, not a broken section: nothing here is referenced
+    // often enough to be a hub, which is exactly what the skill's `Role` column says about the same
+    // corpus. Naming the threshold keeps the reader from reading the silence as a bug. ASCII only —
+    // this goes to a terminal.
+    lines.push(
+      `  (none: no document has ${hubMinInDegree} or more incoming references)`,
+    );
+  }
   for (const hub of hubs) {
-    lines.push(`  ${hub.path} (${hub.inDegree + hub.outDegree})`);
+    // Both degrees, not their sum: the sum cannot distinguish the document everything depends on
+    // from the index that depends on everything, and those are opposite answers to the question a
+    // reader opens this section with.
+    lines.push(`  ${hub.path} (${hub.inDegree}/${hub.outDegree})`);
   }
   // Reading-order output must report what cycles excluded: list them here, rendered like GRP-001.
   if (graph.cycles.length > 0) {

@@ -326,7 +326,7 @@ Each phase is an epic detailed in its own folder (meta `index.md` + numbered tas
 - **Every zero was backed by a negative control** — twenty rule configurations that reported nothing were re-run deliberately broken and each fired. F-07 is the one zero that survived: `CTX-003` is silent and green when its glossary path matches no file.
 - Cut along three seams rather than by finding number: inference sampling three-to-five files for a config that runs over the whole corpus (F-03, F-04, F-10); five surfaces stating what a reader disproves with one `grep` (F-02, F-06, F-08, F-12, F-14); and two configurations accepted without a word that cannot do what they claim (F-07, F-09).
 - No blockers: four majors, seven minors, three polish. Twelve of the fourteen reproduce on throwaway trees.
-- **Exit:** every finding fixed or registered as deliberate, each with a test written from the field test's own reproduction; a re-run of the [playbook](field-test-playbook.md) reports none of them.
+- **Exit:** every finding fixed or registered as deliberate, each with a test written from the field test's own reproduction. Confirming that with a full [playbook](field-test-playbook.md) re-run needs a repository we did not author, so that half belongs to [PR.05](P-release/05-release-verification.md) step 2, which already owns it.
 
 ### Phase P-release — Distribution, CI & release · `M` · depends on: all (incl. P9–P17) · reuse: Medium
 

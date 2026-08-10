@@ -10,6 +10,10 @@ The default (`--format text`) groups findings by file, listing each rule ID, sev
 wastech-mdlint lint .
 ```
 
+The layout is line-oriented, and that is a contract you can parse against: an **unindented line names a file**, and every **indented line below it is one finding** in that file (`  <location>  <severity>  <message>  <rule ID>`, two spaces between fields). One finding is always exactly one line — so the number of unindented lines is the number of files with findings, which is what makes a CI annotator, an editor problem matcher, or a per-file count over this output correct.
+
+Keeping that true costs something: a message quotes source text, and source text wraps. Whitespace runs inside a message are collapsed to a single space here, so a checklist item written across two lines is reported on one. The verbatim text is not lost — use [JSON output](#json-output), where `message` keeps its line breaks (escaped) and `data` carries the quoted value as its own field.
+
 ## JSON output
 
 `lint --format json` emits a structured, deterministic `{ summary, messages, files }` document for machine consumption (CI, dashboards, AI agents):
@@ -50,11 +54,13 @@ Four commands and tools report lint findings, and they do **not** all return the
 | Surface | Top-level shape | Finding counts |
 | --- | --- | --- |
 | CLI `lint --format json` | `{ summary, messages, files }` | `summary.errors`, `summary.warnings` |
-| CLI [`impact <file> --format json`](context-graph.md#impact-file) | the same record MCP returns, under a `lint` key, narrowed to the affected subgraph | `lint.errorCount`, `lint.warningCount` |
+| CLI [`impact <file> --format json`](context-graph.md#impact-file) | the impact record, carrying the lint record MCP `lint-files` returns under a `lint` key, narrowed to the affected subgraph | `lint.errorCount`, `lint.warningCount` |
 | MCP [`lint-files`](mcp-server.md#the-6-tools) | `{ messages, files, errorCount, warningCount }` | `errorCount`, `warningCount` |
 | MCP [`lint`](mcp-server.md#the-6-tools) | `{ messages, errorCount, warningCount }` | `errorCount`, `warningCount` |
 
 `messages` is the same array of the shape above on all four. The differences are the wrapper and the counts: only the CLI's `lint` wraps the record in a `summary`, and only the ad-hoc MCP `lint` tool omits `files` — it lints one caller-supplied string, which is not a corpus, so there is no file list to report.
+
+The **impact record** itself — `{ file, directlyAffected, transitivelyAffected, readingOrder, excluded }` — is identical on both hosts, key for key, and the CLI's `lint` key is an addition to it rather than a change in it. So a client generated from the MCP [`impact-analysis`](mcp-server.md#the-6-tools) `outputSchema` reads the CLI's JSON unchanged, and a cross-host test compares the two payloads directly.
 
 ## Exit codes
 

@@ -97,6 +97,7 @@ export async function handleContextGraph(
     // `cwd` is already taken by the base above; this is the *validated* resolution of it, and the
     // root `computeGraphCoverage` probes for out-of-corpus files.
     const {
+      config,
       cwd: corpusRoot,
       documents,
       graph,
@@ -123,8 +124,14 @@ export async function handleContextGraph(
 
     // The same text renderer serves both branches: it is a pure function over `graph` either way, so
     // both formats get one consistent human-readable summary rather than a second renderer.
+    //
+    // The threshold is threaded for the reason the CLI threads it: the summary's `top hubs` list and
+    // the `hub` role in a generated skill answer the same question, so they read the same configured
+    // in-degree rather than one of them silently using the default.
     return successResult({
-      summary: formatContextGraphSummary(graph),
+      summary: formatContextGraphSummary(graph, {
+        hubMinInDegree: config.compile?.hubMinInDegree,
+      }),
       structured,
     });
   } catch (error) {

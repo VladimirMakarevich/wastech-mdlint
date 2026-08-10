@@ -366,7 +366,8 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
     },
     // Wording of the generated "Working with dependencies" block. Default "generic".
     "commandPreset": "generic", // "claude" | "generic" | "none"
-    // In-degree threshold to classify a document as a hub. Default 3.
+    // In-degree threshold for a hub — used by the SKILL.md Role column and by
+    // `graph`'s top-hubs list, which is why both call the same document a hub. Default 3.
     "hubMinInDegree": 3,
   },
 }
@@ -374,7 +375,7 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
 
 ## When it is rejected
 
-Anything the schema rejects comes back as `Invalid config at <the file that was read>:` followed by one `- <path>: <problem>` line per problem, and exits `2`. Paths are `config` + `.key` + `[n]`, matching the structure above. Three real examples:
+Anything the schema rejects comes back as `Invalid config at <the file that was read>:` followed by one `- <path>: <problem>` line per problem, and exits `2`. Paths are `config` + `.key` + `[n]`, matching the structure above. Four real examples:
 
 ```text
 Invalid config at wastech-mdlint.config.json:
@@ -391,7 +392,14 @@ Invalid config at wastech-mdlint.config.json:
 - config.rules[0]: Unknown rule "TBL-03". Did you mean "TBL-003"?
 ```
 
-The middle one is a `SIZE-001` entry whose `tokens` budget was spelled `token`: every rule's option object is strict, so a typo'd key is rejected rather than silently ignored.
+```text
+Invalid config at wastech-mdlint.config.json:
+- config.rules[0].options: Unrecognized key: "files". Rule "REF-001" takes no "files" option. Its "exclude" filters the link and image targets this rule probes, not the source documents it runs on. Use the top-level "include"/"exclude" to choose which files are linted.
+```
+
+The second is a `SIZE-001` entry whose `tokens` budget was spelled `token`: every rule's option object is strict, so a typo'd key is rejected rather than silently ignored.
+
+The last is the one mistake the diagnostic explains rather than merely reports, because being told "unknown key" answers the wrong question when the key is one most other rules have. A rule that takes no file scope says so and points at the top-level `include`/`exclude`; the two rules whose `exclude` filters link and image _targets_ ([REF-001](rules/REF-001.md), [REF-003](rules/REF-003.md)) also say what that key next door actually does — reaching for `files` and settling for `exclude` there type-checks, runs, and quietly filters something else.
 
 A **syntax** error is reported differently, because it happens before the schema sees anything: `Failed to parse JSONC config at wastech-mdlint.config.json: CloseBraceExpected at offset 412`. Byte offsets rather than config paths are the only location a half-parsed file can honestly offer.
 

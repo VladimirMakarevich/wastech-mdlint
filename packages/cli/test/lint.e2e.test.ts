@@ -426,6 +426,29 @@ describe("lint command", () => {
     expect(result.stderr).toContain("config.rules[0].severity");
     expect(result.stderr).toMatch(/error.*warning.*off/);
   });
+
+  it("explains a `files` key on a rule that has no file scope", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [{ rule: "REF-001", options: { files: ["docs/**"] } }],
+      }),
+    });
+
+    // Asserted at the host boundary because the CLI prints a config error's `message` and drops its
+    // structured `hint` entirely — an explanation carried anywhere but the message never reaches a
+    // terminal, which is the only surface this mistake is made on.
+    const result = await run(["lint", cwd], cwd);
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    expect(result.stderr).toContain('Rule "REF-001" takes no "files" option');
+    expect(result.stderr).toContain("link and image targets");
+    expect(result.stderr).toContain('top-level "include"/"exclude"');
+    // One line, like every other diagnostic: a hint that wrapped would be rendered as a second
+    // `- config…` entry by anything reading this output line by line.
+    expect(
+      result.stderr.split("\n").filter((line) => line.startsWith("- config")),
+    ).toHaveLength(1);
+  });
 });
 
 // @boundary-guard host-parity

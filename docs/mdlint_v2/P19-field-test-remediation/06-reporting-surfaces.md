@@ -1,6 +1,6 @@
 # P19.06 — Hub ranking, and the skill sections that scale
 
-> Phase: [P19 — Field-test remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
+> Phase: [P19 — Field-test remediation](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Done**.
 >
 > Closes [F-12](../field-test-2026-08-09-debates.md#f-12--graphs-top-hubs-ranks-by-total-degree-and-compile-disagrees-with-it) and [F-13](../field-test-2026-08-09-debates.md#f-13--the-skillmd-sections-that-scale-with-the-corpus-are-the-ones-nobody-bounds).
 
@@ -30,9 +30,27 @@ The number is documented: the context-graph guide says a `top hubs` item is `pat
 3. **Consider `Reading Order` in the same pass** — it is the same shape and the same growth, and splitting them across two rounds means writing the disclosure twice.
 4. **A test that pins the composition**, not just the content: for a fixture corpus, the artifact's uncapped sections stay within a stated bound or carry the disclosure.
 
+## Outcome
+
+**F-12. One threshold, applied by both surfaces.** The choice was between ranking `top hubs` by in-degree and keeping total degree while rendering `path (in/out)`; what shipped does both, because only the pair closes the exit criteria literally. `top hubs` now lists documents whose **in-degree** reaches `hubMinInDegree`, ranked in-degree first (out-degree, then path, break ties), rendered `path (in/out)`. `DEFAULT_HUB_MIN_IN_DEGREE` moved to `graph/graph-algorithms.ts` and `compile/graph-analysis.ts` re-exports it, so there is one definition rather than two that happen to agree; both hosts thread the configured value from `compile.hubMinInDegree`, which is now the one `compile.*` key reaching another command.
+
+The rejected option was renaming the section to something like `most connected`. It would have removed the vocabulary collision without removing the misdirection F-12 measured — the index that depends on everything would still have led the list — and the whole cost of the finding was a maintainer being pointed at the wrong document.
+
+A corpus where nothing clears the threshold now prints `(none: no document has 3 or more incoming references)` rather than falling back to the best-connected files. That is the same answer the skill's `Role` column gives such a corpus, and an empty list that explains itself is worth more than a populated one that means something else.
+
+The section header deliberately still carries no count. A counted header joins the human-versus-structured parity contract the shared reader enforces, and the JSON document has no hub array to compare against — so the hub lines are instead diffed against per-node `inDegree`/`outDegree` in both hosts' suites. Reverting any part of this fails `compile-graph-analysis.test.ts` ("never lists a document the classifier calls a non-hub"), `graph-algorithms.test.ts`, and the degree-parity cases in `packages/cli/test/graph.e2e.test.ts` and `packages/mcp-server/test/context-graph.test.ts`.
+
+**F-13. Cap the table; label what stays complete.** `Document Architecture` is capped at 25 documents, selected by the ranking `### References` already used — deliberately the same 25, so the artifact describes one set of documents in detail rather than two overlapping ones — and carries the same three-part disclosure: the bound always, the omission count when the cap engages, and where the rest lives. The measured effect on the 139-document fixture is the artifact falling from ~29 000 to 19 776 bytes, with the table going from ~32% to 9.4%.
+
+Capping it is safe for one reason, and the disclosure says so: `Reading Order` lists every document and is not capped, so the cap drops columns rather than documents. That block and the excluded list keep growing with the corpus by design — a document silently missing from the reading order is the dishonesty they exist to prevent — and each now opens with a `Complete:` line naming itself as complete-and-therefore-growing. Every section of the artifact is now one of the two kinds and says which.
+
+The alternative the task allowed — leave it uncapped and disclose — was rejected because the goal was to put the growth bound on the section that grows, and a disclosure alone still reaches ~20 000 tokens at a thousand documents.
+
+The composition test is `packages/core/test/compile-composition.test.ts`, and it measures growth rather than shares: it synthesizes the same corpus at 50 and 200 documents with an identical rule set and asserts that any block growing past 1.5× carries `Bounded summary:` or `Complete:`. Deleting the reading order's disclosure line fails it by name. A share bar cannot make that distinction — at one corpus size a capped section and a merely small one are the same number — which is how the inversion survived. The share bars in `compile-context.test.ts` were retuned around the new composition, since capping the table raises the dependency section's share of a smaller artifact; the orientation floor stayed there rather than moving into the growth test, because two blocks are complete by design and no orientation share can hold at every corpus size. What the growth test asserts instead is scale-free: essentially all of the artifact's growth lands in blocks that declare it.
+
 ## Exit criteria
 
-- [ ] `graph` and `compile` do not classify the same document as a hub and a non-hub.
-- [ ] A reader can tell in-degree from out-degree in whatever `graph` prints.
-- [ ] `Document Architecture` is capped or says it is not.
-- [ ] The compile-composition test fails if an uncapped section grows without a disclosure.
+- [x] `graph` and `compile` do not classify the same document as a hub and a non-hub.
+- [x] A reader can tell in-degree from out-degree in whatever `graph` prints.
+- [x] `Document Architecture` is capped or says it is not.
+- [x] The compile-composition test fails if an uncapped section grows without a disclosure.

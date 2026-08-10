@@ -193,6 +193,100 @@ describe("CTX-003 glossary aliases", () => {
   });
 });
 
+// A rule that loaded no aliases can produce no finding, which used to be indistinguishable from a
+// corpus that uses canonical terms everywhere: `No problems found.` and exit 0, with the rule inert
+// since whichever day the glossary file or a column header was renamed. Every way to get there is
+// now one error-severity finding attributed to the `glossary` option, naming the stage that came up
+// empty — and `error` specifically, because the default `--fail-on` is `error`, so a warning would
+// print and still exit 0.
+describe("CTX-003 reports a configuration it cannot honour", () => {
+  const WORKING_GLOSSARY =
+    "| Term | Aliases |\n| --- | --- |\n| GraphQL | gql |\n";
+
+  async function inertResult(options: Record<string, unknown>) {
+    const cwd = await fixtureRepo({
+      "glossary.md": WORKING_GLOSSARY,
+      "doc.md": "We use gql here.\n",
+    });
+    return lint(cwd, [rule("CTX-003", options)]);
+  }
+
+  it("reports a glossary glob that matched no scanned document", async () => {
+    const result = await inertResult({
+      glossary: "nope.md",
+      termColumn: "Term",
+      aliasColumn: "Aliases",
+    });
+
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]).toMatchObject({
+      ruleId: "CTX-003",
+      severity: "error",
+      // Attributed to the config value, not to a corpus location: the thing to go and fix is the
+      // string in the config, and there is no document at this path to attribute it to anyway.
+      filePath: "nope.md",
+      line: 0,
+    });
+    expect(result.messages[0]?.message).toContain("nope.md");
+    expect(result.errorCount).toBe(1);
+  });
+
+  it("reports a glossary whose tables carry no termColumn", async () => {
+    const result = await inertResult({
+      glossary: "glossary.md",
+      termColumn: "Concept",
+      aliasColumn: "Aliases",
+    });
+
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.severity).toBe("error");
+    // Names the column, since the glossary itself resolved and reading it is not the fix.
+    expect(result.messages[0]?.message).toContain('"Concept"');
+  });
+
+  it("reports an omitted aliasColumn, which can never derive an alias", async () => {
+    const result = await inertResult({
+      glossary: "glossary.md",
+      termColumn: "Term",
+    });
+
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.message).toContain("aliasColumn");
+  });
+
+  it("reports an aliasColumn naming a header the glossary does not have", async () => {
+    // The one inert mode no load-time check could ever catch: the config is well-formed, the
+    // glossary is there, the term column is there, and the alias column is a typo.
+    const result = await inertResult({
+      glossary: "glossary.md",
+      termColumn: "Term",
+      aliasColumn: "Aliasess",
+    });
+
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]?.message).toContain('"Aliasess"');
+  });
+
+  it("stays quiet when the glossary does yield aliases", async () => {
+    // The guard against the diagnostic firing on a working configuration: a rule that reports its
+    // own health on every clean run is the same defect wearing the opposite sign.
+    const result = await inertResult({
+      glossary: "glossary.md",
+      termColumn: "Term",
+      aliasColumn: "Aliases",
+      files: ["doc.md"],
+    });
+
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]).toMatchObject({
+      severity: "warning",
+      filePath: "doc.md",
+      data: { alias: "gql", canonical: "GraphQL" },
+    });
+    expect(result.errorCount).toBe(0);
+  });
+});
+
 // The CTX half of the shared `exclude` matrix. Both documents trip all three rules at once
 // (an empty section, an unchecked box, an alias); `glossary.md` has no headings and no checklist, so
 // it stays clean under CTX-001/CTX-002 and is self-skipped by CTX-003.

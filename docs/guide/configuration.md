@@ -163,7 +163,7 @@ Each entry names a `rule` and may set `severity` and `options`:
 ```
 
 - **Rule IDs are case-insensitive and dash-optional** — `ref-001` and `REF001` both canonicalize to `REF-001`.
-- `severity` is `"error" | "warning" | "off"`. `"off"` documents but disables a rule. Omitting `severity` uses the rule's built-in default (see each rule page).
+- `severity` is `"error" | "warning" | "off"`. `"off"` documents but disables a rule. Omitting `severity` uses the rule's built-in default (see each rule page). A config written by [`init`](cli.md#the-rule-set-init-proposes-and-why-your-first-lint-is-green) uses both spellings deliberately: a rule your corpus already satisfies is written with no `severity` at all, and one it does not is written `"off"` with the finding count in the comment beside it, so the first run is green and the work is still on the page.
 - `options` must match that rule's schema; unknown option keys are rejected.
 - The **same rule can appear multiple times** with different `files`/`exclude`/options — e.g. one [TBL-001](rules/TBL-001.md) column set for `docs/requirements/**` and another elsewhere.
 - Most document-scope rules accept `files` and `exclude` to narrow which files that instance applies to. Some project/identity rules intentionally omit them (see the rule's page). Where a rule takes both, `exclude` wins over `files`, mirroring the top-level pair — and the scope also bounds `--fix`, so an excluded file is never rewritten either.
@@ -203,11 +203,11 @@ All three `idRef` fields (`idPattern`, `definitions`, `idColumn`) are required w
 
 ## The `custom` rule
 
-The declarative [`custom`](rules/custom.md) rule composes a closed assertion vocabulary from config — no rebuild, no code. Its `id` must be namespaced and must not shadow a built-in prefix (`CTX/GRP/LLM/REF/SEC/SIZE/STR/TBL`). See its page for the full list of assertion kinds.
+The declarative [`custom`](rules/custom.md) rule composes a closed assertion vocabulary from config — no rebuild, no code. Its `id` must be namespaced, must not shadow a built-in prefix (`CTX/GRP/LLM/REF/SEC/SIZE/STR/TBL`), and [must not repeat another `custom` entry's id](rules/custom.md#each-custom-id-must-be-unique) — an id is how a finding is attributed and how a disable comment names what to silence, so two entries under one cannot both work. Listing the same **built-in** rule twice under different `files` scopes is unaffected. See its page for the full list of assertion kinds.
 
 ## `compile`
 
-Configures the [`compile`](compile.md) command. `skill.name`/`skill.description` are required; `sections`, `commandPreset`, and `hubMinInDegree` tune the generated `SKILL.md`. See the [compile guide](compile.md) and the [annotated reference](config-reference.md).
+Configures the [`compile`](compile.md) command. `skill.name`/`skill.description` are required; `sections`, `commandPreset`, and `hubMinInDegree` tune the generated `SKILL.md`. `hubMinInDegree` reaches one surface outside `compile`: it is also the threshold [`graph`](context-graph.md#graph) applies to its `top hubs` list, so the two reports cannot call one document a hub and a non-hub. See the [compile guide](compile.md) and the [annotated reference](config-reference.md).
 
 ## Validation & errors
 

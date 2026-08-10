@@ -23,6 +23,7 @@ import {
   type DocCluster,
   type GeneratedInitConfig,
   type InferredRule,
+  type PrunedDirectory,
   type RuleCategory,
 } from "@wastech-mdlint/core";
 
@@ -484,6 +485,61 @@ describe("init command · existing config handling", () => {
     expect(written.$schema).toBe(
       "./node_modules/@wastech-mdlint/cli/schema.json",
     );
+  });
+
+  it("--on-existing merge appends no rule whose only evidence sits outside the preserved include", async () => {
+    // Two correct behaviors used to meet badly here. A merge preserves `include` exactly, and it
+    // says so; inference read the whole repository scan. So the merge appended REF-003 and TBL-002
+    // justified by an `assets/` tree the config will never read, and wrote that measurement into the
+    // file as a permanent comment — false of every run the config would ever perform. Any repository
+    // whose `include` is narrower than its Markdown hit this on the first merge.
+    // `guides/` is a directory the scan does cluster, so it is offered and confirmed like any other
+    // — the existing `include` is the only thing keeping it out of the run, which is precisely the
+    // mechanism under test.
+    const cwd = await fixtureRepo(
+      withInstalledSchema({
+        "docs/a.md": "# A\n\n## Overview\n\nSee [B](b.md).\n",
+        "docs/b.md": "# B\n\n## Overview\n\nOrdinary prose.\n",
+        "guides/gallery.md": [
+          "# Gallery",
+          "",
+          "## Pictures",
+          "",
+          "![diagram](diagram.png)",
+          "",
+          "| Name | Value |",
+          "| --- | --- |",
+          "| a | b |",
+          "",
+        ].join("\n"),
+        "wastech-mdlint.config.json": `${JSON.stringify(
+          { include: ["docs/**/*.md"], rules: [] },
+          null,
+          2,
+        )}\n`,
+      }),
+    );
+
+    const result = await run(
+      ["init", cwd, "--yes", "--on-existing", "merge"],
+      cwd,
+    );
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const written = readConfig(
+      await readFile(path.join(cwd, CONFIG_FILE), "utf8"),
+    );
+    expect(written.include).toEqual(["docs/**/*.md"]);
+    const ruleIds = (written.rules as { rule: string }[]).map(
+      (entry) => entry.rule,
+    );
+    expect(ruleIds).not.toContain("REF-003");
+    expect(ruleIds).not.toContain("TBL-002");
+    // The rules that *are* appended come from the two documents the config selects, and no rationale
+    // may name a file outside them — the comment has to stay true of every run of this config.
+    expect(ruleIds).toEqual(["GRP-001", "REF-001"]);
+    const configText = await readFile(path.join(cwd, CONFIG_FILE), "utf8");
+    expect(configText).not.toContain("guides/");
   });
 
   it("--on-existing skip previews the skip message and leaves the file untouched", async () => {
@@ -1362,13 +1418,14 @@ describe("init command · writing the config", () => {
   });
 
   it("writes a nested config whose workflow lint command actually lints that subtree", async () => {
-    // docs/ has a broken local link (REF-001 evidence + a real violation). The workflow scopes lint
-    // to the config directory, so running that same command must load the nested config and scan the
-    // nested tree — not lint the repo root against docs-relative globs and find nothing.
+    // docs/ starts clean, so REF-001 is proposed enabled, and the link is broken *afterwards* — the
+    // sequence a repository actually lives through, and the only one that can prove this workflow
+    // scans the nested tree. A tree broken before `init` would have the rule written disabled and
+    // report nothing, which is indistinguishable from linting the wrong directory.
     const cwd = await fixtureRepo({
       ".git/HEAD": "ref: refs/heads/main\n",
-      "docs/a.md": "# A\n\nSee [missing](nope.md).\n",
-      "docs/b.md": "# B\n\nSee [A](a.md).\n",
+      "docs/a.md": "# A\n\nSee [B](b.md).\n",
+      "docs/b.md": "# B\n\nJust prose.\n",
     });
 
     const initResult = await run(
@@ -1376,6 +1433,12 @@ describe("init command · writing the config", () => {
       cwd,
     );
     expect(initResult.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    await writeFile(
+      path.join(cwd, "docs", "a.md"),
+      "# A\n\nSee [missing](nope.md).\n",
+      "utf8",
+    );
 
     // Run the emitted argv *verbatim*, from the repo root where GitHub runs the workflow. This test
     // used to mirror the command with hand-written absolute paths, which is precisely why the
@@ -1712,15 +1775,16 @@ describe("init command · hidden and gitignored trees", () => {
     // The count is the one thing the field test could not get from the draft: `.github` holds two
     // Markdown files and nothing said so, leaving a 63-file gap on the real repository silent.
     expect(init.stdout).toContain(
-      "hidden directories: 2 Markdown files in 1 directory whose name starts with a dot — .github (2)",
+      "hidden directories, not linted: 2 Markdown files in 1 directory whose name starts with a dot — .github (2)",
     );
-    // Per reason, not one total: each class gets its own line, and the two uncounted ones say so
-    // rather than implying a zero.
+    // Per reason, not one total: each class gets its own line, and the two unlisted ones say so
+    // rather than implying a zero. Each name carries its own occurrence count, so the total at the
+    // head of the line is arithmetic the reader can perform rather than take on faith.
     expect(init.stdout).toContain(
-      "build and dependency directories: 1 directory skipped by name, contents not counted — .venv.",
+      "build and dependency directories: 1 directory skipped by name, contents not counted — .venv (1).",
     );
     expect(init.stdout).toContain(
-      "gitignored directories: 1 directory skipped, contents not counted — generated-docs.",
+      "gitignored directories: 1 directory skipped, contents not counted — generated-docs (1).",
     );
     expect(init.stdout).not.toContain("4 files excluded");
   });
@@ -1769,14 +1833,17 @@ describe("init command · the scan-exclusion disclosure", () => {
     // The count and the reason together — a count alone does not tell the user that `.claude/` was
     // considered and dropped, which is the sentence the field test found missing.
     expect(init.stdout).toContain(
-      "hidden directories: 3 Markdown files in 2 directories whose name starts with a dot — .agents (2), .claude (1)",
+      "hidden directories, not linted: 3 Markdown files in 2 directories whose name starts with a dot — .agents (2), .claude (1)",
     );
     expect(init.stdout).toContain(
-      "build and dependency directories: 1 directory skipped by name, contents not counted — node_modules.",
+      "build and dependency directories: 1 directory skipped by name, contents not counted — node_modules (1).",
     );
     expect(init.stdout).toContain(
-      "gitignored directories: 1 directory skipped, contents not counted — generated-docs.",
+      "gitignored directories: 1 directory skipped, contents not counted — generated-docs (1).",
     );
+    // Nothing in this fixture sits under a proposed cluster, so the corpus-covered line has nothing
+    // to report and is omitted rather than printed as a zero.
+    expect(init.stdout).not.toContain("linted anyway");
   });
 
   it("accounts for every tracked Markdown file as either linted or disclosed", async () => {
@@ -1787,9 +1854,8 @@ describe("init command · the scan-exclusion disclosure", () => {
 
     const init = await run(["init", cwd, "--yes"], cwd);
     expect(init.exitCode).toBe(EXIT_CODE_SUCCESS);
-    const disclosed = /hidden directories: (\d+) Markdown files/.exec(
-      init.stdout,
-    );
+    const disclosed =
+      /hidden directories, not linted: (\d+) Markdown files/.exec(init.stdout);
     expect(disclosed).not.toBeNull();
 
     const lint = await run(
@@ -1849,9 +1915,8 @@ describe("init command · the scan-exclusion disclosure", () => {
     ]);
     // The number in the disclosure is a claim about that same set, so it is checked against it rather
     // than restated: a disclosure that drifts from the gap it explains is worse than none.
-    const disclosed = /hidden directories: (\d+) Markdown files/.exec(
-      init.stdout,
-    );
+    const disclosed =
+      /hidden directories, not linted: (\d+) Markdown files/.exec(init.stdout);
     expect(disclosed).not.toBeNull();
     expect(Number(disclosed![1])).toBe(missing.length);
   });
@@ -1869,10 +1934,12 @@ describe("init command · the scan-exclusion disclosure", () => {
     const init = await run(["init", cwd, "--yes"], cwd);
     expect(init.exitCode).toBe(EXIT_CODE_SUCCESS);
     expect(init.stdout).toContain(
-      "hidden directories: 2 Markdown files in 1 directory",
+      "hidden directories, linted anyway: 2 Markdown files in 1 directory",
     );
     expect(init.stdout).toContain("no include will be written");
     expect(init.stdout).not.toContain("add a pattern");
+    // Every file here ends up in the corpus, so there is no excluded half to report at all.
+    expect(init.stdout).not.toContain("not linted");
 
     const written = readConfig(
       await readFile(path.join(cwd, CONFIG_FILE), "utf8"),
@@ -1918,6 +1985,184 @@ describe("init command · the scan-exclusion disclosure", () => {
     expect(lint.exitCode).toBe(EXIT_CODE_SUCCESS);
     const { files } = JSON.parse(lint.stdout) as { files: string[] };
     expect(files).toEqual(DOT_DIRECTORY_TRACKED_MARKDOWN);
+  });
+});
+
+// A dot-directory sitting *under* a directory the scan proposes as a cluster. The scan refuses to
+// propose it, so nothing in the draft names it — but the cluster glob written one line above is
+// depth-agnostic and config globs match dot-segments, so the config lints it anyway. On the run that
+// found this, 12 of the 63 files the block called excluded were in the corpus, and findings were then
+// reported against two of them.
+//
+// The two `node_modules` copies at different depths are the other half of the fixture: they prune as
+// one name at two paths, which is the shape that let a directory count sit beside a shorter list of
+// names with no stated relationship between them.
+const NESTED_DOT_DIRECTORY_FIXTURE: Record<string, string> = {
+  ".gitignore": "generated-docs/\nnode_modules/\n",
+  "docs/guide.md": "# Guide\n",
+  "docs/reference.md": "# Reference\n",
+  "docs/.internal/notes.md": "# Notes\n",
+  ".agents/rules/testing.md": "# Testing\n",
+  ".agents/rules/architecture.md": "# Architecture\n",
+  "node_modules/left-pad/README.md": "# leftpad\n",
+  "mobile/node_modules/right-pad/README.md": "# rightpad\n",
+  "generated-docs/api/one.md": "# One\n",
+};
+
+// One parsed line of the block: the total it states, the entries it names with their own counts, and
+// how many entries an elided tail stands for along with their total.
+type DisclosureLine = {
+  label: string;
+  statedTotal: number;
+  entries: { name: string; count: number }[];
+  elidedTotal: number;
+};
+
+// Reads the rendered block back out of stdout. Deliberately a parser over the human text rather than
+// a call into the formatter's own helpers: recomputing the numbers with the code that printed them
+// would make the assertion agree with itself no matter what either side does.
+function parseDisclosure(stdout: string): DisclosureLine[] {
+  const start = stdout.indexOf("Excluded from the scan:");
+  expect(start).toBeGreaterThanOrEqual(0);
+  const block = stdout.slice(start).split("\n\n")[0]!.split("\n").slice(1);
+
+  return block.map((line) => {
+    const head = /^ {2}([^:]+): (\d+) /.exec(line);
+    expect(head, `no label and total in: ${line}`).not.toBeNull();
+
+    // The list runs from the em dash to the sentence that ends it.
+    const listed = /— (.+?)\.(?: |$)/.exec(line);
+    expect(listed, `no named list in: ${line}`).not.toBeNull();
+
+    const entries: DisclosureLine["entries"] = [];
+    let elidedTotal = 0;
+    for (const item of listed![1]!.split(", ")) {
+      const tail = /^\+(\d+) more \((\d+)\)$/.exec(item);
+      if (tail !== null) {
+        elidedTotal = Number(tail[2]);
+        continue;
+      }
+      const entry = /^(.+) \((\d+)\)$/.exec(item);
+      expect(entry, `no count beside the name: ${item}`).not.toBeNull();
+      entries.push({ name: entry![1]!, count: Number(entry![2]) });
+    }
+
+    return {
+      label: head![1]!,
+      statedTotal: Number(head![2]),
+      entries,
+      elidedTotal,
+    };
+  });
+}
+
+describe("init command · the disclosure describes the written config's boundary", () => {
+  it("keeps a dot-directory under a proposed cluster off the excluded line", async () => {
+    const cwd = await fixtureRepo(NESTED_DOT_DIRECTORY_FIXTURE);
+
+    const init = await run(["init", cwd, "--yes"], cwd);
+    expect(init.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    // Asserted rather than assumed: the whole reproduction depends on the proposed glob being
+    // depth-agnostic under `docs`, so a cluster heuristic that started proposing `docs/*.{md,mdx}`
+    // would leave this fixture green while testing nothing.
+    const written = readConfig(
+      await readFile(path.join(cwd, CONFIG_FILE), "utf8"),
+    );
+    expect(written.include).toEqual(["docs/**/*.{md,mdx}"]);
+
+    const lines = parseDisclosure(init.stdout);
+    const notLinted = lines.find(
+      (line) => line.label === "hidden directories, not linted",
+    );
+    const lintedAnyway = lines.find(
+      (line) => line.label === "hidden directories, linted anyway",
+    );
+
+    expect(notLinted?.entries).toEqual([{ name: ".agents", count: 2 }]);
+    expect(lintedAnyway?.entries).toEqual([
+      { name: "docs/.internal", count: 1 },
+    ]);
+    // The advice names a directory from the excluded group. Suggesting a pattern for a directory the
+    // include already covers is the half of the defect a corrected count alone would leave standing.
+    expect(init.stdout).toContain(
+      'add a pattern such as ".agents/**/*.{md,mdx}"',
+    );
+    expect(init.stdout).not.toContain('add a pattern such as "docs/.internal');
+  });
+
+  // @boundary-guard shared-exclude
+  // Every number in the block, walked back to the corpus the config it wrote produces. Two failures
+  // live here that no in-process assertion over the formatter can see, because both are disagreements
+  // between two documents the same run emits: a file named as excluded that the written `include`
+  // pulls in, and a total printed beside a list that does not add up to it. Both shipped while the
+  // formatter's own tests were green, since a test that restates the expected string agrees with the
+  // renderer by construction. The corpus side comes from a separate `lint` invocation over the config
+  // `init` chose, not one this test hand-wrote.
+  it("walks every count in the block back to the corpus the written config produces", async () => {
+    const cwd = await fixtureRepo(NESTED_DOT_DIRECTORY_FIXTURE);
+
+    const init = await run(["init", cwd, "--yes"], cwd);
+    expect(init.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const lint = await run(
+      ["lint", cwd, "--format", "json", "--fail-on", "off"],
+      cwd,
+    );
+    expect(lint.exitCode).toBe(EXIT_CODE_SUCCESS);
+    const { files } = JSON.parse(lint.stdout) as { files: string[] };
+
+    const lines = parseDisclosure(init.stdout);
+    // Non-vacuous: all four classes have to be present, or the loop below proves nothing about the
+    // one that went missing.
+    expect(lines.map((line) => line.label)).toEqual([
+      "hidden directories, not linted",
+      "hidden directories, linted anyway",
+      "build and dependency directories",
+      "gitignored directories",
+    ]);
+
+    for (const line of lines) {
+      const summed =
+        line.entries.reduce((total, entry) => total + entry.count, 0) +
+        line.elidedTotal;
+      expect(summed, `${line.label} does not add up`).toBe(line.statedTotal);
+    }
+
+    const filesUnder = (directory: string): string[] =>
+      files.filter((file) => file.startsWith(`${directory}/`));
+
+    for (const entry of lines[0]!.entries) {
+      expect(
+        filesUnder(entry.name),
+        `${entry.name} was reported excluded`,
+      ).toEqual([]);
+    }
+    for (const entry of lines[1]!.entries) {
+      expect(filesUnder(entry.name)).toHaveLength(entry.count);
+    }
+
+    // The corpus itself, so the two lines above are read against a known whole rather than against
+    // whatever the run happened to produce.
+    expect(files).toEqual([
+      "docs/.internal/notes.md",
+      "docs/guide.md",
+      "docs/reference.md",
+    ]);
+  });
+
+  it("counts both node_modules copies under the one name it prints", async () => {
+    // The two are one *name* and two *paths*. Printing the path count beside a deduplicated list of
+    // names is what left `3 directories skipped by name — .git, node_modules` unreconcilable.
+    const cwd = await fixtureRepo(NESTED_DOT_DIRECTORY_FIXTURE);
+
+    const init = await run(["init", cwd, "--yes"], cwd);
+    expect(init.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    expect(init.stdout).toContain(
+      "build and dependency directories: 2 directories skipped by name, " +
+        "contents not counted — node_modules (2).",
+    );
   });
 });
 
@@ -2503,49 +2748,63 @@ describe("formatDraftSummary", () => {
 });
 
 describe("formatScanExclusions", () => {
+  // A hidden entry holding `count` Markdown files under `dir`, named so a partition against an
+  // include can be asserted per file rather than per directory.
+  function hiddenDir(dir: string, count: number): PrunedDirectory {
+    return {
+      path: dir,
+      reason: "hidden",
+      markdownFiles: Array.from(
+        { length: count },
+        (_unused, index) => `${dir}/file-${index}.md`,
+      ),
+    };
+  }
+
+  const DOCS_INCLUDE = ["docs/**/*.{md,mdx}"];
+
   it("renders one line per reason and no aggregate total", () => {
     const lines = formatScanExclusions(
       {
         directories: [
-          { path: ".agents", reason: "hidden", markdownFileCount: 23 },
-          { path: ".claude", reason: "hidden", markdownFileCount: 28 },
+          hiddenDir(".agents", 23),
+          hiddenDir(".claude", 28),
           { path: "generated-docs", reason: "gitignored" },
           { path: "node_modules", reason: "noise" },
         ],
       },
-      true,
+      DOCS_INCLUDE,
     );
 
     expect(lines[0]).toBe("Excluded from the scan:");
     expect(lines).toHaveLength(4);
     expect(lines[1]).toContain("51 Markdown files in 2 directories");
     expect(lines[1]).toContain(".agents (23), .claude (28)");
-    expect(lines[2]).toContain("contents not counted — node_modules");
-    expect(lines[3]).toContain("contents not counted — generated-docs");
+    expect(lines[2]).toContain("contents not counted — node_modules (1)");
+    expect(lines[3]).toContain("contents not counted — generated-docs (1)");
 
     // The defect this closes is a single number the user skims past, so no line may present the
-    // three classes as one total.
+    // classes as one total.
     expect(lines.join("\n")).not.toContain("52 ");
   });
 
   it("renders nothing when the scan pruned nothing worth disclosing", () => {
-    expect(formatScanExclusions({ directories: [] }, true)).toEqual([]);
+    expect(formatScanExclusions({ directories: [] }, DOCS_INCLUDE)).toEqual([]);
 
     // A hidden directory holding no Markdown is not a finding — reporting it would train the reader
-    // to ignore the line that matters.
-    expect(
-      formatScanExclusions(
-        {
-          directories: [
-            { path: ".husky", reason: "hidden", markdownFileCount: 0 },
-          ],
-        },
-        true,
-      ),
-    ).toEqual([]);
+    // to ignore the line that matters. Both the empty-list and the absent-key shapes, since the key
+    // is optional on the public type and only the hidden reason populates it.
+    for (const entry of [
+      hiddenDir(".husky", 0),
+      { path: ".husky", reason: "hidden" } as const,
+    ]) {
+      expect(
+        formatScanExclusions({ directories: [entry] }, DOCS_INCLUDE),
+      ).toEqual([]);
+    }
   });
 
-  it("dedupes noise basenames and caps a long list with a +N more tail", () => {
+  it("counts occurrences per name so a directory line adds up to its own total", () => {
     const lines = formatScanExclusions(
       {
         directories: [
@@ -2559,26 +2818,24 @@ describe("formatScanExclusions", () => {
           })),
         ],
       },
-      true,
+      DOCS_INCLUDE,
     );
 
-    // Nine pruned directories, seven distinct basenames: the count is directories, the list is
-    // names, and the cap keeps the line readable on a monorepo.
+    // Nine pruned directories, seven distinct basenames. The line used to put "9" beside a list of
+    // seven names with no stated relationship, so a reader could not tell whether the disclosure or
+    // their own arithmetic was wrong. Now every name carries its occurrence count and the elided
+    // tail carries the total it drops: 1+1+1+1+1 shown, +2 names covering 4 more, which is 9.
     expect(lines[1]).toContain("9 directories skipped by name");
     expect(lines[1]).toContain(
-      "dbuild, ebuild, fbuild, gbuild, hbuild, +2 more",
+      "dbuild (1), ebuild (1), fbuild (1), gbuild (1), hbuild (1), +2 more (4)",
     );
     expect(lines[1]).not.toContain("ibuild");
   });
 
   it("uses singular wording for a single file in a single directory", () => {
     const lines = formatScanExclusions(
-      {
-        directories: [
-          { path: ".claude", reason: "hidden", markdownFileCount: 1 },
-        ],
-      },
-      true,
+      { directories: [hiddenDir(".claude", 1)] },
+      DOCS_INCLUDE,
     );
 
     expect(lines[1]).toContain("1 Markdown file in 1 directory");
@@ -2586,8 +2843,78 @@ describe("formatScanExclusions", () => {
     // suggested tail is MARKDOWN_GLOB_SUFFIX, not a literal `*.md`: the count in the same sentence
     // was produced with `.md` + `.mdx`, so a narrower pattern would under-deliver on it.
     expect(lines[1]).toContain(
-      'add a pattern such as ".claude/**/*.{md,mdx}" to lint it',
+      'add a pattern such as ".claude/**/*.{md,mdx}" to lint them',
     );
+  });
+
+  it("separates hidden files an include covers from the ones it does not", () => {
+    // The defect: a cluster glob proposed for an ancestor directory matches dot-segments nested
+    // under it, so the block reported files as excluded that the config beside it pulled straight
+    // into the corpus — and then advised adding a pattern for a directory already covered. On the
+    // run that found it, findings were reported in files the same screen had called excluded.
+    const lines = formatScanExclusions(
+      {
+        directories: [hiddenDir("backend/.rules", 6), hiddenDir(".agents", 2)],
+      },
+      ["backend/**/*.{md,mdx}"],
+    );
+
+    expect(lines).toHaveLength(3);
+    expect(lines[1]).toContain(
+      "hidden directories, not linted: 2 Markdown files in 1 directory",
+    );
+    expect(lines[1]).toContain(".agents (2)");
+    expect(lines[1]).not.toContain("backend/.rules");
+    // The advice names a directory from its own group, so it can never propose a pattern for files
+    // an include already selects.
+    expect(lines[1]).toContain('add a pattern such as ".agents/**/*.{md,mdx}"');
+
+    expect(lines[2]).toContain(
+      "hidden directories, linted anyway: 6 Markdown files in 1 directory",
+    );
+    expect(lines[2]).toContain("backend/.rules (6)");
+    expect(lines[2]).toContain("so they are in the corpus");
+    expect(lines[2]).not.toContain("add a pattern");
+  });
+
+  it("reports a partly covered directory on both lines", () => {
+    // An include can reach into part of a hidden tree and not the rest, so the split is per file:
+    // a per-directory verdict would have to round one of the two counts to zero.
+    const lines = formatScanExclusions(
+      {
+        directories: [
+          {
+            path: ".agents",
+            reason: "hidden",
+            markdownFiles: [".agents/drafts/x.md", ".agents/rules/a.md"],
+          },
+        ],
+      },
+      [".agents/rules/**/*.{md,mdx}"],
+    );
+
+    expect(lines[1]).toContain(
+      "hidden directories, not linted: 1 Markdown file in 1 directory",
+    );
+    expect(lines[1]).toContain(".agents (1)");
+    expect(lines[2]).toContain(
+      "hidden directories, linted anyway: 1 Markdown file in 1 directory",
+    );
+    expect(lines[2]).toContain(".agents (1)");
+  });
+
+  it("treats an empty include as selecting nothing, not as the default", () => {
+    // Deselecting every offered cluster writes a literal `"include": []`, which lints nothing. That
+    // is a different file from an omitted key, and coalescing the two here would tell the user the
+    // dot-matching default covers files their config excludes outright.
+    const lines = formatScanExclusions(
+      { directories: [hiddenDir(".agents", 2)] },
+      [],
+    );
+
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toContain("hidden directories, not linted: 2 Markdown");
+    expect(lines[1]).toContain("add a pattern such as");
   });
 
   it("says the default lints them instead when no include will be written", () => {
@@ -2596,31 +2923,52 @@ describe("formatScanExclusions", () => {
     // what governs. Telling that user to add a pattern would contradict the `Include (…)` line
     // printed two lines above.
     const lines = formatScanExclusions(
-      {
-        directories: [
-          { path: ".agents", reason: "hidden", markdownFileCount: 2 },
-        ],
-      },
-      false,
+      { directories: [hiddenDir(".agents", 2)] },
+      undefined,
     );
 
-    expect(lines[1]).toContain("2 Markdown files in 1 directory");
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toContain(
+      "hidden directories, linted anyway: 2 Markdown files in 1 directory",
+    );
     expect(lines[1]).toContain("no include will be written");
-    expect(lines[1]).toContain("**/*.md default stays in force");
+    expect(lines[1]).toContain("default stays in force");
     expect(lines[1]).not.toContain("add a pattern");
+  });
+
+  it("keeps an .mdx file out of the corpus the omitted-include default produces", () => {
+    // The default `include` is derived from the linted extensions, which are `.md` only, while the
+    // scan counts `.mdx` too. Rolling both into one "the default lints these" sentence would state a
+    // corpus the run does not produce.
+    const lines = formatScanExclusions(
+      {
+        directories: [
+          {
+            path: ".agents",
+            reason: "hidden",
+            markdownFiles: [".agents/a.md", ".agents/b.mdx"],
+          },
+        ],
+      },
+      undefined,
+    );
+
+    expect(lines[1]).toContain(
+      "hidden directories, not linted: 1 Markdown file in 1 directory",
+    );
+    expect(lines[1]).toContain("it selects .md only");
+    expect(lines[1]).not.toContain("add a pattern");
+    expect(lines[2]).toContain(
+      "hidden directories, linted anyway: 1 Markdown file in 1 directory",
+    );
   });
 
   it("sorts the hidden entries at the rendering site", () => {
     // `ScanPruning` is public core API and this formatter is exported, so an unsorted record must not
     // change either the order or which entries survive the cap.
     const lines = formatScanExclusions(
-      {
-        directories: [
-          { path: ".claude", reason: "hidden", markdownFileCount: 1 },
-          { path: ".agents", reason: "hidden", markdownFileCount: 2 },
-        ],
-      },
-      true,
+      { directories: [hiddenDir(".claude", 1), hiddenDir(".agents", 2)] },
+      DOCS_INCLUDE,
     );
 
     expect(lines[1]).toContain(".agents (2), .claude (1)");
@@ -3320,6 +3668,75 @@ describe("init command · clean fixture lints clean", () => {
     expect(lintResult.exitCode).toBe(EXIT_CODE_SUCCESS);
     expect(lintResult.stdout).toBe("No problems found.\n");
     await expect(loadConfiguration({ cwd })).resolves.toBeDefined();
+  });
+});
+
+describe("init command · a messy repository still lints clean on the first run", () => {
+  // The measured defect: `init --yes` then `lint` reported 24 errors and 435 warnings over 151
+  // files, 433 of them from one rule whose written justification claimed 29 checklist items for a
+  // corpus holding 433. Eighteen of the 459 were worth acting on. A gate that red on the day it
+  // lands is ignored and then disabled, taking the rules that were clean with it — and the same run
+  // offers a CI workflow that would fail on the first push.
+  //
+  // Every rule below has something to report in this fixture, so under the old presence gate the
+  // first lint reported all of it. The property now: a rule joins enabled only when the corpus it
+  // will lint already reports nothing for it.
+  const MESSY_FIXTURE: Record<string, string> = {
+    "docs/checklist.md": `# Checklist\n\n## Tasks\n\n${Array.from(
+      { length: 40 },
+      (_unused, index) => `- [ ] task ${index + 1}`,
+    ).join("\n")}\n`,
+    "docs/links.md":
+      "# Links\n\n## Overview\n\nSee [gone](nowhere.md) and [anchored](checklist.md#no-such-heading).\n",
+    "docs/tables.md":
+      "# Tables\n\n## Data\n\n| Name | Value |\n| --- | --- |\n| a | |\n",
+    "docs/placeholder.md": "# Placeholder\n\n## Notes\n\nTBD\n",
+    "docs/index.md": "# Index\n\n## Members\n\nSee [member](member.md).\n",
+    "docs/member.md":
+      "# Member\n\n## Overview\n\nBack to the [index](index.md).\n",
+  };
+
+  it("init --yes then lint reports nothing and exits 0", async () => {
+    const cwd = await fixtureRepo(MESSY_FIXTURE);
+
+    const initResult = await run(["init", cwd, "--yes"], cwd);
+    expect(initResult.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const lintResult = await run(["lint", cwd], cwd);
+    // The exact zero-messages string, not just exit 0: CTX-002 and TBL-002 default to `warning`, so
+    // a run still reporting them would exit 0 under the default `--fail-on error` and hide the very
+    // volume this asserts against.
+    expect(lintResult.stdout).toBe("No problems found.\n");
+    expect(lintResult.exitCode).toBe(EXIT_CODE_SUCCESS);
+  });
+
+  it("writes each unsatisfied rule down as a disabled entry carrying its real count", async () => {
+    const cwd = await fixtureRepo(MESSY_FIXTURE);
+
+    await run(["init", cwd, "--yes"], cwd);
+    const configText = await readFile(path.join(cwd, CONFIG_FILE), "utf8");
+    const written = readConfig(configText);
+    const entries = written.rules as { rule: string; severity?: string }[];
+
+    // Disabled is not the same as omitted. The config is the work list: every rule the corpus makes
+    // relevant is present, and the ones it does not satisfy carry the number that disabled them.
+    expect(
+      entries
+        .filter((entry) => entry.severity === "off")
+        .map((entry) => entry.rule),
+    ).toEqual(["CTX-001", "CTX-002", "REF-001", "REF-002", "TBL-002"]);
+    // GRP-001 stays enabled: the only loop here spans two documents, which is below its floor, so
+    // the rule reports nothing and the entry is a live gate rather than a deferred one.
+    expect(
+      entries.find((entry) => entry.rule === "GRP-001")?.severity,
+    ).toBeUndefined();
+
+    // The count in the comment is the corpus count, not a sample's — the number a reader reproduces
+    // by turning the rule on and running lint.
+    expect(configText).toContain("40 checklist item(s)");
+    expect(configText).toContain("6 file(s) this config lints");
+    // And the cycle GRP-001 cites is named together with the reason this config leaves it alone.
+    expect(configText).toContain("will NOT report");
   });
 });
 

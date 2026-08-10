@@ -9,6 +9,7 @@ import {
   formatContextGraphSummary,
   getComponents,
   topologicalSort,
+  type ContextGraphSummaryOptions,
 } from "./graph-algorithms.js";
 import type { ImpactClassification } from "./impact-analysis.js";
 import type { ContextSliceResult } from "./search-index.js";
@@ -133,8 +134,9 @@ function summarizeExclusionCauses(
 export function renderContextGraphText(
   graph: ContextGraph,
   coverage?: GraphCoverage,
+  options: ContextGraphSummaryOptions = {},
 ): string {
-  const lines = [formatContextGraphSummary(graph)];
+  const lines = [formatContextGraphSummary(graph, options)];
 
   // Clusters nest one level deeper than the other sections because a component is itself a list:
   // flattening the members under a single `clusters:` header would lose the boundary between one

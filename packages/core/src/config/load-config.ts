@@ -10,6 +10,8 @@ import {
 import { normalizeRelativePath } from "../discovery/globs.js";
 import { RuleResolutionError, type RuleRegistry } from "../engine/registry.js";
 import {
+  duplicateCustomIdMessage,
+  findDuplicateCustomIds,
   resolveCustomRule,
   type CustomRuleEntry,
 } from "../engine/rules/custom.js";
@@ -142,6 +144,17 @@ function resolveRules(
   const resolved: ConfiguredRule[] = [];
   const errors: string[] = [];
 
+  // Uniqueness is the one id constraint `resolveCustomRule` cannot enforce: it validates a single
+  // entry and has no view of its siblings. Computed here, where the whole list and its indices are
+  // in hand, and reported inside the loop below so all of this stage's diagnostics come out in
+  // entry order rather than grouped by which check found them.
+  const collisionByIndex = new Map(
+    findDuplicateCustomIds(entries).map((collision) => [
+      collision.index,
+      collision,
+    ]),
+  );
+
   entries.forEach((entry, index) => {
     try {
       const rule =
@@ -151,6 +164,24 @@ function resolveRules(
               entry.rule,
               (entry as { options?: unknown }).options,
             );
+
+      const collision = collisionByIndex.get(index);
+      if (collision !== undefined) {
+        // Reported only once the entry is otherwise valid. An id that fails the grammar is already
+        // being reported as malformed, and adding "and it is a duplicate" to it describes a
+        // consequence of the first problem as though it were a second one to go and fix.
+        errors.push(
+          formatConfigIssue({
+            path: ["rules", index, "id"],
+            message: duplicateCustomIdMessage({
+              id: collision.id,
+              siblingPath: `config.rules[${collision.firstIndex}]`,
+            }),
+          }),
+        );
+        return;
+      }
+
       resolved.push({ rule, severity: entry.severity });
     } catch (error) {
       if (error instanceof RuleResolutionError) {

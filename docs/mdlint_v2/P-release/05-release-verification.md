@@ -37,6 +37,8 @@ Every advisory is therefore in the dev chain — the tooling that builds and tes
 
 These are two numbers from one date, not a baseline. Re-take both at release time; the conclusion to re-establish is "the shipped tree installs clean", not "the counts still match".
 
+**Half of that is now a gate.** The 2026-08-09 field test found the complement of the case above — a production-tree advisory that a workspace-wide `npm audit` could not distinguish from the dev noise, on a lockfile pin the published range already fixed — so [P19.07](../P19-field-test-remediation/07-host-and-release.md) added an `audit` job to `ci.yml` running `npm audit --omit=dev --audit-level=high`. The production half is therefore continuously checked and the bare-sandbox install below is confirmation rather than discovery; the **workspace** number is still the one only this step takes, and the "no dependency was bumped on dev-chain evidence" decision above is unchanged.
+
 ## Decisions applied
 
 - [M4](../requirements/05-mcp-server.md) wire-level tests · [I4/I5/I7](../requirements/06-installation.md).

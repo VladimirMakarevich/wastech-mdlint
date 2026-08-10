@@ -29,6 +29,13 @@
  * of this corpus and this rule set together, so restating either in each suite meant a change to the
  * location vocabulary had to be chased through three files.
  *
+ * The checklist item wrapped onto a second source line is here for the same reason and is the one
+ * piece of the corpus that is about the *shape* of a message rather than a location: `CTX-002` quotes
+ * the item's text, and a soft line break survives into that text, so the message carries a literal
+ * newline. Interpolated into a line-oriented format it produces an unindented continuation line —
+ * indistinguishable from a file heading — and every following finding is attributed to a file that
+ * does not exist. A corpus of single-line messages cannot see that, which is how it shipped.
+ *
  * Callers write the files with their own fixture helper (each package already has one) and compare
  * their parsed locations against {@link PARITY_LINT_FIXTURE.locations}. A suite that needs more — the
  * cross-host guard also needs a graph with real edges — extends the map rather than restating it.
@@ -39,17 +46,19 @@ export const PARITY_LINT_FIXTURE: {
   readonly locations: readonly string[];
 } = {
   files: {
-    "a.md": "# A\n\n[broken](missing.md)\n\nmore\nlines\nhere\n",
+    "a.md":
+      "# A\n\n[broken](missing.md)\n\nmore\nlines\nhere\n\n- [ ] wrapped item that continues\n  onto a second source line\n",
     "b.md": "# B\n\n| ID | Owner |\n| --- | --- |\n| REQ-1 |  |\n",
     "wastech-mdlint.config.json": JSON.stringify({
       rules: [
+        { rule: "CTX-002" },
         { rule: "REF-001" },
         { rule: "SIZE-001", options: { lines: { warn: 2 } } },
         { rule: "TBL-002", options: { columns: ["Owner"] } },
       ],
     }),
   },
-  locations: ["-", "-", "3:1", "5"],
+  locations: ["-", "-", "3:1", "5", "9"],
 };
 
 /** The subset of a `LintMessage` these comparisons read. Restated so this module needs no core import. */
@@ -188,10 +197,17 @@ export function readLintSummaryLine(
 /**
  * Project structured lint messages into the same rows {@link readLintFindingLines} produces.
  *
- * The location rule (`-` for a whole-file finding, `line`, or `line:column`) is restated here on
- * purpose rather than imported from core: sharing one implementation would make both sides of the
- * comparison the same code, which is not parity. If the two ever disagree, one of them is the defect —
- * that is the point.
+ * Two rules of the human format are restated here on purpose rather than imported from core, because
+ * sharing one implementation would make both sides of the comparison the same code, which is not
+ * parity. If a restatement and the renderer ever disagree, one of them is the defect — that is the
+ * point.
+ *
+ * The first is the location (`-` for a whole-file finding, `line`, or `line:column`). The second is
+ * that a row occupies exactly one line, so the structured payload's message — which keeps its
+ * newlines, being escaped rather than laid out — has its whitespace runs flattened before comparison.
+ * What that leaves the comparison asserting is the structural half: how many rows the text renders,
+ * which file each is grouped under, and in what order. Those are what a message spilling onto a
+ * second line destroys, and they are not weakened by the two sides agreeing about whitespace.
  */
 export function lintMessagesAsRows(
   messages: readonly ParityLintMessage[],
@@ -205,7 +221,7 @@ export function lintMessagesAsRows(
           ? `${message.line}`
           : `${message.line}:${message.column}`,
     severity: message.severity,
-    message: message.message,
+    message: message.message.split(/\s+/).filter(Boolean).join(" "),
     ruleId: message.ruleId,
   }));
 }

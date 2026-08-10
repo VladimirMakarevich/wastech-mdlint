@@ -68,6 +68,7 @@ export { inferRuleSet } from "./discovery/rule-inference.js";
 export type {
   ClusterRuleInference,
   DetectedPatterns,
+  InferenceScope,
   InferredRule,
   RuleInferenceResult,
 } from "./discovery/rule-inference.js";
@@ -110,7 +111,10 @@ export {
   getComponents,
   topologicalSort,
 } from "./graph/graph-algorithms.js";
-export type { TopologicalSortResult } from "./graph/graph-algorithms.js";
+export type {
+  ContextGraphSummaryOptions,
+  TopologicalSortResult,
+} from "./graph/graph-algorithms.js";
 // `query` and `getImpactSet` (below) have no host caller: the graph commands and MCP tools reach
 // traversal through `getContextSlice` / `impact` / compile, and `query`'s only cross-module callers
 // are core's own `graph/search-index.ts` and `compile/compile-context.ts` (besides `impact()` in the
@@ -292,8 +296,15 @@ export {
 } from "./engine/rules/index.js";
 export { fileScopeShape, matchesFileScope } from "./engine/rules/scope.js";
 export type { FileScope } from "./engine/rules/scope.js";
-export { resolveCustomRule } from "./engine/rules/custom.js";
-export type { CustomRuleEntry } from "./engine/rules/custom.js";
+export {
+  duplicateCustomIdMessage,
+  findDuplicateCustomIds,
+  resolveCustomRule,
+} from "./engine/rules/custom.js";
+export type {
+  CustomIdCollision,
+  CustomRuleEntry,
+} from "./engine/rules/custom.js";
 
 // Schema + docs generation
 export { generateConfigSchema } from "./engine/schema.js";
@@ -327,3 +338,14 @@ export type {
   ConfiguredRule,
   LoadedConfiguration,
 } from "./config/load-config.js";
+// Public because `init` has to measure the same corpus the config it writes will lint, and the
+// `exclude` that config carries is this list. A host re-deriving it would be a second copy, free to
+// disagree with the lint path about which files the counts in the written rationale describe.
+//
+// `DEFAULT_INCLUDE_GLOBS` for the same reason on the other side: when a draft omits the `include`
+// key, this is the scope its files will actually be selected by, and `init`'s disclosure has to
+// judge each skipped file against it rather than assume the key it is not writing.
+export {
+  DEFAULT_EXCLUDE_GLOBS,
+  DEFAULT_INCLUDE_GLOBS,
+} from "./config/corpus-scope.js";

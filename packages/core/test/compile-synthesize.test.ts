@@ -393,11 +393,20 @@ describe("synthesize", () => {
     expect(result.skillContent).toContain("- `a.md -> b.md -> a.md`");
     // One excluded path per bullet: the field test measured this as a 3702-character single line.
     // Uncapped, unlike the fan-out — a document missing from reading order with no explanation is
-    // exactly the silent truncation this block exists to prevent.
+    // exactly the silent truncation this block exists to prevent. The `Complete:` line says so in
+    // the artifact, because a count alone cannot tell a reader whether a list was capped.
     expect(result.skillContent).toContain(
-      ["Excluded from reading order (2):", "", "- `a.md`", "- `b.md`"].join(
-        "\n",
-      ),
+      [
+        "Excluded from reading order (2):",
+        "",
+        "Complete: every excluded document is listed.",
+        "",
+        "- `a.md`",
+        "- `b.md`",
+      ].join("\n"),
+    );
+    expect(result.skillContent).toContain(
+      "Complete: all 1 document(s) in the order are listed, so this section grows with the corpus.",
     );
   });
 
@@ -591,21 +600,124 @@ describe("synthesize", () => {
         ]),
       );
 
-      const referencesBlock = (documents: string[]): string => {
-        const content = synthesize(
-          input({ documentPaths: documents, profiles }),
-        ).skillContent;
-        return content.slice(content.indexOf("### References"));
-      };
+      const compiled = (documents: string[]): string =>
+        synthesize(input({ documentPaths: documents, profiles })).skillContent;
 
-      // Only the References block is compared: the Architecture table renders `documentPaths` in
-      // caller order by contract (`compileContext` sorts before calling), so reversing the input
-      // legitimately reorders it — the ranking is what must not move.
-      expect(referencesBlock([...documentPaths].reverse())).toBe(
-        referencesBlock(documentPaths),
+      // The whole artifact, not just this block: both capped sections rank-select and then render in
+      // path order, so caller order reaches neither of them and reversing the input must change
+      // nothing at all. A comparator falling back to input order would surface here.
+      expect(compiled([...documentPaths].reverse())).toBe(
+        compiled(documentPaths),
       );
-      expect(referencesBlock(documentPaths)).toContain("`doc-24.md`");
-      expect(referencesBlock(documentPaths)).not.toContain("`doc-25.md`");
+
+      const referencesBlock = compiled(documentPaths).slice(
+        compiled(documentPaths).indexOf("### References"),
+      );
+      expect(referencesBlock).toContain("`doc-24.md`");
+      expect(referencesBlock).not.toContain("`doc-25.md`");
+    });
+  });
+
+  describe("bounded Document Architecture table", () => {
+    function inboundEdges(to: string, count: number): ContextGraphEdge[] {
+      return Array.from({ length: count }, (_unused, index) => ({
+        from: `docs/area-01/topic-${String(index).padStart(3, "0")}.md`,
+        to,
+        type: "link" as const,
+        line: 1,
+      }));
+    }
+
+    // 30 documents with distinct reference counts, so rank and path order disagree and the test can
+    // tell which one selected the rows.
+    const documentPaths = Array.from(
+      { length: 30 },
+      (_unused, index) => `doc-${String(index).padStart(2, "0")}.md`,
+    );
+    const profiles = new Map(
+      documentPaths.map((documentPath, index) => [
+        documentPath,
+        profile({ referencedBy: inboundEdges(documentPath, index) }),
+      ]),
+    );
+
+    function architectureBlock(content: string): string {
+      return content.slice(
+        content.indexOf("## Document Architecture"),
+        content.indexOf("## Document Rules"),
+      );
+    }
+
+    it("states the bound always and the omission only when the cap engages", () => {
+      const small = synthesize(
+        input({
+          documentPaths: ["a.md"],
+          profiles: new Map([["a.md", profile()]]),
+        }),
+      );
+
+      expect(architectureBlock(small.skillContent)).toContain(
+        "Bounded summary: at most 25 documents get a row here, selected by total references and rendered in path order.",
+      );
+      // A corpus under the bound is not told about an elision that did not happen.
+      expect(architectureBlock(small.skillContent)).not.toContain(
+        "documents are shown",
+      );
+    });
+
+    it("caps the table, selects by rank, and renders in path order", () => {
+      const block = architectureBlock(
+        synthesize(input({ documentPaths, profiles })).skillContent,
+      );
+      const rows = block
+        .split("\n")
+        .filter((line) => line.startsWith("| doc-"));
+
+      expect(rows).toHaveLength(25);
+      expect(block).toContain(
+        "The 25 most-referenced of 30 documents are shown; the other 5 are omitted, and Reading Order below still lists every one.",
+      );
+      // The five least-referenced documents are the ones dropped, and the survivors are in path
+      // order rather than rank order — rank decides *which* rows exist, not where a reader looks.
+      expect(rows[0]).toContain("| doc-05.md |");
+      expect(rows.at(-1)).toContain("| doc-29.md |");
+      // The same 25 documents the References block details, so a row never lacks an entry.
+      const referencesBlock = synthesize(
+        input({ documentPaths, profiles }),
+      ).skillContent.slice(
+        synthesize(input({ documentPaths, profiles })).skillContent.indexOf(
+          "### References",
+        ),
+      );
+      for (const row of rows) {
+        const [, documentPath] = /^\| (\S+) \|/.exec(row) ?? [];
+        expect(referencesBlock).toContain(`\`${documentPath}\``);
+      }
+    });
+
+    it("does not point at Reading Order when the dependency section is gated off", () => {
+      // The pointer names a heading inside `Document Dependencies`. With that section disabled the
+      // claim would send a reader to a heading the artifact does not contain, so it is dropped —
+      // the bound and the omission count are still stated.
+      const block = architectureBlock(
+        synthesize(
+          input({
+            documentPaths,
+            profiles,
+            sections: {
+              architecture: true,
+              rules: true,
+              dependencies: false,
+              workflow: true,
+            },
+          }),
+        ).skillContent,
+      );
+
+      expect(block).toContain(
+        "The 25 most-referenced of 30 documents are shown; the other 5 are omitted.",
+      );
+      expect(block).not.toContain("Reading Order");
     });
   });
 

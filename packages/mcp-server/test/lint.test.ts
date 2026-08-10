@@ -283,6 +283,35 @@ describe("handleLint", () => {
     expect(output.hint).toMatch(/reserved built-in prefix/);
   });
 
+  it("rejects two custom entries sharing an id, naming both request indices", () => {
+    // This tool resolves rules from the request rather than from a config, so it never passes
+    // through the loader's uniqueness check and needed its own. Both entries would otherwise run and
+    // emit findings labelled identically — on this host, to a model that cannot then attribute
+    // either one, and with a `severity` on one governing the other's findings.
+    const result = handleLint({
+      content: "- [ ] todo\n",
+      rules: [
+        {
+          rule: "custom",
+          id: "PROJ-DUP",
+          options: { assert: { kind: "allChecked" } },
+        },
+        {
+          rule: "custom",
+          id: "PROJ-DUP",
+          options: { assert: { kind: "noPlaceholders" } },
+        },
+      ],
+    });
+
+    expect(result.isError).toBe(true);
+    const output = structured(result);
+    expect(output.code).toBe("INVALID_INPUT");
+    expect(output.message).toMatch(/identify exactly one rule/);
+    expect(output.hint).toMatch(/rules\[1\]\.id/);
+    expect(output.hint).toMatch(/already used by rules\[0\]/);
+  });
+
   it("selects nothing when a custom rule's `files` glob misses the synthetic path", () => {
     // The document is always `content.md`, so a caller-supplied glob scoped to a directory silently
     // matches no file — the foot-gun the tool description now discloses.

@@ -7,7 +7,11 @@ import { z } from "zod";
 
 import type { DocCluster } from "../src/discovery/repo-scan.js";
 import { scanRepository } from "../src/discovery/repo-scan.js";
-import { inferRuleSet } from "../src/discovery/rule-inference.js";
+import {
+  inferRuleSet,
+  type InferenceScope,
+  type RuleInferenceResult,
+} from "../src/discovery/rule-inference.js";
 import { compareStrings } from "../src/deterministic-sort.js";
 import { defineRule, RuleRegistry } from "../src/engine/registry.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
@@ -40,16 +44,41 @@ async function createFixtureTree(
 }
 
 // Hand-built DocCluster for tests that pin exact gate behavior independent of scanRepository.
+//
+// `sampleFiles` defaults to empty and every test below leaves it that way, which is the point:
+// inference reads the corpus its scope selects and never this list. The field stays on the type
+// because the scan still reports it for the confirmation prompt, and a test that fed it here would
+// pass while proving nothing about what a config measures.
 function buildCluster(
-  overrides: Partial<DocCluster> & { path: string; sampleFiles: string[] },
+  overrides: Partial<DocCluster> & { path: string },
 ): DocCluster {
   return {
     kind: "cluster",
     score: 1,
-    subtreeCount: overrides.sampleFiles.length,
+    subtreeCount: 1,
     includeGlob: `${overrides.path}/**/*.{md,mdx}`,
+    sampleFiles: [],
     ...overrides,
   };
+}
+
+// The scope a fresh `init` writes for these clusters. Passing it — rather than letting the call
+// default to something — is what makes these tests measure the corpus the drafted config lints.
+function scopeFor(clusters: DocCluster[]): InferenceScope {
+  return { include: clusters.map((cluster) => cluster.includeGlob) };
+}
+
+function infer(
+  root: string,
+  clusters: DocCluster[],
+  registry = ruleRegistry,
+): Promise<RuleInferenceResult> {
+  return inferRuleSet({
+    cwd: root,
+    clusters,
+    registry,
+    scope: scopeFor(clusters),
+  });
 }
 
 describe("inferRuleSet · end to end", () => {
@@ -123,16 +152,10 @@ describe("inferRuleSet · end to end", () => {
     });
 
     const scan = await scanRepository({ cwd: root });
-    const result = await inferRuleSet({
-      cwd: root,
-      clusters: scan.clusters,
-      registry: ruleRegistry,
-    });
+    const result = await infer(root, scan.clusters);
 
     // "Global" is about the *evidence*, not about carrying no options: every rule here but SEC-001
     // is proposed from corpus-wide patterns, while SEC-001 is scoped to the cluster that earned it.
-    // Filtering on `options === undefined` used to express that and no longer does, because GRP-001
-    // now carries a corpus-wide option of its own — asserted right below.
     const globalRules = result.rules.filter((rule) => rule.rule !== "SEC-001");
     expect(globalRules.map((rule) => rule.rule)).toEqual([
       "CTX-001",
@@ -142,20 +165,40 @@ describe("inferRuleSet · end to end", () => {
       "REF-002",
       "TBL-002",
     ]);
-    // The sampled cycle is `docs/a.md -> docs/b.md -> docs/a.md`, two documents — below GRP-001's
-    // own `minCycleLength` floor of 3. The entry lowers the floor to the cycle its rationale cites,
-    // so the config it proposes reports the finding the comment above it describes.
-    expect(
-      globalRules.find((rule) => rule.rule === "GRP-001")?.options,
-    ).toEqual({ minCycleLength: 2 });
+    // The cycle in this corpus is `docs/a.md -> docs/b.md -> docs/a.md`, two documents — below
+    // GRP-001's floor of 3. The entry must not carry an option lowering that floor: the floor is
+    // there because an index and a member linking each other is an ordinary shape, and a config that
+    // reinstates it at `error` hands a new adopter a failing build for writing documentation
+    // normally. The rationale names the cycle and says it will not be reported instead.
+    const grp001 = globalRules.find((rule) => rule.rule === "GRP-001");
+    expect(grp001?.options).toBeUndefined();
+    expect(grp001?.rationale).toContain("will NOT report");
+    expect(grp001?.rationale).toContain("docs/a.md -> docs/b.md -> docs/a.md");
+
     for (const rule of globalRules) {
       expect(rule.rationale.length).toBeGreaterThan(0);
       expect(rule.description.length).toBeGreaterThan(0);
     }
 
+    // One unchecked box and one TBD section are real findings over this corpus, so those two rules
+    // are written disabled; everything else reports nothing and is enabled.
+    expect(
+      Object.fromEntries(
+        result.rules.map((rule) => [rule.rule, rule.severity]),
+      ),
+    ).toEqual({
+      "CTX-001": "off",
+      "CTX-002": "off",
+      "GRP-001": undefined,
+      "REF-001": undefined,
+      "REF-002": undefined,
+      "SEC-001": undefined,
+      "TBL-002": undefined,
+    });
+
     const sec001 = result.rules.find((rule) => rule.rule === "SEC-001");
     expect(sec001).toMatchObject({
-      // Reading order from the sampled ADRs ("## Status" then "## Context" then "## Decision"),
+      // Reading order from the ADRs ("## Status" then "## Context" then "## Decision"),
       // not alphabetical — SEC-001's fix scaffolds missing sections in this order.
       options: {
         files: ["adr/**/*.{md,mdx}"],
@@ -181,6 +224,63 @@ describe("inferRuleSet · end to end", () => {
         compareStrings,
       ),
     );
+    expect(result.corpusFileCount).toBe(4);
+  });
+});
+
+describe("inferRuleSet · severity policy", () => {
+  // The defect this pins: a rationale measured on three-to-five sampled files decided a rule that
+  // then ran over everything. A document holding forty unchecked boxes sorts last here, so a
+  // five-file sample never reaches it — the proposal has to come from the corpus or not at all.
+  it("counts a checklist volume no sample would reach, and writes the rule off rather than red", async () => {
+    const filler = Object.fromEntries(
+      ["a", "b", "c", "d", "e"].map((name) => [
+        `docs/${name}.md`,
+        `# ${name.toUpperCase()}\n\n## Overview\n\nOrdinary prose, no checklists.\n`,
+      ]),
+    );
+    const boxes = Array.from(
+      { length: 40 },
+      (_unused, index) => `- [ ] task ${index + 1}`,
+    ).join("\n");
+    const root = await createFixtureTree({
+      ...filler,
+      "docs/z-checklist.md": `# Checklist\n\n## Tasks\n\n${boxes}\n`,
+    });
+
+    const result = await infer(root, [buildCluster({ path: "docs" })]);
+
+    const ctx002 = result.rules.find((rule) => rule.rule === "CTX-002");
+    expect(ctx002).toBeDefined();
+    expect(ctx002?.severity).toBe("off");
+    expect(ctx002?.rationale).toContain("40 checklist item(s)");
+    expect(ctx002?.rationale).toContain("40 finding(s)");
+    expect(ctx002?.rationale).toContain("6 file(s) this config lints");
+  });
+
+  it("enables a rule the corpus already satisfies, with no severity key at all", async () => {
+    const root = await createFixtureTree({
+      "docs/a.md": [
+        "# A",
+        "",
+        "## Tasks",
+        "",
+        "- [x] done",
+        "- [x] also done",
+        "",
+      ].join("\n"),
+    });
+
+    const result = await infer(root, [buildCluster({ path: "docs" })]);
+
+    const ctx002 = result.rules.find((rule) => rule.rule === "CTX-002");
+    expect(ctx002).toBeDefined();
+    // Absent rather than `"error"`/`"warning"`: an entry that restates the registry default is a key
+    // a later reader has to prove is inert, and the written file stays scannable without it.
+    expect(ctx002?.severity).toBeUndefined();
+    expect(ctx002?.rationale).toContain(
+      "It reports nothing over the 1 file(s)",
+    );
   });
 });
 
@@ -199,15 +299,7 @@ describe("inferRuleSet · per-pattern isolation", () => {
       ].join("\n"),
     });
 
-    const cluster = buildCluster({
-      path: "docs",
-      sampleFiles: ["docs/only-tables.md"],
-    });
-    const result = await inferRuleSet({
-      cwd: root,
-      clusters: [cluster],
-      registry: ruleRegistry,
-    });
+    const result = await infer(root, [buildCluster({ path: "docs" })]);
 
     expect(result.rules.map((rule) => rule.rule)).toEqual(["TBL-002"]);
   });
@@ -225,15 +317,7 @@ describe("inferRuleSet · per-pattern isolation", () => {
       ].join("\n"),
     });
 
-    const cluster = buildCluster({
-      path: "docs",
-      sampleFiles: ["docs/only-checklist.md"],
-    });
-    const result = await inferRuleSet({
-      cwd: root,
-      clusters: [cluster],
-      registry: ruleRegistry,
-    });
+    const result = await infer(root, [buildCluster({ path: "docs" })]);
 
     expect(result.rules.map((rule) => rule.rule)).toEqual(["CTX-002"]);
   });
@@ -252,20 +336,12 @@ describe("inferRuleSet · per-pattern isolation", () => {
       ].join("\n"),
     });
 
-    const cluster = buildCluster({
-      path: "docs",
-      sampleFiles: ["docs/only-images.md"],
-    });
-    const result = await inferRuleSet({
-      cwd: root,
-      clusters: [cluster],
-      registry: ruleRegistry,
-    });
+    const result = await infer(root, [buildCluster({ path: "docs" })]);
 
     expect(result.rules.map((rule) => rule.rule)).toEqual(["REF-003"]);
   });
 
-  it("produces no rules when a sample has none of the detectable patterns", async () => {
+  it("produces no rules when the corpus has none of the detectable patterns", async () => {
     const root = await createFixtureTree({
       "docs/plain.md": [
         "# Plain",
@@ -277,18 +353,77 @@ describe("inferRuleSet · per-pattern isolation", () => {
       ].join("\n"),
     });
 
-    const cluster = buildCluster({
-      path: "docs",
-      sampleFiles: ["docs/plain.md"],
-    });
-    const result = await inferRuleSet({
-      cwd: root,
-      clusters: [cluster],
-      registry: ruleRegistry,
-    });
+    const result = await infer(root, [buildCluster({ path: "docs" })]);
 
     expect(result.rules).toEqual([]);
     expect(result.clusters[0]?.contributesTo).toEqual([]);
+  });
+});
+
+describe("inferRuleSet · corpus scope decides the evidence", () => {
+  // The property that makes a merge safe: a rule can only be justified by files the config being
+  // written will read. Here the images and tables live outside the scope, so neither REF-003 nor
+  // TBL-002 has any evidence at all — not evidence that is later filtered out.
+  it("ignores files outside the scope entirely, however the clusters were drawn", async () => {
+    const root = await createFixtureTree({
+      "docs/a.md": "# A\n\n## Overview\n\nProse with a [link](b.md).\n",
+      "docs/b.md": "# B\n\n## Overview\n\nMore prose.\n",
+      "assets/gallery.md": [
+        "# Gallery",
+        "",
+        "## Pictures",
+        "",
+        "![diagram](diagram.png)",
+        "",
+        "| Name | Value |",
+        "| --- | --- |",
+        "| a | b |",
+        "",
+      ].join("\n"),
+    });
+
+    const result = await inferRuleSet({
+      cwd: root,
+      clusters: [
+        buildCluster({ path: "docs" }),
+        buildCluster({ path: "assets" }),
+      ],
+      registry: ruleRegistry,
+      scope: { include: ["docs/**/*.md"] },
+    });
+
+    expect(result.rules.map((rule) => rule.rule)).toEqual([
+      "GRP-001",
+      "REF-001",
+    ]);
+    expect(result.corpusFileCount).toBe(2);
+    // The out-of-scope cluster is still reported, with an empty file list — the confirmation prompt
+    // needs to show it was considered, and an empty list is how it shows nothing backed it.
+    const assets = result.clusters.find(
+      (cluster) => cluster.clusterPath === "assets",
+    );
+    expect(assets?.files).toEqual([]);
+    expect(assets?.contributesTo).toEqual([]);
+  });
+
+  it("reports each cluster's own corpus files as the evidence it was measured on", async () => {
+    const root = await createFixtureTree({
+      "docs/a.md": "# A\n\n## Overview\n\nProse.\n",
+      "docs/nested/b.md": "# B\n\n## Overview\n\nProse.\n",
+      "other/c.md": "# C\n\n## Overview\n\nProse.\n",
+    });
+
+    const clusters = [
+      buildCluster({ path: "docs" }),
+      buildCluster({ path: "other" }),
+    ];
+    const result = await infer(root, clusters);
+
+    expect(result.clusters[0]?.files).toEqual([
+      "docs/a.md",
+      "docs/nested/b.md",
+    ]);
+    expect(result.clusters[1]?.files).toEqual(["other/c.md"]);
   });
 });
 
@@ -321,21 +456,13 @@ describe("inferRuleSet · ADR detection", () => {
       ].join("\n"),
     });
 
-    const cluster = buildCluster({
-      path: "notes",
-      sampleFiles: ["notes/a.md", "notes/b.md"],
-    });
-    const result = await inferRuleSet({
-      cwd: root,
-      clusters: [cluster],
-      registry: ruleRegistry,
-    });
+    const result = await infer(root, [buildCluster({ path: "notes" })]);
 
     expect(result.clusters[0]?.patterns.adrSections).toEqual([]);
     expect(result.rules.some((rule) => rule.rule === "SEC-001")).toBe(false);
   });
 
-  it("excludes a section whose casing differs across samples from the exact-string intersection", async () => {
+  it("excludes a section whose casing differs across documents from the exact-string intersection", async () => {
     const root = await createFixtureTree({
       "adr/0001.md": [
         "# ADR 1",
@@ -371,15 +498,8 @@ describe("inferRuleSet · ADR detection", () => {
       ].join("\n"),
     });
 
-    const cluster = buildCluster({
-      path: "adr",
-      sampleFiles: ["adr/0001.md", "adr/0002.md"],
-    });
-    const result = await inferRuleSet({
-      cwd: root,
-      clusters: [cluster],
-      registry: ruleRegistry,
-    });
+    const cluster = buildCluster({ path: "adr" });
+    const result = await infer(root, [cluster]);
 
     const adrSections = result.clusters[0]?.patterns.adrSections ?? [];
     expect(adrSections).not.toContain("Status");
@@ -393,66 +513,41 @@ describe("inferRuleSet · ADR detection", () => {
     });
   });
 
-  it("does not propose SEC-001 when the cluster's includeGlob does not match its own .mdx samples", async () => {
-    // Mirrors the scan's accepted fallback shape: scanRepository's global fallback cluster uses
-    // the literal glob "**/*.md" even when its sampled files are .mdx (deliberately not
-    // .mdx-aware, so it matches the tool's real zero-config default). Proposing SEC-001 scoped to
-    // that glob would be a dead rule — valid config that checks none of the files that justified it.
+  it("finds no ADR evidence in .mdx files a `**/*.md` scope does not select", async () => {
+    // The scan's global fallback cluster uses the literal glob "**/*.md" even where the directory
+    // holds .mdx files, mirroring the tool's real zero-config default rather than the scan's own
+    // discovery criteria. SEC-001 scoped to that glob would be a dead rule — valid config checking
+    // none of the files that justified it. Measuring the corpus that glob selects makes that
+    // unreachable rather than guarded against: the .mdx files are never read, so they cannot
+    // contribute evidence in the first place.
+    const adrBody = [
+      "## Status",
+      "",
+      "Accepted",
+      "",
+      "## Context",
+      "",
+      "Some context.",
+      "",
+      "## Decision",
+      "",
+      "Some decision.",
+      "",
+    ].join("\n");
     const root = await createFixtureTree({
-      "adr/0001.mdx": [
-        "# ADR 1",
-        "",
-        "## Status",
-        "",
-        "Accepted",
-        "",
-        "## Context",
-        "",
-        "Some context.",
-        "",
-        "## Decision",
-        "",
-        "Some decision.",
-        "",
-      ].join("\n"),
-      "adr/0002.mdx": [
-        "# ADR 2",
-        "",
-        "## Status",
-        "",
-        "Accepted",
-        "",
-        "## Context",
-        "",
-        "Other context.",
-        "",
-        "## Decision",
-        "",
-        "Other decision.",
-        "",
-      ].join("\n"),
+      "adr/0001.mdx": `# ADR 1\n\n${adrBody}`,
+      "adr/0002.mdx": `# ADR 2\n\n${adrBody}`,
     });
 
     const cluster = buildCluster({
       path: "",
       kind: "fallback",
       includeGlob: "**/*.md",
-      sampleFiles: ["adr/0001.mdx", "adr/0002.mdx"],
     });
+    const result = await infer(root, [cluster]);
 
-    const result = await inferRuleSet({
-      cwd: root,
-      clusters: [cluster],
-      registry: ruleRegistry,
-    });
-
-    // The ADR evidence is still detected from the sampled content...
-    expect(result.clusters[0]?.patterns.adrSections).toEqual([
-      "Status",
-      "Context",
-      "Decision",
-    ]);
-    // ...but SEC-001 must not be proposed: "**/*.md" does not match either sampled .mdx file.
+    expect(result.corpusFileCount).toBe(0);
+    expect(result.clusters[0]?.patterns.adrSections).toEqual([]);
     expect(result.rules.some((rule) => rule.rule === "SEC-001")).toBe(false);
     expect(result.clusters[0]?.contributesTo).not.toContain("SEC-001");
   });
@@ -504,49 +599,17 @@ describe("inferRuleSet · registry drift safety", () => {
       ),
     );
 
-    const cluster = buildCluster({ path: "adr", sampleFiles: ["adr/0001.md"] });
-    const result = await inferRuleSet({
-      cwd: root,
-      clusters: [cluster],
-      registry: trimmedRegistry,
-    });
+    const result = await infer(
+      root,
+      [buildCluster({ path: "adr" })],
+      trimmedRegistry,
+    );
 
     const ruleIds = result.rules.map((rule) => rule.rule);
     expect(ruleIds).not.toContain("CTX-002");
     expect(ruleIds).not.toContain("SEC-001");
     expect(result.clusters[0]?.contributesTo).not.toContain("CTX-002");
     expect(result.clusters[0]?.contributesTo).not.toContain("SEC-001");
-  });
-});
-
-describe("inferRuleSet · unreadable sample file", () => {
-  it("skips a sample path that no longer exists on disk without throwing", async () => {
-    const root = await createFixtureTree({
-      "docs/exists.md": [
-        "# Exists",
-        "",
-        "## Data",
-        "",
-        "| Name | Value |",
-        "| --- | --- |",
-        "| a | b |",
-        "",
-      ].join("\n"),
-    });
-
-    const cluster = buildCluster({
-      path: "docs",
-      sampleFiles: ["docs/exists.md", "docs/missing.md"],
-    });
-
-    const result = await inferRuleSet({
-      cwd: root,
-      clusters: [cluster],
-      registry: ruleRegistry,
-    });
-
-    expect(result.clusters[0]?.sampledFiles).toEqual(["docs/exists.md"]);
-    expect(result.rules.map((rule) => rule.rule)).toEqual(["TBL-002"]);
   });
 });
 
@@ -573,16 +636,8 @@ describe("inferRuleSet · determinism", () => {
     });
 
     const scan = await scanRepository({ cwd: root });
-    const first = await inferRuleSet({
-      cwd: root,
-      clusters: scan.clusters,
-      registry: ruleRegistry,
-    });
-    const second = await inferRuleSet({
-      cwd: root,
-      clusters: scan.clusters,
-      registry: ruleRegistry,
-    });
+    const first = await infer(root, scan.clusters);
+    const second = await infer(root, scan.clusters);
 
     expect(first).toEqual(second);
     const ids = first.rules.map((rule) => rule.rule);
@@ -590,27 +645,17 @@ describe("inferRuleSet · determinism", () => {
   });
 });
 
-describe("inferRuleSet · cross-cluster cycle heuristic", () => {
-  it("surfaces a concrete file pair in the GRP-001 rationale when two clusters reference each other", async () => {
+describe("inferRuleSet · the cycle a GRP-001 rationale cites", () => {
+  it("names a concrete file pair when two clusters reference each other", async () => {
     const root = await createFixtureTree({
       "docs/a.md": "# A\n\nSee [B](../other/b.md).\n",
       "other/b.md": "# B\n\nSee [A](../docs/a.md).\n",
     });
 
-    const docsCluster = buildCluster({
-      path: "docs",
-      sampleFiles: ["docs/a.md"],
-    });
-    const otherCluster = buildCluster({
-      path: "other",
-      sampleFiles: ["other/b.md"],
-    });
-
-    const result = await inferRuleSet({
-      cwd: root,
-      clusters: [docsCluster, otherCluster],
-      registry: ruleRegistry,
-    });
+    const result = await infer(root, [
+      buildCluster({ path: "docs" }),
+      buildCluster({ path: "other" }),
+    ]);
 
     const grp001 = result.rules.find((rule) => rule.rule === "GRP-001");
     expect(grp001).toBeDefined();
@@ -620,27 +665,17 @@ describe("inferRuleSet · cross-cluster cycle heuristic", () => {
 
   it("resolves a root-relative link the same way the shared reference pipeline does", async () => {
     // Root-relative targets resolve from the repo root, not from the source file's directory —
-    // resolveRelativeToSource alone would have misresolved "/other/b.md" against "docs/a.md" as
-    // "docs/other/b.md", missing the real sample at "other/b.md" entirely.
+    // resolving against "docs/a.md" instead would misread "/other/b.md" as "docs/other/b.md" and
+    // miss the real document at "other/b.md" entirely.
     const root = await createFixtureTree({
       "docs/a.md": "# A\n\nSee [B](/other/b.md).\n",
       "other/b.md": "# B\n\nSee [A](/docs/a.md).\n",
     });
 
-    const docsCluster = buildCluster({
-      path: "docs",
-      sampleFiles: ["docs/a.md"],
-    });
-    const otherCluster = buildCluster({
-      path: "other",
-      sampleFiles: ["other/b.md"],
-    });
-
-    const result = await inferRuleSet({
-      cwd: root,
-      clusters: [docsCluster, otherCluster],
-      registry: ruleRegistry,
-    });
+    const result = await infer(root, [
+      buildCluster({ path: "docs" }),
+      buildCluster({ path: "other" }),
+    ]);
 
     const grp001 = result.rules.find((rule) => rule.rule === "GRP-001");
     expect(grp001).toBeDefined();
@@ -648,48 +683,54 @@ describe("inferRuleSet · cross-cluster cycle heuristic", () => {
     expect(grp001?.rationale).toContain("other/b.md");
   });
 
-  it("does not treat a broken anchor as a graph edge when checking for a sample cycle", async () => {
+  it("does not treat a broken anchor as a graph edge", async () => {
     // b.md's only heading ("# B") slugs to "b", not "missing-heading" — REF-002's evidence, not a
-    // real edge back to a.md, so no sampled cycle should be found at all.
+    // real edge back to a.md, so there is no cycle here at all.
     const root = await createFixtureTree({
       "docs/a.md": "# A\n\nSee [B](b.md#missing-heading).\n",
       "docs/b.md": "# B\n\nSee [A](a.md).\n",
     });
 
-    const cluster = buildCluster({
-      path: "docs",
-      sampleFiles: ["docs/a.md", "docs/b.md"],
-    });
-    const result = await inferRuleSet({
-      cwd: root,
-      clusters: [cluster],
-      registry: ruleRegistry,
-    });
+    const result = await infer(root, [buildCluster({ path: "docs" })]);
 
     const grp001 = result.rules.find((rule) => rule.rule === "GRP-001");
     expect(grp001).toBeDefined();
     expect(grp001?.rationale).not.toContain("loops back on itself");
-    expect(grp001?.rationale).toContain("forming a reference graph");
+    expect(grp001?.rationale).toContain("no cycles in it today");
   });
 
-  it("describes the full sampled chain, not just the closing back-edge, for a 3-node cycle", async () => {
+  it("cites a two-document loop and states that the proposed config will not report it", async () => {
+    const root = await createFixtureTree({
+      "docs/index.md": "# Index\n\nSee [member](member.md).\n",
+      "docs/member.md": "# Member\n\nBack to the [index](index.md).\n",
+    });
+
+    const result = await infer(root, [buildCluster({ path: "docs" })]);
+
+    const grp001 = result.rules.find((rule) => rule.rule === "GRP-001");
+    expect(grp001).toBeDefined();
+    // Both halves matter. Dropping the citation would hide a real loop the user can see; dropping
+    // the caveat would annotate the entry with a finding the config it sits in never produces.
+    expect(grp001?.rationale).toContain(
+      "docs/index.md -> docs/member.md -> docs/index.md",
+    );
+    expect(grp001?.rationale).toContain("will NOT report");
+    expect(grp001?.rationale).toContain("3 or more documents");
+    expect(grp001?.options).toBeUndefined();
+    // No finding, so the entry is enabled: the loop is below the floor and nothing else is wrong.
+    expect(grp001?.severity).toBeUndefined();
+  });
+
+  it("describes the full chain, not just the closing back-edge, for a 3-node cycle", async () => {
     // The back-edge alone is c.md -> a.md; wording must not claim those two endpoints mutually
-    // reference each other, since only a -> b and c -> a actually exist as sampled links.
+    // reference each other, since only a -> b and c -> a actually exist as links.
     const root = await createFixtureTree({
       "docs/a.md": "# A\n\nSee [B](b.md).\n",
       "docs/b.md": "# B\n\nSee [C](c.md).\n",
       "docs/c.md": "# C\n\nSee [A](a.md).\n",
     });
 
-    const cluster = buildCluster({
-      path: "docs",
-      sampleFiles: ["docs/a.md", "docs/b.md", "docs/c.md"],
-    });
-    const result = await inferRuleSet({
-      cwd: root,
-      clusters: [cluster],
-      registry: ruleRegistry,
-    });
+    const result = await infer(root, [buildCluster({ path: "docs" })]);
 
     const grp001 = result.rules.find((rule) => rule.rule === "GRP-001");
     expect(grp001).toBeDefined();
@@ -697,9 +738,11 @@ describe("inferRuleSet · cross-cluster cycle heuristic", () => {
     expect(grp001?.rationale).toContain("docs/b.md");
     expect(grp001?.rationale).toContain("docs/c.md");
     expect(grp001?.rationale).not.toContain("reference each other");
-    // Three documents is the rule's own default floor, so the cited cycle reports without help and
-    // the entry stays option-free — the common case, and the other half of the two-node pin above.
+    expect(grp001?.rationale).not.toContain("will NOT report");
     expect(grp001?.options).toBeUndefined();
+    // Three documents is the rule's own floor, so this cycle *is* reported — which is exactly why
+    // the entry is written disabled rather than failing the first run.
+    expect(grp001?.severity).toBe("off");
   });
 });
 
@@ -719,15 +762,7 @@ describe("inferRuleSet · gate evidence matches what the rule evaluates", () => 
       ].join("\n"),
     });
 
-    const cluster = buildCluster({
-      path: "docs",
-      sampleFiles: ["docs/external-images.md"],
-    });
-    const result = await inferRuleSet({
-      cwd: root,
-      clusters: [cluster],
-      registry: ruleRegistry,
-    });
+    const result = await infer(root, [buildCluster({ path: "docs" })]);
 
     expect(result.clusters[0]?.patterns.imageCount).toBe(0);
     expect(result.rules).toEqual([]);
@@ -745,15 +780,7 @@ describe("inferRuleSet · gate evidence matches what the rule evaluates", () => 
       ].join("\n"),
     });
 
-    const cluster = buildCluster({
-      path: "docs",
-      sampleFiles: ["docs/empty-link.md"],
-    });
-    const result = await inferRuleSet({
-      cwd: root,
-      clusters: [cluster],
-      registry: ruleRegistry,
-    });
+    const result = await infer(root, [buildCluster({ path: "docs" })]);
 
     expect(result.clusters[0]?.patterns.localLinkCount).toBe(0);
     expect(result.rules).toEqual([]);

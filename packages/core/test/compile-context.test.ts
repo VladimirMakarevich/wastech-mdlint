@@ -15,6 +15,7 @@ import { lintFiles } from "../src/engine/lint-files.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
 import {
   LARGE_CORPUS_DOCUMENT_COUNT,
+  LARGE_CORPUS_EXCLUDED_COUNT,
   LARGE_CORPUS_HUB_IN_DEGREE,
   LARGE_CORPUS_HUB_PATH,
   LARGE_CORPUS_LINE_WIDTH_BOUND,
@@ -389,15 +390,40 @@ describe("compileContext at corpus scale", () => {
     expect(skillContent).toContain(`\`${LARGE_CORPUS_HUB_PATH}\``);
   });
 
-  it("gives the budget back: dependencies shrink and rules + workflow grow", () => {
-    // Measured 89.7% / 0.7% in the field. The bars are the contract; REFERENCE_DOCUMENT_LIMIT is
-    // the dial. `Document Architecture` is ~32% here and is legitimately the corpus inventory, so
-    // it is not the section expected to give.
-    expect(sectionShare("## Document Dependencies")).toBeLessThanOrEqual(0.65);
+  it("bounds the inventory table and discloses what it dropped", () => {
+    expect(skillContent).toContain(
+      "Bounded summary: at most 25 documents get a row here, selected by total references and rendered in path order.",
+    );
+    expect(skillContent).toContain(
+      `The 25 most-referenced of ${LARGE_CORPUS_DOCUMENT_COUNT} documents are shown; the other 114 are omitted, and Reading Order below still lists every one.`,
+    );
+
+    // The claim the disclosure makes has to be true: the table is 25 rows, and the reading order it
+    // points a reader at is the corpus minus what a cycle excluded. A disclosure naming a section
+    // that did not in fact carry the rest would be worse than no disclosure.
+    const rows = skillContent
+      .split("\n")
+      .filter((line) => /^\| \S.*\| \d+ \/ \d+ \|$/.test(line));
+    expect(rows).toHaveLength(25);
+    expect(skillContent.match(/^\d+\. `[^`]+`$/gm)).toHaveLength(
+      LARGE_CORPUS_DOCUMENT_COUNT - LARGE_CORPUS_EXCLUDED_COUNT,
+    );
+  });
+
+  it("gives the budget back: the two listings shrink and orientation grows", () => {
+    // Measured in the field at 151 documents: the dependency block 71%, the inventory table 26%, and
+    // everything a reader would call orientation — the corpus estimate, the rule list, the workflow —
+    // 2.4%. Both listings are capped now, so the bars below are what keeps that from inverting again.
+    // `REFERENCE_DOCUMENT_LIMIT` and `ARCHITECTURE_DOCUMENT_LIMIT` are the dials.
+    //
+    // What these bars cannot see is *growth* — a share measured at one corpus size is the same
+    // number whether the section is capped or merely small here. `compile-composition.test.ts`
+    // compiles two corpus sizes and is where that half is proven.
+    expect(sectionShare("## Document Architecture")).toBeLessThanOrEqual(0.15);
     expect(
       sectionShare("## Document Rules") + sectionShare("## Workflow"),
-    ).toBeGreaterThanOrEqual(0.03);
-    expect(Buffer.byteLength(skillContent, "utf8")).toBeLessThanOrEqual(40_000);
+    ).toBeGreaterThanOrEqual(0.04);
+    expect(Buffer.byteLength(skillContent, "utf8")).toBeLessThanOrEqual(24_000);
   });
 
   it("stays byte-identical and hash-stable across two compiles (capping is deterministic)", async () => {

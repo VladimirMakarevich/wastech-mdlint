@@ -1,5 +1,7 @@
 import {
   customRuleEntrySchema,
+  duplicateCustomIdMessage,
+  findDuplicateCustomIds,
   formatLintResultText,
   lintContent,
   resolveCustomRule,
@@ -118,6 +120,22 @@ function resolveCustomRequest(entry: LintRuleRequest): Rule {
 function resolveRequestedRules(
   entries: readonly LintRuleRequest[],
 ): ResolvedRule[] {
+  // Checked here as well as in the config loader because this tool resolves its rules from the
+  // request rather than from a config, so it never passes through that check. Two custom entries
+  // under one id both run and produce findings labelled identically — which on this host means a
+  // model reading them cannot attribute either. Refused before any rule resolves, since the whole
+  // request is unusable rather than one entry of it.
+  const collision = findDuplicateCustomIds(entries)[0];
+  if (collision !== undefined) {
+    throw new ToolInputError(
+      'A "custom" rule id must identify exactly one rule.',
+      `rules[${collision.index}].id: ${duplicateCustomIdMessage({
+        id: collision.id,
+        siblingPath: `rules[${collision.firstIndex}]`,
+      })}`,
+    );
+  }
+
   const resolved: ResolvedRule[] = [];
   for (const entry of entries) {
     let rule: Rule;
