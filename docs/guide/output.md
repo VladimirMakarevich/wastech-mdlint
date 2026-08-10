@@ -54,11 +54,13 @@ Four commands and tools report lint findings, and they do **not** all return the
 | Surface | Top-level shape | Finding counts |
 | --- | --- | --- |
 | CLI `lint --format json` | `{ summary, messages, files }` | `summary.errors`, `summary.warnings` |
-| CLI [`impact <file> --format json`](context-graph.md#impact-file) | the same record MCP returns, under a `lint` key, narrowed to the affected subgraph | `lint.errorCount`, `lint.warningCount` |
+| CLI [`impact <file> --format json`](context-graph.md#impact-file) | the impact record, carrying the lint record MCP `lint-files` returns under a `lint` key, narrowed to the affected subgraph | `lint.errorCount`, `lint.warningCount` |
 | MCP [`lint-files`](mcp-server.md#the-6-tools) | `{ messages, files, errorCount, warningCount }` | `errorCount`, `warningCount` |
 | MCP [`lint`](mcp-server.md#the-6-tools) | `{ messages, errorCount, warningCount }` | `errorCount`, `warningCount` |
 
 `messages` is the same array of the shape above on all four. The differences are the wrapper and the counts: only the CLI's `lint` wraps the record in a `summary`, and only the ad-hoc MCP `lint` tool omits `files` — it lints one caller-supplied string, which is not a corpus, so there is no file list to report.
+
+The **impact record** itself — `{ file, directlyAffected, transitivelyAffected, readingOrder, excluded }` — is identical on both hosts, key for key, and the CLI's `lint` key is an addition to it rather than a change in it. So a client generated from the MCP [`impact-analysis`](mcp-server.md#the-6-tools) `outputSchema` reads the CLI's JSON unchanged, and a cross-host test compares the two payloads directly.
 
 ## Exit codes
 

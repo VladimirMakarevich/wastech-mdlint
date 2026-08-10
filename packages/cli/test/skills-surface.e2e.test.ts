@@ -360,14 +360,14 @@ describe("skills reference the real CLI JSON contract", () => {
     const payload = await runJson(["impact", "b.md", "--format", "json"], cwd);
 
     expectContract(impactSkill, payload, [
-      "changedFile",
+      "file",
       "directlyAffected",
       "transitivelyAffected",
       "readingOrder",
       "excluded",
       "lint",
     ]);
-    expect(payload.changedFile).toBe("b.md");
+    expect(payload.file).toBe("b.md");
 
     const directly = payload.directlyAffected as Record<string, unknown>[];
     expect(directly.length, "a.md directly references b.md").toBeGreaterThan(0);

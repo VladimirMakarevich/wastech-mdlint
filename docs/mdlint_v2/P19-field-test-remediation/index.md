@@ -1,6 +1,6 @@
 # Phase P19 — Field-test remediation
 
-> Roadmap: [v2 Index](../index.md) · Phase **P19** · Size **M** · Status **In progress** · Depends on [P18](../P18-followup-burndown/index.md) (the follow-up queue is empty, so this phase starts from a clean backlog).
+> Roadmap: [v2 Index](../index.md) · Phase **P19** · Size **M** · Status **Done** · Depends on [P18](../P18-followup-burndown/index.md) (the follow-up queue is empty, so this phase starts from a clean backlog).
 >
 > **Goal:** close the fourteen findings from the [2026-08-09 field test](../field-test-2026-08-09-debates.md) — the first run in which the packed artifacts were installed **into** an external repository rather than beside it.
 
@@ -41,23 +41,23 @@ The other three — F-11 (output rendering), F-13 (compile bounds), F-01 (releas
 
 **Sequence.** [P19.01](01-inference-scope.md) before [P19.02](02-scan-disclosure.md): the disclosure describes what inference decided, so correcting the scope first means the disclosure is written once. Everything else is independent and can run in any order. [P19.04](04-text-report-grammar.md) is the cheapest of the four majors and the one whose absence corrupts the default output, so it is worth doing first regardless of the order the rest take.
 
-**What this phase does not do.** F-03's fix is a policy decision about what `init` should propose, not only a code change, and the task states the options rather than picking one — that call belongs to whoever owns the first-run experience. Likewise F-13 offers a cap or a disclosure and does not assume which.
+**What this phase does not do.** F-03's fix is a policy decision about what `init` should propose, not only a code change, and the task states the options rather than picking one — that call belongs to whoever owns the first-run experience. Likewise F-13 offered a cap or a disclosure and did not assume which; [P19.06](06-reporting-surfaces.md) chose the cap and records why there.
 
 ## Progress
 
-| Task                                  | Status      | Findings closed  |
-| ------------------------------------- | ----------- | ---------------- |
-| [P19.01](01-inference-scope.md)       | Done        | F-03, F-04, F-10 |
-| [P19.02](02-scan-disclosure.md)       | Done        | F-05, F-06       |
-| [P19.03](03-silent-configurations.md) | Done        | F-07, F-09       |
-| [P19.04](04-text-report-grammar.md)   | Done        | F-11             |
-| [P19.05](05-message-scope.md)         | Done        | F-02, F-08       |
-| [P19.06](06-reporting-surfaces.md)    | Not started | —                |
-| [P19.07](07-host-and-release.md)      | Not started | —                |
+| Task                                  | Status | Findings closed  |
+| ------------------------------------- | ------ | ---------------- |
+| [P19.01](01-inference-scope.md)       | Done   | F-03, F-04, F-10 |
+| [P19.02](02-scan-disclosure.md)       | Done   | F-05, F-06       |
+| [P19.03](03-silent-configurations.md) | Done   | F-07, F-09       |
+| [P19.04](04-text-report-grammar.md)   | Done   | F-11             |
+| [P19.05](05-message-scope.md)         | Done   | F-02, F-08       |
+| [P19.06](06-reporting-surfaces.md)    | Done   | F-12, F-13       |
+| [P19.07](07-host-and-release.md)      | Done   | F-14, F-01       |
 
 ## Exit criteria
 
-- [ ] All fourteen findings are closed, or carry a stated decision to accept them in the [accepted-behaviors register](../accepted-behaviors.md).
-- [ ] Each closed finding has a test that fails without the fix, written from the field test's own reproduction rather than restated from the task file.
-- [ ] The gaps the run could not reach — a second platform, `init`'s interactive branches, a real MCP host, `settings.siteRouter` and `settings.idRef` — are still recorded as gaps and not mistaken for coverage.
-- [ ] A re-run of the [playbook](../field-test-playbook.md) against a target reports none of `F-01` … `F-14`.
+- [x] All fourteen findings are closed, or carry a stated decision to accept them in the [accepted-behaviors register](../accepted-behaviors.md).
+- [x] Each closed finding has a test that fails without the fix, written from the field test's own reproduction rather than restated from the task file. F-01's is a CI gate rather than a Vitest case — `npm audit --omit=dev --audit-level=high` in the `audit` job — because the defect was a lockfile pin, which no in-process test can hold.
+- [x] The gaps the run could not reach — a second platform, `init`'s interactive branches, a real MCP host, `settings.siteRouter` and `settings.idRef` — are still recorded as gaps and not mistaken for coverage.
+- ~~A re-run of the [playbook](../field-test-playbook.md) against a target reports none of `F-01` … `F-14`.~~ Carries no box here: the check is performable, but only from outside this repository — it means installing the packed artifacts **into** a repository we did not author, which is what made the 2026-08-09 run worth its findings. [PR.05](../P-release/05-release-verification.md) step 2 already owns running that playbook at release time, so the criterion moves there rather than being ticked on evidence this tree cannot produce. Every finding's own reproduction is covered by the tests named in the task files above.

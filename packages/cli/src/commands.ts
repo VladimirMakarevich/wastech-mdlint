@@ -236,6 +236,13 @@ async function handleGraph(
       siteRouter: loaded.settings.siteRouter,
     });
 
+  // The `top hubs` list uses the same in-degree threshold that classifies a document as a `hub` in a
+  // generated skill, so the two reports cannot call one document a hub and a non-hub. Undefined when
+  // the config has no `compile` section, which leaves core on its default.
+  const summaryOptions = {
+    hubMinInDegree: loaded.config.compile?.hubMinInDegree,
+  };
+
   if (command.format === "json") {
     return {
       output: `${JSON.stringify(summarizeContextGraph(graph, coverage()), null, 2)}\n`,
@@ -256,7 +263,7 @@ async function handleGraph(
   }
 
   return {
-    output: `${renderContextGraphText(graph, coverage())}\n`,
+    output: `${renderContextGraphText(graph, coverage(), summaryOptions)}\n`,
     exitCode: EXIT_CODE_SUCCESS,
   };
 }
@@ -356,8 +363,14 @@ async function handleImpact(
   const lint = filterLintResult(fullLintResult, affectedFiles);
 
   if (command.format === "json") {
+    // `file`, not a host-local synonym: this is core's `ImpactClassification` verbatim plus a `lint`
+    // key, and the MCP tool returns the same record under the same name. The subject was once called
+    // `changedFile` here, which read better in isolation and meant a client generated from the MCP
+    // output schema could not find its subject in this payload — a difference in spelling where the
+    // two hosts have no difference in meaning. The `lint` key below is the one real divergence, and
+    // it adds a field rather than renaming one.
     const payload = {
-      changedFile: classification.file,
+      file: classification.file,
       directlyAffected: classification.directlyAffected,
       transitivelyAffected: classification.transitivelyAffected,
       readingOrder: classification.readingOrder,

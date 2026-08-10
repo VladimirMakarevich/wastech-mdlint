@@ -16,17 +16,23 @@ import { skillFrontmatterSchema } from "./skill-frontmatter.js";
 // A `SKILL.md` is loaded into an agent's context *whole*, so its byte budget is the
 // product. On a 139-document corpus the unbounded References block made the artifact 110 789 bytes,
 // 89.7% of it an edge list an agent cannot act on, while `Document Rules` and `Workflow` — the two
-// sections that say how to operate — were 0.7% between them. These two caps buy that budget back.
+// sections that say how to operate — were 0.7% between them. These caps buy that budget back.
 //
-// Both are **fixed**, not corpus-relative: neither engages below its bound, and the bound the
+// All three are **fixed**, not corpus-relative: none engages below its bound, and the bound the
 // artifact states means the same thing in every repository rather than varying with corpus size.
-// That is not a promise that an existing artifact is unchanged — the same change added the `Refs`
-// column, the always-on disclosure paragraph, and one-edge-per-line fan-out, so every generated
-// `SKILL.md` changes bytes and content hash once and has to be regenerated. Nor is it independence
-// from the rest of the corpus: `REFERENCE_DOCUMENT_LIMIT` is a top-N selection, so adding a
-// document elsewhere can evict an existing one's entry (see `renderReferencesBlock`).
-// `compile.hubMinInDegree` is deliberately *not* reused here: it governs role assignment, not
-// fan-out.
+// That is not a promise that an existing artifact is unchanged — every change to the caps or the
+// disclosures moves the bytes and content hash of every generated `SKILL.md`, which then has to be
+// regenerated. Nor is it independence from the rest of the corpus: both document limits are top-N
+// selections, so adding a well-referenced document elsewhere can evict an existing one's entry.
+// `compile.hubMinInDegree` is deliberately *not* reused as a cap: it governs role assignment.
+//
+// Which sections are bounded is the load-bearing part, and it was once inverted. The section a
+// reader would call the corpus inventory grows one row per document; the reading order grows one
+// entry per document; the dependency block does not grow at all past its caps. Measured on a
+// 151-document corpus, the two O(n) sections were 97% of the artifact and the bounded one was the
+// only one that said so. So every section here is either capped with its omission stated, or
+// complete and labelled as complete — a reader can always tell which kind they are holding, and
+// nothing grows silently.
 
 /** Maximum edges listed per document per direction. The bullet's count is always the full total. */
 const REFERENCE_FANOUT_LIMIT = 10;
@@ -36,12 +42,26 @@ const REFERENCE_FANOUT_LIMIT = 10;
  * selects *which* documents are listed; they are rendered in path order. The rest are reachable
  * through `graph --format json`, which the disclosure names.
  *
- * This is the dial the section-share bars are tuned against: `Document Architecture` is ~32% of the
- * artifact at 139 documents and is legitimately the inventory, so References is the only block with
- * slack. At 25 it lands at 62.8% of the artifact against a 65% bar, with enough margin that an
- * unrelated byte added elsewhere does not flip the assertion.
+ * A References entry is up to 21 lines (two counted bullets plus their capped fan-out), against one
+ * table row in `Document Architecture` — which is why this block, not the inventory, is where the
+ * artifact's bytes concentrate and why it was capped first.
  */
 const REFERENCE_DOCUMENT_LIMIT = 25;
+
+/**
+ * Maximum rows in the `Document Architecture` table, selected by the same ranking References uses so
+ * the artifact describes one set of documents in detail rather than two overlapping ones.
+ *
+ * Deliberately equal to {@link REFERENCE_DOCUMENT_LIMIT}: the two blocks state one rule a reader can
+ * hold ("the 25 most-referenced documents are the ones described in full") instead of two numbers
+ * that would have to be looked up separately.
+ *
+ * What the cap drops is columns, not documents: `Reading Order` below lists every document in the
+ * corpus and is not capped, so nothing disappears from the artifact — a document past the bound
+ * loses its role, type and degrees, not its existence. That is why capping here is safe while
+ * capping the reading order would not be.
+ */
+const ARCHITECTURE_DOCUMENT_LIMIT = 25;
 
 export type CompileSections = {
   architecture: boolean;
@@ -199,15 +219,26 @@ function classifyDocumentType(
 function renderArchitecture(
   documentPaths: string[],
   profiles: Map<string, DocumentProfile>,
+  // Whether `Document Dependencies` renders. The disclosure below points a reader at `Reading Order`
+  // for the documents the cap dropped, and that block lives inside the dependency section — with it
+  // gated off the pointer would name a heading that is not in the file.
+  dependenciesRendered: boolean,
 ): string {
   if (documentPaths.length === 0) {
     return ["## Document Architecture", "", "(no documents found)"].join("\n");
   }
 
+  const listed = selectMostReferenced(
+    documentPaths,
+    profiles,
+    ARCHITECTURE_DOCUMENT_LIMIT,
+  );
+  const omitted = documentPaths.length - listed.length;
+
   // A flat, fully-path-qualified table instead of a nested tree: the repo-relative path already
   // conveys structure, and a flat table is trivially deterministic to render and assert on (no
   // locked example mandates nesting).
-  const rows = documentPaths.map((documentPath) => {
+  const rows = listed.map((documentPath) => {
     const profile = profiles.get(documentPath);
     const role = profile?.role ?? "isolated";
     const type =
@@ -221,8 +252,28 @@ function renderArchitecture(
     return `| ${tableCell(documentPath)} | ${role} | ${type} | ${refs} |`;
   });
 
+  // Same three-part shape as the References disclosure: the bound always stated, the omission stated
+  // only when the cap engages, and a pointer to where the rest lives. One sentence per line —
+  // soft-wrapped, still one Markdown paragraph — so the disclosure is never the artifact's longest
+  // line.
+  const disclosure = [
+    `Bounded summary: at most ${ARCHITECTURE_DOCUMENT_LIMIT} documents get a row here, selected by total references and rendered in path order.`,
+    ...(omitted > 0
+      ? [
+          `The ${listed.length} most-referenced of ${documentPaths.length} documents are shown; the other ${omitted} are omitted${
+            dependenciesRendered
+              ? ", and Reading Order below still lists every one"
+              : ""
+          }.`,
+        ]
+      : []),
+    "Run `wastech-mdlint graph --format json` for every document with its in- and out-degrees (`Role` and `Type` are derived here and appear in no other output).",
+  ].join("\n");
+
   return [
     "## Document Architecture",
+    "",
+    disclosure,
     "",
     "| Path | Role | Type | Refs (in/out) |",
     "| --- | --- | --- | --- |",
@@ -263,6 +314,15 @@ function renderReadingOrderBlock(
       `(no reading order — all ${documentPaths.length} document(s) are excluded by cycles; see Cycles below)`,
     );
   } else {
+    // Labelled complete, not bounded — the opposite disclosure to the two capped blocks, and the
+    // reason this one is worth stating at all: this list grows one entry per document forever, and a
+    // reader deciding whether the artifact scales needs to know which sections do that. Capping it
+    // instead is not an option: a document silently missing from the reading order is exactly the
+    // dishonesty this block exists to prevent.
+    lines.push(
+      `Complete: all ${analysis.readingOrder.length} document(s) in the order are listed, so this section grows with the corpus.`,
+      "",
+    );
     analysis.readingOrder.forEach((documentPath, index) => {
       lines.push(`${index + 1}. ${codeSpan(documentPath)}`);
     });
@@ -295,7 +355,15 @@ function renderCyclesBlock(analysis: GraphAnalysis): string {
     return lines.join("\n");
   }
 
-  lines.push("", `Excluded from reading order (${excluded.length}):`, "");
+  lines.push(
+    "",
+    `Excluded from reading order (${excluded.length}):`,
+    "",
+    // Complete like the reading order above, and labelled the same way for the same reason: this
+    // list also grows with the corpus, and the count alone does not say whether it was capped.
+    "Complete: every excluded document is listed.",
+    "",
+  );
   for (const documentPath of excluded) {
     lines.push(`- ${codeSpan(documentPath)}`);
   }
@@ -342,6 +410,38 @@ function totalReferences(profile: DocumentProfile | undefined): number {
   );
 }
 
+/**
+ * The `limit` most-referenced documents, returned in path order.
+ *
+ * Rank by total references, then by path. Both keys are load-bearing: a tie broken by the caller's
+ * array order would be deterministic only by accident, and that is precisely the kind of implicit
+ * ordering a two-run determinism test cannot see. Note what the ranking costs — which documents
+ * survive depends on the whole corpus, so adding a well-referenced document elsewhere can drop an
+ * existing one. Each caller's disclosure is what keeps that visible.
+ *
+ * Shared by the two capped blocks so they select the *same* documents: an artifact that tabulated
+ * one set of 25 and detailed a different set would make a reader cross-reference two rankings to
+ * find out why a row has no entry.
+ */
+function selectMostReferenced(
+  documentPaths: string[],
+  profiles: Map<string, DocumentProfile>,
+  limit: number,
+): string[] {
+  return (
+    [...documentPaths]
+      .sort(
+        (left, right) =>
+          totalReferences(profiles.get(right)) -
+            totalReferences(profiles.get(left)) || compareStrings(left, right),
+      )
+      .slice(0, limit)
+      // Rendered back in path order: rank decides *which* documents are listed, not where a reader
+      // looks for one, and below the cap the output keeps the order it always had.
+      .sort(compareStrings)
+  );
+}
+
 function renderReferencesBlock(
   documentPaths: string[],
   profiles: Map<string, DocumentProfile>,
@@ -350,19 +450,11 @@ function renderReferencesBlock(
     return ["### References", "", "(no documents found)"].join("\n");
   }
 
-  // Rank by total references, then by path. Both keys are load-bearing: a tie broken by the
-  // caller's array order would be deterministic only by accident, and that is precisely the kind of
-  // implicit ordering a two-run determinism test cannot see. Note what the ranking costs: which
-  // documents survive depends on the whole corpus, so adding a well-referenced document elsewhere
-  // can drop an existing one's entry. The disclosure below is what keeps that visible.
-  const ranked = [...documentPaths].sort(
-    (left, right) =>
-      totalReferences(profiles.get(right)) -
-        totalReferences(profiles.get(left)) || compareStrings(left, right),
+  const listed = selectMostReferenced(
+    documentPaths,
+    profiles,
+    REFERENCE_DOCUMENT_LIMIT,
   );
-  // Rendered back in path order: rank decides *which* documents are listed, not where a reader
-  // looks for one, and below the cap the entries keep the order the section always had.
-  const listed = ranked.slice(0, REFERENCE_DOCUMENT_LIMIT).sort(compareStrings);
   const omitted = documentPaths.length - listed.length;
 
   const entries = listed.map((documentPath) => {
@@ -505,7 +597,11 @@ export function synthesize(input: SynthesizeInput): CompileResult {
   const title = `# ${toSingleLine(input.skill.name)}`;
   const budgetSection = renderBudget(input.budget);
   const architectureSection = input.sections.architecture
-    ? renderArchitecture(input.documentPaths, input.profiles)
+    ? renderArchitecture(
+        input.documentPaths,
+        input.profiles,
+        input.sections.dependencies,
+      )
     : undefined;
   const rulesSection = input.sections.rules
     ? renderRules(input.ruleGroups)

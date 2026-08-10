@@ -59,18 +59,18 @@ Prefer the MCP tool when the host exposes it (honest host semantics); otherwise 
 - **Preferred — MCP `impact-analysis` tool.** Input `{ file, configPath?, cwd? }`. Returns structured output shaped `{ file, directlyAffected, transitivelyAffected, readingOrder, excluded }`.
 - **Fallback — CLI.** `npx wastech-mdlint impact <file> --format json`.
 
-**The two surfaces do not return byte-identical JSON — state the difference honestly and read the fields that actually exist:**
+**The two surfaces return the same record, with one field the CLI adds — read the fields that actually exist:**
 
 | Field | CLI JSON | MCP output |
 | --- | --- | --- |
-| changed file | `changedFile` (string) | `file` (string) |
+| `file` | the changed file (string) | same |
 | `directlyAffected` | `{ path, references }[]` | same |
 | `transitivelyAffected` | `{ path, depth, via }[]` | same |
 | `readingOrder` | `string[]` | same |
 | `excluded` | `string[]` | same |
 | `lint` | present: `{ messages, files, errorCount, warningCount }` for the affected subgraph | **absent** |
 
-So: the changed file is under `changedFile` on the CLI and `file` on MCP; and the CLI adds a `lint` field the MCP tool does not have. There is **no `hubs` field** on either surface — do not report one; if the user wants hub context, that needs a separate `graph` call (step 4). Do not reference any field not in this table.
+So: the only difference is that the CLI adds a `lint` field the MCP tool does not have — every other field is named and shaped identically, so code written against one reads the other. There is **no `hubs` field** on either surface — do not report one; if the user wants hub context, that needs a separate `graph` call (step 4). Do not reference any field not in this table.
 
 ## 4. Present the findings
 

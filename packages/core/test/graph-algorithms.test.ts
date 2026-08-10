@@ -134,7 +134,7 @@ describe("getComponents", () => {
 });
 
 describe("formatContextGraphSummary", () => {
-  it("reports counts, entry points, and top hubs by total degree", () => {
+  it("reports counts, entry points, and a hub-free corpus by name", () => {
     const graph = graphOf({
       "index.md": "[a](a.md)\n[b](b.md)\n",
       "a.md": "[b](b.md)\n",
@@ -151,11 +151,76 @@ describe("formatContextGraphSummary", () => {
         "entry points (1):",
         "  index.md",
         "top hubs:",
-        "  a.md (2)",
-        "  b.md (2)",
-        "  index.md (2)",
+        // Nothing here is referenced three times, so this corpus has no hubs — which is the same
+        // answer the skill's `Role` column gives it. Stating the threshold keeps an empty section
+        // from reading as a renderer that gave up.
+        "  (none: no document has 3 or more incoming references)",
       ].join("\n"),
     );
+  });
+
+  it("ranks hubs by in-degree and shows both degrees", () => {
+    // The shape that made two surfaces disagree. `audit.md` is an index: it references six documents
+    // and one document references it (total degree 7). `api.md` is what the corpus actually depends
+    // on: five documents reference it and it references none (total degree 5). Ranked by
+    // `inDegree + outDegree` the index leads, so a maintainer asking what must not break is handed
+    // the document that depends on everything else.
+    const graph = graphOf({
+      "index.md": "[audit](audit.md)\n",
+      "audit.md":
+        "[api](api.md)\n[a](a.md)\n[b](b.md)\n[c](c.md)\n[d](d.md)\n[e](e.md)\n",
+      "a.md": "[api](api.md)\n",
+      "b.md": "[api](api.md)\n",
+      "c.md": "[api](api.md)\n",
+      "d.md": "[api](api.md)\n",
+      "e.md": "# E\n",
+      "api.md": "# API\n",
+    });
+
+    const summary = formatContextGraphSummary(graph).split("\n");
+
+    // `audit.md` (in 1 / out 6) is absent: one incoming reference is below the threshold, and the
+    // skill's classifier calls it a `bridge` for the same reason.
+    expect(summary.slice(summary.indexOf("top hubs:") + 1)).toEqual([
+      "  api.md (5/0)",
+    ]);
+  });
+
+  it("orders equal in-degrees by out-degree, then by path", () => {
+    // Three documents referenced three times each. Only the tiebreak distinguishes them, and it has
+    // to be stable: an order falling out of `graph.nodes` would be deterministic by accident.
+    const entries: Record<string, string> = {
+      "hub-idle.md": "# Idle\n",
+      "hub-linked.md": "[one](t1.md)\n",
+      "hub-busy.md": "[one](t1.md)\n[two](t2.md)\n",
+      "t1.md": "# T1\n",
+      "t2.md": "# T2\n",
+    };
+    for (const source of ["r1.md", "r2.md", "r3.md"]) {
+      entries[source] =
+        "[a](hub-idle.md)\n[b](hub-linked.md)\n[c](hub-busy.md)\n";
+    }
+
+    const summary = formatContextGraphSummary(graphOf(entries)).split("\n");
+
+    expect(summary.slice(summary.indexOf("top hubs:") + 1)).toEqual([
+      "  hub-busy.md (3/2)",
+      "  hub-linked.md (3/1)",
+      "  hub-idle.md (3/0)",
+    ]);
+  });
+
+  it("honours a configured threshold, so the graph and the skill agree on the word", () => {
+    const graph = graphOf({
+      "api.md": "# API\n",
+      "a.md": "[api](api.md)\n",
+      "b.md": "[api](api.md)\n",
+      "c.md": "[api](api.md)\n",
+    });
+
+    expect(
+      formatContextGraphSummary(graph, { hubMinInDegree: 4 }).split("\n"),
+    ).toContain("  (none: no document has 4 or more incoming references)");
   });
 
   it("renders an empty entry-point set as a bare header with no trailing space", () => {
@@ -176,8 +241,7 @@ describe("formatContextGraphSummary", () => {
         "cycles: 1",
         "entry points (0):",
         "top hubs:",
-        "  a.md (2)",
-        "  b.md (2)",
+        "  (none: no document has 3 or more incoming references)",
         "cycles:",
         "  a.md -> b.md -> a.md",
       ].join("\n"),

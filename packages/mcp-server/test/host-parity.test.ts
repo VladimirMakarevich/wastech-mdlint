@@ -180,6 +180,46 @@ describe("CLI and MCP render the same lint run identically", () => {
   }, 60_000);
 });
 
+describe("CLI and MCP return the same impact record", () => {
+  it("carries the impact record key for key, with `lint` the only CLI addition", async () => {
+    // `impact` scans the cwd and takes no path argument, and `runCliBin` spawns inside the fixture,
+    // so both hosts resolve the same corpus and the same config from the same root.
+    const cli = runCliBin(["impact", "docs/api.md", "--format", "json"]);
+    const mcp = await client.callTool({
+      name: "impact-analysis",
+      arguments: { cwd: fixture, file: "docs/api.md" },
+    });
+
+    expect(cli.status).toBe(0);
+    const cliPayload = JSON.parse(cli.stdout) as Record<string, unknown>;
+    const mcpPayload = mcp.structuredContent as unknown as Record<
+      string,
+      unknown
+    >;
+
+    // The whole record, not a field at a time. This is the comparison that did not exist while the
+    // CLI named the subject `changedFile` and MCP named it `file`: each host's own suite passed, and
+    // a client generated from the MCP output schema could not find its subject in the CLI's JSON.
+    // Nothing about the two documents differs in meaning, so `lint` aside they must not differ in
+    // spelling either.
+    const { lint, ...withoutLint } = cliPayload;
+    expect(withoutLint).toEqual(mcpPayload);
+
+    // Non-vacuous: the record really does describe a blast radius, and the one documented divergence
+    // — a field the CLI adds rather than one it renames — is present and shaped as the guide says.
+    expect(mcpPayload.file).toBe("docs/api.md");
+    expect((mcpPayload.directlyAffected as unknown[]).length).toBeGreaterThan(
+      0,
+    );
+    expect(Object.keys(lint as Record<string, unknown>).sort()).toEqual([
+      "errorCount",
+      "files",
+      "messages",
+      "warningCount",
+    ]);
+  }, 60_000);
+});
+
 describe("CLI and MCP render the same graph consistently", () => {
   it("prefixes the CLI graph report with exactly the MCP tool's text block", async () => {
     const cli = runCliBin(["graph", fixture]);

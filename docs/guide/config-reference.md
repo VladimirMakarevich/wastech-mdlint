@@ -366,7 +366,8 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
     },
     // Wording of the generated "Working with dependencies" block. Default "generic".
     "commandPreset": "generic", // "claude" | "generic" | "none"
-    // In-degree threshold to classify a document as a hub. Default 3.
+    // In-degree threshold for a hub — used by the SKILL.md Role column and by
+    // `graph`'s top-hubs list, which is why both call the same document a hub. Default 3.
     "hubMinInDegree": 3,
   },
 }

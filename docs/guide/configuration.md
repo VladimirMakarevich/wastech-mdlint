@@ -207,7 +207,7 @@ The declarative [`custom`](rules/custom.md) rule composes a closed assertion voc
 
 ## `compile`
 
-Configures the [`compile`](compile.md) command. `skill.name`/`skill.description` are required; `sections`, `commandPreset`, and `hubMinInDegree` tune the generated `SKILL.md`. See the [compile guide](compile.md) and the [annotated reference](config-reference.md).
+Configures the [`compile`](compile.md) command. `skill.name`/`skill.description` are required; `sections`, `commandPreset`, and `hubMinInDegree` tune the generated `SKILL.md`. `hubMinInDegree` reaches one surface outside `compile`: it is also the threshold [`graph`](context-graph.md#graph) applies to its `top hubs` list, so the two reports cannot call one document a hub and a non-hub. See the [compile guide](compile.md) and the [annotated reference](config-reference.md).
 
 ## Validation & errors
 

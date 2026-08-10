@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,10 +11,14 @@ import { runCli } from "../src/program.js";
 // The 139-document fixture lives in core's test support so cli, mcp-server, and core all assert
 // against one corpus; duplicating it is what the fixture exists to prevent.
 import {
+  LARGE_CORPUS_CONFIG_FILENAME,
   LARGE_CORPUS_DOCUMENT_COUNT,
   LARGE_CORPUS_ENTRY_POINT_COUNT,
   LARGE_CORPUS_EXCLUDED_COUNT,
+  LARGE_CORPUS_HUB_IN_DEGREE,
+  LARGE_CORPUS_HUB_PATH,
   LARGE_CORPUS_LINE_WIDTH_BOUND,
+  largeCorpusConfigJson,
   writeLargeCorpus,
 } from "../../core/test/support/large-corpus.js";
 import { readHumanSections } from "../../core/test/support/output-parity.js";
@@ -311,6 +315,78 @@ describe("graph command over the large corpus", () => {
       LARGE_CORPUS_ENTRY_POINT_COUNT,
     );
   }, 60_000);
+
+  // The `top hubs` list is the one path-bearing section the parity reader above cannot see — its
+  // header carries no count, deliberately, because the JSON document has no hub array to diff it
+  // against. So it is compared against the JSON's per-node degrees instead: the two numbers a hub
+  // line prints must be the two the node carries, or the human report is quietly its own source.
+  it("prints each hub's real in- and out-degree, most-referenced first", async () => {
+    const [human, json] = await Promise.all([
+      run(["graph", root], root),
+      run(["graph", root, "--format", "json"], root),
+    ]);
+    expect(human.exitCode).toBe(EXIT_CODE_SUCCESS);
+
+    const degrees = new Map(
+      (
+        JSON.parse(json.stdout) as {
+          nodes: { path: string; inDegree: number; outDegree: number }[];
+        }
+      ).nodes.map((node) => [node.path, node]),
+    );
+
+    const lines = human.stdout.split("\n");
+    const hubLines = lines.slice(
+      lines.indexOf("top hubs:") + 1,
+      lines.indexOf("cycles:"),
+    );
+
+    expect(hubLines[0]).toBe(`  ${LARGE_CORPUS_HUB_PATH} (124/0)`);
+    const inDegrees = hubLines.map((line) => {
+      const [, hubPath, inDegree, outDegree] =
+        /^ {2}(.+) \((\d+)\/(\d+)\)$/.exec(line) ?? [];
+      const node = degrees.get(hubPath ?? "");
+      expect(node).toBeDefined();
+      expect([inDegree, outDegree]).toEqual([
+        String(node?.inDegree),
+        String(node?.outDegree),
+      ]);
+      return Number(inDegree);
+    });
+
+    expect(inDegrees).toEqual([...inDegrees].sort((a, b) => b - a));
+    // Every listed document clears the threshold the skill's `Role` column uses, so neither report
+    // can call one document a hub while the other calls it something else.
+    expect(Math.min(...inDegrees)).toBeGreaterThanOrEqual(3);
+  }, 60_000);
+
+  it("honours a configured hubMinInDegree through the command boundary", async () => {
+    // Above the corpus's own maximum in-degree, so the only correct answer is that this repository
+    // has no hubs — which is what the generated skill would say about it at the same threshold.
+    const tunedRoot = await mkdtemp(
+      path.join(os.tmpdir(), "wastech-mdlint-cli-hub-threshold-"),
+    );
+    try {
+      await writeLargeCorpus(tunedRoot);
+      const config = JSON.parse(largeCorpusConfigJson()) as {
+        compile: { hubMinInDegree?: number };
+      };
+      config.compile.hubMinInDegree = LARGE_CORPUS_HUB_IN_DEGREE + 1;
+      await writeFile(
+        path.join(tunedRoot, LARGE_CORPUS_CONFIG_FILENAME),
+        `${JSON.stringify(config, null, 2)}\n`,
+        "utf8",
+      );
+
+      const result = await run(["graph", tunedRoot], tunedRoot);
+      expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+      expect(result.stdout.split("\n")).toContain(
+        `  (none: no document has ${LARGE_CORPUS_HUB_IN_DEGREE + 1} or more incoming references)`,
+      );
+    } finally {
+      await rm(tunedRoot, { recursive: true, force: true });
+    }
+  }, 60_000);
 });
 
 describe("slice command over the fixture corpus", () => {
@@ -356,7 +432,7 @@ describe("impact command over the fixture corpus", () => {
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
 
     const payload = JSON.parse(result.stdout) as {
-      changedFile: string;
+      file: string;
       directlyAffected: { path: string; references: number }[];
       transitivelyAffected: { path: string; depth: number; via: string }[];
       lint: {
@@ -365,7 +441,7 @@ describe("impact command over the fixture corpus", () => {
       };
     };
 
-    expect(payload.changedFile).toBe("requirements.md");
+    expect(payload.file).toBe("requirements.md");
     expect(payload.directlyAffected).toEqual([
       { path: "design.md", references: 1 },
       { path: "guide.md", references: 1 },

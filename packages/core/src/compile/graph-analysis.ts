@@ -1,7 +1,14 @@
 import type { ContextGraph } from "../graph/context-graph-types.js";
-import { getComponents, topologicalSort } from "../graph/graph-algorithms.js";
+import {
+  DEFAULT_HUB_MIN_IN_DEGREE,
+  getComponents,
+  topologicalSort,
+} from "../graph/graph-algorithms.js";
 
-export const DEFAULT_HUB_MIN_IN_DEGREE = 3;
+// The threshold is defined with the graph summary rather than here, and imported, because the graph
+// report's `top hubs` list and this classifier's `hub` role must never disagree about one document.
+// Re-exported so callers that reason about node roles keep reaching it through this module.
+export { DEFAULT_HUB_MIN_IN_DEGREE };
 
 export type NodeRole = "isolated" | "hub" | "entry" | "leaf" | "bridge";
 

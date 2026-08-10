@@ -111,7 +111,10 @@ export {
   getComponents,
   topologicalSort,
 } from "./graph/graph-algorithms.js";
-export type { TopologicalSortResult } from "./graph/graph-algorithms.js";
+export type {
+  ContextGraphSummaryOptions,
+  TopologicalSortResult,
+} from "./graph/graph-algorithms.js";
 // `query` and `getImpactSet` (below) have no host caller: the graph commands and MCP tools reach
 // traversal through `getContextSlice` / `impact` / compile, and `query`'s only cross-module callers
 // are core's own `graph/search-index.ts` and `compile/compile-context.ts` (besides `impact()` in the
