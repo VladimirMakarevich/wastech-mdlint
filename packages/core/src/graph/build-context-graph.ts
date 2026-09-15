@@ -61,13 +61,14 @@ const PROSE_TOKEN_PATTERN = /[^\s,]+/g;
 
 // A prose mention routinely carries adjacent sentence punctuation a table cell never does:
 // "Blocks REQ-1.", "see REQ-1)", "(REQ-1". Trim leading/trailing non-alphanumerics before matching
-// so those still resolve (audit finding H). Only the boundaries are cleaned — a real ID's internal
+// so those still resolve; without the trim a reference written mid-sentence is silently missed and
+// the document reads as an orphan. Only the boundaries are cleaned — a real ID's internal
 // hyphen and digits survive — which makes this deliberately looser than `defined-ids.ts`'s column
 // tokenizer, justified because free text (not a cell) is where trailing punctuation actually occurs.
 const PROSE_TOKEN_TRIM_PATTERN = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
 
-// id-ref edges: definitions come from `extractDefinedIds` (column + heading discovery, audit
-// 2.1/5.5); references are discovered by scanning each document's prose for tokens equal to a
+// id-ref edges: definitions come from `extractDefinedIds`, which discovers an ID either in a table
+// column or in a heading; references are discovered by scanning each document's prose for tokens equal to a
 // defined ID whose definer is a *different* document.
 function buildIdRefEdges(
   documents: Map<string, ParsedDocument>,

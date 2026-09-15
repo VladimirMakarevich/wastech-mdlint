@@ -296,9 +296,9 @@ describe("loadDocuments", () => {
 // had was the same table one layer up, against a real tree — and that layer is where the shapes stop
 // being equivalent: `exclude` prunes whole directories through a synthetic-child probe before any file
 // is offered to the file-level filter, so a root-anchored `node_modules/**` does not merely fail to
-// match a nested copy, it descends into it and parses every file inside. That is the blocker the
-// field test measured (2740 files under one `mobile/node_modules/`), and a matcher-level `false` is
-// not evidence about it.
+// match a nested copy, it descends into it and parses every file inside. That is the blocker
+// measured on a real monorepo, where one nested `mobile/node_modules/` contributed 2740 parsed
+// files, and a matcher-level `false` is not evidence about it.
 //
 // One fixture for the whole table so a failing row names a pattern rather than a fixture.
 describe("loadDocuments glob anchoring over a real tree", () => {

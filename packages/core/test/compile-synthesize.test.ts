@@ -391,7 +391,8 @@ describe("synthesize", () => {
 
     expect(result.skillContent).toContain("### Cycles");
     expect(result.skillContent).toContain("- `a.md -> b.md -> a.md`");
-    // One excluded path per bullet: the field test measured this as a 3702-character single line.
+    // One excluded path per bullet: rendered as a single line this measured 3702 characters, which
+    // no reader and no diff can use.
     // Uncapped, unlike the fan-out — a document missing from reading order with no explanation is
     // exactly the silent truncation this block exists to prevent. The `Complete:` line says so in
     // the artifact, because a count alone cannot tell a reader whether a list was capped.

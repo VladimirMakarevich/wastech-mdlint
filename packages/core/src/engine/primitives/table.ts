@@ -6,8 +6,10 @@ import type {
 import { compileRegex } from "../regex.js";
 import type { PrimitiveContext, PrimitiveFinding } from "./types.js";
 
-// Table-scoping shared by every table primitive: restrict to tables under a given section (audit
-// 5.3 flat ownership), or all tables when `section` is omitted.
+// Table-scoping shared by every table primitive: restrict to tables under a given section, or all
+// tables when `section` is omitted. Section ownership is flat — a table belongs to the nearest
+// preceding heading and not to any ancestor of it — so a rule scoped to a parent section does not
+// silently sweep in the tables of every subsection beneath it.
 function tablesInScope(
   document: ParsedDocument,
   section?: string,

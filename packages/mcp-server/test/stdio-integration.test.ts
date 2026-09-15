@@ -400,10 +400,10 @@ describe("mcp-server over stdio", () => {
     }
   });
 
-  // Over the wire because that is where the defect was measured: the field test saw
+  // Over the wire because that is where the defect was measured: a client received
   // `INTERNAL_ERROR` and "An unexpected internal error occurred." against a directory whose
   // permissions were removed, while the CLI on the same fixture printed `Operational error: EACCES on
-  // docs/locked` and exited 2. It also exercises the new code against the client's primed
+  // docs/locked` and exited 2. The two hosts disagreed about the same fault. It also exercises the new code against the client's primed
   // output-schema validator (`beforeAll`) — `OPERATIONAL_ERROR` is a fresh member of the advertised
   // `code` enum, so a payload the enum did not admit would be rejected here.
   //

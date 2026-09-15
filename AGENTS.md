@@ -4,85 +4,66 @@
 
 These instructions apply to the entire repository.
 
-## Project State
+## Source Of Truth
 
-`wastech-mdlint` is now the v2 production target: an npm-workspaces monorepo under `packages/*`, not a pre-migration single package.
+**The codebase is the only source of truth.** Not a plan, not a roadmap, not an audit report, not a task file. When you need to know how something behaves, read the code and the tests that pin it.
 
-- The single-package codebase was relocated into `packages/core` at P0.04, and the legacy pipeline was removed at the P3.09 cutover. All product code lives under `packages/*`; there is no root `src/` or `test/`.
-- The target product is the v2 monorepo/workspace design documented under `docs/mdlint_v2/`.
-- Treat the current filesystem state as truth for where code lives today.
-- Treat the v2 roadmap as truth for where the product is going next.
+Three rules follow from that, and they are not negotiable:
 
-Do not invent post-P0 package layout in implementation work unless the task explicitly belongs to that phase. Likewise, do not preserve legacy single-package behavior once a v2 phase explicitly replaces it.
+1. **Task documentation is temporary.** A document written to carry one piece of work through to completion is deleted when that work lands. Nothing — no comment, no test, no other document — may build a dependency on it. If a fact has to outlive the task, it goes into the code as a comment, into a test as an assertion, or into the permanent user documentation. A pointer is not a home for a fact.
+2. **Permanent documentation is a short list.** [`README.md`](README.md) is the product overview. [`docs/guide/`](docs/guide/README.md) is the full user reference and is maintained. These files and `.agents/rules/` are the agent-operation guidance. Everything else in the tree is either code or temporary.
+3. **Comments carry their own reasons.** See [Comments](#comments) below; the full rule is in [`.agents/rules/coding-style.md`](.agents/rules/coding-style.md).
 
-## Sources Of Truth
+## Project Shape
 
-The production v2 effort is the current focus. Its authoritative planning lives under `docs/mdlint_v2/`:
+`wastech-mdlint` is an npm-workspaces monorepo. All product code lives under `packages/*`; there is no root `src/` or `test/`.
 
-- Roadmap: `docs/mdlint_v2/index.md`
-- Locked requirements: `docs/mdlint_v2/requirements/` with index at `docs/mdlint_v2/requirements/index.md`
-- Architectural decisions: `docs/mdlint_v2/decisions/`
-- Phase task plans: `docs/mdlint_v2/P0-foundations/` through `docs/mdlint_v2/P-release/`
-- Glossary (canonical project vocabulary): `docs/mdlint_v2/glossary.md`
+- `@wastech-mdlint/core` — the engine.
+- `@wastech-mdlint/cli` — the commander-based CLI host. Bin: `wastech-mdlint`.
+- `@wastech-mdlint/mcp-server` — the stdio MCP host. Bin: `wastech-mdlint-mcp`.
 
-The glossary is a lookup reference for terms — public types, config keys, CLI/MCP surfaces, rule IDs, and the planning taxonomy. It is not a precedence tier: when it disagrees with a phase task file, requirement, or decision, those win and the glossary entry is the thing to fix.
-
-When documents disagree, use this precedence:
-
-1. The specific phase task file for the work you are doing
-2. The relevant locked requirements document
-3. The relevant decision document
-4. The roadmap summary
-
-If a contradiction changes implementation behavior, surface it explicitly instead of guessing.
-
-Historical v1 planning is no longer in the tree: `PLAN.md` was deleted in `957a1ca` and is recoverable from git history, and `docs/plan/` was never tracked at all. Either way it is background context only when it conflicts with `docs/mdlint_v2/`.
-
-## Delivery Order
-
-Unless the user explicitly asks for a different slice, follow the v2 phase order in `.agents/rules/architecture.md` and the task dependency chains inside each phase. **For implementation sequencing, respect each task file's `Previous`, `Next`, `Depends on`, and `Blocks` links** — the phase order alone does not sequence work within a phase, and a task whose `Depends on` has not landed is the usual cause of a change that has to be redone.
-
-**The remediation phases derive from named assessments, and the derivation is what makes their scope legible:** P9/P10 close the [P0–P8 audit](docs/mdlint_v2/audit-2026-07-23-p0-p8.md); P11/P12 close the [post-P9 audit](docs/mdlint_v2/audit-2026-07-25-post-p9.md); P13–P17 close the [2026-08-05 consolidated backlog](docs/mdlint_v2/remediation-backlog-2026-08-05.md) — a deep plan-conformance audit, its QA pass, and a field test of the packed CLI; P19 closes the [2026-08-09 field test](docs/mdlint_v2/field-test-2026-08-09-debates.md), the first run to install the packed artifacts **into** an external repository rather than beside it. Those documents are the definition site for the finding IDs (`M-1`, `H-2`, `W-31`, `F-07`, …) that the phase task files are written in; nothing else defines them, which is why they are frozen rather than rewritten. `P-release` is the terminal phase.
+Treat the filesystem as truth for where code lives.
 
 ## Architecture Invariants
 
-- `@wastech-mdlint/core` is the single owner of parsing, config loading, lint orchestration, graph construction, compile logic, and result formatting.
-- `@wastech-mdlint/cli` and `@wastech-mdlint/mcp-server` are thin adapters over core. They do not re-implement the pipeline.
-- Runtime surfaces in `core`, `cli`, and `mcp-server` must behave correctly on Windows, macOS, and Linux.
-- `ParsedDocument` is produced from one parse pass and feeds rules, graph, compile, and inline suppression behavior.
-- The rule system is registry-driven: structured metadata, Zod-validated options, shared assertion primitives, and deterministic findings.
-- `ContextGraph` is shared infrastructure for graph commands, impact/slice logic, and graph-aware rules. Do not create parallel traversal implementations.
-- Public/report output uses normalized repository-relative POSIX paths and deterministic ordering.
-- v2 config is JSONC in `wastech-mdlint.config.json` with a local `$schema`. Do not introduce remote schema URLs, runtime TypeScript config loading, or `.cjs`/`.mjs` config support in v2 work unless the roadmap changes.
+These hold for every change. Breaking one is a design decision, not an implementation detail, and needs to be raised explicitly rather than done quietly.
+
+- **Core owns the pipeline.** `@wastech-mdlint/core` is the single owner of parsing, config loading, lint orchestration, graph construction, compile logic, and result formatting.
+- **Hosts are thin.** `cli` and `mcp-server` are adapters over core. They never re-implement the pipeline. Host-specific behavior — argument parsing, exit codes, tool registration, error wrapping, structured output — belongs at the boundary; shared computation belongs in core. Two hosts computing the same answer separately is how they start giving different answers.
+- **One parse pass.** `ParsedDocument` is produced once per document and feeds rules, graph, compile, and inline suppression. Nothing re-parses Markdown ad hoc.
+- **The rule system is registry-driven.** Structured metadata, Zod-validated options, shared assertion primitives, deterministic findings. Declarative custom rules stay data-driven over a closed primitive vocabulary — never runtime user code.
+- **One graph.** `ContextGraph` is shared infrastructure for graph commands, impact and slice logic, MCP tools, and graph-aware rules. A parallel traversal implementation is a bug waiting to diverge.
+- **Deterministic output.** Public and report output uses normalized repository-relative POSIX paths and stable ordering. No timestamps, no filesystem-order dependence, no locale-dependent collation.
+- **Cross-platform.** Runtime surfaces in all three packages must behave correctly on Windows, macOS and Linux. Path normalization, glob handling, newline behavior and child-process handling are correctness concerns, not polish.
+- **Config is data.** JSONC in `wastech-mdlint.config.json` with a local `$schema`. No remote schema URLs, no runtime TypeScript config loading, no `.cjs`/`.mjs` config.
 
 ## Implementation Guidance
 
-- Prefer small modules with explicit data handoff between parser, config, engine, rules, graph, compile, CLI, and MCP.
+- Prefer small modules with explicit data handoff between parser, config, engine, rules, graph, compile, CLI and MCP.
 - Keep rule logic pure where practical: parsed inputs in, structured findings or edits out.
-- Use explicit public types for load-bearing contracts such as `ParsedDocument`, `Rule`, `RuleContext`, `LintMessage`, `ContextGraph`, and compile outputs.
-- Treat path normalization, glob handling, newline behavior, and report rendering as cross-platform correctness concerns, not platform-specific polish.
+- Use explicit public types for load-bearing contracts: `ParsedDocument`, `Rule`, `RuleContext`, `LintMessage`, `ContextGraph`, compile outputs.
 - Reuse parser libraries and structured AST traversal instead of ad hoc Markdown parsing.
-- Keep token estimation isolated so the current heuristic can be replaced later without refactoring unrelated code.
-- Do not add broad abstractions before the phase plan creates a concrete need for them.
-- Code comments must be self-contained. No phase/task/backlog/finding/audit ids (`P16.03`, `W-31`) and no references to `docs/`, `AGENTS.md`, `CLAUDE.md`, `.agents/rules/`, or the accepted-behaviors register inside a comment — in any file that carries comments, including JSONC, dotfiles, and CI YAML. Write the reason out in the comment instead: those documents get superseded and deleted, and what is left behind is a pointer where a rationale used to be. The full rule, including the carve-out for machine-read markers such as `@boundary-guard`, is in `.agents/rules/coding-style.md`.
-- Do not add new skills, `.claude/skills/`, hooks, LSP support, docs-site work, external HTTP link checking, external link caches, or code-plugin execution unless the user explicitly asks for that scope.
+- Keep token estimation isolated so the current heuristic can be replaced without refactoring unrelated code.
+- Reuse existing local patterns and helper APIs before adding new abstractions. Do not build extension points for hypothetical needs.
+- Do not add skills, `.claude/skills/`, hooks, LSP support, docs-site work, external HTTP link checking, external link caches, or code-plugin execution unless the user explicitly asks for that scope.
+
+## Comments
+
+A comment is read by somebody sitting in the code, long after it was written, with nothing else open beside them. So every comment carries its own justification in full.
+
+- Follow **why, not what**. Explain the reason, the invariant, the alternative that was rejected, or the bug this shape prevents. Do not restate what the syntax already says.
+- **No pointers.** No phase or task ids, no finding or backlog ids, no audit rounds, no ticket numbers, and no references to `docs/`, `AGENTS.md`, `CLAUDE.md`, `.agents/rules/`, or any other document — not as a path, a link, a section title, or a bare "see …". This applies to every non-prose file: `.ts`, JSONC, `#`-comments, CI YAML, and doc comments alike.
+- **Write the substance instead.** Whatever the pointer stood in for, state it. Deleting the pointer and leaving nothing is the wrong fix — the rationale is the deliverable.
+- **The check:** strike the pointer out. If what is left no longer explains why the code looks like this, the comment is not finished.
+- **One carve-out:** machine-read markers (`@boundary-guard <category>`, ESLint and TypeScript directives, `prettier-ignore`) are program input wearing comment syntax. Keep them verbatim.
+
+Naming other code — a source or test file, a symbol, an upstream library's behavior — is allowed, because those move together with the comment under review. State the fact first anyway, so the comment survives that file being renamed.
 
 ## Testing And Verification
 
 Prefer focused fixtures over this repository's real Markdown files.
 
-Expected coverage areas across the roadmap:
-
-- config loading, defaults, diagnostics, and schema generation
-- Markdown parsing: headings, tables, sections, links, images, checklist items, imports, inline-disable directives
-- rule fixtures per rule family
-- graph algorithms, slice, impact, and coverage reporting
-- CLI command behavior and exit codes
-- MCP stdio integration and structured output
-- compile/init deterministic output
-- generated docs/schema sync checks
-
-Before finishing code changes, prefer these commands when they apply:
+Before finishing code changes:
 
 ```bash
 npm run typecheck
@@ -90,20 +71,20 @@ npm test
 npm run build
 ```
 
-Use `npm run lint` and `npm run format` when the touched scope or task requires style verification.
+Use `npm run lint` and `npm run format` when the touched scope needs style verification, and `npm run lint:docs` when you touched documentation.
 
-Keep the five process-boundary guard categories intact — spawning the installed bin, a write failure, shared `exclude` scope, determinism, and host parity (added by P16.01: a human rendering against its structured payload, and each host's rendering against the other's). They are the standing answer to the post-P9 audit's systemic cause, and the checklist plus its enforcing test live in `.agents/rules/testing.md` under "Process-Boundary Guards".
+**Build before test.** Several suites spawn the built entrypoints in `dist/`, so `npm run typecheck` (which is `tsc -b`, and emits) or `npm run build` has to run first; those suites call a shared `assertBuilt()` and fail with that message rather than a confusing behavioral diff. If the build does not clear it, run `npx tsc -b --force` — `assertBuilt()` compares modification times while `tsc -b` decides up-to-dateness from content, so a source file whose timestamp moved without its content changing leaves `dist/` untouched.
+
+**Test files are never type-checked.** No tsconfig includes `test/**`. A coverage guard written as a `satisfies` constraint in a test file therefore never runs; write it as a runtime assertion.
+
+Keep the five process-boundary guard categories intact — spawning the installed bin, a write failure, shared `exclude` scope, determinism, and host parity. They cover defect classes the in-process suite structurally cannot see. The checklist and the test that enforces it are in [`.agents/rules/testing.md`](.agents/rules/testing.md).
 
 ## Repository Hygiene
 
 - Do not rewrite or revert existing user changes unless explicitly requested.
-- Keep documentation aligned with the current v2 phase/task files when implementation decisions intentionally diverge.
-- Keep user-facing product documentation in `README.md`.
-- Keep agent-operation guidance in `AGENTS.md`, `CLAUDE.md`, and `.agents/rules/`.
-- Keep the glossary (`docs/mdlint_v2/glossary.md`) current as part of the change that introduces the term — not as a later cleanup pass. Add, rename, or retire an entry whenever you add or rename a load-bearing public type, config key, CLI flag, MCP tool, rule ID, or assertion primitive; change what a term means or its shipped/planned status; or introduce a new domain concept a future reader would otherwise reverse-engineer from code. This is part of "bring the affected docs in line," not optional polish.
+- Keep user-facing product documentation in `README.md` and `docs/guide/`, and keep it current in the change that makes it wrong — not in a later cleanup pass.
+- Keep agent-operation guidance in `AGENTS.md`, `CLAUDE.md` and `.agents/rules/`.
 - If a task is documentation-only, do not change product code, public interfaces, package metadata, or dependencies unless the user explicitly expands scope.
-- Run `npm run format` before committing **any** deliverable, including a documentation-only or audit one. `prettier --check .` covers every tracked Markdown file, so a docs change can turn the gate red exactly as a code change can — which is how a red gate reached a branch once already (post-P9 audit §1: three separate runs skipped the gate P9.06 had added to CI). The remedy is a targeted `npx prettier --write <paths>` on the files you touched, never a repo-wide rewrite. CI runs the same check on ubuntu, windows, and macOS; `.gitattributes` (`* text=auto eol=lf`) is what keeps it from failing on line endings alone. Deliberately outside the gate: `tasks/` (see `docs/mdlint_v2/P12-consistency/06-process-boundary-tests.md` for why).
-- **Markdown prose is not hard-wrapped.** `.prettierrc.json` sets `proseWrap: "never"`, so one paragraph is one line and the gate reflows it for you — never hand-wrap to a column, and never write a line break inside an inline code span or a list continuation. Machine-generated blocks stay exempt via `<!-- prettier-ignore -->` (see `scripts/generate-docs.mjs`). Before `proseWrap` was set, this convention was unwritten and the gate could not see a violation, so agents guessed wrap widths and re-wrapped by hand at real cost.
-- **Never nest a glob-bearing code span inside a bold span.** A `**`-containing code span written inside `**…**` is rewritten destructively — the surrounding inline delimiters are eaten and the sentence stops reading as authored — and because the formatter produced the damage itself, **`prettier --check` passes on it**. Nothing in CI can catch this class, so avoiding the construct is the whole guard: put the glob in the sentence body, outside the bold span. One live instance reached `main` this way (`docs/mdlint_v2/P7-mcp-server/02-lint-tools.md`, repaired by P17.06).
-- When a change accepts a behavior instead of fixing it, record it in `docs/mdlint_v2/accepted-behaviors.md` in the same change, so the decision is stated rather than latent in a task file.
-- **Tick the completion surface in the change that earns it.** The change that lands a task ticks that task's exit criteria; the change that lands a phase's _last_ task also sets the phase index `Status` and ticks the index criteria. A criterion nobody can perform is retired in place with its reason, never ticked and never left open. The full rule — the three index statuses, why the P0–P3 criteria are records rather than checklists, and the test that enforces it — is in [`docs/mdlint_v2/completion-surface.md`](docs/mdlint_v2/completion-surface.md).
+- Run `npm run format` before committing **any** deliverable, documentation included. `prettier --check .` covers every tracked Markdown file, so a docs change can turn the gate red exactly as a code change can. The remedy is a targeted `npx prettier --write <paths>` on the files you touched, never a repo-wide rewrite. CI runs the same check on ubuntu, windows and macOS; `.gitattributes` (`* text=auto eol=lf`) is what keeps it from failing on line endings alone. Deliberately outside the gate: `tasks/`.
+- **Markdown prose is not hard-wrapped.** `.prettierrc.json` sets `proseWrap: "never"`, so one paragraph is one line and the formatter reflows it for you. Never hand-wrap to a column, and never write a line break inside an inline code span or a list continuation.
+- **Never nest a glob-bearing code span inside a bold span.** A code span containing a double asterisk, written inside a bold span, is rewritten destructively — the surrounding inline delimiters are eaten and the sentence stops reading as authored — and because the formatter produced the damage itself, `prettier --check` passes on it. Nothing in CI can catch this class, so avoiding the construct is the whole guard: put the glob in the sentence body, outside the bold span.

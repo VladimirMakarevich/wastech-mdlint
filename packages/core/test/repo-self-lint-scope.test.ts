@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { resolveCorpusScope } from "../src/config/corpus-scope.js";
 import { loadConfiguration } from "../src/config/load-config.js";
+import { compareStrings } from "../src/deterministic-sort.js";
 import { loadDocuments } from "../src/markdown/load-documents.js";
 
 const repoRoot = path.resolve(
@@ -42,6 +43,19 @@ function trackedFiles(): string[] {
   return result.stdout.split("\0").filter((entry) => entry.length > 0);
 }
 
+// Repository-relative POSIX paths, so the comparison below reads the same on every host.
+function markdownFilesOnDiskUnder(absoluteDir: string): string[] {
+  return readdirSync(absoluteDir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(absoluteDir, entry.name);
+    if (entry.isDirectory()) {
+      return markdownFilesOnDiskUnder(full);
+    }
+    return entry.name.endsWith(".md")
+      ? [path.relative(repoRoot, full).split(path.sep).join("/")]
+      : [];
+  });
+}
+
 function isSelfLintTarget(relPath: string): boolean {
   return (
     relPath === "README.md" ||
@@ -75,7 +89,7 @@ function loadSelfLintCorpus(): Promise<string[]> {
 
 // This guards the one way the CI docs gate can rot without anyone noticing: a narrowed `include`.
 // The gate is green when it analyzes nothing, so dropping half the corpus — a stray `exclude`, a
-// pattern edited to `docs/mdlint_v2/**`, a `*.md` tail lost in a refactor — looks exactly like a
+// pattern narrowed to one subdirectory, a `*.md` tail lost in a refactor — looks exactly like a
 // clean run. Comparing against the tracked-file list in both directions is what makes the silence
 // audible.
 //
@@ -87,10 +101,33 @@ describe.skipIf(!hasGit)("repository self-lint scope", () => {
     "covers every tracked docs page and the README",
     async () => {
       const corpus = new Set(await loadSelfLintCorpus());
-      const expected = trackedFiles().filter(isSelfLintTarget);
+      const tracked = new Set(trackedFiles());
+      const expected = [...tracked]
+        .filter(isSelfLintTarget)
+        .sort(compareStrings);
 
-      // Guards against the config being read at all: an empty expectation would make this vacuous.
-      expect(expected.length).toBeGreaterThan(100);
+      // What the scope *should* contain is derived from the documentation tree itself rather than
+      // asserted against a pinned count. A constant floor is only ever accurate on the day it is
+      // written: the previous one kept passing long after the corpus it described had changed size,
+      // which is the same silence this file exists to break. Reading the tree from disk and
+      // intersecting it with the tracked list keeps both failure directions live — a predicate that
+      // stops matching docs pages, and one that starts matching files outside the docs tree — while
+      // an untracked scratch page a contributor left under `docs/` fails nobody's local run.
+      expect(expected).toEqual(
+        [
+          ...markdownFilesOnDiskUnder(path.join(repoRoot, "docs")).filter(
+            (relPath) => tracked.has(relPath),
+          ),
+          "README.md",
+        ].sort(compareStrings),
+      );
+
+      // An anchor against both sides collapsing together: if the docs tree were emptied or the
+      // predicate stopped matching anything, the equality above would compare two short lists and
+      // pass. The user guide's index is permanent documentation, so its absence from the lint scope
+      // is never the correct state.
+      expect(expected).toContain("docs/guide/README.md");
+
       expect(expected.filter((relPath) => !corpus.has(relPath))).toEqual([]);
     },
     CORPUS_WALK_TIMEOUT_MS,

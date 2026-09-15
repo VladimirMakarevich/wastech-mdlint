@@ -1,36 +1,25 @@
-# PR.01 · Finalize per-package publish metadata + supply chain
+# 01 · Publish metadata, version coupling, and payload shape
 
-> Phase: [P-release — Release](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
+> Part of the [release checklist](index.md).
 
 ## Goal
 
-Make every package correctly publishable, building on the [P0.07 baseline](../P0-foundations/07-ci-packaging-baseline.md).
+Make every package correctly publishable, and make the three versions move together.
 
-## Sequence
+## Steps
 
-- **Previous:** [P10 — Post-audit consistency](../P10-consistency/index.md) (all remediation landed); the product surface itself comes from [P7](../P7-mcp-server/index.md) (mcp-server filled) and [P8](../P8-skills/index.md) (skills) — the full surface now exists.
-- **Next:** [PR.02 — Single-tag release](02-single-tag-release.md), [PR.03](03-github-action.md), [PR.04](04-docs-readme.md).
-- **Depends on:** P7, P8 · **Blocks:** PR.02–PR.04.
+1. **Audit each `package.json`.** Most of this already shipped; this step confirms it rather than authoring it. In place across all three: `engines.node: ">=24.17.0"` with no upper bound, `publishConfig: { access: "public", provenance: true }`, the bin names (`wastech-mdlint` on `cli`, `wastech-mdlint-mcp` on `mcp-server`), and a `files` allowlist. A library `exports` map applies to `core` only — `cli` and `mcp-server` are bin-only apps and correctly ship none. Also confirm the three fields that a tarball needs and a manifest audit tends to skip, because omitting them once shipped unnoticed: a per-package `README.md`, MIT `LICENSE` text inside the payload, and `repository` carrying the package's own `directory` subpath.
 
-## Deliverables / steps
+2. **Bump the version and every internal pin in one change.** Internal dependencies are exact literal pins (`"@wastech-mdlint/core": "0.0.0"`), which is the npm-workspaces convention — there is no `workspace:*` protocol here, so nothing is rewritten at publish time. A release that bumps the three `version` fields but leaves the pins behind publishes a `cli` and an `mcp-server` that depend on a `core` version nobody ever published, and npm resolves that at install time, not at publish time. The failure therefore reaches users rather than the release.
 
-1. **Verify** per-package `package.json` — most of this shipped in P0/P3, so this is an audit, not fresh authoring. Already in place across all three: `engines.node: ">=24.17.0"` (no upper bound), `publishConfig: { access: "public", provenance: true }`, the `bin` names (`wastech-mdlint` on `cli`, `wastech-mdlint-mcp` on `mcp-server`), and `files` allowlists. Library `exports` (+ types) applies to **`core` only** — `cli`/`mcp-server` are bin-only apps and correctly ship no `exports` map. Also verify the three fields this list omitted until [P16.02](../P16-release-readiness/02-package-metadata.md) delivered them: a per-package `README.md`, MIT `LICENSE` text in the payload, and `repository` with the package's `directory` subpath. Their omission here is how F-04 (W-29) went unnoticed, so they are audited as part of this step rather than assumed. Confirm/add any metadata the P7/P8 surface introduced.
-2. Internal deps are exact literal pins (`"@wastech-mdlint/core": "0.0.0"`, the npm-workspaces convention — there is **no** `workspace:*` protocol here, so nothing "resolves on publish"). The release tool ([PR.02](02-single-tag-release.md)) must bump each package version **and every internal `@wastech-mdlint/*` dependency pin** to the same `vX.Y.Z` in one atomic change, so published `cli`/`mcp-server` depend on the published `core`, not a stale `0.0.0`.
-3. Confirm the generated `schema.json` still ships in `cli`'s `files` (already listed) so editor `$schema` resolution works from the installed package ([C9](../requirements/01-configuration.md)).
-4. `npm pack --dry-run` per package: confirm `dist` (+ `cli`'s `schema.json`) is present and no dev/test files leak. **The payload ships no source maps** — [P16.03](../P16-release-readiness/03-published-payload.md) turned `declarationMap` and `sourceMap` off in `tsconfig.base.json`, which is the third of the three options W-31 offered and the only one that does not grow the payload. Recorded here rather than only in the phase file because it is a release-shape decision this step is the one that re-checks: **the maps were unresolvable, not merely unused.** Each emitted `"sources":["../src/…"]` with no `sourcesContent` into a tarball whose `files` allowlist is `dist`-only, so nothing at the consumer could ever open one, and they were roughly half of core's packed size. The two alternatives both grow the payload to buy a benefit two of three packages cannot use: `cli` and `mcp-server` are bin-only apps, `inlineSources` embeds the source text into both the `.js.map` and the `.d.ts.map`, and adding `src` to `files` ships the whole source tree. Deliverable 1's `repository.directory` already gives a consumer who wants source a link to the exact subtree. The choice has a local DX cost, not just a consumer-side one: a file inside a referencing project's `include` (`cli`/`mcp-server` reference `core` via `tsconfig.json`) still gets project-reference redirect to source for go-to-definition, but a file in no tsconfig — any test file — now resolves `@wastech-mdlint/core` to `dist/index.d.ts` instead of source. If a future task wants published maps back, the requirement to state is which of the two costs it is buying.
+3. **Confirm `cli` still ships `schema.json`.** It is the one payload file present only because the allowlist names it, and it is what makes `$schema` resolution work offline from the installed package: config files point at a relative path into `node_modules`, never at a URL, so an editor validates against the version actually installed.
 
-## Decisions applied
+4. **Pack each package and read the payload.** `dist` present, `cli`'s `schema.json` present, no dev or test files leaking. **The payload ships no source maps**, deliberately: `declarationMap` and `sourceMap` are off in `tsconfig.base.json`. The maps were not merely unused, they were unresolvable — each emitted `"sources":["../src/…"]` with no `sourcesContent` into a tarball whose allowlist is `dist`-only, so nothing at the consumer could ever open one, and they were roughly half of core's packed size. The two ways to make them resolvable both grow the payload to buy a benefit two of the three packages cannot use: `inlineSources` embeds the source text into both the `.js.map` and the `.d.ts.map`, and adding `src` to `files` ships the whole source tree. The `repository.directory` field from step 1 already gives a consumer who wants source a link to the exact subtree. The cost is local as well as consumer-side: a file inside a referencing project's `include` still gets project-reference redirect to source for go-to-definition, but a file in no tsconfig — any test file — now resolves `@wastech-mdlint/core` to `dist/index.d.ts` instead of source. Anyone restoring published maps should state which of the two payload costs they are buying.
 
-- [I5](../requirements/06-installation.md) supply chain · [C9](../requirements/01-configuration.md) ship schema.
+## Done when
 
-## Exit criteria
+- [ ] All three packages' publish metadata and provenance are verified (`core` has `exports`; `cli` and `mcp-server` are bin-only and have none).
+- [ ] Package versions and internal `@wastech-mdlint/*` pins move in lockstep; no stale pin ships.
+- [ ] `cli` ships `schema.json`.
 
-- [ ] All three packages' publish metadata + provenance verified (`core` has `exports`; `cli`/`mcp-server` are bin-only, no `exports`).
-- [ ] Every tarball carries a per-package `README.md` and readable MIT `LICENSE` text, and every manifest declares `repository` with its own `directory` — **delivered by [P16.02](../P16-release-readiness/02-package-metadata.md)** and asserted by `packages/core/test/package-payload.test.ts`, so this criterion is measured by running the gate rather than re-tracked here.
-- [ ] Package version + internal `@wastech-mdlint/*` pins bump in lockstep — no stale `0.0.0` dependency ships.
-- [ ] `cli` ships `schema.json`. The pack-clean half is **delivered by [P16.03](../P16-release-readiness/03-published-payload.md)** — `release:check` ends in `npm pack --dry-run --workspaces` and `ci.yml`'s `pack` job matrixes the same check per package — so it is measured by running the gate rather than re-tracked here.
-- [ ] No tarball carries a source map, and no tarball carries a top-level entry outside its own allowlist — **decided and delivered by [P16.03](../P16-release-readiness/03-published-payload.md)** (maps off in `tsconfig.base.json`, reasons in deliverable 4 above) and asserted by `packages/core/test/package-payload.test.ts`, so this criterion is measured by running the gate rather than re-tracked here.
-
-## Hand-off to next
-
-PR.02 wires the release workflow that publishes these packages under one tag.
+Payload shape — per-package README and LICENSE, `repository.directory`, no source maps, nothing outside each allowlist — is asserted against the packed tarballs by `packages/core/test/package-payload.test.ts`, so it is measured by running the gate rather than re-checked by hand.

@@ -176,10 +176,9 @@ describe("handleLintFiles", () => {
   });
 
   // Fast in-process feedback on the operational classifier; the wire-level evidence is
-  // in `stdio-integration.test.ts`. This is the field test's own scenario — a directory inside the
-  // corpus with its permissions removed — which used to come back as `INTERNAL_ERROR` and "An
-  // unexpected internal error occurred.", dropping the errno and the path that are the entire
-  // actionable content.
+  // in `stdio-integration.test.ts`. The scenario is a directory inside the corpus with its
+  // permissions removed, which used to come back as `INTERNAL_ERROR` and "An unexpected internal
+  // error occurred.", dropping the errno and the path that are the entire actionable content.
   //
   // Root ignores directory permissions and Windows has no equivalent model, so the fault only exists
   // for an unprivileged POSIX user — the same precondition, and the same guard, as the CLI's

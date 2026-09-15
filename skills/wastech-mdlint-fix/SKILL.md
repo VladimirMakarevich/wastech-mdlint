@@ -2,7 +2,7 @@
 name: "wastech-mdlint-fix"
 description: "Fix wastech-mdlint findings in a repository: run the CLI lint, apply the deterministic core --fix for the mechanically fixable rules, then handle the remaining findings by rule family with AI edits or user confirmation. Use when the user asks to fix, clean up, or resolve wastech-mdlint lint findings in their Markdown."
 license: "MIT"
-compatibility: "Version-coupled to @wastech-mdlint/cli: use the CLI release carrying the same version tag as this skill (one tag publishes the CLI and tags the skills together; do not mix tags)."
+compatibility: "Requires @wastech-mdlint/cli 0.1.0. One tag publishes the CLI and tags the skills together, so a skill and the CLI it drives always carry the same version; do not mix versions."
 metadata:
   homepage: "https://github.com/VladimirMakarevich/wastech-mdlint"
   source: "https://github.com/VladimirMakarevich/wastech-mdlint"

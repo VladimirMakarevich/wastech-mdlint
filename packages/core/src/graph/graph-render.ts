@@ -100,9 +100,15 @@ function pushPathList(
  * Counts rather than a per-node label, and on its own line rather than inside the header. The header
  * is `label (N):` with a bare count, which is the contract the human-versus-structured parity reader
  * parses — text inside those parentheses would make the section invisible to it, and a section that
- * silently drops out of the parity comparison is the exact drift that guard exists to catch. Per-node
- * attribution is a wider change (it feeds four surfaces including a byte-contract artifact) and is
- * scoped separately in `docs/mdlint_v2/backlog/`.
+ * silently drops out of the parity comparison is the exact drift that guard exists to catch.
+ *
+ * Per-node attribution — naming, for each excluded document, the cycle or the upstream node that
+ * excluded it — is deliberately not done here. It is a wider change than it looks: the same excluded
+ * set is rendered by the human `graph` report, its structured payload, the MCP tool that returns the
+ * graph, and the generated `SKILL.md`, whose byte-for-byte content hash consumers diff and cache
+ * against. Adding a per-node reason therefore changes an artifact contract, and it needs a decision
+ * on what a node with several upstream causes reports before any of it can be written. The counts
+ * are the half that carries most of the value at none of that cost.
  *
  * Cycle membership comes from the Tarjan pass the graph already ran, so this costs a set build and a
  * filter — no second traversal, and no widening of `topologicalSort`'s result.

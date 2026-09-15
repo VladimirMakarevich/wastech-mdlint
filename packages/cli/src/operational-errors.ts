@@ -14,7 +14,7 @@ import { normalizeRelativePath } from "@wastech-mdlint/core";
 // error that names no path has none to leak, and dropping its text costs the caller the diagnosis
 // (see `formatOperationalError`).
 //
-// `toWriteTargetPath` is the one deliberate exception, added by P14.02: a file the command *wrote*
+// `toWriteTargetPath` is the one deliberate exception: a file the command *wrote*
 // outside `cwd` is named by its absolute platform-native path, because the user has to be able to
 // open it and a chain of `../` hops — or, across Windows drives, no relative form at all — is not a
 // location anyone can read back. So the convention above is the rule for what a failure *blames*,

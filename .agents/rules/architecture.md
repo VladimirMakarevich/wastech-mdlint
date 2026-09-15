@@ -1,63 +1,46 @@
 # Architecture Rules
 
-The architectural source of truth is `docs/mdlint_v2/`, especially:
+These invariants govern implementation work. They are stated here in full; the code and its tests are the only place to verify that they still hold.
 
-- `docs/mdlint_v2/index.md`
-- `docs/mdlint_v2/requirements/`
-- `docs/mdlint_v2/decisions/core-hosts-the-pipeline.md`
+## Package Layout
 
-For the vocabulary these invariants use — `ParsedDocument`, `ContextGraph`, edge types, rule scopes, hosts, and the rest — see the glossary at `docs/mdlint_v2/glossary.md`. Use its terms consistently and keep it current when an architectural change adds or renames one.
+An npm-workspaces monorepo. All product code lives under `packages/*`; there is no root `src/`.
 
-These invariants should guide implementation work.
-
-## Current vs Target State
-
-- The single-package code was relocated into `packages/core` at P0.04, and the legacy pipeline was removed at the P3.09 cutover. All product code lives under `packages/*`; there is no root `src/`.
-- The target architecture is an npm-workspaces monorepo with:
-  - `@wastech-mdlint/core`
-  - `@wastech-mdlint/cli`
-  - `@wastech-mdlint/mcp-server`
-- Do not fake future package boundaries before the relevant roadmap phase. Follow the actual filesystem for today's edits and the phase plan for tomorrow's shape.
+- `@wastech-mdlint/core` — the engine.
+- `@wastech-mdlint/cli` — the CLI host. Bin: `wastech-mdlint`.
+- `@wastech-mdlint/mcp-server` — the stdio MCP host. Bin: `wastech-mdlint-mcp`.
 
 ## Core Ownership
 
 - Core owns the parsing pipeline, config loading, lint orchestration, graph construction, compile logic, and result formatting.
 - CLI and MCP are thin host adapters over core. They must not fork or duplicate the core pipeline.
 - Host-specific behavior belongs at the boundary:
-  - CLI: argument parsing, command dispatch, exit codes, file output
-  - MCP: tool registration, input validation, structured output, error wrapping
+  - CLI: argument parsing, command dispatch, exit codes, file output.
+  - MCP: tool registration, input validation, structured output, error wrapping.
 - Shared computational behavior belongs in core, not in host packages.
 
-This is enforced by the accepted decision in `docs/mdlint_v2/decisions/core-hosts-the-pipeline.md`.
+The reason is not tidiness. Two hosts that each compute an answer will eventually compute two different answers, and because each package's own tests pass, nothing reports the divergence — which is why a cross-host parity guard exists in the test suite as well.
 
 ## Pipeline Invariants
 
-- One Markdown parse pass should produce the `ParsedDocument` data needed by rules, graph, compile, and inline suppression handling.
+- One Markdown parse pass produces the `ParsedDocument` data that rules, graph, compile, and inline suppression handling all read. Nothing re-parses Markdown ad hoc.
 - The rule engine is registry-driven: rule metadata, options schema, scope, default severity, structured findings, and optional fixes are defined centrally.
-- Declarative custom rules are data-driven. Do not introduce runtime user-code execution or code plugins into v2 work unless the roadmap explicitly changes.
-- `ContextGraph` is shared infrastructure. Graph-aware rules, `graph`, `slice`, `impact`, MCP tools, and compile analysis should reuse the same graph and query layer.
-- Generated output must be deterministic: stable sorting, normalized repo-relative POSIX paths, no timestamp-driven churn.
+- Declarative custom rules are data-driven, closed over a fixed primitive vocabulary. No runtime user-code execution and no code plugins.
+- `ContextGraph` is shared infrastructure. Graph-aware rules, the `graph`, `slice` and `impact` commands, MCP tools, and compile analysis reuse the same graph and query layer.
+- Output is deterministic: stable sorting, normalized repository-relative POSIX paths, no timestamp-driven churn, no locale-dependent collation.
 
 ## Config And Surface Rules
 
-- v2 config is JSONC in `wastech-mdlint.config.json`.
-- v2 config uses a local `$schema`; do not introduce remote schema URLs.
-- `.cjs`, `.mjs`, and runtime TypeScript config loading are legacy single-package concerns, not target v2 behavior.
-- MCP in v2 stays stdio-only and read-only for its six shipped tools.
-- External HTTP link checking, external link caches, LSP, and docs-site work are outside the v2 core scope unless explicitly requested.
-
-## Phase Discipline
-
-- Follow the roadmap order `P0` → … → `P8`, then the post-audit phases `P9` (code remediation) and `P10` (docs/tests consistency), then the second post-audit round `P11` (post-P9 code remediation) and `P12` (post-P9 consistency/coverage), then the third round `P13` (corpus/correctness) → `P14` (host boundary) → `P15` (output contracts) → `P16` (release readiness and test debt) → `P17` (plan of record and self-linting), then the terminal `P-release`, unless the user asks for a different slice.
-- `P13`–`P17` are driven by the [consolidated remediation backlog](../../docs/mdlint_v2/remediation-backlog-2026-08-05.md), not by a frozen audit report: each task names the `W-NN` items it closes and the backlog names their source findings. Two of its items change glob semantics and introduce lint-time defaults, so **anything that depends on what `include`/`exclude` mean must land after `P13`** — including a repository configuration of our own (`P17.02`).
-- Within a phase, respect each task file's `Previous`, `Next`, `Depends on`, and `Blocks` chain.
-- If the roadmap and a task file disagree on a load-bearing detail, use the more specific task file and surface the inconsistency.
-- Known roadmap drift around built-in rule count should be treated explicitly: current phase files include `SEC-003`, so built-in rule work must account for it.
+- Config is JSONC in `wastech-mdlint.config.json`.
+- Config uses a local `$schema` — a relative path into the installed package, never a URL. Schema resolution stays offline and version-matched, so an editor validates against the version actually installed rather than whatever the network serves.
+- No `.cjs`, `.mjs`, or runtime TypeScript config loading.
+- MCP stays stdio-only, and its six shipped tools stay read-only.
+- External HTTP link checking, external link caches, LSP, and docs-site work are outside scope unless explicitly requested.
 
 ## What Not To Do
 
 - Do not re-implement `lintFiles`, config loading, or result formatting in CLI or MCP.
-- Do not create parallel graph traversal logic for rules vs commands vs MCP.
+- Do not create parallel graph traversal logic for rules versus commands versus MCP.
 - Do not introduce non-deterministic reporting behavior.
 - Do not add local agent skills, repo hooks, or other automation surfaces unless the task explicitly targets that scope.
-- Do not guess future architecture from memory when `docs/mdlint_v2/` already states it.
+- Do not add broad abstractions before there is a concrete need for them.
