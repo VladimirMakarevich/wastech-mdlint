@@ -1,6 +1,5 @@
 {
   "name": "wastech-mdlint",
-  "version": "0.0.0",
   "description": "CLI for auditing Markdown context in repositories.",
   "license": "MIT",
   "repository": {
