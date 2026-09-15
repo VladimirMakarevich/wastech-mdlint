@@ -190,7 +190,7 @@ afterAll(async () => {
 });
 
 describe.each(PUBLISHED_PACKAGES)(
-  "published payload of $name (W-29)",
+  "published payload of $name",
   ({ name, directory, allowedTopLevelEntries }) => {
     function payload(): Map<string, Buffer> {
       return payloads.get(name)!;
@@ -289,9 +289,9 @@ describe.each(PUBLISHED_PACKAGES)(
       // checkout built before maps were turned off hits exactly this.
       expect(
         maps,
-        `${name} packs ${String(maps.length)} source map(s). Maps are off in tsconfig.base.json ` +
-          "(P16.03 / W-31), so these are stale build output: delete packages/*/dist and run " +
-          "`npx tsc -b --force`, then re-run. `npm run build` alone will not clear them.",
+        `${name} packs ${String(maps.length)} source map(s). Maps are off in tsconfig.base.json, ` +
+          "so these are stale build output: delete packages/*/dist and run `npx tsc -b --force`, " +
+          "then re-run. `npm run build` alone will not clear them.",
       ).toEqual([]);
     });
 
@@ -345,10 +345,10 @@ describe("release:check", () => {
   });
 });
 
-describe("published payload of @wastech-mdlint/cli — allowlist-only files (W-29)", () => {
+describe("published payload of @wastech-mdlint/cli — allowlist-only files", () => {
   // Named for its subject rather than for its package: `describe.each` above generates a suite
-  // called `published payload of @wastech-mdlint/cli (W-29)` for the same package, and a title that
-  // is a prefix of that one cannot be selected alone with `-t`.
+  // called `published payload of @wastech-mdlint/cli` for the same package, and a title that is a
+  // prefix of that one cannot be selected alone with `-t`.
   it("still ships schema.json", () => {
     // The one payload file that ships *only* because `files` lists it — README and LICENSE are
     // force-included by npm regardless. So this is where the suite has real allowlist sensitivity,

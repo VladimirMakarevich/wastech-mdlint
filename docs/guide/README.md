@@ -2,7 +2,7 @@
 
 `wastech-mdlint` is a deterministic, **local-first** linter and analysis toolkit for the Markdown context in a repository — `README.md`, `CLAUDE.md`, `AGENTS.md`, requirements tables, and `skills/**/SKILL.md`-style files. It runs a registry-driven rule engine over a single Markdown parse pass, builds a context graph of how documents reference each other, and can compile a project-specific agent skill.
 
-This guide is the full reference. For a one-page summary see the top-level [README](../../README.md); for the design/roadmap see [docs/mdlint_v2](../mdlint_v2/index.md).
+This guide is the full reference. For a one-page summary see the top-level [README](../../README.md).
 
 > These files are **hand-maintained**. The machine-generated rule table and MCP tool inventory live in the top-level [README](../../README.md) (produced by `npm run generate:docs`); this guide adds the prose, examples, and per-rule pages around them.
 

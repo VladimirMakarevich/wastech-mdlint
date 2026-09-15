@@ -1,12 +1,9 @@
 name: Publish
 
-# PLACEHOLDER — no automated publishing yet.
+# A single `vX.Y.Z` tag publishes all three packages at that version.
 #
-# The intended shape, not yet built: a single `vX.Y.Z` tag publishes
-# @wastech-mdlint/{core,cli,mcp-server} together with npm provenance and tags the skills, via a
-# changesets/release workflow. Until that exists, this workflow only proves the tagged commit is
-# publish-shaped (gate + per-package `npm pack --dry-run`); it intentionally does not run
-# `npm publish`.
+# Publishing runs in the same job as the gate, not a downstream one, so there is no window in which
+# a green gate and a later publish disagree about which commit they ran on.
 
 on:
   push:
@@ -16,11 +13,19 @@ on:
 
 permissions:
   contents: read
-  id-token: write # reserved for npm provenance once this workflow actually publishes
+  # Required to mint the OIDC token npm signs a provenance attestation with. Needed whether the
+  # publish authenticates by token or by trusted publishing, so this line stays in both modes.
+  id-token: write
 
 jobs:
-  publish-readiness:
+  publish:
     runs-on: ubuntu-latest
+    # Authentication by granular access token. Moving to npm trusted publishing means deleting this
+    # `env:` block and nothing else: the OIDC permission above and the `--provenance` flags below are
+    # what both modes need. Trusted publishing cannot be configured for a package that does not exist
+    # in the registry yet, so the first release of each package necessarily goes out by token.
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -28,16 +33,46 @@ jobs:
           node-version-file: ".node-version"
           registry-url: "https://registry.npmjs.org"
           cache: "npm"
+
       - run: npm ci
+
+      # The tag is what a human types and the manifests are what actually gets published; nothing
+      # else compares them. A mismatch here would publish a version nobody tagged, under a tag
+      # pointing at a different version, and neither is correctable after the fact because npm
+      # refuses to republish a version number.
+      - name: Tag matches the published version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          for package in core cli mcp-server; do
+            manifest_version="$(node -p "require('./packages/${package}/package.json').version")"
+            if [ "${manifest_version}" != "${tag_version}" ]; then
+              echo "Tag ${GITHUB_REF_NAME} does not match @wastech-mdlint/${package}@${manifest_version}." >&2
+              exit 1
+            fi
+          done
+
+      # The full gate. `lint` and `format` are here because this workflow triggers on a tag rather
+      # than on the pull request CI gates, so a style failure could otherwise reach a tag through a
+      # direct push. `build` must precede both the docs lint and the publish: the docs lint runs the
+      # built CLI against this repository's own documentation, and the cross-workspace publish path
+      # runs no lifecycle script that would emit `dist` on its own.
       - run: npm run typecheck
-      # lint and format match the CI `verify` job's gate: without them a red style gate
-      # could reach a `v*` tag through a direct push, since this workflow triggers on the tag rather
-      # than on the PR that CI gates.
       - run: npm run lint
       - run: npm run format
       - run: npm test
       - run: npm run build
-      # --workspaces packs every publishable package (core, cli, mcp-server) in dry-run mode.
+      - run: npm run lint:docs
       - run: npm pack --dry-run --workspaces
-      - name: Release automation pending
-        run: echo "Publish is not automated yet. The single-tag release that publishes core+cli+mcp and tags the skills together is not wired up."
+
+      # `core` first, and separately: `cli` and `mcp-server` pin it by exact version, so publishing
+      # them against a registry that does not yet carry that `core` version leaves the first consumer
+      # to install a dependency that cannot resolve.
+      - name: Publish @wastech-mdlint/core
+        run: npm publish -w @wastech-mdlint/core --provenance
+
+      - name: Publish @wastech-mdlint/cli
+        run: npm publish -w @wastech-mdlint/cli --provenance
+
+      - name: Publish @wastech-mdlint/mcp-server
+        run: npm publish -w @wastech-mdlint/mcp-server --provenance

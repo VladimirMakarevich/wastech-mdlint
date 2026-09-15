@@ -182,11 +182,14 @@ function renderBudget(budget: CompileBudget): string {
     lines.push("All configured entrypoints are within budget.");
   } else {
     // Phrasing mirrors LLM-001's own report (engine/rules/llm.ts), with one deliberate divergence:
-    // the finding appends `TOKEN_ESTIMATE_NOTE` and this line does not. The calibration belongs with
-    // the number a reader can act on, and appending it here would move the bytes and content hash of
-    // every generated `SKILL.md` — so the artifact states its token numbers uncalibrated instead, and
-    // the register row (accepted-behaviors.md, the Context Budget block) is the disclosure. Do not
-    // append the note here to close the gap; that is the trade this comment records.
+    // the finding appends `TOKEN_ESTIMATE_NOTE` and this line does not. The estimate is a character
+    // heuristic that errs low for non-Latin scripts, so the calibration belongs with a number a
+    // reader can act on — but appending it here would move the bytes, and therefore the content
+    // hash, of every generated `SKILL.md`. That hash is a contract: consumers diff and cache the
+    // artifact against it. The trade taken is that the generated artifact states its token numbers
+    // uncalibrated, and the calibration is disclosed in the user documentation instead. Do not
+    // append the note here to close the gap without also accepting the hash change for every
+    // artifact already in the wild.
     for (const entrypoint of budget.entrypointsOverBudget) {
       const percentOver = (
         ((entrypoint.totalTokens - entrypoint.maxTokens) /
@@ -343,7 +346,7 @@ function renderCyclesBlock(analysis: GraphAnalysis): string {
     lines.push(`- ${codeSpan(formatCyclePath(cycle))}`);
   }
 
-  // One excluded path per bullet, uncapped: the field test measured this as a 3702-character single
+  // One excluded path per bullet, uncapped: rendered as one line this measured a 3702-character single
   // line, and unlike the fan-out it is a fact about the corpus a reader needs in full — a document
   // missing from the reading order with no explanation is exactly the silence this block exists to break.
   const excluded = analysis.excludedFromReadingOrder;

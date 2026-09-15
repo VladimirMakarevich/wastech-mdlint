@@ -1,54 +1,36 @@
-# PR.05 · Release dry-run & launch verification
+# 05 · Release gate and end-to-end launch verification
 
-> Phase: [P-release — Release](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
+> Part of the [release checklist](index.md).
 
 ## Goal
 
-Prove the whole release works end-to-end across all three channels before tagging v2.
+Prove the release works across all three install channels before the tag is cut.
 
-## Sequence
+## Steps
 
-- **Previous:** [PR.02 — Single-tag release](02-single-tag-release.md), [PR.03 — GitHub Action](03-github-action.md), [PR.04 — Docs](04-docs-readme.md).
-- **Next:** **v2 launch** (backlog becomes the next iteration — see [requirements backlog](../requirements/index.md)).
-- **Depends on:** PR.02–PR.04 · **Blocks:** the release tag.
+1. **Run the full gate.** `npm run release:check` is `npm run typecheck && npm test && npm run build && npm pack --dry-run --workspaces`; it omits `lint`, `format` and `lint:docs`, so a pre-tag run adds those explicitly. (`publish.yml`'s readiness job does run `lint` and `format`, which is why the omission has never turned CI red — it only affects a local run.) Two ordering facts are load-bearing and should survive any later edit to that chain: `--workspaces` is what makes the pack step exercise the three packages' allowlists rather than the root, which is `private: true` and has none; and `npm run build` must stay ahead of the pack, because the cross-workspace pack path runs no lifecycle script and nothing else re-emits `dist` for it.
 
-## Deliverables / steps
+2. **Smoke the three channels against packed artifacts, not the workspace.**
+   - CLI: install the packed `cli` into a clean directory, then `init` → `lint` → `graph` / `slice` / `impact` → `compile`.
+   - MCP: boot `wastech-mdlint-mcp` over stdio and confirm it advertises and answers all six tools.
+   - Skills: confirm each skill installs and that the commands and tool names it references exist in the published surface.
 
-1. Full workspace gate green: run the existing root `release:check` script (`npm run typecheck && npm test && npm run build && npm pack --dry-run --workspaces`); it currently omits `lint`, `format`, and the schema-sync/skill-frontmatter checks, so either extend the script or also run `npm run lint`, `npm run format`, and those tests explicitly on the pinned Node 24 line. (`publish.yml`'s `publish-readiness` job runs `lint` and `format` as of [P12.06](../P12-consistency/06-process-boundary-tests.md), but `release:check` still does not — so a local pre-tag run has to add them by hand.) The `--workspaces` flag arrived in [P16.03](../P16-release-readiness/03-published-payload.md); before it the pack step ran against the `private: true` root and exercised none of the three allowlists. `npm run build` stays ahead of the pack because that pack path runs no lifecycle script — do not reorder the chain when extending it.
-2. **End-to-end smoke** across the three channels:
-   - CLI: install the packed `cli`, run `init` → `lint` → `graph`/`slice`/`impact` → `compile`;
-   - MCP: boot `wastech-mdlint-mcp`, call each of the 6 tools;
-   - Skill: `gh skill install … --pin` resolves and references real commands/tools.
+   Run the corpus half against a repository we did not author. Our own fixtures are shaped by the assumptions the code already makes, so they cannot reveal the assumption itself — every defect this smoke has ever caught came from a tree with an unfamiliar shape: documentation under dot-directories, a nested dependency tree, a gitignored build output.
 
-   The executable form of this smoke — install sandbox, corpus reconnaissance, and a phase-by-phase run against an unrelated repository's real documentation — is the [field-test playbook](../field-test-playbook.md), whose expectations are formulas over a per-target reconnaissance rather than fixed counts, so it re-runs against any repository. The first dated run of that shape, against a private Angular/.NET monorepo, is [field-test-2026-08-05-debates.md](../field-test-2026-08-05-debates.md). Run it against a repo we did not author, not against our own fixtures: that is where the defects the in-repo suite cannot see live.
+3. **Dry-run the publish.** The `publish.yml` readiness job already runs the gate and `npm pack --dry-run --workspaces` on `v*` tags. Verify against that job rather than building a second dry-run beside it.
 
-3. Dry-run the single-tag release ([PR.02](02-single-tag-release.md)) without publishing. The existing `.github/workflows/publish.yml` `publish-readiness` job already runs the gate + `npm pack --dry-run --workspaces` on `v*` tags; PR.02 upgrades it to real publishing, so verify against that job rather than reinventing the dry-run.
-4. Walk the two registers P12.06 established, since neither is enforced by the gate above: the [process-boundary guard checklist](../../../.agents/rules/testing.md) (confirm each of the five categories still has a guard — `packages/core/test/boundary-guards.test.ts` proves the tags survive, but only a reader can confirm a _new_ subsystem did not ship without one), and the [accepted-behaviors register](../accepted-behaviors.md) (confirm every user-reachable row still has its `README.md` / `docs/guide/` home, and that no row was silently fixed without being removed). Both are launch-facing: they are what a first-time user's surprise gets checked against.
-5. Tick the Phase P-release [exit criteria](index.md); confirm **Milestone M4 (launch)**.
+4. **Walk the process-boundary guard categories.** `packages/core/test/boundary-guards.test.ts` proves each category still has a tagged guard, but only a reader can confirm that a newly added subsystem did not ship without one. That check has no automated form and is worth one pass before a release.
 
-### Note — dev-chain advisories (W-33, recorded by [P16.03](../P16-release-readiness/03-published-payload.md))
+## Dependency advisories: which number to take
 
-Measured on 2026-08-05 (field F-03), and recorded here because this is the step that would otherwise re-discover it:
+`npm audit` over the workspace and `npm audit` over what actually ships answer different questions, and mixing them is how a real advisory hides inside dev-chain noise.
 
-- `npm audit` on the **workspace** reported `9 vulnerabilities (1 low, 3 moderate, 5 high)`.
-- Installing the three packed tarballs into a **bare sandbox** reported `found 0 vulnerabilities` across 196 packages.
+The production half is continuously gated: `ci.yml` runs `npm audit --omit=dev --audit-level=high`. The workspace half is not, and this step is the only place it gets taken. The last measurement — one date, not a baseline — reported 9 workspace vulnerabilities (1 low, 3 moderate, 5 high) while installing the three packed tarballs into a bare sandbox reported 0 across 196 packages. Every advisory was therefore in the tooling that builds and tests the packages, none of which ships.
 
-Every advisory is therefore in the dev chain — the tooling that builds and tests the packages, none of which ships. **No dependency was bumped on this evidence**, deliberately: a bump justified by an advisory a consumer cannot reach buys nothing and moves the lockfile the CI matrix is pinned to.
+**No dependency was bumped on that evidence, deliberately.** A bump justified by an advisory no consumer can reach buys nothing and moves the lockfile the CI matrix is pinned to. Re-take both numbers at release time; the conclusion to re-establish is "the shipped tree installs clean", not "the counts still match".
 
-These are two numbers from one date, not a baseline. Re-take both at release time; the conclusion to re-establish is "the shipped tree installs clean", not "the counts still match".
+## Done when
 
-**Half of that is now a gate.** The 2026-08-09 field test found the complement of the case above — a production-tree advisory that a workspace-wide `npm audit` could not distinguish from the dev noise, on a lockfile pin the published range already fixed — so [P19.07](../P19-field-test-remediation/07-host-and-release.md) added an `audit` job to `ci.yml` running `npm audit --omit=dev --audit-level=high`. The production half is therefore continuously checked and the bare-sandbox install below is confirmation rather than discovery; the **workspace** number is still the one only this step takes, and the "no dependency was bumped on dev-chain evidence" decision above is unchanged.
-
-## Decisions applied
-
-- [M4](../requirements/05-mcp-server.md) wire-level tests · [I4/I5/I7](../requirements/06-installation.md).
-
-## Exit criteria
-
-- [ ] Full gate green; release dry-run succeeds. The pack-dry-run half is **delivered by [P16.03](../P16-release-readiness/03-published-payload.md)** — `release:check` ends in `npm pack --dry-run --workspaces` and `ci.yml`'s `pack` job matrixes the same check per package — so it is measured by running the gate rather than re-tracked here.
-- [ ] End-to-end smoke passes for CLI, MCP, and skills.
-- [ ] **Milestone M4 reached — v2 is ready to tag and publish.**
-
-## Hand-off to next
-
-v2 ships. The recorded [backlog](../requirements/index.md) (C6, G7/G8, R9 plugins, S9, M5, HTTP transport, LSP, docs site) seeds the next iteration.
+- [ ] The full gate is green and the publish dry-run succeeds.
+- [ ] The end-to-end smoke passes for CLI, MCP and skills against packed artifacts.
+- [ ] The bare-sandbox install of the three tarballs reports no vulnerabilities.

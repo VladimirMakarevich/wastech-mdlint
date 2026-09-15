@@ -83,7 +83,7 @@ wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-
 
 ## MCP server
 
-`@wastech-mdlint/mcp-server` is a stdio-only Model Context Protocol host over the same core pipeline the CLI uses: 6 read-only tools, no HTTP/SSE, no code-plugin execution. A `fix`/`schema` pair is planned for a later release — v2 ships exactly these 6.
+`@wastech-mdlint/mcp-server` is a stdio-only Model Context Protocol host over the same core pipeline the CLI uses: 6 read-only tools, no HTTP/SSE, no code-plugin execution. A `fix`/`schema` pair is planned for a later release; this release ships exactly these 6.
 
 ```bash
 npx @wastech-mdlint/mcp-server        # run directly, no install
@@ -117,6 +117,22 @@ Add it to any stdio-based MCP host (Claude Code's `.mcp.json`, Claude Desktop's 
 <!-- END GENERATED MCP TOOLS -->
 
 All 6 tools carry a `readOnlyHint` annotation; five return `structuredContent` + `outputSchema` (`compile-context` returns two plain-text content blocks instead). MCP errors use the structured `{ code, message, hint }` contract; the CLI maps the same core error taxonomy to stderr + exit codes.
+
+## Agent skills
+
+Three hand-authored, host-neutral Agent Skills ship alongside the packages. They are workflow instructions an AI host executes over the CLI and MCP surface — a contract over the product, not code — and they are tagged with the same version as the npm packages, so a skill and the CLI it drives never disagree about what exists.
+
+| Skill | Purpose |
+| --- | --- |
+| [`wastech-mdlint-init`](skills/wastech-mdlint-init/SKILL.md) | Scan a repository and produce a sensible `wastech-mdlint.config.json` via `init`. |
+| [`wastech-mdlint-fix`](skills/wastech-mdlint-fix/SKILL.md) | Fix findings by rule family, delegating the mechanically fixable ones to the deterministic `--fix`. |
+| [`wastech-mdlint-impact`](skills/wastech-mdlint-impact/SKILL.md) | Explain the blast radius of changing a document, using `impact` and the context graph. |
+
+```bash
+gh skill install VladimirMakarevich/wastech-mdlint wastech-mdlint-init --pin v0.1.0
+```
+
+**Pin both halves to the same version.** Each skill's `compatibility` frontmatter names the CLI release it was written against, and a test in this repository fails when the two disagree. A skill installed with `--pin` but driving a bare `@wastech-mdlint/cli` — which resolves to whatever is latest at run time — can still reach a CLI whose surface has moved, so the commands inside each skill request `@wastech-mdlint/cli@<version>` explicitly. Details in [the skills guide](docs/guide/skills.md).
 
 ## Config
 
@@ -238,7 +254,3 @@ That `summary` wrapper is the CLI's; the MCP `lint-files` and `lint` tools retur
 - The context graph is rebuilt each run (no incremental cache yet).
 - Cycle detection is recursive, so a single connected component of many thousands of documents can exhaust the call stack — a densely cross-linked component descends about as deep as a long chain would. Many small components are fine at any corpus size; see [context graph limitations](docs/guide/context-graph.md#limitations).
 - Dangling reference-style links (`[text][missing]` with no matching `[missing]: url` definition) are parsed as literal text, not a link, so `REF-001` never sees them — this matches GitHub's own rendering and is intentional, not a gap. See [REF-001](docs/guide/rules/REF-001.md#notes).
-
-## Planning docs
-
-The v2 roadmap and locked requirements live under [docs/mdlint_v2/](docs/mdlint_v2/index.md).

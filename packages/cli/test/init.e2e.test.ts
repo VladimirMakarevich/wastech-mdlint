@@ -1772,8 +1772,9 @@ describe("init command · hidden and gitignored trees", () => {
     const init = await run(["init", cwd, "--yes"], cwd);
     expect(init.exitCode).toBe(EXIT_CODE_SUCCESS);
 
-    // The count is the one thing the field test could not get from the draft: `.github` holds two
-    // Markdown files and nothing said so, leaving a 63-file gap on the real repository silent.
+    // The count is the part a bare reason cannot supply: `.github` holds two Markdown files and an
+    // earlier draft of this line said only that dot-directories were skipped, which left a 63-file
+    // shortfall on a real repository silent.
     expect(init.stdout).toContain(
       "hidden directories, not linted: 2 Markdown files in 1 directory whose name starts with a dot — .github (2)",
     );
@@ -1790,10 +1791,10 @@ describe("init command · hidden and gitignored trees", () => {
   });
 });
 
-// The field test's own shape — a repository whose LLM-facing documentation lives
-// under dot-directories, beside an ordinary `docs/` cluster, a nested dependency tree, and a
-// gitignored build output. On the real target this shape left the corpus at 139 files where
-// `git ls-files` tracked 202, and nothing said so.
+// A shape real repositories actually have: LLM-facing documentation living under dot-directories,
+// beside an ordinary `docs/` cluster, a nested dependency tree, and a gitignored build output. On
+// one such repository this left the corpus at 139 files where `git ls-files` tracked 202, and the
+// run reported nothing about the other 63.
 //
 // The fixture and its companion tracked-file list are exported module-level consts so the corpus
 // comparison below can
@@ -1831,7 +1832,7 @@ describe("init command · the scan-exclusion disclosure", () => {
 
     expect(init.exitCode).toBe(EXIT_CODE_SUCCESS);
     // The count and the reason together — a count alone does not tell the user that `.claude/` was
-    // considered and dropped, which is the sentence the field test found missing.
+    // considered and dropped, and being told only a number is what leaves a user unable to act.
     expect(init.stdout).toContain(
       "hidden directories, not linted: 3 Markdown files in 2 directories whose name starts with a dot — .agents (2), .claude (1)",
     );
@@ -1847,9 +1848,9 @@ describe("init command · the scan-exclusion disclosure", () => {
   });
 
   it("accounts for every tracked Markdown file as either linted or disclosed", async () => {
-    // The `comm`-against-`git ls-files` arithmetic the field test used to prove its 63-file gap was
-    // entirely the hidden-directory prune: corpus + disclosed hidden must equal the tracked set,
-    // with the disclosed number read out of the summary rather than restated by the test.
+    // The arithmetic that proves a shortfall is entirely accounted for: corpus + disclosed hidden
+    // must equal the tracked set, with the disclosed number read out of the summary rather than
+    // restated by the test — otherwise the test asserts its own expectation back at itself.
     const cwd = await fixtureRepo(DOT_DIRECTORY_FIXTURE);
 
     const init = await run(["init", cwd, "--yes"], cwd);
@@ -1874,8 +1875,8 @@ describe("init command · the scan-exclusion disclosure", () => {
   // @boundary-guard shared-exclude
   // The arithmetic above is necessary and not sufficient: `corpus + disclosed ==
   // tracked` also holds when the corpus drops one tracked file and gains one untracked file, which is
-  // the failure a count cannot see. This is the set comparison instead — the two `comm` directions the
-  // field test ran to account for its 63-file gap — so *which* files, not how many.
+  // the failure a count cannot see. This is the set comparison instead, in both directions, so
+  // *which* files, not how many.
   //
   // The `extra` direction is the one that would have caught the blocker: an untracked
   // `node_modules` document entering the corpus is invisible to a total that the same run's exclusion

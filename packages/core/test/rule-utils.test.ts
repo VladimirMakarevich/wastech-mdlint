@@ -169,8 +169,9 @@ describe("matchesConfigGlob anchoring", () => {
     expect(matchesConfigGlob("NOTE.md", ["./NOTE.md"])).toBe(true);
     expect(matchesConfigGlob("docs/NOTE.md", ["./NOTE.md"])).toBe(false);
 
-    // Why `README.md:127`'s old `node_modules/**` under-excluded a monorepo, and why `**/` is the
-    // form to copy — a globstar segment matches zero segments, so the root copy stays covered.
+    // Why a documented `node_modules/**` under-excluded a monorepo, and why `**/node_modules/**` is
+    // the form to copy — a globstar segment matches zero segments, so the root copy stays covered
+    // while every nested copy is reached too.
     expect(matchesConfigGlob("node_modules/l/a.md", ["node_modules/**"])).toBe(
       true,
     );

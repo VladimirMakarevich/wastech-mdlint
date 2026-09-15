@@ -16,10 +16,11 @@ import { PARITY_LINT_FIXTURE } from "../../core/test/support/output-parity.js";
 // The cross-host leg of output parity: each host's rendering against the other's.
 //
 // The two hosts are thin adapters over one core pipeline, which is exactly why nothing compared them —
-// each package tests its own handler, and both pass while rendering the same run differently. Three of
-// the defects the deep audit missed were divergences of this shape (a `hint` present in one document
-// and not the other, a `--format` word that meant different things on sibling commands, a summary key
-// one format carried and the other did not), and every one was found by reading rather than by a test.
+// each package tests its own handler, and both pass while rendering the same run differently. Three
+// shipped defects were divergences of exactly this shape — a `hint` present in one document and not
+// the other, a `--format` word that meant different things on sibling commands, a summary key one
+// format carried and the other did not — and every one was found by a person reading the two
+// outputs side by side, because no test ever put them side by side.
 //
 // Crossing a real process boundary is deliberate and is what distinguishes this from the two
 // human-vs-structured suites: the CLI's rendering only exists as bytes on a real stdout, and the MCP

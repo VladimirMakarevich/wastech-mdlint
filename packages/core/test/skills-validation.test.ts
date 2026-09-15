@@ -25,7 +25,7 @@ function readSkill(id: string): string {
 }
 
 describe("shipped skills", () => {
-  it("ships exactly the three P8 skills", () => {
+  it("ships exactly the three skills the release tags", () => {
     expect(skillIds).toEqual([
       "wastech-mdlint-fix",
       "wastech-mdlint-impact",
@@ -34,18 +34,15 @@ describe("shipped skills", () => {
   });
 
   // Every static skill's frontmatter validates against the one shared schema.
-  it.each(skillIds)(
-    "validates %s frontmatter against the schema (S1)",
-    (id) => {
-      const result = parseStaticSkill(readSkill(id), `skills/${id}/SKILL.md`);
-      if (!result.ok) {
-        throw new Error(
-          `${id} failed validation: ${JSON.stringify(result.issues, null, 2)}`,
-        );
-      }
-      expect(result.skill.id).toBe(id);
-    },
-  );
+  it.each(skillIds)("validates %s frontmatter against the schema", (id) => {
+    const result = parseStaticSkill(readSkill(id), `skills/${id}/SKILL.md`);
+    if (!result.ok) {
+      throw new Error(
+        `${id} failed validation: ${JSON.stringify(result.issues, null, 2)}`,
+      );
+    }
+    expect(result.skill.id).toBe(id);
+  });
 
   // Host-neutrality — no vendor-specific command injection, no leftover placeholders.
   describe.each(skillIds)("host-neutrality of %s", (id) => {
@@ -72,5 +69,54 @@ describe("shipped skills", () => {
     it("uses the real repository slug", () => {
       expect(body).toContain("VladimirMakarevich/wastech-mdlint");
     });
+  });
+});
+
+// One tag publishes the CLI and tags the skills, so a skill's `compatibility` is a claim about which
+// CLI release it was written against. Nothing but this test connects the two: the field is free
+// prose the frontmatter schema accepts in any shape, and a version bump that misses it leaves three
+// skills confidently naming a version that was never published. That failure is invisible in the
+// repository — every command a skill names still exists here — and only shows up once an agent runs
+// the skill against a CLI whose surface has moved.
+const cliVersion = (
+  JSON.parse(
+    readFileSync(
+      path.resolve(
+        path.dirname(fileURLToPath(import.meta.url)),
+        "../../cli/package.json",
+      ),
+      "utf8",
+    ),
+  ) as { version: string }
+).version;
+
+describe("skill compatibility is coupled to the published CLI version", () => {
+  it.each(skillIds)("%s names the CLI version it ships with", (id) => {
+    const parsed = parseStaticSkill(readSkill(id), `skills/${id}/SKILL.md`);
+    if (!parsed.ok) {
+      throw new Error(`${id} failed validation`);
+    }
+
+    const compatibility = parsed.skill.frontmatter.compatibility;
+
+    // Asserted as present before being matched: the field is optional in the schema, and an absent
+    // one would otherwise satisfy a substring check against `undefined` with no complaint.
+    expect(
+      compatibility,
+      `skills/${id}/SKILL.md declares no compatibility field.`,
+    ).toBeTypeOf("string");
+
+    // Matched as a whole version rather than as a substring, so `0.1.0` is not satisfied by a stray
+    // `10.1.0` or `0.1.09`. The trailing boundary rejects a digit or a further dotted component but
+    // must still allow sentence punctuation, since the version routinely ends a sentence.
+    const wholeVersion = new RegExp(
+      String.raw`(?<![\d.])${cliVersion.replace(/\./g, String.raw`\.`)}(?!\d)(?!\.\d)`,
+    );
+
+    expect(
+      wholeVersion.test(compatibility!),
+      `skills/${id}/SKILL.md compatibility does not name @wastech-mdlint/cli ${cliVersion}: ` +
+        `"${compatibility!}". Bump it in the same change that bumps the package versions.`,
+    ).toBe(true);
   });
 });

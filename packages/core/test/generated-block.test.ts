@@ -104,7 +104,8 @@ describe("generate-docs.mjs splice sites", () => {
     expect(
       source.includes(".replace("),
       "scripts/generate-docs.mjs must not call .replace() directly: generated content used as a " +
-        "replacement string expands `$&`, `` $` ``, `$'` and `$n` (W-55). Splice through " +
+        "replacement string expands `$&`, `` $` ``, `$'` and `$n`, silently corrupting it. Splice " +
+        "through " +
         "replaceGeneratedBlock(), or — for a replace that has nothing to do with generated content " +
         "— pass a replacer function and relax this guard deliberately.",
     ).toBe(false);

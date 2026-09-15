@@ -31,8 +31,8 @@ describe("DEFAULT_EXCLUDE_GLOBS", () => {
   });
 
   it("prunes a noise directory at any depth, not only at the root", () => {
-    // A root-anchored default would have left the nested copy — 2740 of the
-    // field test's 3063 parsed files — in the corpus.
+    // A root-anchored default would have left the nested copy in the corpus. On one measured
+    // monorepo that was 2740 of 3063 parsed files.
     for (const candidate of [
       "node_modules/pkg/README.md",
       "mobile/node_modules/leftpad/README.md",

@@ -1,34 +1,22 @@
-# PR.03 · First-class GitHub Action / reusable CI workflow
+# 03 · Reusable GitHub Action for consumers
 
-> Phase: [P-release — Release](index.md) · Roadmap: [v2 Index](../index.md) · Size **M** · Status **Not started**.
+> Part of the [release checklist](index.md).
 
 ## Goal
 
-Ship a publishable/reusable GitHub Action so consumers run `wastech-mdlint` in CI in one step — a major adoption lever ([I6](../requirements/06-installation.md)).
+Ship a reusable composite Action so a consumer runs `wastech-mdlint` in CI in one step instead of assembling an install-and-run block themselves.
 
-> **Baseline already exists.** `.github/workflows/ci.yml` (verify on the pinned Node 24 line via `.node-version`; a `pack` job matrixed over the three packages) and `.github/workflows/publish.yml` shipped in [P0.07](../P0-foundations/07-ci-packaging-baseline.md). This task adds the _consumer-facing, reusable composite Action_ on top — it does not create CI from scratch.
+This is additive. `.github/workflows/ci.yml` (the workspace verification gate, plus a `pack` job matrixed over the three packages) and `.github/workflows/publish.yml` already exist and are this repository's own CI. What is missing is the consumer-facing half.
 
-## Sequence
+## Steps
 
-- **Previous:** [PR.01 — Package metadata](01-package-metadata.md).
-- **Next:** [PR.05 — Release verification](05-release-verification.md).
-- **Depends on:** PR.01 · **Parallel with:** PR.02, PR.04 · **Blocks:** PR.05.
+1. A composite Action that installs the CLI and runs `lint`, with `--fail-on`, `--config` and `--format` configurable, surfacing findings in the job log.
 
-## Deliverables / steps
+2. Point the workflow template that `init` can drop into a repository at the Action. Until the Action exists, `buildCiWorkflowYaml` in `config-writer.ts` emits a self-contained `npm install` plus `npx wastech-mdlint lint` block, because a template cannot `uses:` something unpublished. Swapping that template is part of this task, not a follow-up: the two will otherwise describe different ways of doing the same thing.
 
-1. A reusable composite Action (`wastech-mdlint`) that installs and runs `lint` with configurable `--fail-on`/`--config`/`--format`, surfacing findings in CI.
-2. A documented workflow snippet (`.github/workflows/wastech-mdlint.yml`) that the [`init` P6.04](../P6-init/04-config-writer-schema.md) optionally drops into a repo. **Until this task lands, P6.04 ships a self-contained `npm install` + `npx wastech-mdlint lint` workflow** (the Action does not exist before P-release); part of this task is swapping that template (`buildCiWorkflowYaml` in `config-writer.ts`) to reference the composite Action via `uses:`.
-3. (Optional) SARIF output mapping from structured findings ([R3](../requirements/02-rules-engine.md)) so results appear in GitHub code scanning.
+3. Optional: map structured findings to SARIF so results appear in GitHub code scanning. The rule engine already produces findings with a path, a line, a column, a rule ID and a severity, which is the whole of what SARIF needs.
 
-## Decisions applied
+## Done when
 
-- [I6](../requirements/06-installation.md) first-class Action · [R3](../requirements/02-rules-engine.md) structured findings → SARIF.
-
-## Exit criteria
-
-- [ ] Reusable Action runs the linter in CI and reports findings.
-- [ ] The `init`-droppable workflow references this Action.
-
-## Hand-off to next
-
-PR.05 includes the Action in the end-to-end launch smoke test.
+- [ ] The Action runs the linter in a consumer repository's CI and reports findings.
+- [ ] The workflow template `init` writes references the Action.

@@ -26,7 +26,7 @@ import type { LintConfig } from "./config-schema.js";
 // (`classifyPrunedDirName`) — is deliberately NOT mirrored here. The two questions have
 // inverted failure modes. Over-pruning the scan is cheap: an unproposed cluster is one `include`
 // edit away. Over-excluding the lint corpus is silent under-reporting — exit `0`, a plausible file
-// count, and the documents most likely to matter never read. Measured on the field-test target,
+// count, and the documents most likely to matter never read. Measured against a real repository,
 // a `**/.*/**` default put 31% of the tracked corpus — agent-instruction and skill trees under
 // dot-directories — outside a zero-config run; this repository has the same shape. What genuinely belongs in a
 // lint-time default is the dependency and build trees that happen to be hidden — `.venv`, `.yarn`,
@@ -37,8 +37,8 @@ import type { LintConfig } from "./config-schema.js";
 // The leading `**/` is load-bearing: `collectMarkdownFiles` prunes these by *basename at every
 // depth* (`repo-scan.ts`), so only a depth-agnostic glob faithfully mirrors what the scan skipped —
 // and on the lint path a root-anchored `<name>/**` default would reproduce the very monorepo
-// under-exclusion this default exists to close (a nested `mobile/node_modules/` was 2740 of the
-// field test's 3063 parsed files). The root-anchored form silently under-delivered on the same
+// under-exclusion this default exists to close: in one measured monorepo a nested
+// `mobile/node_modules/` accounted for 2740 of 3063 parsed files. The root-anchored form silently under-delivered on the same
 // promise inside `init` already. A leading `**/` matches zero leading segments in
 // picomatch, so a root-level `node_modules/` stays pruned too.
 //
