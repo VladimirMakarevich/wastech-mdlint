@@ -13,19 +13,19 @@ on:
 
 permissions:
   contents: read
-  # Required to mint the OIDC token npm signs a provenance attestation with. Needed whether the
-  # publish authenticates by token or by trusted publishing, so this line stays in both modes.
+  # Required to mint the short-lived OIDC token npm exchanges for publish rights, and which it signs
+  # the provenance attestation with. Authentication carries no stored credential: npm holds a trust
+  # relationship between each package and this repository plus this workflow's filename, matched
+  # exactly and case-sensitively. Renaming or moving this file therefore breaks publishing until that
+  # relationship is updated on all three packages, which is why the name is not merely cosmetic.
   id-token: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    # Authentication by granular access token. Moving to npm trusted publishing means deleting this
-    # `env:` block and nothing else: the OIDC permission above and the `--provenance` flags below are
-    # what both modes need. Trusted publishing cannot be configured for a package that does not exist
-    # in the registry yet, so the first release of each package necessarily goes out by token.
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    # No registry credential is set here on purpose. An empty `NODE_AUTH_TOKEN` is not the same as an
+    # absent one: the npmrc that `setup-node` writes would carry an empty auth line, and the registry
+    # answers a blank credential with a rejection rather than falling through to the OIDC exchange.
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -68,11 +68,36 @@ jobs:
       # `core` first, and separately: `cli` and `mcp-server` pin it by exact version, so publishing
       # them against a registry that does not yet carry that `core` version leaves the first consumer
       # to install a dependency that cannot resolve.
+      #
+      # Each step skips a version the registry already carries. The registry refuses to overwrite a
+      # published version, so without the check a release that failed partway cannot be re-run: it
+      # would abort on the package that already succeeded and never reach the ones that did not. The
+      # same check is what lets a tag be pushed for a release published by other means — the earliest
+      # version of each package predates any trust relationship npm could authenticate this workflow
+      # against, so it was published by hand.
       - name: Publish @wastech-mdlint/core
-        run: npm publish -w @wastech-mdlint/core --provenance
+        run: |
+          version="$(node -p "require('./packages/core/package.json').version")"
+          if [ -n "$(npm view "@wastech-mdlint/core@${version}" version 2>/dev/null)" ]; then
+            echo "@wastech-mdlint/core@${version} is already in the registry; nothing to publish."
+          else
+            npm publish -w @wastech-mdlint/core --provenance
+          fi
 
       - name: Publish @wastech-mdlint/cli
-        run: npm publish -w @wastech-mdlint/cli --provenance
+        run: |
+          version="$(node -p "require('./packages/cli/package.json').version")"
+          if [ -n "$(npm view "@wastech-mdlint/cli@${version}" version 2>/dev/null)" ]; then
+            echo "@wastech-mdlint/cli@${version} is already in the registry; nothing to publish."
+          else
+            npm publish -w @wastech-mdlint/cli --provenance
+          fi
 
       - name: Publish @wastech-mdlint/mcp-server
-        run: npm publish -w @wastech-mdlint/mcp-server --provenance
+        run: |
+          version="$(node -p "require('./packages/mcp-server/package.json').version")"
+          if [ -n "$(npm view "@wastech-mdlint/mcp-server@${version}" version 2>/dev/null)" ]; then
+            echo "@wastech-mdlint/mcp-server@${version} is already in the registry; nothing to publish."
+          else
+            npm publish -w @wastech-mdlint/mcp-server --provenance
+          fi
