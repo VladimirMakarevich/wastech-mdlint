@@ -2,7 +2,7 @@
 name: "wastech-mdlint-impact"
 description: "Compute the blast radius of changing a Markdown file with wastech-mdlint: resolve the target, run the CLI impact command (or the MCP impact-analysis tool when available), then report which files are affected directly and transitively, in what reading order, and what a cycle excluded. Use when the user wants to scope the impact of a change before editing, or asks what depends on a document."
 license: "MIT"
-compatibility: "Requires @wastech-mdlint/cli 0.1.0. One tag publishes the CLI and tags the skills together, so a skill and the CLI it drives always carry the same version; do not mix versions."
+compatibility: "Requires @wastech-mdlint/cli 0.1.1. One tag publishes the CLI and tags the skills together, so a skill and the CLI it drives always carry the same version; do not mix versions."
 metadata:
   homepage: "https://github.com/VladimirMakarevich/wastech-mdlint"
   source: "https://github.com/VladimirMakarevich/wastech-mdlint"

@@ -6,9 +6,15 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1]
+
+No functional changes: the published code is byte-identical to `0.1.0`.
+
+What differs is how it was published. `0.1.0` was published by hand, because npm cannot register a trusted publisher for a package that does not yet exist in the registry — the first release of each package necessarily precedes the trust relationship that would authenticate a workflow to publish it. `0.1.1` is the first release published from CI, and therefore the first carrying a provenance attestation linking the tarball to the commit and workflow run that produced it. Prefer it over `0.1.0` for that reason alone.
+
 ## [0.1.0]
 
-First public release.
+First public release. Published manually and carries no provenance attestation; see `0.1.1`.
 
 ### Linting
 
@@ -44,5 +50,6 @@ First public release.
 - Windows, macOS, and Linux are all supported: paths in public output are normalized to repository-relative POSIX form, ordering uses a code-point comparator rather than locale collation, and every product file is written through an atomic temp-and-rename path so a failed write cannot truncate an existing file.
 - All analysis is local. No external HTTP link checking, no link cache, no remote schema resolution, and no install-time file writes.
 
-[unreleased]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/VladimirMakarevich/wastech-mdlint/releases/tag/v0.1.0

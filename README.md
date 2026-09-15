@@ -129,7 +129,7 @@ Three hand-authored, host-neutral Agent Skills ship alongside the packages. They
 | [`wastech-mdlint-impact`](skills/wastech-mdlint-impact/SKILL.md) | Explain the blast radius of changing a document, using `impact` and the context graph. |
 
 ```bash
-gh skill install VladimirMakarevich/wastech-mdlint wastech-mdlint-init --pin v0.1.0
+gh skill install VladimirMakarevich/wastech-mdlint wastech-mdlint-init --pin v0.1.1
 ```
 
 **Pin both halves to the same version.** Each skill's `compatibility` frontmatter names the CLI release it was written against, and a test in this repository fails when the two disagree. A skill installed with `--pin` but driving a bare `@wastech-mdlint/cli` — which resolves to whatever is latest at run time — can still reach a CLI whose surface has moved, so the commands inside each skill request `@wastech-mdlint/cli@<version>` explicitly. Details in [the skills guide](docs/guide/skills.md).

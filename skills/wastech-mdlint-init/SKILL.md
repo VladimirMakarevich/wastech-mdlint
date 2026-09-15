@@ -2,7 +2,7 @@
 name: "wastech-mdlint-init"
 description: "Bootstrap wastech-mdlint in a repository: run the CLI init to scan and infer a config, install the CLI, lint once, then offer a CI workflow and a README section. Use when a repo has no wastech-mdlint.config.json yet or the user asks to set up, adopt, or onboard wastech-mdlint."
 license: "MIT"
-compatibility: "Requires @wastech-mdlint/cli 0.1.0. One tag publishes the CLI and tags the skills together, so a skill and the CLI it drives always carry the same version; do not mix versions."
+compatibility: "Requires @wastech-mdlint/cli 0.1.1. One tag publishes the CLI and tags the skills together, so a skill and the CLI it drives always carry the same version; do not mix versions."
 metadata:
   homepage: "https://github.com/VladimirMakarevich/wastech-mdlint"
   source: "https://github.com/VladimirMakarevich/wastech-mdlint"
