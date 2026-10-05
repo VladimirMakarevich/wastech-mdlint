@@ -6,6 +6,16 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.2]
+
+### Security
+
+- `@wastech-mdlint/core` now depends on `picomatch` directly instead of `micromatch`, which removes `braces` from every installation. `npm audit` reported `braces` as high severity ([GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm): stack exhaustion on deeply nested brace patterns, no patched release), so every repository that installed the linter inherited five high-severity findings. The vulnerable code was never reachable from wastech-mdlint — the matching call it made into `micromatch` already went straight to `picomatch`, which compiles `{a,b}` itself — but the finding could not be cleared without dropping the dependency.
+
+### Changed
+
+- Glob matching keeps the same ordered semantics: a `!` entry subtracts what the entries before it selected, a later entry adds it back, and a list of nothing but negations starts from everything. The pattern compiler moves from `picomatch` 2 to `picomatch` 4, which changes two rare extglob forms: a repeated extglob whose branches are themselves `*(…)` sequences, such as `+(*(a)|*(b))`, now honors every branch instead of only the first; and a trailing `/**` inside an extglob group, such as `test(/utils/**)`, now also matches the directory itself.
+
 ## [0.1.1]
 
 No functional changes: the published code is byte-identical to `0.1.0`.
@@ -50,6 +60,7 @@ First public release. Published manually and carries no provenance attestation; 
 - Windows, macOS, and Linux are all supported: paths in public output are normalized to repository-relative POSIX form, ordering uses a code-point comparator rather than locale collation, and every product file is written through an atomic temp-and-rename path so a failed write cannot truncate an existing file.
 - All analysis is local. No external HTTP link checking, no link cache, no remote schema resolution, and no install-time file writes.
 
-[unreleased]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.1.1...HEAD
+[unreleased]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/VladimirMakarevich/wastech-mdlint/releases/tag/v0.1.0
