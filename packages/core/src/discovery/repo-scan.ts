@@ -110,7 +110,7 @@ function dirnameOf(filePath: string): string {
 // Escaping uses single-character bracket classes (`[x]`) rather than a backslash, because
 // normalizeConfigGlob (discovery/globs.ts) converts every `\` to `/` when normalizing
 // Windows-style separators — a backslash-escaped pattern would be silently unescaped before it
-// ever reaches micromatch. `]` is placed first inside its own class, the bracket-expression
+// ever reaches picomatch. `]` is placed first inside its own class, the bracket-expression
 // convention for a literal `]`. `/` is left untouched — it is the path separator, not a
 // wildcard.
 const GLOB_SPECIAL_CHARS = /[\\*?[\]{}()!+@|]/g;

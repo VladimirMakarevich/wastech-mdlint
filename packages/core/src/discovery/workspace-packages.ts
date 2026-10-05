@@ -1,10 +1,8 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-import micromatch from "micromatch";
-
 import { compareStrings } from "../deterministic-sort.js";
-import { normalizeRelativePath } from "./globs.js";
+import { matchGlobList, normalizeRelativePath } from "./globs.js";
 import {
   DEFAULT_NOISE_DIR_NAMES,
   isPrunedDirName,
@@ -244,14 +242,14 @@ export async function detectWorkspacePackagesWithNoise(
   // empty pnpm `packages:` block) — must suppress the sibling fallback; only the total
   // absence of a declaration should trigger it.
   //
-  // Match the whole list at once (`micromatch(list, patterns)`), not per-dir `isMatch()`:
-  // isMatch() evaluates each candidate against the pattern array in isolation, so an ordered
+  // Match the whole list at once (`matchGlobList`), not each dir against each pattern:
+  // matching a candidate against the pattern array one pattern at a time means an ordered
   // negation like `["packages/*", "!packages/private"]` never actually excludes anything —
   // every candidate independently matches the positive pattern. Matching the list as a whole
   // applies the negation across the set the way npm/Yarn/pnpm workspace globs are specified.
   const matchedDirs =
     resolvedGlobs !== undefined
-      ? micromatch(packageJsonDirs, resolvedGlobs, { dot: true })
+      ? matchGlobList(packageJsonDirs, resolvedGlobs)
       : detectSiblingFallback(packageJsonDirs);
 
   const packages: WorkspacePackage[] = [];

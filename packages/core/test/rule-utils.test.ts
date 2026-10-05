@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   isGlobPattern,
+  matchGlobList,
   matchesConfigGlob,
   normalizeConfigGlob,
 } from "../src/discovery/globs.js";
@@ -157,6 +158,48 @@ describe("matchesConfigGlob ordered negation", () => {
 
 // The anchoring rule is stated for users in the configuration guide;
 // these pin the four shapes that document answers, so the prose cannot drift from the matcher.
+// matchGlobList is the ordered-list algorithm written directly over picomatch, so these pin the
+// list-level behaviors that the per-path cases above cannot see: which entries come back, a later
+// entry restoring what an earlier negation removed, and a leading `!(` counting as a subtraction.
+describe("matchGlobList", () => {
+  it("applies an ordered negation across the whole list, and lets a later entry restore", () => {
+    const dirs = ["packages/a", "packages/private", "packages/b", "apps/web"];
+
+    expect(matchGlobList(dirs, ["packages/*", "!packages/private"])).toEqual([
+      "packages/a",
+      "packages/b",
+    ]);
+    expect(
+      matchGlobList(dirs, ["packages/*", "!packages/*", "packages/b"]),
+    ).toEqual(["packages/b"]);
+  });
+
+  it("starts an all-negated list from the whole list, and an empty one from nothing", () => {
+    expect(matchGlobList(["a.md", "drafts/b.md"], ["!drafts/**"])).toEqual([
+      "a.md",
+    ]);
+    expect(matchGlobList(["a.md"], [])).toEqual([]);
+  });
+
+  it("treats a slash-containing pattern that opens with `!(` as a subtraction", () => {
+    // The guide documents `["docs/**", "!(docs)/**"]` as selecting nothing at all. That only holds
+    // while a parser-reported negated extglob is counted as a negation: read as a plain positive
+    // pattern, it would *add* every path outside `docs` instead of removing the ones inside.
+    const include = ["docs/**", "!(docs)/**"];
+
+    expect(matchesConfigGlob("docs/a.md", include)).toBe(false);
+    expect(matchesConfigGlob("src/a.md", include)).toBe(false);
+  });
+
+  it("matches brace alternatives without a brace-expansion dependency", () => {
+    // `init` proposes `./*.{md,mdx}`, so brace alternatives are load-bearing. picomatch compiles
+    // them into a regex alternation itself; this fails if that ever stops being true.
+    expect(
+      matchGlobList(["a.md", "b.mdx", "c.txt", "docs/d.md"], ["*.{md,mdx}"]),
+    ).toEqual(["a.md", "b.mdx"]);
+  });
+});
+
 describe("matchesConfigGlob anchoring", () => {
   it("matches a slash-free pattern at any depth", () => {
     expect(matchesConfigGlob("NOTE.md", ["NOTE.md"])).toBe(true);

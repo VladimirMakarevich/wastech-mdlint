@@ -1,4 +1,4 @@
-import micromatch from "micromatch";
+import picomatch from "picomatch";
 
 function normalizePathValue(value: string): string {
   return value.replaceAll("\\", "/");
@@ -58,7 +58,66 @@ export function normalizeRelativePath(filePath: string): string {
 // Backslashes are normalized first because picomatch reads `\` as an escape character, which would
 // make a Windows-style `docs\README.md` parse as an escaped literal instead of a path.
 export function isGlobPattern(pattern: string): boolean {
-  return micromatch.scan(normalizePathValue(pattern)).isGlob;
+  return picomatch.scan(normalizePathValue(pattern)).isGlob;
+}
+
+/**
+ * The entries of `list` that `patterns` select, evaluated **in order**: a `!` entry subtracts what the
+ * entries before it selected, a later positive entry adds it back, and so the last entry that matches
+ * a path decides. A pattern list made only of negations starts from the whole list rather than from
+ * nothing, so `["!drafts/**"]` reads as "everything except drafts".
+ *
+ * Each selected entry comes back as picomatch's normalized `output` for it, which on Windows has its
+ * backslashes turned into `/`.
+ */
+export function matchGlobList(
+  list: readonly string[],
+  patterns: readonly string[],
+): string[] {
+  // This is the ordered-list algorithm micromatch runs, written directly over picomatch — which is
+  // all micromatch did for this call — so the selection rules are unchanged while the tree loses
+  // `braces`. That package has no patched release for a stack-exhaustion advisory on deeply nested
+  // brace patterns, so `npm audit` reported it as high severity in every repository that installed
+  // this package, even though nothing here ever called it: picomatch compiles `{a,b}` itself.
+  //
+  // The sets are keyed by `output` rather than by the input string so that two spellings of one
+  // path (`a\b` and `a/b` on Windows) are one entry, and a negation that matched one spelling
+  // removes both.
+  const selected = new Set<string>();
+  const omitted = new Set<string>();
+  const tested = new Set<string>();
+  let negatedCount = 0;
+
+  for (const pattern of patterns) {
+    const matcher = picomatch(pattern, { dot: true }, true);
+    // A pattern that opens with `!(` compiles to a negated extglob, not a negation, yet it still
+    // selects by exclusion — so it subtracts like `!x` and counts toward the all-negations case.
+    const negated =
+      matcher.state.negated || matcher.state.negatedExtglob === true;
+
+    if (negated) {
+      negatedCount += 1;
+    }
+
+    for (const entry of list) {
+      // For a negated pattern `isMatch` is already inverted: false means the path matched the
+      // pattern's body, which is exactly the path the negation subtracts.
+      const { isMatch, output } = matcher(entry, true);
+      tested.add(output);
+
+      if (negated) {
+        if (!isMatch) {
+          omitted.add(output);
+        }
+      } else if (isMatch) {
+        omitted.delete(output);
+        selected.add(output);
+      }
+    }
+  }
+
+  const candidates = negatedCount === patterns.length ? tested : selected;
+  return [...candidates].filter((output) => !omitted.has(output));
 }
 
 /**
@@ -69,27 +128,19 @@ export function matchesConfigGlob(
   filePath: string,
   patterns: string[],
 ): boolean {
-  // Match a one-item list (`micromatch(list, patterns)`) rather than `isMatch(input, patterns)`
-  // — the two are not interchangeable. `isMatch` is a first-truthy OR across the array in which a `!` entry compiles
-  // to an *inverting* matcher, so `["docs/public/**", "!docs/private/**"]` read as "under docs/public
-  // OR not under docs/private" — true for almost every path in a repository. The list form is the
-  // only place micromatch applies negation across a set, and it is the same call shape
-  // `workspace-packages.ts` already uses for the same reason.
+  // Match a one-item list (`matchGlobList`) rather than asking "does any pattern match?" — the two
+  // are not interchangeable. Taken one at a time, a `!` entry compiles to an *inverting* matcher, so
+  // `["docs/public/**", "!docs/private/**"]` would read as "under docs/public OR not under
+  // docs/private" — true for almost every path in a repository. Only the list form applies negation
+  // across the set, and it is the same call `workspace-packages.ts` makes for the same reason.
   //
-  // A one-item list keeps the semantics per-path: micromatch keys its keep/omit sets by the matcher's
-  // `output`, which is derived from the *input* (formatted by the same options for every pattern), so
-  // the sets line up on every platform and no two paths can interact.
-  //
-  // For a list with no negated entry micromatch's `negatives === 0` path reduces to "matched at least
-  // one pattern" — byte-identical to the `isMatch` OR — so nothing changes for a non-negated config,
-  // and an empty list still matches nothing.
+  // A one-item list keeps the semantics per-path: no two paths can interact. With no negated entry
+  // the list form reduces to "matched at least one pattern", so nothing changes for a non-negated
+  // config, and an empty pattern list still matches nothing.
   return (
-    micromatch(
+    matchGlobList(
       [normalizeRelativePath(filePath)],
       normalizeConfigGlobs(patterns),
-      {
-        dot: true,
-      },
     ).length > 0
   );
 }
