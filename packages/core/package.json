@@ -1,7 +1,19 @@
 {
   "name": "@wastech-mdlint/core",
-  "version": "0.1.2",
-  "description": "Core pipeline for wastech-mdlint: parsing, config, rules, graph, and compile.",
+  "version": "0.1.3",
+  "description": "Markdown linter engine behind wastech-mdlint: parsing, config, lint rules, context graph, and compile.",
+  "keywords": [
+    "markdown",
+    "md",
+    "lint",
+    "linter",
+    "markdown-lint",
+    "markdown-linter",
+    "mdlint",
+    "documentation",
+    "llm",
+    "context-graph"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",

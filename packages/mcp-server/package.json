@@ -1,7 +1,22 @@
 {
   "name": "@wastech-mdlint/mcp-server",
-  "version": "0.1.2",
-  "description": "Model Context Protocol server for wastech-mdlint: a stdio-only, read-only adapter over core.",
+  "version": "0.1.3",
+  "description": "MCP server for Markdown linting: read-only Model Context Protocol tools for lint findings, the context graph, and change impact.",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "markdown",
+    "md",
+    "lint",
+    "linter",
+    "markdown-linter",
+    "documentation",
+    "llm",
+    "ai-agents",
+    "agents-md",
+    "claude-md"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -26,7 +41,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@wastech-mdlint/core": "0.1.2",
+    "@wastech-mdlint/core": "0.1.3",
     "zod": "^4"
   },
   "publishConfig": {

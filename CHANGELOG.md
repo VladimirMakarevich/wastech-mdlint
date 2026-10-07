@@ -6,6 +6,14 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.3]
+
+No functional changes: the published code is identical to `0.1.2`.
+
+### Changed
+
+- Every package now declares npm `keywords` and a description that names it as a Markdown linter. npm search matches a query against a package's name, description and keywords; the published manifests carried no keywords and descriptions without the words "lint" or "linter", so a search such as `markdown linter` or `md linter` did not return any of the three packages — only the literal `mdlint` did. Package metadata is read from the published manifest, so changing it takes a new version.
+
 ## [0.1.2]
 
 ### Security
@@ -60,7 +68,8 @@ First public release. Published manually and carries no provenance attestation; 
 - Windows, macOS, and Linux are all supported: paths in public output are normalized to repository-relative POSIX form, ordering uses a code-point comparator rather than locale collation, and every product file is written through an atomic temp-and-rename path so a failed write cannot truncate an existing file.
 - All analysis is local. No external HTTP link checking, no link cache, no remote schema resolution, and no install-time file writes.
 
-[unreleased]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.1.2...HEAD
+[unreleased]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/VladimirMakarevich/wastech-mdlint/releases/tag/v0.1.0
