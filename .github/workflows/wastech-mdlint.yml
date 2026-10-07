@@ -1,0 +1,115 @@
+name: Markdown context
+
+# Lints this repository's own Markdown context with the released CLI, installed from npm the way a
+# consumer installs it. The `verify` job in ci.yml already runs the same config through the CLI built
+# from this checkout (`npm run lint:docs`), on every operating system; this workflow answers the other
+# question — whether the version people actually download still works on a real repository, this one
+# included — and leaves a report of the run in the job summary.
+#
+# `@latest` rather than a pinned version, deliberately. A pin would have to move in its own commit
+# after every publish — the release commit is pushed before its tag, so the version it names is not in
+# the registry yet when CI runs on it — and a pin nobody bumps quietly turns this into a test of an
+# old release. The price: a rule or option added to the config before a release carries it fails
+# this workflow with exit 2 until that release ships.
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  context:
+    # Ubuntu alone: the released CLI's cross-platform behavior is the `verify` matrix's subject, and a
+    # second OS here would only re-download the same tarball.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # On a pull request the checkout is GitHub's merge commit, whose first parent is the base
+          # branch tip. One commit of history beyond it is what lets the impact step diff against it.
+          fetch-depth: 2
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: ".node-version"
+
+      # Installed under the runner's temp directory, not as a devDependency. This workspace already
+      # owns the name `@wastech-mdlint/cli`, so npm resolves that name to the local package, and the
+      # run would exercise this checkout's source while appearing to exercise the release. The
+      # separate prefix is also why there is no `npm ci` here: the released CLI needs none of this
+      # repository's dependencies, and installing them would only give it a chance to pick one up.
+      - name: Install the released CLI
+        run: |
+          npm install --prefix "$RUNNER_TEMP/wastech-mdlint" --no-save --no-package-lock --no-audit --no-fund @wastech-mdlint/cli@latest
+          echo "$RUNNER_TEMP/wastech-mdlint/node_modules/.bin" >> "$GITHUB_PATH"
+
+      # `--fail-on error`, so the budget rules — which report as warnings — land in the summary
+      # without failing the build. The output is captured before the exit status is acted on, because
+      # the summary matters most on exactly the run that fails.
+      - name: Lint
+        run: |
+          version="$(wastech-mdlint --version)"
+          status=0
+          wastech-mdlint lint . --fail-on error > "$RUNNER_TEMP/lint.txt" 2>&1 || status=$?
+          cat "$RUNNER_TEMP/lint.txt"
+          {
+            echo "## Markdown context — wastech-mdlint ${version}"
+            echo
+            echo '```text'
+            cat "$RUNNER_TEMP/lint.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      # Which documents a pull request's Markdown changes reach, so a reviewer sees the blast radius
+      # of an edit to a page other pages link to or a rule file `CLAUDE.md` imports.
+      #
+      # Only files in the lint corpus are nodes of the context graph, and `impact` exits 2 for any
+      # other path — indistinguishable from a real failure — so the changed list is intersected with
+      # the graph first. File names come from the pull request, so they travel NUL-separated and reach
+      # the CLI as one argv entry each behind `--`: never through a shell word, and never parsed as a
+      # flag even when one starts with a dash.
+      #
+      # The summary is a table rendered from the JSON report rather than the text one. A hub page such
+      # as the root README reaches most of the guide, and its full listing — every affected file, then
+      # the reading order — would bury every other row of a pull request that touches it.
+      - name: Impact of changed Markdown
+        if: github.event_name == 'pull_request'
+        run: |
+          git diff -z --name-only --diff-filter=AMR HEAD^1 HEAD -- '*.md' \
+            | jq -Rs 'split("\u0000") | map(select(length > 0))' > "$RUNNER_TEMP/changed.json"
+          wastech-mdlint graph --format json \
+            | jq -j --slurpfile changed "$RUNNER_TEMP/changed.json" \
+                '[.nodes[].path] as $corpus | $changed[0][] | select(IN($corpus[])) | . + "\u0000"' \
+            > "$RUNNER_TEMP/targets"
+          : > "$RUNNER_TEMP/impact.jsonl"
+          while IFS= read -r -d '' file; do
+            status=0
+            wastech-mdlint impact --format json -- "$file" > "$RUNNER_TEMP/impact.json" || status=$?
+            # Exit 1 only means the affected documents carry findings, which the lint step already
+            # gates on; anything higher is the command failing to run, and that must not pass quietly.
+            if [ "$status" -ge 2 ]; then
+              exit "$status"
+            fi
+            jq -c . "$RUNNER_TEMP/impact.json" >> "$RUNNER_TEMP/impact.jsonl"
+          done < "$RUNNER_TEMP/targets"
+          jq -rs '
+            def code: "`" + gsub("\\|"; "\\|") + "`";
+            def names($n): map(.path | code) as $all
+              | ($all[:$n] | join(", "))
+                + (if ($all | length) > $n then ", … +\(($all | length) - $n) more" else "" end);
+            "## Impact of changed Markdown\n",
+            if length == 0 then
+              "No Markdown file in the lint scope changed."
+            else
+              "| Changed file | Directly affected | Transitively affected | Findings in the affected set |",
+              "| --- | --- | --- | --- |",
+              (.[] | "| \(.file | code) | \(.directlyAffected | length)"
+                + (if (.directlyAffected | length) > 0 then ": " + (.directlyAffected | names(8)) else "" end)
+                + " | \(.transitivelyAffected | length)"
+                + " | \(.lint.errorCount) errors, \(.lint.warningCount) warnings |")
+            end
+          ' "$RUNNER_TEMP/impact.jsonl" | tee -a "$GITHUB_STEP_SUMMARY"

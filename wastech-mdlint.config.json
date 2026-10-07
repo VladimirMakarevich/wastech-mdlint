@@ -5,27 +5,87 @@
   // the tool writes for any repository that has the package installed.
   "$schema": "./node_modules/@wastech-mdlint/cli/schema.json",
 
-  // This repository lints its own documentation and nothing else. Whatever a pattern selects is
-  // parsed as Markdown regardless of extension, so the `*.md` tail is load-bearing rather than
-  // decoration — a bare `docs/**` would hand the JSON data files under the docs tree to the Markdown
-  // parser. `./README.md` is anchored on purpose: a pattern with no slash matches at any depth, so
-  // the bare name would also pull in each package's own README, outside the tree this scope covers.
+  // This repository lints the Markdown that a reader or an agent actually loads: the user guide, the
+  // root documents, the agent instructions (`AGENTS.md`, and the `.agents/rules/` pages `CLAUDE.md`
+  // imports along with it), the shipped skills, and each package's README, which is the page npm
+  // renders. The product exists to check exactly this kind of context, so leaving its own out would
+  // mean the files every coding session starts from were the only ones nothing verified.
+  //
+  // Whatever a pattern selects is parsed as Markdown regardless of extension, so the `*.md` tail is
+  // load-bearing rather than decoration — a bare `docs/**` would hand the JSON data files under the
+  // docs tree to the Markdown parser. `./*.md` is anchored on purpose: a pattern with no slash matches
+  // at any depth, so the bare form would sweep in every Markdown file in the repository. Left out on
+  // purpose: the test fixtures under `packages/*/test/`, which are broken by design — a fixture for a
+  // dangling link is a dangling link — and the `tasks/`, `.worc/` and `.claude/` trees, which hold
+  // task files and tool configuration rather than project context.
   //
   // No `exclude` key, deliberately. Dependency and build trees are already pruned by a lint-time
   // default that applies on every run; a list here would EXTEND that default rather than replace it,
   // so restating those directories would be duplication and deleting an entry would change nothing.
-  // No `respectGitignore` either: it is off unless asked for, nothing under the docs tree is
-  // ignored, and a key that changes no behavior is one a later reader has to prove is inert.
-  "include": ["docs/**/*.md", "./README.md"],
+  // No `respectGitignore` either: it is off unless asked for, nothing in this scope is ignored, and a
+  // key that changes no behavior is one a later reader has to prove is inert.
+  "include": [
+    "./*.md",
+    "docs/**/*.md",
+    ".agents/**/*.md",
+    "skills/**/*.md",
+    "packages/*/README.md"
+  ],
 
-  // Two rules, deliberately, not the full set. A gate that reports hundreds of findings on the day
-  // it lands gets ignored and then disabled; these two report zero over this corpus today, so a red
-  // build here means a genuinely broken link or anchor and nothing else. Starting narrow also lets
-  // the gate prove itself before it is asked to carry more.
+  // Not the full rule set, deliberately. A gate that reports hundreds of findings on the day it lands
+  // gets ignored and then disabled; every rule in the first group reports zero over this corpus, so a
+  // red build means a genuinely broken link, anchor, image, empty required table cell, or reference
+  // cycle and nothing else.
   //
   // How this list grows: a rule joins only once a full run over this corpus already reports zero for
   // it, so the gate is never red on the day it changes, and whoever brings it to zero — or any
-  // contributor, where it already is — is the one who adds it here. Next candidate is REF-003
-  // (image targets resolve), which measures zero over this corpus already.
-  "rules": [{ "rule": "REF-001" }, { "rule": "REF-002" }]
+  // contributor, where it already is — is the one who adds it here. CTX-001 is the one that does not
+  // qualify as written: it reports the `Unreleased` heading of `CHANGELOG.md`, which is empty between
+  // releases by the changelog convention rather than by neglect.
+  "rules": [
+    { "rule": "REF-001" },
+    { "rule": "REF-002" },
+    { "rule": "REF-003" },
+    { "rule": "GRP-001" },
+    { "rule": "TBL-002" },
+
+    // The second group is budgets, and both report as warnings. CI runs `lint --fail-on error`, so a
+    // crossed budget shows up in the log and the job summary without failing the build: outgrowing a
+    // budget is a reason to trim, not a defect, and a gate that blocked on it would be loosened the
+    // first time a legitimate change needed the room.
+    //
+    // `CLAUDE.md` eagerly imports `AGENTS.md` and the four `.agents/rules/` pages, so every session
+    // loads that whole closure before it reads a line of code; `AGENTS.md` is the same kind of
+    // entrypoint for agents that read it directly. The closure under `CLAUDE.md` estimated about 7,700
+    // tokens when this budget was set, so 10,000 leaves room for the rules to grow and still reports
+    // before the always-loaded context doubles unnoticed.
+    {
+      "rule": "LLM-001",
+      "options": {
+        "entrypoints": ["./CLAUDE.md", "./AGENTS.md"],
+        "maxTokensPerEntrypoint": 10000
+      }
+    },
+
+    // A skill's `SKILL.md` body is loaded whole the moment the skill triggers, so its size is paid on
+    // every use. The Agent Skills authoring guidance keeps that body under 500 lines and roughly 5,000
+    // tokens; the largest shipped skill sat near 3,600 tokens and 120 lines when this was set.
+    //
+    // The budget sits in an `overrides` entry with no top-level metric, because SIZE-001 takes no
+    // `files` scope: a file that matches no override has no threshold, so it is not measured at all.
+    // The user guide is deliberately unbudgeted — a reference page is read on demand, and its length
+    // is the length of what it documents.
+    {
+      "rule": "SIZE-001",
+      "options": {
+        "overrides": [
+          {
+            "pattern": "skills/**/SKILL.md",
+            "lines": { "warn": 500 },
+            "tokens": { "warn": 5000 }
+          }
+        ]
+      }
+    }
+  ]
 }
