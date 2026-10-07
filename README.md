@@ -43,7 +43,7 @@ npm run build     # tsc -b -> each package's dist/
 npm test          # vitest across all packages
 npm run lint      # eslint across the workspace
 npm run format    # prettier --check . (CI-enforced; run before pushing)
-npm run lint:docs # wastech-mdlint over docs/ + README (CI-enforced; needs npm run build first)
+npm run lint:docs # wastech-mdlint over docs/ and the agent context (CI-enforced; needs npm run build first)
 ```
 
 ## Quick start

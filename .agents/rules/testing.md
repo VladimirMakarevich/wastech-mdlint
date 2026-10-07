@@ -51,9 +51,9 @@ Two suites read this repository's own Markdown rather than a fixture. They are n
 | Guard | What it proves |
 | --- | --- |
 | `packages/core/test/docs-sync.test.ts` | Generated documentation — the README rule table, the MCP tool inventory, the schema — still matches what the registry declares. |
-| `packages/core/test/repo-self-lint-scope.test.ts` | The `include` scope this repository lints itself with still covers every tracked documentation page and nothing outside it, compared in both directions against the tracked-file list, because a narrowed scope looks exactly like a clean run. |
+| `packages/core/test/repo-self-lint-scope.test.ts` | The `include` scope this repository lints itself with still covers every tracked documentation page and agent-context file (root documents, `.agents/rules/`, the skills, each package README) and nothing outside it, compared in both directions against the tracked-file list, because a narrowed scope looks exactly like a clean run. |
 
-`npm run lint:docs` is the third guard, and the only one outside Vitest: it runs this tool over its own documentation and fails on a broken link or anchor.
+`npm run lint:docs` is the third guard, and the only one outside Vitest: it runs this tool over its own documentation and agent context and fails on a broken link, anchor or image, an empty required table cell, or a reference cycle, while reporting context-budget overruns as warnings. The `Markdown context` workflow runs the same config through the release installed from npm, so the version users download is exercised on this repository too.
 
 ## Cross-Platform Expectations
 
@@ -73,7 +73,7 @@ npm test
 npm run build
 ```
 
-Run `npm run lint` and `npm run format` when the task or touched scope makes them relevant, and `npm run lint:docs` when you touched documentation.
+Run `npm run lint` and `npm run format` when the task or touched scope makes them relevant, and `npm run lint:docs` when you touched documentation or agent instructions.
 
 Three facts about these gates that are easy to learn the hard way:
 

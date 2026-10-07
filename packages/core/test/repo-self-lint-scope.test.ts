@@ -56,11 +56,40 @@ function markdownFilesOnDiskUnder(absoluteDir: string): string[] {
   });
 }
 
+// The Markdown a reader or an agent loads: root documents, the user guide, the agent rules, the
+// shipped skills, and each package's README. Everything else that is tracked Markdown — test fixtures
+// that are broken by design, task files, tool configuration under `.worc/` and `.claude/` — is
+// outside it on purpose.
+const SELF_LINT_TREES = ["docs", ".agents", "skills"];
+
 function isSelfLintTarget(relPath: string): boolean {
+  if (!relPath.endsWith(".md")) {
+    return false;
+  }
   return (
-    relPath === "README.md" ||
-    (relPath.startsWith("docs/") && relPath.endsWith(".md"))
+    !relPath.includes("/") ||
+    SELF_LINT_TREES.some((tree) => relPath.startsWith(`${tree}/`)) ||
+    /^packages\/[^/]+\/README\.md$/.test(relPath)
   );
+}
+
+// The second formulation of the same scope, read from the disk rather than matched against a path:
+// root-level Markdown, every Markdown file under each tree, and the README beside each package
+// manifest. If the two ever disagree, one of them has drifted from the scope the config claims.
+function selfLintTargetsOnDisk(): string[] {
+  const rootFiles = readdirSync(repoRoot, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .map((entry) => entry.name);
+  const treeFiles = SELF_LINT_TREES.flatMap((tree) =>
+    markdownFilesOnDiskUnder(path.join(repoRoot, tree)),
+  );
+  const packageReadmes = readdirSync(path.join(repoRoot, "packages"), {
+    withFileTypes: true,
+  })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => `packages/${entry.name}/README.md`)
+    .filter((relPath) => existsSync(path.join(repoRoot, relPath)));
+  return [...rootFiles, ...treeFiles, ...packageReadmes];
 }
 
 // Reading and parsing the whole real corpus is seconds of work — several times the default per-test
@@ -98,7 +127,7 @@ function loadSelfLintCorpus(): Promise<string[]> {
 // themselves rather than to this file.
 describe.skipIf(!hasGit)("repository self-lint scope", () => {
   it(
-    "covers every tracked docs page and the README",
+    "covers every tracked docs page and agent-context file",
     async () => {
       const corpus = new Set(await loadSelfLintCorpus());
       const tracked = new Set(trackedFiles());
@@ -106,27 +135,30 @@ describe.skipIf(!hasGit)("repository self-lint scope", () => {
         .filter(isSelfLintTarget)
         .sort(compareStrings);
 
-      // What the scope *should* contain is derived from the documentation tree itself rather than
-      // asserted against a pinned count. A constant floor is only ever accurate on the day it is
-      // written: the previous one kept passing long after the corpus it described had changed size,
-      // which is the same silence this file exists to break. Reading the tree from disk and
-      // intersecting it with the tracked list keeps both failure directions live — a predicate that
-      // stops matching docs pages, and one that starts matching files outside the docs tree — while
-      // an untracked scratch page a contributor left under `docs/` fails nobody's local run.
+      // What the scope *should* contain is derived from the trees themselves rather than asserted
+      // against a pinned count. A constant floor is only ever accurate on the day it is written: an
+      // earlier one kept passing long after the corpus it described had changed size, which is the
+      // same silence this file exists to break. Reading the trees from disk and intersecting them with
+      // the tracked list keeps both failure directions live — a predicate that stops matching pages it
+      // should, and one that starts matching files outside the scope — while an untracked scratch page
+      // a contributor left under `docs/` fails nobody's local run.
       expect(expected).toEqual(
-        [
-          ...markdownFilesOnDiskUnder(path.join(repoRoot, "docs")).filter(
-            (relPath) => tracked.has(relPath),
-          ),
-          "README.md",
-        ].sort(compareStrings),
+        selfLintTargetsOnDisk()
+          .filter((relPath) => tracked.has(relPath))
+          .sort(compareStrings),
       );
 
-      // An anchor against both sides collapsing together: if the docs tree were emptied or the
-      // predicate stopped matching anything, the equality above would compare two short lists and
-      // pass. The user guide's index is permanent documentation, so its absence from the lint scope
-      // is never the correct state.
-      expect(expected).toContain("docs/guide/README.md");
+      // Anchors against both sides collapsing together: if a tree were emptied or the predicate
+      // stopped matching anything, the equality above would compare two short lists and pass. Each
+      // of these is permanent — the guide's index, and the two agent entrypoints every session loads —
+      // so its absence from the lint scope is never the correct state.
+      expect(expected).toEqual(
+        expect.arrayContaining([
+          "docs/guide/README.md",
+          "AGENTS.md",
+          "CLAUDE.md",
+        ]),
+      );
 
       expect(expected.filter((relPath) => !corpus.has(relPath))).toEqual([]);
     },
@@ -134,13 +166,14 @@ describe.skipIf(!hasGit)("repository self-lint scope", () => {
   );
 
   it(
-    "selects nothing outside the docs tree and the README",
+    "selects nothing outside the docs and agent-context scope",
     async () => {
       const corpus = await loadSelfLintCorpus();
 
       // Checked structurally rather than against git, so an untracked scratch file a contributor left
       // under `docs/` fails nobody's local run — the widening this direction exists to catch is a
-      // pattern that reaches `packages/` or the repository's agent-instruction files, not a draft.
+      // pattern that reaches the deliberately broken test fixtures under `packages/` or the task and
+      // tool trees, not a draft.
       expect(corpus.filter((relPath) => !isSelfLintTarget(relPath))).toEqual(
         [],
       );

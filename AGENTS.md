@@ -71,7 +71,7 @@ npm test
 npm run build
 ```
 
-Use `npm run lint` and `npm run format` when the touched scope needs style verification, and `npm run lint:docs` when you touched documentation.
+Use `npm run lint` and `npm run format` when the touched scope needs style verification, and `npm run lint:docs` when you touched documentation or agent instructions.
 
 **Build before test.** Several suites spawn the built entrypoints in `dist/`, so `npm run typecheck` (which is `tsc -b`, and emits) or `npm run build` has to run first; those suites call a shared `assertBuilt()` and fail with that message rather than a confusing behavioral diff. If the build does not clear it, run `npx tsc -b --force` — `assertBuilt()` compares modification times while `tsc -b` decides up-to-dateness from content, so a source file whose timestamp moved without its content changing leaves `dist/` untouched.
 
