@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { parseStaticSkill } from "../src/skills/parse-static-skill.js";
 
-const PATH = "skills/wastech-mdlint-init/SKILL.md";
+const PATH = "skills/mdlint-init/SKILL.md";
 
 function frontmatter(lines: string[]): string {
   return `---\n${lines.join("\n")}\n---\n\n# Body\n`;
@@ -12,7 +12,7 @@ describe("parseStaticSkill", () => {
   it("accepts a full frontmatter block and derives the id from the path", () => {
     const result = parseStaticSkill(
       frontmatter([
-        'name: "wastech-mdlint-init"',
+        'name: "mdlint-init"',
         'description: "Bootstrap the tool."',
         'license: "MIT"',
         'compatibility: "coupled: same tag"',
@@ -25,7 +25,7 @@ describe("parseStaticSkill", () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.skill.id).toBe("wastech-mdlint-init");
+      expect(result.skill.id).toBe("mdlint-init");
       expect(result.skill.kind).toBe("static");
       expect(result.skill.path).toBe(PATH);
       expect(result.skill.frontmatter.metadata?.homepage).toBe(
@@ -36,7 +36,7 @@ describe("parseStaticSkill", () => {
 
   it("accepts a CRLF-terminated frontmatter block (Windows checkout)", () => {
     const lf = frontmatter([
-      'name: "wastech-mdlint-init"',
+      'name: "mdlint-init"',
       'description: "Bootstrap the tool."',
       "metadata:",
       '  homepage: "https://example.com"',

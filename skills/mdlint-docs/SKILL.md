@@ -1,5 +1,5 @@
 ---
-name: "wastech-mdlint-docs"
+name: "mdlint-docs"
 description: "Keep a repository's Markdown inside its wastech-mdlint size budgets without losing content: find the SIZE-001 and LLM-001 findings, decide who owns each split, draft a split plan from the impact blast radius, split the document by meaning, and verify with lint. Use when a Markdown file is over or near its budget, when an edit will not fit in a file, or when the user asks to split or restructure docs, skills or agent context."
 license: "MIT"
 compatibility: "Requires @wastech-mdlint/cli 0.1.3. One tag publishes the CLI and tags the skills together, so a skill and the CLI it drives always carry the same version; do not mix versions."
@@ -22,7 +22,7 @@ Run the steps in order.
 
 ## 1. Verify setup
 
-Confirm a `wastech-mdlint.config.json` exists: start from the working directory and walk up its ancestors (a nested `docs/` or `packages/foo/` can carry its own config, and `lint` resolves the config by the same walk-up). If none exists, stop and point the user at the `wastech-mdlint-init` skill — do not hand-write a config here. Run every command below from the directory that owns the config.
+Confirm a `wastech-mdlint.config.json` exists: start from the working directory and walk up its ancestors (a nested `docs/` or `packages/foo/` can carry its own config, and `lint` resolves the config by the same walk-up). If none exists, stop and point the user at the `mdlint-init` skill — do not hand-write a config here. Run every command below from the directory that owns the config.
 
 Invoke the CLI through the repository's package manager — there is no reliable bare `wastech-mdlint` binary on `PATH`, and `npx` is npm-specific. Pick the form matching the lockfile in the config's directory (`bun.lock`/`bun.lockb` → bun, `pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, `package-lock.json` → npm):
 
@@ -76,7 +76,7 @@ Before planning, find every document that links to the file you are about to spl
 npx wastech-mdlint impact <file> --format json
 ```
 
-`directlyAffected` lists the documents that link to the file, each with how many `references` it holds — those are the links that may need retargeting once sections move. The `wastech-mdlint-impact` skill covers the rest of this output, and the MCP route when the host exposes it.
+`directlyAffected` lists the documents that link to the file, each with how many `references` it holds — those are the links that may need retargeting once sections move. The `mdlint-impact` skill covers the rest of this output, and the MCP route when the host exposes it.
 
 ## 5. Draft the split plan
 
@@ -113,4 +113,4 @@ Report the new files with their topics, the links you retargeted, and anything s
 
 ## Next steps to mention
 
-Point the user at the companion skills: `wastech-mdlint-fix` for the findings this skill does not handle, and `wastech-mdlint-impact` for the full blast radius of a change. Keep these as pointers — this skill's job ends at a clean `lint` or an honest report of why it is not clean yet.
+Point the user at the companion skills: `mdlint-fix` for the findings this skill does not handle, and `mdlint-impact` for the full blast radius of a change. Keep these as pointers — this skill's job ends at a clean `lint` or an honest report of why it is not clean yet.

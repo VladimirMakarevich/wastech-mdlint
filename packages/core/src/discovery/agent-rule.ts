@@ -29,7 +29,7 @@ export type AgentRuleParams = {
 
 // The companion skill that walks an agent through a split. Named here rather than discovered: the
 // page is written into a repository that has no copy of this one's `skills/` tree to look in.
-const DOCS_SKILL_ID = "wastech-mdlint-docs";
+const DOCS_SKILL_ID = "mdlint-docs";
 const REPOSITORY_SLUG = "VladimirMakarevich/wastech-mdlint";
 
 /**

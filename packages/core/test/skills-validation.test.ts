@@ -27,10 +27,10 @@ function readSkill(id: string): string {
 describe("shipped skills", () => {
   it("ships exactly the four skills the release tags", () => {
     expect(skillIds).toEqual([
-      "wastech-mdlint-docs",
-      "wastech-mdlint-fix",
-      "wastech-mdlint-impact",
-      "wastech-mdlint-init",
+      "mdlint-docs",
+      "mdlint-fix",
+      "mdlint-impact",
+      "mdlint-init",
     ]);
   });
 

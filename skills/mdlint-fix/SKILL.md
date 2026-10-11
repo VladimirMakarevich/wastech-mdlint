@@ -1,5 +1,5 @@
 ---
-name: "wastech-mdlint-fix"
+name: "mdlint-fix"
 description: "Fix wastech-mdlint findings in a repository: run the CLI lint, apply the deterministic core --fix for the mechanically fixable rules, then handle the remaining findings by rule family with AI edits or user confirmation. Use when the user asks to fix, clean up, or resolve wastech-mdlint lint findings in their Markdown."
 license: "MIT"
 compatibility: "Requires @wastech-mdlint/cli 0.1.3. One tag publishes the CLI and tags the skills together, so a skill and the CLI it drives always carry the same version; do not mix versions."
@@ -16,7 +16,7 @@ Run the steps in order.
 
 ## 1. Verify setup
 
-This skill assumes wastech-mdlint is already installed and configured. Confirm a `wastech-mdlint.config.json` exists: start from the working directory and walk up its ancestors (a nested `docs/` or `packages/foo/` can carry its own config, and `lint` resolves the config by the same walk-up). If none exists, stop and point the user at the `wastech-mdlint-init` skill to bootstrap first — do not hand-write a config here.
+This skill assumes wastech-mdlint is already installed and configured. Confirm a `wastech-mdlint.config.json` exists: start from the working directory and walk up its ancestors (a nested `docs/` or `packages/foo/` can carry its own config, and `lint` resolves the config by the same walk-up). If none exists, stop and point the user at the `mdlint-init` skill to bootstrap first — do not hand-write a config here.
 
 Run every command below from the directory that owns the config you found, so the lint scope, the `--fix` writes, and the confirming re-lint all anchor to one project.
 
@@ -32,7 +32,7 @@ The examples below use the npm form; substitute your package manager's form thro
 Then confirm both prerequisites before running the real flow, so a predictable setup gap fails here with a clear message instead of as an opaque shell error mid-flow:
 
 - **No lockfile in the config's directory.** The runner mapping above has nothing to key on, so do not silently assume one — ask the user which package manager should run the CLI, and carry that choice through every command below.
-- **The CLI does not resolve.** Verify the chosen runner can actually execute the CLI (e.g. `npx wastech-mdlint --version`, or the `pnpm exec`/`yarn`/`bunx` equivalent). If it cannot — a missing or unbuilt install — stop and route the user to the `wastech-mdlint-init` skill; this fix skill does not install the CLI itself.
+- **The CLI does not resolve.** Verify the chosen runner can actually execute the CLI (e.g. `npx wastech-mdlint --version`, or the `pnpm exec`/`yarn`/`bunx` equivalent). If it cannot — a missing or unbuilt install — stop and route the user to the `mdlint-init` skill; this fix skill does not install the CLI itself.
 
 ## 2. Assess the findings
 
@@ -95,4 +95,4 @@ Report counts honestly against these snapshots; do not claim a family is resolve
 
 ## Next steps to mention
 
-Point the user at the companion skills for day-to-day use: `wastech-mdlint-init` to set up or reconfigure the linter, and `wastech-mdlint-impact` to scope the blast radius of a change before editing. Keep these as pointers — this skill's job ends at a summarized, re-linted result.
+Point the user at the companion skills for day-to-day use: `mdlint-init` to set up or reconfigure the linter, and `mdlint-impact` to scope the blast radius of a change before editing. Keep these as pointers — this skill's job ends at a summarized, re-linted result.

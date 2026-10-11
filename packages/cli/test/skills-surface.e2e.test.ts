@@ -23,14 +23,14 @@ function readSkill(id: string): string {
   return readFileSync(path.join(skillsDir, id, "SKILL.md"), "utf8");
 }
 
-const docsSkill = readSkill("wastech-mdlint-docs");
-const fixSkill = readSkill("wastech-mdlint-fix");
-const impactSkill = readSkill("wastech-mdlint-impact");
+const docsSkill = readSkill("mdlint-docs");
+const fixSkill = readSkill("mdlint-fix");
+const impactSkill = readSkill("mdlint-impact");
 const skillBodies = [
   docsSkill,
   fixSkill,
   impactSkill,
-  readSkill("wastech-mdlint-init"),
+  readSkill("mdlint-init"),
 ];
 const allSkillText = skillBodies.join("\n");
 

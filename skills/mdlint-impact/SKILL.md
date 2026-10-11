@@ -1,5 +1,5 @@
 ---
-name: "wastech-mdlint-impact"
+name: "mdlint-impact"
 description: "Compute the blast radius of changing a Markdown file with wastech-mdlint: resolve the target, run the CLI impact command (or the MCP impact-analysis tool when available), then report which files are affected directly and transitively, in what reading order, and what a cycle excluded. Use when the user wants to scope the impact of a change before editing, or asks what depends on a document."
 license: "MIT"
 compatibility: "Requires @wastech-mdlint/cli 0.1.3. One tag publishes the CLI and tags the skills together, so a skill and the CLI it drives always carry the same version; do not mix versions."
@@ -16,7 +16,7 @@ Run the steps in order.
 
 ## 1. Verify setup
 
-This skill assumes wastech-mdlint is already installed and configured. Confirm a `wastech-mdlint.config.json` exists: start from the working directory and walk up its ancestors (a nested `docs/` or `packages/foo/` can carry its own config, and the impact engine resolves the config by the same walk-up). If none exists, stop and point the user at the `wastech-mdlint-init` skill to bootstrap first — do not hand-write a config here.
+This skill assumes wastech-mdlint is already installed and configured. Confirm a `wastech-mdlint.config.json` exists: start from the working directory and walk up its ancestors (a nested `docs/` or `packages/foo/` can carry its own config, and the impact engine resolves the config by the same walk-up). If none exists, stop and point the user at the `mdlint-init` skill to bootstrap first — do not hand-write a config here.
 
 Run every command below from the directory that owns the config you found, so the corpus the graph is built from is the project you mean to analyze.
 
@@ -86,4 +86,4 @@ If the user wants to know which documents are hubs (high fan-in/fan-out) rather 
 
 ## Next steps to mention
 
-Point the user at the companion skills as follow-ups: `wastech-mdlint-fix` to resolve any findings this analysis surfaced (especially the `lint` findings from the CLI path), and `wastech-mdlint-init` if step 1 turned up a setup gap. Keep these as pointers — this skill's job ends at a reported blast radius.
+Point the user at the companion skills as follow-ups: `mdlint-fix` to resolve any findings this analysis surfaced (especially the `lint` findings from the CLI path), and `mdlint-init` if step 1 turned up a setup gap. Keep these as pointers — this skill's job ends at a reported blast radius.

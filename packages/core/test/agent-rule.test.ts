@@ -78,7 +78,7 @@ describe("buildAgentRuleMarkdown", () => {
 
   it("pins the companion skill to the CLI version writing the page", () => {
     expect(buildAgentRuleMarkdown(ROOT_INSTALLED)).toContain(
-      "`gh skill install VladimirMakarevich/wastech-mdlint wastech-mdlint-docs --pin v9.8.7`",
+      "`gh skill install VladimirMakarevich/wastech-mdlint mdlint-docs --pin v9.8.7`",
     );
   });
 

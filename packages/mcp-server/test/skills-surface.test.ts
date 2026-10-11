@@ -17,7 +17,7 @@ import { createServer } from "../src/index.js";
 const impactSkill = readFileSync(
   path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
-    "../../../skills/wastech-mdlint-impact/SKILL.md",
+    "../../../skills/mdlint-impact/SKILL.md",
   ),
   "utf8",
 );

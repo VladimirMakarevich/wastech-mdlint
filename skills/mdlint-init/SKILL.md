@@ -1,5 +1,5 @@
 ---
-name: "wastech-mdlint-init"
+name: "mdlint-init"
 description: "Bootstrap wastech-mdlint in a repository: run the CLI init to scan and infer a config, install the CLI, lint once, then offer a CI workflow and a README section. Use when a repo has no wastech-mdlint.config.json yet or the user asks to set up, adopt, or onboard wastech-mdlint."
 license: "MIT"
 compatibility: "Requires @wastech-mdlint/cli 0.1.3. One tag publishes the CLI and tags the skills together, so a skill and the CLI it drives always carry the same version; do not mix versions."
@@ -111,7 +111,7 @@ Ask whether the user wants a short wastech-mdlint section added to their `README
 
 This repository uses [wastech-mdlint](https://github.com/VladimirMakarevich/wastech-mdlint) to lint its Markdown.
 
-- Install this bootstrap skill (pin to a release so the skill and CLI stay on one tag): `gh skill install VladimirMakarevich/wastech-mdlint wastech-mdlint-init --pin vX.Y.Z`.
+- Install this bootstrap skill (pin to a release so the skill and CLI stay on one tag): `gh skill install VladimirMakarevich/wastech-mdlint mdlint-init --pin vX.Y.Z`.
 - Lint: run via your package manager — `npx wastech-mdlint lint` (npm), `pnpm exec wastech-mdlint lint`, `yarn wastech-mdlint lint`, or `bunx wastech-mdlint lint`.
 - Configuration lives in `<config path init reported>` (the repository-relative path from `init`'s write summary — often `wastech-mdlint.config.json` at the root, but a subdirectory target lands elsewhere, e.g. `docs/wastech-mdlint.config.json`).
 ```
@@ -120,4 +120,4 @@ If the user also wants the CLI-package install noted, keep it secondary and pinn
 
 ## Next steps to mention
 
-Once the repo lints cleanly, point the user at the companion skills for day-to-day use: `wastech-mdlint-impact` to scope the blast radius of a change, `wastech-mdlint-fix` to apply fixes, and `wastech-mdlint-docs` to split a document that outgrows its size budget. Keep these as pointers — this skill's job ends at a working `lint`.
+Once the repo lints cleanly, point the user at the companion skills for day-to-day use: `mdlint-impact` to scope the blast radius of a change, `mdlint-fix` to apply fixes, and `mdlint-docs` to split a document that outgrows its size budget. Keep these as pointers — this skill's job ends at a working `lint`.

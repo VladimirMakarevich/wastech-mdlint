@@ -124,13 +124,13 @@ Four hand-authored, host-neutral Agent Skills ship alongside the packages. They 
 
 | Skill | Purpose |
 | --- | --- |
-| [`wastech-mdlint-init`](skills/wastech-mdlint-init/SKILL.md) | Scan a repository and produce a sensible `wastech-mdlint.config.json` via `init`. |
-| [`wastech-mdlint-fix`](skills/wastech-mdlint-fix/SKILL.md) | Fix findings by rule family, delegating the mechanically fixable ones to the deterministic `--fix`. |
-| [`wastech-mdlint-impact`](skills/wastech-mdlint-impact/SKILL.md) | Explain the blast radius of changing a document, using `impact` and the context graph. |
-| [`wastech-mdlint-docs`](skills/wastech-mdlint-docs/SKILL.md) | Split a document that outgrows its `SIZE-001` or `LLM-001` budget by meaning, without dropping any of its content. |
+| [`mdlint-init`](skills/mdlint-init/SKILL.md) | Scan a repository and produce a sensible `wastech-mdlint.config.json` via `init`. |
+| [`mdlint-fix`](skills/mdlint-fix/SKILL.md) | Fix findings by rule family, delegating the mechanically fixable ones to the deterministic `--fix`. |
+| [`mdlint-impact`](skills/mdlint-impact/SKILL.md) | Explain the blast radius of changing a document, using `impact` and the context graph. |
+| [`mdlint-docs`](skills/mdlint-docs/SKILL.md) | Split a document that outgrows its `SIZE-001` or `LLM-001` budget by meaning, without dropping any of its content. |
 
 ```bash
-gh skill install VladimirMakarevich/wastech-mdlint wastech-mdlint-init --pin v0.1.3
+gh skill install VladimirMakarevich/wastech-mdlint mdlint-init --pin v0.1.3
 ```
 
 **Pin both halves to the same version.** Each skill's `compatibility` frontmatter names the CLI release it was written against, and a test in this repository fails when the two disagree. A skill installed with `--pin` but driving a bare `@wastech-mdlint/cli` — which resolves to whatever is latest at run time — can still reach a CLI whose surface has moved, so the commands inside each skill request `@wastech-mdlint/cli@<version>` explicitly. Details in [the skills guide](docs/guide/skills.md).

@@ -6,10 +6,10 @@
 
 | Skill | Purpose |
 | --- | --- |
-| [`wastech-mdlint-init`](../../skills/wastech-mdlint-init/SKILL.md) | Bootstrap: scan the repo and produce a sensible `wastech-mdlint.config.json` via `init`. |
-| [`wastech-mdlint-fix`](../../skills/wastech-mdlint-fix/SKILL.md) | Fix findings by rule prefix — delegating mechanical fixes to the deterministic `--fix`, reserving judgement for the AI. |
-| [`wastech-mdlint-impact`](../../skills/wastech-mdlint-impact/SKILL.md) | Explain the blast radius of a change using `impact` / the graph. |
-| [`wastech-mdlint-docs`](../../skills/wastech-mdlint-docs/SKILL.md) | Split a document that outgrows its `SIZE-001` / `LLM-001` budget by meaning, never by cutting content. |
+| [`mdlint-init`](../../skills/mdlint-init/SKILL.md) | Bootstrap: scan the repo and produce a sensible `wastech-mdlint.config.json` via `init`. |
+| [`mdlint-fix`](../../skills/mdlint-fix/SKILL.md) | Fix findings by rule prefix — delegating mechanical fixes to the deterministic `--fix`, reserving judgement for the AI. |
+| [`mdlint-impact`](../../skills/mdlint-impact/SKILL.md) | Explain the blast radius of a change using `impact` / the graph. |
+| [`mdlint-docs`](../../skills/mdlint-docs/SKILL.md) | Split a document that outgrows its `SIZE-001` / `LLM-001` budget by meaning, never by cutting content. |
 
 ## Host-neutral by design
 
@@ -21,7 +21,7 @@ Each `SKILL.md` carries `name`, `description`, `license`, `compatibility`, and `
 
 ## `-fix` delegation policy
 
-`wastech-mdlint-fix` reads the fixable set from the generated rule table (currently [SEC-001](rules/SEC-001.md) and [TBL-002](rules/TBL-002.md)) rather than hardcoding it, runs core `--fix` for those, and leaves non-mechanical findings for human/AI judgement.
+`mdlint-fix` reads the fixable set from the generated rule table (currently [SEC-001](rules/SEC-001.md) and [TBL-002](rules/TBL-002.md)) rather than hardcoding it, runs core `--fix` for those, and leaves non-mechanical findings for human/AI judgement.
 
 ## Generated vs. static skills
 
