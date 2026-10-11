@@ -13,7 +13,7 @@ wastech-mdlint compile --outdir build/skill
 wastech-mdlint compile --cwd packages/docs
 ```
 
-- Output path precedence: `--outdir` → `config.compile.outdir` → `.claude/skills/wastech-mdlint/`. The file is always named `SKILL.md`.
+- Output path precedence: `--outdir` → `config.compile.outdir` → `.claude/skills/mdlint/`. The file is always named `SKILL.md`.
 - **The default outdir is inside the default lint corpus.** Nothing is excluded merely for starting with a dot, so a later `lint` reads the `SKILL.md` this command generated — a parse and no findings on the zero-config path, and governed by your `include` once you have a config. Retarget `outdir` if you would rather it stay out of scope; see [what is excluded before you write anything](configuration.md#what-is-excluded-before-you-write-anything).
 - Unlike other commands, `compile` takes `--cwd` (not `[path]`), and resolves a relative `--outdir` against it. A relative `--config` resolves against `--cwd` too — not as a compile-specific rule, but because every command resolves `--config` against the directory it analyzes (see [CLI reference](cli.md#lint-default)).
 - An `--outdir` that resolves outside `--cwd` is reported by its **absolute** path, in the success line and in a write failure alike; one inside is reported repository-relative with `/` separators, as everywhere else.
@@ -58,7 +58,7 @@ The corpus total and the per-entrypoint breaches in that block come from the sam
 
 ```jsonc
 "compile": {
-  "outdir": ".claude/skills/wastech-mdlint",
+  "outdir": ".claude/skills/mdlint",
   "skill": {
     "name": "my-project-context",              // required, non-empty
     "description": "Docs context for my project" // required, non-empty

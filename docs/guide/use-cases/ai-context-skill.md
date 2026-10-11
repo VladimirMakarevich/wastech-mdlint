@@ -7,7 +7,7 @@
 ```jsonc
 {
   "compile": {
-    "outdir": ".claude/skills/wastech-mdlint",
+    "outdir": ".claude/skills/mdlint",
     "skill": {
       "name": "my-project-context",
       "description": "Docs context for my project",

@@ -99,7 +99,7 @@ Generates a deterministic [`SKILL.md`](compile.md) from the document graph, rule
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--config <file>` | auto | Config file. Resolved against `--cwd`. |
-| `--outdir <dir>` | `config.compile.outdir` → `.claude/skills/wastech-mdlint/` | Where to write `SKILL.md`. Resolved against `--cwd`. |
+| `--outdir <dir>` | `config.compile.outdir` → `.claude/skills/mdlint/` | Where to write `SKILL.md`. Resolved against `--cwd`. |
 | `--dry-run` | — | Print the generated content to stdout instead of writing. |
 | `--cwd <dir>` | cwd | Working directory to compile from; must be an existing directory (exits `2` otherwise). |
 

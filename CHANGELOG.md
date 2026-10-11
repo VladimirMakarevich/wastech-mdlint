@@ -14,6 +14,7 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - The Agent Skills drop the `wastech-` prefix: `wastech-mdlint-init`, `wastech-mdlint-fix` and `wastech-mdlint-impact` are now `mdlint-init`, `mdlint-fix` and `mdlint-impact`, so a skill is shorter to install and to invoke. They keep the `mdlint-` part rather than becoming bare `init` or `fix`, which would collide with a host's own built-in commands and with other projects' skills. Install by the new name — `gh skill install VladimirMakarevich/wastech-mdlint mdlint-init --pin vX.Y.Z` — from this release on; tags up to `v0.1.3` still carry only the old names. The packages, the `wastech-mdlint` and `wastech-mdlint-mcp` binaries and the config file name are unchanged.
+- `compile` writes to `.claude/skills/mdlint/` by default instead of `.claude/skills/wastech-mdlint/`, matching the shorter skill names. A config that sets `compile.outdir` is unaffected. One that relied on the default leaves the previous release's `SKILL.md` behind, and an agent host would load it as a second, stale copy of the same skill — so `compile` names that file in its output when it finds it, and leaves deleting it (or setting `compile.outdir` back to the old directory) to you.
 
 ## [0.1.3]
 

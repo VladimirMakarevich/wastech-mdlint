@@ -43,7 +43,14 @@ import { formatWriteFailure, toWriteTargetPath } from "./operational-errors.js";
 
 // Resolution order: an explicit `--outdir` wins, then `config.compile.outdir`, then this
 // fallback, which is the path the documented example configs use.
-const DEFAULT_COMPILE_OUTDIR = ".claude/skills/wastech-mdlint/";
+const DEFAULT_COMPILE_OUTDIR = ".claude/skills/mdlint/";
+
+// The fallback up to 0.1.3. A repository that relied on it still has that release's `SKILL.md`
+// there after upgrading, and since both files carry the same configured skill `name`, an agent host
+// would load two copies of one skill — the stale one included — with nothing reporting it. So a run
+// that used the default says so when the old file is present, rather than deleting a file in a
+// directory the user may have since put to other use.
+const LEGACY_DEFAULT_COMPILE_OUTDIR = ".claude/skills/wastech-mdlint/";
 
 // The whole exit-code taxonomy, in one place because the distinction is load-bearing for
 // CI: `1` means *the linter found problems*, `2` means *the command could not run*. `1` is therefore
@@ -428,6 +435,16 @@ async function handleSchema(
   };
 }
 
+// `stat` rather than an `access` check so a directory sitting at the path does not count: only a
+// leftover `SKILL.md` file is something an agent host would load.
+async function isFile(absolutePath: string): Promise<boolean> {
+  try {
+    return (await stat(absolutePath)).isFile();
+  } catch {
+    return false;
+  }
+}
+
 // `compile`: core owns generation (`compileContext`); this handler only resolves `outdir`
 // and does the file I/O, matching the core-hosts-the-pipeline decision.
 async function handleCompile(
@@ -458,6 +475,8 @@ async function handleCompile(
     return { output: result.skillContent, exitCode: EXIT_CODE_SUCCESS };
   }
 
+  const usedDefaultOutdir =
+    command.outdir === undefined && loaded.config.compile?.outdir === undefined;
   const outdirSetting =
     command.outdir ?? loaded.config.compile?.outdir ?? DEFAULT_COMPILE_OUTDIR;
   const resolvedOutdir = path.resolve(command.cwd, outdirSetting);
@@ -476,10 +495,21 @@ async function handleCompile(
     throw new CliUsageError(formatWriteFailure(outputPathForUser, error));
   }
 
-  return {
-    output: `SKILL.md written to ${outputPathForUser}\n`,
-    exitCode: EXIT_CODE_SUCCESS,
-  };
+  let output = `SKILL.md written to ${outputPathForUser}\n`;
+  const legacyPath = path.join(
+    command.cwd,
+    LEGACY_DEFAULT_COMPILE_OUTDIR,
+    "SKILL.md",
+  );
+  if (usedDefaultOutdir && (await isFile(legacyPath))) {
+    output +=
+      `Note: ${toWriteTargetPath(command.cwd, legacyPath)} is still there from an earlier ` +
+      "release, which wrote compile's output to that directory by default. An agent host loads " +
+      "both files as skills, so delete that directory — or set compile.outdir to it to keep " +
+      "writing there instead.\n";
+  }
+
+  return { output, exitCode: EXIT_CODE_SUCCESS };
 }
 
 // The exit code for each way `init` can end. A switch rather than a predicate so the `never` check

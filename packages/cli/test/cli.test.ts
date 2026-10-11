@@ -34,7 +34,9 @@ async function fixtureRepo(files: Record<string, string>): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-cli-"));
   tempDirs.push(root);
   for (const [relativePath, content] of Object.entries(files)) {
-    await writeFile(path.join(root, relativePath), content, "utf8");
+    const absolutePath = path.join(root, relativePath);
+    await mkdir(path.dirname(absolutePath), { recursive: true });
+    await writeFile(absolutePath, content, "utf8");
   }
   return root;
 }
@@ -385,7 +387,7 @@ describe("compile command", () => {
     compile: { skill: { name: "docs-skill", description: "Docs skill" } },
   });
 
-  it("writes SKILL.md to the default .claude/skills/wastech-mdlint/ outdir", async () => {
+  it("writes SKILL.md to the default .claude/skills/mdlint/ outdir", async () => {
     const cwd = await fixtureRepo({
       "a.md": "# A\n",
       "wastech-mdlint.config.json": compileConfig,
@@ -395,12 +397,62 @@ describe("compile command", () => {
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
 
     // Repository-relative POSIX path (invariant), not an absolute host path.
-    expect(result.stdout).toContain(".claude/skills/wastech-mdlint/SKILL.md");
+    expect(result.stdout).toContain(".claude/skills/mdlint/SKILL.md");
     expect(result.stdout).not.toContain(cwd);
 
-    const outputPath = path.join(cwd, ".claude/skills/wastech-mdlint/SKILL.md");
+    const outputPath = path.join(cwd, ".claude/skills/mdlint/SKILL.md");
     const written = await readFile(outputPath, "utf8");
     expect(written).toContain('name: "docs-skill"');
+  });
+
+  // The default directory was renamed, so a repository that relied on the old default still holds
+  // that release's SKILL.md after upgrading — a second, stale copy of the same skill for any agent
+  // host. The run has to say so, and must not touch a file it did not write this time.
+  it("points out a SKILL.md left at the pre-rename default outdir, without touching it", async () => {
+    const legacy = '---\nname: "docs-skill"\ndescription: "old"\n---\n';
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": compileConfig,
+      ".claude/skills/wastech-mdlint/SKILL.md": legacy,
+    });
+
+    const result = await run(["compile", "--cwd", cwd], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain(
+      "SKILL.md written to .claude/skills/mdlint/SKILL.md",
+    );
+    expect(result.stdout).toContain(
+      "Note: .claude/skills/wastech-mdlint/SKILL.md is still there from an earlier release",
+    );
+    await expect(
+      readFile(
+        path.join(cwd, ".claude/skills/wastech-mdlint/SKILL.md"),
+        "utf8",
+      ),
+    ).resolves.toBe(legacy);
+  });
+
+  // An explicit outdir is a choice the user already made about where the skill lives, so a file in
+  // the old default directory is not compile's to comment on — it may be exactly where they point.
+  it("says nothing about the pre-rename directory when an outdir is configured", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        compile: {
+          outdir: ".claude/skills/wastech-mdlint",
+          skill: { name: "docs-skill", description: "Docs skill" },
+        },
+      }),
+      ".claude/skills/wastech-mdlint/SKILL.md": "old\n",
+    });
+
+    const result = await run(["compile", "--cwd", cwd], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toBe(
+      "SKILL.md written to .claude/skills/wastech-mdlint/SKILL.md\n",
+    );
   });
 
   it("resolves a relative --config path against --cwd, not the process cwd", async () => {
@@ -420,7 +472,7 @@ describe("compile command", () => {
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
 
     const written = await readFile(
-      path.join(cwd, ".claude/skills/wastech-mdlint/SKILL.md"),
+      path.join(cwd, ".claude/skills/mdlint/SKILL.md"),
       "utf8",
     );
     expect(written).toContain('name: "docs-skill"');
@@ -477,10 +529,7 @@ describe("compile command", () => {
     expect(result.stdout).toContain('name: "docs-skill"');
 
     await expect(
-      readFile(
-        path.join(cwd, ".claude/skills/wastech-mdlint/SKILL.md"),
-        "utf8",
-      ),
+      readFile(path.join(cwd, ".claude/skills/mdlint/SKILL.md"), "utf8"),
     ).rejects.toThrow();
   });
 

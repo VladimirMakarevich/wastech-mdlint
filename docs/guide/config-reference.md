@@ -351,8 +351,8 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
   // Config for the `compile` command (generates SKILL.md). Required by that command; `skill` is
   // mandatory inside it.
   "compile": {
-    // Where `compile` writes SKILL.md. Precedence: --outdir flag → this → .claude/skills/wastech-mdlint/
-    "outdir": ".claude/skills/wastech-mdlint",
+    // Where `compile` writes SKILL.md. Precedence: --outdir flag → this → .claude/skills/mdlint/
+    "outdir": ".claude/skills/mdlint",
     "skill": {
       "name": "my-project-context", // required, non-empty
       "description": "Project docs context skill", // required, non-empty

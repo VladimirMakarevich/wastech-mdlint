@@ -549,7 +549,7 @@ describe("compile config", () => {
       JSON.stringify({
         rules: [],
         compile: {
-          outdir: ".claude/skills/wastech-mdlint",
+          outdir: ".claude/skills/mdlint",
           skill: { name: "docs-skill", description: "Docs skill" },
           sections: {
             architecture: true,
@@ -565,7 +565,7 @@ describe("compile config", () => {
 
     const loaded = await loadConfiguration({ cwd: root, registry });
     expect(loaded.config.compile).toEqual({
-      outdir: ".claude/skills/wastech-mdlint",
+      outdir: ".claude/skills/mdlint",
       skill: { name: "docs-skill", description: "Docs skill" },
       sections: {
         architecture: true,
