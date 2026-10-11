@@ -45,6 +45,7 @@ import {
   type InitPrompter,
 } from "../src/init-command.js";
 import {
+  buildAgentRulePromptConfig,
   buildCiWorkflowPromptConfig,
   buildExistingConfigActionPromptConfig,
   buildPackageManagerPromptConfig,
@@ -132,6 +133,7 @@ function createDefaultFakePrompter(
       overrides.selectCategories ?? (async (categories) => categories),
     confirmDraft: overrides.confirmDraft ?? (async () => true),
     confirmCiWorkflow: overrides.confirmCiWorkflow ?? (async () => false),
+    confirmAgentRule: overrides.confirmAgentRule ?? (async () => false),
   };
 }
 
@@ -1710,6 +1712,251 @@ describe("init command · writing the config", () => {
   });
 });
 
+describe("init command · agent rule", () => {
+  const AGENT_RULE = path.join(".agents", "rules", "wastech-mdlint.md");
+
+  it("--yes --with-agent-rule writes the page and says what it is, where, and that nothing loads it", async () => {
+    const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+
+    const result = await run(["init", cwd, "--yes", "--with-agent-rule"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain(
+      "Wrote agent rule .agents/rules/wastech-mdlint.md — how coding agents should lint",
+    );
+    // The disclosure the offer exists to make: the page is inert until the user wires it in, and
+    // the two ways of doing that cost different things.
+    expect(result.stdout).toContain("Nothing loads it yet");
+    expect(result.stdout).toContain("counts toward LLM-001");
+    const page = await readFile(path.join(cwd, AGENT_RULE), "utf8");
+    expect(page).toContain("# Markdown documents and wastech-mdlint");
+    // Nothing is installed in the fixture, so the page must not send agents to a binary that does
+    // not resolve.
+    expect(page).toContain("npx -y @wastech-mdlint/cli@");
+  });
+
+  it("plain --yes writes no agent rule", async () => {
+    const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+
+    const result = await run(["init", cwd, "--yes"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).not.toContain("agent rule");
+    await expect(
+      readFile(path.join(cwd, AGENT_RULE), "utf8"),
+    ).rejects.toThrow();
+  });
+
+  it("--on-existing skip writes no agent rule, even with --with-agent-rule", async () => {
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      [CONFIG_FILE]: "{}\n",
+    });
+
+    const result = await run(
+      ["init", cwd, "--yes", "--on-existing", "skip", "--with-agent-rule"],
+      cwd,
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    await expect(
+      readFile(path.join(cwd, AGENT_RULE), "utf8"),
+    ).rejects.toThrow();
+  });
+
+  // The page belongs to the repository root, where agent context is read from, while a nested
+  // config is invisible from there — so the page has to name the config's directory.
+  it("anchors the page at the git root and points it at a nested config's directory", async () => {
+    const cwd = await fixtureRepo(
+      withInstalledSchema({
+        ...CROSS_LINKED_DOCS_FIXTURE,
+        ".git/HEAD": "ref: refs/heads/main\n",
+        "pnpm-lock.yaml": "lockfileVersion: '9.0'\n",
+      }),
+    );
+
+    const result = await run(
+      ["init", "docs", "--yes", "--with-agent-rule"],
+      cwd,
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain(
+      "Wrote agent rule .agents/rules/wastech-mdlint.md",
+    );
+    const page = await readFile(path.join(cwd, AGENT_RULE), "utf8");
+    expect(page).toContain("`docs/wastech-mdlint.config.json`");
+    expect(page).toContain("Run the linter from `docs/`");
+    await expect(
+      readFile(path.join(cwd, "docs", AGENT_RULE), "utf8"),
+    ).rejects.toThrow();
+  });
+
+  it("uses the detected package manager once the CLI is installed", async () => {
+    const cwd = await fixtureRepo(
+      withInstalledSchema({
+        ...CROSS_LINKED_DOCS_FIXTURE,
+        "pnpm-lock.yaml": "lockfileVersion: '9.0'\n",
+      }),
+    );
+
+    await run(["init", cwd, "--yes", "--with-agent-rule"], cwd);
+
+    const page = await readFile(path.join(cwd, AGENT_RULE), "utf8");
+    expect(page).toContain("`pnpm exec wastech-mdlint lint`");
+    expect(page).not.toContain("@wastech-mdlint/cli@");
+  });
+
+  // The page is meant to be edited; a re-run of `init` must not undo those edits, and must say it
+  // kept the file rather than stay silent, which would read the same as never offering it.
+  it("never overwrites an existing agent rule and reports it as kept", async () => {
+    const edited = "# Our own rules\n\nHand-edited.\n";
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      [AGENT_RULE]: edited,
+    });
+
+    const result = await run(["init", cwd, "--yes", "--with-agent-rule"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain(
+      "Kept the existing agent rule .agents/rules/wastech-mdlint.md",
+    );
+    expect(result.stdout).not.toContain("Wrote agent rule");
+    await expect(readFile(path.join(cwd, AGENT_RULE), "utf8")).resolves.toBe(
+      edited,
+    );
+  });
+
+  it("interactive mode always prompts for the agent rule, even with --with-agent-rule set", async () => {
+    let calls = 0;
+    const prompter = createDefaultFakePrompter({
+      confirmAgentRule: async () => {
+        calls += 1;
+        return false;
+      },
+    });
+    const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+
+    const result = await run(["init", cwd, "--with-agent-rule"], cwd, {
+      isTty: true,
+      initPrompter: prompter,
+    });
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(calls).toBe(1);
+    await expect(
+      readFile(path.join(cwd, AGENT_RULE), "utf8"),
+    ).rejects.toThrow();
+  });
+
+  it("an accepted interactive prompt writes the page", async () => {
+    const prompter = createDefaultFakePrompter({
+      confirmAgentRule: async () => true,
+    });
+    const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+
+    const result = await run(["init", cwd], cwd, {
+      isTty: true,
+      initPrompter: prompter,
+    });
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain("Wrote agent rule");
+    await expect(
+      readFile(path.join(cwd, AGENT_RULE), "utf8"),
+    ).resolves.toContain("wastech-mdlint");
+  });
+
+  it("Ctrl+C at the agent-rule prompt keeps the already-written config and its summary", async () => {
+    const prompter = createDefaultFakePrompter({
+      confirmAgentRule: async () => {
+        throw Object.assign(new Error("cancelled"), {
+          name: "ExitPromptError",
+        });
+      },
+    });
+    const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+
+    const result = await run(["init", cwd], cwd, {
+      isTty: true,
+      initPrompter: prompter,
+    });
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain(`Wrote ${CONFIG_FILE}`);
+    await expect(
+      readFile(path.join(cwd, AGENT_RULE), "utf8"),
+    ).rejects.toThrow();
+  });
+
+  // @boundary-guard write-failure
+  //
+  // A regular file where the `.agents` directory belongs is a fault every platform reproduces
+  // without permissions: creating `.agents/rules` beneath it fails. The config is already on disk by
+  // then, so the run has to report both facts — written, and not — and still exit non-zero.
+  it("reports a failed agent-rule write, keeps the config, and exits 2", async () => {
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      ".agents": "not a directory\n",
+    });
+
+    const result = await run(["init", cwd, "--yes", "--with-agent-rule"], cwd);
+
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    expect(result.stdout).toContain(`Wrote ${CONFIG_FILE}`);
+    expect(result.stdout).toContain(
+      "Could not write the agent rule .agents/rules/wastech-mdlint.md — the config above was still written",
+    );
+    await expect(readFile(path.join(cwd, ".agents"), "utf8")).resolves.toBe(
+      "not a directory\n",
+    );
+    await expect(
+      readFile(path.join(cwd, CONFIG_FILE), "utf8"),
+    ).resolves.toBeDefined();
+  });
+
+  // The page lands in a repository that may well lint `.agents/**` — that is half the reason to
+  // write it — so a page that reported its own broken link or empty table cell would be the tool
+  // failing its own first run. Linted through the real CLI with every option-free structural rule.
+  it("the written page lints clean under the structural rules", async () => {
+    const cwd = await fixtureRepo(CROSS_LINKED_DOCS_FIXTURE);
+    await run(["init", cwd, "--yes", "--with-agent-rule"], cwd);
+    await writeFile(
+      path.join(cwd, "lint-page.config.json"),
+      JSON.stringify({
+        include: [".agents/**/*.md"],
+        rules: ["REF-001", "REF-002", "REF-003", "TBL-002", "CTX-001"].map(
+          (rule) => ({ rule }),
+        ),
+      }),
+      "utf8",
+    );
+
+    const lint = await run(
+      [
+        "lint",
+        cwd,
+        "--config",
+        "lint-page.config.json",
+        "--format",
+        "json",
+        "--fail-on",
+        "warning",
+      ],
+      cwd,
+    );
+
+    const payload = JSON.parse(lint.stdout) as {
+      summary: { files: number };
+      messages: unknown[];
+    };
+    expect(payload.summary.files).toBe(1);
+    expect(payload.messages).toEqual([]);
+    expect(lint.exitCode).toBe(EXIT_CODE_SUCCESS);
+  });
+});
+
 // `init` used to propose `.github/**`, `.venv/**` and `generated-docs/**` as doc clusters, and
 // because the written config left `respectGitignore` at its `false` default, lint then read them.
 describe("init command · hidden and gitignored trees", () => {
@@ -3161,6 +3408,43 @@ describe("formatWriteSummary", () => {
     expect(summary).not.toContain("Wrote CI workflow");
   });
 
+  it("reports a failed agent-rule write without implying the config failed too", () => {
+    const summary = formatWriteSummary({
+      action: "fresh",
+      result: buildResult(),
+      configPath: CONFIG_FILE,
+      commentsDropped: false,
+      agentRule: {
+        kind: "failed",
+        path: ".agents/rules/wastech-mdlint.md",
+        code: "EACCES",
+      },
+    });
+
+    expect(summary).toContain(`Wrote ${CONFIG_FILE} with 2 rule(s).`);
+    expect(summary).toContain(
+      "Could not write the agent rule .agents/rules/wastech-mdlint.md (EACCES)",
+    );
+    expect(summary).not.toContain("Wrote agent rule");
+  });
+
+  it("reports a withheld agent rule when the config path cannot be named", () => {
+    const summary = formatWriteSummary({
+      action: "fresh",
+      result: buildResult(),
+      configPath: CONFIG_FILE,
+      commentsDropped: false,
+      agentRule: {
+        kind: "unsafe-config-path",
+        path: ".agents/rules/wastech-mdlint.md",
+      },
+    });
+
+    expect(summary).toContain(
+      "Skipped the agent rule .agents/rules/wastech-mdlint.md — the config path contains a line terminator",
+    );
+  });
+
   it("omits the errno from a failed CI-workflow line when there is none", () => {
     const summary = formatWriteSummary({
       action: "fresh",
@@ -3636,6 +3920,12 @@ describe("interactive prompt defaults match --yes", () => {
 
   it("confirmCiWorkflow's prompt defaults to false — \"ask first, don't write silently\"", () => {
     expect(buildCiWorkflowPromptConfig().default).toBe(false);
+  });
+
+  it("confirmAgentRule's prompt defaults to false and names the file it would write", () => {
+    const config = buildAgentRulePromptConfig();
+    expect(config.default).toBe(false);
+    expect(config.message).toContain(".agents/rules/wastech-mdlint.md");
   });
 });
 

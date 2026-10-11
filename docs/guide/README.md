@@ -23,7 +23,7 @@ This guide is the full reference. For a one-page summary see the top-level [READ
 | **Context graph** | `graph` / `slice` / `impact` over the reference graph between documents. | [Context graph](context-graph.md) |
 | **Context compiler** | `compile` generates a deterministic `SKILL.md` from the graph + rules + config. | [Compile](compile.md) |
 | **MCP server** | 6 read-only stdio tools exposing the same pipeline to AI agents. | [MCP server](mcp-server.md) |
-| **Agent skills** | 3 hand-authored, host-neutral Agent Skills (`-init`, `-fix`, `-impact`). | [Skills](skills.md) |
+| **Agent skills** | 4 hand-authored, host-neutral Agent Skills (`-init`, `-fix`, `-impact`, `-docs`). | [Skills](skills.md) |
 | **Inline suppression** | `disable` / `disable-next-line` directives per rule. | [Suppression](suppression.md) |
 | **Output & exit codes** | Text and JSON reports; CI-friendly exit codes. | [Output](output.md) |
 | **Concepts** | Parse model, determinism, path handling, token estimation. | [Concepts](concepts.md) |

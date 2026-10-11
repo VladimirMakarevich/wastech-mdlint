@@ -73,6 +73,10 @@ export type {
   RuleInferenceResult,
 } from "./discovery/rule-inference.js";
 
+// Agent rule
+export { buildAgentRuleMarkdown } from "./discovery/agent-rule.js";
+export type { AgentRuleParams } from "./discovery/agent-rule.js";
+
 // Config writer
 export {
   buildCiWorkflowYaml,

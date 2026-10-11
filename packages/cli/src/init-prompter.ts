@@ -90,6 +90,23 @@ export function buildCiWorkflowPromptConfig(): {
   };
 }
 
+/**
+ * `default: false` for the same reason as the CI workflow: a bare Enter must not opt into writing a
+ * file into the user's repository. The message names the path and what the page is for, because
+ * this prompt is the only place the user decides on it before it exists.
+ */
+export function buildAgentRulePromptConfig(): {
+  message: string;
+  default: boolean;
+} {
+  return {
+    message:
+      "Also add an agent rule (.agents/rules/wastech-mdlint.md) telling coding agents how to lint " +
+      "this repository's Markdown and split documents that outgrow a size budget?",
+    default: false,
+  };
+}
+
 // `@inquirer/prompts`' context argument wants a full `NodeJS.WritableStream` (it renders through
 // `.write()` but also expects the standard `Writable` shape); our injected seam is deliberately
 // narrowed to just `write` (mirrors `CliIo.stdout`), so wrap it in a real `Writable` that forwards
@@ -177,6 +194,10 @@ export function createInquirerPrompter(
 
     async confirmCiWorkflow(): Promise<boolean> {
       return confirm(buildCiWorkflowPromptConfig(), context);
+    },
+
+    async confirmAgentRule(): Promise<boolean> {
+      return confirm(buildAgentRulePromptConfig(), context);
     },
   };
 }

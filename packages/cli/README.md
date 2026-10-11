@@ -20,7 +20,7 @@ wastech-mdlint slice <query> [--config <file>] [--depth <n>] [--format text|json
 wastech-mdlint impact <file> [--config <file>] [--format text|json]
 wastech-mdlint schema [--out schema.json]
 wastech-mdlint compile [--config <file>] [--outdir <dir>] [--dry-run] [--cwd <dir>]
-wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-ci-workflow]
+wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-ci-workflow] [--with-agent-rule]
 ```
 
 `lint` is the default command, so a bare `wastech-mdlint` lints the current directory. Default only in that sense: an unrecognized subcommand is an error rather than a path, so a typo'd CI step fails loudly — which also means a bare path still needs its subcommand (`wastech-mdlint lint docs`).

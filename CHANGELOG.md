@@ -1,10 +1,15 @@
 # Changelog
 
-All notable changes to this project are documented here. The three packages — `@wastech-mdlint/core`, `@wastech-mdlint/cli`, and `@wastech-mdlint/mcp-server` — are published together at one version from a single `vX.Y.Z` tag, and the three Agent Skills are tagged with them, so one entry below describes all of them.
+All notable changes to this project are documented here. The three packages — `@wastech-mdlint/core`, `@wastech-mdlint/cli`, and `@wastech-mdlint/mcp-server` — are published together at one version from a single `vX.Y.Z` tag, and the Agent Skills are tagged with them, so one entry below describes all of them.
 
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+
+- `init` offers an agent rule: `.agents/rules/wastech-mdlint.md`, a page that tells coding agents how the repository's Markdown is linted, that an `error` is fixed rather than silenced, and that a `SIZE-001` or `LLM-001` budget is answered by splitting a document rather than by cutting its content — with a table of who decides on a split for each kind of file and the procedure for one. Interactive runs offer it with a default of no; `--with-agent-rule` writes it under `--yes`. Only the config's location and the CLI invocation are generated, so the page cannot go stale against the config; it is never overwritten once it exists, and it is not wired into `AGENTS.md` or `CLAUDE.md` for you — the write summary says where it went and how to reference it.
+- A fourth Agent Skill, `wastech-mdlint-docs`, walks an agent through such a split: find the budget findings, decide who owns the split, plan it from the `impact` blast radius, split by meaning, and verify with `lint`.
 
 ## [0.1.3]
 

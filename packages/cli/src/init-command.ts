@@ -5,6 +5,7 @@ import path from "node:path";
 import { type ParseError, parse as parseJsonc } from "jsonc-parser";
 
 import {
+  buildAgentRuleMarkdown,
   buildCiWorkflowYaml,
   canonicalizeRuleId,
   compareStrings,
@@ -71,6 +72,9 @@ export type InitPrompter = {
   // The opt-in CI-workflow offer: "ask first, don't write silently", so its prompt defaults to
   // no. Only consulted on an interactive run when no workflow file already exists.
   confirmCiWorkflow(): Promise<boolean>;
+  // The opt-in agent-rule offer, under the same discipline and with the same default: only
+  // consulted on an interactive run when no agent rule file already exists.
+  confirmAgentRule(): Promise<boolean>;
 };
 
 export type InitCommandOptions = {
@@ -81,6 +85,12 @@ export type InitCommandOptions = {
   // Pre-answers the CI-workflow prompt under `--yes` only (mirrors `--on-existing`): interactive
   // runs always prompt regardless of this flag.
   withCiWorkflow?: boolean;
+  // Pre-answers the agent-rule prompt under `--yes` only, exactly as `withCiWorkflow` does.
+  withAgentRule?: boolean;
+  // The running CLI's own version. The agent rule pins its on-demand runner and its companion skill
+  // to it; read once by the host rather than here, since the host already owns reading its package
+  // metadata for `--version`.
+  cliVersion: string;
   // True only when the CLI's `[path]` argument was actually typed by the user (program.ts is the
   // one layer that can tell "typed, and happens to equal cwd" apart from "omitted"). A required
   // field, not optional, so every call site is forced to decide it explicitly: an
@@ -139,7 +149,7 @@ export type ConfigPreview = {
 };
 
 /**
- * Every way `runInitCommand` can end, named — because four of the six write nothing and the host has
+ * Every way `runInitCommand` can end, named — because four of the seven write nothing and the host has
  * to sort them into two exit codes that mean opposite things. A boolean could not:
  * the previous `writeFailed` flag collapsed "the user asked for no write" and "the file we were told
  * to merge into is invalid" into one `false`, so a CI merge step that refused to write reported
@@ -147,7 +157,7 @@ export type ConfigPreview = {
  * switched exhaustively at the boundary rather than inferred from a flag.
  *
  * Deliberate no-write (exit `0`): `skipped`, `declined`. Operational failure (exit `2`):
- * `invalid-existing-config`, `write-failed`, `ci-workflow-write-failed`.
+ * `invalid-existing-config`, `write-failed`, `ci-workflow-write-failed`, `agent-rule-write-failed`.
  */
 export type InitOutcome =
   | "written"
@@ -155,7 +165,8 @@ export type InitOutcome =
   | "declined"
   | "invalid-existing-config"
   | "write-failed"
-  | "ci-workflow-write-failed";
+  | "ci-workflow-write-failed"
+  | "agent-rule-write-failed";
 
 export type RunInitCommandResult = {
   output: string;
@@ -857,6 +868,43 @@ async function findInstalledSchemaDir(
 }
 
 /**
+ * Asks one post-write opt-in question. These prompts run AFTER the config/schema are already on disk,
+ * so a Ctrl+C here must not unwind the whole command — that would exit without the write summary and
+ * make an already-mutated repo look untouched. Cancellation is therefore read as "no" and the summary
+ * still prints. Matched on `.name` (not `instanceof`), the version-stable @inquirer convention used
+ * in program.ts.
+ */
+async function askOptIn(ask: () => Promise<boolean>): Promise<boolean> {
+  try {
+    return await ask();
+  } catch (error) {
+    if (error instanceof Error && error.name === "ExitPromptError") {
+      return false;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Writes one opt-in file whose parent directory routinely does not exist yet (`.github/workflows`,
+ * `.agents/rules`). The atomic helper deliberately leaves directory creation to its caller, so a
+ * failure to create it is reported the same way a failed write is — just without an errno to
+ * attribute it to, since the directory, not the file, is what could not be made.
+ */
+async function writeOptInFile(
+  absolutePath: string,
+  content: string,
+): Promise<{ ok: true } | { ok: false; code?: string }> {
+  try {
+    await mkdir(path.dirname(absolutePath), { recursive: true });
+  } catch {
+    return { ok: false };
+  }
+  const written = await writeFilesAtomic([{ path: absolutePath, content }]);
+  return written.ok ? { ok: true } : { ok: false, code: written.code };
+}
+
+/**
  * Outcome of the opt-in CI-workflow write. `path` is a repository-relative POSIX path. `"failed"`
  * exists because this write happens *after* the config and schema are already committed: dropping the
  * whole summary on its failure would leave an already-mutated repo looking untouched, so the failure
@@ -920,43 +968,104 @@ async function offerCiWorkflow(params: {
     return { kind: "kept", path: relativeWorkflowPath };
   }
 
-  // This prompt runs AFTER the config/schema are already on disk. A Ctrl+C here must not unwind the
-  // whole command (that would exit without the write summary and make an already-mutated repo look
-  // untouched) — treat cancellation as "no workflow" and let the write summary print. Matched on
-  // `.name` (not `instanceof`), the version-stable @inquirer convention used in program.ts.
-  let wantsCi: boolean;
-  if (yes) {
-    wantsCi = true;
-  } else {
-    try {
-      wantsCi = await prompter.confirmCiWorkflow();
-    } catch (error) {
-      if (error instanceof Error && error.name === "ExitPromptError") {
-        return undefined;
-      }
-      throw error;
-    }
-  }
+  const wantsCi = yes || (await askOptIn(() => prompter.confirmCiWorkflow()));
   if (!wantsCi) {
     return undefined;
   }
 
   const configArg =
     configFromRoot === CONFIG_FILE_NAME ? undefined : configFromRoot;
-  try {
-    // The atomic helper deliberately leaves directory creation to its caller, and `.github/workflows`
-    // routinely does not exist yet — a failure here is reported the same way a failed write is, just
-    // without an errno to attribute it to.
-    await mkdir(path.dirname(ciWorkflowPath), { recursive: true });
-  } catch {
-    return { kind: "failed", path: relativeWorkflowPath };
-  }
-  const written = await writeFilesAtomic([
-    { path: ciWorkflowPath, content: buildCiWorkflowYaml(configArg) },
-  ]);
+  const written = await writeOptInFile(
+    ciWorkflowPath,
+    buildCiWorkflowYaml(configArg),
+  );
   return written.ok
     ? { kind: "written", path: relativeWorkflowPath }
     : { kind: "failed", path: relativeWorkflowPath, code: written.code };
+}
+
+// Where the agent rule lands, as path segments joined via path.join for a Windows-correct write.
+// `.agents/rules/` is the host-neutral home for agent-operation guidance — it belongs to no single
+// agent product — and the file is named after this tool rather than after its topic, so it cannot
+// collide with a `markdown.md` or `docs.md` rule the repository already keeps for its own reasons.
+const AGENT_RULE_PATH_SEGMENTS = [
+  ".agents",
+  "rules",
+  "wastech-mdlint.md",
+] as const;
+
+/**
+ * Outcome of the opt-in agent-rule write. The four kinds mean what they mean for the CI workflow
+ * (`CiWorkflowOutcome`), for the same reasons: `"failed"` is reported rather than thrown because the
+ * config is already on disk, `"kept"` and `"unsafe-config-path"` are withheld offers that must still
+ * be stated, and a user's "no" stays `undefined`. `path` is a repository-relative POSIX path.
+ */
+export type AgentRuleOutcome =
+  | { kind: "written"; path: string }
+  | { kind: "failed"; path: string; code?: string }
+  | { kind: "kept"; path: string }
+  | { kind: "unsafe-config-path"; path: string };
+
+/**
+ * Offer — and, if accepted, write — the opt-in agent rule. Called from the same confirmed
+ * config-write branch as the CI-workflow offer, so `skip` never reaches it either. Anchored at the
+ * repository root for the reason the workflow is: agent context is read from the repository root,
+ * not from wherever a nested config happens to sit, and the page itself names that config's
+ * directory so its commands still find it. Never overwrites an existing rule — the page is meant to
+ * be edited, and a re-run of `init` must not undo those edits.
+ */
+async function offerAgentRule(params: {
+  repoRoot: string;
+  configAbsPath: string;
+  yes: boolean;
+  withAgentRule: boolean | undefined;
+  prompter: InitPrompter;
+  cliInstalled: boolean;
+  packageManager: DetectedPackageManager;
+  cliVersion: string;
+}): Promise<AgentRuleOutcome | undefined> {
+  const { repoRoot, configAbsPath, yes, withAgentRule, prompter } = params;
+
+  if (yes && withAgentRule !== true) {
+    return undefined;
+  }
+
+  const configFromRoot = normalizeRelativePath(
+    path.relative(repoRoot, configAbsPath),
+  );
+  const agentRulePath = path.join(repoRoot, ...AGENT_RULE_PATH_SEGMENTS);
+  const relativeAgentRulePath = normalizeRelativePath(
+    path.relative(repoRoot, agentRulePath),
+  );
+
+  // The page names the config's directory inside an inline code span, and no code span can carry a
+  // line terminator — so decline rather than write a page pointing agents at a directory that does
+  // not exist.
+  if (/[\r\n]/.test(configFromRoot)) {
+    return { kind: "unsafe-config-path", path: relativeAgentRulePath };
+  }
+
+  if (await fileExists(agentRulePath)) {
+    return { kind: "kept", path: relativeAgentRulePath };
+  }
+
+  const wantsRule = yes || (await askOptIn(() => prompter.confirmAgentRule()));
+  if (!wantsRule) {
+    return undefined;
+  }
+
+  const written = await writeOptInFile(
+    agentRulePath,
+    buildAgentRuleMarkdown({
+      configPath: configFromRoot,
+      cliInstalled: params.cliInstalled,
+      packageManager: params.packageManager,
+      cliVersion: params.cliVersion,
+    }),
+  );
+  return written.ok
+    ? { kind: "written", path: relativeAgentRulePath }
+    : { kind: "failed", path: relativeAgentRulePath, code: written.code };
 }
 
 /**
@@ -1108,9 +1217,49 @@ function formatCiWorkflowLine(ciWorkflow: CiWorkflowOutcome): string {
   }
 }
 
+// Each line says what the file is, where it went and why — the page is written into the user's
+// repository on their behalf, and the one thing nobody can infer from its path alone is that nothing
+// reads it yet. `init` deliberately does not edit `AGENTS.md` or `CLAUDE.md` to wire it in: those are
+// the user's own files, and whether the page is loaded every session or read on demand is a budget
+// decision only they can make.
+function formatAgentRuleLine(agentRule: AgentRuleOutcome): string {
+  switch (agentRule.kind) {
+    case "written":
+      return (
+        `Wrote agent rule ${agentRule.path} — how coding agents should lint this repository's ` +
+        "Markdown and split a document instead of cutting it when it outgrows a size budget. " +
+        "Nothing loads it yet: reference it from AGENTS.md or CLAUDE.md — an @ import loads it " +
+        "into every session and counts toward LLM-001, an ordinary link lets an agent read it " +
+        "on demand."
+      );
+    case "failed": {
+      const reason = agentRule.code === undefined ? "" : ` (${agentRule.code})`;
+      return (
+        `Could not write the agent rule ${agentRule.path}${reason} — the config above was still ` +
+        "written, and no partial file was left behind. Re-run init to retry it."
+      );
+    }
+    case "kept":
+      return (
+        `Kept the existing agent rule ${agentRule.path} — init never overwrites it, so edits made ` +
+        "to it survive. Delete it and re-run init to regenerate it."
+      );
+    case "unsafe-config-path":
+      return (
+        `Skipped the agent rule ${agentRule.path} — the config path contains a line terminator, ` +
+        "which the page cannot name. The config above was still written; rename the directory " +
+        "and re-run init to add it."
+      );
+    default: {
+      const exhaustiveCheck: never = agentRule;
+      return exhaustiveCheck;
+    }
+  }
+}
+
 /**
  * Deterministic write-outcome summary: how the config was written (fresh/merge), rule counts, which
- * `$schema` it points at, and where the config / project schema / CI workflow landed. Every path is
+ * `$schema` it points at, and where the config / project schema / CI workflow / agent rule landed. Every path is
  * a repository-relative POSIX path (so a subdirectory run reports `docs/wastech-mdlint.config.json`,
  * not a bare filename). Pure and exported so it can be asserted directly, mirroring `formatDraftSummary`.
  */
@@ -1123,9 +1272,17 @@ export function formatWriteSummary(params: {
   commentsDropped: boolean;
   schema?: SchemaWriteOutcome;
   ciWorkflow?: CiWorkflowOutcome;
+  agentRule?: AgentRuleOutcome;
 }): string {
-  const { action, result, configPath, commentsDropped, schema, ciWorkflow } =
-    params;
+  const {
+    action,
+    result,
+    configPath,
+    commentsDropped,
+    schema,
+    ciWorkflow,
+    agentRule,
+  } = params;
   const lines: string[] = [];
 
   if (action === "merge") {
@@ -1154,6 +1311,9 @@ export function formatWriteSummary(params: {
   }
   if (ciWorkflow !== undefined) {
     lines.push(formatCiWorkflowLine(ciWorkflow));
+  }
+  if (agentRule !== undefined) {
+    lines.push(formatAgentRuleLine(agentRule));
   }
 
   return `${lines.join("\n")}\n`;
@@ -1581,6 +1741,20 @@ export async function runInitCommand(
     withCiWorkflow: options.withCiWorkflow,
     prompter,
   });
+  // Offered even when the workflow write just failed: the two files are independent, and a failure
+  // in one is no reason to withhold the other the user may have asked for.
+  const agentRule = await offerAgentRule({
+    repoRoot,
+    configAbsPath: configPath,
+    yes: options.yes,
+    withAgentRule: options.withAgentRule,
+    prompter,
+    // The same on-disk evidence `$schema` was anchored on above: an installed package schema is an
+    // installed CLI, and without one the page's commands have no local binary to resolve.
+    cliInstalled: schemaAnchor !== undefined,
+    packageManager,
+    cliVersion: options.cliVersion,
+  });
 
   return {
     output: composeOutput(
@@ -1591,12 +1765,18 @@ export async function runInitCommand(
         commentsDropped: existingConfigHasComments,
         schema: schemaOutcome,
         ciWorkflow,
+        agentRule,
       }),
     ),
-    // The config and schema landed; only the opt-in workflow the user asked for did not. Still a
-    // failed write, so the exit code has to say so — the summary above names which file it was.
+    // The config and schema landed; only an opt-in file the user asked for did not. Still a failed
+    // write, so the exit code has to say so — the summary above names which file it was, and names
+    // both when both failed, which is why naming the workflow first here loses nothing.
     outcome:
-      ciWorkflow?.kind === "failed" ? "ci-workflow-write-failed" : "written",
+      ciWorkflow?.kind === "failed"
+        ? "ci-workflow-write-failed"
+        : agentRule?.kind === "failed"
+          ? "agent-rule-write-failed"
+          : "written",
   };
 }
 

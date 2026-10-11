@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { buildAgentRuleMarkdown } from "@wastech-mdlint/core";
+
 import { EXIT_CODE_SUCCESS } from "../src/commands.js";
 import { runCli } from "../src/program.js";
 
@@ -21,9 +23,15 @@ function readSkill(id: string): string {
   return readFileSync(path.join(skillsDir, id, "SKILL.md"), "utf8");
 }
 
+const docsSkill = readSkill("wastech-mdlint-docs");
 const fixSkill = readSkill("wastech-mdlint-fix");
 const impactSkill = readSkill("wastech-mdlint-impact");
-const skillBodies = [fixSkill, impactSkill, readSkill("wastech-mdlint-init")];
+const skillBodies = [
+  docsSkill,
+  fixSkill,
+  impactSkill,
+  readSkill("wastech-mdlint-init"),
+];
 const allSkillText = skillBodies.join("\n");
 
 function referencedInAnySkill(needle: string): boolean {
@@ -89,7 +97,12 @@ const COMMANDS: {
   {
     command: "init",
     usage: "wastech-mdlint init",
-    flags: ["--yes", "--on-existing", "--with-ci-workflow"],
+    flags: [
+      "--yes",
+      "--on-existing",
+      "--with-ci-workflow",
+      "--with-agent-rule",
+    ],
     // The init skill documents `--on-existing <overwrite|merge|skip>`; each value must sit in that list.
     choices: [
       { value: "overwrite", evidence: /--on-existing <[^>]*\boverwrite\b/ },
@@ -374,4 +387,113 @@ describe("skills reference the real CLI JSON contract", () => {
     // The skill presents each directly-affected entry as `{ path, references }`.
     expectContract(impactSkill, directly[0]!, ["path", "references"]);
   });
+
+  // The docs skill reads a budget finding's numbers out of its `data`, so those keys are as much a
+  // contract as the top-level ones — and they exist only on SIZE-001 and LLM-001 findings, which the
+  // shared fixture above never produces.
+  it("lint --format json emits the SIZE-001/LLM-001 data the docs skill reads", async () => {
+    const cwd = await fixtureRepo();
+    await writeFile(
+      path.join(cwd, "CLAUDE.md"),
+      "# Entry\n\n@b.md\n\nsome words here\n",
+      "utf8",
+    );
+    await writeFile(
+      path.join(cwd, "wastech-mdlint.config.json"),
+      JSON.stringify({
+        rules: [
+          { rule: "SIZE-001", options: { lines: { warn: 1, error: 100 } } },
+          {
+            rule: "LLM-001",
+            options: { entrypoints: ["CLAUDE.md"], maxTokensPerEntrypoint: 1 },
+          },
+        ],
+      }),
+      "utf8",
+    );
+
+    const payload = await runJson(
+      ["lint", cwd, "--format", "json", "--fail-on", "off"],
+      cwd,
+    );
+    const messages = payload.messages as Record<string, unknown>[];
+    const byRule = (ruleId: string): Record<string, unknown> => {
+      const message = messages.find((entry) => entry.ruleId === ruleId);
+      expect(
+        message,
+        `fixture should surface a ${ruleId} finding`,
+      ).toBeDefined();
+      return message!;
+    };
+
+    const size = byRule("SIZE-001");
+    expectContract(docsSkill, size, ["ruleId", "severity", "filePath", "data"]);
+    expectContract(docsSkill, size.data as Record<string, unknown>, [
+      "metric",
+      "actual",
+      "warnAt",
+      "errorAt",
+    ]);
+    expectContract(
+      docsSkill,
+      byRule("LLM-001").data as Record<string, unknown>,
+      ["totalTokens", "maxTokens", "importedFiles"],
+    );
+  });
+
+  it("impact --format json carries the directlyAffected references the docs skill reads", async () => {
+    const cwd = await fixtureRepo();
+    const payload = await runJson(["impact", "b.md", "--format", "json"], cwd);
+
+    expectContract(docsSkill, payload, ["directlyAffected"]);
+    const directly = payload.directlyAffected as Record<string, unknown>[];
+    expectContract(docsSkill, directly[0]!, ["references"]);
+  });
+});
+
+// The agent rule `init` writes is a skill in all but name: a page of instructions an agent follows
+// verbatim, naming CLI commands and flags. It is generated rather than committed, so nothing above
+// reads it — this renders every runner variant and holds each invocation against the live `--help`
+// of the command it names, so a renamed command or flag fails here rather than in a user's agent.
+describe("the agent rule init writes references a live CLI surface", () => {
+  const variants = [
+    { cliInstalled: false, packageManager: undefined },
+    { cliInstalled: true, packageManager: "npm" },
+    { cliInstalled: true, packageManager: "pnpm" },
+    { cliInstalled: true, packageManager: "yarn" },
+    { cliInstalled: true, packageManager: "bun" },
+  ] as const;
+
+  it.each(variants)(
+    "every command in the page (installed: $cliInstalled, $packageManager) exists with its flags",
+    async ({ cliInstalled, packageManager }) => {
+      const page = buildAgentRuleMarkdown({
+        configPath: "docs/wastech-mdlint.config.json",
+        cliInstalled,
+        packageManager,
+        cliVersion: "0.0.0",
+      });
+
+      // Anchored on a package runner, as the skills parse above is, so prose that merely names the
+      // tool ("wastech-mdlint checks", "`wastech-mdlint init`") is not mistaken for an invocation.
+      const invocations = [
+        ...page.matchAll(
+          /(?:npx|exec|yarn|bunx) (?:-y )?(?:wastech-mdlint|@wastech-mdlint\/cli@[\d.]+) (\w[\w-]*)([^`\n]*)`/g,
+        ),
+      ];
+      const commands = new Set(invocations.map((match) => match[1]!));
+      // Pinned so a broken extractor cannot make the loop below vacuous.
+      expect([...commands].sort()).toEqual(["impact", "lint"]);
+
+      for (const [, command, rest] of invocations) {
+        const { exitCode, text } = await help(command!);
+        expect(exitCode, `${command} is not a CLI command`).toBe(
+          EXIT_CODE_SUCCESS,
+        );
+        for (const flag of rest!.match(/--[a-z][a-z-]+/g) ?? []) {
+          expect(text, `${command} --help is missing ${flag}`).toContain(flag);
+        }
+      }
+    },
+  );
 });

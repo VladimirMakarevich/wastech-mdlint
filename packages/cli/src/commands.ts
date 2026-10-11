@@ -118,6 +118,7 @@ export type InitCommand = {
   onExisting?: ExistingConfigAction;
   isTty: boolean;
   withCiWorkflow?: boolean;
+  withAgentRule?: boolean;
   // Whether the CLI's `[path]` argument was actually typed (vs. omitted and defaulted to cwd) —
   // see `InitCommandOptions.pathWasExplicit` for why this must be known this far down.
   pathWasExplicit: boolean;
@@ -486,7 +487,7 @@ async function handleCompile(
 // falls on. A boolean stood here once and got it wrong for
 // `invalid-existing-config` precisely because nobody had to state an answer.
 //
-// The dividing question is not "was anything written" — four of these six write nothing. It is
+// The dividing question is not "was anything written" — four of these seven write nothing. It is
 // whether *the user asked for* no write (`skip`, declining the draft: exit 0) or the command could
 // not do what they asked (an unloadable file to merge into, a failed write: exit 2).
 function initExitCode(outcome: InitOutcome): number {
@@ -498,6 +499,7 @@ function initExitCode(outcome: InitOutcome): number {
     case "invalid-existing-config":
     case "write-failed":
     case "ci-workflow-write-failed":
+    case "agent-rule-write-failed":
       return EXIT_CODE_USAGE_ERROR;
     default: {
       const exhaustiveCheck: never = outcome;
@@ -521,6 +523,8 @@ async function handleInit(
       onExisting: command.onExisting,
       isTty: command.isTty,
       withCiWorkflow: command.withCiWorkflow,
+      withAgentRule: command.withAgentRule,
+      cliVersion: await readPackageVersion(),
       pathWasExplicit: command.pathWasExplicit,
     },
     prompter,

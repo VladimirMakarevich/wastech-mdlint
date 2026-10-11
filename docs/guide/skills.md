@@ -2,13 +2,14 @@
 
 > [Guide index](README.md) · [Compile](compile.md) · [MCP server](mcp-server.md)
 
-`wastech-mdlint` ships **3 hand-authored, host-neutral Agent Skills** that orchestrate the CLI/MCP surface. They are workflow instructions an AI host executes — a contract over the product surface, not code. They live under [`skills/`](../../skills):
+`wastech-mdlint` ships **4 hand-authored, host-neutral Agent Skills** that orchestrate the CLI/MCP surface. They are workflow instructions an AI host executes — a contract over the product surface, not code. They live under [`skills/`](../../skills):
 
 | Skill | Purpose |
 | --- | --- |
 | [`wastech-mdlint-init`](../../skills/wastech-mdlint-init/SKILL.md) | Bootstrap: scan the repo and produce a sensible `wastech-mdlint.config.json` via `init`. |
 | [`wastech-mdlint-fix`](../../skills/wastech-mdlint-fix/SKILL.md) | Fix findings by rule prefix — delegating mechanical fixes to the deterministic `--fix`, reserving judgement for the AI. |
 | [`wastech-mdlint-impact`](../../skills/wastech-mdlint-impact/SKILL.md) | Explain the blast radius of a change using `impact` / the graph. |
+| [`wastech-mdlint-docs`](../../skills/wastech-mdlint-docs/SKILL.md) | Split a document that outgrows its `SIZE-001` / `LLM-001` budget by meaning, never by cutting content. |
 
 ## Host-neutral by design
 
@@ -24,7 +25,7 @@ Each `SKILL.md` carries `name`, `description`, `license`, `compatibility`, and `
 
 ## Generated vs. static skills
 
-These 3 are **static** (hand-authored, shipped as-is). Separately, [`compile`](compile.md) generates a **project-specific** `SKILL.md` from your repo. Both share one frontmatter contract.
+These 4 are **static** (hand-authored, shipped as-is). Separately, [`compile`](compile.md) generates a **project-specific** `SKILL.md` from your repo. Both share one frontmatter contract.
 
 ## Install
 

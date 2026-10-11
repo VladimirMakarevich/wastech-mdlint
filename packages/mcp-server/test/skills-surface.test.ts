@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { buildAgentRuleMarkdown } from "@wastech-mdlint/core";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { describe, expect, it } from "vitest";
 
@@ -131,6 +132,53 @@ describe("skills reference a live MCP surface", () => {
       | { properties?: { format?: unknown } }
       | undefined;
     expect(JSON.stringify(graphInput?.properties?.format)).toContain("summary");
+
+    await client.close();
+    await server.close();
+  });
+});
+
+// The agent rule `init` writes names MCP tools from core, which has no view of what this server
+// registers — so a tool renamed here would leave every generated page sending agents to a tool that
+// does not exist, with nothing on either side failing. Its tool mentions are parsed the way the
+// skill's are above (a dashed name in a code span followed by the word "tool"), and must all be live.
+describe("the agent rule init writes names live MCP tools", () => {
+  it("every tool the page names is advertised", async () => {
+    const page = buildAgentRuleMarkdown({
+      configPath: "wastech-mdlint.config.json",
+      cliInstalled: true,
+      packageManager: "npm",
+      cliVersion: "0.0.0",
+    });
+    const named = [
+      ...page.matchAll(
+        /`([a-z]+(?:-[a-z]+)+)`(?: and `([a-z]+(?:-[a-z]+)+)`)? tools?\b/g,
+      ),
+    ]
+      .flatMap((match) => [match[1], match[2]])
+      .filter((name): name is string => name !== undefined);
+    expect(
+      named.length,
+      "no MCP tool names parsed from the page",
+    ).toBeGreaterThan(0);
+
+    const server = await createServer();
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "agent-rule-surface", version: "0.0.0" });
+    await Promise.all([
+      server.connect(serverTransport),
+      client.connect(clientTransport),
+    ]);
+
+    const { tools } = await client.listTools();
+    const advertised = tools.map((tool) => tool.name);
+    for (const name of named) {
+      expect(
+        advertised,
+        `the agent rule names unknown MCP tool ${name}`,
+      ).toContain(name);
+    }
 
     await client.close();
     await server.close();

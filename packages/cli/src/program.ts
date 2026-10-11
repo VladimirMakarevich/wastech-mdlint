@@ -378,6 +378,12 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
         "write .github/workflows/wastech-mdlint.yml under --yes without prompting",
       ),
     )
+    .addOption(
+      new Option(
+        "--with-agent-rule",
+        "write the agent rule .agents/rules/wastech-mdlint.md under --yes without prompting",
+      ),
+    )
     .action(
       async (
         targetPath: string | undefined,
@@ -385,6 +391,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
           yes?: boolean;
           onExisting?: ExistingConfigAction;
           withCiWorkflow?: boolean;
+          withAgentRule?: boolean;
         },
       ) => {
         const yes = options.yes ?? false;
@@ -427,6 +434,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
             onExisting: options.onExisting,
             isTty,
             withCiWorkflow: options.withCiWorkflow,
+            withAgentRule: options.withAgentRule,
             pathWasExplicit,
           },
           { prompter: io.initPrompter ?? createInquirerPrompter(stdout) },

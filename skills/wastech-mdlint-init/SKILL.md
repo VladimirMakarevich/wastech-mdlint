@@ -44,7 +44,9 @@ First determine the **effective init root** — the directory `init` will actual
 
 Because that directory _is_ the target, `init` needs no `[path]` argument (its default is the current directory), and the config `init` writes lands at this cwd, so `lint` finds it by its normal walk-up with no `--config` flag. Only pass `--config "<path>"` (shell-quoted, since a path may contain spaces) if you deliberately run from somewhere else.
 
-`init` is interactive by default and prompts for its own decisions (existing-config disposition, clusters, categories, package manager, draft confirmation). For a non-interactive or CI environment, pass `--yes`; then `--on-existing <overwrite|merge|skip>` selects how an existing config is handled and `--with-ci-workflow` writes the CI workflow without prompting.
+`init` is interactive by default and prompts for its own decisions (existing-config disposition, clusters, categories, package manager, draft confirmation). For a non-interactive or CI environment, pass `--yes`; then `--on-existing <overwrite|merge|skip>` selects how an existing config is handled, `--with-ci-workflow` writes the CI workflow without prompting, and `--with-agent-rule` writes the agent rule without prompting.
+
+**The agent rule is offered here, not later.** After the config is written, `init` offers to write `.agents/rules/wastech-mdlint.md`: a page telling coding agents how this repository's Markdown is linted and how to split a document that outgrows a size budget instead of cutting it. Unlike the CI workflow it needs no working lint to be useful, so ask the user now and answer the prompt accordingly (or pass `--with-agent-rule` with `--yes`). `init` never overwrites an existing one. When it writes the page, relay what its summary line says: nothing loads the page yet, and wiring it in is the user's choice — an `@` import from `AGENTS.md` or `CLAUDE.md` loads it every session and counts toward `LLM-001`, an ordinary link lets an agent read it on demand. Do not edit those files to add the reference unless the user asks you to.
 
 Do not re-implement any of this inference. If the user asks "what rules should we use?", the answer is "whatever `init` infers from the repository" — let the command decide.
 
@@ -118,4 +120,4 @@ If the user also wants the CLI-package install noted, keep it secondary and pinn
 
 ## Next steps to mention
 
-Once the repo lints cleanly, point the user at the companion skills for day-to-day use: `wastech-mdlint-impact` to scope the blast radius of a change, and `wastech-mdlint-fix` to apply fixes. Keep these as pointers — this skill's job ends at a working `lint`.
+Once the repo lints cleanly, point the user at the companion skills for day-to-day use: `wastech-mdlint-impact` to scope the blast radius of a change, `wastech-mdlint-fix` to apply fixes, and `wastech-mdlint-docs` to split a document that outgrows its size budget. Keep these as pointers — this skill's job ends at a working `lint`.

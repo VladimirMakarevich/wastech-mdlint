@@ -25,8 +25,9 @@ function readSkill(id: string): string {
 }
 
 describe("shipped skills", () => {
-  it("ships exactly the three skills the release tags", () => {
+  it("ships exactly the four skills the release tags", () => {
     expect(skillIds).toEqual([
+      "wastech-mdlint-docs",
       "wastech-mdlint-fix",
       "wastech-mdlint-impact",
       "wastech-mdlint-init",
@@ -74,8 +75,8 @@ describe("shipped skills", () => {
 
 // One tag publishes the CLI and tags the skills, so a skill's `compatibility` is a claim about which
 // CLI release it was written against. Nothing but this test connects the two: the field is free
-// prose the frontmatter schema accepts in any shape, and a version bump that misses it leaves three
-// skills confidently naming a version that was never published. That failure is invisible in the
+// prose the frontmatter schema accepts in any shape, and a version bump that misses it leaves every
+// skill confidently naming a version that was never published. That failure is invisible in the
 // repository — every command a skill names still exists here — and only shows up once an agent runs
 // the skill against a CLI whose surface has moved.
 const cliVersion = (

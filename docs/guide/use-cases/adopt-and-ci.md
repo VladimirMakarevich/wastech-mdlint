@@ -8,6 +8,7 @@
 wastech-mdlint init                       # interactive: scans, infers a rule set, writes config
 wastech-mdlint init --yes                 # CI-friendly: accept the inferred draft, no prompts
 wastech-mdlint init --yes --with-ci-workflow   # also drop .github/workflows/wastech-mdlint.yml
+wastech-mdlint init --yes --with-agent-rule    # also write .agents/rules/wastech-mdlint.md for coding agents
 ```
 
 Then gate CI on exit codes:
