@@ -6,6 +6,8 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1]
+
 ### Changed
 
 - The default `exclude` gains `**/worktrees/**`, so every run — with or without a config — skips a directory named `worktrees` at any depth, and `init` no longer scans one for doc clusters. Agent tools such as Claude Code check out git worktrees inside the repository, under `.claude/worktrees/<name>/`, and each is a full second copy of every tracked document, so a lint reported every finding once more per worktree. Hand-written Markdown under a directory literally named `worktrees` is now skipped too; negate the default (`"!**/worktrees/**"`) in your own `exclude` to lint it.
@@ -86,7 +88,8 @@ First public release. Published manually and carries no provenance attestation; 
 - Windows, macOS, and Linux are all supported: paths in public output are normalized to repository-relative POSIX form, ordering uses a code-point comparator rather than locale collation, and every product file is written through an atomic temp-and-rename path so a failed write cannot truncate an existing file.
 - All analysis is local. No external HTTP link checking, no link cache, no remote schema resolution, and no install-time file writes.
 
-[unreleased]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.2.0...HEAD
+[unreleased]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.1.1...v0.1.2

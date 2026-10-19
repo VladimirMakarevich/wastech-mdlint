@@ -1,6 +1,6 @@
 {
   "name": "@wastech-mdlint/cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Markdown linter for repository docs and agent context (README, AGENTS.md, CLAUDE.md): lint rules, autofix, context graph, impact analysis.",
   "keywords": [
     "markdown",
@@ -45,7 +45,7 @@
   },
   "dependencies": {
     "@inquirer/prompts": "^8.5.2",
-    "@wastech-mdlint/core": "0.2.0",
+    "@wastech-mdlint/core": "0.2.1",
     "commander": "^14.0.3",
     "jsonc-parser": "^3.3.1"
   },
