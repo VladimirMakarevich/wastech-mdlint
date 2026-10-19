@@ -6,6 +6,10 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- The default `exclude` gains `**/worktrees/**`, so every run — with or without a config — skips a directory named `worktrees` at any depth, and `init` no longer scans one for doc clusters. Agent tools such as Claude Code check out git worktrees inside the repository, under `.claude/worktrees/<name>/`, and each is a full second copy of every tracked document, so a lint reported every finding once more per worktree. Hand-written Markdown under a directory literally named `worktrees` is now skipped too; negate the default (`"!**/worktrees/**"`) in your own `exclude` to lint it.
+
 ## [0.2.0]
 
 Breaking for anyone installing the Agent Skills by name, or relying on where `compile` writes by default — see Changed.

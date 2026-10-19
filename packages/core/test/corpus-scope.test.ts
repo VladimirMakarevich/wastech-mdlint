@@ -63,6 +63,35 @@ describe("DEFAULT_EXCLUDE_GLOBS", () => {
       );
     }
   });
+
+  it("prunes a git worktree checkout under an otherwise-linted dot-directory", () => {
+    // Claude Code checks worktrees out under `.claude/worktrees/<name>/`, each a full second copy of
+    // the repository, so a run that walked them reported every finding once more per worktree. The
+    // prune has to be by name: `.claude` itself stays in the corpus, so the dot-prefix prune the scan
+    // applies would never reach it on the lint path.
+    for (const candidate of [
+      ".claude/worktrees/feature-x/README.md",
+      ".claude/worktrees/feature-x/docs/guide/configuration.md",
+      directoryProbe(".claude/worktrees"),
+      "worktrees/feature-x/AGENTS.md",
+    ]) {
+      expect(matchesConfigGlob(candidate, [...DEFAULT_EXCLUDE_GLOBS])).toBe(
+        true,
+      );
+    }
+
+    // Only a *directory* named `worktrees` is pruned: the sibling skill tree and a page that merely
+    // has the word as its file name are still linted.
+    for (const candidate of [
+      ".claude/skills/mdlint/SKILL.md",
+      directoryProbe(".claude"),
+      "docs/worktrees.md",
+    ]) {
+      expect(matchesConfigGlob(candidate, [...DEFAULT_EXCLUDE_GLOBS])).toBe(
+        false,
+      );
+    }
+  });
 });
 
 describe("resolveCorpusScope", () => {

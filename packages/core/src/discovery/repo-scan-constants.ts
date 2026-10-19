@@ -2,16 +2,23 @@
 // detection). Both modules need the same NOISE list; a single source avoids duplicating the
 // literal array and avoids a value-level import cycle between the two.
 
-// Directories pruned from every scan: build output, VCS metadata, and dependency trees — hidden or
-// not — never contain source-of-truth Markdown worth clustering. This list is also the sole source
-// of the lint-time default `exclude` (config/corpus-scope.ts), so the rule for adding to it is
-// narrower than "the scan would rather not walk this": a hidden directory earns a place here only
-// when it is a dependency or build tree, never merely for being hidden. `.venv` and
-// `.yarn` are here for that reason, which keeps the hidden-directory *count* walk in repo-scan.ts
-// off a virtualenv or a Yarn Berry cache — but only off *those two*. The bound is name-based, so any
-// unlisted hidden cache (`.tox`, `.gradle`, `.terraform`, `.turbo`, …) classifies as `"hidden"` and
-// is walked to size it. That cost is accepted rather than fixed: name-listing every cache tool in
-// existence would rot faster than the walk costs, and the walk happens once, during `init`.
+// Directories pruned from every scan: build output, VCS metadata, dependency trees — hidden or
+// not — and git worktree checkouts never contain source-of-truth Markdown worth clustering. A
+// worktree is the odd one out: it is not generated, but it is a full second checkout of the same
+// repository, so walking it lints every tracked document twice and proposes every doc cluster
+// twice. Agent tools park them under a `worktrees` directory inside the repository (Claude Code
+// uses `.claude/worktrees/<name>/`); the scan already skips `.claude` by shape, but the lint corpus
+// does not, which is why the name has to be on this list rather than left to the dot-prefix prune.
+//
+// This list is also the sole source of the lint-time default `exclude` (config/corpus-scope.ts),
+// so the rule for adding to it is narrower than "the scan would rather not walk this": a hidden
+// directory earns a place here only when it is a dependency or build tree, never merely for being
+// hidden. `.venv` and `.yarn` are here for that reason, which keeps the hidden-directory *count*
+// walk in repo-scan.ts off a virtualenv or a Yarn Berry cache — but only off *those two*. The
+// bound is name-based, so any unlisted hidden cache (`.tox`, `.gradle`, `.terraform`, `.turbo`, …)
+// classifies as `"hidden"` and is walked to size it. That cost is accepted rather than fixed:
+// name-listing every cache tool in existence would rot faster than the walk costs, and the walk
+// happens once, during `init`.
 export const DEFAULT_NOISE_DIR_NAMES: readonly string[] = [
   "node_modules",
   ".git",
@@ -25,6 +32,7 @@ export const DEFAULT_NOISE_DIR_NAMES: readonly string[] = [
   ".venv",
   ".yarn",
   "target",
+  "worktrees",
 ];
 
 /**
