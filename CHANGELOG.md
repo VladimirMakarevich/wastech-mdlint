@@ -6,6 +6,8 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.2]
+
 ### Security
 
 - `@wastech-mdlint/core` and `@wastech-mdlint/mcp-server` now require `zod` 4.6.6 or later. Earlier releases are affected by [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5) (high severity: memory exhaustion while validating oversized constrained collections). The previous range, `^4`, already allowed the patched version, but a project whose lockfile resolved an older `zod` kept it through an upgrade of these packages and kept the `npm audit` finding.
@@ -13,7 +15,6 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - A malformed custom rule entry in the config is diagnosed again by what is actually wrong with it. Under `zod` 4.6, which a fresh install of `0.2.1` already resolves to, a typo inside an `assert` block — `"colums"` for `"columns"`, an array where an object belongs, an unknown `kind` — was reported as `Unrecognized key: "id"` plus a note that a `"custom"` entry requires `id` and `options.assert`, even though `id` was present and correct. The error now names the offending path inside `options.assert`, as it did with earlier `zod` releases. A custom entry missing `id` or `options` is now reported one missing key at a time, at its own path — `config.rules[0].options: …` — instead of the one summary line, which for `{ "rule": "custom", "id": "REQ-1" }` had also objected to `id`.
-
 - A densely cross-linked set of documents no longer stalls every command that builds the context graph — `lint` (even with `"rules": []`), `graph`, `slice`, `impact`, `compile`, `init` and the MCP tools. To report a cycle, the graph extracts one concrete path through each group of mutually reachable documents, and that search retried every ordering of documents it had already ruled out, which grows factorially with the size of the group. A dozen pages that all link to one another, sorting ahead of the one page that links back, were enough to keep a ~170-document corpus at 100% CPU for hours. The search now visits each document once. The reported cycles are unchanged: it returns the same path as before, without re-exploring documents that cannot lead back.
 
 ## [0.2.1]
@@ -98,7 +99,8 @@ First public release. Published manually and carries no provenance attestation; 
 - Windows, macOS, and Linux are all supported: paths in public output are normalized to repository-relative POSIX form, ordering uses a code-point comparator rather than locale collation, and every product file is written through an atomic temp-and-rename path so a failed write cannot truncate an existing file.
 - All analysis is local. No external HTTP link checking, no link cache, no remote schema resolution, and no install-time file writes.
 
-[unreleased]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.2.1...HEAD
+[unreleased]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.1.2...v0.1.3

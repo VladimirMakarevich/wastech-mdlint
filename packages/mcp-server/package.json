@@ -1,6 +1,6 @@
 {
   "name": "@wastech-mdlint/mcp-server",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "MCP server for Markdown linting: read-only Model Context Protocol tools for lint findings, the context graph, and change impact.",
   "keywords": [
     "mcp",
@@ -41,7 +41,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@wastech-mdlint/core": "0.2.1",
+    "@wastech-mdlint/core": "0.2.2",
     "zod": "^4.6.6"
   },
   "publishConfig": {

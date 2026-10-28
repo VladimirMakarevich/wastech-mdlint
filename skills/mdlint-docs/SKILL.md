@@ -2,7 +2,7 @@
 name: "mdlint-docs"
 description: "Keep a repository's Markdown inside its wastech-mdlint size budgets without losing content: find the SIZE-001 and LLM-001 findings, decide who owns each split, draft a split plan from the impact blast radius, split the document by meaning, and verify with lint. Use when a Markdown file is over or near its budget, when an edit will not fit in a file, or when the user asks to split or restructure docs, skills or agent context."
 license: "MIT"
-compatibility: "Requires @wastech-mdlint/cli 0.2.1. One tag publishes the CLI and tags the skills together, so a skill and the CLI it drives always carry the same version; do not mix versions."
+compatibility: "Requires @wastech-mdlint/cli 0.2.2. One tag publishes the CLI and tags the skills together, so a skill and the CLI it drives always carry the same version; do not mix versions."
 metadata:
   homepage: "https://github.com/VladimirMakarevich/wastech-mdlint"
   source: "https://github.com/VladimirMakarevich/wastech-mdlint"
