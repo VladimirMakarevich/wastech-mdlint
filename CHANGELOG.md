@@ -6,6 +6,10 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- A densely cross-linked set of documents no longer stalls every command that builds the context graph — `lint` (even with `"rules": []`), `graph`, `slice`, `impact`, `compile`, `init` and the MCP tools. To report a cycle, the graph extracts one concrete path through each group of mutually reachable documents, and that search retried every ordering of documents it had already ruled out, which grows factorially with the size of the group. A dozen pages that all link to one another, sorting ahead of the one page that links back, were enough to keep a ~170-document corpus at 100% CPU for hours. The search now visits each document once. The reported cycles are unchanged: it returns the same path as before, without re-exploring documents that cannot lead back.
+
 ## [0.2.1]
 
 ### Changed

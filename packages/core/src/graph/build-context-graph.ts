@@ -359,7 +359,26 @@ function detectCycles(
 // Find a concrete cycle through an SCC starting at its smallest node, returned as a closed path
 // (start repeated at the end).
 //
-// `walk` backtracks over simple paths inside a single SCC, so its stack depth is bounded by that
+// TIME BOUND: `walk` is a depth-first search that marks a member visited once and never unmarks it,
+// so each member is entered at most once and each adjacency list is scanned once — O(V + E) per
+// component. Unmarking on backtrack turns it into an enumeration of every simple path out of `start`
+// until one happens to close, which is factorial on a densely cross-linked component. That shape is
+// ordinary documentation: a dozen mutually linked pages sorting ahead of the one page that links back
+// made `lint` try every ordering of the dozen first, and a ~170-document corpus ran for hours.
+//
+// Unmarking buys nothing, and dropping it changes no reported path. The input is strongly connected,
+// so every member reaches `start` and the search cannot come back empty. And a member whose walk did
+// come back empty would come back empty on every later entry too. Say the search re-enters it along a
+// different path: the two paths agree up to some member, and the first member past that point on the
+// earlier path was backtracked out of, so its walk failed with only the shared prefix blocked. The
+// re-entered member is reachable from it along the abandoned path, so a route from the re-entered
+// member back to `start` around the shared prefix would have made that walk succeed — there is none,
+// and the re-entry would fail as well. Skipping a visited member therefore only prunes branches that
+// exhaustive backtracking would also abandon, and the cycle returned is the same first-found one. It
+// is deliberately not the shortest: GRP-001's `minCycleLength` filters this path's length, so a
+// shortest-cycle search would silently change which components that rule reports.
+//
+// DEPTH: `walk` recurses once per member on the current path, so its stack depth is bounded by that
 // SCC's member count — a strictly smaller bound than `strongConnect`'s above, since reaching it needs
 // thousands of documents *mutually reachable* in one component, not merely one long cycle. Same
 // accepted v2 limitation; see the note on `detectCycles`.
@@ -389,7 +408,6 @@ function cyclePath(
         return found;
       }
       path.pop();
-      visited.delete(neighbor);
     }
     return undefined;
   };
