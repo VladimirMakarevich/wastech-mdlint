@@ -123,10 +123,25 @@ export const customRuleEntrySchema = z
 // It stays load-bearing for *acceptance* even though `ruleEntryBranchIndex` below now decides which
 // branch a rejection *renders* from: the two are independent, and dropping the refine would
 // make {"rule":"custom"} a valid standard entry again.
+//
+// `abort: true` is load-bearing for *rendering*. When every branch of a union fails, Zod (since 4.6)
+// emits the `invalid_union` issue `ruleEntryBranchIndex` chooses from only if zero or several
+// branches are still "non-aborted" — failed solely on continuable issues such as unrecognized keys
+// or refinements. If exactly one is, Zod returns that branch's issues as the union's own, and no
+// branch choice happens at all. A custom entry with a typo inside `assert` aborts the custom branch
+// (a missing required key is a type error), while the standard branch fails only on an unrecognized
+// `id` plus this refine — both continuable — so without the abort the user is told
+// `Unrecognized key: "id"` about the one key that is correct. Aborting here keeps the standard branch
+// out of that pick for every "custom" entry, just as the custom branch's `rule` literal mismatch
+// keeps it out for every other entry. The cost is that the config loader never renders this
+// refine's own message: a bare {"rule":"custom"} is reported by the custom branch instead, one issue
+// per missing key at its own path. The message still reaches anyone parsing the exported
+// `ruleEntryUnionSchema` directly, as one branch's detail in the `invalid_union` issue.
 const standardRuleEntrySchema = ruleEntrySchema.refine(
   (entry) => entry.rule !== "custom",
   {
     message: 'a "custom" rule entry also requires "id" and "options.assert"',
+    abort: true,
   },
 );
 

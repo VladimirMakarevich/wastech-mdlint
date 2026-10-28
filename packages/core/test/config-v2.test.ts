@@ -375,6 +375,10 @@ describe("config diagnostics", () => {
 
     expect(message).toContain("config.rules[0].options.assert");
     expect(message).toContain("colums");
+    // The standard-rule branch's view of the same entry: `id` is the one key here that is correct.
+    // Zod returns a union's only non-aborted branch as the union's own result, so this is what
+    // renders if that branch ever stops aborting on `rule: "custom"`.
+    expect(message).not.toContain('Unrecognized key: "id"');
   });
 
   it("identifies the shape problem when options.assert is an array", async () => {
