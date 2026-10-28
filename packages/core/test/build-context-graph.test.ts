@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildContextGraph } from "../src/graph/build-context-graph.js";
+import type { ContextGraph } from "../src/graph/context-graph-types.js";
 import { loadDocuments } from "../src/markdown/load-documents.js";
 import type { ParsedDocument } from "../src/markdown/document-types.js";
 import { parseDocument } from "../src/markdown/parse-document.js";
@@ -471,5 +472,104 @@ describe("buildContextGraph · deep reference chains within the documented depth
     expect(cycle.slice(0, DEPTH)).toEqual(
       Array.from({ length: DEPTH }, (_unused, index) => chainName(index)),
     );
+  });
+});
+
+// A closed path is valid when it starts and ends on the same node, visits no member twice in
+// between, and every hop is an edge the graph actually holds — so it is a cycle that exists, not
+// merely a list of the component's members.
+function expectClosedPathAlongEdges(
+  cycle: string[],
+  graph: ContextGraph,
+): void {
+  const edgeKeys = new Set(
+    graph.edges.map((edge) => `${edge.from} ${edge.to}`),
+  );
+
+  expect(cycle.length).toBeGreaterThan(2);
+  expect(cycle.at(-1)).toBe(cycle[0]);
+  expect(new Set(cycle.slice(0, -1)).size).toBe(cycle.length - 1);
+  for (let index = 0; index + 1 < cycle.length; index += 1) {
+    expect(edgeKeys.has(`${cycle[index]} ${cycle[index + 1]}`)).toBe(true);
+  }
+}
+
+// One component built so that the only way back to its start sorts after a dense block: `a -> x1`,
+// the documents `x1…xk` all link to one another, only `x1` links on to `z`, and `z -> a`. Every `x…`
+// sorts before `z`, so a depth-first search out of `x1` enters the clique before it tries `z`.
+// A search that unmarks members on backtrack then tries every ordering of the clique before giving
+// up on it — on the order of k! paths — while one that marks permanently exhausts it once. Measured
+// before the fix, a whole `lint` run of this shape took ~5 s at k = 11 and ~65 s at k = 12, growing
+// by a factor of about k per step, so k = 14 leaves no machine fast enough for that regression to
+// pass.
+//
+// The cap is generous (the fixed build takes milliseconds) so slow CI does not flake, and it catches
+// a slowdown that still finishes. A return of the factorial enumeration does not fail at the cap:
+// `buildContextGraph` is synchronous, so neither this assertion nor Vitest's own timeout gets to run
+// before it returns, and the regression shows up as this test stalling.
+const CLIQUE_SIZE = 14;
+const CLIQUE_BUILD_CAP_MS = 2_000;
+
+function cliqueBehindBackEdge(size: number): Record<string, string> {
+  const files: Record<string, string> = {
+    "docs/a.md": "# a\n\n- [x1](x1.md)\n",
+    "docs/z.md": "# z\n\n- [a](a.md)\n",
+  };
+  for (let index = 1; index <= size; index += 1) {
+    const links: string[] = [];
+    for (let other = 1; other <= size; other += 1) {
+      if (other !== index) {
+        links.push(`- [x${other}](x${other}.md)`);
+      }
+    }
+    if (index === 1) {
+      links.push("- [z](z.md)");
+    }
+    files[`docs/x${index}.md`] = `# x${index}\n\n${links.join("\n")}\n`;
+  }
+  return files;
+}
+
+describe("buildContextGraph · cycle extraction", () => {
+  it(`extracts a cycle through a ${CLIQUE_SIZE}-document clique in linear time`, async () => {
+    const root = await createFixtureTree(cliqueBehindBackEdge(CLIQUE_SIZE));
+    const documents = await loadDocuments(["docs/**/*.md"], { cwd: root });
+
+    const startedAt = performance.now();
+    const graph = buildContextGraph(documents);
+    const elapsedMs = performance.now() - startedAt;
+
+    expect(elapsedMs).toBeLessThan(CLIQUE_BUILD_CAP_MS);
+    expect(graph.nodes).toHaveLength(CLIQUE_SIZE + 2);
+    // Every document reaches every other, so the whole fixture is the one component.
+    expect(graph.cycles).toHaveLength(1);
+    const cycle = graph.cycles[0]!;
+    expectClosedPathAlongEdges(cycle, graph);
+    const nodePaths = new Set(graph.nodes.map((node) => node.path));
+    expect(cycle.every((member) => nodePaths.has(member))).toBe(true);
+    // The clique has no way out but back through `x1`, so the search abandons it and closes via `z`.
+    expect(cycle).toEqual([
+      "docs/a.md",
+      "docs/x1.md",
+      "docs/z.md",
+      "docs/a.md",
+    ]);
+  });
+
+  it("reports the first cycle the depth-first walk reaches, not the shortest one", () => {
+    // `a -> c -> a` is the shortest cycle through `a`, but the walk enters `b` first and closes the
+    // longer loop through it. The difference is user-visible: GRP-001 filters this path's length by
+    // `minCycleLength` (default 3), so reporting the two-document loop instead would silence the rule
+    // on this component.
+    const graph = buildContextGraph(
+      docs({
+        "a.md": "[b](b.md) [c](c.md)\n",
+        "b.md": "[c](c.md)\n",
+        "c.md": "[a](a.md)\n",
+      }),
+    );
+
+    expect(graph.cycles).toEqual([["a.md", "b.md", "c.md", "a.md"]]);
+    expectClosedPathAlongEdges(graph.cycles[0]!, graph);
   });
 });

@@ -45,6 +45,11 @@ function isRuleEntryPath(issuePath: readonly PropertyKey[]): boolean {
  * For a `rules[]` entry that is `rule: "custom"` vs everything else. Anywhere else the schema offers
  * no discriminator, so the closest match by issue count is the best available guess — and it is a
  * guess with a floor, since every branch's issues describe the same input.
+ *
+ * Only reached when Zod reports `invalid_union`. Zod returns a single branch's issues directly when
+ * that branch alone failed without aborting, so for `rules[]` the choice made here is only right if
+ * the branch the author did not mean always aborts — which `standardRuleEntrySchema`'s refine
+ * guarantees for custom entries.
  */
 function selectBranch(
   branches: readonly (readonly z.core.$ZodIssue[])[],

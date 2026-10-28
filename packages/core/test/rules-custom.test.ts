@@ -277,8 +277,10 @@ describe("declarative custom rule", () => {
     expect(error).toBeInstanceOf(ConfigError);
     expect((error as ConfigError).code).toBe("CONFIG_INVALID");
     expect((error as ConfigError).message).toMatch(/config\.rules\[0\]/);
+    // Rendered from the custom branch, so each missing key is named at its own path.
+    expect((error as ConfigError).message).toMatch(/config\.rules\[0\]\.id:/);
     expect((error as ConfigError).message).toMatch(
-      /"id" and "options\.assert"/,
+      /config\.rules\[0\]\.options:/,
     );
   });
 
@@ -327,6 +329,14 @@ describe("declarative custom rule", () => {
     expect(error).toBeInstanceOf(ConfigError);
     expect((error as ConfigError).code).toBe("CONFIG_INVALID");
     expect((error as ConfigError).message).toMatch(/config\.rules\[0\]/);
+    // The missing key is `options`; the standard-rule branch's objection to `id` must not be what the
+    // user reads, since `id` is the one key here that is right.
+    expect((error as ConfigError).message).toMatch(
+      /config\.rules\[0\]\.options:/,
+    );
+    expect((error as ConfigError).message).not.toMatch(
+      /Unrecognized key: "id"/,
+    );
   });
 });
 
