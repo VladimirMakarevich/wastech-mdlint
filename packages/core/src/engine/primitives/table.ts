@@ -109,7 +109,9 @@ export type RowCellCountOptions = { section?: string };
 // rowCellCount — every body row has exactly as many cells as the header (TBL-007). The header's own
 // count needs no check: GFM recognises a table only when the header and delimiter rows agree. The
 // message names the rendering consequence, because the two directions fail differently: extra cells
-// vanish from the rendered table, missing ones render as blanks.
+// vanish from the rendered table, missing ones render as blanks. Only the row's own count takes a
+// noun, and it can be 1 — a GFM row always has at least one cell, so a lone cell under a wider
+// header is an ordinary short row — so the noun agrees with that count instead of staying plural.
 export function rowCellCount(
   document: ParsedDocument,
   options: RowCellCountOptions,
@@ -132,7 +134,7 @@ export function rowCellCount(
           : "the missing cells render empty";
 
       findings.push({
-        message: `Row has ${actual} cells but the header declares ${expected}; ${consequence}.`,
+        message: `Row has ${actual} ${actual === 1 ? "cell" : "cells"} but the header declares ${expected}; ${consequence}.`,
         line: row.line,
         data: { expected, actual },
       });

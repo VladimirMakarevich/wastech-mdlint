@@ -203,6 +203,24 @@ describe("TBL-007 row cell count", () => {
     ]);
   });
 
+  // A GFM row always has at least one cell, so a one-cell row under a wider header is the only
+  // count that needs the singular noun; the plural cases are pinned by the over-long/short test.
+  it("uses the singular noun for a one-cell row", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": ["| A | B |", "| --- | --- |", "| 1 |"].join("\n"),
+    });
+    const result = await lint(cwd, [rule("TBL-007")]);
+    expect(result.messages).toEqual([
+      expect.objectContaining({
+        ruleId: "TBL-007",
+        line: 3,
+        message:
+          "Row has 1 cell but the header declares 2; the missing cells render empty.",
+        data: { expected: 2, actual: 1 },
+      }),
+    ]);
+  });
+
   it("reports nothing on a well-formed table, escaped pipes included", async () => {
     const cwd = await fixtureRepo({
       "a.md": [
