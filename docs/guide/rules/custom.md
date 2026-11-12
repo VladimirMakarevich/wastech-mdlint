@@ -74,6 +74,7 @@ The MCP ad-hoc [`lint`](../mcp-server.md) tool enforces the same constraint on i
 Notes on individual fields:
 
 - `section` (on table/section/content kinds) scopes the check to content under a heading whose text matches; omit it to check every table/section in the file.
+- `columnNotEmpty` skips the missing cells of a row shorter than its header, exactly as [TBL-002](TBL-002.md) does: such a cell was never written, so the defect is the row, which [TBL-007](TBL-007.md) reports. A cell written empty is still reported.
 - `crossColumn`'s `when` and `then` are each a **column condition**: `{ column, ... }` where the `...` is exactly one of `equals: string`, `matches: string` (regex), or `notEmpty: boolean`. The rule reads "for every row where `when` holds, `then` must also hold."
 - `columnMatches` / `columnUnique` / `contentNotMatch` take a regex `pattern` (or `idPattern`) as a string; `flags` is a separate optional string (`contentNotMatch` and `columnMatches`). Matching is added automatically where the primitive needs the global flag. `columnMatches` tests each cell independently, so `g`/`y` are accepted but carry no meaning there and cannot make findings depend on row order — see [TBL-004](TBL-004.md).
 - `noPlaceholders`'s `placeholders` **extends** the locked default set (`TBD`, `TODO`, `WIP`, `FIXME`, `N/A`); it does not replace it. A section is flagged when it is empty or contains only a bare placeholder token (whole-body, case-insensitive), not when prose merely mentions one.

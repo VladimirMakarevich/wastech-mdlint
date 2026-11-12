@@ -54,7 +54,7 @@ export function defineRule<TSchema extends z.ZodType>(def: {
   return {
     metadata: {
       ...def.metadata,
-      // Derived here rather than repeated in 24 rule files: a rule that spelled its own URL could
+      // Derived here rather than repeated in every rule file: a rule that spelled its own URL could
       // disagree with the README table's link, and a rule that forgot one would emit a finding with
       // no `helpUri` at all — which is exactly what two rules once shipped.
       docsUrl: def.metadata.docsUrl ?? ruleDocsUrl(def.metadata.id),

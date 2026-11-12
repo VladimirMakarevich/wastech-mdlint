@@ -41,6 +41,7 @@ const EXPECTED: Record<string, { scope: RuleScope; severity: Severity }> = {
   "TBL-004": { scope: "document", severity: "error" },
   "TBL-005": { scope: "document", severity: "error" },
   "TBL-006": { scope: "project", severity: "error" },
+  "TBL-007": { scope: "document", severity: "error" },
   "SEC-001": { scope: "document", severity: "error" },
   "SEC-002": { scope: "document", severity: "error" },
   "SEC-003": { scope: "project", severity: "error" },
@@ -73,7 +74,7 @@ const EXPECTED_CATEGORIES = [
 ].sort(compareStrings);
 
 describe("BUILTIN_RULE_DEFINITIONS inventory", () => {
-  it("ships exactly the documented 24 rule ids", () => {
+  it("ships exactly the documented 25 rule ids", () => {
     const ids = BUILTIN_RULE_DEFINITIONS.map(
       (definition) => definition.metadata.id,
     ).sort(compareStrings);
@@ -145,7 +146,7 @@ describe("rule documentation URLs", () => {
     // The assertions above strip `RULE_DOCS_BASE_URL` and check the filename half on disk, so the
     // owner/repo half of the constant was pinned by nothing — and it is a second spelling of the
     // root manifest's `repository.url`. A rename that updates the manifest and misses the constant
-    // turns every finding's `helpUri` and all 24 README table links into 404s with the suite green,
+    // turns every finding's `helpUri` and all README table links into 404s with the suite green,
     // which no on-disk check can see because the path half stays correct.
     const origin = rootRepositoryUrl
       .replace(/^git\+/, "")
@@ -182,6 +183,7 @@ const FILE_SCOPED = [
   "TBL-004",
   "TBL-005",
   "TBL-006",
+  "TBL-007",
   "SEC-001",
   "SEC-002",
   "SEC-003",

@@ -2,7 +2,7 @@
 
 > [Guide index](README.md) · [Configuration guide](configuration.md) · [Rules index](rules/README.md)
 
-This is a single `wastech-mdlint.config.json` that exercises **every** option the linter accepts, with a comment on each. It is a _reference_, not a recommended starting config — you would never enable all 24 rules at once with every option. Copy the pieces you need. For a curated starter, run [`wastech-mdlint init`](cli.md#init).
+This is a single `wastech-mdlint.config.json` that exercises **every** option the linter accepts, with a comment on each. It is a _reference_, not a recommended starting config — you would never enable all 25 rules at once with every option. Copy the pieces you need. For a curated starter, run [`wastech-mdlint init`](cli.md#init).
 
 Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys — top-level, in any rule's `options`, or under `compile` — are rejected. Every field below is drawn from the generated schema (`wastech-mdlint schema`).
 
@@ -124,6 +124,13 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
       "options": {
         "column": "ID", // required
         "idPattern": "REQ-\\d+", // optional: only values matching this count as IDs
+        "section": "Requirements",
+      },
+    },
+    // TBL-007: every body row has as many cells as the header (no required options).
+    {
+      "rule": "TBL-007",
+      "options": {
         "section": "Requirements",
       },
     },

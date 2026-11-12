@@ -167,10 +167,142 @@ describe("TBL rules", () => {
   });
 });
 
+// A row's written cell count is what both TBL-007 and TBL-002's padding-cell skip read, so the
+// fixture holds one over-long row, one short row, one written-empty cell and one row that only looks
+// malformed (escaped pipes, inside and outside a code span).
+const MALFORMED_TABLE = [
+  "| ID | Owner | Status |",
+  "| --- | --- | --- |",
+  "| REQ-1 | Ann | open | extra |",
+  "| REQ-2 | Bob |",
+  "| REQ-3 | `a\\|b` | x \\| y |",
+  "| REQ-4 | Cy |  |",
+].join("\n");
+
+describe("TBL-007 row cell count", () => {
+  it("reports an over-long and a short row with their lines and both counts (error)", async () => {
+    const cwd = await fixtureRepo({ "a.md": MALFORMED_TABLE });
+    const result = await lint(cwd, [rule("TBL-007")]);
+    expect(result.messages).toEqual([
+      expect.objectContaining({
+        ruleId: "TBL-007",
+        severity: "error",
+        line: 3,
+        message:
+          "Row has 4 cells but the header declares 3; the extra cells are dropped when the table renders.",
+        data: { expected: 3, actual: 4 },
+      }),
+      expect.objectContaining({
+        ruleId: "TBL-007",
+        severity: "error",
+        line: 4,
+        message:
+          "Row has 2 cells but the header declares 3; the missing cells render empty.",
+        data: { expected: 3, actual: 2 },
+      }),
+    ]);
+  });
+
+  it("reports nothing on a well-formed table, escaped pipes included", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": [
+        "| ID | Note |",
+        "| --- | --- |",
+        "| REQ-1 | x \\| y |",
+        "| REQ-2 | `a\\|b` |",
+        "| REQ-3 |  |",
+      ].join("\n"),
+    });
+    const result = await lint(cwd, [rule("TBL-007")]);
+    expect(result.messages).toEqual([]);
+  });
+
+  // GFM splits cells before inline code is recognised, so this row renders as three cells on
+  // GitHub; TBL-007 follows the renderer rather than a private tokenizer.
+  it("counts an unescaped pipe inside backticks as a separator", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": ["| ID | Note |", "| --- | --- |", "| REQ-1 | `a|b` |"].join(
+        "\n",
+      ),
+    });
+    const result = await lint(cwd, [rule("TBL-007")]);
+    expect(result.messages.map((message) => message.data)).toEqual([
+      { expected: 2, actual: 3 },
+    ]);
+  });
+
+  it("honors section scoping", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": [
+        "## Clean",
+        "",
+        "| A | B |",
+        "| --- | --- |",
+        "| 1 |",
+        "",
+        "## Checked",
+        "",
+        "| A | B |",
+        "| --- | --- |",
+        "| 1 |",
+      ].join("\n"),
+    });
+    const result = await lint(cwd, [rule("TBL-007", { section: "Checked" })]);
+    expect(result.messages.map((message) => message.line)).toEqual([11]);
+  });
+});
+
+describe("TBL-002 and padding cells", () => {
+  it("does not report a short row's padding cell, with or without the column named", async () => {
+    const cwd = await fixtureRepo({ "a.md": MALFORMED_TABLE });
+
+    for (const options of [undefined, { columns: ["Status"] }]) {
+      const result = await lint(cwd, [rule("TBL-002", options)]);
+      // Only REQ-4's written-empty Status cell; REQ-2's missing Status cell is TBL-007's defect.
+      expect(
+        result.messages.map((message) => [message.line, message.data?.column]),
+      ).toEqual([[6, "Status"]]);
+    }
+  });
+
+  it("leaves exactly one finding, from TBL-007, for a short row", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": ["| ID | Owner |", "| --- | --- |", "| REQ-1 |"].join("\n"),
+    });
+    const result = await lint(cwd, [rule("TBL-002"), rule("TBL-007")]);
+    expect(result.messages.map((message) => message.ruleId)).toEqual([
+      "TBL-007",
+    ]);
+  });
+
+  it("--fix leaves a short row byte-unchanged while filling a written-empty cell", async () => {
+    const cwd = await fixtureRepo({ "a.md": MALFORMED_TABLE });
+
+    await applyFixes({
+      cwd,
+      config: { rules: [] },
+      rules: [rule("TBL-002")],
+      settings: {},
+    });
+
+    const written = (await readFile(path.join(cwd, "a.md"), "utf8")).split(
+      "\n",
+    );
+    expect(written[3]).toBe("| REQ-2 | Bob |");
+    expect(written[5]).toBe("| REQ-4 | Cy | TODO |");
+  });
+});
+
 // The shared `files`/`exclude` shape had no end-to-end coverage on any document-scope
 // rule, which is how an unscoped one shipped. Both fixture documents violate every case below, so the only
 // variable across the three runs is the scope the rule was given.
-const FILE_SCOPE_CASES: readonly { id: string; options: object }[] = [
+// `fixture` defaults to TABLE; TBL-007 needs a malformed row to report, and TABLE stays untouched
+// because the other TBL tests count findings against it.
+const FILE_SCOPE_CASES: readonly {
+  id: string;
+  options: object;
+  fixture?: string;
+}[] = [
   { id: "TBL-001", options: { requiredColumns: ["ID", "Priority"] } },
   { id: "TBL-002", options: { columns: ["Owner"] } },
   { id: "TBL-003", options: { column: "Status", values: ["open", "done"] } },
@@ -182,6 +314,7 @@ const FILE_SCOPE_CASES: readonly { id: string; options: object }[] = [
       then: { column: "Owner", notEmpty: true },
     },
   },
+  { id: "TBL-007", options: {}, fixture: MALFORMED_TABLE },
 ];
 
 describe("TBL file scope (exclude)", () => {
@@ -199,10 +332,10 @@ describe("TBL file scope (exclude)", () => {
 
   it.each(FILE_SCOPE_CASES)(
     "$id drops an excluded document, with and without `files`",
-    async ({ id, options }) => {
+    async ({ id, options, fixture = TABLE }) => {
       const cwd = await fixtureRepo({
-        "docs/a.md": TABLE,
-        "drafts/b.md": TABLE,
+        "docs/a.md": fixture,
+        "drafts/b.md": fixture,
       });
 
       expect(await reportedFiles(cwd, rule(id, options))).toEqual([

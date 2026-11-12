@@ -244,7 +244,7 @@ function pickCitedCycle(cycles: string[][]): string[] | undefined {
 // silently instead of emitting a dangling id or crashing — that degradation is what "no hardcoded
 // drift" buys.
 //
-// Why these 7 and not the other 17 built-ins: every other rule has a *required* option with no
+// Why these 8 and not the other 17 built-ins: every other rule has a *required* option with no
 // safe way to derive it from the corpus without inventing a threshold (a pipeline `chain`, a
 // `template` file, a `zonesDir`, an idColumn/idPattern split, a glossary table, an enumerated
 // `values` set, etc.).
@@ -283,6 +283,14 @@ const PATTERN_GATES: Record<
     gate: (patterns) => patterns.tableCount > 0,
     relevance: (patterns) =>
       `The corpus contains ${patterns.tableCount} table(s); TBL-002 checks that target cells are not left empty.`,
+  },
+  // Proposed wherever TBL-002 is: TBL-002 does not report the padding cells of a short row, because
+  // the defect there is the row, so a config holding TBL-002 alone would stop flagging short rows.
+  // TBL-007 has no required option, so proposing it never needs an invented value.
+  "TBL-007": {
+    gate: (patterns) => patterns.tableCount > 0,
+    relevance: (patterns) =>
+      `The corpus contains ${patterns.tableCount} table(s); TBL-007 checks that every row has as many cells as its header.`,
   },
   "CTX-001": {
     gate: (patterns) => patterns.placeholderSectionCount > 0,

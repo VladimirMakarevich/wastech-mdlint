@@ -164,6 +164,7 @@ describe("inferRuleSet · end to end", () => {
       "REF-001",
       "REF-002",
       "TBL-002",
+      "TBL-007",
     ]);
     // The cycle in this corpus is `docs/a.md -> docs/b.md -> docs/a.md`, two documents — below
     // GRP-001's floor of 3. The entry must not carry an option lowering that floor: the floor is
@@ -194,6 +195,7 @@ describe("inferRuleSet · end to end", () => {
       "REF-002": undefined,
       "SEC-001": undefined,
       "TBL-002": undefined,
+      "TBL-007": undefined,
     });
 
     const sec001 = result.rules.find((rule) => rule.rule === "SEC-001");
@@ -220,9 +222,15 @@ describe("inferRuleSet · end to end", () => {
       (cluster) => cluster.clusterPath === "docs",
     );
     expect(docsCluster?.contributesTo).toEqual(
-      ["CTX-001", "CTX-002", "GRP-001", "REF-001", "REF-002", "TBL-002"].sort(
-        compareStrings,
-      ),
+      [
+        "CTX-001",
+        "CTX-002",
+        "GRP-001",
+        "REF-001",
+        "REF-002",
+        "TBL-002",
+        "TBL-007",
+      ].sort(compareStrings),
     );
     expect(result.corpusFileCount).toBe(4);
   });
@@ -285,7 +293,9 @@ describe("inferRuleSet · severity policy", () => {
 });
 
 describe("inferRuleSet · per-pattern isolation", () => {
-  it("gates TBL-002 on table presence alone", async () => {
+  // TBL-007 rides on the same gate: TBL-002 skips a short row's padding cells, so proposing TBL-002
+  // alone would leave an init-written config blind to short rows.
+  it("gates TBL-002 and TBL-007 on table presence alone", async () => {
     const root = await createFixtureTree({
       "docs/only-tables.md": [
         "# Only tables",
@@ -301,7 +311,10 @@ describe("inferRuleSet · per-pattern isolation", () => {
 
     const result = await infer(root, [buildCluster({ path: "docs" })]);
 
-    expect(result.rules.map((rule) => rule.rule)).toEqual(["TBL-002"]);
+    expect(result.rules.map((rule) => rule.rule)).toEqual([
+      "TBL-002",
+      "TBL-007",
+    ]);
   });
 
   it("gates CTX-002 on checklist presence alone", async () => {

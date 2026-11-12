@@ -9,14 +9,16 @@ import {
   columnUnique,
   crossColumn,
   DEFAULT_COLUMN_IN_SET_CASE_SENSITIVE,
+  isPaddingCell,
   requiredColumns,
+  rowCellCount,
 } from "../primitives/table.js";
 import { regexFlagsSchema, regexStringSchema } from "../regex.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
 import type { TextEdit } from "../types.js";
 
-// The six table rules — thin presets over the shared table primitives plus file scoping.
+// The seven table rules — thin presets over the shared table primitives plus file scoping.
 
 // TBL-001 — required columns present.
 export const tbl001: RuleDefinition = defineRule({
@@ -82,7 +84,9 @@ function locateCellRange(
 }
 
 // TBL-002 fix: replace each empty target cell with ` TODO ` — deterministic, so it is safe to apply
-// unattended.
+// unattended. Padding cells are skipped through the same `isPaddingCell` predicate `columnNotEmpty`
+// uses, so the fix never rewrites a cell the check did not report. `locateCellRange` happens to
+// reject most of them anyway, but only because the row lacks the pipes, which is not a contract.
 function emptyCellEdits(
   document: ParsedDocument,
   options: { columns?: string[]; section?: string },
@@ -103,7 +107,10 @@ function emptyCellEdits(
         continue;
       }
       for (const row of table.rows) {
-        if ((row.cells[column] ?? "").trim().length > 0) {
+        if (
+          isPaddingCell(row, cellIndex) ||
+          (row.cells[column] ?? "").trim().length > 0
+        ) {
           continue;
         }
         const lineText = lines[row.line - 1];
@@ -301,6 +308,38 @@ export const tbl006: RuleDefinition = defineRule({
   },
 });
 
+// TBL-007 — every body row has as many cells as the header. Error by default: an over-long row
+// silently loses content when rendered, and a malformed row changes what every other TBL rule
+// reads. Not fixable: padding a short row is deterministic, but for an over-long row there is no
+// safe way to choose which cell to drop, and a fix that handles only one direction would be
+// surprising.
+export const tbl007: RuleDefinition = defineRule({
+  metadata: {
+    id: "TBL-007",
+    category: "TBL",
+    description: "Table rows have as many cells as the header.",
+    defaultSeverity: "error",
+    scope: "document",
+    fixable: false,
+  },
+  optionsSchema: z
+    .object({
+      section: z.string().optional(),
+      ...fileScopeShape,
+    })
+    .strict(),
+  check: (options) => (context) => {
+    if (!matchesFileScope(context.filePath!, options)) {
+      return;
+    }
+    for (const finding of rowCellCount(context.document!, {
+      section: options.section,
+    })) {
+      context.report(finding);
+    }
+  },
+});
+
 export const TBL_RULES: readonly RuleDefinition[] = [
   tbl001,
   tbl002,
@@ -308,4 +347,5 @@ export const TBL_RULES: readonly RuleDefinition[] = [
   tbl004,
   tbl005,
   tbl006,
+  tbl007,
 ];

@@ -215,6 +215,7 @@ The following table is generated from the rule metadata (`npm run generate:docs`
 | [`TBL-004`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-004.md) | TBL | error | document | no | Cell values match a required pattern. |
 | [`TBL-005`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-005.md) | TBL | error | document | no | Cross-column conditional holds (when → then). |
 | [`TBL-006`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-006.md) | TBL | error | project | no | Column IDs are unique across files. |
+| [`TBL-007`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-007.md) | TBL | error | document | no | Table rows have as many cells as the header. |
 
 <!-- END GENERATED RULES -->
 

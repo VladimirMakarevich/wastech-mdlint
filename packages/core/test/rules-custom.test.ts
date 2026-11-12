@@ -75,6 +75,33 @@ describe("declarative custom rule", () => {
     expect(result.messages[0]!.helpUri).not.toBe("REQ-OWNER");
   });
 
+  // The padding-cell skip lives in the shared primitive so the declarative twin cannot disagree with
+  // TBL-002: both must ignore the missing cell of a short row and both must report a written-empty one.
+  it("skips a short row's padding cell in columnNotEmpty exactly as TBL-002 does", async () => {
+    const cwd = await repo({
+      "docs/reqs.md":
+        "| ID | Owner |\n| --- | --- |\n| REQ-1 |\n| REQ-2 |  |\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [
+          {
+            rule: "custom",
+            id: "REQ-OWNER",
+            options: { assert: { kind: "columnNotEmpty", column: "Owner" } },
+          },
+          { rule: "TBL-002", options: { columns: ["Owner"] } },
+        ],
+      }),
+    });
+
+    const result = await lintWithConfig(cwd);
+    expect(
+      result.messages.map((message) => [message.ruleId, message.line]),
+    ).toEqual([
+      ["REQ-OWNER", 4],
+      ["TBL-002", 4],
+    ]);
+  });
+
   it("runs a project-scope custom rule (columnUnique) from config", async () => {
     const cwd = await repo({
       "a.md": "| ID |\n| --- |\n| X-1 |\n",
