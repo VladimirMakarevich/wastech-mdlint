@@ -280,3 +280,37 @@ describe("SLICE_RESOLUTION_DESCRIPTION", () => {
     expect(SLICE_RESOLUTION_DESCRIPTION).toMatch(/no fuzzy/i);
   });
 });
+
+// Frontmatter used to parse as a setext H2, registering an invented slug in the index. `slice` by
+// that `#slug` must now find nothing, while the first real heading still resolves and slices.
+describe("resolveQuery · frontmatter", () => {
+  const FRONTMATTER_DOC =
+    "---\nname: demo-skill\ndescription: does a thing\n---\n\n# Title\n\n[b](b.md)\n";
+
+  it("no longer resolves the slug frontmatter used to invent", () => {
+    const { documents } = buildFixture({ "a.md": FRONTMATTER_DOC });
+
+    expect(
+      resolveQuery(
+        buildSearchIndex(documents),
+        "#name-demo-skilldescription-does-a-thing",
+      ),
+    ).toBeNull();
+  });
+
+  it("resolves and slices from the first real heading", () => {
+    const { documents, graph } = buildFixture({
+      "a.md": FRONTMATTER_DOC,
+      "b.md": "# B\n",
+    });
+
+    expect(resolveQuery(buildSearchIndex(documents), "#title")).toEqual({
+      kind: "anchor",
+      starts: ["a.md"],
+    });
+    expect(getContextSlice(graph, documents, "#title").files).toEqual([
+      "a.md",
+      "b.md",
+    ]);
+  });
+});

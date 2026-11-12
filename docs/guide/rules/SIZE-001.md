@@ -16,6 +16,8 @@ The three metrics are measured as:
 - **lines** — the number of newline (`\n`) characters in the content.
 - **tokens** — an _estimate_ from the isolated token heuristic (see [Notes](#notes)).
 
+All three measure the whole file, including any YAML frontmatter: an agent host loads the frontmatter of a `SKILL.md` or agent file along with its body, and `bytes` and `lines` stay counts you can reproduce with `wc`.
+
 A file-level finding has no single offending line, so it is anchored at line 0.
 
 ## Options

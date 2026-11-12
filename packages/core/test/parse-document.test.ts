@@ -356,3 +356,162 @@ describe("parseDocument · determinism", () => {
     expect(JSON.stringify(first)).toBe(JSON.stringify(second));
   });
 });
+
+// Frontmatter used to parse as a thematic break plus a setext H2, inventing the heading
+// "name: demo-skill\ndescription: does a thing" and the slug below. Every consumer that reads
+// `headings`/`sections` saw that heading, so the parser-level pins here are the root of the fix.
+const FRONTMATTER_DOC =
+  "---\nname: demo-skill\ndescription: does a thing\n---\n\n# Title\n\nBody text.\n";
+
+describe("parseDocument · frontmatter", () => {
+  it("exposes the raw block and its inclusive fence-to-fence line range", () => {
+    expect(parse(FRONTMATTER_DOC).frontmatter).toEqual({
+      raw: "name: demo-skill\ndescription: does a thing",
+      startLine: 1,
+      endLine: 4,
+    });
+  });
+
+  it("produces no heading or section for the block, and the first real heading keeps its slug and line", () => {
+    const doc = parse(FRONTMATTER_DOC);
+
+    expect(doc.headings).toEqual([
+      { text: "Title", depth: 1, slug: "title", line: 6 },
+    ]);
+    expect(doc.sections).toEqual(["Title"]);
+  });
+
+  it("keeps the frontmatter bytes in `content` so size and offsets stay whole-file", () => {
+    expect(parse(FRONTMATTER_DOC).content).toBe(FRONTMATTER_DOC);
+  });
+
+  it("exposes absence as an explicit null that survives serialization", () => {
+    const doc = parse("# Title\n");
+
+    expect(doc.frontmatter).toBeNull();
+    expect("frontmatter" in doc).toBe(true);
+    expect(JSON.parse(JSON.stringify(doc))).toHaveProperty("frontmatter", null);
+  });
+
+  it("leaves a later `---` as a thematic break that adds no heading", () => {
+    const doc = parse(`${FRONTMATTER_DOC}\n---\n\n## Next\n`);
+
+    expect(doc.frontmatter?.endLine).toBe(4);
+    expect(doc.headings.map((heading) => heading.text)).toEqual([
+      "Title",
+      "Next",
+    ]);
+  });
+
+  it("still parses a mid-document setext H2", () => {
+    const doc = parse(`${FRONTMATTER_DOC}\nParagraph\n---\n`);
+
+    expect(
+      doc.headings.map((heading) => [heading.text, heading.depth]),
+    ).toEqual([
+      ["Title", 1],
+      ["Paragraph", 2],
+    ]);
+  });
+
+  it("does not treat an unclosed opening fence as frontmatter", () => {
+    const doc = parse("---\nname: x\n\n# Title\n");
+
+    expect(doc.frontmatter).toBeNull();
+    expect(doc.headings).toEqual([
+      { text: "Title", depth: 1, slug: "title", line: 4 },
+    ]);
+  });
+
+  it("does not treat an unclosed fence with no heading as frontmatter", () => {
+    const doc = parse("---\nname: x\ndescription: y\n");
+
+    expect(doc.frontmatter).toBeNull();
+    expect(doc.headings).toEqual([]);
+  });
+
+  // Recognition is anchored to the very start of the file. A block that starts one line down is
+  // ordinary Markdown again, setext heading included — that is the standard behaviour every
+  // remark-based tool and GitHub share.
+  it("only recognises a block whose opening fence is the first line", () => {
+    const doc = parse("\n---\nname: x\n---\n# T\n");
+
+    expect(doc.frontmatter).toBeNull();
+  });
+
+  // The extension does no YAML validation, so a file that opens with a horizontal rule and has a
+  // later `---` line has everything between the two treated as frontmatter, real headings included.
+  // That is the documented contract (use `***` or `___` for a rule on line 1), pinned here so it
+  // stays a deliberate one.
+  it("swallows everything up to the next `---` line when line 1 is `---`", () => {
+    const doc = parse("---\n\n# Heading\n\ntext\n\n---\n\n# After\n");
+
+    expect(doc.frontmatter).toEqual({
+      raw: "\n# Heading\n\ntext\n",
+      startLine: 1,
+      endLine: 7,
+    });
+    expect(doc.headings).toEqual([
+      { text: "After", depth: 1, slug: "after", line: 9 },
+    ]);
+  });
+
+  it("recognises an empty block", () => {
+    const doc = parse("---\n---\n# T\n");
+
+    expect(doc.frontmatter).toEqual({ raw: "", startLine: 1, endLine: 2 });
+    expect(doc.headings).toEqual([{ text: "T", depth: 1, slug: "t", line: 3 }]);
+  });
+
+  // Built at runtime: `.gitattributes` forces `eol=lf` on committed files, so a checked-in CRLF
+  // fixture would silently become LF.
+  it("normalises CRLF in `raw` without moving any line number", () => {
+    const doc = parse(FRONTMATTER_DOC.replace(/\n/g, "\r\n"));
+
+    expect(doc.frontmatter).toEqual({
+      raw: "name: demo-skill\ndescription: does a thing",
+      startLine: 1,
+      endLine: 4,
+    });
+    expect(doc.headings).toEqual([
+      { text: "Title", depth: 1, slug: "title", line: 6 },
+    ]);
+  });
+
+  it("recognises a block behind a UTF-8 byte-order mark", () => {
+    const doc = parse(`\uFEFF${FRONTMATTER_DOC}`);
+
+    expect(doc.frontmatter).toEqual({
+      raw: "name: demo-skill\ndescription: does a thing",
+      startLine: 1,
+      endLine: 4,
+    });
+    expect(doc.headings.map((heading) => heading.slug)).toEqual(["title"]);
+  });
+
+  it("extracts no link, import or directive from inside the block, and keeps absolute lines after it", () => {
+    const doc = parse(
+      [
+        "---",
+        "see: [x](other.md)",
+        "ref: @other.md",
+        "<!-- wastech-mdlint-disable -->",
+        "---",
+        "",
+        "# Title",
+        "",
+        "<!-- wastech-mdlint-disable-next-line REF-001 -->",
+        "[real](real.md)",
+        "",
+      ].join("\n"),
+    );
+
+    expect(doc.links.map((link) => [link.rawTarget, link.line])).toEqual([
+      ["real.md", 10],
+    ]);
+    expect(doc.imports).toEqual([]);
+    expect(doc.directives).toEqual([
+      { kind: "disable-next-line", ruleIds: ["REF-001"], line: 9 },
+    ]);
+  });
+});

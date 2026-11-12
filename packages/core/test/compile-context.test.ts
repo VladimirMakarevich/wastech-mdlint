@@ -281,6 +281,25 @@ describe("compileContext", () => {
     );
   });
 
+  // Frontmatter is kept out of the outline but inside the budget: an agent host loads the whole
+  // file, so the corpus estimate must count it. Computed from the locked formula, as above, so the
+  // assertion cannot move in lockstep with the code under test.
+  it("counts frontmatter in the corpus token estimate", async () => {
+    const fileContent =
+      "---\nname: demo-skill\ndescription: does a thing\n---\n\n# Title\n\nBody text.\n";
+    const root = await fixtureRepo({ "doc.md": fileContent });
+    const config = loadedConfig({
+      include: ["**/*.md"],
+      compile: { skill: { name: "s", description: "d" } },
+    });
+
+    const result = await compileContext(config, root);
+
+    expect(result.skillContent).toContain(
+      `Corpus token estimate: ${Math.ceil(fileContent.length / 4)} tokens.`,
+    );
+  });
+
   it("compiles an empty corpus without throwing", async () => {
     const root = await fixtureRepo({});
     const config = loadedConfig({

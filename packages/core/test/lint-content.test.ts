@@ -139,3 +139,38 @@ describe("lintContent agrees with lintFiles on the same document", () => {
     expect(result.files).toEqual([AD_HOC_PATH]);
   });
 });
+
+// Frontmatter occupies source lines without producing nodes a rule sees, so the risk is that a line
+// number or a directive's target line drifts by the height of the block. Line numbers are absolute
+// source lines either way; this pins that suppression and reporting both still use them. The block
+// itself carries a disable directive to prove it is not read as one — otherwise it would swallow
+// the unsuppressed finding too.
+describe("lintContent on a document with frontmatter", () => {
+  it("suppresses by absolute line and reports the remaining finding at its source line", () => {
+    const content = [
+      "---",
+      "name: demo-skill",
+      "note: <!-- wastech-mdlint-disable -->",
+      "---",
+      "",
+      "# Title",
+      "",
+      "<!-- wastech-mdlint-disable-next-line REF-002 -->",
+      "[suppressed](#nope-one)",
+      "",
+      "[reported](#nope-two)",
+      "",
+    ].join("\n");
+
+    const result = lintContent({
+      path: AD_HOC_PATH,
+      content,
+      rules: [{ rule: ruleRegistry.resolveRule("REF-002", {}) }],
+      rootDir: process.cwd(),
+    });
+
+    expect(
+      result.messages.map((message) => [message.line, message.data?.anchor]),
+    ).toEqual([[11, "nope-two"]]);
+  });
+});

@@ -31,6 +31,7 @@ Suppress findings inline with HTML-comment directives. Use this for intentional 
 - `disable` runs until a matching `enable` or the end of the file.
 - `disable-next-line` covers only the single line that follows it.
 - Suppression is applied after rules run: a suppressed finding is dropped from the report.
+- A directive comment written inside YAML frontmatter is frontmatter text, not a directive, and suppresses nothing.
 
 ## Scope note
 

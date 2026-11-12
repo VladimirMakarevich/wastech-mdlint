@@ -54,6 +54,27 @@ describe("REF-002 anchors", () => {
       result.messages.map((message) => message.data?.anchor).sort(),
     ).toEqual(["missing", "nope"]);
   });
+
+  // Frontmatter used to parse as a setext H2, so a link to this invented slug resolved and passed.
+  // It must now be a broken anchor in both the same-file and the cross-file form.
+  it("reports a link to the slug frontmatter used to invent as a broken anchor", async () => {
+    const bogus = "name-demo-skilldescription-does-a-thing";
+    const cwd = await fixtureRepo({
+      "a.md": `---\nname: demo-skill\ndescription: does a thing\n---\n\n# Title\n\n[bad](#${bogus})\n[good](#title)\n`,
+      "b.md": `# B\n\n[cross](a.md#${bogus})\n[crossgood](a.md#title)\n`,
+    });
+    const result = await lint(cwd, [rule("REF-002")]);
+    expect(
+      result.messages.map((message) => [
+        message.filePath,
+        message.line,
+        message.data?.anchor,
+      ]),
+    ).toEqual([
+      ["a.md", 8, bogus],
+      ["b.md", 3, bogus],
+    ]);
+  });
 });
 
 describe("REF-003 images", () => {

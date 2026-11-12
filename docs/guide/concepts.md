@@ -6,8 +6,9 @@ Background on how the linter works — useful for understanding rule behavior an
 
 ## One parse pass → `ParsedDocument`
 
-Each Markdown file is parsed **once** (remark + GitHub-flavored Markdown + GitHub slugger) into a `ParsedDocument` that captures everything downstream needs:
+Each Markdown file is parsed **once** (remark + GitHub-flavored Markdown + YAML frontmatter + GitHub slugger) into a `ParsedDocument` that captures everything downstream needs:
 
+- **frontmatter** — a YAML block fenced by `---` lines, opening on the file's first line, exposed as its raw text plus its line range (it is not parsed as YAML); a file without one exposes `null`;
 - **headings** and their GitHub-style **slugs** (for anchor resolution);
 - **sections** (a heading plus the body it owns, last-heading-wins);
 - **tables** (header + keyed rows + line);
@@ -15,9 +16,15 @@ Each Markdown file is parsed **once** (remark + GitHub-flavored Markdown + GitHu
 - **links** and **images** (with resolved raw targets);
 - **eager imports** (`@path` directives);
 - **inline-disable directives**;
-- raw **content** (for placeholder scans, size/token estimation).
+- raw **content**, the whole file including any frontmatter (for placeholder scans, size/token estimation).
 
 Rules, the [context graph](context-graph.md), [`compile`](compile.md), and inline [suppression](suppression.md) all read this one structure — nothing re-parses Markdown ad hoc.
+
+Frontmatter is excluded from the outline: it produces no heading, section, slug, link, image, import or inline directive, so it never appears as an anchor target, in `slice` or `impact` results, or in a compiled outline. Without it, the YAML lines of a `SKILL.md` or agent file would read as a setext heading, which is why it is recognised. Three edges to know:
+
+- The block is recognised only when `---` is the very first line. A file whose first line is `---` is treated as frontmatter up to the next `---` line, whatever lies between — so use `***` or `___` for a horizontal rule on line 1.
+- An opening `---` with no closing `---` line is not frontmatter; it stays an ordinary horizontal rule.
+- TOML frontmatter fenced by `+++` is not recognised and is read as ordinary Markdown.
 
 ## The rule engine
 
@@ -35,7 +42,7 @@ Ordering uses a plain code-point string comparison, not locale-aware collation �
 
 ## Token estimation
 
-The context-budget rules ([SIZE-001](rules/SIZE-001.md), [LLM-001](rules/LLM-001.md)) estimate tokens with a simple, isolated heuristic: `ceil(characters / 4)`, counting UTF-16 code units — **not** bytes, which `SIZE-001`'s separate `bytes` metric measures and which run about 3× higher for CJK content. It is deliberately kept in one place so it can be replaced with a real tokenizer later without touching unrelated code.
+The context-budget rules ([SIZE-001](rules/SIZE-001.md), [LLM-001](rules/LLM-001.md)) estimate tokens with a simple, isolated heuristic: `ceil(characters / 4)`, counting UTF-16 code units — **not** bytes, which `SIZE-001`'s separate `bytes` metric measures and which run about 3× higher for CJK content. It is deliberately kept in one place so it can be replaced with a real tokenizer later without touching unrelated code. The estimate, like `SIZE-001`'s `bytes` and `lines`, covers the whole file including frontmatter, because an agent host loads the whole file.
 
 Because a real tokenizer emits more tokens per character for non-Latin scripts, the estimate errs **low** for Cyrillic or CJK documents — the wrong direction for a budget whose job is preventing context overflow, so set those budgets with headroom. Every finding that quotes a token count says so in its own message, so this page is not the only place the calibration is stated.
 

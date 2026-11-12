@@ -194,3 +194,21 @@ describe("relativizeImpact", () => {
     ]);
   });
 });
+
+// Frontmatter used to parse as a setext H2, so an anchor link to its invented slug resolved and
+// made the linking file an impact dependent. That edge must be gone; a link to the real heading
+// keeps its edge.
+describe("getImpactSet · frontmatter", () => {
+  it("drops the dependent whose only link targets the slug frontmatter used to invent", () => {
+    const graph = graphOf({
+      "a.md":
+        "---\nname: demo-skill\ndescription: does a thing\n---\n\n# Title\n",
+      "b.md": "[bogus](a.md#name-demo-skilldescription-does-a-thing)\n",
+      "c.md": "[real](a.md#title)\n",
+    });
+
+    const paths = getImpactSet(graph, "a.md").map((entry) => entry.path);
+    expect(paths).toContain("c.md");
+    expect(paths).not.toContain("b.md");
+  });
+});

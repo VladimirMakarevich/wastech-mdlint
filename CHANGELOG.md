@@ -6,6 +6,10 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- A file that opens with YAML frontmatter — a `SKILL.md`, an agent file, a docs-site page — no longer gains a heading that does not exist. The block between the two `---` lines used to parse as a horizontal rule plus a heading made of the YAML text, so a file opening with `name: demo-skill` and `description: does a thing` had a heading whose slug was `name-demo-skilldescription-does-a-thing`, a link to that slug passed `REF-002`, and `SEC-*`, `CTX-001`, `slice`, `impact` and `compile` all treated it as real. Frontmatter is now recognised during parsing and kept out of the outline, so such a link is reported by `REF-002` as a broken anchor. Links, `@` imports and suppression directives written inside frontmatter are no longer picked up either. Size and token counts still include the frontmatter. A file whose first line is a `---` horizontal rule followed later by another `---` line is now read as frontmatter up to that line; use `***` or `___` for a horizontal rule on line 1.
+
 ## [0.2.2]
 
 ### Security

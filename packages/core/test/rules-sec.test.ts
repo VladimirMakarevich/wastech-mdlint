@@ -264,6 +264,54 @@ describe("SEC-003 template conformance", () => {
   });
 });
 
+// Frontmatter used to parse as a setext H2, so a template carrying it demanded that invented
+// heading of every document (SEC-003 at level 2), and a fix appended after it could have been
+// tempted to treat it as content. Both now see only the real outline.
+describe("SEC-* on documents with frontmatter", () => {
+  const FRONTMATTER =
+    "---\nname: demo-skill\ndescription: does a thing\n---\n\n";
+
+  it("SEC-003 does not require the heading a template's frontmatter used to invent", async () => {
+    const cwd = await fixtureRepo({
+      "template.md": `${FRONTMATTER}# T\n\n## Context\n`,
+      "adr/one.md": `${FRONTMATTER}# One\n\n## Context\n`,
+      "adr/two.md": "# Two\n\n## Context\n",
+    });
+
+    const result = await lint(cwd, [
+      rule("SEC-003", {
+        template: "template.md",
+        files: ["adr/**/*.md"],
+        level: 2,
+      }),
+    ]);
+    expect(result.messages).toEqual([]);
+  });
+
+  it("SEC-001 --fix appends at EOF and leaves the frontmatter bytes untouched", async () => {
+    const original = `${FRONTMATTER}# Title\n\n## Intro\n`;
+    const cwd = await fixtureRepo({ "a.md": original });
+
+    const before = await lint(cwd, [
+      rule("SEC-001", { sections: ["Intro", "Summary"] }),
+    ]);
+    expect(before.messages.map((message) => message.data?.section)).toEqual([
+      "Summary",
+    ]);
+
+    await applyFixes({
+      cwd,
+      config: { rules: [] },
+      rules: [rule("SEC-001", { sections: ["Intro", "Summary"] })],
+      settings: {},
+    });
+
+    const written = await readFile(path.join(cwd, "a.md"), "utf8");
+    expect(written.startsWith(original)).toBe(true);
+    expect(written.slice(original.length)).toContain("## Summary");
+  });
+});
+
 // The SEC half of the shared `exclude` matrix. One fixture serves all three cases: both
 // documents violate every case, while `templates/t.md` satisfies SEC-001/SEC-002 (it has `Summary`,
 // and neither `Overview` nor `Usage`, which `sectionOrder` skips) and is self-skipped by SEC-003.
