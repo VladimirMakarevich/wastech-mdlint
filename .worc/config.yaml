@@ -2,11 +2,12 @@
 # New keys were added from the packaged template with their default values; your existing
 # values were preserved. Inline comments are not kept here — see the annotated
 # config.example.yaml under .worc/ for documentation of every field.
-schema_version: 34
+schema_version: 41
 orchestrator:
   auto_mode:
     enabled: false
     confirm_next_task: false
+    confirm_timeout_s: 900
   poll_interval_seconds: 300
   queue: default
 repo:
@@ -15,15 +16,13 @@ repo:
   base_branch: main
   branch_prefix: worc
   branch_mode: new
+  governance_paths: []
 paths:
   tasks_dir: tasks
 agents:
-  # codex temporarily removed to test Claude usage limits without a cross-provider
-  # fallback hop. The `providers.codex` block below is left intact — re-add the
-  # list entry to restore fallback. (Note: it never actually rescued a run — every
-  # fallback attempt on 2026-08-06 failed with `authentication_failed`.)
   allowed:
   - claude
+  - codex
   max_stage_attempts: 3
   max_fix_cycles: 15
   max_total_fix_iterations: 30
@@ -38,23 +37,24 @@ agents:
   providers:
     claude:
       command: claude
-      model: claude-opus-5
+      model: claude-opus-5-5
       reasoning: xhigh
       timeout_seconds: 7200
       max_turns: 400
       max_turns_gate: false
+      background_tasks: false
       permission_profile: workspace-write
       extra_args: []
       primary: true
     codex:
       command: codex
-      model: gpt-5.4
+      model: gpt-6-sol
       reasoning: high
       timeout_seconds: 7200
       permission_profile: workspace-write
       extra_args: []
 security:
-  strict_isolation: true
+  strict_isolation: false
   disable_read_isolation: true
   allow_git_evidence: true
   allowed_environment:
@@ -67,6 +67,7 @@ security:
   - TMPDIR
   - LD_LIBRARY_PATH
   - DYLD_LIBRARY_PATH
+  extra_environment: {}
   denied_read_paths:
   - .env
   - .worc/.env
@@ -83,16 +84,9 @@ validation:
   max_task_lines: 5000
   max_line_bytes: 8192
   max_control_ratio: 0.01
-  required_fields:
-  - id
-  - title
-  reject_unknown_fields: true
   quarantine_folder: /Users/a1234/Documents/GitHub/wastech-mdlint/.worc/tasks/rejected
 checks:
   command_sets:
-    # Scoped so a documentation-only diff (a deep_research report under docs/research/) does not drag
-    # the whole npm cycle behind it. The runner runs the union of sets whose paths glob the diff, so a
-    # change touching both code and Markdown runs both sets.
     default:
       paths:
       - packages/**
@@ -133,9 +127,6 @@ checks:
         - npm
         - run
         - build
-    # The gate for every Markdown the orchestrator commits — research reports included. `format` is
-    # `prettier --check .` (a checking command, so it never trips the green-but-dirtying guard) and it
-    # enforces the repo's proseWrap: never rule on the committed document.
     docs:
       paths:
       - '**/*.md'
@@ -162,9 +153,6 @@ telegram:
   chat_id_env: TELEGRAM_CHAT_ID
   ask_timeout_s: 28800
   trace: true
-skills:
-  dynamic: false
-  strict: false
 supervisor:
   enabled: true
   role_file: roles/supervisor.md
@@ -176,14 +164,14 @@ supervisor:
     - failure
     - fallback
     include_nodes: []
-    model: claude-sonnet-5
-    reasoning: low
+    model: claude-sonnet-5-5
+    reasoning: xhigh
   finalize:
-    model: claude-sonnet-5
-    reasoning: medium
+    model: claude-sonnet-5-5
+    reasoning: high
   handoff:
-    model: claude-sonnet-5
-    reasoning: medium
+    model: claude-sonnet-5-5
+    reasoning: high
 logging:
   level: debug
   artifacts: full

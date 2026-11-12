@@ -55,7 +55,7 @@
 # ----------------------------------------------------------------------------------------------------
 # Per-node tuning: see .worc/guide/flows/reference.md for every available field. Only the fields this
 # flow actually sets are written out below — anything unset inherits (provider and model come from
-# config.yaml, where claude is primary at claude-opus-5).
+# config.yaml, where claude is primary at claude-opus-5-5).
 # ----------------------------------------------------------------------------------------------------
 flow:
   name: security_audit

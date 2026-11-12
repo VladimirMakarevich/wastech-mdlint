@@ -3,7 +3,7 @@
 # The pipeline expressed as data: planning -> implementation -> testing(checks) -> review(evaluator)
 # -> documentation -> publish, with the two fix loops (through fixing) and decomposition. `planning`
 # is the entry node. After review accepts the code, `documentation` updates the target project's docs
-# to match the change just shipped (workspace-write, in its own fresh session), and its edits join
+# to match the change just shipped (workspace-write, resuming the implementation session), and its edits join
 # the same diff the orchestrator commits. Any node can be disabled per task via
 # `nodes.<id>.enabled: false` — the one place a task may name a node id instead of stating a `when`
 # fact, deliberately bounded to this on/off switch.
@@ -18,13 +18,6 @@
 # `hitl: { allow_question: true, allow_approval: true }`, and a `human_input` answer file propagates
 # from there exactly as it did from refinement. Restore the node from the packaged flow if you ever
 # want the audit artifact back.
-#
-# LOCAL DEVIATION 2 — every editing node (`implementation`, `fixing`,
-# `documentation`) is pinned to `fresh_disposable` instead of the shipped `editing_lineage`, so no
-# stage carries a stale in-session view of the tree across a checks/review round trip. That also
-# means `lineage_affinity` is absent by design — it is only valid against an `editing_lineage` owner
-# and the flow validator rejects it otherwise. Revert both together if you ever want durable
-# sessions back.
 #
 # Two behaviors here are not visible in the YAML: `review` is an evaluator (findings gate the graph,
 # they are not advisory), and the core enforces the commit-candidate mutation guard whenever a
@@ -84,21 +77,21 @@ flow:
       hitl: { allow_question: true, allow_approval: true }
       # Operator pin: planning sets the shape the rest of the flow executes, so it gets the deepest
       # reasoning tier rather than the flow-wide default. Provider/model are deliberately NOT pinned
-      # — they come from config.yaml (claude is primary at claude-opus-5).
-      reasoning: xhigh
+      # — they come from config.yaml (claude is primary at claude-opus-5-5).
+      reasoning: high
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []
     - id: implementation
       kind: agent
       role_file: implementation/implementation.md
-      # Operator choice: every editing node in this flow runs as a fresh disposable session rather
-      # than the packaged `editing_lineage`, so each stage re-reads the tree instead of trusting a
-      # carried-over view of it. `lineage_affinity` is therefore dropped from `fixing` /
-      # `documentation` below — it is only valid against an `editing_lineage` owner.
-      session_scope: fresh_disposable
+      # The short text for a turn that continues this node's own session — a renewed turn
+      # grant, a delivered human answer, a reconsider after a denial. Selected only when
+      # the session is live and this node has already spoken on it.
+      resume_role_file: implementation/implementation.continue.md
+      session_scope: editing_lineage
       permission_profile: workspace-write
-      reasoning: xhigh
+      reasoning: medium
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []
@@ -123,9 +116,9 @@ flow:
       # commit/push/PR. On this host (macOS Seatbelt) the sandboxed shell is always available.
       git_evidence: true
       # optional overrides (uncomment to pin this evaluator):
-      # provider: claude
-      # model: claude-opus-5
-      # reasoning: high
+      provider: codex
+      model: gpt-6-sol
+      reasoning: medium
       # network_access: false
       # blocking: true
       # gate_severity: high  # min finding severity that gates (high|medium|low|critical|blocking).
@@ -136,41 +129,32 @@ flow:
     - id: fixing
       kind: agent
       role_file: implementation/fixing.md
-      session_scope: fresh_disposable
+      resume_role_file: implementation/fixing.continue.md
+      session_scope: editing_lineage
+      lineage_affinity: implementation
       permission_profile: workspace-write
-      # Cost pin: this node does not decide WHAT to change — `review` hands it a
-      # findings list where every item already carries a concrete `fix`, and
-      # `testing` hands it a failing command. Executing a specified change is
-      # exactly where Sonnet 5 lands closest to Opus, so the generator runs cheap
-      # while the Opus reviewer that gates it stays expensive — a strong critic
-      # over a cheaper fixer, not a cheaper critic. `high` rather than `xhigh` for
-      # the same reason: the search space was already narrowed upstream.
-      # Watch the review->fixing loop count after this change: a fix that needs a
-      # second rework round costs more than the model saved, so if `budgets.review_fix`
-      # starts being consumed where it wasn't, revert this pin first.
-      provider: claude
-      model: claude-sonnet-5
+      # It resumes the implementation editing lineage, so it inherits that session's model (no
+      # model/provider pin here: a different model on a resumed session drops the prompt cache and
+      # re-reads the whole transcript). `high` rather than `xhigh`: `review` / `testing` already
+      # narrowed the change to a concrete fix list or a failing command.
       reasoning: high
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []
     # Whole-task docs update after the code is accepted: an ordinary workspace-write agent that
-    # mirrors `fixing` (no output_artifact, no hitl/when). Like the other editing nodes it runs
-    # fresh-disposable here, so it reads the shipped diff off the tree rather than inheriting the
-    # implementation session's view of it. It is deliberately kept OUT of decomposition.sub_flow so
-    # it runs once per task (after the last subtask), not once per subtask.
+    # mirrors `fixing` (resumes the implementation editing lineage, no output_artifact, no hitl/when)
+    # so the agent has the full context of what shipped. It is deliberately kept OUT of
+    # decomposition.sub_flow so it runs once per task (after the last subtask), not once per subtask.
     - id: documentation
       kind: agent
       role_file: implementation/documentation.md
-      session_scope: fresh_disposable
+      session_scope: editing_lineage
+      lineage_affinity: implementation
       permission_profile: workspace-write
       # Documentation is a mechanical write-up of what already shipped, so it runs at medium
       # reasoning regardless of the flow-wide default — no quality loss, less wall-time on the tail.
-      # Same argument extends to the model: the diff is already on the tree and accepted, so this
-      # node transcribes rather than decides. Cheapest node to move off Opus with no judgment at risk.
-      provider: claude
-      model: claude-sonnet-5
-      reasoning: medium
+      # No model/provider pin: it resumes the implementation editing lineage and keeps its model.
+      reasoning: low
       # Explicit offline stance: doc-writing needs no network, and pinning it here keeps the node
       # offline even if this flow later gains a flow-wide network_policy. This is a hard guarantee
       # only under Codex (OS-sandbox blocks Bash network); under Claude it only disables
@@ -185,7 +169,7 @@ flow:
       network_access: false
       # other optional overrides (uncomment to pin this node):
       # provider: claude
-      # model: claude-opus-5
+      # model: claude-opus-5-5
       # timeout_seconds: 7200
       # extra_args: []
     - id: publish
