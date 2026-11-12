@@ -1,0 +1,101 @@
+# The triage flow worc-connect ships and `worc-connect install-flow` copies into `.worc/flows/`.
+#
+# It runs inside worc like any other operator flow: worc's validator judges it, worc's sandbox
+# confines it, and it can weaken nothing. Two properties are what make it safe to point at a
+# stranger's issue text, and neither may be edited away:
+#
+#   * it publishes nothing (`publishing: none`) and opens no pull request, so the analysis of an
+#     untrusted report can never become a change anybody has to review;
+#   * every write goes into the report directory (`report_dir`), which is the connector's own home
+#     and is gitignored, so the reproduction node cannot leave a file behind in the tree.
+#
+# The deliverable is one report the connector reads and acts on by itself. The verdict block at the
+# end of it is the only part read by a machine; everything else in the report is for the operator.
+#
+# Per-node tuning (every field is optional — omit one to inherit the default):
+#   provider: codex | claude · model: <id> · reasoning: minimal|low|medium|high|xhigh|max
+#   timeout_seconds · network_access · best_effort
+# Disabling a node is PER-TASK: set `nodes.<id>.enabled: false` in the task file.
+flow:
+  name: issue_triage
+  task_type: issue_triage
+  # The ceiling the reproduction node needs. Every other node is read-only, and the ceiling is what
+  # a node may ask for, never what it gets by default.
+  permission_ceiling: workspace-write
+  output_policy: private_control_workspace_report
+  publishing: none
+  # The connector's own home, not worc's. A report about untrusted issue text belongs in the
+  # directory the process that reads it owns; `worc-connect init` gitignores this path, and worc
+  # refuses to publish a private report that git can see.
+  report_dir: .worc-connect/triage
+
+  defaults:
+    evaluator: { session_scope: fresh_disposable, permission_profile: read-only }
+
+  nodes:
+    - id: scope
+      kind: agent
+      reasoning: medium
+      role_file: issue_triage/scope.md
+      session_scope: fresh_disposable
+      permission_profile: read-only
+      network_access: false
+    - id: analysis
+      kind: agent
+      reasoning: medium
+      role_file: issue_triage/analysis.md
+      session_scope: fresh_disposable
+      permission_profile: read-only
+      network_access: false
+    - id: reproduction
+      kind: agent
+      reasoning: medium
+      role_file: issue_triage/reproduction.md
+      session_scope: fresh_disposable
+      # The one writing node, and it writes only inside the report directory — worc's after-stage
+      # guard enforces that, so a scratch test cannot be left in the working tree.
+      permission_profile: workspace-write
+      network_access: false
+      # A reproduction that could not be built is an ordinary triage outcome, not a failed task:
+      # the report says so and the verdict accounts for it.
+      best_effort: true
+    - id: review
+      kind: evaluator
+      reasoning: medium
+      role: verifier
+      # Cross-model check: the report's claims come from claude, so codex verifies them.
+      provider: codex
+      model: gpt-6-sol
+      role_file: issue_triage/verifier.md
+      session_scope: fresh_disposable
+      permission_profile: read-only
+      network_access: false
+      # Non-blocking on purpose: triage exists to produce an answer cheaply, and an evaluator that
+      # could hold an item forever would make the step more expensive than the work it triages.
+      blocking: false
+      max_rework_per_stage: 1
+      gate_severity: medium
+    - id: report
+      kind: agent
+      reasoning: medium
+      role_file: issue_triage/report.md
+      session_scope: fresh_disposable
+      # Read-only: the agent returns the report as its structured output and worc writes it into
+      # the report directory, so no agent-writable path is left open at the last step.
+      permission_profile: read-only
+      output_artifact: report
+      network_access: false
+    - id: private_storage
+      kind: publish
+      policy: private_control_workspace_report
+
+  edges:
+    - { from: scope, to: analysis }
+    - { from: analysis, to: reproduction }
+    - { from: reproduction, to: review }
+    - { from: review, to: report, outcome: accept }
+    - { from: review, to: analysis, outcome: rework, budget: 1 }
+    - { from: report, to: private_storage }
+
+  budgets:
+    global_fix_iterations: 4
