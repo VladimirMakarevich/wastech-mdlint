@@ -127,6 +127,11 @@ checks:
         - npm
         - run
         - build
+      - name: lint-docs
+        argv:
+        - npm
+        - run
+        - lint:docs
     docs:
       paths:
       - '**/*.md'
@@ -136,6 +141,16 @@ checks:
         - npm
         - run
         - format
+      - name: build
+        argv:
+        - npm
+        - run
+        - build
+      - name: lint-docs
+        argv:
+        - npm
+        - run
+        - lint:docs
   timeout_seconds: 7200
 git:
   create_pull_request: true
