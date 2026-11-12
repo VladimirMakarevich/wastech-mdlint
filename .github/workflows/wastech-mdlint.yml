@@ -12,11 +12,16 @@ name: Markdown context
 # old release. The price: a rule or option added to the config before a release carries it fails
 # this workflow with exit 2 until that release ships.
 
+# `push` is limited to `main` for the same reason as in ci.yml: a branch with an open pull request
+# would otherwise run this job twice on one commit, and the push run is the weaker of the two — it
+# skips the impact step, which needs the pull request's base to diff against. `workflow_dispatch`
+# covers a branch that has no pull request yet.
 on:
   push:
     branches:
-      - "**"
+      - main
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
