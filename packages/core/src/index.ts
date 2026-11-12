@@ -12,6 +12,7 @@ export type {
   ParsedDocument,
   ParsedFrontmatter,
   ParsedHeading,
+  ParsedHtmlAnchor,
   ParsedImage,
   ParsedImport,
   ParsedLink,

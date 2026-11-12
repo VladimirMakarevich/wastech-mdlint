@@ -75,6 +75,113 @@ describe("REF-002 anchors", () => {
       ["b.md", 3, bogus],
     ]);
   });
+
+  function reportedAnchors(result: {
+    messages: { data?: Record<string, unknown> }[];
+  }): unknown[] {
+    return result.messages.map((message) => message.data?.anchor);
+  }
+
+  it("resolves HTML `id` and `name` anchors same-file and cross-file", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        '# A\n\n<a id="custom"></a>\n\n<a name="named"></a>\n\n[s1](#custom)\n[s2](#named)\n[c1](b.md#bid)\n[c2](b.md#bname)\n[bad](b.md#absent)\n',
+      "b.md": '# B\n\nText <a id="bid"></a> and <a name="bname"></a>.\n',
+    });
+    const result = await lint(cwd, [rule("REF-002")]);
+    expect(reportedAnchors(result)).toEqual(["absent"]);
+    expect(result.messages[0]?.message).toContain("heading or HTML anchor");
+  });
+
+  // HTML keeps the first of two `id`s on one tag, so the second is not a fragment target.
+  it("reports a fragment named only by a repeated attribute", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        '# A\n\n<a id="real" id="ghost"></a>\n\n[r](#real)\n[g](#ghost)\n',
+      "b.md": "# B\n\n[c](a.md#ghost)\n",
+    });
+    const result = await lint(cwd, [rule("REF-002")]);
+    expect(reportedAnchors(result)).toEqual(["ghost", "ghost"]);
+  });
+
+  // A tag written inside a `<script>` or `<textarea>` is text on the rendered page, so a link to
+  // its `id` goes nowhere.
+  it("reports a fragment declared only inside a raw-text element", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": `# A\n\n<script>const x = '<a id="ghost">';</script>\n\n[g](#ghost)\n[c](b.md#ghost)\n`,
+      "b.md": `# B\n\nText <textarea><a id="ghost"></a></textarea>.\n`,
+    });
+    const result = await lint(cwd, [rule("REF-002")]);
+    expect(reportedAnchors(result)).toEqual(["ghost", "ghost"]);
+  });
+
+  // `id=` inside another attribute's quoted value is text, not an anchor: accepting it would pass a
+  // link that goes nowhere on the rendered page.
+  it("reports a fragment that only appears inside a quoted attribute value", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": `# A\n\n<div title="foo id='ghost'"></div>\n\n[g](#ghost)\n[c](b.md#ghost)\n`,
+      "b.md": `# B\n\n<p title="x <span id='ghost'> y"></p>\n`,
+    });
+    const result = await lint(cwd, [rule("REF-002")]);
+    expect(reportedAnchors(result)).toEqual(["ghost", "ghost"]);
+  });
+
+  it("accepts `#top` and GitHub line fragments, and rejects malformed line fragments", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "# A\n\n[t](#top)\n[T](#TOP)\n[l](#L5)\n[r](#L10-L12)\n[rc](#L10C5-L12C3)\n[x](b.md#L3)\n[e1](#L)\n[e2](#Lx)\n[e3](#L0)\n",
+      "b.md": "# B\n",
+    });
+    const result = await lint(cwd, [rule("REF-002")]);
+    expect(reportedAnchors(result)).toEqual(["L", "Lx", "L0"]);
+  });
+
+  it("compares case-sensitively by default and folds case with `ignoreCase`", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "# Demo\n\n[d](#Demo)\n[l](#l5)\n",
+    });
+    expect(reportedAnchors(await lint(cwd, [rule("REF-002")]))).toEqual([
+      "Demo",
+      "l5",
+    ]);
+    // Line fragments stay case-sensitive under `ignoreCase`: `#l5` is not a GitHub line anchor.
+    expect(
+      reportedAnchors(await lint(cwd, [rule("REF-002", { ignoreCase: true })])),
+    ).toEqual(["l5"]);
+  });
+
+  it("skips only fragments matching `ignoredPattern`", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n\n[g](#gen-x)\n[o](#other)\n[c](b.md#gen-y)\n",
+      "b.md": "# B\n",
+    });
+    expect(
+      reportedAnchors(
+        await lint(cwd, [rule("REF-002", { ignoredPattern: "^gen-" })]),
+      ),
+    ).toEqual(["other"]);
+  });
+
+  // @boundary-guard determinism
+  //
+  // `ignoredPattern` is compiled once per resolved rule and shared across every link, document and
+  // run. Had it carried a `g` flag, `lastIndex` would survive a successful `.test()`, so the second
+  // of two consecutive matching fragments would fail to match and be reported — and a second run
+  // with the same rule would start from a different `lastIndex` than the first. Consecutive matches
+  // interleaved with misses, linted twice through one rule instance, is the shape that exposes it.
+  it("gives identical findings when one `ignoredPattern` rule is run twice", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "# A\n\n[1](#skip-a)\n[2](#skip-b)\n[3](#keep-a)\n[4](#skip-c)\n[5](#skip-d)\n[6](#keep-b)\n",
+    });
+    const configured = rule("REF-002", { ignoredPattern: "^skip" });
+
+    const first = await lint(cwd, [configured]);
+    const second = await lint(cwd, [configured]);
+
+    expect(reportedAnchors(first)).toEqual(["keep-a", "keep-b"]);
+    expect(second.messages).toEqual(first.messages);
+  });
 });
 
 describe("REF-003 images", () => {
@@ -289,6 +396,21 @@ describe("REF option schemas (file scope inventory)", () => {
         exclude: ["docs/drafts/**"],
       }).id,
     ).toBe("REF-002");
+  });
+
+  it("rejects an `ignoredPattern` that does not compile, naming the rule and option path", () => {
+    const error = resolutionError("REF-002", { ignoredPattern: "(" });
+    expect(error.code).toBe("INVALID_OPTIONS");
+    expect(error.ruleName).toBe("REF-002");
+    expect(error.issues?.map((issue) => issue.path)).toEqual([
+      ["options", "ignoredPattern"],
+    ]);
+  });
+
+  it("rejects a non-boolean `ignoreCase`", () => {
+    expect(resolutionError("REF-002", { ignoreCase: "yes" }).code).toBe(
+      "INVALID_OPTIONS",
+    );
   });
 });
 

@@ -7,7 +7,9 @@
 // every reader listed beside it.
 //
 // Field → consumer:
-// headings → REF-002 anchor slugs, SEC-* ordering, anchor graph edges, slice index
+// headings → REF-002 anchor slugs, SEC-* ordering, anchor graph edges, slice index (the slugs
+//              reach all three through `explicitAnchors` in engine/anchor-resolve.ts)
+//   htmlAnchors → REF-002, anchor graph edges, slice index (same `explicitAnchors` route)
 //   sections   → cheap SEC-*/CTX-* section-existence checks
 //   tables     → TBL-* rules, REF-005/006 id tables, extractDefinedIds(), compile
 //   checkItems → CTX-002 checklist rules
@@ -79,6 +81,17 @@ export type ParsedLink = {
   column?: number;
 };
 
+// A fragment target declared in raw HTML rather than by a heading: `id` on any element, or `name`
+// on an `<a>`. GitHub renders both as link targets, so without them a `#custom` link to
+// `<a id="custom"></a>` reads as broken. Collected from `html` nodes during the parse, which is why
+// HTML shown inside inline code, a fenced block or frontmatter never contributes one.
+export type ParsedHtmlAnchor = {
+  // Attribute value verbatim: no entity decoding and no case folding, because the browser matches
+  // a fragment against the attribute exactly as written.
+  id: string;
+  line: number;
+};
+
 export type ParsedImage = {
   rawTarget: string;
   line: number;
@@ -120,6 +133,8 @@ export type ParsedDocument = {
   // time instead of recomputing per consumer.
   path: string;
   headings: ParsedHeading[];
+  // Document order, duplicates kept, so a consumer can report a repeated id at each occurrence.
+  htmlAnchors: ParsedHtmlAnchor[];
   sections: string[];
   tables: ParsedTable[];
   checkItems: ParsedCheckItem[];

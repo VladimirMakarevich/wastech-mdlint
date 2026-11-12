@@ -1,5 +1,6 @@
 import { compareStrings } from "../deterministic-sort.js";
 import { normalizeRelativePath } from "../discovery/globs.js";
+import { explicitAnchors } from "../engine/anchor-resolve.js";
 import { extractDefinedIds, type IdRef } from "../engine/defined-ids.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
 import type { ContextGraph } from "./context-graph-types.js";
@@ -82,11 +83,14 @@ export function buildSearchIndex(
 
   const bySlug = new Map<string, string[]>();
   for (const document of documentsByPath.values()) {
-    // `heading.slug` is the canonical github-slugger slug with parse-time document-order dedup
-    // (`-1`/`-2`) already applied — reused verbatim so `#heading` resolves to the same file(s) an
-    // anchor graph edge would (build-context-graph.ts compares against this same string).
-    for (const heading of document.headings) {
-      addToIndex(bySlug, heading.slug, document.path);
+    // `explicitAnchors` is the anchor set REF-002 and the graph's anchor edges resolve against:
+    // github-slugger heading slugs (parse-time dedup `-1`/`-2` applied) plus HTML `id`/`name`
+    // anchors, so `#x` starts from the same file(s) an anchor edge would point at. `#top` and line
+    // fragments are deliberately not indexed: they resolve in every document, so indexing them
+    // would make `#top` match the whole corpus. An HTML anchor id is also reachable as a bare
+    // (heading-kind) query, which the exact-match precedence below already handles.
+    for (const anchor of explicitAnchors(document)) {
+      addToIndex(bySlug, anchor, document.path);
     }
   }
 

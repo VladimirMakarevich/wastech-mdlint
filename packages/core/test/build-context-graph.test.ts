@@ -84,6 +84,26 @@ describe("buildContextGraph · anchor edges validate against the target's headin
 
     expect(graph.edges).toEqual([]);
   });
+
+  // The graph resolves fragments through the same `anchorResolves` REF-002 uses, so `impact` and
+  // `slice` see an edge for every fragment the rule accepts under default options.
+  it("builds anchor edges to HTML anchors, `#top` and line fragments, but not to `#Lx`", () => {
+    const graph = buildContextGraph(
+      docs({
+        "a.md":
+          "[h](b.md#custom)\n[t](b.md#top)\n[l](b.md#L5)\n[bad](b.md#Lx)\n",
+        "b.md": '## Sec\n\n<a id="custom"></a>\n',
+      }),
+    );
+
+    expect(
+      graph.edges.map((edge) => [edge.type, edge.to, edge.rawTarget]),
+    ).toEqual([
+      ["anchor", "b.md", "b.md#custom"],
+      ["anchor", "b.md", "b.md#top"],
+      ["anchor", "b.md", "b.md#L5"],
+    ]);
+  });
 });
 
 describe("buildContextGraph · self-refs are skipped", () => {

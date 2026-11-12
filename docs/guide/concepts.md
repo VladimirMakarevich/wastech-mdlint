@@ -10,6 +10,7 @@ Each Markdown file is parsed **once** (remark + GitHub-flavored Markdown + YAML 
 
 - **frontmatter** — a YAML block fenced by `---` lines, opening on the file's first line, exposed as its raw text plus its line range (it is not parsed as YAML); a file without one exposes `null`;
 - **headings** and their GitHub-style **slugs** (for anchor resolution);
+- **HTML anchors** — `id` attributes on any element and `name` attributes on `<a>`, read from raw HTML in the document (for anchor resolution alongside the slugs);
 - **sections** (a heading plus the body it owns, last-heading-wins);
 - **tables** (header + keyed rows + line);
 - **checklist items** (`- [ ]` / `- [x]`);

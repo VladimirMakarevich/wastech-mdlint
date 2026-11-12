@@ -77,7 +77,10 @@ const BOUNDARY_GUARDS: Record<string, string[]> = {
   ],
   // Output must not depend on evaluation order or on state carried between calls (a `g`-flagged
   // RegExp's `lastIndex` being the concrete case that shipped).
-  determinism: ["packages/core/test/primitives.test.ts"],
+  determinism: [
+    "packages/core/test/primitives.test.ts",
+    "packages/core/test/rules-ref.test.ts",
+  ],
 };
 
 function tagsIn(relativePath: string): string[] {

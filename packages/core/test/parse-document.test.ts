@@ -334,6 +334,131 @@ describe("parseDocument · inline-disable directives", () => {
   });
 });
 
+describe("parseDocument · html anchors", () => {
+  it("collects inline `<a id>` and `<a name>` anchors with their lines", () => {
+    const doc = parse(
+      '# T\n\nSee <a id="custom"></a> here.\n\n<a name="n"></a>\n',
+    );
+
+    expect(doc.htmlAnchors).toEqual([
+      { id: "custom", line: 3 },
+      { id: "n", line: 5 },
+    ]);
+  });
+
+  it("collects `id` on any element, on the right line of a multi-line block", () => {
+    const doc = parse('<div>\n  <p>x</p>\n  <span id="d">y</span>\n</div>\n');
+
+    expect(doc.htmlAnchors).toEqual([{ id: "d", line: 3 }]);
+  });
+
+  it("ignores `name` on a non-anchor element and look-alike attributes", () => {
+    const doc = parse(
+      '<input name="field">\n\n<div data-id="x" aid="y"></div>\n',
+    );
+
+    expect(doc.htmlAnchors).toEqual([]);
+  });
+
+  // An unanchored search for `id=` used to read text inside another attribute's quoted value as an
+  // attribute, and a tag search that ignored quotes found a `<span>` written inside one. Both
+  // invented anchors that exist nowhere on the rendered page.
+  it("reads nothing from inside a quoted attribute value", () => {
+    const doc = parse(
+      [
+        `<div title="foo id='ghost1'" data-x='name="ghost2"'></div>`,
+        "",
+        `<a title="a <span id='ghost3'> b > c" id="real">x</a>`,
+        "",
+      ].join("\n"),
+    );
+
+    expect(doc.htmlAnchors).toEqual([{ id: "real", line: 3 }]);
+  });
+
+  // HTML drops every repeat of an attribute after the first, in any letter case, so a later `id` or
+  // `name` names nothing on the rendered page — including after an empty first value.
+  it("keeps only the first occurrence of a repeated attribute", () => {
+    const doc = parse(
+      [
+        '<a id="real" id="ghost1" ID="ghost2" name="n" NAME="ghost3"></a>',
+        "",
+        '<div id="" id="ghost4"></div>',
+        "",
+      ].join("\n"),
+    );
+
+    expect(doc.htmlAnchors).toEqual([
+      { id: "real", line: 1 },
+      { id: "n", line: 1 },
+    ]);
+  });
+
+  // A browser reads the content of these elements as text up to the matching end tag, so a tag
+  // written inside a script string or a textarea is not an anchor. Inline HTML is split by remark
+  // into one node per tag, which is why the inline and the unclosed cases need state carried across
+  // nodes; the `<!--` inside the script must not hide the `</script>` that closes it.
+  it("collects nothing inside raw-text elements, block or inline", () => {
+    const doc = parse(
+      [
+        "<script>",
+        `const x = '<a id="ghost1">'; // <!--`,
+        "</script>",
+        "",
+        `Inline <style>.c{content:'<a id="ghost2">'}</style> then <a id="after"></a>.`,
+        "",
+        `<textarea id="box"><a name="ghost3"></a></TEXTAREA><div id="kept"></div>`,
+        "",
+        'Open <script> here <a id="ghost4"></a>',
+        "",
+        '<a id="ghost5"></a>',
+        "",
+      ].join("\n"),
+    );
+
+    expect(doc.htmlAnchors).toEqual([
+      { id: "after", line: 5 },
+      { id: "box", line: 7 },
+      { id: "kept", line: 7 },
+    ]);
+  });
+
+  it("accepts single-quoted, unquoted and uppercase attributes", () => {
+    const doc = parse("<a id='s'></a> <A NAME=u></A> <p ID=\"up\"></p>\n");
+
+    expect(doc.htmlAnchors.map((anchor) => anchor.id)).toEqual([
+      "s",
+      "u",
+      "up",
+    ]);
+  });
+
+  it("collects nothing from comments, inline code, fenced code or frontmatter", () => {
+    const doc = parse(
+      [
+        "---",
+        'title: <a id="fm"></a>',
+        "---",
+        "",
+        '<!-- <a id="commented"></a> -->',
+        "",
+        'Code `<a id="inline"></a>` only.',
+        "",
+        "```html",
+        '<a id="fenced"></a>',
+        "```",
+        "",
+      ].join("\n"),
+    );
+
+    expect(doc.htmlAnchors).toEqual([]);
+  });
+
+  it("is an empty array for a document with no HTML", () => {
+    expect(parse("# Plain\n\ntext\n").htmlAnchors).toEqual([]);
+  });
+});
+
 describe("parseDocument · determinism", () => {
   it("produces byte-identical output across two parses of the same input", () => {
     const content = [

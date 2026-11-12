@@ -12,7 +12,7 @@
 | Edge type | Created by |
 | --- | --- |
 | `link` | A relative Markdown link `[text](other.md)`. |
-| `anchor` | A link to a heading/anchor (`other.md#slug` or `#slug`). |
+| `anchor` | A link to a heading/anchor (`other.md#slug`) whose fragment resolves in the target: a heading slug, an HTML `id`/`name` anchor, `#top`, or a GitHub line fragment such as `#L5`. |
 | `image` | An image reference `![alt](diagram.png)`. |
 | `import` | An eager import directive `@path` (also feeds [LLM-001](rules/LLM-001.md)). |
 | `id-ref` | An ID reference resolved via [`settings.idRef`](configuration.md#settingsidref). |
@@ -61,7 +61,7 @@ wastech-mdlint slice "#installation" --format json
 wastech-mdlint slice docs/index.md
 ```
 
-Resolution is **exact match only** — a defined ID, a heading/anchor slug (`#slug`), or a file path. No fuzzy, substring, keyword, or LLM matching. A query that matches nothing returns an honest empty result (`matchKind: null` in JSON), never an error. `slice` always scans the cwd (no `[path]`).
+Resolution is **exact match only** — a defined ID, a heading/anchor slug (`#slug`, which also matches an HTML `id`/`name` anchor), or a file path. No fuzzy, substring, keyword, or LLM matching. A query that matches nothing returns an honest empty result (`matchKind: null` in JSON), never an error. `slice` always scans the cwd (no `[path]`).
 
 The text output is line-oriented like `graph`'s, for the same reason: `starts` only looks like a singleton — an anchor, heading, or ID query resolves to _every_ file carrying that slug — so it is its own `starts (N):` list rather than a parenthetical on the `matched:` line. Read the resolved target(s) from that list, and prefer `--format json` if you are parsing rather than reading.
 

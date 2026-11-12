@@ -184,11 +184,15 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
         },
       },
     },
-    // REF-002: link anchors match a heading slug.
+    // REF-002: link anchors match a heading or HTML anchor (`#top` and GitHub line fragments
+    // such as `#L10-L12` always resolve). `ignoredPattern` is an unanchored regex; a fragment
+    // matching it is never reported.
     {
       "rule": "REF-002",
       "options": {
         "siteRouter": { "preset": "starlight" },
+        "ignoreCase": false,
+        "ignoredPattern": "^generated-",
         "files": [],
         "exclude": [],
       },
