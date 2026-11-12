@@ -36,6 +36,7 @@ import {
   formatDraftSummary,
   formatNotWrittenSummary,
   formatScanExclusions,
+  formatSkipSummary,
   formatWriteFailureSummary,
   formatWriteSummary,
   groupInferredRulesByCategory,
@@ -564,7 +565,10 @@ describe("init command · existing config handling", () => {
     ).resolves.toBe(existingConfigText);
   });
 
-  it("--on-existing skip never touches the filesystem, even with --with-ci-workflow", async () => {
+  // Skipping the config skips only the config: ending the run there once dropped
+  // `--with-ci-workflow` without a word and still exited 0, so a repository that already had a config
+  // could not get the workflow from `init` without overwriting or merging that config.
+  it("--on-existing skip still writes the CI workflow --with-ci-workflow asks for, leaving the config untouched", async () => {
     const cwd = await fixtureRepo({
       ...CROSS_LINKED_DOCS_FIXTURE,
       ".git/HEAD": "ref: refs/heads/main\n",
@@ -578,10 +582,88 @@ describe("init command · existing config handling", () => {
 
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
     expect(result.stdout).toContain(
+      "skipped — existing config left untouched.\nWrote CI workflow .github/workflows/wastech-mdlint.yml.",
+    );
+    await expect(
+      readFile(
+        path.join(cwd, ".github", "workflows", "wastech-mdlint.yml"),
+        "utf8",
+      ),
+    ).resolves.toContain("wastech-mdlint");
+    await expect(
+      readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8"),
+    ).resolves.toBe(existingConfigText);
+  });
+
+  // The smallest repository that reproduces the defect: one Markdown file and a config with no rules,
+  // run with both opt-in flags. There is no `.git`, so the repository root falls back to the
+  // config's own directory, and both opt-in files land beside it.
+  it("--on-existing skip with both opt-in flags writes both files and nothing else", async () => {
+    const configText = '{"rules":[]}\n';
+    const cwd = await fixtureRepo({
+      "README.md": "# A\n",
+      [CONFIG_FILE]: configText,
+    });
+
+    const result = await run(
+      [
+        "init",
+        ".",
+        "--yes",
+        "--on-existing",
+        "skip",
+        "--with-agent-rule",
+        "--with-ci-workflow",
+      ],
+      cwd,
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain(
       "skipped — existing config left untouched.",
     );
-    // skip is a strict no-write outcome (plan invariant): no CI workflow, no config change.
-    expect(result.stdout).not.toContain("Wrote CI workflow");
+    expect(result.stdout).toContain(
+      "Wrote CI workflow .github/workflows/wastech-mdlint.yml.",
+    );
+    expect(result.stdout).toContain(
+      "Wrote agent rule .agents/rules/wastech-mdlint.md",
+    );
+    await expect(
+      readFile(
+        path.join(cwd, ".github", "workflows", "wastech-mdlint.yml"),
+        "utf8",
+      ),
+    ).resolves.toBeDefined();
+    await expect(
+      readFile(path.join(cwd, ".agents", "rules", "wastech-mdlint.md"), "utf8"),
+    ).resolves.toBeDefined();
+    // Skip writes neither the config nor a project-local schema for it.
+    await expect(readFile(path.join(cwd, CONFIG_FILE), "utf8")).resolves.toBe(
+      configText,
+    );
+    await expect(
+      readFile(path.join(cwd, "schema.json"), "utf8"),
+    ).rejects.toThrow();
+  });
+
+  // A plain skip's whole output is the header and the skip line, so a caller that recognises a skip
+  // by comparing against it would misread the run if offering the opt-in files added a single byte
+  // when none was requested.
+  it("plain --yes --on-existing skip prints exactly the skip line and writes no opt-in file", async () => {
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      [CONFIG_FILE]: existingConfigText,
+    });
+
+    const result = await run(
+      ["init", cwd, "--yes", "--on-existing", "skip"],
+      cwd,
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toBe(
+      "wastech-mdlint init — draft configuration\n\nskipped — existing config left untouched.\n",
+    );
     await expect(
       readFile(
         path.join(cwd, ".github", "workflows", "wastech-mdlint.yml"),
@@ -589,8 +671,81 @@ describe("init command · existing config handling", () => {
       ),
     ).rejects.toThrow();
     await expect(
-      readFile(path.join(cwd, "wastech-mdlint.config.json"), "utf8"),
-    ).resolves.toBe(existingConfigText);
+      readFile(path.join(cwd, ".agents", "rules", "wastech-mdlint.md"), "utf8"),
+    ).rejects.toThrow();
+  });
+
+  // An interactive skip used to end the run before either opt-in prompt. There is no draft on this
+  // path, so none of the draft-building prompts may run either.
+  it("an interactive skip still offers both opt-in files, and asks nothing about a draft", async () => {
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      [CONFIG_FILE]: existingConfigText,
+    });
+    const confirmCiWorkflow = vi.fn(async () => true);
+    const confirmAgentRule = vi.fn(async () => true);
+    const confirmDraft = vi.fn(async () => true);
+    const selectClusters = vi.fn(async (clusters: DocCluster[]) => clusters);
+    const choosePackageManager = vi.fn(async () => undefined);
+    const prompter = createDefaultFakePrompter({
+      resolveExistingConfigAction: async () => "skip",
+      confirmCiWorkflow,
+      confirmAgentRule,
+      confirmDraft,
+      selectClusters,
+      choosePackageManager,
+    });
+
+    const result = await run(["init", cwd], cwd, {
+      isTty: true,
+      initPrompter: prompter,
+    });
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(confirmCiWorkflow).toHaveBeenCalledTimes(1);
+    expect(confirmAgentRule).toHaveBeenCalledTimes(1);
+    expect(confirmDraft).not.toHaveBeenCalled();
+    expect(selectClusters).not.toHaveBeenCalled();
+    expect(choosePackageManager).not.toHaveBeenCalled();
+    await expect(
+      readFile(
+        path.join(cwd, ".github", "workflows", "wastech-mdlint.yml"),
+        "utf8",
+      ),
+    ).resolves.toBeDefined();
+    await expect(
+      readFile(path.join(cwd, ".agents", "rules", "wastech-mdlint.md"), "utf8"),
+    ).resolves.toBeDefined();
+    await expect(readFile(path.join(cwd, CONFIG_FILE), "utf8")).resolves.toBe(
+      existingConfigText,
+    );
+  });
+
+  it("--on-existing skip keeps an existing CI workflow and words the line for an untouched config", async () => {
+    const workflowText = "name: mine\n";
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      [CONFIG_FILE]: existingConfigText,
+      ".github/workflows/wastech-mdlint.yml": workflowText,
+    });
+
+    const result = await run(
+      ["init", cwd, "--yes", "--on-existing", "skip", "--with-ci-workflow"],
+      cwd,
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain(
+      "Kept the existing CI workflow .github/workflows/wastech-mdlint.yml — init never overwrites " +
+        "it. Check that it still points at the existing config.",
+    );
+    expect(result.stdout).not.toContain("written above");
+    await expect(
+      readFile(
+        path.join(cwd, ".github", "workflows", "wastech-mdlint.yml"),
+        "utf8",
+      ),
+    ).resolves.toBe(workflowText);
   });
 
   it("--on-existing skip over an unloadable config still exits 0 (deliberate no-write)", async () => {
@@ -1747,7 +1902,7 @@ describe("init command · agent rule", () => {
     ).rejects.toThrow();
   });
 
-  it("--on-existing skip writes no agent rule, even with --with-agent-rule", async () => {
+  it("--on-existing skip still writes the agent rule --with-agent-rule asks for", async () => {
     const cwd = await fixtureRepo({
       ...CROSS_LINKED_DOCS_FIXTURE,
       [CONFIG_FILE]: "{}\n",
@@ -1759,9 +1914,108 @@ describe("init command · agent rule", () => {
     );
 
     expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain(
+      "Wrote agent rule .agents/rules/wastech-mdlint.md",
+    );
     await expect(
       readFile(path.join(cwd, AGENT_RULE), "utf8"),
+    ).resolves.toContain("# Markdown documents and wastech-mdlint");
+    await expect(readFile(path.join(cwd, CONFIG_FILE), "utf8")).resolves.toBe(
+      "{}\n",
+    );
+  });
+
+  // The offer reads only the config's location, never its contents, so a config the loader rejects
+  // is no reason to withhold the page.
+  it("--on-existing skip over an unloadable config still writes the agent rule", async () => {
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      [CONFIG_FILE]: "{ not json",
+    });
+
+    const result = await run(
+      ["init", cwd, "--yes", "--on-existing", "skip", "--with-agent-rule"],
+      cwd,
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    const page = await readFile(path.join(cwd, AGENT_RULE), "utf8");
+    expect(page).toContain(`\`${CONFIG_FILE}\``);
+    await expect(readFile(path.join(cwd, CONFIG_FILE), "utf8")).resolves.toBe(
+      "{ not json",
+    );
+  });
+
+  // Skip never scans, so the package manager and the installed-CLI evidence have to be gathered on
+  // that path by themselves; a page that silently fell back to the npx form would hide that they
+  // were not wired.
+  it("after a skip, uses the detected package manager once the CLI is installed", async () => {
+    const cwd = await fixtureRepo(
+      withInstalledSchema({
+        ...CROSS_LINKED_DOCS_FIXTURE,
+        "pnpm-lock.yaml": "lockfileVersion: '9.0'\n",
+        [CONFIG_FILE]: "{}\n",
+      }),
+    );
+
+    const result = await run(
+      ["init", cwd, "--yes", "--on-existing", "skip", "--with-agent-rule"],
+      cwd,
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    const page = await readFile(path.join(cwd, AGENT_RULE), "utf8");
+    expect(page).toContain("`pnpm exec wastech-mdlint lint`");
+    expect(page).not.toContain("npx -y @wastech-mdlint/cli@");
+  });
+
+  it("after a skip with nothing installed, the page uses the npx form", async () => {
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      [CONFIG_FILE]: "{}\n",
+    });
+
+    await run(
+      ["init", cwd, "--yes", "--on-existing", "skip", "--with-agent-rule"],
+      cwd,
+    );
+
+    const page = await readFile(path.join(cwd, AGENT_RULE), "utf8");
+    expect(page).toContain("npx -y @wastech-mdlint/cli@");
+  });
+
+  // A bare invocation re-roots onto an ancestor's config; after a skip the page still belongs at the
+  // git root and must name the directory that config actually sits in.
+  it("after an interactive skip of an ancestor config, anchors the page at the git root", async () => {
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      ".git/HEAD": "ref: refs/heads/main\n",
+      [`docs/${CONFIG_FILE}`]: "{}\n",
+    });
+    const nestedDir = path.join(cwd, "docs", "nested");
+    await mkdir(nestedDir, { recursive: true });
+    const prompter = createDefaultFakePrompter({
+      resolveExistingConfigAction: async () => "skip",
+      confirmAgentRule: async () => true,
+    });
+
+    const result = await run(["init"], nestedDir, {
+      isTty: true,
+      initPrompter: prompter,
+    });
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    expect(result.stdout).toContain(
+      "Wrote agent rule .agents/rules/wastech-mdlint.md",
+    );
+    const page = await readFile(path.join(cwd, AGENT_RULE), "utf8");
+    expect(page).toContain(`\`docs/${CONFIG_FILE}\``);
+    await expect(
+      readFile(path.join(cwd, "docs", AGENT_RULE), "utf8"),
     ).rejects.toThrow();
+    await expect(
+      readFile(path.join(cwd, "docs", CONFIG_FILE), "utf8"),
+    ).resolves.toBe("{}\n");
   });
 
   // The page belongs to the repository root, where agent context is read from, while a nested
@@ -1914,6 +2168,38 @@ describe("init command · agent rule", () => {
     await expect(
       readFile(path.join(cwd, CONFIG_FILE), "utf8"),
     ).resolves.toBeDefined();
+  });
+
+  // @boundary-guard write-failure
+  //
+  // The same fault after a skip. Nothing else was written on this path, so a run that exited 0 here
+  // would let a CI step report success after writing nothing it was asked to write — the defect
+  // that skipping the opt-in offers entirely once hid.
+  it("reports a failed agent-rule write after a skip, leaves the config untouched, and exits 2", async () => {
+    const cwd = await fixtureRepo({
+      ...CROSS_LINKED_DOCS_FIXTURE,
+      [CONFIG_FILE]: "{}\n",
+      ".agents": "not a directory\n",
+    });
+
+    const result = await run(
+      ["init", cwd, "--yes", "--on-existing", "skip", "--with-agent-rule"],
+      cwd,
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
+    expect(result.stdout).toContain(
+      "skipped — existing config left untouched.",
+    );
+    expect(result.stdout).toContain(
+      "Could not write the agent rule .agents/rules/wastech-mdlint.md — the existing config was left untouched",
+    );
+    await expect(readFile(path.join(cwd, ".agents"), "utf8")).resolves.toBe(
+      "not a directory\n",
+    );
+    await expect(readFile(path.join(cwd, CONFIG_FILE), "utf8")).resolves.toBe(
+      "{}\n",
+    );
   });
 
   // The page lands in a repository that may well lint `.agents/**` — that is half the reason to
@@ -3575,6 +3861,38 @@ describe("formatWriteSummary", () => {
     );
     expect(summary).not.toContain("custom rules present");
   });
+});
+
+describe("formatSkipSummary", () => {
+  it("is exactly the skip line when no opt-in file was offered", () => {
+    expect(formatSkipSummary({})).toBe(
+      "skipped — existing config left untouched.\n",
+    );
+  });
+
+  // The write-path wording says the config "was still written" or was "written above"; after a
+  // skip neither is true, and a line claiming it would misreport the one file the user protected.
+  for (const kind of ["failed", "kept", "unsafe-config-path"] as const) {
+    it(`words a ${kind} opt-in line for an untouched config`, () => {
+      const summary = formatSkipSummary({
+        ciWorkflow: { kind, path: ".github/workflows/wastech-mdlint.yml" },
+        agentRule: { kind, path: ".agents/rules/wastech-mdlint.md" },
+      });
+      const lines = summary.trimEnd().split("\n");
+
+      expect(lines).toHaveLength(3);
+      expect(lines[0]).toBe("skipped — existing config left untouched.");
+      expect(lines[1]).toContain(".github/workflows/wastech-mdlint.yml");
+      expect(lines[2]).toContain(".agents/rules/wastech-mdlint.md");
+      // The agent rule's `kept` line says nothing about the config in either wording.
+      if (kind !== "kept") {
+        expect(lines[2]).toMatch(/left untouched/i);
+      }
+      expect(lines[1]).toMatch(/existing config/i);
+      expect(summary).not.toContain("still written");
+      expect(summary).not.toContain("written above");
+    });
+  }
 });
 
 describe("resolveSchemaWriteOutcome", () => {

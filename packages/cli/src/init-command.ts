@@ -12,6 +12,7 @@ import {
   CONFIG_FILE_NAME,
   containsJsoncComments,
   DEFAULT_EXCLUDE_GLOBS,
+  detectPackageManager,
   DEFAULT_INCLUDE_GLOBS,
   findConfig,
   generateInitConfig,
@@ -158,6 +159,13 @@ export type ConfigPreview = {
  *
  * Deliberate no-write (exit `0`): `skipped`, `declined`. Operational failure (exit `2`):
  * `invalid-existing-config`, `write-failed`, `ci-workflow-write-failed`, `agent-rule-write-failed`.
+ *
+ * `skipped` means the *config* was deliberately left alone, not that nothing was written: the CI
+ * workflow and agent rule are still offered after a skip, because a repository that already has a
+ * config is exactly the one that wants to add them without touching it. So the two opt-in failure
+ * outcomes can follow either a config write or a skip — a requested file that could not be written
+ * is a failed write either way, and exiting `0` for it would let a CI step report success after
+ * writing nothing it was asked to write.
  */
 export type InitOutcome =
   | "written"
@@ -868,9 +876,10 @@ async function findInstalledSchemaDir(
 }
 
 /**
- * Asks one post-write opt-in question. These prompts run AFTER the config/schema are already on disk,
- * so a Ctrl+C here must not unwind the whole command — that would exit without the write summary and
- * make an already-mutated repo look untouched. Cancellation is therefore read as "no" and the summary
+ * Asks one opt-in question. These prompts run after the config/schema are already on disk (or after
+ * a skip, when the CI workflow may already have been written before the agent-rule prompt), so a
+ * Ctrl+C here must not unwind the whole command — that would exit without the summary and make an
+ * already-mutated repo look untouched. Cancellation is therefore read as "no" and the summary
  * still prints. Matched on `.name` (not `instanceof`), the version-stable @inquirer convention used
  * in program.ts.
  */
@@ -924,10 +933,10 @@ export type CiWorkflowOutcome =
   | { kind: "unsafe-config-path"; path: string };
 
 /**
- * Offer — and, if accepted, write — the opt-in CI workflow. Only called from the
- * confirmed config-write branch of `runInitCommand` — `skip` returns earlier and never reaches this,
- * so `--with-ci-workflow` has no effect when the existing config is left untouched (skip is a strict
- * no-write outcome). Never overwrites an existing workflow. Anchors at the project root (where GitHub
+ * Offer — and, if accepted, write — the opt-in CI workflow. Reached through `offerOptInFiles` after
+ * either a confirmed config write or a `skip` of an existing config: the workflow depends only on
+ * where the config lives, not on whether this run wrote it, so skipping the config must not also
+ * silently skip the workflow `--with-ci-workflow` asked for. Never overwrites an existing workflow. Anchors at the project root (where GitHub
  * loads workflows) and points the workflow at `configAbsPath` relative to that root. Returns the
  * write outcome, or undefined when the offer was declined/withheld and nothing was attempted.
  */
@@ -959,7 +968,7 @@ async function offerCiWorkflow(params: {
 
   // A line terminator in the path can't be represented safely in the workflow's shell command, and
   // stripping it would mis-target the config — so decline this opt-in feature rather than emit a
-  // broken/mis-pointing workflow (an extreme but legal path edge; the config itself is still written).
+  // broken/mis-pointing workflow (an extreme but legal path edge; the config itself is unaffected).
   if (/[\r\n]/.test(configFromRoot)) {
     return { kind: "unsafe-config-path", path: relativeWorkflowPath };
   }
@@ -1007,8 +1016,8 @@ export type AgentRuleOutcome =
   | { kind: "unsafe-config-path"; path: string };
 
 /**
- * Offer — and, if accepted, write — the opt-in agent rule. Called from the same confirmed
- * config-write branch as the CI-workflow offer, so `skip` never reaches it either. Anchored at the
+ * Offer — and, if accepted, write — the opt-in agent rule. Reached through `offerOptInFiles`, after a
+ * config write or a `skip` alike, for the same reason as the CI-workflow offer. Anchored at the
  * repository root for the reason the workflow is: agent context is read from the repository root,
  * not from wherever a nested config happens to sit, and the page itself names that config's
  * directory so its commands still find it. Never overwrites an existing rule — the page is meant to
@@ -1066,6 +1075,67 @@ async function offerAgentRule(params: {
   return written.ok
     ? { kind: "written", path: relativeAgentRulePath }
     : { kind: "failed", path: relativeAgentRulePath, code: written.code };
+}
+
+/**
+ * Offers both opt-in files in their fixed order — the workflow, then the agent rule. The config-write
+ * branch and the `skip` branch of `runInitCommand` both go through here rather than each calling the
+ * two offers, because two copies of this sequence would drift: one branch would gain a new opt-in
+ * file, an ordering change or a guard that the other silently lacks.
+ */
+async function offerOptInFiles(params: {
+  repoRoot: string;
+  configAbsPath: string;
+  options: InitCommandOptions;
+  prompter: InitPrompter;
+  cliInstalled: boolean;
+  packageManager: DetectedPackageManager;
+}): Promise<{
+  ciWorkflow: CiWorkflowOutcome | undefined;
+  agentRule: AgentRuleOutcome | undefined;
+}> {
+  const { repoRoot, configAbsPath, options, prompter } = params;
+  const ciWorkflow = await offerCiWorkflow({
+    repoRoot,
+    configAbsPath,
+    yes: options.yes,
+    withCiWorkflow: options.withCiWorkflow,
+    prompter,
+  });
+  // Offered even when the workflow write just failed: the two files are independent, and a failure
+  // in one is no reason to withhold the other the user may have asked for.
+  const agentRule = await offerAgentRule({
+    repoRoot,
+    configAbsPath,
+    yes: options.yes,
+    withAgentRule: options.withAgentRule,
+    prompter,
+    cliInstalled: params.cliInstalled,
+    packageManager: params.packageManager,
+    cliVersion: options.cliVersion,
+  });
+  return { ciWorkflow, agentRule };
+}
+
+/**
+ * The run's outcome once the opt-in files have been offered. A requested opt-in file that failed to
+ * land turns an otherwise-successful run into a failed write whichever branch it followed — the
+ * summary names which file it was, and names both when both failed, which is why naming the
+ * workflow first here loses nothing. `onSuccess` is what the run was before the offers: `"written"`
+ * after a config write, `"skipped"` after leaving an existing config untouched.
+ */
+function optInOutcome(
+  ciWorkflow: CiWorkflowOutcome | undefined,
+  agentRule: AgentRuleOutcome | undefined,
+  onSuccess: "written" | "skipped",
+): InitOutcome {
+  if (ciWorkflow?.kind === "failed") {
+    return "ci-workflow-write-failed";
+  }
+  if (agentRule?.kind === "failed") {
+    return "agent-rule-write-failed";
+  }
+  return onSuccess;
 }
 
 /**
@@ -1186,29 +1256,50 @@ function formatSchemaWriteLine(schema: SchemaWriteOutcome): string {
   }
 }
 
-function formatCiWorkflowLine(ciWorkflow: CiWorkflowOutcome): string {
+/**
+ * What this run did to the config before the opt-in files were offered. The opt-in lines tell the
+ * user what state the config is in alongside the file that did or did not land, and after a `skip`
+ * the write-path wording ("the config above was still written") would be false. A parameter rather
+ * than a second pair of formatters, so the two wordings stay side by side and the write-path bytes
+ * the e2e suite pins cannot drift while the skip wording is edited.
+ */
+type OptInConfigState = "written" | "untouched";
+
+function formatCiWorkflowLine(
+  ciWorkflow: CiWorkflowOutcome,
+  configState: OptInConfigState,
+): string {
   switch (ciWorkflow.kind) {
     case "written":
       return `Wrote CI workflow ${ciWorkflow.path}.`;
     case "failed": {
       const reason =
         ciWorkflow.code === undefined ? "" : ` (${ciWorkflow.code})`;
+      const configNote =
+        configState === "written"
+          ? "the config above was still written"
+          : "the existing config was left untouched";
       return (
-        `Could not write the CI workflow ${ciWorkflow.path}${reason} — the config above was still ` +
-        "written, and no partial workflow file was left behind. Re-run init to retry it, or add " +
-        "the workflow by hand."
+        `Could not write the CI workflow ${ciWorkflow.path}${reason} — ${configNote}, and no ` +
+        "partial workflow file was left behind. Re-run init to retry it, or add the workflow by " +
+        "hand."
       );
     }
     case "kept":
       return (
         `Kept the existing CI workflow ${ciWorkflow.path} — init never overwrites it. Check that ` +
-        "it still points at the config written above."
+        (configState === "written"
+          ? "it still points at the config written above."
+          : "it still points at the existing config.")
       );
     case "unsafe-config-path":
       return (
         `Skipped the CI workflow ${ciWorkflow.path} — the config path contains a line terminator, ` +
-        "which cannot be embedded safely in the workflow's shell command. The config above was " +
-        "still written; add the workflow by hand, or rename the directory."
+        "which cannot be embedded safely in the workflow's shell command. " +
+        (configState === "written"
+          ? "The config above was still written"
+          : "The existing config was left untouched") +
+        "; add the workflow by hand, or rename the directory."
       );
     default: {
       const exhaustiveCheck: never = ciWorkflow;
@@ -1222,7 +1313,14 @@ function formatCiWorkflowLine(ciWorkflow: CiWorkflowOutcome): string {
 // reads it yet. `init` deliberately does not edit `AGENTS.md` or `CLAUDE.md` to wire it in: those are
 // the user's own files, and whether the page is loaded every session or read on demand is a budget
 // decision only they can make.
-function formatAgentRuleLine(agentRule: AgentRuleOutcome): string {
+function formatAgentRuleLine(
+  agentRule: AgentRuleOutcome,
+  configState: OptInConfigState,
+): string {
+  const configNote =
+    configState === "written"
+      ? "the config above was still written"
+      : "the existing config was left untouched";
   switch (agentRule.kind) {
     case "written":
       return (
@@ -1235,8 +1333,8 @@ function formatAgentRuleLine(agentRule: AgentRuleOutcome): string {
     case "failed": {
       const reason = agentRule.code === undefined ? "" : ` (${agentRule.code})`;
       return (
-        `Could not write the agent rule ${agentRule.path}${reason} — the config above was still ` +
-        "written, and no partial file was left behind. Re-run init to retry it."
+        `Could not write the agent rule ${agentRule.path}${reason} — ${configNote}, and no ` +
+        "partial file was left behind. Re-run init to retry it."
       );
     }
     case "kept":
@@ -1247,8 +1345,11 @@ function formatAgentRuleLine(agentRule: AgentRuleOutcome): string {
     case "unsafe-config-path":
       return (
         `Skipped the agent rule ${agentRule.path} — the config path contains a line terminator, ` +
-        "which the page cannot name. The config above was still written; rename the directory " +
-        "and re-run init to add it."
+        "which the page cannot name. " +
+        (configState === "written"
+          ? "The config above was still written"
+          : "The existing config was left untouched") +
+        "; rename the directory and re-run init to add it."
       );
     default: {
       const exhaustiveCheck: never = agentRule;
@@ -1310,12 +1411,33 @@ export function formatWriteSummary(params: {
     lines.push(formatSchemaWriteLine(schema));
   }
   if (ciWorkflow !== undefined) {
-    lines.push(formatCiWorkflowLine(ciWorkflow));
+    lines.push(formatCiWorkflowLine(ciWorkflow, "written"));
   }
   if (agentRule !== undefined) {
-    lines.push(formatAgentRuleLine(agentRule));
+    lines.push(formatAgentRuleLine(agentRule, "written"));
   }
 
+  return `${lines.join("\n")}\n`;
+}
+
+/**
+ * The summary for a `skip` of an existing config: the skip line, then one line per opt-in file that
+ * was written, kept, withheld or failed. With no opt-in outcome it is exactly the single skip line
+ * a plain `--yes --on-existing skip` has always printed. That line is the whole of a plain skip's
+ * output, so anything that recognises a skip by comparing against it — a CI script, an agent driving
+ * `init` — would misread an unchanged run if the opt-in offers added a byte to it. Pure and exported so it can be asserted directly, mirroring `formatWriteSummary`.
+ */
+export function formatSkipSummary(params: {
+  ciWorkflow?: CiWorkflowOutcome;
+  agentRule?: AgentRuleOutcome;
+}): string {
+  const lines = ["skipped — existing config left untouched."];
+  if (params.ciWorkflow !== undefined) {
+    lines.push(formatCiWorkflowLine(params.ciWorkflow, "untouched"));
+  }
+  if (params.agentRule !== undefined) {
+    lines.push(formatAgentRuleLine(params.agentRule, "untouched"));
+  }
   return `${lines.join("\n")}\n`;
 }
 
@@ -1386,8 +1508,10 @@ export function formatNotWrittenSummary(
  * clusters/package-manager, re-run inference against the confirmed cluster subset (so global gates
  * and the cycle heuristic reflect what the user actually kept), confirm categories, diff against an
  * existing config when merging, and confirm the draft. On confirmation, writes the config (and an
- * optional project-local schema + CI workflow); a `merge` whose existing config is unreadable aborts
- * the write entirely rather than risk dropping an entry it cannot even parse.
+ * optional project-local schema), then offers the CI workflow and agent rule; a `merge` whose
+ * existing config is unreadable aborts the write entirely rather than risk dropping an entry it
+ * cannot even parse. A `skip` of an existing config ends the config flow before any scan, but still
+ * offers the CI workflow and agent rule against the existing config.
  *
  * When no `[path]` was explicitly typed, a config found at a strict ancestor of `options.cwd`
  * governs the whole run (scan/inference/write all re-root to that ancestor's directory). When
@@ -1439,11 +1563,34 @@ export async function runInitCommand(
       : await prompter.resolveExistingConfigAction(relativeConfigPath);
 
     if (existingConfigAction === "skip") {
-      // `skip` must never touch the filesystem (plan invariant): no config, schema, or CI workflow
-      // write — the CI-workflow offer belongs only to the confirmed config-write branch below.
+      // `skip` leaves the config and its schema byte-unchanged and never scans or drafts — but it
+      // skips only the config. The CI workflow and agent rule depend on nothing but where the config
+      // lives, and a repository that already has one is exactly the one that wants to add them
+      // without overwriting or merging it; ending the run here once ignored `--with-ci-workflow`
+      // and `--with-agent-rule` without a word and still exited 0.
+      const repoRoot = (await findRepositoryRoot(cwd)) ?? cwd;
+      // The package manager comes from lockfile detection alone. The write path asks the user when
+      // nothing is detected, but here its only effect is the agent rule's runner line, whose
+      // undetected fallback is the npm form — a package-manager question would be out of place in a
+      // run whose whole point is to leave the config alone.
+      const packageManager = await detectPackageManager(cwd);
+      const { ciWorkflow, agentRule } = await offerOptInFiles({
+        repoRoot,
+        // `findConfig` only ever matches `CONFIG_FILE_NAME`, so this is the same path the write path
+        // would have written; the offers read only its location, never its contents, which is why an
+        // unloadable existing config does not stop them.
+        configAbsPath: existingConfigPath,
+        options,
+        prompter,
+        // The same on-disk evidence the write path anchors `$schema` on: an installed package
+        // schema is an installed CLI, and without one the agent rule's commands have no local
+        // binary to resolve.
+        cliInstalled: (await findInstalledSchemaDir(cwd)) !== undefined,
+        packageManager,
+      });
       return {
-        output: `${DRAFT_SUMMARY_HEADER}\n\nskipped — existing config left untouched.\n`,
-        outcome: "skipped",
+        output: `${DRAFT_SUMMARY_HEADER}\n\n${formatSkipSummary({ ciWorkflow, agentRule })}`,
+        outcome: optInOutcome(ciWorkflow, agentRule, "skipped"),
       };
     }
   }
@@ -1734,26 +1881,15 @@ export async function runInitCommand(
     };
   }
 
-  const ciWorkflow = await offerCiWorkflow({
+  const { ciWorkflow, agentRule } = await offerOptInFiles({
     repoRoot,
     configAbsPath: configPath,
-    yes: options.yes,
-    withCiWorkflow: options.withCiWorkflow,
-    prompter,
-  });
-  // Offered even when the workflow write just failed: the two files are independent, and a failure
-  // in one is no reason to withhold the other the user may have asked for.
-  const agentRule = await offerAgentRule({
-    repoRoot,
-    configAbsPath: configPath,
-    yes: options.yes,
-    withAgentRule: options.withAgentRule,
+    options,
     prompter,
     // The same on-disk evidence `$schema` was anchored on above: an installed package schema is an
     // installed CLI, and without one the page's commands have no local binary to resolve.
     cliInstalled: schemaAnchor !== undefined,
     packageManager,
-    cliVersion: options.cliVersion,
   });
 
   return {
@@ -1768,15 +1904,9 @@ export async function runInitCommand(
         agentRule,
       }),
     ),
-    // The config and schema landed; only an opt-in file the user asked for did not. Still a failed
-    // write, so the exit code has to say so — the summary above names which file it was, and names
-    // both when both failed, which is why naming the workflow first here loses nothing.
-    outcome:
-      ciWorkflow?.kind === "failed"
-        ? "ci-workflow-write-failed"
-        : agentRule?.kind === "failed"
-          ? "agent-rule-write-failed"
-          : "written",
+    // The config and schema landed; an opt-in file the user asked for that did not is still a
+    // failed write, so the exit code has to say so.
+    outcome: optInOutcome(ciWorkflow, agentRule, "written"),
   };
 }
 
