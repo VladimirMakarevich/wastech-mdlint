@@ -213,7 +213,11 @@ function resolveRawLinkTarget(
 }
 
 // Map a GFM table into headers + rows keyed by header text. Cells missing from a short row default
-// to "" so column-based rules (TBL-*, custom columnNotEmpty) never index past the row.
+// to "" so column-based rules (TBL-*, custom columnNotEmpty) never index past the row, and cells
+// beyond the header are dropped. remark-gfm itself keeps every cell a row was written with, so the
+// written count is recorded as `cellCount` — otherwise this mapping would hide a malformed row from
+// TBL-007. The cell split is micromark's, so `\|` (inside a code span too) never counts as a
+// separator.
 function extractTable(
   node: Table,
   section: string | undefined,
@@ -234,7 +238,11 @@ function extractTable(
       cells[header] = cell === undefined ? "" : collectText(cell).trim();
     });
 
-    return { line: row.position?.start.line ?? 0, cells };
+    return {
+      line: row.position?.start.line ?? 0,
+      cells,
+      cellCount: row.children.length,
+    };
   });
 
   return {

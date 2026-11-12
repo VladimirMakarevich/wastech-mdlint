@@ -34,8 +34,9 @@
 
   // Not the full rule set, deliberately. A gate that reports hundreds of findings on the day it lands
   // gets ignored and then disabled; every rule in the first group reports zero over this corpus, so a
-  // red build means a genuinely broken link, anchor, image, empty required table cell, or reference
-  // cycle and nothing else.
+  // red build means a genuinely broken link, anchor, image, empty required table cell, table row
+  // whose cell count differs from its header, or reference cycle and nothing else. TBL-007 sits
+  // beside TBL-002 because TBL-002 does not report the missing cells of a short row.
   //
   // How this list grows: a rule joins only once a full run over this corpus already reports zero for
   // it, so the gate is never red on the day it changes, and whoever brings it to zero — or any
@@ -48,6 +49,7 @@
     { "rule": "REF-003" },
     { "rule": "GRP-001" },
     { "rule": "TBL-002" },
+    { "rule": "TBL-007" },
 
     // The second group is budgets, and both report as warnings. CI runs `lint --fail-on error`, so a
     // crossed budget shows up in the log and the job summary without failing the build: outgrowing a

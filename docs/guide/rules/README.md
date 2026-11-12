@@ -2,7 +2,7 @@
 
 > [Guide index](../README.md) · [Configuration](../configuration.md) · [Annotated config](../config-reference.md)
 
-`wastech-mdlint` ships **24 built-in rules** across 8 categories, plus the declarative [`custom`](custom.md) rule. Every rule has a Zod-validated options schema, a fixed **scope** (`document` = per file · `project` = once over the whole corpus), and a default **severity** (`error` | `warning`) you can override per entry. Enable rules in your [config](../configuration.md); most accept `files`/`exclude` to narrow their reach.
+`wastech-mdlint` ships **25 built-in rules** across 8 categories, plus the declarative [`custom`](custom.md) rule. Every rule has a Zod-validated options schema, a fixed **scope** (`document` = per file · `project` = once over the whole corpus), and a default **severity** (`error` | `warning`) you can override per entry. Enable rules in your [config](../configuration.md); most accept `files`/`exclude` to narrow their reach.
 
 > There is **no `CHK` category** — checklist completeness is [CTX-002](CTX-002.md).
 
@@ -16,6 +16,7 @@
 | [TBL-004](TBL-004.md) | TBL | document | error | no | Cell values match a required pattern. |
 | [TBL-005](TBL-005.md) | TBL | document | error | no | Cross-column conditional holds (when → then). |
 | [TBL-006](TBL-006.md) | TBL | project | error | no | Column IDs are unique across files. |
+| [TBL-007](TBL-007.md) | TBL | document | error | no | Table rows have as many cells as the header. |
 | [SEC-001](SEC-001.md) | SEC | document | error | **yes** | Required sections are present. |
 | [SEC-002](SEC-002.md) | SEC | document | error | no | Sections appear in the required order. |
 | [SEC-003](SEC-003.md) | SEC | project | error | no | Sections conform to a template's heading structure. |

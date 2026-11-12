@@ -13,7 +13,9 @@ import {
   columnNotEmpty,
   columnUnique,
   crossColumn,
+  isPaddingCell,
   requiredColumns,
+  rowCellCount,
 } from "../src/engine/primitives/table.js";
 import {
   sectionOrder,
@@ -85,6 +87,64 @@ describe("table primitives", () => {
     const findings = columnNotEmpty(doc(TABLE), {});
     expect(findings).toHaveLength(1);
     expect(findings[0]?.data?.column).toBe("Owner");
+  });
+
+  it("columnNotEmpty skips a short row's padding cells but reports a written-empty cell", () => {
+    const document = doc(
+      [
+        "| ID | Owner | Status |",
+        "| --- | --- | --- |",
+        "| REQ-1 | Ann |",
+        "| REQ-2 | Bob |  |",
+      ].join("\n"),
+    );
+    expect(isPaddingCell(document.tables[0]!.rows[0]!, 2)).toBe(true);
+    expect(isPaddingCell(document.tables[0]!.rows[1]!, 2)).toBe(false);
+    expect(
+      columnNotEmpty(document, {}).map((finding) => [
+        finding.line,
+        finding.data?.column,
+      ]),
+    ).toEqual([[4, "Status"]]);
+  });
+
+  it("rowCellCount reports rows whose cell count differs from the header", () => {
+    const findings = rowCellCount(
+      doc(
+        [
+          "| A | B |",
+          "| --- | --- |",
+          "| 1 | 2 |",
+          "| 1 | 2 | 3 |",
+          "| 1 |",
+        ].join("\n"),
+      ),
+      {},
+    );
+    expect(
+      findings.map((finding) => [finding.line, finding.data, finding.fixable]),
+    ).toEqual([
+      [4, { expected: 2, actual: 3 }, undefined],
+      [5, { expected: 2, actual: 1 }, undefined],
+    ]);
+  });
+
+  it("rowCellCount restricts itself to tables under the given section", () => {
+    const content = [
+      "## One",
+      "",
+      "| A | B |",
+      "| --- | --- |",
+      "| 1 |",
+      "",
+      "## Two",
+      "",
+      "| A | B |",
+      "| --- | --- |",
+      "| 1 | 2 |",
+    ].join("\n");
+    expect(rowCellCount(doc(content), { section: "Two" })).toEqual([]);
+    expect(rowCellCount(doc(content), { section: "One" })).toHaveLength(1);
   });
 
   it("columnInSet flags values outside the allowed set (case-insensitive optional)", () => {

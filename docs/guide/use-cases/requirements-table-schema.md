@@ -38,4 +38,4 @@ wastech-mdlint lint docs/requirements
 wastech-mdlint lint docs/requirements --fix   # TBL-002 fills empty ID/Status cells with ` TODO `
 ```
 
-**You get:** a report of tables missing columns, malformed IDs, duplicate IDs across files, out-of-set statuses, and `done`-without-owner rows. See [TBL-001](../rules/TBL-001.md)…[TBL-006](../rules/TBL-006.md).
+**You get:** a report of tables missing columns, malformed IDs, duplicate IDs across files, out-of-set statuses, and `done`-without-owner rows. See [TBL-001](../rules/TBL-001.md)…[TBL-006](../rules/TBL-006.md); add [TBL-007](../rules/TBL-007.md) to catch rows whose cell count differs from the header.

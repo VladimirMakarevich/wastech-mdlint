@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { generateRuleDocs } from "../src/engine/rule-docs.js";
+import { ruleRegistry } from "../src/engine/rules/index.js";
 
 const readmePath = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -48,9 +49,10 @@ describe("README rule table", () => {
     const rows = generateRuleDocs()
       .split("\n")
       .filter((line) => line.startsWith("| [`"));
-    // 24 built-ins, each linked — a rule whose cell lost its link (or gained a mismatched one) fails
-    // here rather than only showing up as a stale README diff.
-    expect(rows).toHaveLength(24);
+    // One linked row per registered built-in — a rule whose cell lost its link (or gained a
+    // mismatched one) fails here rather than only showing up as a stale README diff. The count comes
+    // from the registry so it moves with it; registry-inventory.test.ts pins the exact id set.
+    expect(rows).toHaveLength(ruleRegistry.getAllMetadata().length);
     for (const row of rows) {
       const match = /^\| \[`([^`]+)`\]\((\S+)\) \|/.exec(row);
       expect(match, row).not.toBeNull();

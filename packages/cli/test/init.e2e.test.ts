@@ -173,7 +173,7 @@ async function readReferencedSchema(configDir: string): Promise<string> {
 }
 
 // Cross-linked docs/ cluster: two local links (one anchored) + a real anchor match (REF-001/002),
-// a two-node reference cycle (GRP-001), a table (TBL-002), and an unchecked checklist item
+// a two-node reference cycle (GRP-001), a table (TBL-002/TBL-007), and an unchecked checklist item
 // (CTX-002). "docs" is a known cluster name (DEFAULT_KNOWN_CLUSTER_NAMES) so 2 files qualify.
 const CROSS_LINKED_DOCS_FIXTURE: Record<string, string> = {
   "docs/a.md": [
@@ -204,11 +204,11 @@ const CROSS_LINKED_DOCS_FIXTURE: Record<string, string> = {
 
 // A deliberately clean derivation of CROSS_LINKED_DOCS_FIXTURE (the clean-fixture exit
 // criterion "on a clean fixture, lint exits 0"). Two surgical edits keep the *same* inferred rule
-// set the byte-identical draft test already proves — REF-001/REF-002/TBL-002/CTX-002/GRP-001 — so
-// the new test only has to prove the new property (zero findings): the checklist item is checked
-// (CTX-002 clean) and docs/b.md's back-link to a.md is dropped so a↔b is a DAG, not a cycle
-// (GRP-001 clean). The resolvable link + real anchor + filled table stay, so REF-001/REF-002/TBL-002
-// still infer and still pass.
+// set the byte-identical draft test already proves — REF-001/REF-002/TBL-002/TBL-007/CTX-002/
+// GRP-001 — so the new test only has to prove the new property (zero findings): the checklist item
+// is checked (CTX-002 clean) and docs/b.md's back-link to a.md is dropped so a↔b is a DAG, not a cycle
+// (GRP-001 clean). The resolvable link + real anchor + filled, well-formed table stay, so
+// REF-001/REF-002/TBL-002/TBL-007 still infer and still pass.
 const CLEAN_DOCS_FIXTURE: Record<string, string> = {
   "docs/a.md": [
     "# A",
@@ -238,7 +238,7 @@ const CLEAN_DOCS_FIXTURE: Record<string, string> = {
 // deliverable 1's "custom layout" fixture, deliverable 3's "clean fixture lints clean", and the only
 // fixture that exercises SEC-001's clean path (plain docs/ never infers SEC-001). specs/ is a
 // one-directional resolvable link + a checked checklist + a filled table (REF-001/CTX-002/TBL-002/
-// GRP-001 clean, no cycle, no anchor so no REF-002). adr/ carries two files with Status/Context/
+// TBL-007/GRP-001 clean, no cycle, no anchor so no REF-002). adr/ carries two files with Status/Context/
 // Decision headings, modeled on rule-inference.test.ts's proven ADR shape, so SEC-001 is inferred
 // scoped to adr/**/*.{md,mdx} and passes (every adr file has all three sections).
 const CUSTOM_LAYOUT_FIXTURE: Record<string, string> = {
@@ -4060,6 +4060,7 @@ describe("init command · custom layout (specs/, adr/)", () => {
       "REF-001",
       "SEC-001",
       "TBL-002",
+      "TBL-007",
     ]);
     // Local, version-matched schema ref — never a remote URL; schema resolution stays offline.
     expect(written.$schema).toBe(

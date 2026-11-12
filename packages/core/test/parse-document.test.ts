@@ -61,7 +61,7 @@ describe("parseDocument · tables", () => {
     expect(table?.section).toBe("Requirements");
     expect(table?.line).toBe(3);
     expect(table?.rows).toEqual([
-      { line: 5, cells: { ID: "REQ-1", Owner: "Ann" } },
+      { line: 5, cells: { ID: "REQ-1", Owner: "Ann" }, cellCount: 2 },
     ]);
   });
 
@@ -71,6 +71,63 @@ describe("parseDocument · tables", () => {
     );
 
     expect(doc.tables[0]?.rows[0]?.cells).toEqual({ A: "only", B: "" });
+    // The padding must not hide the short row: the written count stays 1.
+    expect(doc.tables[0]?.rows[0]?.cellCount).toBe(1);
+  });
+
+  it("keeps the written cell count of an over-long row while cells holds only header keys", () => {
+    const doc = parse(
+      ["| A | B |", "| --- | --- |", "| 1 | 2 | 3 |", ""].join("\n"),
+    );
+
+    expect(doc.tables[0]?.rows[0]).toEqual({
+      line: 3,
+      cells: { A: "1", B: "2" },
+      cellCount: 3,
+    });
+  });
+
+  it("does not count an escaped pipe as a cell separator", () => {
+    const doc = parse(
+      ["| A | B |", "| --- | --- |", "| x \\| y | z |", ""].join("\n"),
+    );
+
+    expect(doc.tables[0]?.rows[0]).toEqual({
+      line: 3,
+      cells: { A: "x | y", B: "z" },
+      cellCount: 2,
+    });
+  });
+
+  it("does not count an escaped pipe inside a code span as a separator", () => {
+    const doc = parse(
+      ["| A | B |", "| --- | --- |", "| `p\\|q` | z |", ""].join("\n"),
+    );
+
+    expect(doc.tables[0]?.rows[0]).toEqual({
+      line: 3,
+      cells: { A: "p|q", B: "z" },
+      cellCount: 2,
+    });
+  });
+
+  // GFM splits table cells before inline parsing, so an unescaped `|` inside backticks is a cell
+  // separator — GitHub renders it that way too. The written count follows micromark rather than a
+  // hand-rolled tokenizer, so TBL-007 agrees with the renderer and with `cells`.
+  it("counts an unescaped pipe inside backticks as a separator, as GFM does", () => {
+    const doc = parse(
+      ["| A | B |", "| --- | --- |", "| `p|q` | z |", ""].join("\n"),
+    );
+
+    expect(doc.tables[0]?.rows[0]?.cellCount).toBe(3);
+  });
+
+  it("records the row line of a table inside a blockquote", () => {
+    const doc = parse(
+      ["Intro", "", "> | A | B |", "> | --- | --- |", "> | 1 |", ""].join("\n"),
+    );
+
+    expect(doc.tables[0]?.rows[0]).toMatchObject({ line: 5, cellCount: 1 });
   });
 
   it("leaves section undefined when a table precedes every heading", () => {
@@ -194,7 +251,9 @@ describe("parseDocument · CJK content and anchors", () => {
       headers: ["項目", "値"],
       section: "概要",
       line: 3,
-      rows: [{ line: 5, cells: { 項目: "名前", 値: "山田太郎" } }],
+      rows: [
+        { line: 5, cells: { 項目: "名前", 値: "山田太郎" }, cellCount: 2 },
+      ],
     });
     expect(doc.checkItems).toEqual([
       { text: "完了ですタスク", checked: true, section: "概要", line: 7 },

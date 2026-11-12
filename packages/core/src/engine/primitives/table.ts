@@ -2,6 +2,7 @@ import { compareStrings } from "../../deterministic-sort.js";
 import type {
   ParsedDocument,
   ParsedTable,
+  ParsedTableRow,
 } from "../../markdown/document-types.js";
 import { compileRegex } from "../regex.js";
 import type { PrimitiveContext, PrimitiveFinding } from "./types.js";
@@ -49,11 +50,24 @@ export function requiredColumns(
   return findings;
 }
 
+// A padding cell is one the row never wrote: the parser fills a short row's missing trailing cells
+// with "" so column lookups never miss, but the defect there is the row, which TBL-007 reports with
+// both counts. Reporting each padded cell as empty as well would raise two findings for one defect,
+// and a TODO written into it by the TBL-002 fix would hide the short row instead of repairing it.
+// `columnNotEmpty` and the TBL-002 fix hook both ask this one predicate, so the cells the check
+// reports and the cells `--fix` rewrites cannot drift apart.
+export function isPaddingCell(row: ParsedTableRow, cellIndex: number): boolean {
+  return cellIndex >= row.cellCount;
+}
+
 export type ColumnNotEmptyOptions = { columns?: string[]; section?: string };
 
 // columnNotEmpty — cells in the target column(s) must be non-empty (TBL-002). When `columns` is
-// omitted, every column of each scoped table is checked. Findings are flagged fixable so the
-// TBL-002 fix hook (empty → TODO) can act; custom rules ignore the flag (no fix hook).
+// omitted, every column of each scoped table is checked. Padding cells of a short row are skipped
+// (see `isPaddingCell`); a cell written empty is still reported. The skip lives here rather than in
+// TBL-002 so the declarative `assert.columnNotEmpty` keeps agreeing with the built-in. Findings are
+// flagged fixable so the TBL-002 fix hook (empty → TODO) can act; custom rules ignore the flag (no
+// fix hook).
 export function columnNotEmpty(
   document: ParsedDocument,
   options: ColumnNotEmptyOptions,
@@ -64,11 +78,17 @@ export function columnNotEmpty(
     const columns = options.columns ?? table.headers;
 
     for (const column of columns) {
-      if (!tableHasColumn(table, column)) {
+      const cellIndex = table.headers.indexOf(column);
+
+      if (cellIndex === -1) {
         continue;
       }
 
       for (const row of table.rows) {
+        if (isPaddingCell(row, cellIndex)) {
+          continue;
+        }
+
         if ((row.cells[column] ?? "").trim().length === 0) {
           findings.push({
             message: `Cell in column "${column}" is empty.`,
@@ -78,6 +98,44 @@ export function columnNotEmpty(
           });
         }
       }
+    }
+  }
+
+  return findings;
+}
+
+export type RowCellCountOptions = { section?: string };
+
+// rowCellCount — every body row has exactly as many cells as the header (TBL-007). The header's own
+// count needs no check: GFM recognises a table only when the header and delimiter rows agree. The
+// message names the rendering consequence, because the two directions fail differently: extra cells
+// vanish from the rendered table, missing ones render as blanks.
+export function rowCellCount(
+  document: ParsedDocument,
+  options: RowCellCountOptions,
+): PrimitiveFinding[] {
+  const findings: PrimitiveFinding[] = [];
+
+  for (const table of tablesInScope(document, options.section)) {
+    const expected = table.headers.length;
+
+    for (const row of table.rows) {
+      const actual = row.cellCount;
+
+      if (actual === expected) {
+        continue;
+      }
+
+      const consequence =
+        actual > expected
+          ? "the extra cells are dropped when the table renders"
+          : "the missing cells render empty";
+
+      findings.push({
+        message: `Row has ${actual} cells but the header declares ${expected}; ${consequence}.`,
+        line: row.line,
+        data: { expected, actual },
+      });
     }
   }
 

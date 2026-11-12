@@ -11,7 +11,7 @@
 //              reach all three through `explicitAnchors` in engine/anchor-resolve.ts)
 //   htmlAnchors → REF-002, anchor graph edges, slice index (same `explicitAnchors` route)
 //   sections   → cheap SEC-*/CTX-* section-existence checks
-//   tables     → TBL-* rules, REF-005/006 id tables, extractDefinedIds(), compile
+//   tables     → TBL-* rules (TBL-007 via row cellCount), REF-005/006 id tables, extractDefinedIds(), compile
 //   checkItems → CTX-002 checklist rules
 // links → REF-001/002 link resolution, link/anchor graph edges, edge explainability
 // images → REF-003 image resolution, image graph edges
@@ -49,9 +49,14 @@ export type ParsedHeading = {
 
 export type ParsedTableRow = {
   line: number;
-  // Cells keyed by their header text. Missing trailing cells map to "" so column-based rules can
-  // assert on every declared header without index bookkeeping.
+  // Cells keyed by their header text. Missing trailing cells map to "" and cells beyond the header
+  // are dropped, so column-based rules can assert on every declared header without index
+  // bookkeeping.
   cells: Record<string, string>;
+  // The number of cells as written, before `cells` pads or truncates the row to the header. `cells`
+  // alone hides both defects: TBL-007 reads this to report a row whose count differs from the
+  // header's, and TBL-002 reads it to tell a padding cell (never written) from one written empty.
+  cellCount: number;
 };
 
 export type ParsedTable = {
