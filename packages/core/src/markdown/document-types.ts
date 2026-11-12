@@ -15,7 +15,14 @@
 // images → REF-003 image resolution, image graph edges
 // imports → LLM eager-import budget (SIZE/LLM rules), import graph edges
 //   directives → inline-disable suppression (applied engine-side, not by the parser)
-//   content    → CTX-001 placeholder scan, size/token estimation, raw fallbacks
+//   frontmatter → no rule reads it yet; it is exposed so frontmatter-aware rules can be added
+//                 without re-parsing. Recognising the block matters even with no reader: a YAML
+//                 block between two `---` fences would otherwise parse as a thematic break plus
+//                 a setext H2, inventing a heading, section and slug, and any link, `@import` or
+//                 directive-looking text inside it would be extracted as if it were prose.
+//   content    → CTX-001 placeholder scan, size/token estimation, raw fallbacks. Still the whole
+//                file, frontmatter bytes included, so byte/line counts match `wc` and every
+//                offset a fix or line lookup computes against it stays a true source offset.
 //
 // Defined IDs are intentionally NOT a field: they are derived from `tables`/`headings`
 // by the shared `extractDefinedIds(doc, idRef)` helper, keeping the parser
@@ -94,6 +101,19 @@ export type InlineDirective = {
   line: number;
 };
 
+// A YAML frontmatter block. Only the raw text is exposed: core has no YAML parser, so turning it
+// into a structured value is left to whichever consumer first needs one.
+export type ParsedFrontmatter = {
+  // Text between the fences, fences excluded, line endings normalised to "\n" so a CRLF checkout
+  // of the same committed file exposes the identical string.
+  raw: string;
+  // 1-based line of the opening fence. Always 1 in practice: the block is only recognised when the
+  // fence opens the file.
+  startLine: number;
+  // 1-based line of the closing fence; the range is inclusive of both fences.
+  endLine: number;
+};
+
 export type ParsedDocument = {
   // Repo-relative POSIX path. Not strictly parse output, but carried here because findings are
   // attributed by repo-relative path, and carrying it here fixes it deterministically at load
@@ -107,5 +127,8 @@ export type ParsedDocument = {
   images: ParsedImage[];
   imports: ParsedImport[];
   directives: InlineDirective[];
+  // Required and `null` when absent, rather than optional: the key is always present, so absence is
+  // explicit and survives `JSON.stringify`, which would silently drop an `undefined`.
+  frontmatter: ParsedFrontmatter | null;
   content: string;
 };

@@ -21,7 +21,7 @@ wastech-mdlint compile --cwd packages/docs
 
 ## What goes into `SKILL.md`
 
-The compiler analyzes the graph (classifying nodes as entry/hub/leaf/isolated/bridge), extracts a document profile (outline, table schemas, detected ID patterns, references in/out), describes the active rules, and synthesizes a skill document. Output is **byte-deterministic**: sorted, POSIX paths, a content hash, no timestamps — so re-running on the same inputs produces identical bytes.
+The compiler analyzes the graph (classifying nodes as entry/hub/leaf/isolated/bridge), extracts a document profile (outline, table schemas, detected ID patterns, references in/out — a document's YAML frontmatter never appears in its outline), describes the active rules, and synthesizes a skill document. Output is **byte-deterministic**: sorted, POSIX paths, a content hash, no timestamps — so re-running on the same inputs produces identical bytes.
 
 ### Every section is bounded or says it is not
 
@@ -52,7 +52,7 @@ Two things that fixed bounds do **not** promise, both worth knowing before you d
 
 ### The `Context Budget` numbers are estimates
 
-The corpus total and the per-entrypoint breaches in that block come from the same heuristic [SIZE-001 and LLM-001](concepts.md#token-estimation) use — `ceil(characters / 4)`, which errs **low** for non-Latin scripts. Unlike a lint finding, which now states that calibration in its own message, the block states it nowhere: the artifact is loaded into an agent's context whole, so a sentence repeated per entrypoint costs the context the block exists to protect, and adding it would move the bytes and content hash of every committed `SKILL.md` for a disclosure the reader can get here. Read those numbers as an order of magnitude, and set the budgets they are measured against with headroom.
+The corpus total and the per-entrypoint breaches in that block come from the same heuristic [SIZE-001 and LLM-001](concepts.md#token-estimation) use — `ceil(characters / 4)`, which errs **low** for non-Latin scripts. Unlike a lint finding, which now states that calibration in its own message, the block states it nowhere: the artifact is loaded into an agent's context whole, so a sentence repeated per entrypoint costs the context the block exists to protect, and adding it would move the bytes and content hash of every committed `SKILL.md` for a disclosure the reader can get here. They count the whole of each file, YAML frontmatter included, because an agent host loads it too. Read those numbers as an order of magnitude, and set the budgets they are measured against with headroom.
 
 ## Config
 

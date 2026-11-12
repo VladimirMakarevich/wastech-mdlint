@@ -10,6 +10,7 @@ export type {
   InlineDirectiveKind,
   ParsedCheckItem,
   ParsedDocument,
+  ParsedFrontmatter,
   ParsedHeading,
   ParsedImage,
   ParsedImport,

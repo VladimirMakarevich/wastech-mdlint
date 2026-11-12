@@ -57,6 +57,25 @@ describe("CTX-001 placeholder / empty sections", () => {
     ]);
   });
 
+  // Frontmatter used to be a setext H2 whose "section" ran to the next heading, so it took part in
+  // the empty-section scan under a name made of YAML text. Only real sections may be judged now,
+  // and the reported line must still be the absolute source line. `---` is configured as a
+  // placeholder because the old section body was exactly its own setext underline: with the
+  // defaults that body is never empty, so the invented section would pass unnoticed and this test
+  // could not tell the old parse from the new one.
+  it("judges only real sections in a document with frontmatter", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "---\ntitle: x\n---\n\n# Title\n\n## Empty\n\n## Filled\n\ntext\n",
+    });
+    const result = await lint(cwd, [
+      rule("CTX-001", { placeholders: ["---"] }),
+    ]);
+    expect(
+      result.messages.map((message) => [message.line, message.data?.section]),
+    ).toEqual([[7, "Empty"]]);
+  });
+
   it("unions custom placeholders with the locked defaults", async () => {
     const cwd = await fixtureRepo({ "a.md": "## S\nLATER\n" });
     expect((await lint(cwd, [rule("CTX-001")])).messages).toEqual([]);

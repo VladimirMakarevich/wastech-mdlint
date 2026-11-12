@@ -12,8 +12,10 @@ import type {
   Table,
   TableRow,
   Text,
+  Yaml,
 } from "mdast";
 import { remark } from "remark";
+import remarkFrontmatter from "remark-frontmatter";
 import remarkGfm from "remark-gfm";
 import remarkParse from "remark-parse";
 import { visit } from "unist-util-visit";
@@ -25,6 +27,7 @@ import type {
   InlineDirectiveKind,
   ParsedCheckItem,
   ParsedDocument,
+  ParsedFrontmatter,
   ParsedHeading,
   ParsedImage,
   ParsedImport,
@@ -36,7 +39,14 @@ import type {
 
 // One shared processor: parsing is pure, so a single GFM-enabled instance is reused across every
 // document (a fresh slugger per document keeps dedupe state isolated — see parseDocument).
-const markdownProcessor = remark().use(remarkParse).use(remarkGfm);
+// Frontmatter is recognised here, in the same parse, because without it a YAML block between two
+// `---` fences parses as a thematic break plus a setext H2 and invents a heading. Only `yaml` is
+// enabled: a TOML `+++` line is not a setext underline, so it never caused that defect, and with
+// no TOML consumer recognising it would only hide text from the outline.
+const markdownProcessor = remark()
+  .use(remarkParse)
+  .use(remarkGfm)
+  .use(remarkFrontmatter, ["yaml"]);
 
 // Eager `@path.md` import syntax. Kept byte-identical to the legacy llm/imports scanner so the
 // import set does not shift across the cutover: leading boundary, `@`, then a `.md` target.
@@ -81,6 +91,27 @@ function getReferenceDefinitions(tree: Root): Map<string, string> {
   });
 
   return definitions;
+}
+
+// Only the first child can be frontmatter: the micromark extension matches the opening fence at
+// document offset 0 and nowhere else, so a `---` later in the file stays a thematic break.
+function extractFrontmatter(tree: Root): ParsedFrontmatter | null {
+  const first = tree.children[0];
+
+  if (first?.type !== "yaml") {
+    return null;
+  }
+
+  const node = first as Yaml;
+
+  // LF-normalised so a CRLF checkout (`core.autocrlf` on Windows) exposes the same string as the
+  // committed file. Only line numbers are exposed, never offsets, so normalising cannot put
+  // anything out of step with `content`.
+  return {
+    raw: node.value.replace(/\r\n?/g, "\n"),
+    startLine: node.position?.start.line ?? 1,
+    endLine: node.position?.end.line ?? 1,
+  };
 }
 
 function classifyLink(rawTarget: string): {
@@ -283,6 +314,8 @@ export function parseDocument(params: {
 
   let currentSection: string | undefined;
 
+  // A `yaml` node is a childless literal, not `text`, `link` or `html`, so it falls through to
+  // `default`: nothing inside frontmatter can become a heading, link, `@import` or directive.
   visit(tree, (node) => {
     switch (node.type) {
       case "heading": {
@@ -367,6 +400,7 @@ export function parseDocument(params: {
     images,
     imports,
     directives,
+    frontmatter: extractFrontmatter(tree),
     content: params.content,
   };
 }

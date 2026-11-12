@@ -347,3 +347,18 @@ describe("extractDocProfiles · corpus", () => {
     );
   });
 });
+
+// A document's compile outline is its heading list, which frontmatter used to pollute with an
+// invented setext H2 rendered into the compiled skill.
+describe("extractDocProfiles · frontmatter", () => {
+  it("keeps frontmatter out of the outline", () => {
+    const { documents, graph } = contextOf({
+      "a.md":
+        "---\nname: demo-skill\ndescription: does a thing\n---\n\n# Title\n\nBody text.\n",
+    });
+
+    expect(profileOne(getDocument(documents, "a.md"), graph).outline).toEqual([
+      { text: "Title", depth: 1, slug: "title", line: 6 },
+    ]);
+  });
+});

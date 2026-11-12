@@ -12,7 +12,7 @@ import {
 import { lintFiles } from "../src/engine/lint-files.js";
 import { RuleResolutionError } from "../src/engine/registry.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
-import { TOKEN_ESTIMATE_NOTE } from "../src/engine/tokens.js";
+import { estimateTokens, TOKEN_ESTIMATE_NOTE } from "../src/engine/tokens.js";
 
 const tempDirs: string[] = [];
 
@@ -86,6 +86,36 @@ describe("SIZE-001 tokens metric", () => {
     expect(result.messages.map((message) => message.message)).toContain(
       "File exceeds lines warn budget: 4 lines > 2.",
     );
+  });
+});
+
+// Frontmatter is excluded from the outline but not from the size metrics: an agent host loads the
+// whole file, frontmatter included, so the budget has to count it, and bytes/lines stay numbers a
+// user can reproduce with `wc`. Thresholds of 1 make every metric report its actual.
+describe("SIZE-001 counts frontmatter", () => {
+  it("measures the whole file, frontmatter included", async () => {
+    const content =
+      "---\nname: demo-skill\ndescription: does a thing\n---\n\n# Title\n\nBody text.\n";
+    const cwd = await fixtureRepo({ "a.md": content });
+    const result = await lint(cwd, [
+      rule("SIZE-001", {
+        bytes: { warn: 1 },
+        lines: { warn: 1 },
+        tokens: { warn: 1 },
+      }),
+    ]);
+    expect(
+      Object.fromEntries(
+        result.messages.map((message) => [
+          message.data?.metric,
+          message.data?.actual,
+        ]),
+      ),
+    ).toEqual({
+      bytes: Buffer.byteLength(content, "utf8"),
+      lines: 8,
+      tokens: estimateTokens(content),
+    });
   });
 });
 
