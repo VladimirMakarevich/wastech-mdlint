@@ -15,6 +15,8 @@
 //   checkItems → CTX-002 checklist rules
 // links → REF-001/002 link resolution, link/anchor graph edges, edge explainability
 // images → REF-003 image resolution, image graph edges
+//   undefinedReferences → REF-007. Deliberately no graph edge: an undefined label has no target,
+//                and an edge would have to invent one.
 // imports → LLM eager-import budget (SIZE/LLM rules), import graph edges
 //   directives → inline-disable suppression (applied engine-side, not by the parser)
 //   frontmatter → no rule reads it yet; it is exposed so frontmatter-aware rules can be added
@@ -102,6 +104,23 @@ export type ParsedImage = {
   line: number;
 };
 
+// A reference-style link or image whose label has no definition. micromark leaves such a construct
+// as plain text, so it never reaches `links` or `images`; without this field no rule and no edge
+// would ever see it, and it renders on the page as the literal brackets.
+export type ParsedUndefinedReference = {
+  // The label as written in the source (escapes not decoded), whitespace runs collapsed to one
+  // space and trimmed, so the message quotes what the author typed. For the collapsed and shortcut
+  // forms this is the link text.
+  label: string;
+  kind: "link" | "image";
+  // mdast's own names: `full` is `[text][label]`, `collapsed` is `[label][]`, `shortcut` is
+  // `[label]`. Every form is recorded; the rule decides which to report.
+  referenceType: "full" | "collapsed" | "shortcut";
+  // 1-based source position of the opening `[`, or of the `!` for an image.
+  line: number;
+  column: number;
+};
+
 // Eager `@path.md` import. Becomes an `import` edge in the context graph.
 export type ParsedImport = {
   rawTarget: string;
@@ -145,6 +164,8 @@ export type ParsedDocument = {
   checkItems: ParsedCheckItem[];
   links: ParsedLink[];
   images: ParsedImage[];
+  // Document order.
+  undefinedReferences: ParsedUndefinedReference[];
   imports: ParsedImport[];
   directives: InlineDirective[];
   // Required and `null` when absent, rather than optional: the key is always present, so absence is

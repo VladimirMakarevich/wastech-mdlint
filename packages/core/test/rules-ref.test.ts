@@ -199,12 +199,13 @@ describe("REF-003 images", () => {
   });
 });
 
-// The REF half of the shared `exclude` matrix. REF-002 is the only REF rule that mixes in
+// The REF half of the shared `exclude` matrix. REF-002 and REF-007 are the REF rules that mix in
 // the shared file-scope shape; REF-001/REF-003 spell `exclude` too but mean something else, which is
 // pinned separately below.
-describe("REF-002 file scope (exclude)", () => {
-  const ANCHOR_DOC = "## Intro\n\n[bad](#nope)\n";
-
+describe.each([
+  ["REF-002", "## Intro\n\n[bad](#nope)\n"],
+  ["REF-007", "[text][missing]\n"],
+])("%s file scope (exclude)", (ruleId, failingDoc) => {
   async function reportedFiles(
     cwd: string,
     configured: ConfiguredRule,
@@ -217,22 +218,22 @@ describe("REF-002 file scope (exclude)", () => {
 
   it("drops an excluded document, with and without `files`", async () => {
     const cwd = await fixtureRepo({
-      "docs/a.md": ANCHOR_DOC,
-      "drafts/b.md": ANCHOR_DOC,
+      "docs/a.md": failingDoc,
+      "drafts/b.md": failingDoc,
     });
 
-    expect(await reportedFiles(cwd, rule("REF-002"))).toEqual([
+    expect(await reportedFiles(cwd, rule(ruleId))).toEqual([
       "docs/a.md",
       "drafts/b.md",
     ]);
     // The unscoped shape — `exclude` with no `files` beside it to carry the filtering.
     expect(
-      await reportedFiles(cwd, rule("REF-002", { exclude: ["drafts/**"] })),
+      await reportedFiles(cwd, rule(ruleId, { exclude: ["drafts/**"] })),
     ).toEqual(["docs/a.md"]);
     expect(
       await reportedFiles(
         cwd,
-        rule("REF-002", { files: ["**/*.md"], exclude: ["drafts/**"] }),
+        rule(ruleId, { files: ["**/*.md"], exclude: ["drafts/**"] }),
       ),
     ).toEqual(["docs/a.md"]);
   });
@@ -358,7 +359,7 @@ describe("REF option schemas (file scope inventory)", () => {
     return thrown as RuleResolutionError;
   }
 
-  // Every REF rule except REF-002 is whole-corpus or identity-based by design, so `files` is not a
+  // Every REF rule except REF-002 and REF-007 is whole-corpus or identity-based by design, so `files` is not a
   // silently ignored key — it fails resolution. This is what makes the pairing above unambiguous.
   it.each([
     ["REF-001", {}],
@@ -389,14 +390,17 @@ describe("REF option schemas (file scope inventory)", () => {
     expect(JSON.stringify(error.issues)).toContain("files");
   });
 
-  it("accepts `files` and `exclude` on REF-002, the one file-scoped REF rule", () => {
-    expect(
-      ruleRegistry.resolveRule("REF-002", {
-        files: ["docs/**"],
-        exclude: ["docs/drafts/**"],
-      }).id,
-    ).toBe("REF-002");
-  });
+  it.each(["REF-002", "REF-007"])(
+    "accepts `files` and `exclude` on %s, a file-scoped REF rule",
+    (id) => {
+      expect(
+        ruleRegistry.resolveRule(id, {
+          files: ["docs/**"],
+          exclude: ["docs/drafts/**"],
+        }).id,
+      ).toBe(id);
+    },
+  );
 
   it("rejects an `ignoredPattern` that does not compile, naming the rule and option path", () => {
     const error = resolutionError("REF-002", { ignoredPattern: "(" });
@@ -409,6 +413,12 @@ describe("REF option schemas (file scope inventory)", () => {
 
   it("rejects a non-boolean `ignoreCase`", () => {
     expect(resolutionError("REF-002", { ignoreCase: "yes" }).code).toBe(
+      "INVALID_OPTIONS",
+    );
+  });
+
+  it("rejects a non-boolean `includeShortcut`", () => {
+    expect(resolutionError("REF-007", { includeShortcut: "yes" }).code).toBe(
       "INVALID_OPTIONS",
     );
   });
@@ -618,5 +628,108 @@ describe("REF-006 stability consistency", () => {
       referencedStability: "experimental",
       referencerStability: "stable",
     });
+  });
+});
+
+describe("REF-007 undefined reference labels", () => {
+  it("reports full link and image references with label, position and data", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n\nSee [text][missing] and ![alt][Gone].\n",
+    });
+    const result = await lint(cwd, [rule("REF-007")]);
+    expect(
+      result.messages.map((message) => [
+        message.ruleId,
+        message.severity,
+        message.line,
+        message.column,
+        message.message,
+        message.data,
+      ]),
+    ).toEqual([
+      [
+        "REF-007",
+        "error",
+        3,
+        5,
+        'Reference "[missing]" has no definition, so it renders as literal text; add a "[missing]: <target>" definition or correct the label.',
+        { label: "missing", kind: "link", referenceType: "full" },
+      ],
+      [
+        "REF-007",
+        "error",
+        3,
+        25,
+        'Image reference "[Gone]" has no definition, so it renders as literal text; add a "[Gone]: <target>" definition or correct the label.',
+        { label: "Gone", kind: "image", referenceType: "full" },
+      ],
+    ]);
+  });
+
+  it("reports a full link or image reference whose undefined label starts with `^`", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "[text][^missing] ![alt][^gone] and a footnote[^1].\n",
+    });
+    const result = await lint(cwd, [rule("REF-007")]);
+    expect(
+      result.messages.map((message) => [message.column, message.data]),
+    ).toEqual([
+      [1, { label: "^missing", kind: "link", referenceType: "full" }],
+      [18, { label: "^gone", kind: "image", referenceType: "full" }],
+    ]);
+  });
+
+  it("matches a definition case-insensitively and reports nothing", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "[text][MISSING] ![alt][Missing] [Missing][]\n\n[missing]: b.md\n",
+      "b.md": "# B\n",
+    });
+    expect((await lint(cwd, [rule("REF-007")])).messages).toEqual([]);
+  });
+
+  // `[sic]` and `[WIP]` in prose cannot be told apart from a shortcut reference, so the shortcut
+  // form is opt-in; the collapsed form is an unambiguous attempt and is always reported.
+  it("reports shortcut references only with `includeShortcut`", async () => {
+    const cwd = await fixtureRepo({ "a.md": "[solo] and [pair][]\n" });
+    const labels = async (options?: unknown) =>
+      (await lint(cwd, [rule("REF-007", options)])).messages.map((message) => [
+        message.data?.label,
+        message.data?.referenceType,
+      ]);
+
+    expect(await labels()).toEqual([["pair", "collapsed"]]);
+    expect(await labels({ includeShortcut: true })).toEqual([
+      ["solo", "shortcut"],
+      ["pair", "collapsed"],
+    ]);
+  });
+
+  it("never reports a label inside a code span or a fenced block", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "Use `[a][b]` here.\n\n```md\n[a][b]\n[solo]\n```\n",
+    });
+    expect(
+      (await lint(cwd, [rule("REF-007", { includeShortcut: true })])).messages,
+    ).toEqual([]);
+  });
+
+  it("is suppressed by an inline-disable directive", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "<!-- wastech-mdlint-disable-next-line REF-007 -->\n[a][missing]\n\n[b][missing]\n",
+    });
+    const result = await lint(cwd, [rule("REF-007")]);
+    expect(result.messages.map((message) => message.line)).toEqual([4]);
+  });
+
+  // A defined label pointing at a missing file is REF-001's finding, not REF-007's: the reference
+  // still resolves to a definition, so it must reach `links` exactly as before.
+  it("leaves REF-001 on a defined reference unchanged and stays silent itself", async () => {
+    const cwd = await fixtureRepo({ "a.md": "[x][d]\n\n[d]: missing.md\n" });
+    const result = await lint(cwd, [rule("REF-001"), rule("REF-007")]);
+    expect(result.messages.map((message) => message.ruleId)).toEqual([
+      "REF-001",
+    ]);
   });
 });

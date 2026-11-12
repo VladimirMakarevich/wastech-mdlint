@@ -27,7 +27,7 @@ import { fileScopeShape, matchesFileScope } from "./scope.js";
 import type { RuleContext, SiteRouterSettings } from "../types.js";
 
 // Reference-integrity rules. REF rules use the documents map + existsSync + site-router; no
-// graph needed — that is the GRP family's job.
+// graph needed — that is the GRP family's job. REF-007 reads only the parsed document itself.
 
 const siteRouterOptionSchema = z
   .object({
@@ -503,6 +503,54 @@ export const ref006: RuleDefinition = defineRule({
   },
 });
 
+// Shortcut references are off by default: `[sic]`, `[WIP]` or `[x]` in prose is indistinguishable
+// from a shortcut reference attempt, so reporting them would flag ordinary bracketed text. The full
+// and collapsed forms are unambiguous attempts at a link.
+const DEFAULT_REF007_INCLUDE_SHORTCUT = false;
+
+// REF-007 — reference-style links and images use a defined label. micromark renders an undefined
+// `[text][missing]` as the literal brackets and no link, so the parser records each one as an
+// `undefinedReferences` entry and this rule reports it. Error severity because the result is a
+// broken link on the page, exactly as REF-001's; not fixable because there is no target to invent.
+export const ref007: RuleDefinition = defineRule({
+  metadata: {
+    id: "REF-007",
+    category: "REF",
+    description: "Reference links and images use a defined label.",
+    defaultSeverity: "error",
+    scope: "document",
+    fixable: false,
+  },
+  optionsSchema: z
+    .object({
+      includeShortcut: z.boolean().default(DEFAULT_REF007_INCLUDE_SHORTCUT),
+      ...fileScopeShape,
+    })
+    .strict(),
+  check: (options) => (context) => {
+    if (!matchesFileScope(context.filePath!, options)) {
+      return;
+    }
+    for (const reference of context.document!.undefinedReferences) {
+      if (reference.referenceType === "shortcut" && !options.includeShortcut) {
+        continue;
+      }
+      const subject =
+        reference.kind === "image" ? "Image reference" : "Reference";
+      context.report({
+        message: `${subject} "[${reference.label}]" has no definition, so it renders as literal text; add a "[${reference.label}]: <target>" definition or correct the label.`,
+        line: reference.line,
+        column: reference.column,
+        data: {
+          label: reference.label,
+          kind: reference.kind,
+          referenceType: reference.referenceType,
+        },
+      });
+    }
+  },
+});
+
 export const REF_RULES: readonly RuleDefinition[] = [
   ref001,
   ref002,
@@ -510,4 +558,5 @@ export const REF_RULES: readonly RuleDefinition[] = [
   ref004,
   ref005,
   ref006,
+  ref007,
 ];

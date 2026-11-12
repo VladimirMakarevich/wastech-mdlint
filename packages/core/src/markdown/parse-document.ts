@@ -4,12 +4,14 @@ import type {
   Heading,
   Html,
   Image,
+  Paragraph,
   ImageReference,
   Link,
   LinkReference,
   ListItem,
   Root,
   Table,
+  TableCell,
   TableRow,
   Text,
   Yaml,
@@ -36,7 +38,9 @@ import type {
   ParsedLinkKind,
   ParsedTable,
   ParsedTableRow,
+  ParsedUndefinedReference,
 } from "./document-types.js";
+import { extractUndefinedReferences } from "./undefined-references.js";
 
 // One shared processor: parsing is pure, so a single GFM-enabled instance is reused across every
 // document (a fresh slugger per document keeps dedupe state isolated — see parseDocument).
@@ -448,6 +452,7 @@ export function parseDocument(params: {
   const checkItems: ParsedCheckItem[] = [];
   const links: ParsedLink[] = [];
   const images: ParsedImage[] = [];
+  const undefinedReferences: ParsedUndefinedReference[] = [];
   const imports: ParsedImport[] = [];
   const directives: InlineDirective[] = [];
 
@@ -468,6 +473,23 @@ export function parseDocument(params: {
           slug: slugger.slug(text),
           line: heading.position?.start.line ?? 0,
         });
+        undefinedReferences.push(
+          ...extractUndefinedReferences(heading, params.content, definitions),
+        );
+        return;
+      }
+      // Paragraphs, headings and table cells are the phrasing containers, and they never nest, so
+      // each byte of inline source is scanned for undefined references exactly once. No `SKIP`:
+      // their `text`, `link` and `html` descendants must still be visited below.
+      case "paragraph":
+      case "tableCell": {
+        undefinedReferences.push(
+          ...extractUndefinedReferences(
+            node as Paragraph | TableCell,
+            params.content,
+            definitions,
+          ),
+        );
         return;
       }
       case "table": {
@@ -541,6 +563,7 @@ export function parseDocument(params: {
     checkItems,
     links,
     images,
+    undefinedReferences,
     imports,
     directives,
     frontmatter: extractFrontmatter(tree),

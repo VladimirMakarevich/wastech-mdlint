@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import type { Paragraph } from "mdast";
+
 import { parseDocument } from "../src/markdown/parse-document.js";
+import { extractUndefinedReferences } from "../src/markdown/undefined-references.js";
 
 function parse(content: string, filePath = "doc.md") {
   return parseDocument({ path: filePath, content });
@@ -515,6 +518,205 @@ describe("parseDocument · html anchors", () => {
 
   it("is an empty array for a document with no HTML", () => {
     expect(parse("# Plain\n\ntext\n").htmlAnchors).toEqual([]);
+  });
+});
+
+// micromark leaves a reference with an undefined label as plain text, so these pins are the only
+// thing that makes such a construct visible. The cases fall into two halves: every reference-shaped
+// attempt is recorded with a true source position, and nothing that merely looks like one is.
+describe("parseDocument · undefined references", () => {
+  function refs(content: string) {
+    return parse(content).undefinedReferences;
+  }
+
+  it("records full, image, collapsed and shortcut forms with source positions", () => {
+    expect(refs("[text][missing] ![alt][missing] [m][] [solo]\n")).toEqual([
+      {
+        label: "missing",
+        kind: "link",
+        referenceType: "full",
+        line: 1,
+        column: 1,
+      },
+      {
+        label: "missing",
+        kind: "image",
+        referenceType: "full",
+        line: 1,
+        column: 17,
+      },
+      {
+        label: "m",
+        kind: "link",
+        referenceType: "collapsed",
+        line: 1,
+        column: 33,
+      },
+      {
+        label: "solo",
+        kind: "link",
+        referenceType: "shortcut",
+        line: 1,
+        column: 39,
+      },
+    ]);
+  });
+
+  it("matches definitions case-insensitively and across whitespace, leaving `links` unchanged", () => {
+    const doc = parse(
+      "[t][def] [t][DEF] [t][ d  e\nf ] [Def][]\n\n[Def]: u.md\n[d e f]: v.md\n",
+    );
+
+    expect(doc.undefinedReferences).toEqual([]);
+    expect(doc.links.map((link) => link.rawTarget)).toEqual([
+      "u.md",
+      "u.md",
+      "v.md",
+      "u.md",
+    ]);
+  });
+
+  it.each([
+    ["a code span", "`[a][b]` and `[solo]`\n"],
+    ["a fenced block", "```\n[a][b]\n[solo]\n```\n"],
+    ["an inline HTML attribute", '<span title="[a][b]">x</span>\n'],
+    ["escaped brackets", "\\[a\\]\\[b\\]\n"],
+    ["entity-encoded brackets", "&#91;a&#93;&#91;b&#93;\n"],
+    ["frontmatter", "---\nx: [a][b]\n---\n\nBody.\n"],
+    ["a footnote call", "Text[^1].\n"],
+    ["a collapsed footnote call", "Text [^1][].\n"],
+    ["a GitHub alert marker", "> [!NOTE]\n> Read this.\n"],
+    ["a failed inline link", "[a](<bad)\n"],
+    ["task-list checkboxes", "- [x] done\n- [ ] todo\n"],
+    [
+      "brackets around a resolved inline link",
+      "[[a](u.md)][def]\n\n[def]: z.md\n",
+    ],
+  ])("records nothing for %s", (_name, content) => {
+    expect(refs(content)).toEqual([]);
+  });
+
+  // Only `[^1]` itself is footnote syntax. Written as the label of a full reference, a leading `^`
+  // renders as literal brackets when undefined, exactly like any other missing label.
+  it("records a full link or image reference whose label starts with `^`", () => {
+    expect(refs("[text][^missing] ![alt][^gone]\n")).toEqual([
+      {
+        label: "^missing",
+        kind: "link",
+        referenceType: "full",
+        line: 1,
+        column: 1,
+      },
+      {
+        label: "^gone",
+        kind: "image",
+        referenceType: "full",
+        line: 1,
+        column: 18,
+      },
+    ]);
+  });
+
+  // Each position used to be found by recounting newlines from the start of the container, which
+  // made a paragraph of many undefined references quadratic. The extractor is driven directly over
+  // a synthetic paragraph so parse time does not mask that cost: at this size the quadratic shape
+  // runs for minutes and times the test out, while a linear scan finishes in milliseconds.
+  it("keeps exact positions, in linear time, across a paragraph with many references", () => {
+    const count = 50_000;
+    const content =
+      Array.from({ length: count }, (_, index) => `x [t][m${index}]`).join(
+        "\n",
+      ) + "\n";
+    const paragraph: Paragraph = {
+      type: "paragraph",
+      children: [],
+      position: {
+        start: { line: 1, column: 1, offset: 0 },
+        end: { line: count, column: 1, offset: content.length - 1 },
+      },
+    };
+    const found = extractUndefinedReferences(paragraph, content, new Map());
+
+    expect(found).toHaveLength(count);
+    expect(found[count - 1]).toEqual({
+      label: `m${count - 1}`,
+      kind: "link",
+      referenceType: "full",
+      line: count,
+      column: 3,
+    });
+  });
+
+  it("does not make an image of an escaped `!`", () => {
+    expect(refs("\\![a][b]\n")).toEqual([
+      { label: "b", kind: "link", referenceType: "full", line: 1, column: 3 },
+    ]);
+  });
+
+  it("reads emphasis and balanced brackets inside link text as one full reference", () => {
+    expect(refs("[*em*][missing] [a [b] c][missing]\n")).toEqual([
+      {
+        label: "missing",
+        kind: "link",
+        referenceType: "full",
+        line: 1,
+        column: 1,
+      },
+      {
+        label: "missing",
+        kind: "link",
+        referenceType: "full",
+        line: 1,
+        column: 17,
+      },
+    ]);
+  });
+
+  it("keeps the source label of a collapsed reference around a code span", () => {
+    expect(refs("[`code`][]\n")).toMatchObject([
+      { label: "`code`", referenceType: "collapsed" },
+    ]);
+  });
+
+  it("reports true source columns on a later line, in a blockquote, table cell and heading", () => {
+    const content = [
+      "line one",
+      "see [x][y] here",
+      "",
+      "> quote",
+      "> and [q][r]",
+      "",
+      "| A | B |",
+      "|---|---|",
+      "| [c][d] | e |",
+      "",
+      "## Head [h][i]",
+      "",
+    ].join("\n");
+
+    expect(
+      refs(content).map((reference) => [
+        reference.label,
+        reference.line,
+        reference.column,
+      ]),
+    ).toEqual([
+      ["y", 2, 5],
+      ["r", 5, 7],
+      ["d", 9, 3],
+      ["i", 11, 9],
+    ]);
+  });
+
+  it("counts lines the same way under CRLF line endings", () => {
+    expect(refs("one\r\ntwo [a][b]\r\n")).toEqual([
+      { label: "b", kind: "link", referenceType: "full", line: 2, column: 5 },
+    ]);
+  });
+
+  it("is deterministic across two parses", () => {
+    const content = "[a][x] ![b][y]\n\n| [c][z] |\n|---|\n";
+    expect(refs(content)).toEqual(refs(content));
   });
 });
 

@@ -244,10 +244,12 @@ function pickCitedCycle(cycles: string[][]): string[] | undefined {
 // silently instead of emitting a dangling id or crashing — that degradation is what "no hardcoded
 // drift" buys.
 //
-// Why these 8 and not the other 17 built-ins: every other rule has a *required* option with no
-// safe way to derive it from the corpus without inventing a threshold (a pipeline `chain`, a
+// Why these 8 and not the other 18 built-ins: every other rule but one has a *required* option with
+// no safe way to derive it from the corpus without inventing a threshold (a pipeline `chain`, a
 // `template` file, a `zonesDir`, an idColumn/idPattern split, a glossary table, an enumerated
-// `values` set, etc.).
+// `values` set, etc.). The exception is REF-007, which needs no option but has no gate either: the
+// only corpus evidence for it is an undefined reference label, which is itself a finding, so a gate
+// could only ever propose the rule to a corpus that already fails it.
 //
 // That scope was re-examined for the two rules the README leads with, SIZE-001 and LLM-001, and
 // reached the same answer: both are budgets, and a budget is a choice rather than a measurement —
