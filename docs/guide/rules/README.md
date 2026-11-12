@@ -2,7 +2,7 @@
 
 > [Guide index](../README.md) · [Configuration](../configuration.md) · [Annotated config](../config-reference.md)
 
-`wastech-mdlint` ships **26 built-in rules** across 8 categories, plus the declarative [`custom`](custom.md) rule. Every rule has a Zod-validated options schema, a fixed **scope** (`document` = per file · `project` = once over the whole corpus), and a default **severity** (`error` | `warning`) you can override per entry. Enable rules in your [config](../configuration.md); most accept `files`/`exclude` to narrow their reach.
+`wastech-mdlint` ships **27 built-in rules** across 8 categories, plus the declarative [`custom`](custom.md) rule. Every rule has a Zod-validated options schema, a fixed **scope** (`document` = per file · `project` = once over the whole corpus), and a default **severity** (`error` | `warning`) you can override per entry. Enable rules in your [config](../configuration.md); most accept `files`/`exclude` to narrow their reach.
 
 > There is **no `CHK` category** — checklist completeness is [CTX-002](CTX-002.md).
 
@@ -28,6 +28,7 @@
 | [REF-005](REF-005.md) | REF | project | error | no | IDs are traceable between definitions and references. |
 | [REF-006](REF-006.md) | REF | project | warning | no | References do not depend on less-stable entities. |
 | [REF-007](REF-007.md) | REF | document | error | no | Reference links and images use a defined label. |
+| [REF-008](REF-008.md) | REF | document | error | no | Links and images have a target and use link syntax in the right order. |
 | [CTX-001](CTX-001.md) | CTX | document | warning | no | Sections are not empty or placeholder-only. |
 | [CTX-002](CTX-002.md) | CTX | document | warning | no | All checklist items are checked. |
 | [CTX-003](CTX-003.md) | CTX | project | warning | no | Content uses canonical glossary terms instead of aliases. |

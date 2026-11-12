@@ -219,18 +219,27 @@ describe("parseDocument · links & images", () => {
     expect(doc.links[0]?.anchor).toBe("тест");
   });
 
-  it("extracts every image target with its line (classification deferred to REF-003)", () => {
-    const doc = parse("![doc](d.md)\n![png](a.png)\n");
+  it("extracts every image target with its line and column (classification deferred to REF-003)", () => {
+    const doc = parse("![doc](d.md)\nx ![png](a.png)\n");
 
     expect(doc.images).toEqual([
-      { rawTarget: "d.md", line: 1 },
-      { rawTarget: "a.png", line: 2 },
+      { rawTarget: "d.md", line: 1, column: 1 },
+      { rawTarget: "a.png", line: 2, column: 3 },
     ]);
+  });
+
+  it("records empty and bare-fragment targets verbatim, so REF-008 can see them", () => {
+    const doc = parse("[a]() [b](#) [c](<>) ![d]()\n");
+
+    expect(doc.links.map((link) => link.rawTarget)).toEqual(["", "#", ""]);
+    expect(doc.images).toEqual([{ rawTarget: "", line: 1, column: 22 }]);
   });
 
   it("resolves reference-style image definitions (not just reference-style links)", () => {
     const doc = parse("![Diagram][d]\n\n[d]: assets/diagram.png\n");
-    expect(doc.images).toEqual([{ rawTarget: "assets/diagram.png", line: 1 }]);
+    expect(doc.images).toEqual([
+      { rawTarget: "assets/diagram.png", line: 1, column: 1 },
+    ]);
   });
 });
 
@@ -529,6 +538,22 @@ describe("parseDocument · undefined references", () => {
     return parse(content).undefinedReferences;
   }
 
+  // Same shared source cursor as reversed links: a lone CR is a line break, CRLF is one break.
+  it.each([
+    ["a lone CR", "x\ry [t][missing]\r"],
+    ["CRLF", "x\r\ny [t][missing]\r\n"],
+  ])("positions a record after %s on the parser's line", (_name, content) => {
+    expect(refs(content)).toEqual([
+      {
+        label: "missing",
+        kind: "link",
+        referenceType: "full",
+        line: 2,
+        column: 3,
+      },
+    ]);
+  });
+
   it("records full, image, collapsed and shortcut forms with source positions", () => {
     expect(refs("[text][missing] ![alt][missing] [m][] [solo]\n")).toEqual([
       {
@@ -580,6 +605,13 @@ describe("parseDocument · undefined references", () => {
     ["a code span", "`[a][b]` and `[solo]`\n"],
     ["a fenced block", "```\n[a][b]\n[solo]\n```\n"],
     ["an inline HTML attribute", '<span title="[a][b]">x</span>\n'],
+    // remark splits the tags from their content, so masking the tags alone left this scanned.
+    ["inline HTML code", "Use <code>[a][b]</code> or <KBD>[solo]</KBD>.\n"],
+    // The first `</code>` closes only the inner element, so the brackets after it are still code.
+    [
+      "nested inline HTML code",
+      "<code>a <code>b</code> [c][d] [solo]</code>\n",
+    ],
     ["escaped brackets", "\\[a\\]\\[b\\]\n"],
     ["entity-encoded brackets", "&#91;a&#93;&#91;b&#93;\n"],
     ["frontmatter", "---\nx: [a][b]\n---\n\nBody.\n"],
@@ -899,5 +931,126 @@ describe("parseDocument · frontmatter", () => {
     expect(doc.directives).toEqual([
       { kind: "disable-next-line", ruleIds: ["REF-001"], line: 9 },
     ]);
+  });
+});
+
+// micromark has no construct for `(text)[target]`, so these pins are the only thing that makes it
+// visible. The first half proves a reversed link is recorded with its true source position wherever
+// prose can hold one; the second half proves nothing that is code, escaped, a real link, or ordinary
+// bracketed prose is recorded.
+describe("parseDocument · reversed links", () => {
+  function reversed(content: string) {
+    return parse(content).reversedLinks;
+  }
+
+  it.each([
+    ["a relative path", "(text)[./a.md]\n", "./a.md"],
+    // The URL becomes a GFM autolink between two `text` nodes, so no single node holds the syntax.
+    ["a URL", "(text)[https://example.com]\n", "https://example.com"],
+    ["a www. autolink", "(text)[www.example.com]\n", "www.example.com"],
+  ])(
+    "records %s target with text, target and position",
+    (_name, content, target) => {
+      expect(reversed(content)).toEqual([
+        { text: "text", target, line: 1, column: 1 },
+      ]);
+    },
+  );
+
+  it("reads emphasis inside the parens as written and balances nested parens", () => {
+    expect(reversed("(*em*)[./a.md] and (a (b)\n c)[./x.md]\n")).toEqual([
+      { text: "*em*", target: "./a.md", line: 1, column: 1 },
+      { text: "a (b) c", target: "./x.md", line: 1, column: 20 },
+    ]);
+  });
+
+  it("returns nested records in document order", () => {
+    expect(reversed("((a)[./x.md] b)[./y.md]\n")).toEqual([
+      { text: "(a)[./x.md] b", target: "./y.md", line: 1, column: 1 },
+      { text: "a", target: "./x.md", line: 1, column: 2 },
+    ]);
+  });
+
+  it("counts blockquote prefixes, table pipes and heading markers in the column", () => {
+    expect(reversed("> first\n> then (t)[./a.md]\n")).toEqual([
+      { text: "t", target: "./a.md", line: 2, column: 8 },
+    ]);
+    expect(reversed("| a |\n| - |\n| q (t)[./a.md] |\n")).toEqual([
+      { text: "t", target: "./a.md", line: 3, column: 5 },
+    ]);
+    expect(reversed("## Head (t)[./a.md]\n")).toEqual([
+      { text: "t", target: "./a.md", line: 1, column: 9 },
+    ]);
+  });
+
+  it.each([
+    ["a code span", "`(text)[./a.md]`\n"],
+    ["a fenced block", "```\n(text)[./a.md]\n```\n"],
+    // remark splits `<code>…</code>` into two `html` tag nodes around a `text` node, so masking the
+    // tags alone left the content scanned; emphasis inside moves the closing tag one level deeper.
+    ["inline HTML code", "Use <code>(text)[./a.md]</code>.\n"],
+    ["inline HTML code around emphasis", "<code>a *(t)[./a.md]* b</code>\n"],
+    ["an unclosed inline HTML code element", "<kbd>(t)[./a.md]\n"],
+    // The first `</code>` closes only the inner element, so the syntax after it is still code.
+    [
+      "nested inline HTML code",
+      "<code>outer <code>inner</code> (t)[./a.md]</code>\n",
+    ],
+    [
+      "nested inline HTML code around emphasis",
+      "<kbd>a *<kbd>b</kbd>* (t)[./a.md]</kbd>\n",
+    ],
+    ["an indented block", "    (text)[./a.md]\n"],
+    ["escaped parens", "\\(text\\)[./a.md]\n"],
+    ["escaped brackets", "(text)\\[./a.md\\]\n"],
+    ["entity-encoded parens", "&#40;text&#41;[./a.md]\n"],
+    ["a space before the bracket", "(see below) [1]\n"],
+    ["a non-target bracket", "(see below)[1] (sic)[WIP]\n"],
+    [
+      "a defined shortcut reference",
+      "(see the guide)[guide]\n\n[guide]: ./g.md\n",
+    ],
+    ["a defined full reference", "(note)[x][d]\n\n[d]: ./d.md\n"],
+    ["an inline link", "(note)[x](u)\n"],
+    ["a closer with no opener", ":)[./a.md]\n"],
+    ["empty parens", "()[./a.md]\n"],
+    ["whitespace in the bracket", "(text)[./a b.md]\n"],
+  ])("does not record %s", (_name, content) => {
+    expect(reversed(content)).toEqual([]);
+  });
+
+  // Only literal-content elements are skipped: the content of `<b>` renders as prose, so reversed
+  // syntax there is on the page; a closed `<code>` before it must not swallow it either.
+  it("still records reversed syntax inside an ordinary inline element and after a closed code element", () => {
+    expect(reversed("<b>(t)[./a.md]</b> <code>x</code> (u)[./b.md]\n")).toEqual(
+      [
+        { text: "t", target: "./a.md", line: 1, column: 4 },
+        { text: "u", target: "./b.md", line: 1, column: 35 },
+      ],
+    );
+  });
+
+  // A raw-text element holds no markup, so a `<script>` written inside one is text and the first
+  // `</script>` really does end it; what follows is prose again.
+  // Written mid-paragraph: a line opening with `<script>` is an HTML block, which is masked whole.
+  it("ends a raw-text element at its first closing tag, nested opener or not", () => {
+    expect(reversed("x <script>a <script> b</script> (t)[./a.md]\n")).toEqual([
+      { text: "t", target: "./a.md", line: 1, column: 33 },
+    ]);
+  });
+
+  // A lone CR is a line break to micromark, so counting LF alone put the record on the line
+  // before the one the parser (and an editor) shows. CRLF must still count once, not twice.
+  it.each([
+    ["a lone CR", "x\r(text)[./a.md]\r"],
+    ["CRLF", "x\r\n(text)[./a.md]\r\n"],
+  ])("positions a record after %s on the parser's line", (_name, content) => {
+    expect(reversed(content)).toEqual([
+      { text: "text", target: "./a.md", line: 2, column: 1 },
+    ]);
+  });
+
+  it("is an empty array for a plain document", () => {
+    expect(reversed("# Plain\n\ntext (aside) here.\n")).toEqual([]);
   });
 });

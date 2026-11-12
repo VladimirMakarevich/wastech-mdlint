@@ -205,6 +205,7 @@ The following table is generated from the rule metadata (`npm run generate:docs`
 | [`REF-005`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-005.md) | REF | error | project | no | IDs are traceable between definitions and references. |
 | [`REF-006`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-006.md) | REF | warning | project | no | References do not depend on less-stable entities. |
 | [`REF-007`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-007.md) | REF | error | document | no | Reference links and images use a defined label. |
+| [`REF-008`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-008.md) | REF | error | document | no | Links and images have a target and use link syntax in the right order. |
 | [`SEC-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-001.md) | SEC | error | document | yes | Required sections are present. |
 | [`SEC-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-002.md) | SEC | error | document | no | Sections appear in the required order. |
 | [`SEC-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-003.md) | SEC | error | project | no | Sections conform to a reference template's heading structure. |

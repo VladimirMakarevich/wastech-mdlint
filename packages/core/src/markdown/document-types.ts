@@ -13,10 +13,13 @@
 //   sections   → cheap SEC-*/CTX-* section-existence checks
 //   tables     → TBL-* rules (TBL-007 via row cellCount), REF-005/006 id tables, extractDefinedIds(), compile
 //   checkItems → CTX-002 checklist rules
-// links → REF-001/002 link resolution, link/anchor graph edges, edge explainability
-// images → REF-003 image resolution, image graph edges
+// links → REF-001/002 link resolution, link/anchor graph edges, edge explainability, REF-008
+//              empty and bare-`#` targets
+// images → REF-003 image resolution, image graph edges, REF-008 empty targets
 //   undefinedReferences → REF-007. Deliberately no graph edge: an undefined label has no target,
 //                and an edge would have to invent one.
+//   reversedLinks → REF-008. Deliberately no graph edge: the target is unrendered text on the page,
+//                so no reader can follow it.
 // imports → LLM eager-import budget (SIZE/LLM rules), import graph edges
 //   directives → inline-disable suppression (applied engine-side, not by the parser)
 //   frontmatter → no rule reads it yet; it is exposed so frontmatter-aware rules can be added
@@ -102,6 +105,7 @@ export type ParsedHtmlAnchor = {
 export type ParsedImage = {
   rawTarget: string;
   line: number;
+  column?: number;
 };
 
 // A reference-style link or image whose label has no definition. micromark leaves such a construct
@@ -117,6 +121,20 @@ export type ParsedUndefinedReference = {
   // `[label]`. Every form is recorded; the rule decides which to report.
   referenceType: "full" | "collapsed" | "shortcut";
   // 1-based source position of the opening `[`, or of the `!` for an image.
+  line: number;
+  column: number;
+};
+
+// Link syntax written in the wrong order, `(text)[target]`. micromark leaves it as plain text (or as
+// text around an autolink), so it never reaches `links`; it renders on the page as the literal
+// parentheses and brackets, and without this field no rule would ever see it.
+export type ParsedReversedLink = {
+  // The parenthetical as written in the source (escapes not decoded), whitespace runs collapsed to
+  // one space and trimmed, so the message quotes what the author typed.
+  text: string;
+  // The bracket content exactly as written.
+  target: string;
+  // 1-based source position of the opening `(`.
   line: number;
   column: number;
 };
@@ -166,6 +184,8 @@ export type ParsedDocument = {
   images: ParsedImage[];
   // Document order.
   undefinedReferences: ParsedUndefinedReference[];
+  // Document order.
+  reversedLinks: ParsedReversedLink[];
   imports: ParsedImport[];
   directives: InlineDirective[];
   // Required and `null` when absent, rather than optional: the key is always present, so absence is

@@ -17,6 +17,7 @@ export type {
   ParsedImport,
   ParsedLink,
   ParsedLinkKind,
+  ParsedReversedLink,
   ParsedTable,
   ParsedTableRow,
   ParsedUndefinedReference,
