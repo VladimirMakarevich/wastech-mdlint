@@ -1,4 +1,5 @@
 import { compareStrings } from "../deterministic-sort.js";
+import { anchorResolves } from "../engine/anchor-resolve.js";
 import { extractDefinedIds, type IdRef } from "../engine/defined-ids.js";
 import { filePart, resolveTargetCandidates } from "../engine/path-resolve.js";
 import { compileRegex } from "../engine/regex.js";
@@ -164,14 +165,12 @@ export function buildContextGraph(
       }
       const hasFragment = link.anchor !== undefined && link.anchor.length > 0;
       if (hasFragment) {
-        // anchor = heading-slug match (AC): a fragment to a target file with no matching heading slug
-        // is skipped entirely, not downgraded to a plain `link` edge.
+        // An `anchor` edge needs a fragment the target resolves — a heading slug, an HTML `id`/`name`
+        // anchor, `#top` or a GitHub line fragment — decided by the same `anchorResolves` REF-002
+        // uses, under its default (case-sensitive) options. An unresolved fragment is skipped
+        // entirely, not downgraded to a plain `link` edge.
         const targetDocument = documentsByPath.get(target)!;
-        if (
-          !targetDocument.headings.some(
-            (heading) => heading.slug === link.anchor,
-          )
-        ) {
+        if (!anchorResolves(targetDocument, link.anchor!)) {
           continue;
         }
       }

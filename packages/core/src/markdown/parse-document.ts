@@ -29,6 +29,7 @@ import type {
   ParsedDocument,
   ParsedFrontmatter,
   ParsedHeading,
+  ParsedHtmlAnchor,
   ParsedImage,
   ParsedImport,
   ParsedLink,
@@ -57,6 +58,52 @@ const IMPORT_PATTERN = /(^|[\s(])@(?<target>\/?[^\s@]+?\.md)\b/gm;
 const DIRECTIVE_PATTERN =
   /^wastech-mdlint-(disable-next-line|disable|enable)(?:\s+([\s\S]*?))?$/;
 const HTML_COMMENT_PATTERN = /^<!--([\s\S]*?)-->$/;
+
+// HTML anchor extraction is a deliberately small heuristic over `html` node text, not an HTML
+// parser (core takes no HTML-parser dependency for two attributes). Whatever sits inside a quoted
+// attribute value is text, never markup, so both patterns below consume a quoted value whole: the
+// tag pattern so that `<`/`>` in `title="a <span id='x'> b"` neither ends the tag nor starts a
+// ghost `<span>`, and the attribute pattern so that `id=` in a value is not an attribute. Known gap:
+// an unterminated quote cannot be skipped as a value, so text after it is scanned as markup.
+// The alternatives inside each repetition start with disjoint characters, so matching stays linear
+// rather than backtracking.
+//
+// Comments and open tags are matched by one pattern, in source order, so a commented-out `<a id>`
+// is skipped as a whole comment, and a `<!--` written inside a `<script>` is never mistaken for a
+// comment that hides the `</script>` closing it. An unterminated comment runs to the end of the
+// node, as it does in a browser. Each scan compiles its own copy of this source, so no `lastIndex`
+// is shared between nodes or documents.
+const HTML_COMMENT_OR_OPEN_TAG_SOURCE =
+  /<!--[\s\S]*?(?:-->|$)|<([A-Za-z][A-Za-z0-9-]*)(\s(?:[^<>"']|"[^"]*"|'[^']*')*?)?\/?>/
+    .source;
+// Elements whose content the HTML parser reads as plain text up to the matching end tag, never as
+// markup: the raw-text and escapable raw-text elements, plus the legacy ones it treats the same
+// way. `<a id="x">` inside a script string or a textarea's default text is not an anchor on the
+// page. `noscript` is left out because its content is markup whenever scripting is disabled.
+const RAW_TEXT_ELEMENT_CLOSE_PATTERNS: ReadonlyMap<string, RegExp> = new Map(
+  [
+    "script",
+    "style",
+    "textarea",
+    "title",
+    "xmp",
+    "iframe",
+    "noembed",
+    "noframes",
+  ].map(
+    // No `g` flag: used only with `String#search`, which ignores and preserves `lastIndex`.
+    (element) => [element, new RegExp(`</${element}(?=[\\s/>]|$)`, "i")],
+  ),
+);
+// One attribute (name, then an optional quoted or unquoted value), consumed left to right. The
+// sticky `y` flag makes each match start exactly where the previous one ended, so a quoted value is
+// always swallowed whole as part of its own attribute: `id='ghost'` written inside
+// `title="foo id='ghost'"` can never be read as an attribute of its own, which an unanchored search
+// for `id=` would do. Matching whole attribute names is also what keeps `data-id=` and `aid=` from
+// counting as an `id`. On markup the tokenizer cannot follow (a stray quote between attributes) it
+// stops early and misses later attributes rather than inventing one.
+const HTML_ATTRIBUTE_PATTERN =
+  /[\s/]*([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/gy;
 
 type LinkLikeNode = Link | LinkReference;
 type ImageLikeNode = Image | ImageReference;
@@ -248,6 +295,86 @@ function parseDirective(node: Html): InlineDirective | undefined {
   };
 }
 
+// `id` counts on any element and `name` only on `<a>`, mirroring HTML itself: `name` is a fragment
+// target only on an anchor element, while an `id` anywhere is one (and GitHub keeps it).
+//
+// `openRawText` is the raw-text element (see `RAW_TEXT_ELEMENT_CLOSE_PATTERNS`) still open when the
+// previous `html` node ended, and the return value carries it on to the next one. It has to cross
+// nodes because remark splits inline HTML: in `x <script>'<a id="g">'</script>` the opening tag, the
+// `<a id="g">` and the closing tag are three separate `html` nodes, so no single node shows that the
+// anchor sits inside a script. An element never closed keeps everything after it out of the anchor
+// set, which is also how a browser reads the rendered page.
+function extractHtmlAnchors(
+  node: Html,
+  openRawText: string | undefined,
+): { anchors: ParsedHtmlAnchor[]; openRawText: string | undefined } {
+  const anchors: ParsedHtmlAnchor[] = [];
+  const nodeStartLine = node.position?.start.line ?? 0;
+  const value = node.value;
+  const scanner = new RegExp(HTML_COMMENT_OR_OPEN_TAG_SOURCE, "g");
+  let rawText = openRawText;
+
+  for (;;) {
+    if (rawText !== undefined) {
+      const rest = value.slice(scanner.lastIndex);
+      const closeAt = rest.search(
+        RAW_TEXT_ELEMENT_CLOSE_PATTERNS.get(rawText)!,
+      );
+      if (closeAt === -1) {
+        return { anchors, openRawText: rawText };
+      }
+      scanner.lastIndex += closeAt + rawText.length + 2;
+      rawText = undefined;
+    }
+
+    const tag = scanner.exec(value);
+    if (tag === null) {
+      return { anchors, openRawText: undefined };
+    }
+    const tagName = tag[1]?.toLowerCase();
+    if (tagName === undefined) {
+      // A comment: nothing inside it is markup.
+      continue;
+    }
+    // A trailing `/` does not close a non-void element in HTML, so `<script/>` still opens one.
+    if (RAW_TEXT_ELEMENT_CLOSE_PATTERNS.has(tagName)) {
+      rawText = tagName;
+    }
+    const attributes = tag[2];
+    if (attributes === undefined) {
+      continue;
+    }
+    const isAnchorElement = tagName === "a";
+    // HTML keeps only the first occurrence of an attribute on a tag and drops later duplicates, so
+    // `<a id="real" id="ghost">` declares `real` alone. A name is marked seen before its value is
+    // checked, because an empty first `id=""` also wins and leaves the element with no anchor.
+    const seenAttributes = new Set<string>();
+
+    for (const attribute of attributes.matchAll(HTML_ATTRIBUTE_PATTERN)) {
+      const attributeName = (attribute[1] ?? "").toLowerCase();
+      if (seenAttributes.has(attributeName)) {
+        continue;
+      }
+      seenAttributes.add(attributeName);
+      if (
+        attributeName !== "id" &&
+        !(attributeName === "name" && isAnchorElement)
+      ) {
+        continue;
+      }
+      const id = attribute[2] ?? attribute[3] ?? attribute[4] ?? "";
+      if (id.length === 0) {
+        continue;
+      }
+      // A block html node spans several lines, so the line comes from the newlines before the tag.
+      anchors.push({
+        id,
+        line: nodeStartLine + findLineNumber(value, tag.index) - 1,
+      });
+    }
+  }
+}
+
 function extractImports(node: Text): ParsedImport[] {
   const imports: ParsedImport[] = [];
   const nodeStartLine = node.position?.start.line ?? 0;
@@ -304,6 +431,10 @@ export function parseDocument(params: {
   const slugger = new GithubSlugger();
 
   const headings: ParsedHeading[] = [];
+  const htmlAnchors: ParsedHtmlAnchor[] = [];
+  // Raw-text element left open by an earlier `html` node; carried in source order because the
+  // visit is a pre-order walk, so `html` nodes arrive in the order a browser would read them.
+  let openRawText: string | undefined;
   const sections: string[] = [];
   const tables: ParsedTable[] = [];
   const checkItems: ParsedCheckItem[] = [];
@@ -379,6 +510,9 @@ export function parseDocument(params: {
         if (directive !== undefined) {
           directives.push(directive);
         }
+        const extracted = extractHtmlAnchors(node as Html, openRawText);
+        htmlAnchors.push(...extracted.anchors);
+        openRawText = extracted.openRawText;
         return;
       }
       case "text": {
@@ -393,6 +527,7 @@ export function parseDocument(params: {
   return {
     path: params.path,
     headings,
+    htmlAnchors,
     sections,
     tables,
     checkItems,

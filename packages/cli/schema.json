@@ -494,6 +494,13 @@
                     },
                     "additionalProperties": false
                   },
+                  "ignoreCase": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "ignoredPattern": {
+                    "type": "string"
+                  },
                   "files": {
                     "type": "array",
                     "items": {

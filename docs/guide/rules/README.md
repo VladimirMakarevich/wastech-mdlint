@@ -21,7 +21,7 @@
 | [SEC-003](SEC-003.md) | SEC | project | error | no | Sections conform to a template's heading structure. |
 | [STR-001](STR-001.md) | STR | project | error | no | Required files exist in the project. |
 | [REF-001](REF-001.md) | REF | document | error | no | Relative links resolve to a file. |
-| [REF-002](REF-002.md) | REF | document | error | no | Link anchors match a heading slug. |
+| [REF-002](REF-002.md) | REF | document | error | no | Link anchors match a heading or HTML anchor. |
 | [REF-003](REF-003.md) | REF | document | error | no | Image targets resolve to a file. |
 | [REF-004](REF-004.md) | REF | document | error | no | Cross-zone links are declared in the zone's Dependencies. |
 | [REF-005](REF-005.md) | REF | project | error | no | IDs are traceable between definitions and references. |

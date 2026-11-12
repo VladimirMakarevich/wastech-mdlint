@@ -6,7 +6,13 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `REF-002` takes two options. `ignoreCase` (default `false`) compares fragments with heading slugs and HTML anchors case-insensitively, so `#Demo` matches `# Demo`; the default stays case-sensitive because GitHub's fragment matching is. `ignoredPattern` is a regular expression, tested unanchored against the fragment without its `#`, whose matches are never reported; a pattern that does not compile is a config error naming `config.rules[i].options.ignoredPattern`.
+
 ### Fixed
+
+- `REF-002` no longer reports anchors that GitHub renders correctly: a fragment naming an HTML anchor (`<a id="custom"></a>`, an `id` on any element, or `<a name="custom"></a>`), `#top`, and GitHub line fragments such as `#L5`, `#L10-L12` and `#L10C5-L12C3`. `#L`, `#Lx`, `#L0` and `#l5` are still reported. The context graph resolves fragments the same way, so a link to another file with one of these fragments now produces an `anchor` edge, which `graph`, `impact`, `slice`, `compile` and the graph rules (including cycle detection) can see where it was skipped before. `slice "#custom"` now also starts from the file declaring `<a id="custom">`. The rule's description is now "Link anchors match a heading or HTML anchor.", and its message reads `does not match any heading or HTML anchor`.
 
 - A file that opens with YAML frontmatter — a `SKILL.md`, an agent file, a docs-site page — no longer gains a heading that does not exist. The block between the two `---` lines used to parse as a horizontal rule plus a heading made of the YAML text, so a file opening with `name: demo-skill` and `description: does a thing` had a heading whose slug was `name-demo-skilldescription-does-a-thing`, a link to that slug passed `REF-002`, and `SEC-*`, `CTX-001`, `slice`, `impact` and `compile` all treated it as real. Frontmatter is now recognised during parsing and kept out of the outline, so such a link is reported by `REF-002` as a broken anchor. Links, `@` imports and suppression directives written inside frontmatter are no longer picked up either. Size and token counts still include the frontmatter. A file whose first line is a `---` horizontal rule followed later by another `---` line is now read as frontmatter up to that line; use `***` or `___` for a horizontal rule on line 1.
 

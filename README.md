@@ -199,7 +199,7 @@ The following table is generated from the rule metadata (`npm run generate:docs`
 | [`GRP-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/GRP-003.md) | GRP | warning | project | no | IDs are carried forward across pipeline stages. |
 | [`LLM-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/LLM-001.md) | LLM | warning | project | no | Eager-import context stays within the per-entrypoint token budget. |
 | [`REF-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-001.md) | REF | error | document | no | Relative links resolve to a file. |
-| [`REF-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-002.md) | REF | error | document | no | Link anchors match a heading slug. |
+| [`REF-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-002.md) | REF | error | document | no | Link anchors match a heading or HTML anchor. |
 | [`REF-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-003.md) | REF | error | document | no | Image targets resolve to a file. |
 | [`REF-004`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-004.md) | REF | error | document | no | Cross-zone links are declared in the zone's Dependencies section. |
 | [`REF-005`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-005.md) | REF | error | project | no | IDs are traceable between definitions and references. |

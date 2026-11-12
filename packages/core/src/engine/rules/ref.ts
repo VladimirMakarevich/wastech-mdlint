@@ -7,6 +7,7 @@ import {
   normalizeRelativePath,
 } from "../../discovery/globs.js";
 import type { ParsedDocument } from "../../markdown/document-types.js";
+import { anchorResolves } from "../anchor-resolve.js";
 import {
   extractColumnIds,
   extractDefinedIds,
@@ -18,7 +19,7 @@ import {
   sourceLocale,
 } from "../path-resolve.js";
 import { imageResolves, linkResolves } from "../primitives/reference.js";
-import { escapeRegExp, regexStringSchema } from "../regex.js";
+import { compileRegex, escapeRegExp, regexStringSchema } from "../regex.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
 import { extractSectionBody } from "../section-body.js";
 import { resolveRoutedUrl } from "../site-router.js";
@@ -93,14 +94,22 @@ function resolveTargetDoc(
   return context.documents!.get(relTarget);
 }
 
-// REF-002 — link anchors match heading slugs (github-slugger). Same-file anchors validate against
-// the doc's own slugs; cross-file anchors against the resolved target's slugs (missing target files
-// are REF-001's concern, so they are skipped here).
+// Case-sensitive by default because GitHub's fragment matching is: `#Demo` does not reach `# Demo`
+// there, so accepting it here would pass a link that is broken on the rendered page.
+const DEFAULT_REF002_IGNORE_CASE = false;
+
+// REF-002 — link anchors resolve in their target document: a heading slug (github-slugger), an
+// HTML `id`/`name` anchor, `#top`, or a GitHub line fragment, all decided by the shared
+// `anchorResolves` so this rule and the graph's anchor edges agree under default options. Same-file
+// anchors validate against the doc itself; cross-file anchors against the resolved target (missing
+// target files are REF-001's concern, so they are skipped here). `ignoreCase` and `ignoredPattern`
+// are per-rule-instance and the graph has no rule options, so with either set this rule can accept
+// a fragment for which no anchor edge exists.
 export const ref002: RuleDefinition = defineRule({
   metadata: {
     id: "REF-002",
     category: "REF",
-    description: "Link anchors match a heading slug.",
+    description: "Link anchors match a heading or HTML anchor.",
     defaultSeverity: "error",
     scope: "document",
     fixable: false,
@@ -108,47 +117,69 @@ export const ref002: RuleDefinition = defineRule({
   optionsSchema: z
     .object({
       siteRouter: siteRouterOptionSchema.optional(),
+      ignoreCase: z.boolean().default(DEFAULT_REF002_IGNORE_CASE),
+      // Validated as a compilable pattern at config load, so a bad one is a config diagnostic
+      // naming `options.ignoredPattern` rather than a throw in the middle of a lint run.
+      ignoredPattern: regexStringSchema.optional(),
       ...fileScopeShape,
     })
     .strict(),
-  check: (options) => (context) => {
-    if (!matchesFileScope(context.filePath!, options)) {
-      return;
-    }
-    const document = context.document!;
-    const router = options.siteRouter ?? context.settings.siteRouter;
+  check: (options) => {
+    // Compiled once per resolved rule and with no flags: a non-`g` RegExp keeps no `lastIndex`, so
+    // sharing it across links, documents and repeated runs cannot make one result depend on the
+    // match before it. Unanchored and independent of `ignoreCase`; users anchor with `^…$` or fold
+    // case inside the pattern with `(?i:…)`.
+    const ignoredPattern =
+      options.ignoredPattern === undefined
+        ? undefined
+        : compileRegex(options.ignoredPattern);
 
-    for (const link of document.links) {
-      if (link.anchor === undefined || link.anchor.length === 0) {
-        continue;
+    return (context) => {
+      if (!matchesFileScope(context.filePath!, options)) {
+        return;
       }
+      const document = context.document!;
+      const router = options.siteRouter ?? context.settings.siteRouter;
 
-      let target: ParsedDocument | undefined;
-      if (link.kind === "same-file-anchor") {
-        target = document;
-      } else if (link.kind === "local-file") {
-        target = resolveTargetDoc(
-          document.path,
-          filePart(link.rawTarget),
-          context,
-          router,
-        );
-        if (target === undefined) {
+      for (const link of document.links) {
+        if (link.anchor === undefined || link.anchor.length === 0) {
           continue;
         }
-      } else {
-        continue;
-      }
+        if (ignoredPattern?.test(link.anchor) === true) {
+          continue;
+        }
 
-      if (!target.headings.some((heading) => heading.slug === link.anchor)) {
-        context.report({
-          message: `Anchor "#${link.anchor}" does not match any heading in ${target.path}.`,
-          line: link.line,
-          column: link.column,
-          data: { anchor: link.anchor, targetPath: target.path },
-        });
+        let target: ParsedDocument | undefined;
+        if (link.kind === "same-file-anchor") {
+          target = document;
+        } else if (link.kind === "local-file") {
+          target = resolveTargetDoc(
+            document.path,
+            filePart(link.rawTarget),
+            context,
+            router,
+          );
+          if (target === undefined) {
+            continue;
+          }
+        } else {
+          continue;
+        }
+
+        if (
+          !anchorResolves(target, link.anchor, {
+            ignoreCase: options.ignoreCase,
+          })
+        ) {
+          context.report({
+            message: `Anchor "#${link.anchor}" does not match any heading or HTML anchor in ${target.path}.`,
+            line: link.line,
+            column: link.column,
+            data: { anchor: link.anchor, targetPath: target.path },
+          });
+        }
       }
-    }
+    };
   },
 });
 

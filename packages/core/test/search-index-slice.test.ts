@@ -94,6 +94,23 @@ describe("resolveQuery · heading / anchor", () => {
       starts: ["dup.md"],
     });
   });
+
+  // The index reads the same anchor set REF-002 resolves against, so `slice "#custom"` starts from
+  // the file holding `<a id="custom">`. `#top` resolves in every document and is not indexed, or it
+  // would match the whole corpus.
+  it("resolves an HTML anchor id and leaves `#top` unindexed", () => {
+    const { documents } = buildFixture({
+      "a.md": "# A\n",
+      "b.md": '# B\n\n<a id="custom"></a>\n',
+    });
+    const index = buildSearchIndex(documents);
+
+    expect(resolveQuery(index, "#custom")).toEqual({
+      kind: "anchor",
+      starts: ["b.md"],
+    });
+    expect(resolveQuery(index, "#top")).toBeNull();
+  });
 });
 
 describe("resolveQuery · path", () => {

@@ -10,6 +10,7 @@ import { flattenConfigIssues } from "../src/config/config-issues.js";
 import { findConfig } from "../src/config/find-config.js";
 import { loadConfiguration } from "../src/config/load-config.js";
 import { defineRule, RuleRegistry } from "../src/engine/registry.js";
+import { ruleRegistry } from "../src/engine/rules/index.js";
 
 const tempDirs: string[] = [];
 
@@ -299,6 +300,26 @@ describe("config diagnostics", () => {
     expect(message).toContain("error");
     expect(message).toContain("warning");
     expect(message).toContain("off");
+  });
+
+  // The real registry, not this file's stub: the point is that REF-002's own option schema is what
+  // turns an uncompilable pattern into a load-time diagnostic instead of a throw mid-lint.
+  it("names the rule entry and option path for a REF-002 `ignoredPattern` that does not compile", async () => {
+    const root = await writeConfig(
+      JSON.stringify({
+        rules: [{ rule: "REF-002", options: { ignoredPattern: "(" } }],
+      }),
+    );
+    const error = await loadConfiguration({
+      cwd: root,
+      registry: ruleRegistry,
+    }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ConfigError);
+    expect((error as ConfigError).code).toBe("CONFIG_INVALID");
+    const message = (error as ConfigError).message;
+    expect(message).toContain("config.rules[0].options.ignoredPattern");
+    expect(message).toContain("valid regular expression");
   });
 
   it("names an unrecognized key on a rule entry", async () => {
