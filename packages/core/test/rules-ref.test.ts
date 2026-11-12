@@ -199,12 +199,13 @@ describe("REF-003 images", () => {
   });
 });
 
-// The REF half of the shared `exclude` matrix. REF-002 and REF-007 are the REF rules that mix in
-// the shared file-scope shape; REF-001/REF-003 spell `exclude` too but mean something else, which is
+// The REF half of the shared `exclude` matrix. REF-002, REF-007 and REF-008 are the REF rules that
+// mix in the shared file-scope shape; REF-001/REF-003 spell `exclude` too but mean something else, which is
 // pinned separately below.
 describe.each([
   ["REF-002", "## Intro\n\n[bad](#nope)\n"],
   ["REF-007", "[text][missing]\n"],
+  ["REF-008", "[text]()\n"],
 ])("%s file scope (exclude)", (ruleId, failingDoc) => {
   async function reportedFiles(
     cwd: string,
@@ -359,7 +360,7 @@ describe("REF option schemas (file scope inventory)", () => {
     return thrown as RuleResolutionError;
   }
 
-  // Every REF rule except REF-002 and REF-007 is whole-corpus or identity-based by design, so `files` is not a
+  // Every REF rule except REF-002, REF-007 and REF-008 is whole-corpus or identity-based by design, so `files` is not a
   // silently ignored key — it fails resolution. This is what makes the pairing above unambiguous.
   it.each([
     ["REF-001", {}],
@@ -390,7 +391,7 @@ describe("REF option schemas (file scope inventory)", () => {
     expect(JSON.stringify(error.issues)).toContain("files");
   });
 
-  it.each(["REF-002", "REF-007"])(
+  it.each(["REF-002", "REF-007", "REF-008"])(
     "accepts `files` and `exclude` on %s, a file-scoped REF rule",
     (id) => {
       expect(
@@ -714,6 +715,13 @@ describe("REF-007 undefined reference labels", () => {
     ).toEqual([]);
   });
 
+  it("never reports a label inside nested inline HTML code", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "<code>a <code>b</code> [c][missing]</code>\n",
+    });
+    expect((await lint(cwd, [rule("REF-007")])).messages).toEqual([]);
+  });
+
   it("is suppressed by an inline-disable directive", async () => {
     const cwd = await fixtureRepo({
       "a.md":
@@ -731,5 +739,151 @@ describe("REF-007 undefined reference labels", () => {
     expect(result.messages.map((message) => message.ruleId)).toEqual([
       "REF-001",
     ]);
+  });
+});
+
+describe("REF-008 empty targets and reversed link syntax", () => {
+  function tuples(result: Awaited<ReturnType<typeof lint>>) {
+    return result.messages.map((message) => [
+      message.ruleId,
+      message.severity,
+      message.line,
+      message.column,
+      message.message,
+      message.data,
+    ]);
+  }
+
+  it("reports an empty link, a bare `#` link and an empty image with position and data", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "# A\n\nSee [text]() and [top](#).\n\n![alt]()\n",
+    });
+    expect(tuples(await lint(cwd, [rule("REF-008")]))).toEqual([
+      [
+        "REF-008",
+        "error",
+        3,
+        5,
+        'Link "[text]" has an empty target, so it goes nowhere; add a target or remove the link.',
+        { problem: "empty-target", kind: "link", target: "" },
+      ],
+      [
+        "REF-008",
+        "error",
+        3,
+        18,
+        'Link "[top]" has a bare "#" target, so it only jumps to the top of the page; add a target or remove the link.',
+        { problem: "empty-target", kind: "link", target: "#" },
+      ],
+      [
+        "REF-008",
+        "error",
+        5,
+        1,
+        "Image has an empty target, so no image is shown; add a target or remove the image.",
+        { problem: "empty-target", kind: "image", target: "" },
+      ],
+    ]);
+  });
+
+  // The parser resolves a reference through its definition before recording it, so an empty
+  // definition is the same dead link as an empty inline target.
+  it("reports an angle-bracket empty target and a reference whose definition is empty", async () => {
+    const cwd = await fixtureRepo({ "a.md": "[t](<>) [x][d]\n\n[d]: <>\n" });
+    const result = await lint(cwd, [rule("REF-008")]);
+    expect(
+      result.messages.map((message) => [message.column, message.data?.target]),
+    ).toEqual([
+      [1, ""],
+      [9, ""],
+    ]);
+  });
+
+  it("does not report a fragment with an anchor or a path ending in `#`", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "# Top\n\n[a](#top) [b](./a.md#)\n",
+    });
+    expect((await lint(cwd, [rule("REF-008")])).messages).toEqual([]);
+  });
+
+  it("reports reversed link syntax in prose at the opening paren", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "Read (the docs)[https://example.com] or (this)[./a.md].\n",
+    });
+    expect(tuples(await lint(cwd, [rule("REF-008")]))).toEqual([
+      [
+        "REF-008",
+        "error",
+        1,
+        6,
+        '"(the docs)[https://example.com]" is reversed link syntax and renders as literal text; write it as "[the docs](https://example.com)".',
+        {
+          problem: "reversed",
+          text: "the docs",
+          target: "https://example.com",
+        },
+      ],
+      [
+        "REF-008",
+        "error",
+        1,
+        41,
+        '"(this)[./a.md]" is reversed link syntax and renders as literal text; write it as "[this](./a.md)".',
+        { problem: "reversed", text: "this", target: "./a.md" },
+      ],
+    ]);
+  });
+
+  it("never reports reversed syntax inside a code span or a fenced block", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "Use `(text)[https://example.com]` and `(text)[./a.md]`.\n\n```md\n(text)[https://example.com]\n(text)[./a.md]\n```\n",
+    });
+    expect((await lint(cwd, [rule("REF-008")])).messages).toEqual([]);
+  });
+
+  it("never reports reversed syntax inside nested inline HTML code, and reports it after", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "<code>outer <code>inner</code> (t)[./a.md]</code> (u)[./b.md]\n",
+    });
+    const result = await lint(cwd, [rule("REF-008")]);
+    expect(
+      result.messages.map((message) => [message.column, message.data?.text]),
+    ).toEqual([[51, "u"]]);
+  });
+
+  it("does not report a parenthetical before a spaced citation or a defined reference link", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "As noted (see below) [1].\n\nRead (see the guide)[guide] first.\n\n[guide]: ./a.md\n",
+    });
+    expect((await lint(cwd, [rule("REF-008")])).messages).toEqual([]);
+  });
+
+  it("leaves REF-001 unchanged for non-empty targets", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "[a](missing.md) [b]() [c](./ok.md)\n",
+      "ok.md": "# OK\n",
+    });
+    const result = await lint(cwd, [rule("REF-001"), rule("REF-008")]);
+    expect(
+      result.messages.map((message) => [
+        message.ruleId,
+        message.column,
+        message.data?.target,
+      ]),
+    ).toEqual([
+      ["REF-001", 1, "missing.md"],
+      ["REF-008", 17, ""],
+    ]);
+  });
+
+  it("is suppressed by an inline-disable directive", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "<!-- wastech-mdlint-disable-next-line REF-008 -->\n[a]() (b)[./b.md]\n\n[c]()\n",
+    });
+    const result = await lint(cwd, [rule("REF-008")]);
+    expect(result.messages.map((message) => message.line)).toEqual([4]);
   });
 });

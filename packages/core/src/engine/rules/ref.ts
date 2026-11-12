@@ -27,7 +27,8 @@ import { fileScopeShape, matchesFileScope } from "./scope.js";
 import type { RuleContext, SiteRouterSettings } from "../types.js";
 
 // Reference-integrity rules. REF rules use the documents map + existsSync + site-router; no
-// graph needed — that is the GRP family's job. REF-007 reads only the parsed document itself.
+// graph needed — that is the GRP family's job. REF-007 and REF-008 read only the parsed document
+// itself.
 
 const siteRouterOptionSchema = z
   .object({
@@ -551,6 +552,84 @@ export const ref007: RuleDefinition = defineRule({
   },
 });
 
+// The target strings REF-008 treats as missing. A bare `#` is a fragment with no anchor: the browser
+// only scrolls to the top of the page, which is almost never what the author meant by a link, and
+// REF-002 skips it because there is no anchor to check. `#top` and `./a.md#` are not bare and are
+// left to the rules that resolve them.
+const EMPTY_TARGETS: ReadonlySet<string> = new Set(["", "#"]);
+
+// REF-008 — links and images have a target and use link syntax in the right order. An empty `()`
+// or bare `(#)` target is skipped by REF-001, REF-002 and REF-003 (there is nothing to resolve), so
+// without this rule a link that goes nowhere passes every check. Reversed `(text)[target]` is
+// recorded by the parser as a `reversedLinks` entry because it renders as literal text and never
+// becomes a link at all. Error severity because either way the page shows a dead link or stray
+// punctuation, exactly as with REF-001; not fixable because a missing target cannot be invented and
+// turning a parenthetical into a link is a judgement call.
+export const ref008: RuleDefinition = defineRule({
+  metadata: {
+    id: "REF-008",
+    category: "REF",
+    description:
+      "Links and images have a target and use link syntax in the right order.",
+    defaultSeverity: "error",
+    scope: "document",
+    fixable: false,
+  },
+  optionsSchema: z.object({ ...fileScopeShape }).strict(),
+  check: (options) => (context) => {
+    if (!matchesFileScope(context.filePath!, options)) {
+      return;
+    }
+    const document = context.document!;
+
+    for (const link of document.links) {
+      if (!EMPTY_TARGETS.has(link.rawTarget)) {
+        continue;
+      }
+      const consequence =
+        link.rawTarget === ""
+          ? "has an empty target, so it goes nowhere"
+          : 'has a bare "#" target, so it only jumps to the top of the page';
+      context.report({
+        message: `Link "[${link.text ?? ""}]" ${consequence}; add a target or remove the link.`,
+        line: link.line,
+        column: link.column,
+        data: { problem: "empty-target", kind: "link", target: link.rawTarget },
+      });
+    }
+
+    for (const image of document.images) {
+      if (!EMPTY_TARGETS.has(image.rawTarget)) {
+        continue;
+      }
+      const target = image.rawTarget === "" ? "an empty" : 'a bare "#"';
+      context.report({
+        message: `Image has ${target} target, so no image is shown; add a target or remove the image.`,
+        line: image.line,
+        column: image.column,
+        data: {
+          problem: "empty-target",
+          kind: "image",
+          target: image.rawTarget,
+        },
+      });
+    }
+
+    for (const reversed of document.reversedLinks) {
+      context.report({
+        message: `"(${reversed.text})[${reversed.target}]" is reversed link syntax and renders as literal text; write it as "[${reversed.text}](${reversed.target})".`,
+        line: reversed.line,
+        column: reversed.column,
+        data: {
+          problem: "reversed",
+          text: reversed.text,
+          target: reversed.target,
+        },
+      });
+    }
+  },
+});
+
 export const REF_RULES: readonly RuleDefinition[] = [
   ref001,
   ref002,
@@ -559,4 +638,5 @@ export const REF_RULES: readonly RuleDefinition[] = [
   ref005,
   ref006,
   ref007,
+  ref008,
 ];

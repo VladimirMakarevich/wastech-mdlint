@@ -1,7 +1,8 @@
-import type { Node, Parent, ReferenceType } from "mdast";
-import { SKIP, visit } from "unist-util-visit";
+import type { Parent, ReferenceType } from "mdast";
 
 import type { ParsedUndefinedReference } from "./document-types.js";
+import { maskSource } from "./mask-source.js";
+import { createSourceCursor } from "./source-cursor.js";
 
 // micromark only creates a `linkReference`/`imageReference` when the label has a definition; an
 // undefined `[text][missing]` is left as plain `text`, so the AST alone cannot show it. This module
@@ -82,7 +83,9 @@ export function extractUndefinedReferences(
   }
 
   const raw = content.slice(start.offset, end.offset);
-  const masked = maskSource(container, raw, start.offset);
+  const masked = maskSource(container, raw, start.offset, (node) =>
+    MASKED_TYPES.has(node.type),
+  );
   const length = masked.length;
 
   // Pair unescaped brackets with a stack in one pass. Searching forward from every `[` on its own
@@ -122,13 +125,9 @@ export function extractUndefinedReferences(
   }
 
   const found: ParsedUndefinedReference[] = [];
-  // Line bookkeeping is carried forward from one recorded reference to the next instead of
-  // recounting newlines from the start of the container each time, which would make a paragraph
-  // with many undefined references quadratic. Records arrive in increasing source order (the walk
-  // below only moves forward), so each character is examined once.
-  let lineCursor = 0;
-  let linesBefore = 0;
-  let lastNewline = -1;
+  // Records arrive in increasing source order (the walk below only moves forward), which is what
+  // the forward-only source cursor requires.
+  const positionOf = createSourceCursor(raw, start);
   const record = (
     open: number,
     label: string,
@@ -154,21 +153,11 @@ export function extractUndefinedReferences(
       return;
     }
     const isImage = imageOpener[open] === 1;
-    const at = isImage ? open - 1 : open;
-    for (; lineCursor < at; lineCursor += 1) {
-      if (raw[lineCursor] === "\n") {
-        linesBefore += 1;
-        lastNewline = lineCursor;
-      }
-    }
     found.push({
       label: trimmed,
       kind: isImage ? "image" : "link",
       referenceType,
-      line: start.line + linesBefore,
-      // Columns come from offsets in the source itself, so a `> ` blockquote prefix or table pipe
-      // before the bracket is counted exactly as an editor counts it.
-      column: lastNewline === -1 ? start.column + at : at - lastNewline,
+      ...positionOf(isImage ? open - 1 : open),
     });
   };
 
@@ -216,33 +205,4 @@ export function extractUndefinedReferences(
   }
 
   return found;
-}
-
-// Blank every masked descendant's source to spaces, keeping line breaks so line and column
-// arithmetic on the masked string still lines up with `raw` index for index.
-function maskSource(
-  container: Parent,
-  raw: string,
-  baseOffset: number,
-): string {
-  const chars = raw.split("");
-
-  visit(container as Node, (node) => {
-    if (node === container || !MASKED_TYPES.has(node.type)) {
-      return;
-    }
-    const from = node.position?.start.offset;
-    const to = node.position?.end.offset;
-    if (from !== undefined && to !== undefined) {
-      for (let index = from - baseOffset; index < to - baseOffset; index += 1) {
-        const char = chars[index];
-        if (char !== undefined && char !== "\n" && char !== "\r") {
-          chars[index] = " ";
-        }
-      }
-    }
-    return SKIP;
-  });
-
-  return chars.join("");
 }

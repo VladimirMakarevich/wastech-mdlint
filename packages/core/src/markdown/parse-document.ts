@@ -36,10 +36,12 @@ import type {
   ParsedImport,
   ParsedLink,
   ParsedLinkKind,
+  ParsedReversedLink,
   ParsedTable,
   ParsedTableRow,
   ParsedUndefinedReference,
 } from "./document-types.js";
+import { extractReversedLinks } from "./reversed-links.js";
 import { extractUndefinedReferences } from "./undefined-references.js";
 
 // One shared processor: parsing is pure, so a single GFM-enabled instance is reused across every
@@ -453,6 +455,7 @@ export function parseDocument(params: {
   const links: ParsedLink[] = [];
   const images: ParsedImage[] = [];
   const undefinedReferences: ParsedUndefinedReference[] = [];
+  const reversedLinks: ParsedReversedLink[] = [];
   const imports: ParsedImport[] = [];
   const directives: InlineDirective[] = [];
 
@@ -476,10 +479,12 @@ export function parseDocument(params: {
         undefinedReferences.push(
           ...extractUndefinedReferences(heading, params.content, definitions),
         );
+        reversedLinks.push(...extractReversedLinks(heading, params.content));
         return;
       }
       // Paragraphs, headings and table cells are the phrasing containers, and they never nest, so
-      // each byte of inline source is scanned for undefined references exactly once. No `SKIP`:
+      // each byte of inline source is scanned for undefined references and for reversed link syntax
+      // exactly once per scanner. No `SKIP`:
       // their `text`, `link` and `html` descendants must still be visited below.
       case "paragraph":
       case "tableCell": {
@@ -488,6 +493,12 @@ export function parseDocument(params: {
             node as Paragraph | TableCell,
             params.content,
             definitions,
+          ),
+        );
+        reversedLinks.push(
+          ...extractReversedLinks(
+            node as Paragraph | TableCell,
+            params.content,
           ),
         );
         return;
@@ -532,7 +543,11 @@ export function parseDocument(params: {
         if (rawTarget === undefined) {
           return;
         }
-        images.push({ rawTarget, line: imageNode.position?.start.line ?? 0 });
+        images.push({
+          rawTarget,
+          line: imageNode.position?.start.line ?? 0,
+          column: imageNode.position?.start.column,
+        });
         return;
       }
       case "html": {
@@ -564,6 +579,7 @@ export function parseDocument(params: {
     links,
     images,
     undefinedReferences,
+    reversedLinks,
     imports,
     directives,
     frontmatter: extractFrontmatter(tree),
