@@ -19,6 +19,7 @@ export type {
   ParsedLinkKind,
   ParsedTable,
   ParsedTableRow,
+  ParsedUndefinedReference,
 } from "./markdown/document-types.js";
 export { parseDocument } from "./markdown/parse-document.js";
 export { loadDocuments } from "./markdown/load-documents.js";

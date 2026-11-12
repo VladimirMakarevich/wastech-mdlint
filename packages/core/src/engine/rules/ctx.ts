@@ -177,7 +177,7 @@ export const ctx003: RuleDefinition = defineRule({
     // the `glossary` value, naming the stage that came up empty.
     //
     // Other rules take an option that names a corpus path and go quiet the same way when it matches
-    // nothing (LLM-001's `entrypoints`, REF-005/REF-007's `definitions` and `references`, REF-006's
+    // nothing (LLM-001's `entrypoints`, REF-005/REF-006's `definitions` and `references`, REF-004's
     // `zonesDir`, GRP-003's `chain[].files`). The reporting shape generalizes and lives in
     // `reportInertConfiguration`, but the decision to use it does not: for those options an empty
     // match can be a legitimate state (a corpus with no definitions yet), whereas a glossary rule
