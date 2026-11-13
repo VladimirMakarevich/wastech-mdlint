@@ -280,6 +280,15 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
         "exclude": ["docs/archive/**"], // drop files from this instance
       },
     },
+    // REF-009: link reference definitions are used. Fixable: --fix deletes the unused definition.
+    {
+      "rule": "REF-009",
+      "options": {
+        "ignoredDefinitions": ["//"], // labels never reported (default ["//"]: the `[//]: # (comment)` idiom)
+        "files": ["docs/**/*.md"], // narrow which files this instance applies to
+        "exclude": ["docs/archive/**"], // drop files from this instance
+      },
+    },
 
     // ── CTX — content quality ───────────────────────────────────────────────────────────────
     // CTX-001: sections are not empty or placeholder-only.

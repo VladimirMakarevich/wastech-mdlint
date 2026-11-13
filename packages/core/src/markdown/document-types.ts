@@ -15,12 +15,21 @@
 //   tables     → TBL-* rules (TBL-007 via row cellCount), REF-005/006 id tables, extractDefinedIds(), compile
 //   checkItems → CTX-002 checklist rules
 // links → REF-001/002 link resolution, link/anchor graph edges, edge explainability, REF-008
-//              empty and bare-`#` targets
+//              empty and bare-`#` targets; `fragmentRange` → the REF-002 case-only fix, which has to
+//              rewrite the fragment bytes exactly where they sit in `content`
 // images → REF-003 image resolution, image graph edges, REF-008 empty targets
 //   undefinedReferences → REF-007. Deliberately no graph edge: an undefined label has no target,
 //                and an edge would have to invent one.
 //   reversedLinks → REF-008. Deliberately no graph edge: the target is unrendered text on the page,
 //                so no reader can follow it.
+//   referenceDefinitions → REF-009 and its fix. Whether a label is referenced is decided here because
+//                label matching is CommonMark's case-folding and whitespace normalisation, which a
+//                rule scanning `content` would have to reimplement.
+//   literalBrackets → the CTX-003 fix, which must not turn `[alias]` that renders as plain text
+//                into a reference to `[canonical]: …`. Which brackets are text and which are link
+//                syntax is a parse fact.
+//   textSpans → the CTX-003 fix. Only the parse knows which bytes are prose and which are code,
+//                HTML, a link target or front matter, so the fix rewrites inside these ranges alone.
 // imports → LLM eager-import budget (SIZE/LLM rules), import graph edges
 //   directives → inline-disable suppression (applied engine-side, not by the parser)
 //   frontmatter → FM-001 and the `frontmatterRequired`/`frontmatterInSet`/`frontmatterMatches`
@@ -96,6 +105,47 @@ export type ParsedLink = {
   kind: ParsedLinkKind;
   line: number;
   column?: number;
+  // Half-open source offsets in `content` of the fragment as written (the bytes after `#`). Set only
+  // for an inline `[text](target#fragment)` whose destination appears verbatim in the source; left
+  // undefined for a reference-style link (its fragment lives in a definition other links may share,
+  // so rewriting it is not a local edit), for a destination written with escapes or entities (the
+  // parsed target no longer matches the bytes), and for a link with no fragment. Undefined means
+  // "no safe place to edit", never "no fragment".
+  fragmentRange?: { start: number; end: number };
+};
+
+// A Markdown link reference definition, `[label]: target`. Recorded whether or not anything uses
+// it, so a rule can report the unused ones without re-parsing the document.
+export type ParsedReferenceDefinition = {
+  // The label as the parser read it (escapes kept), for quoting back in a message.
+  label: string;
+  // CommonMark-normalised label (case-folded, whitespace collapsed): the key references match on.
+  identifier: string;
+  // 1-based lines of the first and last source line the definition spans.
+  line: number;
+  endLine: number;
+  // Half-open source offsets of the definition in `content`.
+  start: number;
+  end: number;
+  // A direct child of the document root. A definition inside a blockquote or list item shares its
+  // source lines with the container's markers, so removing "its" lines would remove those too.
+  topLevel: boolean;
+  // Some full, collapsed or shortcut reference link or image in this document uses the identifier.
+  referenced: boolean;
+};
+
+// The source range of one prose `text` node whose bytes equal its parsed value (line endings
+// normalised). Code spans, code blocks, HTML, link and definition targets and front matter are
+// never `text` nodes, so they never appear here; autolink text (`<https://x>`, `www.x.com`) is
+// excluded because it is the URL itself; the text of a shortcut `[label]` or collapsed `[label][]`
+// reference is excluded because it is the label its definition is found by; and text written with escapes or entities is excluded
+// because an offset into the parsed value would not be an offset into the source.
+export type ParsedTextSpan = {
+  start: number;
+  end: number;
+  // The slug of the heading this text sits in, if any. Rewriting heading text changes its slug, so
+  // a consumer editing prose must know which spans carry one.
+  headingSlug?: string;
 };
 
 // A fragment target declared in raw HTML rather than by a heading: `id` on any element, or `name`
@@ -228,6 +278,15 @@ export type ParsedDocument = {
   undefinedReferences: ParsedUndefinedReference[];
   // Document order.
   reversedLinks: ParsedReversedLink[];
+  // Document order.
+  referenceDefinitions: ParsedReferenceDefinition[];
+  // Document order, non-overlapping.
+  textSpans: ParsedTextSpan[];
+  // Source offsets, ascending, of every unescaped `[` and `]` that the parse left as literal text —
+  // inside a `text` node, so not link, image or reference syntax. Such brackets render as written,
+  // but whether they stay text depends on the label between them having no definition, so a
+  // rewrite inside them can turn text into a link.
+  literalBrackets: number[];
   imports: ParsedImport[];
   directives: InlineDirective[];
   // Required and `null` when absent, rather than optional: the key is always present, so absence is

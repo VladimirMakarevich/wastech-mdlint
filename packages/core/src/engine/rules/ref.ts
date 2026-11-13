@@ -6,8 +6,12 @@ import {
   matchesConfigGlob,
   normalizeRelativePath,
 } from "../../discovery/globs.js";
-import type { ParsedDocument } from "../../markdown/document-types.js";
-import { anchorResolves } from "../anchor-resolve.js";
+import type {
+  ParsedDocument,
+  ParsedLink,
+  ParsedReferenceDefinition,
+} from "../../markdown/document-types.js";
+import { anchorResolves, caseOnlyAnchorMatches } from "../anchor-resolve.js";
 import {
   extractColumnIds,
   extractDefinedIds,
@@ -24,11 +28,11 @@ import { defineRule, type RuleDefinition } from "../registry.js";
 import { extractSectionBody } from "../section-body.js";
 import { resolveRoutedUrl } from "../site-router.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
-import type { RuleContext, SiteRouterSettings } from "../types.js";
+import type { RuleContext, SiteRouterSettings, TextEdit } from "../types.js";
 
 // Reference-integrity rules. REF rules use the documents map + existsSync + site-router; no
-// graph needed — that is the GRP family's job. REF-007 and REF-008 read only the parsed document
-// itself.
+// graph needed — that is the GRP family's job. REF-007, REF-008 and REF-009 read only the parsed
+// document itself.
 
 const siteRouterOptionSchema = z
   .object({
@@ -99,6 +103,112 @@ function resolveTargetDoc(
 // there, so accepting it here would pass a link that is broken on the rendered page.
 const DEFAULT_REF002_IGNORE_CASE = false;
 
+type Ref002Options = {
+  siteRouter?: SiteRouterSettings;
+  ignoreCase: boolean;
+  ignoredPattern?: string;
+  files?: string[];
+  exclude?: string[];
+};
+
+// Characters a replacement fragment must not contain to be written into a link destination as-is:
+// whitespace and `<`/`>` end or break the destination, `(`/`)` and `\` change how it is parsed, `#`
+// would start a second fragment, and `%`/`&` would be decoded as an escape or entity. A target anchor
+// containing any of them is reported but not rewritten, rather than escaped by a guess.
+const DESTINATION_SAFE_FRAGMENT = /^[^\s()<>\\%&#]+$/;
+
+type Ref002Failure = {
+  link: ParsedLink;
+  target: ParsedDocument;
+  // Present only when the failure has exactly one deterministic repair.
+  edit?: TextEdit;
+};
+
+// The one evaluation REF-002's check and fix both run, so `--fix` can never rewrite a fragment the
+// report did not mark fixable, and a fixable finding is always one `--fix` repairs.
+function ref002Failures(
+  options: Ref002Options,
+  ignoredPattern: RegExp | undefined,
+  context: RuleContext,
+): Ref002Failure[] {
+  if (!matchesFileScope(context.filePath!, options)) {
+    return [];
+  }
+  const document = context.document!;
+  const router = options.siteRouter ?? context.settings.siteRouter;
+  const failures: Ref002Failure[] = [];
+
+  for (const link of document.links) {
+    if (link.anchor === undefined || link.anchor.length === 0) {
+      continue;
+    }
+    if (ignoredPattern?.test(link.anchor) === true) {
+      continue;
+    }
+
+    let target: ParsedDocument | undefined;
+    if (link.kind === "same-file-anchor") {
+      target = document;
+    } else if (link.kind === "local-file") {
+      target = resolveTargetDoc(
+        document.path,
+        filePart(link.rawTarget),
+        context,
+        router,
+      );
+      if (target === undefined) {
+        continue;
+      }
+    } else {
+      continue;
+    }
+
+    if (
+      anchorResolves(target, link.anchor, { ignoreCase: options.ignoreCase })
+    ) {
+      continue;
+    }
+
+    // With `ignoreCase` a case-only mismatch already resolved above, so candidates are looked for
+    // only under case-sensitive matching. The rewrite is made only where it is provably local: one
+    // candidate, a known source range for the fragment, and source bytes equal to the decoded
+    // anchor (a percent-encoded fragment would need re-encoding, which is a second guess).
+    const candidates = caseOnlyAnchorMatches(target, link.anchor);
+    const range = link.fragmentRange;
+    const fixable =
+      candidates.length === 1 &&
+      range !== undefined &&
+      document.content.slice(range.start, range.end) === link.anchor &&
+      DESTINATION_SAFE_FRAGMENT.test(candidates[0]!);
+
+    failures.push(
+      fixable
+        ? {
+            link,
+            target,
+            edit: {
+              start: range.start,
+              end: range.end,
+              newText: candidates[0]!,
+            },
+          }
+        : { link, target },
+    );
+  }
+
+  return failures;
+}
+
+// Compiled once per resolved rule and with no flags: a non-`g` RegExp keeps no `lastIndex`, so
+// sharing it across links, documents and repeated runs cannot make one result depend on the match
+// before it. Unanchored and independent of `ignoreCase`; users anchor with `^…$` or fold case
+// inside the pattern with `(?i:…)`.
+function compileIgnoredPattern(options: Ref002Options): RegExp | undefined {
+  return options.ignoredPattern === undefined
+    ? undefined
+    : compileRegex(options.ignoredPattern);
+}
+
 // REF-002 — link anchors resolve in their target document: a heading slug (github-slugger), an
 // HTML `id`/`name` anchor, `#top`, or a GitHub line fragment, all decided by the shared
 // `anchorResolves` so this rule and the graph's anchor edges agree under default options. Same-file
@@ -106,6 +216,10 @@ const DEFAULT_REF002_IGNORE_CASE = false;
 // target files are REF-001's concern, so they are skipped here). `ignoreCase` and `ignoredPattern`
 // are per-rule-instance and the graph has no rule options, so with either set this rule can accept
 // a fragment for which no anchor edge exists.
+//
+// Fixable when the fragment differs from exactly one anchor of the target only by letter case: the
+// fragment bytes are rewritten to that anchor and nothing else in the file is touched. After the
+// rewrite the fragment resolves exactly, so a second `--fix` finds nothing to do.
 export const ref002: RuleDefinition = defineRule({
   metadata: {
     id: "REF-002",
@@ -113,7 +227,7 @@ export const ref002: RuleDefinition = defineRule({
     description: "Link anchors match a heading or HTML anchor.",
     defaultSeverity: "error",
     scope: "document",
-    fixable: false,
+    fixable: true,
   },
   optionsSchema: z
     .object({
@@ -126,61 +240,31 @@ export const ref002: RuleDefinition = defineRule({
     })
     .strict(),
   check: (options) => {
-    // Compiled once per resolved rule and with no flags: a non-`g` RegExp keeps no `lastIndex`, so
-    // sharing it across links, documents and repeated runs cannot make one result depend on the
-    // match before it. Unanchored and independent of `ignoreCase`; users anchor with `^…$` or fold
-    // case inside the pattern with `(?i:…)`.
-    const ignoredPattern =
-      options.ignoredPattern === undefined
-        ? undefined
-        : compileRegex(options.ignoredPattern);
-
+    const ignoredPattern = compileIgnoredPattern(options);
     return (context) => {
-      if (!matchesFileScope(context.filePath!, options)) {
-        return;
-      }
-      const document = context.document!;
-      const router = options.siteRouter ?? context.settings.siteRouter;
-
-      for (const link of document.links) {
-        if (link.anchor === undefined || link.anchor.length === 0) {
-          continue;
-        }
-        if (ignoredPattern?.test(link.anchor) === true) {
-          continue;
-        }
-
-        let target: ParsedDocument | undefined;
-        if (link.kind === "same-file-anchor") {
-          target = document;
-        } else if (link.kind === "local-file") {
-          target = resolveTargetDoc(
-            document.path,
-            filePart(link.rawTarget),
-            context,
-            router,
-          );
-          if (target === undefined) {
-            continue;
-          }
-        } else {
-          continue;
-        }
-
-        if (
-          !anchorResolves(target, link.anchor, {
-            ignoreCase: options.ignoreCase,
-          })
-        ) {
-          context.report({
-            message: `Anchor "#${link.anchor}" does not match any heading or HTML anchor in ${target.path}.`,
-            line: link.line,
-            column: link.column,
-            data: { anchor: link.anchor, targetPath: target.path },
-          });
-        }
+      for (const { link, target, edit } of ref002Failures(
+        options,
+        ignoredPattern,
+        context,
+      )) {
+        context.report({
+          message: `Anchor "#${link.anchor}" does not match any heading or HTML anchor in ${target.path}.`,
+          line: link.line,
+          column: link.column,
+          ...(edit === undefined ? {} : { fixable: true }),
+          data: { anchor: link.anchor, targetPath: target.path },
+        });
       }
     };
+  },
+  // `applyFixes` applies no file scope of its own, so `ref002Failures` repeats the rule's gate for
+  // the fix path exactly as it does for the check.
+  fix: (options) => {
+    const ignoredPattern = compileIgnoredPattern(options);
+    return (context) =>
+      ref002Failures(options, ignoredPattern, context).flatMap((failure) =>
+        failure.edit === undefined ? [] : [failure.edit],
+      );
   },
 });
 
@@ -630,6 +714,141 @@ export const ref008: RuleDefinition = defineRule({
   },
 });
 
+// Labels REF-009 never reports by default. `[//]: # (comment)` is the established idiom for a
+// Markdown comment that renders nothing, and it is unused by design.
+const DEFAULT_REF009_IGNORED_DEFINITIONS = ["//"];
+
+// The bytes to delete to remove `definition` with the whole lines it occupies, or undefined when the
+// definition does not own those lines. Only a top-level definition alone on its lines qualifies: one
+// inside a blockquote or list item shares its lines with the container's `>` or list marker, and
+// deleting the lines would delete the container's markup with it.
+function definitionLineRange(
+  content: string,
+  definition: ParsedReferenceDefinition,
+): { start: number; end: number } | undefined {
+  if (!definition.topLevel) {
+    return undefined;
+  }
+  const lineStart = content.lastIndexOf("\n", definition.start - 1) + 1;
+  const newlineAt = content.indexOf("\n", definition.end);
+  const lineEnd = newlineAt === -1 ? content.length : newlineAt;
+  if (
+    content.slice(lineStart, definition.start).trim().length > 0 ||
+    content.slice(definition.end, lineEnd).trim().length > 0
+  ) {
+    return undefined;
+  }
+  // The line terminator goes with the line (`\r\n` included, since the `\n` is its last byte), so
+  // no blank line is left in its place.
+  return { start: lineStart, end: newlineAt === -1 ? lineEnd : newlineAt + 1 };
+}
+
+type Ref009Options = {
+  ignoredDefinitions: string[];
+  files?: string[];
+  exclude?: string[];
+};
+
+function unusedDefinitions(
+  options: Ref009Options,
+  context: RuleContext,
+): ParsedReferenceDefinition[] {
+  if (!matchesFileScope(context.filePath!, options)) {
+    return [];
+  }
+  return context.document!.referenceDefinitions.filter(
+    (definition) =>
+      !definition.referenced &&
+      !options.ignoredDefinitions.includes(definition.label),
+  );
+}
+
+// The deletions for every removable unused definition, merged so adjacent definitions become one
+// edit. Merging is what makes a single `--fix` run complete: two separate edits that both reach for
+// the same line terminator overlap, `applyEdits` drops one, and a second run would still change the
+// file. A merged block that ends the file without a terminator takes the preceding line terminator
+// instead, so the file does not end with a stray blank line it did not have.
+function definitionRemovalEdits(
+  content: string,
+  definitions: readonly ParsedReferenceDefinition[],
+): TextEdit[] {
+  const ranges = definitions
+    .map((definition) => definitionLineRange(content, definition))
+    .filter((range) => range !== undefined)
+    .sort((left, right) => left.start - right.start);
+
+  const merged: { start: number; end: number }[] = [];
+  for (const range of ranges) {
+    const last = merged[merged.length - 1];
+    if (last !== undefined && range.start <= last.end) {
+      last.end = Math.max(last.end, range.end);
+    } else {
+      merged.push({ ...range });
+    }
+  }
+
+  return merged.map((range) => {
+    let start = range.start;
+    if (range.end === content.length && !content.endsWith("\n") && start > 0) {
+      start -= content[start - 2] === "\r" ? 2 : 1;
+    }
+    return { start, end: range.end, newText: "" };
+  });
+}
+
+// REF-009 — every Markdown link reference definition (`[label]: target`) is used by some reference
+// link or image in the same document. An unused definition renders nothing, so it is invisible on
+// the page and drifts unnoticed: its target is never checked by a reader following the link,
+// because there is no link. This is the label-level counterpart of REF-007 (a reference with no
+// definition) and is unrelated to REF-005, whose "definitions" are ID table rows and heading tokens
+// — deleting one of those would delete content, which is why this is a rule of its own.
+//
+// Warning severity: an unused definition is dead text, not a broken page. Fixable by deleting the
+// definition's lines; once deleted nothing can report it, so a second `--fix` changes nothing. Not
+// fixed: a definition that is not alone on its lines (see `definitionLineRange`). Duplicate
+// definitions of one label are judged by label, so a used label keeps all of its definitions —
+// deciding which duplicate is the dead one depends on which wins resolution, which this rule leaves
+// to the parser.
+export const ref009: RuleDefinition = defineRule({
+  metadata: {
+    id: "REF-009",
+    category: "REF",
+    description: "Link reference definitions are used.",
+    defaultSeverity: "warning",
+    scope: "document",
+    fixable: true,
+  },
+  optionsSchema: z
+    .object({
+      // Matched against the label as written, case-sensitively, so the idiom is opted out exactly.
+      ignoredDefinitions: z
+        .array(z.string())
+        .default(DEFAULT_REF009_IGNORED_DEFINITIONS),
+      ...fileScopeShape,
+    })
+    .strict(),
+  check: (options) => (context) => {
+    const content = context.document!.content;
+    for (const definition of unusedDefinitions(options, context)) {
+      const lineStart = content.lastIndexOf("\n", definition.start - 1) + 1;
+      context.report({
+        message: `Reference definition "[${definition.label}]" is not used by any reference link or image in this document; remove it or link to it.`,
+        line: definition.line,
+        column: definition.start - lineStart + 1,
+        ...(definitionLineRange(content, definition) === undefined
+          ? {}
+          : { fixable: true }),
+        data: { label: definition.label },
+      });
+    }
+  },
+  fix: (options) => (context) =>
+    definitionRemovalEdits(
+      context.document!.content,
+      unusedDefinitions(options, context),
+    ),
+});
+
 export const REF_RULES: readonly RuleDefinition[] = [
   ref001,
   ref002,
@@ -639,4 +858,5 @@ export const REF_RULES: readonly RuleDefinition[] = [
   ref006,
   ref007,
   ref008,
+  ref009,
 ];

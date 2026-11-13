@@ -18,6 +18,7 @@ import { applyEdits, applyFixes, FixWriteError } from "../src/engine/fix.js";
 import { lintFiles } from "../src/engine/lint-files.js";
 import { RuleResolutionError } from "../src/engine/registry.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
+import type { Rule } from "../src/engine/types.js";
 
 const tempDirs: string[] = [];
 
@@ -571,5 +572,52 @@ describe("applyEdits", () => {
         { start: 3, end: 6, newText: "Q" },
       ]),
     ).toBe("aabQ");
+  });
+});
+
+// `applyFixes` once skipped every project-scope rule, on the reasoning that a `TextEdit` targets one
+// document. A project rule now fixes by being handed each document in turn, with the whole corpus
+// beside it. Pinned with a stand-in rule so the contract is checked on its
+// own, not only through CTX-003's behaviour.
+describe("applyFixes with a project-scope fix hook", () => {
+  it("calls the hook once per document with that document and the corpus", async () => {
+    const cwd = await fixtureRepo({ "a.md": "# A\n", "b.md": "# B\n" });
+    const calls: [string, number][] = [];
+    const projectRule: Rule = {
+      id: "TEST-001",
+      description: "stand-in project rule",
+      category: "custom",
+      defaultSeverity: "warning",
+      scope: "project",
+      fixable: true,
+      check: () => {},
+      fix: (context) => {
+        calls.push([context.document!.path, context.documents!.size]);
+        return context.document!.path === "a.md"
+          ? [{ start: 2, end: 3, newText: "Z" }]
+          : [];
+      },
+    };
+
+    const written = await applyFixes({
+      cwd,
+      config: { rules: [] },
+      rules: [{ rule: projectRule }],
+      settings: {},
+    });
+
+    expect(
+      calls.sort((left, right) => compareStrings(left[0], right[0])),
+    ).toEqual([
+      ["a.md", 2],
+      ["b.md", 2],
+    ]);
+    expect(written.fixedFiles).toEqual(["a.md"]);
+    await expect(readFile(path.join(cwd, "a.md"), "utf8")).resolves.toBe(
+      "# Z\n",
+    );
+    await expect(readFile(path.join(cwd, "b.md"), "utf8")).resolves.toBe(
+      "# B\n",
+    );
   });
 });

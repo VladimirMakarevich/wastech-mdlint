@@ -57,6 +57,7 @@ const EXPECTED: Record<string, { scope: RuleScope; severity: Severity }> = {
   "REF-006": { scope: "project", severity: "warning" },
   "REF-007": { scope: "document", severity: "error" },
   "REF-008": { scope: "document", severity: "error" },
+  "REF-009": { scope: "document", severity: "warning" },
   "CTX-001": { scope: "document", severity: "warning" },
   "CTX-002": { scope: "document", severity: "warning" },
   "CTX-003": { scope: "project", severity: "warning" },
@@ -81,7 +82,7 @@ const EXPECTED_CATEGORIES = [
 ].sort(compareStrings);
 
 describe("BUILTIN_RULE_DEFINITIONS inventory", () => {
-  it("ships exactly the documented 31 rule ids", () => {
+  it("ships exactly the documented 32 rule ids", () => {
     const ids = BUILTIN_RULE_DEFINITIONS.map(
       (definition) => definition.metadata.id,
     ).sort(compareStrings);
@@ -200,6 +201,7 @@ const FILE_SCOPED = [
   "REF-002",
   "REF-007",
   "REF-008",
+  "REF-009",
   "CTX-001",
   "CTX-002",
   "CTX-003",

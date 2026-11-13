@@ -43,7 +43,7 @@ A path still needs its subcommand: `wastech-mdlint docs` is `error: unknown comm
 | `--config <file>` | auto-discovered | Path to a config file (otherwise `findConfig` walks up). Resolved against `[path]`. |
 | `--format text\|json` | `text` | Human report vs machine `{ summary, messages, files }`. |
 | `--fail-on error\|warning\|off` | `error` | Minimum severity that forces exit `1`. `off` never fails. |
-| `--fix` | — | Apply deterministic fixes in place (SEC-001, TBL-002), then re-report what remains. |
+| `--fix` | — | Apply deterministic fixes in place (SEC-001, TBL-002, REF-002, REF-009, CTX-003), then re-report what remains. |
 
 ```bash
 wastech-mdlint lint .
@@ -54,7 +54,7 @@ wastech-mdlint lint . --fix
 
 **A relative `--config` is resolved against the directory the command analyzes, not against your shell.** For `lint` and `graph` that is `[path]`, so `wastech-mdlint lint docs --config cfg.json` reads `docs/cfg.json`; for `slice` and `impact` it is the cwd (they take no `[path]`), and for `compile` it is `--cwd`. One rule, every command — and the MCP server's `configPath` follows it too, against that tool's own `cwd`. An absolute `--config` is used as given. If a relative one is not there, the error names it exactly as you typed it — resolution and reporting share the one base, which is what stopped `lint proj --config cfg.json` from blaming a `../cfg.json` nobody wrote; an absolute one that is missing is still reported relative to the analyzed directory, like every other path (see [Exit codes](#exit-codes)).
 
-`--fix` writes only inside the scope of the rule instance that produced the fix: if a [SEC-001](rules/SEC-001.md) or [TBL-002](rules/TBL-002.md) entry sets `files`/`exclude`, files outside that scope are left byte-unchanged. The two surfaces are separate passes over the corpus, so "reported" and "rewritten" could in principle drift apart — they are held together deliberately, since a `--fix` that edited files the report never mentions would be the worst kind of surprise.
+`--fix` writes only inside the scope of the rule instance that produced the fix: if a fixable rule's entry — [SEC-001](rules/SEC-001.md), [TBL-002](rules/TBL-002.md), [REF-002](rules/REF-002.md), [REF-009](rules/REF-009.md) or [CTX-003](rules/CTX-003.md) — sets `files`/`exclude`, files outside that scope are left byte-unchanged. The two surfaces are separate passes over the corpus, so "reported" and "rewritten" could in principle drift apart — they are held together deliberately, since a `--fix` that edited files the report never mentions would be the worst kind of surprise.
 
 See [Output](output.md) for the report shapes and [Suppression](suppression.md) for inline disables.
 

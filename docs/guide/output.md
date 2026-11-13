@@ -42,7 +42,7 @@ Every key a finding can carry. Absent keys are omitted, not `null`, so read the 
 | `helpUri` | yes | The reporting rule's documentation page on GitHub, on the **`blob/main`** branch — so a pinned older install links to the current page for its rule rather than to the one that shipped with it (nothing at runtime knows which version is installed, and the guide pages are in no published tarball, so there is no version-matched page to link; `ruleId` is there for a reader who wants their own copy). A `custom` rule points at [the custom-rules page](rules/custom.md), since a user-chosen ID has no page of its own. It stays _declared_ optional on the finding type and in the MCP `outputSchema` — a rule may in principle carry no documentation page — so a client generated from that schema will type it as nullable even though every shipped rule populates it. |
 | `data` | in practice | The machine-readable half of the message: the offending value, the expected set, the cycle path, the crossed thresholds. Its keys are per rule. Every built-in and `custom` rule sets it, but it is optional by contract. |
 | `column` | no | 1-based, and present only when the finding has a position within the line. |
-| `fixable` | no | `true` only on a finding [`--fix`](#--fix) can repair — currently [SEC-001](rules/SEC-001.md) and [TBL-002](rules/TBL-002.md). Never serialized as `false`. |
+| `fixable` | no | `true` only on a finding [`--fix`](#--fix) can repair — currently [SEC-001](rules/SEC-001.md), [TBL-002](rules/TBL-002.md), [REF-002](rules/REF-002.md), [REF-009](rules/REF-009.md) and [CTX-003](rules/CTX-003.md), each on the findings its fix repairs. Never serialized as `false`. |
 | `endLine` | no | Declared on the finding contract for multi-line spans, and set by no rule that ships today, so it does not currently appear in output. |
 
 `data` is what makes the output actionable beyond re-printing `message` — it is why the finding contract is structured at all. If you are converting to SARIF, `helpUri` is the field that carries the rule's documentation link.
@@ -95,7 +95,7 @@ MCP is stricter than the CLI about what it will name. A failure whose path falls
 
 ## `--fix`
 
-`lint --fix` applies deterministic fixes in place, then re-reports what remains. Only rules with a fix hook change files — currently [SEC-001](rules/SEC-001.md) (scaffold missing sections) and [TBL-002](rules/TBL-002.md) (empty target cell → `TODO`). Everything else is reported, never rewritten.
+`lint --fix` applies deterministic fixes in place, then re-reports what remains. Only rules with a fix hook change files — currently [SEC-001](rules/SEC-001.md) (scaffold missing sections), [TBL-002](rules/TBL-002.md) (empty target cell → `TODO`), [REF-002](rules/REF-002.md) (a fragment that differs from its anchor only by case → the exact anchor), [REF-009](rules/REF-009.md) (delete an unused link reference definition) and [CTX-003](rules/CTX-003.md) (glossary alias → canonical term). Each rewrites only the findings it reports as `fixable`; everything else is reported, never rewritten. A second `--fix` run over the result changes nothing.
 
 Two properties hold for every file `--fix` touches:
 

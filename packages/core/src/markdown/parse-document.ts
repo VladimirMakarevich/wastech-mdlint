@@ -40,9 +40,11 @@ import type {
   ParsedImport,
   ParsedLink,
   ParsedLinkKind,
+  ParsedReferenceDefinition,
   ParsedReversedLink,
   ParsedTable,
   ParsedTableRow,
+  ParsedTextSpan,
   ParsedUndefinedReference,
 } from "./document-types.js";
 import { parseFrontmatterYaml } from "./parse-frontmatter.js";
@@ -493,6 +495,87 @@ function extractImports(node: Text): ParsedImport[] {
   return imports;
 }
 
+// The source offsets of an inline link's fragment, or undefined when they cannot be pinned down
+// exactly. mdast gives the link node's span but not the destination's, so the destination is found
+// by walking the source after the link text: `](`, optional spaces/tabs and at most one line
+// ending, an optional `<`, then the destination itself. Every step must match byte for byte — the
+// parsed `url` equals the source only when no escape or entity was used — and any mismatch gives
+// up rather than guess, because a fix that writes to a guessed offset corrupts the file.
+function locateFragmentRange(
+  node: Link,
+  rawTarget: string,
+  content: string,
+): { start: number; end: number } | undefined {
+  const hashIndex = rawTarget.indexOf("#");
+  const nodeStart = node.position?.start.offset;
+  if (hashIndex === -1 || nodeStart === undefined) {
+    return undefined;
+  }
+  const lastChild = node.children[node.children.length - 1];
+  const textEnd =
+    lastChild === undefined ? nodeStart + 1 : lastChild.position?.end.offset;
+  if (textEnd === undefined || !content.startsWith("](", textEnd)) {
+    return undefined;
+  }
+  let cursor = textEnd + 2;
+  const skipBlanks = () => {
+    while (content[cursor] === " " || content[cursor] === "\t") {
+      cursor += 1;
+    }
+  };
+  skipBlanks();
+  if (content.startsWith("\r\n", cursor)) {
+    cursor += 2;
+  } else if (content[cursor] === "\n" || content[cursor] === "\r") {
+    cursor += 1;
+  }
+  skipBlanks();
+  if (content[cursor] === "<") {
+    cursor += 1;
+  }
+  if (!content.startsWith(rawTarget, cursor)) {
+    return undefined;
+  }
+  return { start: cursor + hashIndex + 1, end: cursor + rawTarget.length };
+}
+
+// A link whose source does not open with `[` is an autolink (`<https://x>` or a GFM literal
+// `www.x.com`): its only text child is the URL itself, not prose.
+function isAutolink(node: Link, content: string): boolean {
+  const start = node.position?.start.offset;
+  return start !== undefined && content[start] !== "[";
+}
+
+// Offsets of `[` and `]` in `content[start, end)` that are not backslash-escaped. Called on a `text`
+// node's own source, where any bracket that is not escaped is literal: one that was link syntax
+// would have produced a link node instead of text. An entity such as `&#91;` is not a bracket in
+// the source and never becomes syntax, so it is rightly not counted.
+function findUnescapedBrackets(
+  content: string,
+  start: number,
+  end: number,
+): number[] {
+  const found: number[] = [];
+  for (let index = start; index < end; index += 1) {
+    const char = content[index];
+    if (char !== "[" && char !== "]") {
+      continue;
+    }
+    let backslashes = 0;
+    while (content[index - 1 - backslashes] === "\\") {
+      backslashes += 1;
+    }
+    if (backslashes % 2 === 0) {
+      found.push(index);
+    }
+  }
+  return found;
+}
+
+function normalizeLineEndings(value: string): string {
+  return value.replace(/\r\n?/g, "\n");
+}
+
 /**
  * Parse one Markdown document into the full `ParsedDocument` in a single traversal.
  *
@@ -522,23 +605,41 @@ export function parseDocument(params: {
   const reversedLinks: ParsedReversedLink[] = [];
   const imports: ParsedImport[] = [];
   const directives: InlineDirective[] = [];
+  const referenceDefinitions: ParsedReferenceDefinition[] = [];
+  const referencedIdentifiers = new Set<string>();
+  const textSpans: ParsedTextSpan[] = [];
+  const literalBrackets: number[] = [];
+  // Heading text nodes mapped to their heading's slug. Filled when the walk reaches the heading,
+  // which a pre-order walk does before any of its descendants, so the `text` case can look its
+  // node up without tracking ancestors.
+  const headingSlugByText = new Map<Text, string>();
+  // Text that is a reference label, not prose: everything inside a shortcut `[label]` or collapsed
+  // `[label][]` reference, where the visible text is also the key that finds the definition.
+  // Rewriting it would orphan the definition and break the link. A full `[text][label]` reference
+  // keeps its label separately, so its text stays prose. Filled the same pre-order way as
+  // `headingSlugByText`, so nested formatting such as `[*label*]` is covered too.
+  const referenceLabelText = new Set<Text>();
 
   let currentSection: string | undefined;
 
   // A `yaml` node is a childless literal, not `text`, `link` or `html`, so it falls through to
   // `default`: nothing inside frontmatter can become a heading, link, `@import` or directive.
-  visit(tree, (node) => {
+  visit(tree, (node, _index, parent) => {
     switch (node.type) {
       case "heading": {
         const heading = node as Heading;
         const text = collectText(heading);
+        const slug = slugger.slug(text);
         currentSection = text;
         sections.push(text);
         headings.push({
           text,
           depth: heading.depth,
-          slug: slugger.slug(text),
+          slug,
           line: heading.position?.start.line ?? 0,
+        });
+        visit(heading, "text", (child: Text) => {
+          headingSlugByText.set(child, slug);
         });
         undefinedReferences.push(
           ...extractUndefinedReferences(heading, params.content, definitions),
@@ -584,12 +685,27 @@ export function parseDocument(params: {
       case "link":
       case "linkReference": {
         const linkNode = node as LinkLikeNode;
+        if (
+          linkNode.type === "linkReference" &&
+          linkNode.referenceType !== "full"
+        ) {
+          visit(linkNode, "text", (child: Text) => {
+            referenceLabelText.add(child);
+          });
+        }
         const rawTarget = resolveRawLinkTarget(linkNode, definitions);
         if (rawTarget === undefined) {
           return;
         }
+        if (linkNode.type === "linkReference") {
+          referencedIdentifiers.add(linkNode.identifier);
+        }
         const classified = classifyLink(rawTarget);
         const label = collectText(linkNode);
+        const fragmentRange =
+          linkNode.type === "link" && classified.anchor !== undefined
+            ? locateFragmentRange(linkNode, rawTarget, params.content)
+            : undefined;
         links.push({
           rawTarget,
           text: label.length > 0 ? label : undefined,
@@ -597,12 +713,16 @@ export function parseDocument(params: {
           kind: classified.kind,
           line: linkNode.position?.start.line ?? 0,
           column: linkNode.position?.start.column,
+          ...(fragmentRange === undefined ? {} : { fragmentRange }),
         });
         return;
       }
       case "image":
       case "imageReference": {
         const imageNode = node as ImageLikeNode;
+        if (imageNode.type === "imageReference") {
+          referencedIdentifiers.add(imageNode.identifier);
+        }
         const rawTarget = resolveRawLinkTarget(imageNode, definitions);
         if (rawTarget === undefined) {
           return;
@@ -624,14 +744,64 @@ export function parseDocument(params: {
         openRawText = extracted.openRawText;
         return;
       }
+      case "definition": {
+        const definition = node as Definition;
+        const start = definition.position?.start.offset;
+        const end = definition.position?.end.offset;
+        if (start === undefined || end === undefined) {
+          return;
+        }
+        referenceDefinitions.push({
+          label: definition.label ?? definition.identifier,
+          identifier: definition.identifier,
+          line: definition.position?.start.line ?? 0,
+          endLine: definition.position?.end.line ?? 0,
+          start,
+          end,
+          topLevel: parent === tree,
+          // Filled in after the walk: a reference may come after its definition.
+          referenced: false,
+        });
+        return;
+      }
       case "text": {
-        imports.push(...extractImports(node as Text));
+        const textNode = node as Text;
+        imports.push(...extractImports(textNode));
+        const start = textNode.position?.start.offset;
+        const end = textNode.position?.end.offset;
+        if (start !== undefined && end !== undefined) {
+          literalBrackets.push(
+            ...findUnescapedBrackets(params.content, start, end),
+          );
+        }
+        if (
+          start !== undefined &&
+          end !== undefined &&
+          !referenceLabelText.has(textNode) &&
+          !(
+            parent?.type === "link" &&
+            isAutolink(parent as Link, params.content)
+          ) &&
+          normalizeLineEndings(params.content.slice(start, end)) ===
+            normalizeLineEndings(textNode.value)
+        ) {
+          const headingSlug = headingSlugByText.get(textNode);
+          textSpans.push(
+            headingSlug === undefined
+              ? { start, end }
+              : { start, end, headingSlug },
+          );
+        }
         return;
       }
       default:
         return;
     }
   });
+
+  for (const definition of referenceDefinitions) {
+    definition.referenced = referencedIdentifiers.has(definition.identifier);
+  }
 
   return {
     path: params.path,
@@ -644,6 +814,9 @@ export function parseDocument(params: {
     images,
     undefinedReferences,
     reversedLinks,
+    referenceDefinitions,
+    textSpans,
+    literalBrackets,
     imports,
     directives,
     frontmatter: extractFrontmatter(tree),

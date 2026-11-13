@@ -180,6 +180,7 @@ describe("parseDocument · links & images", () => {
       kind: "local-file",
       line: 1,
       column: 1,
+      fragmentRange: { start: 22, end: 27 },
     });
   });
 
@@ -1314,6 +1315,138 @@ describe("parseDocument · emphasis paragraphs", () => {
     ]);
     expect(emphasis("# T\r\n\r\n**A**\r\n")).toEqual([
       { text: "A", kind: "strong", line: 3 },
+    ]);
+  });
+});
+
+// The source offsets a `--fix` writes to. Each one is asserted by slicing `content` with it, because
+// that is exactly what a fix does: an offset that is right on paper but wrong against the real
+// bytes is the defect these fields exist to prevent.
+describe("parseDocument · fix offsets", () => {
+  function fragmentText(content: string): (string | undefined)[] {
+    const doc = parse(content);
+    return doc.links.map((link) =>
+      link.fragmentRange === undefined
+        ? undefined
+        : content.slice(link.fragmentRange.start, link.fragmentRange.end),
+    );
+  }
+
+  it("records the fragment bytes of inline same-file and cross-file links", () => {
+    expect(
+      fragmentText(
+        "[a](#Demo) and [b](docs/b.md#Over-view) and [c]( <c.md#X> )\n",
+      ),
+    ).toEqual(["Demo", "Over-view", "X"]);
+  });
+
+  it("leaves fragmentRange unset where the bytes cannot be located exactly", () => {
+    expect(
+      fragmentText(
+        [
+          "[ref][r] [plain](b.md) [esc](#a\\_b) [ent](#a&amp;b) [web](https://x.y/#z)",
+          "",
+          "[r]: #shared",
+          "",
+        ].join("\n"),
+      ),
+    ).toEqual([undefined, undefined, undefined, undefined, undefined]);
+  });
+
+  it("records the fragment on CRLF input, including a destination on the next line", () => {
+    const content = "Intro\r\n\r\n[a](\r\n#Demo) and [b](#Two)\r\n";
+    expect(fragmentText(content)).toEqual(["Demo", "Two"]);
+  });
+
+  it("records reference definitions with label, offsets, top-level and referenced", () => {
+    const content = [
+      "[full][One] [Two][] [three] ![img][Four]",
+      "",
+      "[one]: a.md",
+      "[TWO]: b.md",
+      "[three]: c.md",
+      "[four]: d.png",
+      "[unused]: e.md",
+      "",
+      "> [quoted]: f.md",
+      "",
+    ].join("\r\n");
+    const doc = parse(content);
+    expect(
+      doc.referenceDefinitions.map((definition) => [
+        definition.label,
+        definition.line,
+        content.slice(definition.start, definition.end),
+        definition.topLevel,
+        definition.referenced,
+      ]),
+    ).toEqual([
+      ["one", 3, "[one]: a.md", true, true],
+      ["TWO", 4, "[TWO]: b.md", true, true],
+      ["three", 5, "[three]: c.md", true, true],
+      ["four", 6, "[four]: d.png", true, true],
+      ["unused", 7, "[unused]: e.md", true, false],
+      ["quoted", 9, "[quoted]: f.md", false, false],
+    ]);
+  });
+
+  it("excludes the label text of shortcut and collapsed references but keeps full-reference text", () => {
+    const content =
+      "[gql] [*gql* x][] [the gql][gql]\n\n[gql]: a.md\n[*gql* x]: b.md\n";
+    const doc = parse(content);
+    expect(
+      doc.textSpans.map((span) => content.slice(span.start, span.end)),
+    ).toEqual([" ", " ", "the gql"]);
+  });
+
+  it("records only the brackets the parse left as literal text", () => {
+    const content =
+      "[gql] and [real](a.md) and \\[esc\\] and [*x* y] and `[code]`\n";
+    const doc = parse(content);
+    expect(doc.literalBrackets.map((offset) => content[offset])).toEqual([
+      "[",
+      "]",
+      "[",
+      "]",
+    ]);
+    expect(doc.literalBrackets).toEqual([
+      0,
+      4,
+      content.indexOf("[*x*"),
+      content.indexOf("y]") + 1,
+    ]);
+  });
+
+  it("records only verbatim prose as text spans, with the heading slug where there is one", () => {
+    const content = [
+      "# Head *api*",
+      "",
+      "Use `api` and [the api](api.md) or <https://api.x> www.api.com &amp; x",
+      "",
+      "```",
+      "api",
+      "```",
+      "",
+      "<div>api</div>",
+      "",
+      "tail api\r\nline",
+      "",
+    ].join("\n");
+    const doc = parse(content);
+    expect(
+      doc.textSpans.map((span) => [
+        content.slice(span.start, span.end),
+        span.headingSlug,
+      ]),
+    ).toEqual([
+      ["Head ", "head-api"],
+      ["api", "head-api"],
+      ["Use ", undefined],
+      [" and ", undefined],
+      ["the api", undefined],
+      [" or ", undefined],
+      [" ", undefined],
+      ["tail api\r\nline", undefined],
     ]);
   });
 });
