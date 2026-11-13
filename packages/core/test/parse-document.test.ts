@@ -1216,3 +1216,55 @@ describe("parseDocument · reversed links", () => {
     expect(reversed("# Plain\n\ntext (aside) here.\n")).toEqual([]);
   });
 });
+
+describe("parseDocument · first block", () => {
+  const first = (content: string) => parse(content).firstBlock;
+
+  it("is null when nothing renders", () => {
+    expect(first("")).toBeNull();
+    expect(first("---\ntitle: X\n---\n")).toBeNull();
+    expect(first("<!-- only a comment -->\n")).toBeNull();
+  });
+
+  it("reports a leading heading at its real line, after front matter too", () => {
+    expect(first("# Title\n")).toEqual({ type: "heading", line: 1 });
+    expect(first("---\ntitle: X\n---\n\n# Title\n")).toEqual({
+      type: "heading",
+      line: 5,
+    });
+    expect(first("Title\n=====\n")).toEqual({ type: "heading", line: 1 });
+  });
+
+  it("reports leading prose as a paragraph", () => {
+    expect(first("Some text.\n\n# Title\n")).toEqual({
+      type: "paragraph",
+      line: 1,
+    });
+  });
+
+  it("skips comments, directives and link definitions, but not rendered HTML", () => {
+    expect(
+      first("<!-- wastech-mdlint-disable -->\n\n[x]: ./y.md\n\n# Title\n"),
+    ).toEqual({ type: "heading", line: 5 });
+    expect(first("<!-- a -->\n<!-- b -->\n\n# Title\n")).toEqual({
+      type: "heading",
+      line: 4,
+    });
+    expect(first('<img src="badge.svg">\n\n# Title\n')).toEqual({
+      type: "html",
+      line: 1,
+    });
+  });
+
+  // A heading inside a container is not a document title, so the container is what came first.
+  it("reports the container, not a heading nested inside it", () => {
+    expect(first("> # Quoted\n")).toEqual({ type: "blockquote", line: 1 });
+  });
+
+  it("gives the same lines for a CRLF document", () => {
+    expect(first("---\r\ntitle: X\r\n---\r\n\r\nText.\r\n")).toEqual({
+      type: "paragraph",
+      line: 5,
+    });
+  });
+});

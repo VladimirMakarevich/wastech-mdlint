@@ -29,6 +29,7 @@ import type {
   InlineDirectiveKind,
   ParsedCheckItem,
   ParsedDocument,
+  ParsedFirstBlock,
   ParsedFrontmatter,
   ParsedHeading,
   ParsedHtmlAnchor,
@@ -169,6 +170,32 @@ function extractFrontmatter(tree: Root): ParsedFrontmatter | null {
     endLine: node.position?.end.line ?? 1,
     parsed: parseFrontmatterYaml(raw, startLine),
   };
+}
+
+// Anchored and without the `g` flag, so no `lastIndex` state survives between documents. Matches
+// an `html` block made only of comments, which includes every inline-disable directive.
+const HTML_COMMENTS_ONLY_PATTERN = /^(?:<!--[\s\S]*?-->\s*)+$/;
+
+// The first top-level child that renders something. Skipped: `yaml` (front matter is metadata, not
+// page content), `definition` (a link reference definition renders nothing), and an `html` block
+// that is only comments (a directive or a licence banner is invisible on the page, so it must not
+// count as prose before the title). An `html` block with real markup — a badge `<img>`, a
+// `<p align=center>` — does render, so it counts. Top level only: a heading nested in a blockquote
+// or list is not a document title, so the container's own type is what is reported.
+function extractFirstBlock(tree: Root): ParsedFirstBlock | null {
+  for (const node of tree.children) {
+    if (node.type === "yaml" || node.type === "definition") {
+      continue;
+    }
+    if (
+      node.type === "html" &&
+      HTML_COMMENTS_ONLY_PATTERN.test((node as Html).value.trim())
+    ) {
+      continue;
+    }
+    return { type: node.type, line: node.position?.start.line ?? 0 };
+  }
+  return null;
 }
 
 function classifyLink(rawTarget: string): {
@@ -587,6 +614,7 @@ export function parseDocument(params: {
     imports,
     directives,
     frontmatter: extractFrontmatter(tree),
+    firstBlock: extractFirstBlock(tree),
     content: params.content,
   };
 }

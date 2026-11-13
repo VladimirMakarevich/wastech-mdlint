@@ -28,6 +28,9 @@
 //                 two `---` fences would otherwise parse as a thematic break plus a setext H2,
 //                 inventing a heading, section and slug, and any link, `@import` or
 //                 directive-looking text inside it would be extracted as if it were prose.
+//   firstBlock → SEC-004 title check. A parse-pass fact rather than a scan of `content`, because
+//                deciding what comes "first" means skipping front matter, comments and link
+//                definitions, and a rule doing that over raw text would be re-parsing Markdown.
 //   content    → CTX-001 placeholder scan, size/token estimation, raw fallbacks. Still the whole
 //                file, frontmatter bytes included, so byte/line counts match `wc` and every
 //                offset a fix or line lookup computes against it stays a true source offset.
@@ -186,6 +189,14 @@ export type ParsedFrontmatter = {
   parsed: FrontmatterParseResult;
 };
 
+// The first top-level block that renders something, by its mdast node type (`heading`,
+// `paragraph`, `html`, `list`, `blockquote`, …) and 1-based line. Only the type and line are kept,
+// not the node, so the contract stays small and serialisable while still saying *what* came first.
+export type ParsedFirstBlock = {
+  type: string;
+  line: number;
+};
+
 export type ParsedDocument = {
   // Repo-relative POSIX path. Not strictly parse output, but carried here because findings are
   // attributed by repo-relative path, and carrying it here fixes it deterministically at load
@@ -208,5 +219,8 @@ export type ParsedDocument = {
   // Required and `null` when absent, rather than optional: the key is always present, so absence is
   // explicit and survives `JSON.stringify`, which would silently drop an `undefined`.
   frontmatter: ParsedFrontmatter | null;
+  // `null` when nothing renders (an empty file, or front matter alone); required for the same
+  // reason as `frontmatter`.
+  firstBlock: ParsedFirstBlock | null;
   content: string;
 };

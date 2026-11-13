@@ -210,6 +210,7 @@ The following table is generated from the rule metadata (`npm run generate:docs`
 | [`SEC-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-001.md) | SEC | error | document | yes | Required sections are present. |
 | [`SEC-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-002.md) | SEC | error | document | no | Sections appear in the required order. |
 | [`SEC-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-003.md) | SEC | error | project | no | Sections conform to a reference template's heading structure. |
+| [`SEC-004`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-004.md) | SEC | warning | document | no | Heading levels increment by one, with a single title at the start. |
 | [`SIZE-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SIZE-001.md) | SIZE | warning | document | no | File stays within byte / line / token budgets. |
 | [`STR-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/STR-001.md) | STR | error | project | no | Required files exist in the project. |
 | [`TBL-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-001.md) | TBL | error | document | no | Tables declare their required columns. |

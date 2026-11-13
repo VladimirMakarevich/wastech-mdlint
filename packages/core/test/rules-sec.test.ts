@@ -8,6 +8,7 @@ import type { ConfiguredRule } from "../src/config/load-config.js";
 import { compareStrings } from "../src/deterministic-sort.js";
 import { applyFixes } from "../src/engine/fix.js";
 import { lintFiles } from "../src/engine/lint-files.js";
+import { RuleResolutionError } from "../src/engine/registry.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
 
 const tempDirs: string[] = [];
@@ -470,10 +471,84 @@ describe("SEC-* on documents with frontmatter", () => {
   });
 });
 
-// The SEC half of the shared `exclude` matrix. One fixture serves all three cases: both
-// documents violate every case, while `templates/t.md` satisfies SEC-001/SEC-002 (it has `Summary`,
-// and neither `Overview` nor `Usage`, which `sectionOrder` skips) and is self-skipped by SEC-003.
-const SECTION_DOC = "# Title\n\n## Usage\n\n## Overview\n";
+describe("SEC-004 heading levels", () => {
+  it("reports a skipped level, a second H1 and a prose start at the offending line", async () => {
+    const cwd = await fixtureRepo({
+      "skip.md": "# Title\n\n## A\n\n#### Deep\n",
+      "twice.md": "# One\n\ntext\n\n# Two\n",
+      "prose.md": "Intro text.\n\n# Title\n",
+    });
+
+    const result = await lint(cwd, [rule("SEC-004")]);
+    expect(
+      result.messages.map(({ ruleId, filePath, line, message }) => ({
+        ruleId,
+        filePath,
+        line,
+        message,
+      })),
+    ).toEqual([
+      {
+        ruleId: "SEC-004",
+        filePath: "prose.md",
+        line: 1,
+        message:
+          'Document does not start with an H1 heading or declare a front matter "title" key.',
+      },
+      {
+        ruleId: "SEC-004",
+        filePath: "skip.md",
+        line: 5,
+        message: "Heading level skips from H2 to H4; expected H3 or shallower.",
+      },
+      {
+        ruleId: "SEC-004",
+        filePath: "twice.md",
+        line: 5,
+        message:
+          "Document has more than one H1 heading; the first is on line 1.",
+      },
+    ]);
+  });
+
+  it("validates its options and resolves bare", () => {
+    expect(() => ruleRegistry.resolveRule("SEC-004")).not.toThrow();
+    for (const options of [
+      { increment: "yes" },
+      { level: 7 },
+      { level: 0 },
+      { titleKey: "" },
+      { bogus: true },
+    ]) {
+      expect(() => ruleRegistry.resolveRule("SEC-004", options)).toThrow(
+        RuleResolutionError,
+      );
+    }
+  });
+
+  // The directive suppresses the skip it precedes, and as a comment it renders nothing, so the
+  // document still starts with its H1 and the title check stays quiet.
+  it("honours an inline disable without the directive counting as first content", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "<!-- wastech-mdlint-disable-next-line SEC-004 -->\n# Title\n\n### Deep\n",
+      "b.md":
+        "# Title\n\n<!-- wastech-mdlint-disable-next-line SEC-004 -->\n### Deep\n",
+    });
+
+    const result = await lint(cwd, [rule("SEC-004")]);
+    expect(
+      result.messages.map(({ filePath, line }) => ({ filePath, line })),
+    ).toEqual([{ filePath: "a.md", line: 4 }]);
+  });
+});
+
+// The SEC half of the shared `exclude` matrix. One fixture serves every case: both documents
+// violate each one (the `#### Overview` jump from H2 is what trips SEC-004), while `templates/t.md`
+// satisfies SEC-001/SEC-002 (it has `Summary`, and neither `Overview` nor `Usage`, which
+// `sectionOrder` skips), passes SEC-004 (one leading H1, levels step by one) and is self-skipped by
+// SEC-003.
+const SECTION_DOC = "# Title\n\n## Usage\n\n#### Overview\n";
 const SECTION_TEMPLATE = "# T\n\n## Context\n\n## Summary\n";
 
 const SEC_SCOPE_CASES: readonly { id: string; options: object }[] = [
@@ -484,6 +559,7 @@ const SEC_SCOPE_CASES: readonly { id: string; options: object }[] = [
     id: "SEC-003",
     options: { template: "templates/t.md", level: 2, strict: true },
   },
+  { id: "SEC-004", options: {} },
 ];
 
 describe("SEC file scope (exclude)", () => {

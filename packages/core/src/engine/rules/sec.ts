@@ -18,6 +18,7 @@ import { resolvesOutsideRoot } from "../path-resolve.js";
 import { sectionOrder, sectionPresent } from "../primitives/section.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
+import { headingLevelFindings } from "./sec-heading-levels.js";
 import {
   compileOutline,
   formatOutlineHeading,
@@ -278,6 +279,52 @@ export const sec003: RuleDefinition = defineRule({
   },
 });
 
+// SEC-004 — heading levels increment by one, with a single title at the start. Three checks, each
+// switchable on its own because each has a legitimate exception: a docs-site page often takes its
+// title from front matter and its renderer (title off, or satisfied by `titleKey`), a changelog has
+// one top-level heading per release (singleTitle off), and generated reference pages sometimes jump
+// levels to match an external structure (increment off). Defaults are applied here with `??`
+// rather than a Zod `.default()`, matching SEC-003's `strict`, so the generated schema keeps every
+// option optional the way its siblings do. Not fixable: choosing the right level is a judgment call.
+export const sec004: RuleDefinition = defineRule({
+  metadata: {
+    id: "SEC-004",
+    category: "SEC",
+    description:
+      "Heading levels increment by one, with a single title at the start.",
+    // Outline hygiene rather than a broken contract, and the rule is meant to be enabled bare, so a
+    // warning is the proportionate default.
+    defaultSeverity: "warning",
+    scope: "document",
+    fixable: false,
+  },
+  optionsSchema: z
+    .object({
+      increment: z.boolean().optional(),
+      singleTitle: z.boolean().optional(),
+      title: z.boolean().optional(),
+      // Capped at 6 because Markdown has no H7.
+      level: z.number().int().min(1).max(6).optional(),
+      titleKey: z.string().min(1).optional(),
+      ...fileScopeShape,
+    })
+    .strict(),
+  check: (options) => (context) => {
+    if (!matchesFileScope(context.filePath!, options)) {
+      return;
+    }
+    for (const finding of headingLevelFindings(context.document!, {
+      increment: options.increment ?? true,
+      singleTitle: options.singleTitle ?? true,
+      title: options.title ?? true,
+      level: options.level ?? 1,
+      titleKey: options.titleKey ?? "title",
+    })) {
+      context.report(finding);
+    }
+  },
+});
+
 // STR-001 — required files exist in the project (project). `files` here is the *required* set (each
 // entry is a path or glob), not file scoping.
 //
@@ -360,5 +407,6 @@ export const SEC_STR_RULES: readonly RuleDefinition[] = [
   sec001,
   sec002,
   sec003,
+  sec004,
   str001,
 ];
