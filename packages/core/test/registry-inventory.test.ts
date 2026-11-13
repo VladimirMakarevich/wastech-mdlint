@@ -45,6 +45,9 @@ const EXPECTED: Record<string, { scope: RuleScope; severity: Severity }> = {
   "SEC-001": { scope: "document", severity: "error" },
   "SEC-002": { scope: "document", severity: "error" },
   "SEC-003": { scope: "project", severity: "error" },
+  "SEC-004": { scope: "document", severity: "warning" },
+  "SEC-005": { scope: "document", severity: "warning" },
+  "SEC-006": { scope: "document", severity: "warning" },
   "STR-001": { scope: "project", severity: "error" },
   "REF-001": { scope: "document", severity: "error" },
   "REF-002": { scope: "document", severity: "error" },
@@ -54,18 +57,23 @@ const EXPECTED: Record<string, { scope: RuleScope; severity: Severity }> = {
   "REF-006": { scope: "project", severity: "warning" },
   "REF-007": { scope: "document", severity: "error" },
   "REF-008": { scope: "document", severity: "error" },
+  "REF-009": { scope: "document", severity: "warning" },
   "CTX-001": { scope: "document", severity: "warning" },
   "CTX-002": { scope: "document", severity: "warning" },
   "CTX-003": { scope: "project", severity: "warning" },
+  "CTX-004": { scope: "document", severity: "warning" },
+  "CTX-005": { scope: "document", severity: "warning" },
   "GRP-001": { scope: "project", severity: "error" },
   "GRP-002": { scope: "project", severity: "warning" },
   "GRP-003": { scope: "project", severity: "warning" },
   "SIZE-001": { scope: "document", severity: "warning" },
   "LLM-001": { scope: "project", severity: "warning" },
+  "FM-001": { scope: "document", severity: "error" },
 };
 
 const EXPECTED_CATEGORIES = [
   "CTX",
+  "FM",
   "GRP",
   "LLM",
   "REF",
@@ -76,14 +84,14 @@ const EXPECTED_CATEGORIES = [
 ].sort(compareStrings);
 
 describe("BUILTIN_RULE_DEFINITIONS inventory", () => {
-  it("ships exactly the documented 27 rule ids", () => {
+  it("ships exactly the documented 34 rule ids", () => {
     const ids = BUILTIN_RULE_DEFINITIONS.map(
       (definition) => definition.metadata.id,
     ).sort(compareStrings);
     expect(ids).toEqual(Object.keys(EXPECTED).sort(compareStrings));
   });
 
-  it("ships exactly the documented 8 category prefixes (no CHK)", () => {
+  it("ships exactly the documented 9 category prefixes (no CHK)", () => {
     const categories = [
       ...new Set(
         BUILTIN_RULE_DEFINITIONS.map(
@@ -189,13 +197,20 @@ const FILE_SCOPED = [
   "SEC-001",
   "SEC-002",
   "SEC-003",
+  "SEC-004",
+  "SEC-005",
+  "SEC-006",
   "REF-002",
   "REF-007",
   "REF-008",
+  "REF-009",
   "CTX-001",
   "CTX-002",
   "CTX-003",
+  "CTX-004",
+  "CTX-005",
   "GRP-002",
+  "FM-001",
 ].sort(compareStrings);
 
 // Same key, different meaning: REF-001/REF-003 filter the *link/image target* they are about to

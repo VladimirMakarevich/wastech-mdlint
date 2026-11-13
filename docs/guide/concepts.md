@@ -8,7 +8,7 @@ Background on how the linter works — useful for understanding rule behavior an
 
 Each Markdown file is parsed **once** (remark + GitHub-flavored Markdown + YAML frontmatter + GitHub slugger) into a `ParsedDocument` that captures everything downstream needs:
 
-- **frontmatter** — a YAML block fenced by `---` lines, opening on the file's first line, exposed as its raw text plus its line range (it is not parsed as YAML); a file without one exposes `null`;
+- **frontmatter** — a YAML block fenced by `---` lines, opening on the file's first line, exposed as its raw text, its line range, and its one YAML parse: either the value (under the failsafe schema, so every scalar is a string, never converted to a number, boolean or date) or a structured error with the line it occurred on. No tag is constructed, `<<` is an ordinary key, and alias expansion is bounded. A file without front matter exposes `null`. [FM-001](rules/FM-001.md) and the `frontmatter*` [`custom`](rules/custom.md) kinds read this parse;
 - **headings** and their GitHub-style **slugs** (for anchor resolution);
 - **HTML anchors** — `id` attributes on any element and `name` attributes on `<a>`, read from raw HTML in the document (for anchor resolution alongside the slugs);
 - **sections** (a heading plus the body it owns, last-heading-wins);

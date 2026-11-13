@@ -369,8 +369,13 @@ describe("declarative custom rule", () => {
 
 // One document that trips every assert kind at once, so the `exclude` matrix below varies only the
 // scope. Duplicated verbatim into `docs/a.md` and `drafts/b.md`, which is also what gives
-// `columnUnique` its cross-file duplicates.
+// `columnUnique` its cross-file duplicates. The front matter lacks `owner` and holds a `status`
+// outside every allowed set the cases below use, which trips the three front matter kinds.
 const EVERY_ASSERT_DOC = [
+  "---",
+  "status: bogus",
+  "---",
+  "",
   "## Usage",
   "",
   "| ID | Owner | Status | Resolution |",
@@ -408,7 +413,7 @@ const IN_SCOPE_ONLY = ["docs/a.md"];
 // The `satisfies Record<Assertion["kind"], …>` below documents the intended coverage contract, but
 // it is NOT what enforces it: no tsconfig in this repo includes `test/**` (`packages/core/
 // tsconfig.json` is `include: ["src/**/*.ts", …]`), so `npm run typecheck` never reads this file and
-// a 14th assert kind would not fail it — the claim an earlier revision of this comment made
+// a new assert kind would not fail it — the claim an earlier revision of this comment made
 // The enforcement is the runtime key-set assertion in the describe block below; keep it
 // there, and prefer runtime assertions for any future coverage guard written in a test file.
 const CUSTOM_SCOPE_CASES = {
@@ -483,9 +488,24 @@ const CUSTOM_SCOPE_CASES = {
     control: BOTH,
     scoped: IN_SCOPE_ONLY,
   },
+  frontmatterRequired: {
+    assert: { kind: "frontmatterRequired", keys: ["owner"] },
+    control: BOTH,
+    scoped: IN_SCOPE_ONLY,
+  },
+  frontmatterInSet: {
+    assert: { kind: "frontmatterInSet", key: "status", values: ["done"] },
+    control: BOTH,
+    scoped: IN_SCOPE_ONLY,
+  },
+  frontmatterMatches: {
+    assert: { kind: "frontmatterMatches", key: "status", pattern: "^d" },
+    control: BOTH,
+    scoped: IN_SCOPE_ONLY,
+  },
 } as const satisfies Record<Assertion["kind"], CustomScopeCase>;
 
-// The 12 document kinds share one gate (`custom.ts`, before `runAssertion`) while
+// The document kinds share one gate (`custom.ts`, before `runAssertion`) while
 // `columnUnique` has its own, threaded into the primitive as a `fileMatches` predicate — which is
 // why the project kind is not redundant with TBL-006's coverage.
 describe("custom rule file scope (exclude)", () => {
@@ -619,5 +639,131 @@ describe("custom rule file scope (exclude)", () => {
 
     expect(await run({})).toEqual([]);
     expect(await run({ siteRouter: {} })).toEqual([]);
+  });
+});
+
+// The three front matter kinds go through the same Zod union and target check as every other kind,
+// and share FM-001's semantics — including reporting a block they cannot read instead of passing it.
+describe("custom front matter kinds", () => {
+  function configWith(entry: Record<string, unknown>): string {
+    return JSON.stringify({
+      rules: [{ rule: "custom", id: "ADR-META", ...entry }],
+    });
+  }
+
+  it.each([
+    [
+      "an unknown key",
+      { kind: "frontmatterRequired", keys: ["owner"], section: "x" },
+    ],
+    ["an empty `keys` list", { kind: "frontmatterRequired", keys: [] }],
+    ["an empty key name", { kind: "frontmatterRequired", keys: [""] }],
+    [
+      "an empty `values` list",
+      { kind: "frontmatterInSet", key: "s", values: [] },
+    ],
+    ["a missing `key`", { kind: "frontmatterInSet", values: ["a"] }],
+    [
+      "an invalid `pattern`",
+      { kind: "frontmatterMatches", key: "s", pattern: "([" },
+    ],
+    [
+      "invalid `flags`",
+      { kind: "frontmatterMatches", key: "s", pattern: "a", flags: "q" },
+    ],
+  ])("rejects %s at config load", async (_name, assert) => {
+    const cwd = await repo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": configWith({ options: { assert } }),
+    });
+
+    const error = await loadConfiguration({ cwd }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ConfigError);
+    expect((error as ConfigError).code).toBe("CONFIG_INVALID");
+  });
+
+  // `\u{110000}` is a valid pattern on its own and `u` valid flags on their own, but together they do
+  // not compile. Every kind that takes both is checked as a pair, so such a rule is a config error at
+  // its `pattern` instead of a throw that aborts the lint run.
+  it.each([
+    { kind: "frontmatterMatches", key: "s" },
+    { kind: "columnMatches", column: "ID" },
+    { kind: "contentNotMatch" },
+  ])(
+    "rejects a $kind pattern that is invalid only under its flags",
+    async (fields) => {
+      const pattern = "\\u{110000}";
+      const loads = await repo({
+        "a.md": "# A\n",
+        "wastech-mdlint.config.json": configWith({
+          options: { assert: { ...fields, pattern } },
+        }),
+      });
+      await expect(loadConfiguration({ cwd: loads })).resolves.toBeDefined();
+
+      const cwd = await repo({
+        "a.md": "# A\n",
+        "wastech-mdlint.config.json": configWith({
+          options: { assert: { ...fields, pattern, flags: "u" } },
+        }),
+      });
+      const error = await loadConfiguration({ cwd }).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ConfigError);
+      expect((error as ConfigError).code).toBe("CONFIG_INVALID");
+      expect((error as ConfigError).message).toMatch(
+        /options\.assert\.pattern: expected a valid regular expression under the given flags/u,
+      );
+    },
+  );
+
+  it('accepts target "frontmatter" and rejects any other target for these kinds', async () => {
+    const assert = { kind: "frontmatterRequired", keys: ["owner"] };
+    const accepted = await repo({
+      "a.md": "---\nowner: me\n---\n# A\n",
+      "wastech-mdlint.config.json": configWith({
+        target: "frontmatter",
+        options: { assert },
+      }),
+    });
+    expect((await lintWithConfig(accepted)).messages).toEqual([]);
+
+    const rejected = await repo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": configWith({
+        target: "table",
+        options: { assert },
+      }),
+    });
+    await expect(loadConfiguration({ cwd: rejected })).rejects.toThrow(
+      /target "table" does not match assert kind "frontmatterRequired" \(expected "frontmatter"\)/,
+    );
+  });
+
+  it("reports invalid YAML once under the custom id instead of passing the document", async () => {
+    const cwd = await repo({
+      "adr/0001.md": "---\nstatus: [accepted\n---\n\n# ADR\n",
+      "wastech-mdlint.config.json": configWith({
+        severity: "error",
+        options: {
+          files: ["adr/**"],
+          assert: {
+            kind: "frontmatterInSet",
+            key: "status",
+            values: ["proposed", "accepted"],
+          },
+        },
+      }),
+    });
+
+    const result = await lintWithConfig(cwd);
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]).toMatchObject({
+      ruleId: "ADR-META",
+      filePath: "adr/0001.md",
+      severity: "error",
+    });
+    expect(result.messages[0]?.message).toMatch(
+      /^Front matter is not valid YAML: /u,
+    );
   });
 });

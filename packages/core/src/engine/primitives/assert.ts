@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { regexFlagsSchema, regexStringSchema } from "../regex.js";
+import {
+  isValidPatternWithFlags,
+  patternWithFlagsIssue,
+  regexFlagsSchema,
+  regexStringSchema,
+} from "../regex.js";
 import {
   columnInSet,
   columnMatches,
@@ -13,6 +18,11 @@ import {
 import { sectionOrder, sectionPresent } from "./section.js";
 import { contentNotMatch, noPlaceholders } from "./content.js";
 import { allChecked } from "./checklist.js";
+import {
+  frontmatterInSet,
+  frontmatterMatches,
+  frontmatterRequired,
+} from "./frontmatter.js";
 import { imageResolves, linkResolves } from "./reference.js";
 import type { PrimitiveContext, PrimitiveFinding } from "./types.js";
 
@@ -74,7 +84,8 @@ export const assertionSchema = z.discriminatedUnion("kind", [
       flags: regexFlagsSchema.optional(),
       section: z.string().optional(),
     })
-    .strict(),
+    .strict()
+    .refine(isValidPatternWithFlags, patternWithFlagsIssue),
   z
     .object({
       kind: z.literal("columnUnique"),
@@ -111,7 +122,8 @@ export const assertionSchema = z.discriminatedUnion("kind", [
       pattern: regexStringSchema,
       flags: regexFlagsSchema.optional(),
     })
-    .strict(),
+    .strict()
+    .refine(isValidPatternWithFlags, patternWithFlagsIssue),
   z
     .object({
       kind: z.literal("noPlaceholders"),
@@ -134,6 +146,28 @@ export const assertionSchema = z.discriminatedUnion("kind", [
       exclude: z.array(z.string()).optional(),
     })
     .strict(),
+  z
+    .object({
+      kind: z.literal("frontmatterRequired"),
+      keys: z.array(z.string().min(1)).min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("frontmatterInSet"),
+      key: z.string().min(1),
+      values: z.array(z.string()).min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("frontmatterMatches"),
+      key: z.string().min(1),
+      pattern: regexStringSchema,
+      flags: regexFlagsSchema.optional(),
+    })
+    .strict()
+    .refine(isValidPatternWithFlags, patternWithFlagsIssue),
 ]);
 
 // The **input** type, deliberately: `columnInSet.caseSensitive` carries a `.default()`, so `z.infer`
@@ -160,6 +194,9 @@ export const ASSERTION_TARGETS = {
   allChecked: "checklist",
   linkResolves: "link",
   imageResolves: "link",
+  frontmatterRequired: "frontmatter",
+  frontmatterInSet: "frontmatter",
+  frontmatterMatches: "frontmatter",
 } as const satisfies Record<Assertion["kind"], string>;
 
 // Kinds whose evaluation spans the whole corpus (project scope). Everything else is per-document.
@@ -245,6 +282,19 @@ export function runAssertion(
     case "imageResolves":
       return imageResolves(context.document, context, {
         exclude: assertion.exclude,
+      });
+    case "frontmatterRequired":
+      return frontmatterRequired(context.document, { keys: assertion.keys });
+    case "frontmatterInSet":
+      return frontmatterInSet(context.document, {
+        key: assertion.key,
+        values: assertion.values,
+      });
+    case "frontmatterMatches":
+      return frontmatterMatches(context.document, {
+        key: assertion.key,
+        pattern: assertion.pattern,
+        flags: assertion.flags,
       });
     default: {
       const exhaustiveCheck: never = assertion;

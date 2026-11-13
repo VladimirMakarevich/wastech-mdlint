@@ -13,8 +13,14 @@ import {
   requiredColumns,
   rowCellCount,
 } from "../primitives/table.js";
-import { regexFlagsSchema, regexStringSchema } from "../regex.js";
+import {
+  isValidPatternWithFlags,
+  patternWithFlagsIssue,
+  regexFlagsSchema,
+  regexStringSchema,
+} from "../regex.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
+import { lineStartOffsets } from "../text-position.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
 import type { TextEdit } from "../types.js";
 
@@ -49,17 +55,6 @@ export const tbl001: RuleDefinition = defineRule({
     }
   },
 });
-
-// Compute the character offset of each line start, so cell fixes can be expressed as content edits.
-function lineStartOffsets(content: string): number[] {
-  const offsets = [0];
-  for (let index = 0; index < content.length; index += 1) {
-    if (content.charCodeAt(index) === 10) {
-      offsets.push(index + 1);
-    }
-  }
-  return offsets;
-}
 
 // Locate the [start, end) offsets of cell `cellIndex` within a canonical (leading-pipe) table row.
 // Returns undefined for non-canonical rows or a cell beyond the row's pipes — the fix is then
@@ -165,8 +160,8 @@ export const tbl002: RuleDefinition = defineRule({
   // The gate is repeated here because `applyFixes` (engine/fix.ts) applies none of its own: it walks
   // every loaded document and calls each hook, and a resolved rule's options are already closed over
   // by `resolveRule`, so the runner cannot scope on the hook's behalf. Without this, `--fix` writes
-  // ` TODO ` into files `check` deliberately skipped. Same shape as SEC-001's hook in `sec.ts`; those
-  // two are the only `fixable: true` rules.
+  // ` TODO ` into files `check` deliberately skipped. Every fix hook repeats its rule's gate the
+  // same way.
   fix: (options) => (context) =>
     matchesFileScope(context.filePath!, options)
       ? emptyCellEdits(context.document!, options)
@@ -227,7 +222,8 @@ export const tbl004: RuleDefinition = defineRule({
       section: z.string().optional(),
       ...fileScopeShape,
     })
-    .strict(),
+    .strict()
+    .refine(isValidPatternWithFlags, patternWithFlagsIssue),
   check: (options) => (context) => {
     if (!matchesFileScope(context.filePath!, options)) {
       return;

@@ -21,7 +21,7 @@ Each `SKILL.md` carries `name`, `description`, `license`, `compatibility`, and `
 
 ## `-fix` delegation policy
 
-`mdlint-fix` reads the fixable set from the generated rule table (currently [SEC-001](rules/SEC-001.md) and [TBL-002](rules/TBL-002.md)) rather than hardcoding it, runs core `--fix` for those, and leaves non-mechanical findings for human/AI judgement.
+`mdlint-fix` reads the fixable set from the generated rule table (currently [SEC-001](rules/SEC-001.md), [TBL-002](rules/TBL-002.md), [REF-002](rules/REF-002.md), [REF-009](rules/REF-009.md) and [CTX-003](rules/CTX-003.md)) rather than hardcoding it, runs core `--fix` for those, and leaves non-mechanical findings for human/AI judgement.
 
 ## Generated vs. static skills
 

@@ -1,6 +1,7 @@
 import GithubSlugger from "github-slugger";
 import type {
   Definition,
+  Emphasis,
   Heading,
   Html,
   Image,
@@ -10,6 +11,7 @@ import type {
   LinkReference,
   ListItem,
   Root,
+  Strong,
   Table,
   TableCell,
   TableRow,
@@ -29,6 +31,8 @@ import type {
   InlineDirectiveKind,
   ParsedCheckItem,
   ParsedDocument,
+  ParsedEmphasisParagraph,
+  ParsedFirstBlock,
   ParsedFrontmatter,
   ParsedHeading,
   ParsedHtmlAnchor,
@@ -36,11 +40,14 @@ import type {
   ParsedImport,
   ParsedLink,
   ParsedLinkKind,
+  ParsedReferenceDefinition,
   ParsedReversedLink,
   ParsedTable,
   ParsedTableRow,
+  ParsedTextSpan,
   ParsedUndefinedReference,
 } from "./document-types.js";
+import { parseFrontmatterYaml } from "./parse-frontmatter.js";
 import { extractReversedLinks } from "./reversed-links.js";
 import { extractUndefinedReferences } from "./undefined-references.js";
 
@@ -126,6 +133,45 @@ function collectText(node: unknown): string {
   return text;
 }
 
+// An inline `<br>` tag in any of its spellings: any case, self-closed or not, with or without
+// attributes (`<br class="x">`, attribute values spanning lines included), and the stray end tag
+// `</br>`, which HTML parsers also render as a line break. The parser only emits an `html` node for
+// a single tag CommonMark has already validated, so the tag name followed by whitespace, `/` or
+// the closing `>` is enough to identify it; `<brx>` and `<bra>` are other tags and do not match.
+// No `g` flag: the pattern is shared across every link of every document, and a `g`-flagged
+// `test` would carry `lastIndex` from one call into the next.
+const HTML_LINE_BREAK_PATTERN = /^<\/?br(?:[\s/][\s\S]*)?>$/iu;
+
+// What a reader sees of a link label, as opposed to `collectText`, which also gathers the source of
+// raw HTML nodes. Only `text` and `inlineCode` values are visible, and other `html` is markup that
+// contributes nothing. A Markdown `break` and an inline `<br>` both render as a line break, so they
+// contribute whitespace rather than gluing the words either side together: `[click<br>here](a.md)`
+// reads as "click here", not "clickhere". An image contributes nothing, matching `collectText`: its
+// `alt` describes the image.
+function collectVisibleText(node: unknown): string {
+  let text = "";
+
+  visit(node as Parameters<typeof visit>[0], (child) => {
+    if (
+      child.type === "break" ||
+      (child.type === "html" &&
+        "value" in child &&
+        typeof child.value === "string" &&
+        HTML_LINE_BREAK_PATTERN.test(child.value))
+    ) {
+      text += "\n";
+    } else if (
+      (child.type === "text" || child.type === "inlineCode") &&
+      "value" in child &&
+      typeof child.value === "string"
+    ) {
+      text += child.value;
+    }
+  });
+
+  return text;
+}
+
 // Decode a single percent-encoded fragment (anchor) so it matches github-slugger output, which
 // operates on decoded Unicode text. Left as-is on malformed input.
 function decodeComponent(value: string): string {
@@ -160,11 +206,70 @@ function extractFrontmatter(tree: Root): ParsedFrontmatter | null {
   // LF-normalised so a CRLF checkout (`core.autocrlf` on Windows) exposes the same string as the
   // committed file. Only line numbers are exposed, never offsets, so normalising cannot put
   // anything out of step with `content`.
+  const raw = node.value.replace(/\r\n?/g, "\n");
+  const startLine = node.position?.start.line ?? 1;
   return {
-    raw: node.value.replace(/\r\n?/g, "\n"),
-    startLine: node.position?.start.line ?? 1,
+    raw,
+    startLine,
     endLine: node.position?.end.line ?? 1,
+    parsed: parseFrontmatterYaml(raw, startLine),
   };
+}
+
+// Anchored and without the `g` flag, so no `lastIndex` state survives between documents. Matches
+// an `html` block made only of comments, which includes every inline-disable directive.
+const HTML_COMMENTS_ONLY_PATTERN = /^(?:<!--[\s\S]*?-->\s*)+$/;
+
+// The first top-level child that renders something. Skipped: `yaml` (front matter is metadata, not
+// page content), `definition` (a link reference definition renders nothing), and an `html` block
+// that is only comments (a directive or a licence banner is invisible on the page, so it must not
+// count as prose before the title). An `html` block with real markup — a badge `<img>`, a
+// `<p align=center>` — does render, so it counts. Top level only: a heading nested in a blockquote
+// or list is not a document title, so the container's own type is what is reported.
+function extractFirstBlock(tree: Root): ParsedFirstBlock | null {
+  for (const node of tree.children) {
+    if (node.type === "yaml" || node.type === "definition") {
+      continue;
+    }
+    if (
+      node.type === "html" &&
+      HTML_COMMENTS_ONLY_PATTERN.test((node as Html).value.trim())
+    ) {
+      continue;
+    }
+    return { type: node.type, line: node.position?.start.line ?? 0 };
+  }
+  return null;
+}
+
+// Top-level paragraphs made of exactly one `strong`/`emphasis` node whose only child is `text`.
+// Iterating `tree.children` rather than `visit`ing the tree is what excludes list items,
+// blockquotes, footnote definitions and table cells without any ancestor tracking: their paragraphs
+// are never direct children of the root. Nested formatting (`***x***`), inline code or a link inside
+// the emphasis is not plain text, so it is not recorded — matching markdownlint MD036, which treats
+// such a run as styled prose rather than a stand-in heading. A setext-underlined `**x**` is a
+// `heading` node and so never reaches here.
+function extractEmphasisParagraphs(tree: Root): ParsedEmphasisParagraph[] {
+  const found: ParsedEmphasisParagraph[] = [];
+  for (const node of tree.children) {
+    if (node.type !== "paragraph" || node.children.length !== 1) {
+      continue;
+    }
+    const inline = node.children[0]!;
+    if (inline.type !== "strong" && inline.type !== "emphasis") {
+      continue;
+    }
+    const inner = (inline as Strong | Emphasis).children;
+    if (inner.length !== 1 || inner[0]!.type !== "text") {
+      continue;
+    }
+    found.push({
+      text: (inner[0] as Text).value,
+      kind: inline.type,
+      line: node.position?.start.line ?? 0,
+    });
+  }
+  return found;
 }
 
 function classifyLink(rawTarget: string): {
@@ -429,6 +534,87 @@ function extractImports(node: Text): ParsedImport[] {
   return imports;
 }
 
+// The source offsets of an inline link's fragment, or undefined when they cannot be pinned down
+// exactly. mdast gives the link node's span but not the destination's, so the destination is found
+// by walking the source after the link text: `](`, optional spaces/tabs and at most one line
+// ending, an optional `<`, then the destination itself. Every step must match byte for byte — the
+// parsed `url` equals the source only when no escape or entity was used — and any mismatch gives
+// up rather than guess, because a fix that writes to a guessed offset corrupts the file.
+function locateFragmentRange(
+  node: Link,
+  rawTarget: string,
+  content: string,
+): { start: number; end: number } | undefined {
+  const hashIndex = rawTarget.indexOf("#");
+  const nodeStart = node.position?.start.offset;
+  if (hashIndex === -1 || nodeStart === undefined) {
+    return undefined;
+  }
+  const lastChild = node.children[node.children.length - 1];
+  const textEnd =
+    lastChild === undefined ? nodeStart + 1 : lastChild.position?.end.offset;
+  if (textEnd === undefined || !content.startsWith("](", textEnd)) {
+    return undefined;
+  }
+  let cursor = textEnd + 2;
+  const skipBlanks = () => {
+    while (content[cursor] === " " || content[cursor] === "\t") {
+      cursor += 1;
+    }
+  };
+  skipBlanks();
+  if (content.startsWith("\r\n", cursor)) {
+    cursor += 2;
+  } else if (content[cursor] === "\n" || content[cursor] === "\r") {
+    cursor += 1;
+  }
+  skipBlanks();
+  if (content[cursor] === "<") {
+    cursor += 1;
+  }
+  if (!content.startsWith(rawTarget, cursor)) {
+    return undefined;
+  }
+  return { start: cursor + hashIndex + 1, end: cursor + rawTarget.length };
+}
+
+// A link whose source does not open with `[` is an autolink (`<https://x>` or a GFM literal
+// `www.x.com`): its only text child is the URL itself, not prose.
+function isAutolink(node: Link, content: string): boolean {
+  const start = node.position?.start.offset;
+  return start !== undefined && content[start] !== "[";
+}
+
+// Offsets of `[` and `]` in `content[start, end)` that are not backslash-escaped. Called on a `text`
+// node's own source, where any bracket that is not escaped is literal: one that was link syntax
+// would have produced a link node instead of text. An entity such as `&#91;` is not a bracket in
+// the source and never becomes syntax, so it is rightly not counted.
+function findUnescapedBrackets(
+  content: string,
+  start: number,
+  end: number,
+): number[] {
+  const found: number[] = [];
+  for (let index = start; index < end; index += 1) {
+    const char = content[index];
+    if (char !== "[" && char !== "]") {
+      continue;
+    }
+    let backslashes = 0;
+    while (content[index - 1 - backslashes] === "\\") {
+      backslashes += 1;
+    }
+    if (backslashes % 2 === 0) {
+      found.push(index);
+    }
+  }
+  return found;
+}
+
+function normalizeLineEndings(value: string): string {
+  return value.replace(/\r\n?/g, "\n");
+}
+
 /**
  * Parse one Markdown document into the full `ParsedDocument` in a single traversal.
  *
@@ -458,23 +644,41 @@ export function parseDocument(params: {
   const reversedLinks: ParsedReversedLink[] = [];
   const imports: ParsedImport[] = [];
   const directives: InlineDirective[] = [];
+  const referenceDefinitions: ParsedReferenceDefinition[] = [];
+  const referencedIdentifiers = new Set<string>();
+  const textSpans: ParsedTextSpan[] = [];
+  const literalBrackets: number[] = [];
+  // Heading text nodes mapped to their heading's slug. Filled when the walk reaches the heading,
+  // which a pre-order walk does before any of its descendants, so the `text` case can look its
+  // node up without tracking ancestors.
+  const headingSlugByText = new Map<Text, string>();
+  // Text that is a reference label, not prose: everything inside a shortcut `[label]` or collapsed
+  // `[label][]` reference, where the visible text is also the key that finds the definition.
+  // Rewriting it would orphan the definition and break the link. A full `[text][label]` reference
+  // keeps its label separately, so its text stays prose. Filled the same pre-order way as
+  // `headingSlugByText`, so nested formatting such as `[*label*]` is covered too.
+  const referenceLabelText = new Set<Text>();
 
   let currentSection: string | undefined;
 
   // A `yaml` node is a childless literal, not `text`, `link` or `html`, so it falls through to
   // `default`: nothing inside frontmatter can become a heading, link, `@import` or directive.
-  visit(tree, (node) => {
+  visit(tree, (node, _index, parent) => {
     switch (node.type) {
       case "heading": {
         const heading = node as Heading;
         const text = collectText(heading);
+        const slug = slugger.slug(text);
         currentSection = text;
         sections.push(text);
         headings.push({
           text,
           depth: heading.depth,
-          slug: slugger.slug(text),
+          slug,
           line: heading.position?.start.line ?? 0,
+        });
+        visit(heading, "text", (child: Text) => {
+          headingSlugByText.set(child, slug);
         });
         undefinedReferences.push(
           ...extractUndefinedReferences(heading, params.content, definitions),
@@ -520,31 +724,53 @@ export function parseDocument(params: {
       case "link":
       case "linkReference": {
         const linkNode = node as LinkLikeNode;
+        if (
+          linkNode.type === "linkReference" &&
+          linkNode.referenceType !== "full"
+        ) {
+          visit(linkNode, "text", (child: Text) => {
+            referenceLabelText.add(child);
+          });
+        }
         const rawTarget = resolveRawLinkTarget(linkNode, definitions);
         if (rawTarget === undefined) {
           return;
         }
+        if (linkNode.type === "linkReference") {
+          referencedIdentifiers.add(linkNode.identifier);
+        }
         const classified = classifyLink(rawTarget);
         const label = collectText(linkNode);
+        const visibleLabel = collectVisibleText(linkNode);
+        const fragmentRange =
+          linkNode.type === "link" && classified.anchor !== undefined
+            ? locateFragmentRange(linkNode, rawTarget, params.content)
+            : undefined;
         links.push({
           rawTarget,
           text: label.length > 0 ? label : undefined,
+          ...(visibleLabel === label ? {} : { visibleText: visibleLabel }),
           anchor: classified.anchor,
           kind: classified.kind,
           line: linkNode.position?.start.line ?? 0,
           column: linkNode.position?.start.column,
+          ...(fragmentRange === undefined ? {} : { fragmentRange }),
         });
         return;
       }
       case "image":
       case "imageReference": {
         const imageNode = node as ImageLikeNode;
+        if (imageNode.type === "imageReference") {
+          referencedIdentifiers.add(imageNode.identifier);
+        }
         const rawTarget = resolveRawLinkTarget(imageNode, definitions);
         if (rawTarget === undefined) {
           return;
         }
         images.push({
           rawTarget,
+          alt: imageNode.alt ?? "",
           line: imageNode.position?.start.line ?? 0,
           column: imageNode.position?.start.column,
         });
@@ -560,14 +786,64 @@ export function parseDocument(params: {
         openRawText = extracted.openRawText;
         return;
       }
+      case "definition": {
+        const definition = node as Definition;
+        const start = definition.position?.start.offset;
+        const end = definition.position?.end.offset;
+        if (start === undefined || end === undefined) {
+          return;
+        }
+        referenceDefinitions.push({
+          label: definition.label ?? definition.identifier,
+          identifier: definition.identifier,
+          line: definition.position?.start.line ?? 0,
+          endLine: definition.position?.end.line ?? 0,
+          start,
+          end,
+          topLevel: parent === tree,
+          // Filled in after the walk: a reference may come after its definition.
+          referenced: false,
+        });
+        return;
+      }
       case "text": {
-        imports.push(...extractImports(node as Text));
+        const textNode = node as Text;
+        imports.push(...extractImports(textNode));
+        const start = textNode.position?.start.offset;
+        const end = textNode.position?.end.offset;
+        if (start !== undefined && end !== undefined) {
+          literalBrackets.push(
+            ...findUnescapedBrackets(params.content, start, end),
+          );
+        }
+        if (
+          start !== undefined &&
+          end !== undefined &&
+          !referenceLabelText.has(textNode) &&
+          !(
+            parent?.type === "link" &&
+            isAutolink(parent as Link, params.content)
+          ) &&
+          normalizeLineEndings(params.content.slice(start, end)) ===
+            normalizeLineEndings(textNode.value)
+        ) {
+          const headingSlug = headingSlugByText.get(textNode);
+          textSpans.push(
+            headingSlug === undefined
+              ? { start, end }
+              : { start, end, headingSlug },
+          );
+        }
         return;
       }
       default:
         return;
     }
   });
+
+  for (const definition of referenceDefinitions) {
+    definition.referenced = referencedIdentifiers.has(definition.identifier);
+  }
 
   return {
     path: params.path,
@@ -580,9 +856,14 @@ export function parseDocument(params: {
     images,
     undefinedReferences,
     reversedLinks,
+    referenceDefinitions,
+    textSpans,
+    literalBrackets,
     imports,
     directives,
     frontmatter: extractFrontmatter(tree),
+    firstBlock: extractFirstBlock(tree),
+    emphasisParagraphs: extractEmphasisParagraphs(tree),
     content: params.content,
   };
 }

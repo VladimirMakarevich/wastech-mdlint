@@ -57,3 +57,21 @@ export function anchorResolves(
   }
   return explicitAnchors(document).includes(fragment);
 }
+
+// The distinct explicit anchors that equal `fragment` once both sides are folded with
+// `toLowerCase` (never `toLocaleLowerCase`, for the reason on `ignoreCase` above). REF-002's fix
+// rewrites a fragment only when exactly one exists: with two (`<a id="Setup">` beside a `# Setup`
+// heading, linked as `#SETUP`) choosing one would be a guess about which the author meant.
+export function caseOnlyAnchorMatches(
+  document: ParsedDocument,
+  fragment: string,
+): string[] {
+  const folded = fragment.toLowerCase();
+  return [
+    ...new Set(
+      explicitAnchors(document).filter(
+        (anchor) => anchor.toLowerCase() === folded,
+      ),
+    ),
+  ];
+}

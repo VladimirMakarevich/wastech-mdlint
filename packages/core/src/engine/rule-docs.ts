@@ -2,7 +2,7 @@ import { ruleRegistry } from "./rules/index.js";
 
 // Generated README rule table. One metadata source drives the registry, schema.json,
 // AND this table — so docs never drift. Includes the per-rule fixable column, whose
-// `yes` set is exactly the deterministic-fixable subset (SEC-001 scaffold, TBL-002 empty→TODO).
+// `yes` set is exactly the rules whose metadata declares a deterministic `--fix`.
 export function generateRuleDocs(): string {
   const header =
     "| Rule | Category | Default severity | Scope | Fixable | Description |";

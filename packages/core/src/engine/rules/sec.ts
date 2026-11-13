@@ -8,13 +8,27 @@ import {
   matchesConfigGlob,
   normalizeRelativePath,
 } from "../../discovery/globs.js";
-import type { ParsedDocument } from "../../markdown/document-types.js";
+import type {
+  ParsedDocument,
+  ParsedHeading,
+} from "../../markdown/document-types.js";
 import { detectNewline } from "../../markdown/newline.js";
 import { parseDocument } from "../../markdown/parse-document.js";
 import { resolvesOutsideRoot } from "../path-resolve.js";
 import { sectionOrder, sectionPresent } from "../primitives/section.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
+import { duplicateHeadingFindings } from "./sec-duplicate-headings.js";
+import {
+  DEFAULT_EMPHASIS_PUNCTUATION,
+  emphasisHeadingFindings,
+} from "./sec-emphasis-headings.js";
+import { headingLevelFindings } from "./sec-heading-levels.js";
+import {
+  compileOutline,
+  formatOutlineHeading,
+  matchOutline,
+} from "./sec-outline.js";
 import type { TextEdit } from "../types.js";
 
 // Section + structure rules.
@@ -122,8 +136,20 @@ function loadTemplate(
   }
 }
 
-// SEC-003 — sections conform to a reference file's heading structure (project). Order is not
-// enforced here (SEC-002 does that); only presence of each template heading.
+// Strict-mode finding data carries `null` rather than omitting a side, so a JSON consumer always
+// sees both keys and can tell "end of document" / "outline complete" apart from a missing field.
+function headingData(
+  heading: ParsedHeading | undefined,
+): { text: string; depth: number; line: number } | null {
+  return heading === undefined
+    ? null
+    : { text: heading.text, depth: heading.depth, line: heading.line };
+}
+
+// SEC-003 — sections conform to a reference file's heading structure (project). By default only
+// presence of each template heading is enforced (SEC-002 handles order). With `strict`, the
+// document's heading sequence must match the template's exactly — presence, order, depth and no
+// extra headings — with `*`/`+`/`?` template headings acting as wildcards.
 export const sec003: RuleDefinition = defineRule({
   metadata: {
     id: "SEC-003",
@@ -138,6 +164,7 @@ export const sec003: RuleDefinition = defineRule({
     .object({
       template: z.string().min(1),
       level: z.number().int().positive().optional(),
+      strict: z.boolean().optional(),
       ...fileScopeShape,
     })
     .strict(),
@@ -177,6 +204,50 @@ export const sec003: RuleDefinition = defineRule({
       return;
     }
 
+    if (options.strict === true) {
+      // `level` keeps its exact-depth meaning and filters both sides, so a per-document `# Title`
+      // can still differ when only `##` headings are compared.
+      const atLevel = (heading: ParsedHeading): boolean =>
+        options.level === undefined || heading.depth === options.level;
+      const outline = compileOutline(template.headings.filter(atLevel));
+      for (const [filePath, document] of context.documents!) {
+        if (
+          filePath === options.template ||
+          !matchesFileScope(filePath, options)
+        ) {
+          continue;
+        }
+        const divergence = matchOutline(
+          outline,
+          document.headings.filter(atLevel),
+        );
+        if (divergence === undefined) {
+          continue;
+        }
+        const { expected, actual } = divergence;
+        const expectedText =
+          expected === undefined
+            ? "no further heading"
+            : `"${formatOutlineHeading(expected)}" (template line ${expected.line})`;
+        const actualText =
+          actual === undefined
+            ? "end of document"
+            : `"${formatOutlineHeading(actual)}"`;
+        context.report({
+          message: `Outline diverges from template ${options.template}: expected ${expectedText}, found ${actualText}.`,
+          // Line 0 is the existing "no specific line" sentinel, used when the document ran out.
+          line: actual?.line ?? 0,
+          filePath,
+          data: {
+            template: options.template,
+            expected: headingData(expected),
+            actual: headingData(actual),
+          },
+        });
+      }
+      return;
+    }
+
     // `level` selects the *exact* heading depth to compare — `level: 2` checks only `##` headings,
     // not "every heading up to depth 2". Exact-depth is what lets a per-document `# Title` differ
     // across files without every document being required to share it. Default: compare all depths.
@@ -209,6 +280,126 @@ export const sec003: RuleDefinition = defineRule({
           });
         }
       }
+    }
+  },
+});
+
+// SEC-004 — heading levels increment by one, with a single title at the start. Three checks, each
+// switchable on its own because each has a legitimate exception: a docs-site page often takes its
+// title from front matter and its renderer (title off, or satisfied by `titleKey`), a changelog has
+// one top-level heading per release (singleTitle off), and generated reference pages sometimes jump
+// levels to match an external structure (increment off). Defaults are applied here with `??`
+// rather than a Zod `.default()`, matching SEC-003's `strict`, so the generated schema keeps every
+// option optional the way its siblings do. Not fixable: choosing the right level is a judgment call.
+export const sec004: RuleDefinition = defineRule({
+  metadata: {
+    id: "SEC-004",
+    category: "SEC",
+    description:
+      "Heading levels increment by one, with a single title at the start.",
+    // Outline hygiene rather than a broken contract, and the rule is meant to be enabled bare, so a
+    // warning is the proportionate default.
+    defaultSeverity: "warning",
+    scope: "document",
+    fixable: false,
+  },
+  optionsSchema: z
+    .object({
+      increment: z.boolean().optional(),
+      singleTitle: z.boolean().optional(),
+      title: z.boolean().optional(),
+      // Capped at 6 because Markdown has no H7.
+      level: z.number().int().min(1).max(6).optional(),
+      titleKey: z.string().min(1).optional(),
+      ...fileScopeShape,
+    })
+    .strict(),
+  check: (options) => (context) => {
+    if (!matchesFileScope(context.filePath!, options)) {
+      return;
+    }
+    for (const finding of headingLevelFindings(context.document!, {
+      increment: options.increment ?? true,
+      singleTitle: options.singleTitle ?? true,
+      title: options.title ?? true,
+      level: options.level ?? 1,
+      titleKey: options.titleKey ?? "title",
+    })) {
+      context.report(finding);
+    }
+  },
+});
+
+// SEC-005 — heading text is not repeated within a document. A repeated heading makes every
+// `section` option that names it ambiguous (the section primitives scope to the first match and
+// silently ignore the rest, while TBL's table filter takes every match), and turns its anchor into an order-dependent `-1` slug that breaks as soon as the
+// headings are reordered. `siblingsOnly` exists because some families repeat headings by design —
+// a changelog's `### Added` per release, an API page's `### Parameters` per function — and there the
+// defect is only a repeat under the same parent. Its default is applied with `??` rather than a Zod
+// `.default()`, matching SEC-003 and SEC-004, so the generated schema keeps every option optional.
+// Not fixable: renaming a heading is a judgment call.
+export const sec005: RuleDefinition = defineRule({
+  metadata: {
+    id: "SEC-005",
+    category: "SEC",
+    description: "Heading text is not repeated within a document.",
+    // Outline hygiene meant to be enabled bare, like SEC-004, so a warning is proportionate.
+    defaultSeverity: "warning",
+    scope: "document",
+    fixable: false,
+  },
+  optionsSchema: z
+    .object({
+      siblingsOnly: z.boolean().optional(),
+      ...fileScopeShape,
+    })
+    .strict(),
+  check: (options) => (context) => {
+    if (!matchesFileScope(context.filePath!, options)) {
+      return;
+    }
+    for (const finding of duplicateHeadingFindings(context.document!, {
+      siblingsOnly: options.siblingsOnly ?? false,
+    })) {
+      context.report(finding);
+    }
+  },
+});
+
+// SEC-006 — emphasis is not used in place of a heading. A paragraph that is only `**Installation**`
+// looks like a heading on the page but is a paragraph to every consumer of the outline: SEC-001 and
+// CTX-001 cannot find the section, a `section` option cannot name it, `slice` cannot cut at it, and
+// it gets no anchor to link to. The semantics follow markdownlint MD036 so a repository moving
+// between the two tools sees the same findings. `punctuation` is the set of final characters that
+// mark the run as a sentence or lead-in rather than a title; its default is applied with `??`
+// rather than a Zod `.default()`, matching SEC-003 to SEC-005, so the generated schema keeps every
+// option optional. An empty string is allowed and means no exemption, so even `**Note:**` reports.
+// Not fixable: choosing the heading level is a judgment call.
+export const sec006: RuleDefinition = defineRule({
+  metadata: {
+    id: "SEC-006",
+    category: "SEC",
+    description: "Emphasis is not used in place of a heading.",
+    // Outline hygiene meant to be enabled bare, like SEC-004 and SEC-005, so a warning is
+    // proportionate.
+    defaultSeverity: "warning",
+    scope: "document",
+    fixable: false,
+  },
+  optionsSchema: z
+    .object({
+      punctuation: z.string().optional(),
+      ...fileScopeShape,
+    })
+    .strict(),
+  check: (options) => (context) => {
+    if (!matchesFileScope(context.filePath!, options)) {
+      return;
+    }
+    for (const finding of emphasisHeadingFindings(context.document!, {
+      punctuation: options.punctuation ?? DEFAULT_EMPHASIS_PUNCTUATION,
+    })) {
+      context.report(finding);
     }
   },
 });
@@ -295,5 +486,8 @@ export const SEC_STR_RULES: readonly RuleDefinition[] = [
   sec001,
   sec002,
   sec003,
+  sec004,
+  sec005,
+  sec006,
   str001,
 ];

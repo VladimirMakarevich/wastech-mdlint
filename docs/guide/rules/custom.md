@@ -4,7 +4,7 @@
 
 ## What it checks
 
-`custom` is not a single fixed check — it is a declarative rule you assemble from configuration. Each `custom` entry names one **assertion** from a closed, built-in vocabulary and points it at a target in your Markdown (a table, a section, content, a checklist, or links). The rule then reports findings exactly the way the matching built-in rule would.
+`custom` is not a single fixed check — it is a declarative rule you assemble from configuration. Each `custom` entry names one **assertion** from a closed, built-in vocabulary and points it at a target in your Markdown (a table, a section, content, a checklist, links, or the front matter). The rule then reports findings exactly the way the matching built-in rule would.
 
 It is **data-only**: a `custom` rule is described entirely by JSON — there is no code execution, no plugin loading, and no runtime `.ts`/`.cjs`/`.mjs` module, because every assertion `kind` maps to a shared primitive that ships with the tool. That is what makes adding or changing one **rebuild-free** (you edit config, not source) and what makes `custom` rules safe to run inside the read-only [MCP server](../mcp-server.md): both MCP lint tools execute them — `lint-files` from the loaded config, and the ad-hoc `lint` tool from an entry passed inline in the request, so an agent can assert an invariant on a draft before that rule exists in config. The CLI runs them from config the same way.
 
@@ -22,7 +22,7 @@ A `custom` entry is a `rules[]` object — in your config, or inline in an MCP [
 | `options.assert` | `object` | **yes** | The single assertion this rule runs. Exactly one `kind` from the vocabulary below. |
 | `description` | `string` | no | Human-readable summary shown in reports; defaults to the `id` if omitted. |
 | `severity` | `"error" \| "warning" \| "off"` | no | Overrides the default `error`. `"off"` documents but disables the rule. |
-| `target` | `"checklist" \| "content" \| "link" \| "section" \| "table"` | no | Optional redundant declaration of what the assertion operates on; if set it must agree with the `kind` (see [Notes](#notes)). |
+| `target` | `"checklist" \| "content" \| "frontmatter" \| "link" \| "section" \| "table"` | no | Optional redundant declaration of what the assertion operates on; if set it must agree with the `kind` (see [Notes](#notes)). |
 | `options.files` | `string[]` | no | Glob(s) narrowing which files this instance applies to. |
 | `options.exclude` | `string[]` | no | Glob(s) removing files from this instance. |
 
@@ -31,10 +31,10 @@ A `custom` entry is a `rules[]` object — in your config, or inline in an MCP [
 `id` must match:
 
 ```text
-^(?!(CTX|GRP|LLM|REF|SEC|SIZE|STR|TBL)-)[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$
+^(?!(CTX|FM|GRP|LLM|REF|SEC|SIZE|STR|TBL)-)[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$
 ```
 
-In words: uppercase, dash-separated, with at least one dash (e.g. `REQ-OWNER`, `REQ-100`, `ACME-DOC-1`), **and** its prefix must **not** shadow a shipped built-in prefix. The negative lookahead reserves `CTX`, `GRP`, `LLM`, `REF`, `SEC`, `SIZE`, `STR`, and `TBL`. A `custom` rule that tries to call itself `TBL-100` or `REF-XYZ` is rejected at config resolution with a clear error — pick your own namespace instead. (The reserved set is derived from the registry at runtime, so this list stays in sync with the actual built-ins.)
+In words: uppercase, dash-separated, with at least one dash (e.g. `REQ-OWNER`, `REQ-100`, `ACME-DOC-1`), **and** its prefix must **not** shadow a shipped built-in prefix. The negative lookahead reserves `CTX`, `FM`, `GRP`, `LLM`, `REF`, `SEC`, `SIZE`, `STR`, and `TBL`. A `custom` rule that tries to call itself `TBL-100` or `REF-XYZ` is rejected at config resolution with a clear error — pick your own namespace instead. (The reserved set is derived from the registry at runtime, so this list stays in sync with the actual built-ins. Adding a built-in category reserves its prefix: `FM` became reserved when [FM-001](FM-001.md) shipped, so a custom rule already named `FM-…` must be renamed.)
 
 ### Each `custom` id must be unique
 
@@ -70,6 +70,9 @@ The MCP ad-hoc [`lint`](../mcp-server.md) tool enforces the same constraint on i
 | `allChecked` | checklist | `section?` | [CTX-002](CTX-002.md) |
 | `linkResolves` | link | `exclude?: string[]` | [REF-001](REF-001.md) |
 | `imageResolves` | link | `exclude?: string[]` | [REF-003](REF-003.md) |
+| `frontmatterRequired` | frontmatter | `keys: string[]` (**req**, ≥1) | [FM-001](FM-001.md) `required` |
+| `frontmatterInSet` | frontmatter | `key: string` (**req**) · `values: string[]` (**req**, ≥1) | [FM-001](FM-001.md) `allowed` |
+| `frontmatterMatches` | frontmatter | `key: string` (**req**) · `pattern: string` (**req**) · `flags?: string` | [FM-001](FM-001.md) `patterns` |
 
 Notes on individual fields:
 
@@ -78,6 +81,7 @@ Notes on individual fields:
 - `crossColumn`'s `when` and `then` are each a **column condition**: `{ column, ... }` where the `...` is exactly one of `equals: string`, `matches: string` (regex), or `notEmpty: boolean`. The rule reads "for every row where `when` holds, `then` must also hold."
 - `columnMatches` / `columnUnique` / `contentNotMatch` take a regex `pattern` (or `idPattern`) as a string; `flags` is a separate optional string (`contentNotMatch` and `columnMatches`). Matching is added automatically where the primitive needs the global flag. `columnMatches` tests each cell independently, so `g`/`y` are accepted but carry no meaning there and cannot make findings depend on row order — see [TBL-004](TBL-004.md).
 - `noPlaceholders`'s `placeholders` **extends** the locked default set (`TBD`, `TODO`, `WIP`, `FIXME`, `N/A`); it does not replace it. A section is flagged when it is empty or contains only a bare placeholder token (whole-body, case-insensitive), not when prose merely mentions one.
+- The three `frontmatter*` kinds share [FM-001](FM-001.md)'s semantics: values are compared as the parsed YAML strings, with no conversion to numbers, booleans or dates (YAML failsafe schema; quotes, escapes and block scalars are still decoded as YAML defines them), `key` is a dot-separated path into nested mappings, a list value is checked item by item, and an absent key is reported only by `frontmatterRequired` (for a document with no front matter at all, once per required key). Front matter that is not valid YAML, or is not a mapping, is reported as **one** finding under your rule id rather than passed silently, so a custom rule used without FM-001 still sees a broken block. Unlike FM-001's `patterns`, `frontmatterMatches` takes an optional `flags` string.
 - Every assertion object is closed: an unknown key inside `assert` is a config error, not a silently ignored typo.
 - `linkResolves`/`imageResolves` are the one place where **two different `exclude` keys meet**, and they mean different things: `options.exclude` chooses which _documents_ this instance scans, while `assert.exclude` lists _link/image targets_ to skip inside whatever it scans (mirroring [REF-001](REF-001.md)/[REF-003](REF-003.md), whose `exclude` is target-only). They are independent filters and compose — set both to say "check only `docs/**`, and there ignore links into `generated/**`". The nesting is the tell: an `exclude` under `assert` follows the assertion's target, one under `options` follows the file scope.
 
@@ -139,10 +143,31 @@ Notes on individual fields:
 
 → Every section in a guide must have real content — flagging empty sections and any of the default placeholders plus `DRAFT`/`???` (same check as `CTX-001`, as a warning).
 
+### ADRs declare a known status
+
+```jsonc
+{
+  "rule": "custom",
+  "id": "ADR-STATUS",
+  "description": "ADRs declare a known status in front matter",
+  "target": "frontmatter",
+  "options": {
+    "files": ["docs/adr/**/*.md"],
+    "assert": {
+      "kind": "frontmatterInSet",
+      "key": "status",
+      "values": ["proposed", "accepted"],
+    },
+  },
+}
+```
+
+→ In each ADR, a front matter `status` must be `proposed` or `accepted` (same check as FM-001's `allowed`, under your own ID). Pair it with a `frontmatterRequired` rule on `["status"]` to also require the key.
+
 ## Notes
 
 - **Scope is derived, not declared.** All kinds are `document`-scoped (evaluated per file) **except** `columnUnique`, which spans the whole corpus and makes the rule **`project`**-scoped. You do not set scope directly; it follows from the assertion `kind`.
-- **`target` is optional and validated.** The shipped `target` enum is exactly `checklist | content | link | section | table`. If you set it, it must match the target the chosen `kind` operates on (per the table above), or config resolution fails. There is no `heading` target — heading-scoped checks (`sectionPresent`, `sectionOrder`) use `section`.
+- **`target` is optional and validated.** The shipped `target` enum is exactly `checklist | content | frontmatter | link | section | table`. If you set it, it must match the target the chosen `kind` operates on (per the table above), or config resolution fails. There is no `heading` target — heading-scoped checks (`sectionPresent`, `sectionOrder`) use `section`.
 - **`files` / `exclude`** let you register the same underlying assertion multiple times under different IDs for different document families — e.g. one column schema for `docs/requirements/**` and another elsewhere — without touching product code.
 - **Default severity is `error`**, because a `custom` rule asserts a project invariant. Set `severity` on the entry to override to `warning` or `off`.
 - **Not fixable.** `custom` rules report findings only; none of the assertion kinds emit an autofix.
@@ -155,4 +180,5 @@ Notes on individual fields:
 - [SEC-001](SEC-001.md), [SEC-002](SEC-002.md) — the section checks behind `sectionPresent` and `sectionOrder`.
 - [CTX-001](CTX-001.md), [CTX-002](CTX-002.md) — the content/checklist checks behind `noPlaceholders` and `allChecked`.
 - [REF-001](REF-001.md), [REF-003](REF-003.md) — the link/image checks behind `linkResolves` and `imageResolves`.
+- [FM-001](FM-001.md) — the front matter checks behind `frontmatterRequired`, `frontmatterInSet`, and `frontmatterMatches`.
 - [Configuration](../configuration.md) — how `rules[]`, `files`/`exclude`, and severity fit together.

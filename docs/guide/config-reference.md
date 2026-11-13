@@ -2,7 +2,7 @@
 
 > [Guide index](README.md) · [Configuration guide](configuration.md) · [Rules index](rules/README.md)
 
-This is a single `wastech-mdlint.config.json` that exercises **every** option the linter accepts, with a comment on each. It is a _reference_, not a recommended starting config — you would never enable all 27 rules at once with every option. Copy the pieces you need. For a curated starter, run [`wastech-mdlint init`](cli.md#init).
+This is a single `wastech-mdlint.config.json` that exercises **every** option the linter accepts, with a comment on each. It is a _reference_, not a recommended starting config — you would never enable all 34 rules at once with every option. Copy the pieces you need. For a curated starter, run [`wastech-mdlint init`](cli.md#init).
 
 Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys — top-level, in any rule's `options`, or under `compile` — are rejected. Every field below is drawn from the generated schema (`wastech-mdlint schema`).
 
@@ -162,6 +162,32 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
         // path is rejected unread so a config cannot read outside the analyzed root
         "template": "docs/_templates/adr.md",
         "level": 2, // heading level to compare (optional)
+        "strict": false, // exact outline incl. order and no extras; template may use *, +, ? headings (optional)
+      },
+    },
+    // SEC-004: heading levels increment by one, with a single title at the start.
+    {
+      "rule": "SEC-004",
+      "options": {
+        "increment": true, // report a heading more than one level deeper than the previous (optional)
+        "singleTitle": true, // report every top-level heading after the first (optional)
+        "title": true, // first block is a top-level heading, or front matter has `titleKey` (optional)
+        "level": 1, // top-level heading depth, 1–6 (optional)
+        "titleKey": "title", // front matter key (dot path) that counts as a title (optional)
+      },
+    },
+    // SEC-005: heading text is not repeated within a document.
+    {
+      "rule": "SEC-005",
+      "options": {
+        "siblingsOnly": false, // only compare headings under the same parent at the same depth (optional)
+      },
+    },
+    // SEC-006: a bold or italic paragraph is not used in place of a heading.
+    {
+      "rule": "SEC-006",
+      "options": {
+        "punctuation": ".,;:!?。，；：！？", // final characters that exempt the text; "" exempts nothing (optional)
       },
     },
 
@@ -254,6 +280,15 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
         "exclude": ["docs/archive/**"], // drop files from this instance
       },
     },
+    // REF-009: link reference definitions are used. Fixable: --fix deletes the unused definition.
+    {
+      "rule": "REF-009",
+      "options": {
+        "ignoredDefinitions": ["//"], // labels never reported (default ["//"]: the `[//]: # (comment)` idiom)
+        "files": ["docs/**/*.md"], // narrow which files this instance applies to
+        "exclude": ["docs/archive/**"], // drop files from this instance
+      },
+    },
 
     // ── CTX — content quality ───────────────────────────────────────────────────────────────
     // CTX-001: sections are not empty or placeholder-only.
@@ -285,6 +320,18 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
         "section": "Glossary", // optional
       },
     },
+    // CTX-004: link text describes its target (no bare "here", "read more", "подробнее").
+    {
+      "rule": "CTX-004",
+      "options": {
+        "phrases": ["here", "click here", "read more"], // REPLACES the default English + Russian list (at least one entry)
+        "additionalPhrases": ["see", "docs"], // EXTENDS the list in effect (the defaults, or `phrases`)
+        "files": [],
+        "exclude": [],
+      },
+    },
+    // CTX-005: images have alt text (no ![](diagram.png)).
+    { "rule": "CTX-005", "options": { "files": [], "exclude": [] } },
 
     // ── GRP — graph integrity (all project scope) ───────────────────────────────────────────
     // GRP-001: no circular references between documents. The graph itself is corpus-wide and cannot be
@@ -360,19 +407,33 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
       },
     },
 
+    // ── FM — front matter ──────────────────────────────────────────────────────────────────
+    // FM-001: front matter is valid YAML (failsafe: every scalar is a string) and matches a schema.
+    // Key paths use dots for nesting; list values are checked item by item.
+    {
+      "rule": "FM-001",
+      "options": {
+        "files": ["docs/adr/**/*.md"],
+        "exclude": [],
+        "required": ["status", "owner.team"], // reported even when the file has no front matter
+        "allowed": { "status": ["proposed", "accepted"] }, // exact, case-sensitive
+        "patterns": { "id": "^ADR-\\d{4}$" }, // bare regex string, no flags field
+      },
+    },
+
     // ── custom — declarative rule ───────────────────────────────────────────────────────────
     // Composes the closed assertion vocabulary from config. `id` must be namespaced and must not
-    // shadow a built-in prefix (CTX/GRP/LLM/REF/SEC/SIZE/STR/TBL). See rules/custom.md for all kinds.
+    // shadow a built-in prefix (CTX/FM/GRP/LLM/REF/SEC/SIZE/STR/TBL). See rules/custom.md for all kinds.
     {
       "rule": "custom",
       "id": "REQ-OWNER", // required, namespaced
       "description": "Each requirement row must have an Owner", // optional (defaults to the id)
       "severity": "error", // optional (default error)
-      "target": "table", // optional; must match the kind's target: checklist | content | link | section | table
+      "target": "table", // optional; must match the kind's target: checklist | content | frontmatter | link | section | table
       "options": {
         "files": ["docs/requirements/**/*.md"],
         "exclude": [],
-        "assert": { "kind": "columnNotEmpty", "column": "Owner" }, // one of 13 assertion kinds
+        "assert": { "kind": "columnNotEmpty", "column": "Owner" }, // one of 16 assertion kinds
       },
     },
   ],
@@ -436,7 +497,7 @@ See [Validation & errors](configuration.md#validation--errors) for the notation 
 
 ## Notes
 
-- The `custom` entry shows one assertion; the [custom rule page](rules/custom.md) lists all 13 assertion kinds (`requiredColumns`, `columnNotEmpty`, `columnInSet`, `columnMatches`, `columnUnique`, `crossColumn`, `sectionPresent`, `sectionOrder`, `contentNotMatch`, `noPlaceholders`, `allChecked`, `linkResolves`, `imageResolves`).
+- The `custom` entry shows one assertion; the [custom rule page](rules/custom.md) lists all 16 assertion kinds (`requiredColumns`, `columnNotEmpty`, `columnInSet`, `columnMatches`, `columnUnique`, `crossColumn`, `sectionPresent`, `sectionOrder`, `contentNotMatch`, `noPlaceholders`, `allChecked`, `linkResolves`, `imageResolves`, `frontmatterRequired`, `frontmatterInSet`, `frontmatterMatches`).
 - `siteRouter` shown on individual REF rules (REF-001/REF-002 only) **overrides** `settings.siteRouter` for that rule; most projects set it once under `settings`. The graph rules read it only through the shared graph, so they take no `siteRouter` of their own.
 - Rules that operate over the whole corpus (identity/graph rules) may intentionally omit `files`/`exclude` — see each rule's page for its exact option set. Two of them spell one of the names with a different meaning, which is why the comments above call it out inline: `STR-001.files` is the required-file set, and `REF-001`/`REF-003`'s `exclude` filters link/image targets.
 - On the rules that do take file scope, it also bounds `--fix` (SEC-001, TBL-002): an excluded file is never rewritten, not just never reported.

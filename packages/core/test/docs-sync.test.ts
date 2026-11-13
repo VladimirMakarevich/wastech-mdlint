@@ -42,7 +42,13 @@ describe("README rule table", () => {
       .filter((line) => line.startsWith("| [`"))
       .filter((line) => line.split("|")[5]?.trim() === "yes")
       .map((line) => /^\| \[`([^`]+)`\]/.exec(line)?.[1]);
-    expect(fixable.sort()).toEqual(["SEC-001", "TBL-002"]);
+    expect(fixable.sort()).toEqual([
+      "CTX-003",
+      "REF-002",
+      "REF-009",
+      "SEC-001",
+      "TBL-002",
+    ]);
   });
 
   it("links every rule id to its own documentation page", () => {

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { ConfiguredRule } from "../src/config/load-config.js";
 import { compareStrings } from "../src/deterministic-sort.js";
+import { applyFixes } from "../src/engine/fix.js";
 import { lintFiles } from "../src/engine/lint-files.js";
 import { RuleResolutionError } from "../src/engine/registry.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
@@ -199,13 +200,14 @@ describe("REF-003 images", () => {
   });
 });
 
-// The REF half of the shared `exclude` matrix. REF-002, REF-007 and REF-008 are the REF rules that
+// The REF half of the shared `exclude` matrix. REF-002, REF-007, REF-008 and REF-009 are the REF rules that
 // mix in the shared file-scope shape; REF-001/REF-003 spell `exclude` too but mean something else, which is
 // pinned separately below.
 describe.each([
   ["REF-002", "## Intro\n\n[bad](#nope)\n"],
   ["REF-007", "[text][missing]\n"],
   ["REF-008", "[text]()\n"],
+  ["REF-009", "[unused]: ./x.md\n"],
 ])("%s file scope (exclude)", (ruleId, failingDoc) => {
   async function reportedFiles(
     cwd: string,
@@ -360,7 +362,7 @@ describe("REF option schemas (file scope inventory)", () => {
     return thrown as RuleResolutionError;
   }
 
-  // Every REF rule except REF-002, REF-007 and REF-008 is whole-corpus or identity-based by design, so `files` is not a
+  // Every REF rule except REF-002, REF-007, REF-008 and REF-009 is whole-corpus or identity-based by design, so `files` is not a
   // silently ignored key — it fails resolution. This is what makes the pairing above unambiguous.
   it.each([
     ["REF-001", {}],
@@ -391,7 +393,7 @@ describe("REF option schemas (file scope inventory)", () => {
     expect(JSON.stringify(error.issues)).toContain("files");
   });
 
-  it.each(["REF-002", "REF-007", "REF-008"])(
+  it.each(["REF-002", "REF-007", "REF-008", "REF-009"])(
     "accepts `files` and `exclude` on %s, a file-scoped REF rule",
     (id) => {
       expect(
@@ -885,5 +887,230 @@ describe("REF-008 empty targets and reversed link syntax", () => {
     });
     const result = await lint(cwd, [rule("REF-008")]);
     expect(result.messages.map((message) => message.line)).toEqual([4]);
+  });
+});
+
+// Run `--fix` twice and return the bytes after each run, plus what each run reported as fixed. The
+// second run is the idempotency check: a fix whose output it would rewrite again is not
+// deterministic, whatever the first run looked like.
+async function fixTwice(
+  cwd: string,
+  rules: ConfiguredRule[],
+  file: string,
+): Promise<{ first: string; second: string; secondFixed: string[] }> {
+  const input = { cwd, config: { rules: [] }, rules, settings: {} };
+  await applyFixes(input);
+  const first = await readFile(path.join(cwd, file), "utf8");
+  const { fixedFiles } = await applyFixes(input);
+  const second = await readFile(path.join(cwd, file), "utf8");
+  return { first, second, secondFixed: fixedFiles };
+}
+
+describe("REF-002 --fix (case-only fragments)", () => {
+  it("rewrites a same-file and a cross-file fragment to the exact slug, then changes nothing", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "## Demo\n\nSee [demo](#Demo) and [over](b.md#OverView) here.\n",
+      "b.md": "## Overview\n",
+    });
+    const before = await lint(cwd, [rule("REF-002")]);
+    expect(before.messages.map((message) => message.fixable)).toEqual([
+      true,
+      true,
+    ]);
+
+    const { first, second, secondFixed } = await fixTwice(
+      cwd,
+      [rule("REF-002")],
+      "a.md",
+    );
+    expect(first).toBe(
+      "## Demo\n\nSee [demo](#demo) and [over](b.md#overview) here.\n",
+    );
+    expect(second).toBe(first);
+    expect(secondFixed).toEqual([]);
+    expect((await lint(cwd, [rule("REF-002")])).messages).toEqual([]);
+  });
+
+  it("reports an ambiguous case-only match without fixing it", async () => {
+    const content = '<a id="Setup"></a>\n\n# Setup\n\n[go](#SETUP)\n';
+    const cwd = await fixtureRepo({ "a.md": content });
+    const result = await lint(cwd, [rule("REF-002")]);
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]!.data?.anchor).toBe("SETUP");
+    expect(result.messages[0]!.fixable).toBeUndefined();
+
+    const written = await applyFixes({
+      cwd,
+      config: { rules: [] },
+      rules: [rule("REF-002")],
+      settings: {},
+    });
+    expect(written.fixedFiles).toEqual([]);
+    await expect(readFile(path.join(cwd, "a.md"), "utf8")).resolves.toBe(
+      content,
+    );
+  });
+
+  it("reports but does not rewrite a reference-style link, a percent-encoded fragment, or a real miss", async () => {
+    const content =
+      "## Demo\n\n[ref][d] [enc](#%44emo) [miss](#nope)\n\n[d]: #Demo\n";
+    const cwd = await fixtureRepo({ "a.md": content });
+    const result = await lint(cwd, [rule("REF-002")]);
+    expect(
+      result.messages.map((message) => [message.data?.anchor, message.fixable]),
+    ).toEqual([
+      ["Demo", undefined],
+      ["Demo", undefined],
+      ["nope", undefined],
+    ]);
+    const { first } = await fixTwice(cwd, [rule("REF-002")], "a.md");
+    expect(first).toBe(content);
+  });
+
+  it("has nothing to fix under ignoreCase", async () => {
+    const content = "## Demo\n\n[demo](#Demo)\n";
+    const cwd = await fixtureRepo({ "a.md": content });
+    const configured = rule("REF-002", { ignoreCase: true });
+    expect((await lint(cwd, [configured])).messages).toEqual([]);
+    const { first } = await fixTwice(cwd, [configured], "a.md");
+    expect(first).toBe(content);
+  });
+
+  it("leaves an out-of-scope file byte-unchanged", async () => {
+    const content = "## Demo\n\n[demo](#Demo)\n";
+    const cwd = await fixtureRepo({
+      "docs/a.md": content,
+      "drafts/b.md": content,
+    });
+    const written = await applyFixes({
+      cwd,
+      config: { rules: [] },
+      rules: [rule("REF-002", { exclude: ["drafts/**"] })],
+      settings: {},
+    });
+    expect(written.fixedFiles).toEqual(["docs/a.md"]);
+    await expect(
+      readFile(path.join(cwd, "drafts", "b.md"), "utf8"),
+    ).resolves.toBe(content);
+  });
+
+  // Built at runtime: `.gitattributes` forces LF on committed files, so a checked-in CRLF fixture
+  // would be converted before the test ever saw a `\r`.
+  it("keeps CRLF line endings and every byte outside the fragment", async () => {
+    const content = "## Demo\r\n\r\nSee [demo](#DEMO).\r\nEnd\r\n";
+    const cwd = await fixtureRepo({ "a.md": content });
+    const { first, second } = await fixTwice(cwd, [rule("REF-002")], "a.md");
+    expect(first).toBe("## Demo\r\n\r\nSee [demo](#demo).\r\nEnd\r\n");
+    expect(first.replace(/\r\n/g, "")).not.toContain("\n");
+    expect(second).toBe(first);
+  });
+});
+
+describe("REF-009 unused link reference definitions", () => {
+  it("reports unused definitions as fixable warnings and ignores used ones and the comment idiom", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": [
+        "Read [the guide][Guide] and [x].",
+        "",
+        "[guide]: guide.md",
+        "[x]: x.md",
+        "[old]: old.md",
+        '[//]: # "comment"',
+        "",
+      ].join("\n"),
+    });
+    const result = await lint(cwd, [rule("REF-009")]);
+    expect(
+      result.messages.map((message) => [
+        message.ruleId,
+        message.severity,
+        message.line,
+        message.column,
+        message.fixable,
+        message.data,
+        message.message,
+      ]),
+    ).toEqual([
+      [
+        "REF-009",
+        "warning",
+        5,
+        1,
+        true,
+        { label: "old" },
+        'Reference definition "[old]" is not used by any reference link or image in this document; remove it or link to it.',
+      ],
+    ]);
+  });
+
+  it("honours ignoredDefinitions, which replaces the default", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": '[keep]: k.md\n[//]: # "comment"\n',
+    });
+    const result = await lint(cwd, [
+      rule("REF-009", { ignoredDefinitions: ["keep"] }),
+    ]);
+    expect(result.messages.map((message) => message.data?.label)).toEqual([
+      "//",
+    ]);
+  });
+
+  it("removes exactly the definition lines, then changes nothing", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": [
+        "Read [the guide][guide].",
+        "",
+        "[guide]: guide.md",
+        "[old]: old.md",
+        "[older]:",
+        "  older.md",
+        '  "title"',
+        "",
+        "Tail.",
+        "",
+      ].join("\n"),
+    });
+    const { first, second, secondFixed } = await fixTwice(
+      cwd,
+      [rule("REF-009")],
+      "a.md",
+    );
+    expect(first).toBe(
+      "Read [the guide][guide].\n\n[guide]: guide.md\n\nTail.\n",
+    );
+    expect(second).toBe(first);
+    expect(secondFixed).toEqual([]);
+  });
+
+  it("removes a last definition with no trailing newline without leaving a blank line", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "Text [a].\n\n[a]: a.md\n[b]: b.md\n[c]: c.md",
+    });
+    const { first, second } = await fixTwice(cwd, [rule("REF-009")], "a.md");
+    expect(first).toBe("Text [a].\n\n[a]: a.md");
+    expect(second).toBe(first);
+  });
+
+  it("keeps CRLF line endings", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "Text [a].\r\n\r\n[a]: a.md\r\n[b]: b.md\r\nEnd\r\n",
+    });
+    const { first, second } = await fixTwice(cwd, [rule("REF-009")], "a.md");
+    expect(first).toBe("Text [a].\r\n\r\n[a]: a.md\r\nEnd\r\n");
+    expect(second).toBe(first);
+  });
+
+  it("reports but does not remove a definition inside a blockquote or list item", async () => {
+    const content = "> [quoted]: q.md\n\n- [listed]: l.md\n";
+    const cwd = await fixtureRepo({ "a.md": content });
+    const result = await lint(cwd, [rule("REF-009")]);
+    expect(
+      result.messages.map((message) => [message.data?.label, message.fixable]),
+    ).toEqual([
+      ["quoted", undefined],
+      ["listed", undefined],
+    ]);
+    const { first } = await fixTwice(cwd, [rule("REF-009")], "a.md");
+    expect(first).toBe(content);
   });
 });
