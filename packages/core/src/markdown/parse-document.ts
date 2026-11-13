@@ -770,6 +770,7 @@ export function parseDocument(params: {
         }
         images.push({
           rawTarget,
+          alt: imageNode.alt ?? "",
           line: imageNode.position?.start.line ?? 0,
           column: imageNode.position?.start.column,
         });

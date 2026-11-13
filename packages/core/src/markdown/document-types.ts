@@ -168,6 +168,16 @@ export type ParsedHtmlAnchor = {
 
 export type ParsedImage = {
   rawTarget: string;
+  // The image's text alternative, kept because a model reading the corpus receives only this text
+  // and never the pixels. Exactly as the mdast `image`/`imageReference` node carries it: entities
+  // and escapes decoded, emphasis and code flattened to their text, raw inline HTML kept as its
+  // source text, whitespace neither trimmed nor collapsed (a wrapped alt keeps its newline). It is
+  // `""` for `![](x)` and `![][ref]`. A reference image takes it from its own brackets, never from
+  // the definition. Required rather than optional because the parser always has a value, so no
+  // consumer has to tell `undefined` from `""`. Raw HTML `<img>` is not parsed into a
+  // `ParsedImage` at all: collecting it would change every consumer of `images`, from image edges
+  // to broken-image checks.
+  alt: string;
   line: number;
   column?: number;
 };

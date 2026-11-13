@@ -199,10 +199,11 @@ export function buildContextGraph(
       if (target === undefined || target === document.path) {
         continue;
       }
-      // Image edges deliberately carry no `text`: edge labels are scoped to link/anchor edges, and
-      // the natural image label (alt text) is not part of the `ParsedImage` contract. Carrying it
-      // would be an additive parser-contract change for a marginal explainability gain — revisit
-      // only if some output actually needs per-image labels.
+      // Image edges deliberately carry no `text`, even though `ParsedImage.alt` is available: edge
+      // labels are scoped to link/anchor edges, and giving image edges one would change the graph's
+      // JSON and text output and every host payload built from it for a marginal explainability
+      // gain. Alt text is judged by its own rule instead — revisit only if some output actually
+      // needs per-image labels.
       edges.push({
         from: document.path,
         to: target,

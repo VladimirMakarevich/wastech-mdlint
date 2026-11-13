@@ -12,6 +12,7 @@ import { escapeRegExp } from "../regex.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
 import { createLineNumberLookup, lineStartOffsets } from "../text-position.js";
 import type { RuleContext, TextEdit } from "../types.js";
+import { imageAltFindings } from "./ctx-image-alt.js";
 import {
   DEFAULT_NON_DESCRIPTIVE_LINK_TEXT,
   linkTextFindings,
@@ -637,9 +638,35 @@ export const ctx004: RuleDefinition = defineRule({
   },
 });
 
+// CTX-005 — images have alt text. A model does not see an image, so its alt text is all of it that
+// reaches the context; an image with none is a hole in what the model reads. Only empty or
+// whitespace-only alt is reported, never a judgment of how good a description is, so the rule takes
+// no options beyond file scope. Not fixable: writing a description is a judgment call.
+export const ctx005: RuleDefinition = defineRule({
+  metadata: {
+    id: "CTX-005",
+    category: "CTX",
+    description: "Images have alt text.",
+    // Writing hygiene meant to be enabled bare across a corpus, so a warning is proportionate.
+    defaultSeverity: "warning",
+    scope: "document",
+    fixable: false,
+  },
+  optionsSchema: z.object({ ...fileScopeShape }).strict(),
+  check: (options) => (context) => {
+    if (!matchesFileScope(context.filePath!, options)) {
+      return;
+    }
+    for (const finding of imageAltFindings(context.document!)) {
+      context.report(finding);
+    }
+  },
+});
+
 export const CTX_RULES: readonly RuleDefinition[] = [
   ctx001,
   ctx002,
   ctx003,
   ctx004,
+  ctx005,
 ];

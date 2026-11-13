@@ -398,12 +398,85 @@ describe("CTX-004 descriptive link text", () => {
   });
 });
 
-// The CTX half of the shared `exclude` matrix. Both documents trip all four rules at once
-// (an empty section, an unchecked box, an alias, a "here" link); `glossary.md` has no headings, no
-// checklist and no links, so it stays clean under CTX-001/CTX-002/CTX-004 and is self-skipped by
-// CTX-003.
+describe("CTX-005 image alt text", () => {
+  async function altTargets(content: string) {
+    const cwd = await fixtureRepo({ "a.md": content });
+    const result = await lint(cwd, [rule("CTX-005")]);
+    return result.messages.map((message) => message.data?.target);
+  }
+
+  it("reports images without alt text as warnings at the image", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "# T\n\n![](a.png) and ![ ](b.png)\n\n![diagram of the pipeline](c.png)\n\n![][r]\n\n[r]: r.png\n",
+    });
+
+    const result = await lint(cwd, [rule("CTX-005")]);
+    expect(
+      result.messages.map(
+        ({ ruleId, severity, filePath, line, column, message }) => ({
+          ruleId,
+          severity,
+          filePath,
+          line,
+          column,
+          message,
+        }),
+      ),
+    ).toEqual([
+      {
+        ruleId: "CTX-005",
+        severity: "warning",
+        filePath: "a.md",
+        line: 3,
+        column: 1,
+        message:
+          'Image "a.png" has no alt text; describe what the image shows.',
+      },
+      {
+        ruleId: "CTX-005",
+        severity: "warning",
+        filePath: "a.md",
+        line: 3,
+        column: 16,
+        message:
+          'Image "b.png" has no alt text; describe what the image shows.',
+      },
+      {
+        ruleId: "CTX-005",
+        severity: "warning",
+        filePath: "a.md",
+        line: 7,
+        column: 1,
+        message:
+          'Image "r.png" has no alt text; describe what the image shows.',
+      },
+    ]);
+    expect(result.errorCount).toBe(0);
+  });
+
+  it("validates its options and resolves bare", () => {
+    expect(() => ruleRegistry.resolveRule("CTX-005")).not.toThrow();
+    expect(() => ruleRegistry.resolveRule("CTX-005", { bogus: true })).toThrow(
+      RuleResolutionError,
+    );
+  });
+
+  it("honours an inline disable on the image's line", async () => {
+    expect(
+      await altTargets(
+        "<!-- wastech-mdlint-disable-next-line CTX-005 -->\n![](a.png)\n\n![](b.png)\n",
+      ),
+    ).toEqual(["b.png"]);
+  });
+});
+
+// The CTX half of the shared `exclude` matrix. Both documents trip all five rules at once
+// (an empty section, an unchecked box, an alias, a "here" link, an image with no alt);
+// `glossary.md` has no headings, no checklist, no links and no images, so it stays clean under
+// CTX-001/CTX-002/CTX-004/CTX-005 and is self-skipped by CTX-003.
 const CONTENT_DOC =
-  "## Empty\n\n## Tasks\n\n- [ ] wire gql\n\nSee [here](a.md).\n";
+  "## Empty\n\n## Tasks\n\n- [ ] wire gql\n\nSee [here](a.md).\n\n![](x.png)\n";
 const GLOSSARY = "| Term | Aliases |\n| --- | --- |\n| GraphQL | gql |\n";
 
 const CTX_SCOPE_CASES: readonly { id: string; options: object }[] = [
@@ -418,6 +491,7 @@ const CTX_SCOPE_CASES: readonly { id: string; options: object }[] = [
     },
   },
   { id: "CTX-004", options: {} },
+  { id: "CTX-005", options: {} },
 ];
 
 describe("CTX file scope (exclude)", () => {

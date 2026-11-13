@@ -75,9 +75,10 @@ export function normalizeLinkText(value: string): string {
 //   other phrase: the rule has no URL branch to special-case it away.
 // - An image inside a link contributes nothing to the text: the parser collects text from `value`
 //   fields and an image carries `alt` instead, so `[![here](b.png)](a.md)` has no text and is
-//   skipped, while `[![i](i.png) here](a.md)` has the text ` here` and is reported. Judging alt text
-//   would need a separate parse field, because widening `text` would change the label every graph
-//   edge explains itself with; alt text describes an image, which is a different check.
+//   skipped, while `[![i](i.png) here](a.md)` has the text ` here` and is reported. Alt text lives
+//   on `ParsedImage.alt` and CTX-005 judges it; it stays out of the link's text because widening
+//   `text` would change the label every graph edge explains itself with, and alt text describes
+//   the image, not where the link leads.
 // - Inline code counts as text, so `` [`here`](a.md) `` is reported.
 // - A reference link whose definition is missing never reaches `links`; the dangling reference is
 //   a reference-integrity finding, not a link-text one.

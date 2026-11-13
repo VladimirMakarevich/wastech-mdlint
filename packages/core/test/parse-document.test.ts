@@ -243,8 +243,8 @@ describe("parseDocument · links & images", () => {
     const doc = parse("![doc](d.md)\nx ![png](a.png)\n");
 
     expect(doc.images).toEqual([
-      { rawTarget: "d.md", line: 1, column: 1 },
-      { rawTarget: "a.png", line: 2, column: 3 },
+      { rawTarget: "d.md", alt: "doc", line: 1, column: 1 },
+      { rawTarget: "a.png", alt: "png", line: 2, column: 3 },
     ]);
   });
 
@@ -252,14 +252,45 @@ describe("parseDocument · links & images", () => {
     const doc = parse("[a]() [b](#) [c](<>) ![d]()\n");
 
     expect(doc.links.map((link) => link.rawTarget)).toEqual(["", "#", ""]);
-    expect(doc.images).toEqual([{ rawTarget: "", line: 1, column: 22 }]);
+    expect(doc.images).toEqual([
+      { rawTarget: "", alt: "d", line: 1, column: 22 },
+    ]);
   });
 
   it("resolves reference-style image definitions (not just reference-style links)", () => {
     const doc = parse("![Diagram][d]\n\n[d]: assets/diagram.png\n");
     expect(doc.images).toEqual([
-      { rawTarget: "assets/diagram.png", line: 1, column: 1 },
+      { rawTarget: "assets/diagram.png", alt: "Diagram", line: 1, column: 1 },
     ]);
+  });
+
+  // CTX-005 judges `alt` alone, so its exact semantics are pinned here: whitespace is not trimmed
+  // by the parser (so the rule sees `" "`, not `""`), inline markup flattens to its text, and a
+  // reference image takes the alt from its own brackets — never from the definition — in all three
+  // reference forms.
+  it("records each image's alt text as the parser decoded it, inline and reference forms alike", () => {
+    const doc = parse(
+      '![](a.png) ![ ](b.png) ![diagram *of* `x`](c.png) ![a &amp; \\* b](e.png)\n\n![r][r] ![r][] ![r] ![][r]\n\n[r]: r.png "Title"\n',
+    );
+
+    expect(doc.images.map((image) => image.alt)).toEqual([
+      "",
+      " ",
+      "diagram of x",
+      "a & * b",
+      "r",
+      "r",
+      "r",
+      "",
+    ]);
+  });
+
+  it("does not collect raw HTML <img> as a parsed image", () => {
+    const doc = parse(
+      '<img src="d.png" alt="">\n\nText <img src="e.png"> here.\n',
+    );
+
+    expect(doc.images).toEqual([]);
   });
 });
 

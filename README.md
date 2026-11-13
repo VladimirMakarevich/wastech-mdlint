@@ -195,6 +195,7 @@ The following table is generated from the rule metadata (`npm run generate:docs`
 | [`CTX-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-002.md) | CTX | warning | document | no | All checklist items are checked. |
 | [`CTX-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-003.md) | CTX | warning | project | yes | Content uses canonical glossary terms instead of aliases. |
 | [`CTX-004`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-004.md) | CTX | warning | document | no | Link text describes its target. |
+| [`CTX-005`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-005.md) | CTX | warning | document | no | Images have alt text. |
 | [`FM-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/FM-001.md) | FM | error | document | no | Front matter is valid YAML and matches the declared keys, values and patterns. |
 | [`GRP-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/GRP-001.md) | GRP | error | project | no | No circular references between documents. |
 | [`GRP-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/GRP-002.md) | GRP | warning | project | no | Documents have at least one incoming reference (except entry points). |
