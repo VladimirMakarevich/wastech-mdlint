@@ -980,6 +980,9 @@
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
                   },
+                  "strict": {
+                    "type": "boolean"
+                  },
                   "files": {
                     "type": "array",
                     "items": {

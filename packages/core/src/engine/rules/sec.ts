@@ -8,13 +8,21 @@ import {
   matchesConfigGlob,
   normalizeRelativePath,
 } from "../../discovery/globs.js";
-import type { ParsedDocument } from "../../markdown/document-types.js";
+import type {
+  ParsedDocument,
+  ParsedHeading,
+} from "../../markdown/document-types.js";
 import { detectNewline } from "../../markdown/newline.js";
 import { parseDocument } from "../../markdown/parse-document.js";
 import { resolvesOutsideRoot } from "../path-resolve.js";
 import { sectionOrder, sectionPresent } from "../primitives/section.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
+import {
+  compileOutline,
+  formatOutlineHeading,
+  matchOutline,
+} from "./sec-outline.js";
 import type { TextEdit } from "../types.js";
 
 // Section + structure rules.
@@ -122,8 +130,20 @@ function loadTemplate(
   }
 }
 
-// SEC-003 — sections conform to a reference file's heading structure (project). Order is not
-// enforced here (SEC-002 does that); only presence of each template heading.
+// Strict-mode finding data carries `null` rather than omitting a side, so a JSON consumer always
+// sees both keys and can tell "end of document" / "outline complete" apart from a missing field.
+function headingData(
+  heading: ParsedHeading | undefined,
+): { text: string; depth: number; line: number } | null {
+  return heading === undefined
+    ? null
+    : { text: heading.text, depth: heading.depth, line: heading.line };
+}
+
+// SEC-003 — sections conform to a reference file's heading structure (project). By default only
+// presence of each template heading is enforced (SEC-002 handles order). With `strict`, the
+// document's heading sequence must match the template's exactly — presence, order, depth and no
+// extra headings — with `*`/`+`/`?` template headings acting as wildcards.
 export const sec003: RuleDefinition = defineRule({
   metadata: {
     id: "SEC-003",
@@ -138,6 +158,7 @@ export const sec003: RuleDefinition = defineRule({
     .object({
       template: z.string().min(1),
       level: z.number().int().positive().optional(),
+      strict: z.boolean().optional(),
       ...fileScopeShape,
     })
     .strict(),
@@ -174,6 +195,50 @@ export const sec003: RuleDefinition = defineRule({
         filePath: options.template,
         data: { template: options.template },
       });
+      return;
+    }
+
+    if (options.strict === true) {
+      // `level` keeps its exact-depth meaning and filters both sides, so a per-document `# Title`
+      // can still differ when only `##` headings are compared.
+      const atLevel = (heading: ParsedHeading): boolean =>
+        options.level === undefined || heading.depth === options.level;
+      const outline = compileOutline(template.headings.filter(atLevel));
+      for (const [filePath, document] of context.documents!) {
+        if (
+          filePath === options.template ||
+          !matchesFileScope(filePath, options)
+        ) {
+          continue;
+        }
+        const divergence = matchOutline(
+          outline,
+          document.headings.filter(atLevel),
+        );
+        if (divergence === undefined) {
+          continue;
+        }
+        const { expected, actual } = divergence;
+        const expectedText =
+          expected === undefined
+            ? "no further heading"
+            : `"${formatOutlineHeading(expected)}" (template line ${expected.line})`;
+        const actualText =
+          actual === undefined
+            ? "end of document"
+            : `"${formatOutlineHeading(actual)}"`;
+        context.report({
+          message: `Outline diverges from template ${options.template}: expected ${expectedText}, found ${actualText}.`,
+          // Line 0 is the existing "no specific line" sentinel, used when the document ran out.
+          line: actual?.line ?? 0,
+          filePath,
+          data: {
+            template: options.template,
+            expected: headingData(expected),
+            actual: headingData(actual),
+          },
+        });
+      }
       return;
     }
 

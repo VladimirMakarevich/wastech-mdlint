@@ -264,6 +264,164 @@ describe("SEC-003 template conformance", () => {
   });
 });
 
+describe("SEC-003 strict outline", () => {
+  const TEMPLATE = "# T\n\n## Context\n\n## Decision\n\n## Consequences\n";
+
+  async function strictLint(files: Record<string, string>, extra = {}) {
+    const cwd = await fixtureRepo({ "template.md": TEMPLATE, ...files });
+    return lint(cwd, [
+      rule("SEC-003", {
+        template: "template.md",
+        files: ["adr/**/*.md"],
+        strict: true,
+        ...extra,
+      }),
+    ]);
+  }
+
+  it("accepts a document matching the template exactly", async () => {
+    const result = await strictLint({ "adr/a.md": TEMPLATE });
+    expect(result.messages).toEqual([]);
+  });
+
+  it("reports a missing section once, naming expected and actual headings", async () => {
+    const result = await strictLint({
+      "adr/a.md": "# T\n\n## Context\n\n## Consequences\n",
+    });
+    expect(result.messages).toEqual([
+      expect.objectContaining({
+        filePath: "adr/a.md",
+        line: 5,
+        message:
+          'Outline diverges from template template.md: expected "## Decision" (template line 5), found "## Consequences".',
+        data: {
+          template: "template.md",
+          expected: { text: "Decision", depth: 2, line: 5 },
+          actual: { text: "Consequences", depth: 2, line: 5 },
+        },
+      }),
+    ]);
+  });
+
+  it("reports a reordered section once", async () => {
+    const result = await strictLint({
+      "adr/a.md": "# T\n\n## Decision\n\n## Context\n\n## Consequences\n",
+    });
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]).toMatchObject({
+      line: 3,
+      data: {
+        expected: { text: "Context", depth: 2 },
+        actual: { text: "Decision", depth: 2 },
+      },
+    });
+    expect(result.messages[0]?.message).toContain('expected "## Context"');
+    expect(result.messages[0]?.message).toContain('found "## Decision"');
+  });
+
+  it("reports an extra section once", async () => {
+    const result = await strictLint({
+      "adr/a.md": `${TEMPLATE}\n## Appendix\n`,
+    });
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]).toMatchObject({
+      line: 9,
+      data: { expected: null, actual: { text: "Appendix", depth: 2 } },
+    });
+    expect(result.messages[0]?.message).toMatch(
+      /expected no further heading, found "## Appendix"\.$/,
+    );
+  });
+
+  it("reports a document that ends early at line 0", async () => {
+    const result = await strictLint({
+      "adr/a.md": "# T\n\n## Context\n\n## Decision\n",
+    });
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]).toMatchObject({
+      line: 0,
+      data: { expected: { text: "Consequences" }, actual: null },
+    });
+    expect(result.messages[0]?.message).toMatch(/found end of document\.$/);
+  });
+
+  it("with `level`, ignores headings at other depths on both sides", async () => {
+    const result = await strictLint(
+      {
+        "adr/a.md":
+          "# Other Title\n\n## Context\n\n### Note\n\n## Decision\n\n## Consequences\n",
+      },
+      { level: 2 },
+    );
+    expect(result.messages).toEqual([]);
+  });
+
+  it("supports wildcard headings for a per-document title and optional middle sections", async () => {
+    const cwd = await fixtureRepo({
+      "template.md": "# ?\n\n## Context\n\n## *\n\n## Decision\n",
+      "adr/a.md": "# First\n\n## Context\n\n## Decision\n",
+      "adr/b.md":
+        "# Second\n\n## Context\n\n## Options\n\n### One\n\n## Notes\n\n## Decision\n",
+      "adr/c.md": "# Third\n\n## Decision\n",
+    });
+    const result = await lint(cwd, [
+      rule("SEC-003", {
+        template: "template.md",
+        files: ["adr/**/*.md"],
+        strict: true,
+      }),
+    ]);
+    expect(result.messages).toEqual([
+      expect.objectContaining({
+        filePath: "adr/c.md",
+        data: {
+          template: "template.md",
+          expected: { text: "Context", depth: 2, line: 3 },
+          actual: { text: "Decision", depth: 2, line: 3 },
+        },
+      }),
+    ]);
+  });
+
+  it("keeps the single config-attributed finding for a missing or escaping template", async () => {
+    const cwd = await fixtureRepo({ "adr/a.md": "# A\n" });
+
+    const missing = await lint(cwd, [
+      rule("SEC-003", { template: "nope.md", strict: true }),
+    ]);
+    expect(missing.messages).toHaveLength(1);
+    expect(missing.messages[0]?.message).toMatch(/was not found/);
+
+    const escaping = await lint(cwd, [
+      rule("SEC-003", { template: "../secret.md", strict: true }),
+    ]);
+    expect(escaping.messages).toHaveLength(1);
+    expect(escaping.messages[0]?.message).toMatch(/escapes the analyzed root/);
+  });
+
+  // `strict: false` must take the presence-only path untouched, so its output is identical to
+  // omitting the option — the guarantee existing configs rely on when the option appears.
+  it("leaves default results identical when `strict` is false", async () => {
+    const cwd = await fixtureRepo({
+      "template.md": "# T\n## Context\n## Decision\n",
+      "adr/one.md": "# One\n## Context\n",
+      "adr/two.md": "# Two\n## Decision\n## Context\n## Extra\n",
+    });
+    const options = { template: "template.md", files: ["adr/**/*.md"] };
+
+    const omitted = await lint(cwd, [rule("SEC-003", options)]);
+    const disabled = await lint(cwd, [
+      rule("SEC-003", { ...options, strict: false }),
+    ]);
+    expect(disabled).toEqual(omitted);
+    expect(omitted.messages.map((message) => message.data)).toEqual([
+      { section: "Decision", template: "template.md" },
+      { section: "T", template: "template.md" },
+      { section: "T", template: "template.md" },
+    ]);
+  });
+});
+
 // Frontmatter used to parse as a setext H2, so a template carrying it demanded that invented
 // heading of every document (SEC-003 at level 2), and a fix appended after it could have been
 // tempted to treat it as content. Both now see only the real outline.
@@ -322,6 +480,10 @@ const SEC_SCOPE_CASES: readonly { id: string; options: object }[] = [
   { id: "SEC-001", options: { sections: ["Summary"] } },
   { id: "SEC-002", options: { order: ["Overview", "Usage"] } },
   { id: "SEC-003", options: { template: "templates/t.md", level: 2 } },
+  {
+    id: "SEC-003",
+    options: { template: "templates/t.md", level: 2, strict: true },
+  },
 ];
 
 describe("SEC file scope (exclude)", () => {
