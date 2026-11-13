@@ -12,7 +12,7 @@ Task-driven recipes: each page starts from a real goal, shows the config and com
 | 4 | [Keep AI context files lean](ai-context-budgets.md) | SIZE-001, LLM-001 |
 | 5 | [Requirements → design → implementation traceability](id-traceability.md) | REF-005, GRP-003, `settings.idRef` |
 | 6 | [Find orphan and circular documents](orphans-and-cycles.md) | GRP-001/002, `graph` |
-| 7 | [Guard content quality](content-quality.md) | CTX-001/002/003 |
+| 7 | [Guard content quality](content-quality.md) | CTX-001/002/003/004 |
 | 8 | [Author a project-specific rule without code](custom-rule.md) | `custom` |
 | 9 | [Understand the blast radius before editing](change-impact.md) | `impact`, `slice` |
 | 10 | [Adopt the linter and wire it into CI](adopt-and-ci.md) | `init`, `--fail-on`, exit codes |

@@ -100,6 +100,13 @@ export type ParsedLink = {
   rawTarget: string;
   // Link label text, kept so an edge can explain itself (`design.md:42 → via "[see REQ-001]"`).
   text?: string;
+  // The label as a reader sees it: raw inline HTML inside the label (`[<em>here</em>](a.md)`) is
+  // left out, because the tags render as formatting rather than text, and a hard line break or an
+  // inline `<br>` counts as whitespace. Set only when it differs from `text`, so `visibleText ?? text` is the visible
+  // label; `text` itself keeps the HTML so the graph's edge explanations stay what they were. It
+  // is `""`, not undefined, when the label is only markup (`[<b></b>](a.md)`), so the fallback to
+  // `text` never resurrects the tags.
+  visibleText?: string;
   // Fragment after `#`, decoded; undefined when the link has no fragment.
   anchor?: string;
   kind: ParsedLinkKind;

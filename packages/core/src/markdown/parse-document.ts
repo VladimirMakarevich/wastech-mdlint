@@ -133,6 +133,45 @@ function collectText(node: unknown): string {
   return text;
 }
 
+// An inline `<br>` tag in any of its spellings: any case, self-closed or not, with or without
+// attributes (`<br class="x">`, attribute values spanning lines included), and the stray end tag
+// `</br>`, which HTML parsers also render as a line break. The parser only emits an `html` node for
+// a single tag CommonMark has already validated, so the tag name followed by whitespace, `/` or
+// the closing `>` is enough to identify it; `<brx>` and `<bra>` are other tags and do not match.
+// No `g` flag: the pattern is shared across every link of every document, and a `g`-flagged
+// `test` would carry `lastIndex` from one call into the next.
+const HTML_LINE_BREAK_PATTERN = /^<\/?br(?:[\s/][\s\S]*)?>$/iu;
+
+// What a reader sees of a link label, as opposed to `collectText`, which also gathers the source of
+// raw HTML nodes. Only `text` and `inlineCode` values are visible, and other `html` is markup that
+// contributes nothing. A Markdown `break` and an inline `<br>` both render as a line break, so they
+// contribute whitespace rather than gluing the words either side together: `[click<br>here](a.md)`
+// reads as "click here", not "clickhere". An image contributes nothing, matching `collectText`: its
+// `alt` describes the image.
+function collectVisibleText(node: unknown): string {
+  let text = "";
+
+  visit(node as Parameters<typeof visit>[0], (child) => {
+    if (
+      child.type === "break" ||
+      (child.type === "html" &&
+        "value" in child &&
+        typeof child.value === "string" &&
+        HTML_LINE_BREAK_PATTERN.test(child.value))
+    ) {
+      text += "\n";
+    } else if (
+      (child.type === "text" || child.type === "inlineCode") &&
+      "value" in child &&
+      typeof child.value === "string"
+    ) {
+      text += child.value;
+    }
+  });
+
+  return text;
+}
+
 // Decode a single percent-encoded fragment (anchor) so it matches github-slugger output, which
 // operates on decoded Unicode text. Left as-is on malformed input.
 function decodeComponent(value: string): string {
@@ -702,6 +741,7 @@ export function parseDocument(params: {
         }
         const classified = classifyLink(rawTarget);
         const label = collectText(linkNode);
+        const visibleLabel = collectVisibleText(linkNode);
         const fragmentRange =
           linkNode.type === "link" && classified.anchor !== undefined
             ? locateFragmentRange(linkNode, rawTarget, params.content)
@@ -709,6 +749,7 @@ export function parseDocument(params: {
         links.push({
           rawTarget,
           text: label.length > 0 ? label : undefined,
+          ...(visibleLabel === label ? {} : { visibleText: visibleLabel }),
           anchor: classified.anchor,
           kind: classified.kind,
           line: linkNode.position?.start.line ?? 0,

@@ -8,6 +8,7 @@ import type { ConfiguredRule } from "../src/config/load-config.js";
 import { compareStrings } from "../src/deterministic-sort.js";
 import { applyFixes } from "../src/engine/fix.js";
 import { lintFiles } from "../src/engine/lint-files.js";
+import { RuleResolutionError } from "../src/engine/registry.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
 
 const tempDirs: string[] = [];
@@ -307,10 +308,102 @@ describe("CTX-003 reports a configuration it cannot honour", () => {
   });
 });
 
-// The CTX half of the shared `exclude` matrix. Both documents trip all three rules at once
-// (an empty section, an unchecked box, an alias); `glossary.md` has no headings and no checklist, so
-// it stays clean under CTX-001/CTX-002 and is self-skipped by CTX-003.
-const CONTENT_DOC = "## Empty\n\n## Tasks\n\n- [ ] wire gql\n";
+describe("CTX-004 descriptive link text", () => {
+  async function linkTexts(content: string, options?: unknown) {
+    const cwd = await fixtureRepo({ "a.md": content });
+    const result = await lint(cwd, [rule("CTX-004", options)]);
+    return result.messages.map((message) => message.data?.text);
+  }
+
+  it("reports default phrases as warnings at the link", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "# T\n\nSee [here](b.md) or [подробнее](c.md).\n\nRead the [installation guide](d.md).\n",
+    });
+
+    const result = await lint(cwd, [rule("CTX-004")]);
+    expect(
+      result.messages.map(({ ruleId, severity, filePath, line, message }) => ({
+        ruleId,
+        severity,
+        filePath,
+        line,
+        message,
+      })),
+    ).toEqual([
+      {
+        ruleId: "CTX-004",
+        severity: "warning",
+        filePath: "a.md",
+        line: 3,
+        message:
+          'Link text "here" does not describe its target; name what the link leads to.',
+      },
+      {
+        ruleId: "CTX-004",
+        severity: "warning",
+        filePath: "a.md",
+        line: 3,
+        message:
+          'Link text "подробнее" does not describe its target; name what the link leads to.',
+      },
+    ]);
+    expect(result.errorCount).toBe(0);
+  });
+
+  it("replaces the defaults with `phrases`", async () => {
+    expect(
+      await linkTexts("[here](a.md) [Docs](b.md)\n", { phrases: ["docs"] }),
+    ).toEqual(["Docs"]);
+  });
+
+  it("extends the defaults with `additionalPhrases`", async () => {
+    expect(
+      await linkTexts("[here](a.md) [docs](b.md) [guide](c.md)\n", {
+        additionalPhrases: ["Docs!"],
+      }),
+    ).toEqual(["here", "docs"]);
+  });
+
+  it("extends a replaced list when both are given", async () => {
+    expect(
+      await linkTexts("[here](a.md) [docs](b.md) [see](c.md)\n", {
+        phrases: ["docs"],
+        additionalPhrases: ["see"],
+      }),
+    ).toEqual(["docs", "see"]);
+  });
+
+  it("validates its options and resolves bare", () => {
+    expect(() => ruleRegistry.resolveRule("CTX-004")).not.toThrow();
+    for (const options of [
+      { phrases: [] },
+      { phrases: ["..."] },
+      { additionalPhrases: ["→"] },
+      { phrases: "here" },
+      { bogus: true },
+    ]) {
+      expect(() => ruleRegistry.resolveRule("CTX-004", options)).toThrow(
+        RuleResolutionError,
+      );
+    }
+  });
+
+  it("honours an inline disable on the link's line", async () => {
+    expect(
+      await linkTexts(
+        "<!-- wastech-mdlint-disable-next-line CTX-004 -->\nSee [here](a.md).\n",
+      ),
+    ).toEqual([]);
+  });
+});
+
+// The CTX half of the shared `exclude` matrix. Both documents trip all four rules at once
+// (an empty section, an unchecked box, an alias, a "here" link); `glossary.md` has no headings, no
+// checklist and no links, so it stays clean under CTX-001/CTX-002/CTX-004 and is self-skipped by
+// CTX-003.
+const CONTENT_DOC =
+  "## Empty\n\n## Tasks\n\n- [ ] wire gql\n\nSee [here](a.md).\n";
 const GLOSSARY = "| Term | Aliases |\n| --- | --- |\n| GraphQL | gql |\n";
 
 const CTX_SCOPE_CASES: readonly { id: string; options: object }[] = [
@@ -324,6 +417,7 @@ const CTX_SCOPE_CASES: readonly { id: string; options: object }[] = [
       aliasColumn: "Aliases",
     },
   },
+  { id: "CTX-004", options: {} },
 ];
 
 describe("CTX file scope (exclude)", () => {

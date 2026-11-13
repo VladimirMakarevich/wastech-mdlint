@@ -2,7 +2,7 @@
 
 > [Guide index](../README.md) · [Configuration](../configuration.md) · [Annotated config](../config-reference.md)
 
-`wastech-mdlint` ships **32 built-in rules** across 9 categories, plus the declarative [`custom`](custom.md) rule. Every rule has a Zod-validated options schema, a fixed **scope** (`document` = per file · `project` = once over the whole corpus), and a default **severity** (`error` | `warning`) you can override per entry. Enable rules in your [config](../configuration.md); most accept `files`/`exclude` to narrow their reach.
+`wastech-mdlint` ships **33 built-in rules** across 9 categories, plus the declarative [`custom`](custom.md) rule. Every rule has a Zod-validated options schema, a fixed **scope** (`document` = per file · `project` = once over the whole corpus), and a default **severity** (`error` | `warning`) you can override per entry. Enable rules in your [config](../configuration.md); most accept `files`/`exclude` to narrow their reach.
 
 > There is **no `CHK` category** — checklist completeness is [CTX-002](CTX-002.md).
 
@@ -36,6 +36,7 @@
 | [CTX-001](CTX-001.md) | CTX | document | warning | no | Sections are not empty or placeholder-only. |
 | [CTX-002](CTX-002.md) | CTX | document | warning | no | All checklist items are checked. |
 | [CTX-003](CTX-003.md) | CTX | project | warning | **yes** | Content uses canonical glossary terms instead of aliases. |
+| [CTX-004](CTX-004.md) | CTX | document | warning | no | Link text describes its target. |
 | [GRP-001](GRP-001.md) | GRP | project | error | no | No circular references between documents. |
 | [GRP-002](GRP-002.md) | GRP | project | warning | no | Documents have at least one incoming reference (except entry points). |
 | [GRP-003](GRP-003.md) | GRP | project | warning | no | IDs are carried forward across pipeline stages. |
@@ -52,7 +53,7 @@ The built-in rows mirror the machine-generated table in the top-level [README](.
 - **SEC — sections.** Required sections, section order, and template conformance.
 - **STR — structure.** Required files exist.
 - **REF — references.** Links, anchors, and images resolve; reference labels are defined and definitions are used; cross-zone dependency declaration; ID traceability and stability direction.
-- **CTX — content quality.** No empty/placeholder sections, checklist completeness, glossary term usage.
+- **CTX — content quality.** No empty/placeholder sections, checklist completeness, glossary term usage, descriptive link text.
 - **GRP — graph integrity.** No cycles, no orphans, ID chains across stages — over the shared [context graph](../context-graph.md).
 - **SIZE / LLM — context hygiene.** Byte/line/token budgets per file, and eager-import token budgets per entrypoint.
 - **FM — front matter.** Front matter is valid YAML, carries its required keys, and holds allowed or patterned values.

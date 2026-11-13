@@ -184,6 +184,25 @@ describe("parseDocument · links & images", () => {
     });
   });
 
+  it("records the visible label beside the source label only when inline HTML or a break differs", () => {
+    const doc = parse(
+      '[<em>here</em>](a.md) [`code` text](b.md) [<b></b>](c.md) [a\\\nb](d.md) [a<br>b](e.md) [a<br class="x">b](f.md) [a<brx>b](g.md)\n',
+    );
+
+    expect(
+      doc.links.map(({ text, visibleText }) => ({ text, visibleText })),
+    ).toEqual([
+      { text: "<em>here</em>", visibleText: "here" },
+      { text: "code text", visibleText: undefined },
+      { text: "<b></b>", visibleText: "" },
+      { text: "ab", visibleText: "a\nb" },
+      { text: "a<br>b", visibleText: "a\nb" },
+      { text: 'a<br class="x">b', visibleText: "a\nb" },
+      { text: "a<brx>b", visibleText: "ab" },
+    ]);
+    expect("visibleText" in doc.links[1]!).toBe(false);
+  });
+
   it("classifies same-file anchors, external, mailto, and other schemes", () => {
     const doc = parse(
       [

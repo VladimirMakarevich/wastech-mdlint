@@ -12,6 +12,11 @@ import { escapeRegExp } from "../regex.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
 import { createLineNumberLookup, lineStartOffsets } from "../text-position.js";
 import type { RuleContext, TextEdit } from "../types.js";
+import {
+  DEFAULT_NON_DESCRIPTIVE_LINK_TEXT,
+  linkTextFindings,
+  normalizeLinkText,
+} from "./ctx-link-text.js";
 import { reportInertConfiguration } from "./inert.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
 
@@ -576,4 +581,65 @@ function isAliasScanned(filePath: string, options: Ctx003Options): boolean {
   );
 }
 
-export const CTX_RULES: readonly RuleDefinition[] = [ctx001, ctx002, ctx003];
+// A phrase with no letter or digit normalises to "" (edge punctuation is trimmed) and could never
+// match any link, so config rejects it at load rather than leaving an entry that silently does
+// nothing. No `g` flag: a shared `g`-flagged RegExp carries `lastIndex` between `test` calls.
+const HAS_LETTER_OR_DIGIT = /[\p{L}\p{N}]/u;
+const linkTextPhraseSchema = z
+  .string()
+  .refine((value) => HAS_LETTER_OR_DIGIT.test(value), {
+    message: "a link-text phrase must contain a letter or digit",
+  });
+
+// CTX-004 — link text describes its target. An agent, like a reader scanning a page, decides whether
+// to follow a link from its text alone, and "here" or "подробнее" says nothing about the target.
+// The comparison is on the whole normalised text, so a listed word inside a longer descriptive
+// phrase is fine. `phrases` replaces the default list and `additionalPhrases` extends whichever list
+// is in effect — unlike CTX-001's `placeholders`, which can only extend — because a project in
+// another language needs to drop the English and Russian defaults, not just add to them. `phrases`
+// has `.min(1)` so an empty list cannot turn the rule into a silent no-op. Defaults are applied with
+// `??` rather than a Zod `.default()`, matching SEC-003 to SEC-006, so the generated schema keeps
+// every option optional. Not fixable: choosing descriptive text is a judgment call.
+export const ctx004: RuleDefinition = defineRule({
+  metadata: {
+    id: "CTX-004",
+    category: "CTX",
+    description: "Link text describes its target.",
+    // Writing hygiene meant to be enabled bare across a corpus, so a warning is proportionate.
+    defaultSeverity: "warning",
+    scope: "document",
+    fixable: false,
+  },
+  optionsSchema: z
+    .object({
+      phrases: z.array(linkTextPhraseSchema).min(1).optional(),
+      additionalPhrases: z.array(linkTextPhraseSchema).optional(),
+      ...fileScopeShape,
+    })
+    .strict(),
+  check: (options) => {
+    // Normalised once per configured rule rather than once per document: the list is fixed for the
+    // run, and both sides must go through the same normalisation to compare at all.
+    const phrases = new Set(
+      [
+        ...(options.phrases ?? DEFAULT_NON_DESCRIPTIVE_LINK_TEXT),
+        ...(options.additionalPhrases ?? []),
+      ].map(normalizeLinkText),
+    );
+    return (context) => {
+      if (!matchesFileScope(context.filePath!, options)) {
+        return;
+      }
+      for (const finding of linkTextFindings(context.document!, { phrases })) {
+        context.report(finding);
+      }
+    };
+  },
+});
+
+export const CTX_RULES: readonly RuleDefinition[] = [
+  ctx001,
+  ctx002,
+  ctx003,
+  ctx004,
+];
