@@ -2,7 +2,7 @@
 
 > [Guide index](README.md) · [Configuration guide](configuration.md) · [Rules index](rules/README.md)
 
-This is a single `wastech-mdlint.config.json` that exercises **every** option the linter accepts, with a comment on each. It is a _reference_, not a recommended starting config — you would never enable all 29 rules at once with every option. Copy the pieces you need. For a curated starter, run [`wastech-mdlint init`](cli.md#init).
+This is a single `wastech-mdlint.config.json` that exercises **every** option the linter accepts, with a comment on each. It is a _reference_, not a recommended starting config — you would never enable all 30 rules at once with every option. Copy the pieces you need. For a curated starter, run [`wastech-mdlint init`](cli.md#init).
 
 Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys — top-level, in any rule's `options`, or under `compile` — are rejected. Every field below is drawn from the generated schema (`wastech-mdlint schema`).
 
@@ -174,6 +174,13 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
         "title": true, // first block is a top-level heading, or front matter has `titleKey` (optional)
         "level": 1, // top-level heading depth, 1–6 (optional)
         "titleKey": "title", // front matter key (dot path) that counts as a title (optional)
+      },
+    },
+    // SEC-005: heading text is not repeated within a document.
+    {
+      "rule": "SEC-005",
+      "options": {
+        "siblingsOnly": false, // only compare headings under the same parent at the same depth (optional)
       },
     },
 

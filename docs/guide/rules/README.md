@@ -2,7 +2,7 @@
 
 > [Guide index](../README.md) · [Configuration](../configuration.md) · [Annotated config](../config-reference.md)
 
-`wastech-mdlint` ships **29 built-in rules** across 9 categories, plus the declarative [`custom`](custom.md) rule. Every rule has a Zod-validated options schema, a fixed **scope** (`document` = per file · `project` = once over the whole corpus), and a default **severity** (`error` | `warning`) you can override per entry. Enable rules in your [config](../configuration.md); most accept `files`/`exclude` to narrow their reach.
+`wastech-mdlint` ships **30 built-in rules** across 9 categories, plus the declarative [`custom`](custom.md) rule. Every rule has a Zod-validated options schema, a fixed **scope** (`document` = per file · `project` = once over the whole corpus), and a default **severity** (`error` | `warning`) you can override per entry. Enable rules in your [config](../configuration.md); most accept `files`/`exclude` to narrow their reach.
 
 > There is **no `CHK` category** — checklist completeness is [CTX-002](CTX-002.md).
 
@@ -21,6 +21,7 @@
 | [SEC-002](SEC-002.md) | SEC | document | error | no | Sections appear in the required order. |
 | [SEC-003](SEC-003.md) | SEC | project | error | no | Sections conform to a template's heading structure. |
 | [SEC-004](SEC-004.md) | SEC | document | warning | no | Heading levels increment by one, with a single title at the start. |
+| [SEC-005](SEC-005.md) | SEC | document | warning | no | Heading text is not repeated within a document. |
 | [STR-001](STR-001.md) | STR | project | error | no | Required files exist in the project. |
 | [REF-001](REF-001.md) | REF | document | error | no | Relative links resolve to a file. |
 | [REF-002](REF-002.md) | REF | document | error | no | Link anchors match a heading or HTML anchor. |

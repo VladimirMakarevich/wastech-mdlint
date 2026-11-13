@@ -543,12 +543,70 @@ describe("SEC-004 heading levels", () => {
   });
 });
 
+describe("SEC-005 duplicate headings", () => {
+  it("reports a repeated heading at the repeat, naming the first line", async () => {
+    const cwd = await fixtureRepo({
+      "dup.md": "# Title\n\n## Usage\n\n## **Usage**\n",
+      "nested.md": "# T\n\n## A\n\n### Added\n\n## B\n\n### Added\n",
+      "clean.md": "# T\n\n## A\n\n## B\n",
+    });
+
+    const result = await lint(cwd, [rule("SEC-005")]);
+    expect(
+      result.messages.map(({ ruleId, filePath, line, message }) => ({
+        ruleId,
+        filePath,
+        line,
+        message,
+      })),
+    ).toEqual([
+      {
+        ruleId: "SEC-005",
+        filePath: "dup.md",
+        line: 5,
+        message: 'Heading "Usage" duplicates the heading on line 3.',
+      },
+      {
+        ruleId: "SEC-005",
+        filePath: "nested.md",
+        line: 9,
+        message: 'Heading "Added" duplicates the heading on line 5.',
+      },
+    ]);
+
+    const siblings = await lint(cwd, [rule("SEC-005", { siblingsOnly: true })]);
+    expect(
+      siblings.messages.map(({ filePath, line }) => ({ filePath, line })),
+    ).toEqual([{ filePath: "dup.md", line: 5 }]);
+  });
+
+  it("validates its options and resolves bare", () => {
+    expect(() => ruleRegistry.resolveRule("SEC-005")).not.toThrow();
+    for (const options of [{ siblingsOnly: "yes" }, { bogus: true }]) {
+      expect(() => ruleRegistry.resolveRule("SEC-005", options)).toThrow(
+        RuleResolutionError,
+      );
+    }
+  });
+
+  it("honours an inline disable on the repeat", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "# T\n\n## Usage\n\n<!-- wastech-mdlint-disable-next-line SEC-005 -->\n## Usage\n",
+    });
+
+    const result = await lint(cwd, [rule("SEC-005")]);
+    expect(result.messages).toEqual([]);
+  });
+});
+
 // The SEC half of the shared `exclude` matrix. One fixture serves every case: both documents
-// violate each one (the `#### Overview` jump from H2 is what trips SEC-004), while `templates/t.md`
-// satisfies SEC-001/SEC-002 (it has `Summary`, and neither `Overview` nor `Usage`, which
-// `sectionOrder` skips), passes SEC-004 (one leading H1, levels step by one) and is self-skipped by
-// SEC-003.
-const SECTION_DOC = "# Title\n\n## Usage\n\n#### Overview\n";
+// violate each one (the `#### Overview` jump from H2 is what trips SEC-004, and the sibling
+// `## Usage` repeat trips SEC-005 in both of its modes), while `templates/t.md` satisfies
+// SEC-001/SEC-002 (it has `Summary`, and neither `Overview` nor `Usage`, which `sectionOrder`
+// skips), passes SEC-004 (one leading H1, levels step by one) and SEC-005 (no repeated heading), and
+// is self-skipped by SEC-003.
+const SECTION_DOC = "# Title\n\n## Usage\n\n#### Overview\n\n## Usage\n";
 const SECTION_TEMPLATE = "# T\n\n## Context\n\n## Summary\n";
 
 const SEC_SCOPE_CASES: readonly { id: string; options: object }[] = [
@@ -560,6 +618,8 @@ const SEC_SCOPE_CASES: readonly { id: string; options: object }[] = [
     options: { template: "templates/t.md", level: 2, strict: true },
   },
   { id: "SEC-004", options: {} },
+  { id: "SEC-005", options: {} },
+  { id: "SEC-005", options: { siblingsOnly: true } },
 ];
 
 describe("SEC file scope (exclude)", () => {

@@ -7,8 +7,9 @@
 // every reader listed beside it.
 //
 // Field → consumer:
-// headings → REF-002 anchor slugs, SEC-* ordering, anchor graph edges, slice index (the slugs
-//              reach all three through `explicitAnchors` in engine/anchor-resolve.ts)
+// headings → REF-002 anchor slugs, SEC-* ordering, SEC-005 duplicate text, anchor graph edges,
+//              slice index (the slugs reach the anchor consumers through `explicitAnchors` in
+//              engine/anchor-resolve.ts)
 //   htmlAnchors → REF-002, anchor graph edges, slice index (same `explicitAnchors` route)
 //   sections   → cheap SEC-*/CTX-* section-existence checks
 //   tables     → TBL-* rules (TBL-007 via row cellCount), REF-005/006 id tables, extractDefinedIds(), compile

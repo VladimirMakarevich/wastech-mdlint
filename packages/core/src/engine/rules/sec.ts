@@ -18,6 +18,7 @@ import { resolvesOutsideRoot } from "../path-resolve.js";
 import { sectionOrder, sectionPresent } from "../primitives/section.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
+import { duplicateHeadingFindings } from "./sec-duplicate-headings.js";
 import { headingLevelFindings } from "./sec-heading-levels.js";
 import {
   compileOutline,
@@ -325,6 +326,42 @@ export const sec004: RuleDefinition = defineRule({
   },
 });
 
+// SEC-005 — heading text is not repeated within a document. A repeated heading makes every
+// `section` option that names it ambiguous (the section primitives scope to the first match and
+// silently ignore the rest, while TBL's table filter takes every match), and turns its anchor into an order-dependent `-1` slug that breaks as soon as the
+// headings are reordered. `siblingsOnly` exists because some families repeat headings by design —
+// a changelog's `### Added` per release, an API page's `### Parameters` per function — and there the
+// defect is only a repeat under the same parent. Its default is applied with `??` rather than a Zod
+// `.default()`, matching SEC-003 and SEC-004, so the generated schema keeps every option optional.
+// Not fixable: renaming a heading is a judgment call.
+export const sec005: RuleDefinition = defineRule({
+  metadata: {
+    id: "SEC-005",
+    category: "SEC",
+    description: "Heading text is not repeated within a document.",
+    // Outline hygiene meant to be enabled bare, like SEC-004, so a warning is proportionate.
+    defaultSeverity: "warning",
+    scope: "document",
+    fixable: false,
+  },
+  optionsSchema: z
+    .object({
+      siblingsOnly: z.boolean().optional(),
+      ...fileScopeShape,
+    })
+    .strict(),
+  check: (options) => (context) => {
+    if (!matchesFileScope(context.filePath!, options)) {
+      return;
+    }
+    for (const finding of duplicateHeadingFindings(context.document!, {
+      siblingsOnly: options.siblingsOnly ?? false,
+    })) {
+      context.report(finding);
+    }
+  },
+});
+
 // STR-001 — required files exist in the project (project). `files` here is the *required* set (each
 // entry is a path or glob), not file scoping.
 //
@@ -408,5 +445,6 @@ export const SEC_STR_RULES: readonly RuleDefinition[] = [
   sec002,
   sec003,
   sec004,
+  sec005,
   str001,
 ];
