@@ -78,7 +78,7 @@ flow:
       # Operator pin: planning sets the shape the rest of the flow executes, so it gets the deepest
       # reasoning tier rather than the flow-wide default. Provider/model are deliberately NOT pinned
       # — they come from config.yaml (claude is primary at claude-opus-5-5).
-      reasoning: high
+      reasoning: medium
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []
@@ -118,7 +118,7 @@ flow:
       # optional overrides (uncomment to pin this evaluator):
       provider: codex
       model: gpt-6-sol
-      reasoning: medium
+      reasoning: high
       # network_access: false
       # blocking: true
       # gate_severity: high  # min finding severity that gates (high|medium|low|critical|blocking).
