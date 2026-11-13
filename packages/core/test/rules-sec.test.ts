@@ -600,13 +600,126 @@ describe("SEC-005 duplicate headings", () => {
   });
 });
 
+describe("SEC-006 emphasis as heading", () => {
+  it("reports a standalone emphasis paragraph, but not a sentence or one inside a container", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": [
+        "# Title",
+        "",
+        "**Installation**",
+        "",
+        "_Usage_",
+        "",
+        "**A bold sentence.**",
+        "",
+        "- **In a list**",
+        "",
+        "> **In a quote**",
+        "",
+        "| Col |",
+        "| --- |",
+        "| **In a cell** |",
+        "",
+      ].join("\n"),
+    });
+
+    const result = await lint(cwd, [rule("SEC-006")]);
+    expect(
+      result.messages.map(({ ruleId, filePath, line, message }) => ({
+        ruleId,
+        filePath,
+        line,
+        message,
+      })),
+    ).toEqual([
+      {
+        ruleId: "SEC-006",
+        filePath: "a.md",
+        line: 3,
+        message: 'Emphasis used instead of a heading: "Installation".',
+      },
+      {
+        ruleId: "SEC-006",
+        filePath: "a.md",
+        line: 5,
+        message: 'Emphasis used instead of a heading: "Usage".',
+      },
+    ]);
+  });
+
+  it("validates its options and resolves bare", () => {
+    expect(() => ruleRegistry.resolveRule("SEC-006")).not.toThrow();
+    expect(() =>
+      ruleRegistry.resolveRule("SEC-006", { punctuation: "" }),
+    ).not.toThrow();
+    for (const options of [{ punctuation: 1 }, { bogus: true }]) {
+      expect(() => ruleRegistry.resolveRule("SEC-006", options)).toThrow(
+        RuleResolutionError,
+      );
+    }
+  });
+
+  it("honours an inline disable on the paragraph", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "# T\n\n<!-- wastech-mdlint-disable-next-line SEC-006 -->\n**Installation**\n",
+    });
+
+    const result = await lint(cwd, [rule("SEC-006")]);
+    expect(result.messages).toEqual([]);
+  });
+
+  // STR-001 is a project-scope existence check that never reads paragraphs, so the two rules cannot
+  // describe the same defect; this pins that running both yields each rule's own finding once.
+  it("does not double-report with STR-001", async () => {
+    const cwd = await fixtureRepo({ "a.md": "# T\n\n**Installation**\n" });
+
+    const both = await lint(cwd, [
+      rule("STR-001", { files: ["MISSING.md"] }),
+      rule("SEC-006"),
+    ]);
+    expect(
+      both.messages.map(({ ruleId, filePath, line }) => ({
+        ruleId,
+        filePath,
+        line,
+      })),
+    ).toEqual([
+      { ruleId: "STR-001", filePath: "MISSING.md", line: 0 },
+      { ruleId: "SEC-006", filePath: "a.md", line: 3 },
+    ]);
+
+    const strOnly = await lint(cwd, [
+      rule("STR-001", { files: ["MISSING.md"] }),
+    ]);
+    expect(strOnly.messages.map((message) => message.filePath)).toEqual([
+      "MISSING.md",
+    ]);
+  });
+
+  // A document opening with `**Title**` has two separate defects — no title heading, and emphasis
+  // standing in for one — so SEC-004 and SEC-006 both report line 1 by design.
+  it("co-reports with SEC-004 on an emphasis title", async () => {
+    const cwd = await fixtureRepo({ "a.md": "**Title**\n\nText.\n" });
+
+    const result = await lint(cwd, [rule("SEC-004"), rule("SEC-006")]);
+    expect(
+      result.messages
+        .map(({ ruleId, line }) => `${ruleId}:${line}`)
+        .sort(compareStrings),
+    ).toEqual(["SEC-004:1", "SEC-006:1"]);
+  });
+});
+
 // The SEC half of the shared `exclude` matrix. One fixture serves every case: both documents
 // violate each one (the `#### Overview` jump from H2 is what trips SEC-004, and the sibling
-// `## Usage` repeat trips SEC-005 in both of its modes), while `templates/t.md` satisfies
-// SEC-001/SEC-002 (it has `Summary`, and neither `Overview` nor `Usage`, which `sectionOrder`
-// skips), passes SEC-004 (one leading H1, levels step by one) and SEC-005 (no repeated heading), and
-// is self-skipped by SEC-003.
-const SECTION_DOC = "# Title\n\n## Usage\n\n#### Overview\n\n## Usage\n";
+// `## Usage` repeat trips SEC-005 in both of its modes, and the `**Stand-in**` paragraph trips
+// SEC-006), while `templates/t.md` satisfies SEC-001/SEC-002 (it has `Summary`, and neither
+// `Overview` nor `Usage`, which `sectionOrder` skips), passes SEC-004 (one leading H1, levels step
+// by one), SEC-005 (no repeated heading) and SEC-006 (no emphasis paragraph), and is self-skipped
+// by SEC-003.
+const SECTION_DOC =
+  "# Title\n\n## Usage\n\n#### Overview\n\n## Usage\n\n**Stand-in**\n";
 const SECTION_TEMPLATE = "# T\n\n## Context\n\n## Summary\n";
 
 const SEC_SCOPE_CASES: readonly { id: string; options: object }[] = [
@@ -620,6 +733,7 @@ const SEC_SCOPE_CASES: readonly { id: string; options: object }[] = [
   { id: "SEC-004", options: {} },
   { id: "SEC-005", options: {} },
   { id: "SEC-005", options: { siblingsOnly: true } },
+  { id: "SEC-006", options: {} },
 ];
 
 describe("SEC file scope (exclude)", () => {

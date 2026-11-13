@@ -2,7 +2,7 @@
 
 > [Guide index](README.md) · [Configuration guide](configuration.md) · [Rules index](rules/README.md)
 
-This is a single `wastech-mdlint.config.json` that exercises **every** option the linter accepts, with a comment on each. It is a _reference_, not a recommended starting config — you would never enable all 30 rules at once with every option. Copy the pieces you need. For a curated starter, run [`wastech-mdlint init`](cli.md#init).
+This is a single `wastech-mdlint.config.json` that exercises **every** option the linter accepts, with a comment on each. It is a _reference_, not a recommended starting config — you would never enable all 31 rules at once with every option. Copy the pieces you need. For a curated starter, run [`wastech-mdlint init`](cli.md#init).
 
 Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys — top-level, in any rule's `options`, or under `compile` — are rejected. Every field below is drawn from the generated schema (`wastech-mdlint schema`).
 
@@ -181,6 +181,13 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
       "rule": "SEC-005",
       "options": {
         "siblingsOnly": false, // only compare headings under the same parent at the same depth (optional)
+      },
+    },
+    // SEC-006: a bold or italic paragraph is not used in place of a heading.
+    {
+      "rule": "SEC-006",
+      "options": {
+        "punctuation": ".,;:!?。，；：！？", // final characters that exempt the text; "" exempts nothing (optional)
       },
     },
 

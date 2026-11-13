@@ -19,6 +19,10 @@ import { sectionOrder, sectionPresent } from "../primitives/section.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
 import { duplicateHeadingFindings } from "./sec-duplicate-headings.js";
+import {
+  DEFAULT_EMPHASIS_PUNCTUATION,
+  emphasisHeadingFindings,
+} from "./sec-emphasis-headings.js";
 import { headingLevelFindings } from "./sec-heading-levels.js";
 import {
   compileOutline,
@@ -362,6 +366,44 @@ export const sec005: RuleDefinition = defineRule({
   },
 });
 
+// SEC-006 — emphasis is not used in place of a heading. A paragraph that is only `**Installation**`
+// looks like a heading on the page but is a paragraph to every consumer of the outline: SEC-001 and
+// CTX-001 cannot find the section, a `section` option cannot name it, `slice` cannot cut at it, and
+// it gets no anchor to link to. The semantics follow markdownlint MD036 so a repository moving
+// between the two tools sees the same findings. `punctuation` is the set of final characters that
+// mark the run as a sentence or lead-in rather than a title; its default is applied with `??`
+// rather than a Zod `.default()`, matching SEC-003 to SEC-005, so the generated schema keeps every
+// option optional. An empty string is allowed and means no exemption, so even `**Note:**` reports.
+// Not fixable: choosing the heading level is a judgment call.
+export const sec006: RuleDefinition = defineRule({
+  metadata: {
+    id: "SEC-006",
+    category: "SEC",
+    description: "Emphasis is not used in place of a heading.",
+    // Outline hygiene meant to be enabled bare, like SEC-004 and SEC-005, so a warning is
+    // proportionate.
+    defaultSeverity: "warning",
+    scope: "document",
+    fixable: false,
+  },
+  optionsSchema: z
+    .object({
+      punctuation: z.string().optional(),
+      ...fileScopeShape,
+    })
+    .strict(),
+  check: (options) => (context) => {
+    if (!matchesFileScope(context.filePath!, options)) {
+      return;
+    }
+    for (const finding of emphasisHeadingFindings(context.document!, {
+      punctuation: options.punctuation ?? DEFAULT_EMPHASIS_PUNCTUATION,
+    })) {
+      context.report(finding);
+    }
+  },
+});
+
 // STR-001 — required files exist in the project (project). `files` here is the *required* set (each
 // entry is a path or glob), not file scoping.
 //
@@ -446,5 +488,6 @@ export const SEC_STR_RULES: readonly RuleDefinition[] = [
   sec003,
   sec004,
   sec005,
+  sec006,
   str001,
 ];

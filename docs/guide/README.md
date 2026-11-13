@@ -18,7 +18,7 @@ This guide is the full reference. For a one-page summary see the top-level [READ
 
 | Area | What it does | Doc |
 | --- | --- | --- |
-| **Rules & rule engine** | 30 built-in rules + a declarative `custom` rule over one parse pass. | [Rules](rules/README.md) |
+| **Rules & rule engine** | 31 built-in rules + a declarative `custom` rule over one parse pass. | [Rules](rules/README.md) |
 | **Configuration** | JSONC config, local `$schema`, per-rule severity/options, shared settings. | [Configuration](configuration.md) |
 | **Context graph** | `graph` / `slice` / `impact` over the reference graph between documents. | [Context graph](context-graph.md) |
 | **Context compiler** | `compile` generates a deterministic `SKILL.md` from the graph + rules + config. | [Compile](compile.md) |
@@ -30,10 +30,10 @@ This guide is the full reference. For a one-page summary see the top-level [READ
 
 ## Rules at a glance
 
-30 built-in rules across 9 categories, plus the declarative `custom` rule. See the [rules index](rules/README.md) for the full table with a page per rule.
+31 built-in rules across 9 categories, plus the declarative `custom` rule. See the [rules index](rules/README.md) for the full table with a page per rule.
 
 - **TBL** (tables) — [TBL-001](rules/TBL-001.md) … [TBL-007](rules/TBL-007.md)
-- **SEC** (sections) — [SEC-001](rules/SEC-001.md) … [SEC-005](rules/SEC-005.md)
+- **SEC** (sections) — [SEC-001](rules/SEC-001.md) … [SEC-006](rules/SEC-006.md)
 - **STR** (structure) — [STR-001](rules/STR-001.md)
 - **REF** (references) — [REF-001](rules/REF-001.md) … [REF-008](rules/REF-008.md)
 - **CTX** (content quality) — [CTX-001](rules/CTX-001.md) … [CTX-003](rules/CTX-003.md)

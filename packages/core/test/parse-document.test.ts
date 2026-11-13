@@ -1268,3 +1268,52 @@ describe("parseDocument · first block", () => {
     });
   });
 });
+
+describe("parseDocument · emphasis paragraphs", () => {
+  const emphasis = (content: string) => parse(content).emphasisParagraphs;
+
+  it("records a top-level strong or emphasis paragraph with its kind and line", () => {
+    expect(emphasis("# T\n\n**Installation**\n\n_Usage_\n")).toEqual([
+      { text: "Installation", kind: "strong", line: 3 },
+      { text: "Usage", kind: "emphasis", line: 5 },
+    ]);
+    expect(emphasis("__A__\n\n*B*\n")).toEqual([
+      { text: "A", kind: "strong", line: 1 },
+      { text: "B", kind: "emphasis", line: 3 },
+    ]);
+  });
+
+  // Anything besides a single plain-text run is styled prose, not a stand-in heading.
+  it("skips mixed paragraphs and nested formatting, code or links", () => {
+    expect(emphasis("**A** text\n")).toEqual([]);
+    expect(emphasis("**A**\\\n")).toEqual([]);
+    expect(emphasis("***A***\n")).toEqual([]);
+    expect(emphasis("**Install `npm`**\n")).toEqual([]);
+    expect(emphasis("**[link](x.md)**\n")).toEqual([]);
+  });
+
+  it("skips emphasis inside a list item, blockquote or table cell", () => {
+    expect(emphasis("- **A**\n")).toEqual([]);
+    expect(emphasis("> **A**\n")).toEqual([]);
+    expect(emphasis("| H |\n| --- |\n| **A** |\n")).toEqual([]);
+  });
+
+  it("does not record a setext heading whose text is emphasis", () => {
+    expect(emphasis("**A**\n---\n")).toEqual([]);
+  });
+
+  it("keeps multi-line text for the rule to judge", () => {
+    expect(emphasis("**A\nB**\n")).toEqual([
+      { text: "A\nB", kind: "strong", line: 1 },
+    ]);
+  });
+
+  it("reports the real line after front matter and under CRLF", () => {
+    expect(emphasis("---\ntitle: X\n---\n\n**A**\n")).toEqual([
+      { text: "A", kind: "strong", line: 5 },
+    ]);
+    expect(emphasis("# T\r\n\r\n**A**\r\n")).toEqual([
+      { text: "A", kind: "strong", line: 3 },
+    ]);
+  });
+});

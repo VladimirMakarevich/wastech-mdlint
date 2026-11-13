@@ -1,6 +1,7 @@
 import GithubSlugger from "github-slugger";
 import type {
   Definition,
+  Emphasis,
   Heading,
   Html,
   Image,
@@ -10,6 +11,7 @@ import type {
   LinkReference,
   ListItem,
   Root,
+  Strong,
   Table,
   TableCell,
   TableRow,
@@ -29,6 +31,7 @@ import type {
   InlineDirectiveKind,
   ParsedCheckItem,
   ParsedDocument,
+  ParsedEmphasisParagraph,
   ParsedFirstBlock,
   ParsedFrontmatter,
   ParsedHeading,
@@ -196,6 +199,36 @@ function extractFirstBlock(tree: Root): ParsedFirstBlock | null {
     return { type: node.type, line: node.position?.start.line ?? 0 };
   }
   return null;
+}
+
+// Top-level paragraphs made of exactly one `strong`/`emphasis` node whose only child is `text`.
+// Iterating `tree.children` rather than `visit`ing the tree is what excludes list items,
+// blockquotes, footnote definitions and table cells without any ancestor tracking: their paragraphs
+// are never direct children of the root. Nested formatting (`***x***`), inline code or a link inside
+// the emphasis is not plain text, so it is not recorded — matching markdownlint MD036, which treats
+// such a run as styled prose rather than a stand-in heading. A setext-underlined `**x**` is a
+// `heading` node and so never reaches here.
+function extractEmphasisParagraphs(tree: Root): ParsedEmphasisParagraph[] {
+  const found: ParsedEmphasisParagraph[] = [];
+  for (const node of tree.children) {
+    if (node.type !== "paragraph" || node.children.length !== 1) {
+      continue;
+    }
+    const inline = node.children[0]!;
+    if (inline.type !== "strong" && inline.type !== "emphasis") {
+      continue;
+    }
+    const inner = (inline as Strong | Emphasis).children;
+    if (inner.length !== 1 || inner[0]!.type !== "text") {
+      continue;
+    }
+    found.push({
+      text: (inner[0] as Text).value,
+      kind: inline.type,
+      line: node.position?.start.line ?? 0,
+    });
+  }
+  return found;
 }
 
 function classifyLink(rawTarget: string): {
@@ -615,6 +648,7 @@ export function parseDocument(params: {
     directives,
     frontmatter: extractFrontmatter(tree),
     firstBlock: extractFirstBlock(tree),
+    emphasisParagraphs: extractEmphasisParagraphs(tree),
     content: params.content,
   };
 }

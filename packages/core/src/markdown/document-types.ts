@@ -32,6 +32,8 @@
 //   firstBlock → SEC-004 title check. A parse-pass fact rather than a scan of `content`, because
 //                deciding what comes "first" means skipping front matter, comments and link
 //                definitions, and a rule doing that over raw text would be re-parsing Markdown.
+//   emphasisParagraphs → SEC-006. A parse-pass fact because telling `**x**` from `**x** y` or
+//                `**x `y`**` is inline Markdown parsing, which a rule scanning `content` would redo.
 //   content    → CTX-001 placeholder scan, size/token estimation, raw fallbacks. Still the whole
 //                file, frontmatter bytes included, so byte/line counts match `wc` and every
 //                offset a fix or line lookup computes against it stays a true source offset.
@@ -198,6 +200,17 @@ export type ParsedFirstBlock = {
   line: number;
 };
 
+// A top-level paragraph whose only content is one `strong` or `emphasis` node holding plain text —
+// the shape of a line like `**Installation**` standing in for a heading. Only top-level paragraphs
+// are recorded: emphasis inside a list item, blockquote or table cell is inline styling of that
+// container, not a stand-in heading. Only the text value is kept, not the node, so the contract
+// stays small and serialisable. `line` is 1-based.
+export type ParsedEmphasisParagraph = {
+  text: string;
+  kind: "strong" | "emphasis";
+  line: number;
+};
+
 export type ParsedDocument = {
   // Repo-relative POSIX path. Not strictly parse output, but carried here because findings are
   // attributed by repo-relative path, and carrying it here fixes it deterministically at load
@@ -223,5 +236,7 @@ export type ParsedDocument = {
   // `null` when nothing renders (an empty file, or front matter alone); required for the same
   // reason as `frontmatter`.
   firstBlock: ParsedFirstBlock | null;
+  // Document order.
+  emphasisParagraphs: ParsedEmphasisParagraph[];
   content: string;
 };
