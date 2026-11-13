@@ -2,7 +2,7 @@
 
 > [Guide index](../README.md) · [Configuration](../configuration.md) · [Annotated config](../config-reference.md)
 
-`wastech-mdlint` ships **27 built-in rules** across 8 categories, plus the declarative [`custom`](custom.md) rule. Every rule has a Zod-validated options schema, a fixed **scope** (`document` = per file · `project` = once over the whole corpus), and a default **severity** (`error` | `warning`) you can override per entry. Enable rules in your [config](../configuration.md); most accept `files`/`exclude` to narrow their reach.
+`wastech-mdlint` ships **28 built-in rules** across 9 categories, plus the declarative [`custom`](custom.md) rule. Every rule has a Zod-validated options schema, a fixed **scope** (`document` = per file · `project` = once over the whole corpus), and a default **severity** (`error` | `warning`) you can override per entry. Enable rules in your [config](../configuration.md); most accept `files`/`exclude` to narrow their reach.
 
 > There is **no `CHK` category** — checklist completeness is [CTX-002](CTX-002.md).
 
@@ -37,6 +37,7 @@
 | [GRP-003](GRP-003.md) | GRP | project | warning | no | IDs are carried forward across pipeline stages. |
 | [SIZE-001](SIZE-001.md) | SIZE | document | warning | no | File stays within byte / line / token budgets. |
 | [LLM-001](LLM-001.md) | LLM | project | warning | no | Eager-import context stays within the per-entrypoint token budget. |
+| [FM-001](FM-001.md) | FM | document | error | no | Front matter is valid YAML and matches the declared keys, values and patterns. |
 | [custom](custom.md) | custom | derived | error | no | Declarative rule composed from a closed assertion vocabulary. |
 
 The built-in rows mirror the machine-generated table in the top-level [README](../../../README.md) (`npm run generate:docs`). The per-rule pages here add prose, options tables, and examples.
@@ -50,6 +51,7 @@ The built-in rows mirror the machine-generated table in the top-level [README](.
 - **CTX — content quality.** No empty/placeholder sections, checklist completeness, glossary term usage.
 - **GRP — graph integrity.** No cycles, no orphans, ID chains across stages — over the shared [context graph](../context-graph.md).
 - **SIZE / LLM — context hygiene.** Byte/line/token budgets per file, and eager-import token budgets per entrypoint.
+- **FM — front matter.** Front matter is valid YAML, carries its required keys, and holds allowed or patterned values.
 - **custom — declarative.** Compose the closed assertion vocabulary from config, no code.
 
 ## Severity & suppression

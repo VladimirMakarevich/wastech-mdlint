@@ -32,6 +32,7 @@ export type RuleCategory =
   | "GRP"
   | "SIZE"
   | "LLM"
+  | "FM"
   | "custom";
 
 // Shared, inheritable config settings. Rules read `ctx.settings`; per-rule options may

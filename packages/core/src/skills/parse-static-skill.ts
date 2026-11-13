@@ -5,11 +5,10 @@ import {
   type SkillValidationResult,
 } from "./skill-model.js";
 
-// Read and validate a committed `skills/<id>/SKILL.md` for CI. The repo deliberately ships
-// no YAML dependency — `synthesize` hand-renders frontmatter with the same posture — so this
-// reader hand-parses the *controlled* subset our static skills are authored in rather than pulling in
-// a parser: top-level `key: "double-quoted-scalar"` lines plus a single two-space-indented `metadata:`
-// map. Anything outside that subset (a bare/unquoted value, tab indent, a stray nesting level) is
+// Read and validate a committed `skills/<id>/SKILL.md` for CI. This reader hand-parses the
+// *controlled* subset our static skills are authored in — the subset `synthesize` hand-renders —
+// rather than accepting whatever a general YAML parser would: top-level `key: "double-quoted-scalar"`
+// lines plus a single two-space-indented `metadata:` map. Anything outside that subset (a bare/unquoted value, tab indent, a stray nesting level) is
 // surfaced as a validation issue, never silently mis-parsed — CI would rather fail loud than accept a
 // skill it did not actually understand.
 //

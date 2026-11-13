@@ -16,6 +16,7 @@ import type { ConfiguredRule } from "../src/config/load-config.js";
 import { compareStrings } from "../src/deterministic-sort.js";
 import { applyEdits, applyFixes, FixWriteError } from "../src/engine/fix.js";
 import { lintFiles } from "../src/engine/lint-files.js";
+import { RuleResolutionError } from "../src/engine/registry.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
 
 const tempDirs: string[] = [];
@@ -107,6 +108,34 @@ describe("TBL rules", () => {
     ]);
     expect(result.messages.map((message) => message.data?.value)).toEqual([
       "BUG-1",
+    ]);
+  });
+
+  // `\u{110000}` is a valid pattern on its own and `u` valid flags on their own, but together they do
+  // not compile. Checked only field by field, this config loaded and then threw mid-lint.
+  it("TBL-004 rejects a pattern that is invalid only under its flags, at resolution", () => {
+    expect(() =>
+      ruleRegistry.resolveRule("TBL-004", {
+        column: "ID",
+        pattern: "\\u{110000}",
+      }),
+    ).not.toThrow();
+    let thrown: unknown;
+    try {
+      ruleRegistry.resolveRule("TBL-004", {
+        column: "ID",
+        pattern: "\\u{110000}",
+        flags: "u",
+      });
+    } catch (error: unknown) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(RuleResolutionError);
+    expect((thrown as RuleResolutionError).issues).toEqual([
+      expect.objectContaining({
+        path: ["options", "pattern"],
+        message: "expected a valid regular expression under the given flags",
+      }),
     ]);
   });
 

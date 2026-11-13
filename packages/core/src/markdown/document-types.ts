@@ -22,10 +22,11 @@
 //                so no reader can follow it.
 // imports → LLM eager-import budget (SIZE/LLM rules), import graph edges
 //   directives → inline-disable suppression (applied engine-side, not by the parser)
-//   frontmatter → no rule reads it yet; it is exposed so frontmatter-aware rules can be added
-//                 without re-parsing. Recognising the block matters even with no reader: a YAML
-//                 block between two `---` fences would otherwise parse as a thematic break plus
-//                 a setext H2, inventing a heading, section and slug, and any link, `@import` or
+//   frontmatter → FM-001 and the `frontmatterRequired`/`frontmatterInSet`/`frontmatterMatches`
+//                 custom kinds, all through `parsed`, so the YAML is parsed once here and never by
+//                 a rule. Recognising the block matters beyond those readers: a YAML block between
+//                 two `---` fences would otherwise parse as a thematic break plus a setext H2,
+//                 inventing a heading, section and slug, and any link, `@import` or
 //                 directive-looking text inside it would be extracted as if it were prose.
 //   content    → CTX-001 placeholder scan, size/token estimation, raw fallbacks. Still the whole
 //                file, frontmatter bytes included, so byte/line counts match `wc` and every
@@ -156,8 +157,23 @@ export type InlineDirective = {
   line: number;
 };
 
-// A YAML frontmatter block. Only the raw text is exposed: core has no YAML parser, so turning it
-// into a structured value is left to whichever consumer first needs one.
+// A front matter value under the failsafe YAML schema: every scalar is a string with no number,
+// boolean or date coercion (YAML's own quoting, escapes and block scalars are still decoded), an
+// empty value is "", and an empty block is `null`.
+export type FrontmatterValue =
+  | string
+  | null
+  | FrontmatterValue[]
+  | { [key: string]: FrontmatterValue };
+
+// The block parsed as YAML, or why it could not be. A structured error rather than a throw, so one
+// malformed block becomes one finding instead of aborting the run. `line` is a 1-based file line.
+export type FrontmatterParseResult =
+  | { ok: true; value: FrontmatterValue }
+  | { ok: false; error: { message: string; line: number } };
+
+// A YAML frontmatter block: the raw text plus its one YAML parse, done in the parse pass so no
+// consumer parses it again.
 export type ParsedFrontmatter = {
   // Text between the fences, fences excluded, line endings normalised to "\n" so a CRLF checkout
   // of the same committed file exposes the identical string.
@@ -167,6 +183,7 @@ export type ParsedFrontmatter = {
   startLine: number;
   // 1-based line of the closing fence; the range is inclusive of both fences.
   endLine: number;
+  parsed: FrontmatterParseResult;
 };
 
 export type ParsedDocument = {

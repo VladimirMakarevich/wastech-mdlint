@@ -787,6 +787,10 @@ describe("parseDocument · frontmatter", () => {
       raw: "name: demo-skill\ndescription: does a thing",
       startLine: 1,
       endLine: 4,
+      parsed: {
+        ok: true,
+        value: { name: "demo-skill", description: "does a thing" },
+      },
     });
   });
 
@@ -868,6 +872,9 @@ describe("parseDocument · frontmatter", () => {
       raw: "\n# Heading\n\ntext\n",
       startLine: 1,
       endLine: 7,
+      // As YAML the swallowed text is a comment plus a plain scalar, so it parses to a string root;
+      // FM-001 reports that shape rather than accepting it as a mapping.
+      parsed: { ok: true, value: "text" },
     });
     expect(doc.headings).toEqual([
       { text: "After", depth: 1, slug: "after", line: 9 },
@@ -877,7 +884,12 @@ describe("parseDocument · frontmatter", () => {
   it("recognises an empty block", () => {
     const doc = parse("---\n---\n# T\n");
 
-    expect(doc.frontmatter).toEqual({ raw: "", startLine: 1, endLine: 2 });
+    expect(doc.frontmatter).toEqual({
+      raw: "",
+      startLine: 1,
+      endLine: 2,
+      parsed: { ok: true, value: null },
+    });
     expect(doc.headings).toEqual([{ text: "T", depth: 1, slug: "t", line: 3 }]);
   });
 
@@ -890,6 +902,10 @@ describe("parseDocument · frontmatter", () => {
       raw: "name: demo-skill\ndescription: does a thing",
       startLine: 1,
       endLine: 4,
+      parsed: {
+        ok: true,
+        value: { name: "demo-skill", description: "does a thing" },
+      },
     });
     expect(doc.headings).toEqual([
       { text: "Title", depth: 1, slug: "title", line: 6 },
@@ -903,6 +919,10 @@ describe("parseDocument · frontmatter", () => {
       raw: "name: demo-skill\ndescription: does a thing",
       startLine: 1,
       endLine: 4,
+      parsed: {
+        ok: true,
+        value: { name: "demo-skill", description: "does a thing" },
+      },
     });
     expect(doc.headings.map((heading) => heading.slug)).toEqual(["title"]);
   });
@@ -931,6 +951,148 @@ describe("parseDocument · frontmatter", () => {
     expect(doc.directives).toEqual([
       { kind: "disable-next-line", ruleIds: ["REF-001"], line: 9 },
     ]);
+  });
+});
+
+// The YAML parse happens once, here, and every front matter reader trusts it. These pins are the
+// security and schema-semantics contract: values stay the author's strings, nothing is constructed
+// from a tag, and every way the parser could guess or blow up is a structured error instead.
+describe("parseDocument · frontmatter YAML", () => {
+  function parsed(block: string) {
+    return parse(`---\n${block}\n---\n\n# T\n`).frontmatter?.parsed;
+  }
+
+  it("keeps every scalar as the string the author wrote (failsafe schema)", () => {
+    expect(
+      parsed(
+        "version: 1.10\nenabled: yes\ncount: 007\ndate: 2026-01-01\nempty:\ntags: [a, b]\nowner:\n  team: core",
+      ),
+    ).toEqual({
+      ok: true,
+      value: {
+        version: "1.10",
+        enabled: "yes",
+        count: "007",
+        date: "2026-01-01",
+        empty: "",
+        tags: ["a", "b"],
+        owner: { team: "core" },
+      },
+    });
+  });
+
+  // No type resolution is not the same as no decoding: YAML's string syntax still applies, so a
+  // value checked against an allowed set or pattern is the decoded string, not the source bytes.
+  it("still decodes quotes, escapes and block scalars as YAML defines them", () => {
+    expect(
+      parsed(
+        "a: \"x\\u0041\"\nb: 'it''s'\nc: |\n  accepted\nd: |-\n  accepted\ne: >-\n  one\n  two",
+      ),
+    ).toEqual({
+      ok: true,
+      value: {
+        a: "xA",
+        b: "it's",
+        c: "accepted\n",
+        d: "accepted",
+        e: "one two",
+      },
+    });
+  });
+
+  it("reports invalid YAML at the file line of the first problem, as one line", () => {
+    const result = parsed("title: ok\nbad: [unclosed");
+
+    expect(result?.ok).toBe(false);
+    if (result?.ok === false) {
+      expect(result.error.line).toBe(3);
+      expect(result.error.message).not.toContain("\n");
+    }
+  });
+
+  it("treats a duplicate key as invalid rather than last-one-wins", () => {
+    expect(parsed("a: 1\na: 2")).toEqual({
+      ok: false,
+      error: { message: "Map keys must be unique", line: 3 },
+    });
+  });
+
+  it("treats an unknown or non-failsafe tag as invalid and constructs nothing", () => {
+    for (const block of [
+      "a: !!js/function 'x'",
+      "a: !custom 1",
+      "a: !!int 3",
+    ]) {
+      const result = parsed(block);
+      expect(result?.ok, block).toBe(false);
+      if (result?.ok === false) {
+        expect(result.error.line).toBe(2);
+        expect(result.error.message).toMatch(/^Unresolved tag/u);
+      }
+    }
+  });
+
+  it("treats a collection used as a key as invalid instead of stringifying it", () => {
+    expect(parsed("? [a, b]\n: x")).toEqual({
+      ok: false,
+      error: { message: "Mapping keys must be plain scalars", line: 2 },
+    });
+  });
+
+  it("keeps a `__proto__` key as an own property without touching Object.prototype", () => {
+    const result = parsed("__proto__:\n  polluted: yes\nb: 1");
+
+    expect(result?.ok).toBe(true);
+    if (result?.ok === true) {
+      const value = result.value as Record<string, unknown>;
+      expect(Object.hasOwn(value, "__proto__")).toBe(true);
+      expect(Object.getPrototypeOf(value)).toBe(Object.prototype);
+    }
+    expect((Object.prototype as Record<string, unknown>).polluted).toBe(
+      undefined,
+    );
+  });
+
+  it("keeps `<<` an ordinary key instead of merging", () => {
+    expect(parsed("base: &b {x: 1}\nc:\n  <<: *b")).toEqual({
+      ok: true,
+      value: { base: { x: "1" }, c: { "<<": { x: "1" } } },
+    });
+  });
+
+  it("bounds alias expansion and reports it at the opening fence", () => {
+    const bomb = [
+      "a: &a [x, x, x, x, x, x, x, x, x]",
+      "b: &b [*a, *a, *a, *a, *a, *a, *a, *a, *a]",
+      "c: &c [*b, *b, *b, *b, *b, *b, *b, *b, *b]",
+      "d: &d [*c, *c, *c, *c, *c, *c, *c, *c, *c]",
+      "e: [*d, *d, *d, *d, *d, *d, *d, *d, *d]",
+    ].join("\n");
+    const result = parsed(bomb);
+
+    expect(result?.ok).toBe(false);
+    if (result?.ok === false) {
+      expect(result.error.line).toBe(1);
+    }
+  });
+
+  it("reports a second YAML document inside the block as invalid", () => {
+    // `...` ends a document without being a `---` fence, so the block holds two documents.
+    const result = parsed("a: 1\n...\nb: 2");
+
+    expect(result?.ok).toBe(false);
+  });
+
+  it("parses a non-mapping root as that value, leaving the shape check to the rules", () => {
+    expect(parsed("- a\n- b")).toEqual({ ok: true, value: ["a", "b"] });
+  });
+
+  it("gives a CRLF checkout the identical parse", () => {
+    const content = "---\nstatus: draft\nbad: [x\n---\n# T\n";
+
+    expect(parse(content.replace(/\n/g, "\r\n")).frontmatter?.parsed).toEqual(
+      parse(content).frontmatter?.parsed,
+    );
   });
 });
 

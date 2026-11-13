@@ -13,7 +13,12 @@ import {
   requiredColumns,
   rowCellCount,
 } from "../primitives/table.js";
-import { regexFlagsSchema, regexStringSchema } from "../regex.js";
+import {
+  isValidPatternWithFlags,
+  patternWithFlagsIssue,
+  regexFlagsSchema,
+  regexStringSchema,
+} from "../regex.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
 import type { TextEdit } from "../types.js";
@@ -227,7 +232,8 @@ export const tbl004: RuleDefinition = defineRule({
       section: z.string().optional(),
       ...fileScopeShape,
     })
-    .strict(),
+    .strict()
+    .refine(isValidPatternWithFlags, patternWithFlagsIssue),
   check: (options) => (context) => {
     if (!matchesFileScope(context.filePath!, options)) {
       return;

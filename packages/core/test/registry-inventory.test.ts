@@ -62,10 +62,12 @@ const EXPECTED: Record<string, { scope: RuleScope; severity: Severity }> = {
   "GRP-003": { scope: "project", severity: "warning" },
   "SIZE-001": { scope: "document", severity: "warning" },
   "LLM-001": { scope: "project", severity: "warning" },
+  "FM-001": { scope: "document", severity: "error" },
 };
 
 const EXPECTED_CATEGORIES = [
   "CTX",
+  "FM",
   "GRP",
   "LLM",
   "REF",
@@ -76,14 +78,14 @@ const EXPECTED_CATEGORIES = [
 ].sort(compareStrings);
 
 describe("BUILTIN_RULE_DEFINITIONS inventory", () => {
-  it("ships exactly the documented 27 rule ids", () => {
+  it("ships exactly the documented 28 rule ids", () => {
     const ids = BUILTIN_RULE_DEFINITIONS.map(
       (definition) => definition.metadata.id,
     ).sort(compareStrings);
     expect(ids).toEqual(Object.keys(EXPECTED).sort(compareStrings));
   });
 
-  it("ships exactly the documented 8 category prefixes (no CHK)", () => {
+  it("ships exactly the documented 9 category prefixes (no CHK)", () => {
     const categories = [
       ...new Set(
         BUILTIN_RULE_DEFINITIONS.map(
@@ -196,6 +198,7 @@ const FILE_SCOPED = [
   "CTX-002",
   "CTX-003",
   "GRP-002",
+  "FM-001",
 ].sort(compareStrings);
 
 // Same key, different meaning: REF-001/REF-003 filter the *link/image target* they are about to

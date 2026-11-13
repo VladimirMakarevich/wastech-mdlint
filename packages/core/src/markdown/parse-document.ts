@@ -41,6 +41,7 @@ import type {
   ParsedTableRow,
   ParsedUndefinedReference,
 } from "./document-types.js";
+import { parseFrontmatterYaml } from "./parse-frontmatter.js";
 import { extractReversedLinks } from "./reversed-links.js";
 import { extractUndefinedReferences } from "./undefined-references.js";
 
@@ -160,10 +161,13 @@ function extractFrontmatter(tree: Root): ParsedFrontmatter | null {
   // LF-normalised so a CRLF checkout (`core.autocrlf` on Windows) exposes the same string as the
   // committed file. Only line numbers are exposed, never offsets, so normalising cannot put
   // anything out of step with `content`.
+  const raw = node.value.replace(/\r\n?/g, "\n");
+  const startLine = node.position?.start.line ?? 1;
   return {
-    raw: node.value.replace(/\r\n?/g, "\n"),
-    startLine: node.position?.start.line ?? 1,
+    raw,
+    startLine,
     endLine: node.position?.end.line ?? 1,
+    parsed: parseFrontmatterYaml(raw, startLine),
   };
 }
 

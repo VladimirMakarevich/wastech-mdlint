@@ -6,6 +6,8 @@
 
 // Parser
 export type {
+  FrontmatterParseResult,
+  FrontmatterValue,
   InlineDirective,
   InlineDirectiveKind,
   ParsedCheckItem,
