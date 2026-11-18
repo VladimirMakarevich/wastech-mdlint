@@ -6,6 +6,10 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0]
+
+Breaking for a config with a `custom` rule whose ID starts with `FM-` or spells a built-in rule's alias in uppercase, for one relying on `TBL-002` to report a row shorter than its header, for a file whose first line is a `---` horizontal rule, and for an inline directive naming an unknown rule category such as `REF_001`, which is now reported as an error — see Added and Fixed.
+
 ### Added
 
 - Every built-in rule has a readable alias, such as `no-broken-anchors` for `REF-002`, accepted in any case wherever a rule ID is: a config entry's `rule`, the MCP `lint` tool's `rules`, and inline suppression directives, so `<!-- wastech-mdlint-disable-next-line no-broken-anchors -->` says what it silences. Findings, reports and written configs keep the canonical ID. Naming one rule by its ID in one entry and by its alias in another is a config error that names both entries; repeating one spelling stays valid. A `custom` rule ID can no longer be an alias in uppercase (`NO-BROKEN-ANCHORS`), since a directive resolves that token to the built-in rule in any case, leaving the custom rule ambiguous and unsuppressible by its own ID. `schema.json` accepts the alias as a rule's `rule` value, the README rule table and each rule page show the alias, and `init --on-existing merge` rewrites an existing alias entry to its ID.
@@ -134,7 +138,8 @@ First public release. Published manually and carries no provenance attestation; 
 - Windows, macOS, and Linux are all supported: paths in public output are normalized to repository-relative POSIX form, ordering uses a code-point comparator rather than locale collation, and every product file is written through an atomic temp-and-rename path so a failed write cannot truncate an existing file.
 - All analysis is local. No external HTTP link checking, no link cache, no remote schema resolution, and no install-time file writes.
 
-[unreleased]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.2.2...HEAD
+[unreleased]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.1.3...v0.2.0
