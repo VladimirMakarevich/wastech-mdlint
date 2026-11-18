@@ -8,7 +8,9 @@
 //     the one a rule does *not* supply: the runner copies it from the rule's `docsUrl` so it is a
 // real documentation URL rather than a restatement of `ruleId`.
 // - Fail-fast: a project rule with no `documents` throws rather than silently no-oping.
-// - Fixes: an optional `fix?` hook returns offset-based `TextEdit`s over the raw content.
+// - Fixes: an optional `fix?` hook returns offset-based `TextEdit`s over the raw content of
+//     `context.document`. `applyFixes` calls it once per document for both scopes, so a
+//     project-scope rule fixes by being handed each document in turn.
 
 import type { ContextGraph } from "../graph/context-graph-types.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
@@ -32,6 +34,7 @@ export type RuleCategory =
   | "GRP"
   | "SIZE"
   | "LLM"
+  | "FM"
   | "custom";
 
 // Shared, inheritable config settings. Rules read `ctx.settings`; per-rule options may
@@ -103,7 +106,8 @@ export type LintMessage = {
 
 // Runtime context handed to `rule.check()` / `rule.fix()`.
 //
-// `document`/`filePath` are present for document-scope rules (the file under lint). `documents`/
+// `document`/`filePath` are present for document-scope rules (the file under lint), and for every
+// `fix` call whatever the rule's scope, since an edit always targets one document. `documents`/
 // `projectFiles` carry the whole corpus and are consumed by project rules and by cross-file
 // document rules (e.g. REF-001 resolving a link against the corpus). They are typed optional so the
 // project-scope fail-fast check is meaningful, but the orchestrator always supplies them.

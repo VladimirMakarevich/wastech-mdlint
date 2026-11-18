@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import type { LintMessage } from "@wastech-mdlint/core";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { lintMessageSchema } from "../src/shared/lint-message-schema.js";
 import { handleLint } from "../src/tools/lint.js";
 import {
   lintMessagesAsRows,
@@ -312,6 +313,34 @@ describe("handleLint", () => {
     expect(output.hint).toMatch(/already used by rules\[0\]/);
   });
 
+  it("accepts a rule alias and reports its findings under the canonical id", () => {
+    const result = handleLint({
+      content: "# Title\n\nsome body\nmore body\n",
+      rules: [{ rule: "file-size-budget", options: { lines: { error: 1 } } }],
+    });
+
+    expect(result.isError).toBeFalsy();
+    const messages = structured(result).messages as LintMessage[];
+    expect(messages.map((message) => message.ruleId)).toEqual(["SIZE-001"]);
+  });
+
+  it("rejects one rule spelled by id and by alias, naming both spellings and indices", () => {
+    // The config loader runs the same check from the same core helper; this tool never reaches the
+    // loader, so without its own call a request could mix spellings that a config cannot.
+    const result = handleLint({
+      content: "# Title\n",
+      rules: [{ rule: "REF-002" }, { rule: "no-broken-anchors" }],
+    });
+
+    expect(result.isError).toBe(true);
+    const output = structured(result);
+    expect(output.code).toBe("INVALID_INPUT");
+    expect(output.message).toMatch(/spelled one way/);
+    expect(output.hint).toBe(
+      'rules[1].rule: rule "no-broken-anchors" names "REF-002", which rules[0] names as "REF-002" — spell every entry for one rule the same way.',
+    );
+  });
+
   it("selects nothing when a custom rule's `files` glob misses the synthetic path", () => {
     // The document is always `content.md`, so a caller-supplied glob scoped to a directory silently
     // matches no file — the foot-gun the tool description now discloses.
@@ -366,6 +395,29 @@ describe("handleLint", () => {
     expect(
       (structured(unsuppressed).messages as LintMessage[]).length,
     ).toBeGreaterThan(0);
+  });
+
+  it("returns a malformed directive as a DIRECTIVE finding that fits the wire schema", () => {
+    // Directive diagnostics are produced in core, so this tool gets them with no code of its own;
+    // what this pins is that the message crosses the tool's output schema intact.
+    const result = handleLint({
+      content: "# Title\n\n<!-- wastech-mdlint-disable FOO -->\n",
+      rules: [{ rule: "REF-001" }],
+    });
+
+    expect(result.isError).toBeFalsy();
+    const output = structured(result);
+    const messages = output.messages as LintMessage[];
+    expect(messages).toHaveLength(1);
+    expect(lintMessageSchema.parse(messages[0])).toEqual(messages[0]);
+    expect(messages[0]).toMatchObject({
+      ruleId: "DIRECTIVE",
+      severity: "error",
+      line: 3,
+      helpUri:
+        "https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/suppression.md",
+    });
+    expect(output.errorCount).toBe(1);
   });
 
   it("reports SEC-003's config-attributed finding for a missing template (no crash)", () => {

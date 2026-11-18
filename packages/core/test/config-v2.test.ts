@@ -24,6 +24,7 @@ const registry = new RuleRegistry([
   defineRule({
     metadata: {
       id: "REF-001",
+      alias: "no-broken-links",
       category: "REF",
       description: "links resolve",
       defaultSeverity: "error",
@@ -38,6 +39,7 @@ const registry = new RuleRegistry([
   defineRule({
     metadata: {
       id: "SIZE-001",
+      alias: "file-size-budget",
       category: "SIZE",
       description: "size budget",
       defaultSeverity: "warning",
@@ -150,6 +152,61 @@ describe("loadConfiguration", () => {
     );
     await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(
       /rules\[0\]: Unknown rule "REF-009"\. Did you mean "REF-001"\?/,
+    );
+  });
+
+  it("accepts a rule alias and resolves it to the canonical id", async () => {
+    const root = await writeConfig(
+      JSON.stringify({ rules: [{ rule: "no-broken-links" }] }),
+    );
+    const loaded = await loadConfiguration({ cwd: root, registry });
+    expect(loaded.rules.map((configured) => configured.rule.id)).toEqual([
+      "REF-001",
+    ]);
+  });
+
+  it("rejects one rule spelled by id and by alias, naming both entries", async () => {
+    const root = await writeConfig(
+      JSON.stringify({
+        rules: [{ rule: "REF-001" }, { rule: "no-broken-links" }],
+      }),
+    );
+    const error = await loadConfiguration({ cwd: root, registry }).catch(
+      (caught: unknown) => caught,
+    );
+    expect(error).toBeInstanceOf(ConfigError);
+    expect((error as ConfigError).code).toBe("CONFIG_INVALID");
+    expect((error as ConfigError).message).toContain(
+      'rules[1].rule: rule "no-broken-links" names "REF-001", which config.rules[0] names as "REF-001"',
+    );
+  });
+
+  it("still accepts one rule repeated under one spelling", async () => {
+    const root = await writeConfig(
+      JSON.stringify({
+        rules: [{ rule: "no-broken-links" }, { rule: "no-broken-links" }],
+      }),
+    );
+    const loaded = await loadConfiguration({ cwd: root, registry });
+    expect(loaded.rules).toHaveLength(2);
+  });
+
+  it("rejects a custom id that is a built-in alias upper-cased", async () => {
+    const root = await writeConfig(
+      JSON.stringify({
+        rules: [
+          {
+            rule: "custom",
+            id: "NO-BROKEN-LINKS",
+            options: {
+              assert: { kind: "requiredColumns", columns: ["Owner"] },
+            },
+          },
+        ],
+      }),
+    );
+    await expect(loadConfiguration({ cwd: root, registry })).rejects.toThrow(
+      /rules\[0\]\.id: id "NO-BROKEN-LINKS": "no-broken-links" is the alias of built-in rule "REF-001"/,
     );
   });
 

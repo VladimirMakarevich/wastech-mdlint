@@ -2,8 +2,10 @@ import {
   customRuleEntrySchema,
   duplicateCustomIdMessage,
   findDuplicateCustomIds,
+  findMixedRuleSpellings,
   formatLintResultText,
   lintContent,
+  mixedRuleSpellingMessage,
   resolveCustomRule,
   ruleEntrySchema,
   ruleRegistry,
@@ -132,6 +134,22 @@ function resolveRequestedRules(
       `rules[${collision.index}].id: ${duplicateCustomIdMessage({
         id: collision.id,
         siblingPath: `rules[${collision.firstIndex}]`,
+      })}`,
+    );
+  }
+
+  // The same cross-entry check the config loader runs, from the same core helper and message, so a
+  // rule list written by id in one entry and by alias in another is refused identically on both
+  // hosts: on either, the reader would miss one of the two entries when searching for the rule.
+  const mixed = findMixedRuleSpellings(entries, ruleRegistry)[0];
+  if (mixed !== undefined) {
+    throw new ToolInputError(
+      "A rule must be spelled one way in one request.",
+      `rules[${mixed.index}].rule: ${mixedRuleSpellingMessage({
+        ruleId: mixed.ruleId,
+        spelling: mixed.spelling,
+        firstSpelling: mixed.firstSpelling,
+        siblingPath: `rules[${mixed.firstIndex}]`,
       })}`,
     );
   }

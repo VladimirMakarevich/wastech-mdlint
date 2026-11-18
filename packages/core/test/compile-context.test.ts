@@ -134,6 +134,27 @@ describe("compileContext", () => {
     expect(result.skillContent).toContain("exceeds 50");
   });
 
+  it("recognizes an LLM-001 entry written by its alias", async () => {
+    const root = await fixtureRepo({
+      "CLAUDE.md": "Preamble @docs/big.md\n",
+      "docs/big.md": `${"x".repeat(400)}\n`,
+    });
+    const config = loadedConfig({
+      include: ["**/*.md"],
+      compile: { skill: { name: "s", description: "d" } },
+      rules: [
+        {
+          rule: "context-token-budget",
+          options: { entrypoints: ["CLAUDE.md"], maxTokensPerEntrypoint: 50 },
+        },
+      ],
+    });
+
+    const result = await compileContext(config, root);
+
+    expect(result.skillContent).toContain("exceeds 50");
+  });
+
   it("uses the strictest matching LLM-001 threshold when multiple entries target the same file", async () => {
     // Finding: `rules[]` may configure LLM-001 more than once, and the engine evaluates every
     // entry independently — a later, stricter entry for the same file must not be silently

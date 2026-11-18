@@ -600,6 +600,7 @@ describe("inferRuleSet · registry drift safety", () => {
           defineRule({
             metadata: {
               id,
+              alias: `${id.toLowerCase()}-alias`,
               category: id.split("-")[0] as "REF" | "TBL" | "CTX" | "GRP",
               description: `${id} description`,
               defaultSeverity: "warning",

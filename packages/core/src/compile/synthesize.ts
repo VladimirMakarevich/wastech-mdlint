@@ -160,8 +160,9 @@ function renderFrontmatter(skill: {
   name: string;
   description: string;
 }): string {
-  // Hand-rendered YAML (no YAML dependency): `JSON.stringify` produces a valid YAML double-quoted
-  // scalar for any string, including one containing quotes or newlines.
+  // Hand-rendered YAML rather than a serializer: two fixed keys need no library, and `JSON.stringify`
+  // produces a valid YAML double-quoted scalar for any string, including one containing quotes or
+  // newlines.
   return `---\nname: ${JSON.stringify(skill.name)}\ndescription: ${JSON.stringify(skill.description)}\n---`;
 }
 

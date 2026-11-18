@@ -144,6 +144,16 @@ describe("describeRules", () => {
     ]);
   });
 
+  it("describes a built-in written by its alias under the canonical id", () => {
+    const [group] = describeRules(
+      [{ rule: "context-token-budget" }],
+      ruleRegistry,
+    );
+    expect(group?.rules).toEqual([
+      { id: "LLM-001", description: descriptionOf("LLM-001") },
+    ]);
+  });
+
   it("describes custom document and project rules from their target plus assertion summary", () => {
     const configuredRules: CustomRuleConfigEntry[] = [
       {
@@ -238,6 +248,71 @@ describe("describeRules", () => {
         id: "REQ-LOOSE",
         description:
           'Custom table rule: requires values in column "Status" to be one of "open" and "done" (case-insensitive).',
+      },
+    ]);
+  });
+
+  it("describes the front matter kinds under the frontmatter target, and FM-001 under its own category", () => {
+    const configuredRules: Array<RuleConfigEntry | CustomRuleConfigEntry> = [
+      { rule: "FM-001" },
+      {
+        rule: "custom",
+        id: "ADR-KEYS",
+        options: {
+          assert: { kind: "frontmatterRequired", keys: ["owner", "status"] },
+        },
+      },
+      {
+        rule: "custom",
+        id: "ADR-STATUS",
+        options: {
+          assert: {
+            kind: "frontmatterInSet",
+            key: "status",
+            values: ["proposed", "accepted"],
+          },
+        },
+      },
+      {
+        rule: "custom",
+        id: "ADR-ID",
+        options: {
+          assert: {
+            kind: "frontmatterMatches",
+            key: "id",
+            pattern: "^ADR-\\d+$",
+            flags: "i",
+          },
+        },
+      },
+    ];
+
+    expect(describeRules(configuredRules, ruleRegistry)).toEqual([
+      {
+        category: "FM",
+        label: "Front Matter",
+        rules: [{ id: "FM-001", description: descriptionOf("FM-001") }],
+      },
+      {
+        category: "custom",
+        label: "Custom",
+        rules: [
+          {
+            id: "ADR-ID",
+            description:
+              'Custom frontmatter rule: requires front matter key "id" to match /^ADR-\\d+$/i.',
+          },
+          {
+            id: "ADR-KEYS",
+            description:
+              'Custom frontmatter rule: requires front matter keys "owner" and "status".',
+          },
+          {
+            id: "ADR-STATUS",
+            description:
+              'Custom frontmatter rule: requires front matter key "status" to be one of "proposed" and "accepted".',
+          },
+        ],
       },
     ]);
   });

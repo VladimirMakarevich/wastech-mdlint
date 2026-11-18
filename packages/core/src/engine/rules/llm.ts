@@ -220,6 +220,7 @@ function collectEntrypointFindings(
 export const llm001: RuleDefinition = defineRule({
   metadata: {
     id: "LLM-001",
+    alias: "context-token-budget",
     category: "LLM",
     description:
       "Eager-import context stays within the per-entrypoint token budget.",

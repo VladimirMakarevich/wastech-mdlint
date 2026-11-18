@@ -180,7 +180,27 @@ describe("parseDocument · links & images", () => {
       kind: "local-file",
       line: 1,
       column: 1,
+      fragmentRange: { start: 22, end: 27 },
     });
+  });
+
+  it("records the visible label beside the source label only when inline HTML or a break differs", () => {
+    const doc = parse(
+      '[<em>here</em>](a.md) [`code` text](b.md) [<b></b>](c.md) [a\\\nb](d.md) [a<br>b](e.md) [a<br class="x">b](f.md) [a<brx>b](g.md)\n',
+    );
+
+    expect(
+      doc.links.map(({ text, visibleText }) => ({ text, visibleText })),
+    ).toEqual([
+      { text: "<em>here</em>", visibleText: "here" },
+      { text: "code text", visibleText: undefined },
+      { text: "<b></b>", visibleText: "" },
+      { text: "ab", visibleText: "a\nb" },
+      { text: "a<br>b", visibleText: "a\nb" },
+      { text: 'a<br class="x">b', visibleText: "a\nb" },
+      { text: "a<brx>b", visibleText: "ab" },
+    ]);
+    expect("visibleText" in doc.links[1]!).toBe(false);
   });
 
   it("classifies same-file anchors, external, mailto, and other schemes", () => {
@@ -223,8 +243,8 @@ describe("parseDocument · links & images", () => {
     const doc = parse("![doc](d.md)\nx ![png](a.png)\n");
 
     expect(doc.images).toEqual([
-      { rawTarget: "d.md", line: 1, column: 1 },
-      { rawTarget: "a.png", line: 2, column: 3 },
+      { rawTarget: "d.md", alt: "doc", line: 1, column: 1 },
+      { rawTarget: "a.png", alt: "png", line: 2, column: 3 },
     ]);
   });
 
@@ -232,14 +252,45 @@ describe("parseDocument · links & images", () => {
     const doc = parse("[a]() [b](#) [c](<>) ![d]()\n");
 
     expect(doc.links.map((link) => link.rawTarget)).toEqual(["", "#", ""]);
-    expect(doc.images).toEqual([{ rawTarget: "", line: 1, column: 22 }]);
+    expect(doc.images).toEqual([
+      { rawTarget: "", alt: "d", line: 1, column: 22 },
+    ]);
   });
 
   it("resolves reference-style image definitions (not just reference-style links)", () => {
     const doc = parse("![Diagram][d]\n\n[d]: assets/diagram.png\n");
     expect(doc.images).toEqual([
-      { rawTarget: "assets/diagram.png", line: 1, column: 1 },
+      { rawTarget: "assets/diagram.png", alt: "Diagram", line: 1, column: 1 },
     ]);
+  });
+
+  // CTX-005 judges `alt` alone, so its exact semantics are pinned here: whitespace is not trimmed
+  // by the parser (so the rule sees `" "`, not `""`), inline markup flattens to its text, and a
+  // reference image takes the alt from its own brackets — never from the definition — in all three
+  // reference forms.
+  it("records each image's alt text as the parser decoded it, inline and reference forms alike", () => {
+    const doc = parse(
+      '![](a.png) ![ ](b.png) ![diagram *of* `x`](c.png) ![a &amp; \\* b](e.png)\n\n![r][r] ![r][] ![r] ![][r]\n\n[r]: r.png "Title"\n',
+    );
+
+    expect(doc.images.map((image) => image.alt)).toEqual([
+      "",
+      " ",
+      "diagram of x",
+      "a & * b",
+      "r",
+      "r",
+      "r",
+      "",
+    ]);
+  });
+
+  it("does not collect raw HTML <img> as a parsed image", () => {
+    const doc = parse(
+      '<img src="d.png" alt="">\n\nText <img src="e.png"> here.\n',
+    );
+
+    expect(doc.images).toEqual([]);
   });
 });
 
@@ -391,6 +442,28 @@ describe("parseDocument · inline-disable directives", () => {
     const doc = parse("<!-- wastech-mdlint-disable ref001, tbl-2 -->\n");
 
     expect(doc.directives[0]?.ruleIds).toEqual(["REF-001", "TBL-2"]);
+  });
+
+  it("extracts disable-file / capture / restore and category tokens", () => {
+    // `disable-file` must not be read as `disable` with a `-file` token, and a category is kept as
+    // a canonical dash-less token for the engine to resolve.
+    const doc = parse(
+      [
+        "<!-- wastech-mdlint-capture -->",
+        "<!-- wastech-mdlint-disable ref -->",
+        "<!-- wastech-mdlint-restore -->",
+        "<!-- wastech-mdlint-disable-file size-001, Tbl -->",
+        "<!-- wastech-mdlint-capture REF-001 -->",
+      ].join("\n"),
+    );
+
+    expect(doc.directives).toEqual([
+      { kind: "capture", ruleIds: [], line: 1 },
+      { kind: "disable", ruleIds: ["REF"], line: 2 },
+      { kind: "restore", ruleIds: [], line: 3 },
+      { kind: "disable-file", ruleIds: ["SIZE-001", "TBL"], line: 4 },
+      { kind: "capture", ruleIds: ["REF-001"], line: 5 },
+    ]);
   });
 
   it("tolerates malformed or unknown directives (ignored, not fatal)", () => {
@@ -787,6 +860,10 @@ describe("parseDocument · frontmatter", () => {
       raw: "name: demo-skill\ndescription: does a thing",
       startLine: 1,
       endLine: 4,
+      parsed: {
+        ok: true,
+        value: { name: "demo-skill", description: "does a thing" },
+      },
     });
   });
 
@@ -868,6 +945,9 @@ describe("parseDocument · frontmatter", () => {
       raw: "\n# Heading\n\ntext\n",
       startLine: 1,
       endLine: 7,
+      // As YAML the swallowed text is a comment plus a plain scalar, so it parses to a string root;
+      // FM-001 reports that shape rather than accepting it as a mapping.
+      parsed: { ok: true, value: "text" },
     });
     expect(doc.headings).toEqual([
       { text: "After", depth: 1, slug: "after", line: 9 },
@@ -877,7 +957,12 @@ describe("parseDocument · frontmatter", () => {
   it("recognises an empty block", () => {
     const doc = parse("---\n---\n# T\n");
 
-    expect(doc.frontmatter).toEqual({ raw: "", startLine: 1, endLine: 2 });
+    expect(doc.frontmatter).toEqual({
+      raw: "",
+      startLine: 1,
+      endLine: 2,
+      parsed: { ok: true, value: null },
+    });
     expect(doc.headings).toEqual([{ text: "T", depth: 1, slug: "t", line: 3 }]);
   });
 
@@ -890,6 +975,10 @@ describe("parseDocument · frontmatter", () => {
       raw: "name: demo-skill\ndescription: does a thing",
       startLine: 1,
       endLine: 4,
+      parsed: {
+        ok: true,
+        value: { name: "demo-skill", description: "does a thing" },
+      },
     });
     expect(doc.headings).toEqual([
       { text: "Title", depth: 1, slug: "title", line: 6 },
@@ -903,6 +992,10 @@ describe("parseDocument · frontmatter", () => {
       raw: "name: demo-skill\ndescription: does a thing",
       startLine: 1,
       endLine: 4,
+      parsed: {
+        ok: true,
+        value: { name: "demo-skill", description: "does a thing" },
+      },
     });
     expect(doc.headings.map((heading) => heading.slug)).toEqual(["title"]);
   });
@@ -931,6 +1024,148 @@ describe("parseDocument · frontmatter", () => {
     expect(doc.directives).toEqual([
       { kind: "disable-next-line", ruleIds: ["REF-001"], line: 9 },
     ]);
+  });
+});
+
+// The YAML parse happens once, here, and every front matter reader trusts it. These pins are the
+// security and schema-semantics contract: values stay the author's strings, nothing is constructed
+// from a tag, and every way the parser could guess or blow up is a structured error instead.
+describe("parseDocument · frontmatter YAML", () => {
+  function parsed(block: string) {
+    return parse(`---\n${block}\n---\n\n# T\n`).frontmatter?.parsed;
+  }
+
+  it("keeps every scalar as the string the author wrote (failsafe schema)", () => {
+    expect(
+      parsed(
+        "version: 1.10\nenabled: yes\ncount: 007\ndate: 2026-01-01\nempty:\ntags: [a, b]\nowner:\n  team: core",
+      ),
+    ).toEqual({
+      ok: true,
+      value: {
+        version: "1.10",
+        enabled: "yes",
+        count: "007",
+        date: "2026-01-01",
+        empty: "",
+        tags: ["a", "b"],
+        owner: { team: "core" },
+      },
+    });
+  });
+
+  // No type resolution is not the same as no decoding: YAML's string syntax still applies, so a
+  // value checked against an allowed set or pattern is the decoded string, not the source bytes.
+  it("still decodes quotes, escapes and block scalars as YAML defines them", () => {
+    expect(
+      parsed(
+        "a: \"x\\u0041\"\nb: 'it''s'\nc: |\n  accepted\nd: |-\n  accepted\ne: >-\n  one\n  two",
+      ),
+    ).toEqual({
+      ok: true,
+      value: {
+        a: "xA",
+        b: "it's",
+        c: "accepted\n",
+        d: "accepted",
+        e: "one two",
+      },
+    });
+  });
+
+  it("reports invalid YAML at the file line of the first problem, as one line", () => {
+    const result = parsed("title: ok\nbad: [unclosed");
+
+    expect(result?.ok).toBe(false);
+    if (result?.ok === false) {
+      expect(result.error.line).toBe(3);
+      expect(result.error.message).not.toContain("\n");
+    }
+  });
+
+  it("treats a duplicate key as invalid rather than last-one-wins", () => {
+    expect(parsed("a: 1\na: 2")).toEqual({
+      ok: false,
+      error: { message: "Map keys must be unique", line: 3 },
+    });
+  });
+
+  it("treats an unknown or non-failsafe tag as invalid and constructs nothing", () => {
+    for (const block of [
+      "a: !!js/function 'x'",
+      "a: !custom 1",
+      "a: !!int 3",
+    ]) {
+      const result = parsed(block);
+      expect(result?.ok, block).toBe(false);
+      if (result?.ok === false) {
+        expect(result.error.line).toBe(2);
+        expect(result.error.message).toMatch(/^Unresolved tag/u);
+      }
+    }
+  });
+
+  it("treats a collection used as a key as invalid instead of stringifying it", () => {
+    expect(parsed("? [a, b]\n: x")).toEqual({
+      ok: false,
+      error: { message: "Mapping keys must be plain scalars", line: 2 },
+    });
+  });
+
+  it("keeps a `__proto__` key as an own property without touching Object.prototype", () => {
+    const result = parsed("__proto__:\n  polluted: yes\nb: 1");
+
+    expect(result?.ok).toBe(true);
+    if (result?.ok === true) {
+      const value = result.value as Record<string, unknown>;
+      expect(Object.hasOwn(value, "__proto__")).toBe(true);
+      expect(Object.getPrototypeOf(value)).toBe(Object.prototype);
+    }
+    expect((Object.prototype as Record<string, unknown>).polluted).toBe(
+      undefined,
+    );
+  });
+
+  it("keeps `<<` an ordinary key instead of merging", () => {
+    expect(parsed("base: &b {x: 1}\nc:\n  <<: *b")).toEqual({
+      ok: true,
+      value: { base: { x: "1" }, c: { "<<": { x: "1" } } },
+    });
+  });
+
+  it("bounds alias expansion and reports it at the opening fence", () => {
+    const bomb = [
+      "a: &a [x, x, x, x, x, x, x, x, x]",
+      "b: &b [*a, *a, *a, *a, *a, *a, *a, *a, *a]",
+      "c: &c [*b, *b, *b, *b, *b, *b, *b, *b, *b]",
+      "d: &d [*c, *c, *c, *c, *c, *c, *c, *c, *c]",
+      "e: [*d, *d, *d, *d, *d, *d, *d, *d, *d]",
+    ].join("\n");
+    const result = parsed(bomb);
+
+    expect(result?.ok).toBe(false);
+    if (result?.ok === false) {
+      expect(result.error.line).toBe(1);
+    }
+  });
+
+  it("reports a second YAML document inside the block as invalid", () => {
+    // `...` ends a document without being a `---` fence, so the block holds two documents.
+    const result = parsed("a: 1\n...\nb: 2");
+
+    expect(result?.ok).toBe(false);
+  });
+
+  it("parses a non-mapping root as that value, leaving the shape check to the rules", () => {
+    expect(parsed("- a\n- b")).toEqual({ ok: true, value: ["a", "b"] });
+  });
+
+  it("gives a CRLF checkout the identical parse", () => {
+    const content = "---\nstatus: draft\nbad: [x\n---\n# T\n";
+
+    expect(parse(content.replace(/\n/g, "\r\n")).frontmatter?.parsed).toEqual(
+      parse(content).frontmatter?.parsed,
+    );
   });
 });
 
@@ -1052,5 +1287,381 @@ describe("parseDocument · reversed links", () => {
 
   it("is an empty array for a plain document", () => {
     expect(reversed("# Plain\n\ntext (aside) here.\n")).toEqual([]);
+  });
+});
+
+describe("parseDocument · first block", () => {
+  const first = (content: string) => parse(content).firstBlock;
+
+  it("is null when nothing renders", () => {
+    expect(first("")).toBeNull();
+    expect(first("---\ntitle: X\n---\n")).toBeNull();
+    expect(first("<!-- only a comment -->\n")).toBeNull();
+  });
+
+  it("reports a leading heading at its real line, after front matter too", () => {
+    expect(first("# Title\n")).toEqual({ type: "heading", line: 1 });
+    expect(first("---\ntitle: X\n---\n\n# Title\n")).toEqual({
+      type: "heading",
+      line: 5,
+    });
+    expect(first("Title\n=====\n")).toEqual({ type: "heading", line: 1 });
+  });
+
+  it("reports leading prose as a paragraph", () => {
+    expect(first("Some text.\n\n# Title\n")).toEqual({
+      type: "paragraph",
+      line: 1,
+    });
+  });
+
+  it("skips comments, directives and link definitions, but not rendered HTML", () => {
+    expect(
+      first("<!-- wastech-mdlint-disable -->\n\n[x]: ./y.md\n\n# Title\n"),
+    ).toEqual({ type: "heading", line: 5 });
+    expect(first("<!-- a -->\n<!-- b -->\n\n# Title\n")).toEqual({
+      type: "heading",
+      line: 4,
+    });
+    expect(first('<img src="badge.svg">\n\n# Title\n')).toEqual({
+      type: "html",
+      line: 1,
+    });
+  });
+
+  // A heading inside a container is not a document title, so the container is what came first.
+  it("reports the container, not a heading nested inside it", () => {
+    expect(first("> # Quoted\n")).toEqual({ type: "blockquote", line: 1 });
+  });
+
+  it("gives the same lines for a CRLF document", () => {
+    expect(first("---\r\ntitle: X\r\n---\r\n\r\nText.\r\n")).toEqual({
+      type: "paragraph",
+      line: 5,
+    });
+  });
+});
+
+describe("parseDocument · emphasis paragraphs", () => {
+  const emphasis = (content: string) => parse(content).emphasisParagraphs;
+
+  it("records a top-level strong or emphasis paragraph with its kind and line", () => {
+    expect(emphasis("# T\n\n**Installation**\n\n_Usage_\n")).toEqual([
+      { text: "Installation", kind: "strong", line: 3 },
+      { text: "Usage", kind: "emphasis", line: 5 },
+    ]);
+    expect(emphasis("__A__\n\n*B*\n")).toEqual([
+      { text: "A", kind: "strong", line: 1 },
+      { text: "B", kind: "emphasis", line: 3 },
+    ]);
+  });
+
+  // Anything besides a single plain-text run is styled prose, not a stand-in heading.
+  it("skips mixed paragraphs and nested formatting, code or links", () => {
+    expect(emphasis("**A** text\n")).toEqual([]);
+    expect(emphasis("**A**\\\n")).toEqual([]);
+    expect(emphasis("***A***\n")).toEqual([]);
+    expect(emphasis("**Install `npm`**\n")).toEqual([]);
+    expect(emphasis("**[link](x.md)**\n")).toEqual([]);
+  });
+
+  it("skips emphasis inside a list item, blockquote or table cell", () => {
+    expect(emphasis("- **A**\n")).toEqual([]);
+    expect(emphasis("> **A**\n")).toEqual([]);
+    expect(emphasis("| H |\n| --- |\n| **A** |\n")).toEqual([]);
+  });
+
+  it("does not record a setext heading whose text is emphasis", () => {
+    expect(emphasis("**A**\n---\n")).toEqual([]);
+  });
+
+  it("keeps multi-line text for the rule to judge", () => {
+    expect(emphasis("**A\nB**\n")).toEqual([
+      { text: "A\nB", kind: "strong", line: 1 },
+    ]);
+  });
+
+  it("reports the real line after front matter and under CRLF", () => {
+    expect(emphasis("---\ntitle: X\n---\n\n**A**\n")).toEqual([
+      { text: "A", kind: "strong", line: 5 },
+    ]);
+    expect(emphasis("# T\r\n\r\n**A**\r\n")).toEqual([
+      { text: "A", kind: "strong", line: 3 },
+    ]);
+  });
+});
+
+describe("parseDocument · code fences", () => {
+  const fences = (content: string) => parse(content).codeFences;
+
+  it("records the language word, line and column of each fence in document order", () => {
+    expect(
+      fences("```bash\nls\n```\n\n~~~ js meta\nx\n~~~\n\n```BASH\nx\n```\n"),
+    ).toEqual([
+      { language: "bash", line: 1, column: 1 },
+      { language: "js", line: 5, column: 1 },
+      { language: "BASH", line: 9, column: 1 },
+    ]);
+  });
+
+  it("records an empty language for a bare or whitespace-only info string", () => {
+    expect(fences("```\nx\n```\n\n``` \nx\n```\n")).toEqual([
+      { language: "", line: 1, column: 1 },
+      { language: "", line: 5, column: 1 },
+    ]);
+  });
+
+  // The fenced/indented split reads the byte at the node's start offset, so these pin that it
+  // lands on the fence character wherever the fence sits.
+  it("records indented fences, fences in containers and an unclosed fence", () => {
+    expect(fences("   ```py\nx\n```\n")).toEqual([
+      { language: "py", line: 1, column: 4 },
+    ]);
+    expect(fences("> ```sh\n> x\n> ```\n")).toEqual([
+      { language: "sh", line: 1, column: 3 },
+    ]);
+    expect(fences("- item\n\n  ```json\n  {}\n  ```\n")).toEqual([
+      { language: "json", line: 3, column: 3 },
+    ]);
+    expect(fences("```txt\nnever closed\n")).toEqual([
+      { language: "txt", line: 1, column: 1 },
+    ]);
+  });
+
+  it("does not record indented code blocks, with spaces, a tab or inside a list", () => {
+    expect(fences("Text.\n\n    code\n")).toEqual([]);
+    expect(fences("Text.\n\n\tcode\n")).toEqual([]);
+    expect(fences("- item\n\n      code\n")).toEqual([]);
+  });
+
+  it("ignores fence-like text in front matter and reports real lines after it and under CRLF", () => {
+    expect(fences("---\nx: |\n  ```\n---\n\n```yaml\nk\n```\n")).toEqual([
+      { language: "yaml", line: 6, column: 1 },
+    ]);
+    expect(fences("# T\r\n\r\n```\r\nx\r\n```\r\n")).toEqual([
+      { language: "", line: 3, column: 1 },
+    ]);
+  });
+});
+
+// The source offsets a `--fix` writes to. Each one is asserted by slicing `content` with it, because
+// that is exactly what a fix does: an offset that is right on paper but wrong against the real
+// bytes is the defect these fields exist to prevent.
+describe("parseDocument · fix offsets", () => {
+  function fragmentText(content: string): (string | undefined)[] {
+    const doc = parse(content);
+    return doc.links.map((link) =>
+      link.fragmentRange === undefined
+        ? undefined
+        : content.slice(link.fragmentRange.start, link.fragmentRange.end),
+    );
+  }
+
+  it("records the fragment bytes of inline same-file and cross-file links", () => {
+    expect(
+      fragmentText(
+        "[a](#Demo) and [b](docs/b.md#Over-view) and [c]( <c.md#X> )\n",
+      ),
+    ).toEqual(["Demo", "Over-view", "X"]);
+  });
+
+  it("leaves fragmentRange unset where the bytes cannot be located exactly", () => {
+    expect(
+      fragmentText(
+        [
+          "[ref][r] [plain](b.md) [esc](#a\\_b) [ent](#a&amp;b) [web](https://x.y/#z)",
+          "",
+          "[r]: #shared",
+          "",
+        ].join("\n"),
+      ),
+    ).toEqual([undefined, undefined, undefined, undefined, undefined]);
+  });
+
+  it("records the fragment on CRLF input, including a destination on the next line", () => {
+    const content = "Intro\r\n\r\n[a](\r\n#Demo) and [b](#Two)\r\n";
+    expect(fragmentText(content)).toEqual(["Demo", "Two"]);
+  });
+
+  it("records reference definitions with label, offsets, top-level and referenced", () => {
+    const content = [
+      "[full][One] [Two][] [three] ![img][Four]",
+      "",
+      "[one]: a.md",
+      "[TWO]: b.md",
+      "[three]: c.md",
+      "[four]: d.png",
+      "[unused]: e.md",
+      "",
+      "> [quoted]: f.md",
+      "",
+    ].join("\r\n");
+    const doc = parse(content);
+    expect(
+      doc.referenceDefinitions.map((definition) => [
+        definition.label,
+        definition.line,
+        content.slice(definition.start, definition.end),
+        definition.topLevel,
+        definition.referenced,
+      ]),
+    ).toEqual([
+      ["one", 3, "[one]: a.md", true, true],
+      ["TWO", 4, "[TWO]: b.md", true, true],
+      ["three", 5, "[three]: c.md", true, true],
+      ["four", 6, "[four]: d.png", true, true],
+      ["unused", 7, "[unused]: e.md", true, false],
+      ["quoted", 9, "[quoted]: f.md", false, false],
+    ]);
+  });
+
+  it("excludes the label text of shortcut and collapsed references but keeps full-reference text", () => {
+    const content =
+      "[gql] [*gql* x][] [the gql][gql]\n\n[gql]: a.md\n[*gql* x]: b.md\n";
+    const doc = parse(content);
+    expect(
+      doc.textSpans.map((span) => content.slice(span.start, span.end)),
+    ).toEqual([" ", " ", "the gql"]);
+  });
+
+  it("records only the brackets the parse left as literal text", () => {
+    const content =
+      "[gql] and [real](a.md) and \\[esc\\] and [*x* y] and `[code]`\n";
+    const doc = parse(content);
+    expect(doc.literalBrackets.map((offset) => content[offset])).toEqual([
+      "[",
+      "]",
+      "[",
+      "]",
+    ]);
+    expect(doc.literalBrackets).toEqual([
+      0,
+      4,
+      content.indexOf("[*x*"),
+      content.indexOf("y]") + 1,
+    ]);
+  });
+
+  it("records only verbatim prose as text spans, with the heading slug where there is one", () => {
+    const content = [
+      "# Head *api*",
+      "",
+      "Use `api` and [the api](api.md) or <https://api.x> www.api.com &amp; x",
+      "",
+      "```",
+      "api",
+      "```",
+      "",
+      "<div>api</div>",
+      "",
+      "tail api\r\nline",
+      "",
+    ].join("\n");
+    const doc = parse(content);
+    expect(
+      doc.textSpans.map((span) => [
+        content.slice(span.start, span.end),
+        span.headingSlug,
+      ]),
+    ).toEqual([
+      ["Head ", "head-api"],
+      ["api", "head-api"],
+      ["Use ", undefined],
+      [" and ", undefined],
+      ["the api", undefined],
+      [" or ", undefined],
+      [" ", undefined],
+      ["tail api\r\nline", undefined],
+    ]);
+  });
+});
+
+// A UTF-8 byte order mark only marks the encoding: the file means the same with or without it.
+// micromark drops it before tokenizing, while `content` keeps it, so the fixture is parsed both ways
+// and every result must agree — values, lines and columns as they are, source offsets one later.
+describe("parseDocument · byte order mark", () => {
+  const BOM = "\uFEFF";
+  const body = [
+    "---",
+    "title: T",
+    "---",
+    "# Title",
+    "",
+    "See [docs](other.md#Some-Anchor), [text][missing] and (text)[./a.md] [gql].",
+    "",
+    "```",
+    "plain",
+    "```",
+    "",
+    "~~~ts",
+    "x",
+    "~~~",
+    "",
+    "    indented",
+    "",
+    "[unused]: https://example.com",
+    "",
+  ].join("\n");
+
+  function shift<T extends { start: number; end: number }>(range: T): T {
+    return { ...range, start: range.start + 1, end: range.end + 1 };
+  }
+
+  it("reads the same values, lines and columns as the file without the mark", () => {
+    const plain = parse(body);
+    const marked = parse(BOM + body);
+    expect(marked.codeFences.map((fence) => fence.language)).toEqual([
+      "",
+      "ts",
+    ]);
+    expect(marked.codeFences).toEqual(plain.codeFences);
+    expect(marked.headings).toEqual(plain.headings);
+    expect(marked.frontmatter).toEqual(plain.frontmatter);
+    expect(marked.undefinedReferences).not.toEqual([]);
+    expect(marked.undefinedReferences).toEqual(plain.undefinedReferences);
+    expect(marked.reversedLinks).not.toEqual([]);
+    expect(marked.reversedLinks).toEqual(plain.reversedLinks);
+  });
+
+  it("points every source offset into the content it was given, mark included", () => {
+    const plain = parse(body);
+    const marked = parse(BOM + body);
+    expect(plain.literalBrackets).not.toEqual([]);
+    expect(marked.literalBrackets).toEqual(
+      plain.literalBrackets.map((offset) => offset + 1),
+    );
+    expect(plain.textSpans).not.toEqual([]);
+    expect(marked.textSpans).toEqual(plain.textSpans.map(shift));
+    expect(marked.referenceDefinitions).toEqual(
+      plain.referenceDefinitions.map(shift),
+    );
+    expect(marked.links.map((link) => link.fragmentRange)).toEqual(
+      plain.links.map(
+        (link) => link.fragmentRange && shift(link.fragmentRange),
+      ),
+    );
+
+    const definition = marked.referenceDefinitions[0]!;
+    expect(marked.content.slice(definition.start, definition.end)).toBe(
+      "[unused]: https://example.com",
+    );
+    const fragment = marked.links[0]!.fragmentRange!;
+    expect(marked.content.slice(fragment.start, fragment.end)).toBe(
+      "Some-Anchor",
+    );
+  });
+
+  // Only offset 0 holds a byte order mark. Anywhere else U+FEFF is a zero-width no-break space that
+  // micromark keeps as text, so no offset moves for it.
+  it("does not move offsets for a U+FEFF after the start of the file", () => {
+    const content = `Text${BOM}.\n\n[unused]: https://example.com\n`;
+    const doc = parse(content);
+    const definition = doc.referenceDefinitions[0]!;
+    expect(content.slice(definition.start, definition.end)).toBe(
+      "[unused]: https://example.com",
+    );
+    expect(
+      doc.textSpans.map((span) => content.slice(span.start, span.end)),
+    ).toEqual([`Text${BOM}.`]);
   });
 });

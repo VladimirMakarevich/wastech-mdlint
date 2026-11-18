@@ -1,6 +1,6 @@
 # SIZE-001 — File byte / line / token budgets
 
-> Category **SIZE** (size) · Scope **document** · Default severity **warning** · Fixable **no** · [Rules index](README.md) · [Configuration](../configuration.md)
+> Category **SIZE** (size) · Scope **document** · Default severity **warning** · Fixable **no** · Alias **`file-size-budget`** · [Rules index](README.md) · [Configuration](../configuration.md)
 
 ## What it checks
 

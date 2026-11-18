@@ -22,6 +22,7 @@ const registry = new RuleRegistry([
   defineRule({
     metadata: {
       id: "TST-001",
+      alias: "test-rule",
       category: "custom",
       description: "flags lines containing BAD",
       defaultSeverity: "error",
@@ -40,6 +41,7 @@ const registry = new RuleRegistry([
   defineRule({
     metadata: {
       id: "GRP-001",
+      alias: "no-circular-references",
       category: "GRP",
       description: "reports once over the corpus",
       defaultSeverity: "warning",
@@ -153,6 +155,127 @@ describe("lintFiles orchestration", () => {
     expect(
       result.messages.map((message) => `${message.filePath}:${message.line}`),
     ).toEqual(["block.md:4", "nextline.md:3"]);
+  });
+
+  it("applies a disable-file written at the end of the file to the lines above it", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": [
+        "BAD one",
+        "BAD two",
+        "<!-- wastech-mdlint-disable-file TST-001 -->",
+      ].join("\n"),
+      "b.md": "BAD three\n",
+    });
+
+    const result = await lintFiles({
+      cwd,
+      config: { rules: [] },
+      rules: [configured("TST-001")],
+      settings: {},
+    });
+
+    expect(
+      result.messages.map((message) => `${message.filePath}:${message.line}`),
+    ).toEqual(["b.md:1"]);
+  });
+
+  // An unknown category or an unbalanced restore is reported, not silently ignored — including in
+  // a file with no other finding, and the report cannot itself be suppressed by a directive.
+  it("reports malformed directives as DIRECTIVE errors that no directive can suppress", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": [
+        "<!-- wastech-mdlint-disable FOO -->",
+        "BAD",
+        "<!-- wastech-mdlint-restore -->",
+      ].join("\n"),
+      "b.md": [
+        "<!-- wastech-mdlint-disable-file -->",
+        "<!-- wastech-mdlint-disable-next-line TBL_001 -->",
+        "ok",
+      ].join("\n"),
+    });
+
+    const result = await lintFiles({
+      cwd,
+      config: { rules: [] },
+      rules: [configured("TST-001")],
+      settings: {},
+    });
+
+    expect(
+      result.messages.map(
+        (message) => `${message.filePath}:${message.line}:${message.ruleId}`,
+      ),
+    ).toEqual([
+      "a.md:1:DIRECTIVE",
+      "a.md:2:TST-001",
+      "a.md:3:DIRECTIVE",
+      "b.md:2:DIRECTIVE",
+    ]);
+    expect(result.errorCount).toBe(4);
+    const directive = result.messages.find(
+      (message) => message.ruleId === "DIRECTIVE",
+    );
+    expect(directive).toMatchObject({
+      severity: "error",
+      helpUri:
+        "https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/suppression.md",
+      data: { directive: "disable", token: "FOO" },
+    });
+  });
+
+  it("emits no directive diagnostic when no rule is active (zero-config stays clean)", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "<!-- wastech-mdlint-disable FOO -->\n<!-- wastech-mdlint-restore -->\n",
+    });
+
+    const result = await lintFiles({
+      cwd,
+      config: { rules: [] },
+      rules: [],
+      settings: {},
+    });
+
+    expect(result.messages).toEqual([]);
+    expect(result.errorCount).toBe(0);
+  });
+
+  it("suppresses a built-in family through its category, whole-file findings included", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "BAD\n<!-- wastech-mdlint-disable-file grp -->\n",
+    });
+
+    const result = await lintFiles({
+      cwd,
+      config: { rules: [] },
+      rules: [configured("TST-001"), configured("GRP-001")],
+      settings: {},
+    });
+
+    // GRP-001 reports on line 0 of a.md; only `disable-file` can reach that line.
+    expect(
+      result.messages.map((message) => `${message.line}:${message.ruleId}`),
+    ).toEqual(["1:TST-001"]);
+  });
+
+  it("reports a category that is not built-in and suppresses nothing with it", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "<!-- wastech-mdlint-disable-file TST -->\nBAD\n",
+    });
+
+    const result = await lintFiles({
+      cwd,
+      config: { rules: [] },
+      rules: [configured("TST-001")],
+      settings: {},
+    });
+
+    // The test registry's `TST-001` has a `TST-` prefix, but categories are the built-in families
+    // only, so the answer does not depend on which rules a config happens to enable.
+    expect(
+      result.messages.map((message) => `${message.line}:${message.ruleId}`),
+    ).toEqual(["1:DIRECTIVE", "2:TST-001"]);
   });
 
   // The corpus half, one layer below the CLI guard: `lintFiles` resolves the lint-time

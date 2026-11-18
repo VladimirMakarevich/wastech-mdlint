@@ -10,6 +10,7 @@ import {
   CUSTOM_RULE_DOCS_URL,
   RULE_DOCS_BASE_URL,
   ruleDocsUrl,
+  SUPPRESSION_DOCS_URL,
 } from "../src/engine/rule-docs-url.js";
 import { BUILTIN_RULE_DEFINITIONS } from "../src/engine/rules/index.js";
 import type { RuleScope, Severity } from "../src/engine/types.js";
@@ -45,6 +46,9 @@ const EXPECTED: Record<string, { scope: RuleScope; severity: Severity }> = {
   "SEC-001": { scope: "document", severity: "error" },
   "SEC-002": { scope: "document", severity: "error" },
   "SEC-003": { scope: "project", severity: "error" },
+  "SEC-004": { scope: "document", severity: "warning" },
+  "SEC-005": { scope: "document", severity: "warning" },
+  "SEC-006": { scope: "document", severity: "warning" },
   "STR-001": { scope: "project", severity: "error" },
   "REF-001": { scope: "document", severity: "error" },
   "REF-002": { scope: "document", severity: "error" },
@@ -54,18 +58,24 @@ const EXPECTED: Record<string, { scope: RuleScope; severity: Severity }> = {
   "REF-006": { scope: "project", severity: "warning" },
   "REF-007": { scope: "document", severity: "error" },
   "REF-008": { scope: "document", severity: "error" },
+  "REF-009": { scope: "document", severity: "warning" },
   "CTX-001": { scope: "document", severity: "warning" },
   "CTX-002": { scope: "document", severity: "warning" },
   "CTX-003": { scope: "project", severity: "warning" },
+  "CTX-004": { scope: "document", severity: "warning" },
+  "CTX-005": { scope: "document", severity: "warning" },
+  "CTX-006": { scope: "document", severity: "warning" },
   "GRP-001": { scope: "project", severity: "error" },
   "GRP-002": { scope: "project", severity: "warning" },
   "GRP-003": { scope: "project", severity: "warning" },
   "SIZE-001": { scope: "document", severity: "warning" },
   "LLM-001": { scope: "project", severity: "warning" },
+  "FM-001": { scope: "document", severity: "error" },
 };
 
 const EXPECTED_CATEGORIES = [
   "CTX",
+  "FM",
   "GRP",
   "LLM",
   "REF",
@@ -76,14 +86,14 @@ const EXPECTED_CATEGORIES = [
 ].sort(compareStrings);
 
 describe("BUILTIN_RULE_DEFINITIONS inventory", () => {
-  it("ships exactly the documented 27 rule ids", () => {
+  it("ships exactly the documented 35 rule ids", () => {
     const ids = BUILTIN_RULE_DEFINITIONS.map(
       (definition) => definition.metadata.id,
     ).sort(compareStrings);
     expect(ids).toEqual(Object.keys(EXPECTED).sort(compareStrings));
   });
 
-  it("ships exactly the documented 8 category prefixes (no CHK)", () => {
+  it("ships exactly the documented 9 category prefixes (no CHK)", () => {
     const categories = [
       ...new Set(
         BUILTIN_RULE_DEFINITIONS.map(
@@ -144,6 +154,22 @@ describe("rule documentation URLs", () => {
     ).toBe(true);
   });
 
+  // Directive diagnostics come from the engine, not a rule, so their `helpUri` is the directive
+  // grammar page one level above the rule pages; a rename of that page would 404 every one of them.
+  it("points directive diagnostics at the suppression page, which exists", () => {
+    const guideBase = new URL("..", RULE_DOCS_BASE_URL).href;
+    expect(SUPPRESSION_DOCS_URL).toBe(`${guideBase}suppression.md`);
+    expect(
+      existsSync(
+        path.join(
+          RULE_DOCS_DIR,
+          "..",
+          SUPPRESSION_DOCS_URL.slice(guideBase.length),
+        ),
+      ),
+    ).toBe(true);
+  });
+
   it("builds those URLs against the repository the root manifest declares", () => {
     // The assertions above strip `RULE_DOCS_BASE_URL` and check the filename half on disk, so the
     // owner/repo half of the constant was pinned by nothing — and it is a second spelling of the
@@ -163,6 +189,7 @@ describe("rule documentation URLs", () => {
   it("declares exactly the metadata fields something reads (no vacuous `messages`)", () => {
     for (const { metadata } of BUILTIN_RULE_DEFINITIONS) {
       expect(Object.keys(metadata).sort(compareStrings)).toEqual([
+        "alias",
         "category",
         "defaultSeverity",
         "description",
@@ -172,6 +199,105 @@ describe("rule documentation URLs", () => {
         "optionsSchema",
         "scope",
       ]);
+    }
+  });
+});
+
+// The shipped alias set, pinned the way `EXPECTED` pins scope and severity: an alias is user input
+// written into configs and suppression comments, so renaming one silently breaks every file that
+// used it, and the schema/README sync tests regenerate from the same registry and cannot notice.
+const EXPECTED_ALIASES: Record<string, string> = {
+  "CTX-001": "no-empty-sections",
+  "CTX-002": "checklist-complete",
+  "CTX-003": "glossary-terms",
+  "CTX-004": "descriptive-link-text",
+  "CTX-005": "image-alt-text",
+  "CTX-006": "code-block-language",
+  "FM-001": "valid-front-matter",
+  "GRP-001": "no-circular-references",
+  "GRP-002": "no-orphan-documents",
+  "GRP-003": "ids-carried-forward",
+  "LLM-001": "context-token-budget",
+  "REF-001": "no-broken-links",
+  "REF-002": "no-broken-anchors",
+  "REF-003": "no-broken-images",
+  "REF-004": "declared-zone-dependencies",
+  "REF-005": "traceable-ids",
+  "REF-006": "stable-dependencies",
+  "REF-007": "no-undefined-references",
+  "REF-008": "no-malformed-links",
+  "REF-009": "no-unused-definitions",
+  "SEC-001": "required-sections",
+  "SEC-002": "section-order",
+  "SEC-003": "section-template",
+  "SEC-004": "heading-increment",
+  "SEC-005": "no-duplicate-headings",
+  "SEC-006": "no-emphasis-as-heading",
+  "SIZE-001": "file-size-budget",
+  "STR-001": "required-files",
+  "TBL-001": "table-required-columns",
+  "TBL-002": "table-no-empty-cells",
+  "TBL-003": "table-allowed-values",
+  "TBL-004": "table-cell-pattern",
+  "TBL-005": "table-conditional-columns",
+  "TBL-006": "table-unique-ids",
+  "TBL-007": "table-row-cell-count",
+};
+
+// Lowercase kebab-case with at least one dash. The dash is load-bearing, not style: a dash-less
+// suppression token is read as a category (`REF`), so a dash-less alias would be ambiguous there.
+const ALIAS_FORMAT = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)+$/;
+
+describe("rule aliases", () => {
+  it("pins the exact alias of every built-in rule", () => {
+    expect(
+      Object.fromEntries(
+        BUILTIN_RULE_DEFINITIONS.map(({ metadata }) => [
+          metadata.id,
+          metadata.alias,
+        ]),
+      ),
+    ).toEqual(EXPECTED_ALIASES);
+  });
+
+  it("gives every built-in a lowercase kebab-case alias with at least one dash", () => {
+    for (const { metadata } of BUILTIN_RULE_DEFINITIONS) {
+      expect(metadata.alias, metadata.id).toMatch(ALIAS_FORMAT);
+    }
+  });
+
+  it("keeps aliases unique", () => {
+    const aliases = BUILTIN_RULE_DEFINITIONS.map(
+      ({ metadata }) => metadata.alias,
+    );
+    expect(new Set(aliases).size).toBe(aliases.length);
+  });
+
+  // An alias equal to an id would make one spelling mean two rules, and one equal to a reserved
+  // prefix would be read as a category in a suppression directive. Compared upper-cased because both
+  // ids and directive tokens are canonicalized that way before anything matches them.
+  it("never collides with a rule id or a reserved category prefix", () => {
+    const ids = new Set(
+      BUILTIN_RULE_DEFINITIONS.map(({ metadata }) => metadata.id),
+    );
+    const prefixes = new Set([...ids].map((id) => id.split("-")[0]!));
+    for (const { metadata } of BUILTIN_RULE_DEFINITIONS) {
+      const upper = metadata.alias.toUpperCase();
+      expect(ids.has(upper), metadata.alias).toBe(false);
+      expect(prefixes.has(upper), metadata.alias).toBe(false);
+    }
+  });
+
+  // The rule pages are hand-written, so nothing regenerates them when an alias changes; this is the
+  // drift guard that keeps each page's header naming the alias the registry actually accepts.
+  it("names the alias in each rule page's header line", () => {
+    for (const { metadata } of BUILTIN_RULE_DEFINITIONS) {
+      const page = readFileSync(
+        path.join(RULE_DOCS_DIR, `${metadata.id}.md`),
+        "utf8",
+      );
+      const header = page.split("\n")[2] ?? "";
+      expect(header, metadata.id).toContain(`Alias **\`${metadata.alias}\`**`);
     }
   });
 });
@@ -189,13 +315,21 @@ const FILE_SCOPED = [
   "SEC-001",
   "SEC-002",
   "SEC-003",
+  "SEC-004",
+  "SEC-005",
+  "SEC-006",
   "REF-002",
   "REF-007",
   "REF-008",
+  "REF-009",
   "CTX-001",
   "CTX-002",
   "CTX-003",
+  "CTX-004",
+  "CTX-005",
+  "CTX-006",
   "GRP-002",
+  "FM-001",
 ].sort(compareStrings);
 
 // Same key, different meaning: REF-001/REF-003 filter the *link/image target* they are about to

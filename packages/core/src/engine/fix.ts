@@ -76,10 +76,13 @@ export class FixWriteError extends Error {
 }
 
 /**
- * Apply the deterministic fixes of document-scope fixable rules to the repo, writing changed files
- * in place, ESLint-style. Fix is inherently document-scoped — a TextEdit targets one
- * document's content — so project-scope rules never contribute fixes. Returns the fixed file list;
- * the caller re-lints to report what remains.
+ * Apply the deterministic fixes of every enabled rule that ships a fix hook, writing changed files
+ * in place, ESLint-style. A `TextEdit` targets one document's content, so each hook is called once
+ * per document with that document in `context.document` — for a project-scope rule too, which reads
+ * the rest of the corpus through `documents` and contributes edits to whichever document it is
+ * handed. That keeps the edit contract, the per-file atomic write and the fail-fast behaviour
+ * identical for both scopes instead of adding a second "edits for many files" shape. Returns the
+ * fixed file list; the caller re-lints to report what remains.
  */
 export async function applyFixes(
   input: LintFilesInput,
@@ -103,7 +106,7 @@ export async function applyFixes(
   const fixRules = input.rules
     .filter((configured) => configured.severity !== "off")
     .map((configured) => configured.rule)
-    .filter((rule) => rule.scope === "document" && rule.fix !== undefined);
+    .filter((rule) => rule.fix !== undefined);
 
   const fixedFiles: string[] = [];
 

@@ -8,7 +8,7 @@ Background on how the linter works — useful for understanding rule behavior an
 
 Each Markdown file is parsed **once** (remark + GitHub-flavored Markdown + YAML frontmatter + GitHub slugger) into a `ParsedDocument` that captures everything downstream needs:
 
-- **frontmatter** — a YAML block fenced by `---` lines, opening on the file's first line, exposed as its raw text plus its line range (it is not parsed as YAML); a file without one exposes `null`;
+- **frontmatter** — a YAML block fenced by `---` lines, opening on the file's first line, exposed as its raw text, its line range, and its one YAML parse: either the value (under the failsafe schema, so every scalar is a string, never converted to a number, boolean or date) or a structured error with the line it occurred on. No tag is constructed, `<<` is an ordinary key, and alias expansion is bounded. A file without front matter exposes `null`. [FM-001](rules/FM-001.md) and the `frontmatter*` [`custom`](rules/custom.md) kinds read this parse;
 - **headings** and their GitHub-style **slugs** (for anchor resolution);
 - **HTML anchors** — `id` attributes on any element and `name` attributes on `<a>`, read from raw HTML in the document (for anchor resolution alongside the slugs);
 - **sections** (a heading plus the body it owns, last-heading-wins);
@@ -32,6 +32,7 @@ Frontmatter is excluded from the outline: it produces no heading, section, slug,
 The engine is **registry-driven**: each rule declares structured metadata (category, scope, default severity), a Zod options schema, and a factory that produces findings. Rules are **pure** where practical — parsed inputs in, structured findings (or deterministic edits) out.
 
 - **Scope** is `document` (evaluated per file) or `project` (evaluated once over the whole corpus, with file-attributed findings). Each rule's page states its scope.
+- **Alias** is a rule's readable second name (`no-broken-anchors` for `REF-002`), accepted as input wherever an ID is — config and suppression directives — so a suppression explains itself. Output only ever carries the ID: one rule with two names in reports would read as two rules. Every alias contains a dash, which keeps it from being mistaken for a suppression category such as `REF`.
 - **Severity** resolves as `config override ?? per-finding ?? rule default`; `"off"` drops the rule.
 - **Assertion primitives** are the shared building blocks (table/section/content/checklist/link checks) that both built-in rules and the declarative [`custom`](rules/custom.md) rule compose.
 

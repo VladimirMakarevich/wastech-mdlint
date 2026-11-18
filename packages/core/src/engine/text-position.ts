@@ -61,3 +61,16 @@ export function createLineNumberLookup(content: string): LineNumberLookup {
     return low + 1;
   };
 }
+
+// The character offset of each line start (index 0 is line 1), so a fix can turn a 1-based line
+// into a `content` offset. Lines are split on `\n` alone, so on CRLF content a line's text keeps its
+// trailing `\r` and every offset stays a true source offset.
+export function lineStartOffsets(content: string): number[] {
+  const offsets = [0];
+  for (let index = 0; index < content.length; index += 1) {
+    if (content.charCodeAt(index) === 10) {
+      offsets.push(index + 1);
+    }
+  }
+  return offsets;
+}

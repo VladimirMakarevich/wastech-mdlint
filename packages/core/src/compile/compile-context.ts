@@ -13,7 +13,6 @@ import type { ContextGraph } from "../graph/context-graph-types.js";
 import { loadContext } from "../graph/load-context.js";
 import { query } from "../graph/query.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
-import { canonicalizeRuleId } from "../rule-id.js";
 import { describeRules } from "./describe-rules.js";
 import { extractDocProfiles } from "./doc-profile.js";
 import { analyzeGraph, DEFAULT_HUB_MIN_IN_DEGREE } from "./graph-analysis.js";
@@ -112,7 +111,7 @@ function computeBudget(
   for (const entry of rules) {
     if (
       isCustomRuleEntry(entry) ||
-      canonicalizeRuleId(entry.rule) !== "LLM-001" ||
+      ruleRegistry.resolveId(entry.rule) !== "LLM-001" ||
       entry.severity === "off"
     ) {
       continue;

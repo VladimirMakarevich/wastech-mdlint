@@ -31,6 +31,12 @@ import {
   linkResolves,
 } from "../src/engine/primitives/reference.js";
 import { runAssertion } from "../src/engine/primitives/assert.js";
+import {
+  frontmatterInSet,
+  frontmatterMatches,
+  frontmatterRequired,
+  lookupKeyPath,
+} from "../src/engine/primitives/frontmatter.js";
 
 const tempDirs: string[] = [];
 
@@ -463,6 +469,172 @@ describe("reference primitives", () => {
       ]);
     },
   );
+});
+
+// Front matter block on lines 1–9: findings about a present block span exactly this range.
+const FM_DOC = [
+  "---",
+  "status: draft",
+  "tags: [api, bogus, web]",
+  "owner:",
+  "  team: core",
+  "  meta:",
+  "    tier: gold",
+  "empty:",
+  "---",
+  "",
+  "# T",
+  "",
+].join("\n");
+
+describe("front matter primitives", () => {
+  it("resolves dot key paths through nested mappings only, by own property", () => {
+    const value = { a: { b: { c: "x" } }, s: "y" };
+
+    expect(lookupKeyPath(value, "a.b.c")).toEqual({ found: true, value: "x" });
+    expect(lookupKeyPath(value, "a.b")).toEqual({
+      found: true,
+      value: { c: "x" },
+    });
+    expect(lookupKeyPath(value, "s.length")).toEqual({ found: false });
+    expect(lookupKeyPath(value, "a.missing")).toEqual({ found: false });
+    expect(lookupKeyPath(value, "constructor")).toEqual({ found: false });
+  });
+
+  it("frontmatterRequired reports each missing key path, sorted, over the block's range", () => {
+    const findings = frontmatterRequired(doc(FM_DOC), {
+      keys: ["zeta", "owner.team", "owner.meta.tier", "empty", "alpha"],
+    });
+
+    expect(findings).toEqual([
+      {
+        message: 'Front matter is missing required key "alpha".',
+        line: 1,
+        endLine: 9,
+        data: { key: "alpha" },
+      },
+      {
+        message: 'Front matter is missing required key "zeta".',
+        line: 1,
+        endLine: 9,
+        data: { key: "zeta" },
+      },
+    ]);
+  });
+
+  it("frontmatterRequired reports at line 0 when the document has no front matter", () => {
+    expect(frontmatterRequired(doc("# T\n"), { keys: ["owner"] })).toEqual([
+      {
+        message:
+          'Document has no front matter; required key "owner" is missing.',
+        line: 0,
+        data: { key: "owner" },
+      },
+    ]);
+  });
+
+  it("frontmatterRequired treats an empty block as an empty mapping", () => {
+    expect(
+      frontmatterRequired(doc("---\n---\n# T\n"), { keys: ["owner"] }),
+    ).toEqual([
+      {
+        message: 'Front matter is missing required key "owner".',
+        line: 1,
+        endLine: 2,
+        data: { key: "owner" },
+      },
+    ]);
+  });
+
+  it("frontmatterInSet checks a scalar exactly and a list item by item", () => {
+    const fmDoc = doc(FM_DOC);
+
+    expect(
+      frontmatterInSet(fmDoc, { key: "status", values: ["draft", "done"] }),
+    ).toEqual([]);
+    expect(
+      frontmatterInSet(fmDoc, { key: "status", values: ["Draft"] }),
+    ).toHaveLength(1);
+    expect(
+      frontmatterInSet(fmDoc, { key: "tags", values: ["api", "web"] }),
+    ).toEqual([
+      {
+        message:
+          'Front matter value "bogus" for key "tags" is not one of the allowed values: api, web.',
+        line: 1,
+        endLine: 9,
+        data: { key: "tags", value: "bogus", allowed: ["api", "web"] },
+      },
+    ]);
+    // An empty value reads as "", so it can be allowed or rejected explicitly.
+    expect(frontmatterInSet(fmDoc, { key: "empty", values: [""] })).toEqual([]);
+  });
+
+  it("value checks skip an absent key and an absent block, and reject a mapping value once", () => {
+    expect(
+      frontmatterInSet(doc(FM_DOC), { key: "missing", values: ["x"] }),
+    ).toEqual([]);
+    expect(
+      frontmatterMatches(doc("# T\n"), { key: "status", pattern: "^d" }),
+    ).toEqual([]);
+    expect(
+      frontmatterMatches(doc(FM_DOC), { key: "owner", pattern: "^d" }),
+    ).toEqual([
+      {
+        message:
+          'Front matter key "owner" must be a scalar or a list of scalars.',
+        line: 1,
+        endLine: 9,
+        data: { key: "owner" },
+      },
+    ]);
+  });
+
+  it("every front matter primitive reports invalid YAML and a non-mapping root instead of passing", () => {
+    const invalid = doc("---\nstatus: [x\n---\n# T\n");
+    const notMapping = doc("---\n- a\n---\n# T\n");
+    const checks = [
+      (d: ParsedDocument) => frontmatterRequired(d, { keys: ["status"] }),
+      (d: ParsedDocument) =>
+        frontmatterInSet(d, { key: "status", values: ["x"] }),
+      (d: ParsedDocument) =>
+        frontmatterMatches(d, { key: "status", pattern: "x" }),
+    ];
+
+    for (const check of checks) {
+      const [invalidFinding, ...restInvalid] = check(invalid);
+      expect(restInvalid).toEqual([]);
+      expect(invalidFinding?.message).toMatch(
+        /^Front matter is not valid YAML: .+\.$/u,
+      );
+      expect(check(notMapping)).toEqual([
+        {
+          message: "Front matter must be a YAML mapping of keys to values.",
+          line: 1,
+          endLine: 3,
+        },
+      ]);
+    }
+  });
+
+  // @boundary-guard determinism
+  //
+  // A list value is tested item by item with one compiled RegExp. Under a `g` flag that instance
+  // carries `lastIndex` from one item into the next, so without a reset a matching item can make
+  // the following matching item fail — the result would depend on list order and on how many times
+  // the check had already run.
+  it('frontmatterMatches is order-independent under a stateful "g" flag', () => {
+    const listDoc = doc("---\nids: [REQ-1, REQ-2, BUG-1, REQ-3]\n---\n# T\n");
+    const run = () =>
+      frontmatterMatches(listDoc, {
+        key: "ids",
+        pattern: "^REQ-\\d+$",
+        flags: "g",
+      }).map((finding) => finding.data?.value);
+
+    expect(run()).toEqual(["BUG-1"]);
+    expect(run()).toEqual(["BUG-1"]);
+  });
 });
 
 describe("runAssertion dispatch", () => {

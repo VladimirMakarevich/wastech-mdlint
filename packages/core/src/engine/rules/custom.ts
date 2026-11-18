@@ -130,7 +130,26 @@ export function resolveCustomRule(
   }
 
   const prefix = id.split("-")[0]!;
-  if (registry.getReservedPrefixes().has(prefix) || registry.has(id)) {
+  if (registry.getReservedPrefixes().has(prefix)) {
+    throw invalid(
+      ["id"],
+      `id "${id}": "${prefix}" is a reserved built-in prefix — use your own namespace, e.g. "REQ-100".`,
+    );
+  }
+
+  // An upper-cased alias (`NO-BROKEN-ANCHORS`) passes the grammar and owns no reserved prefix, yet a
+  // suppression token `no-broken-anchors` would then name two rules at once — the built-in through
+  // its alias and this custom rule through its id — and silence both. Checked before the `has`
+  // fallback below, which is alias-aware too, so the message names the actual collision.
+  if (registry.isAlias(id)) {
+    const builtin = registry.getMetadata(id)!;
+    throw invalid(
+      ["id"],
+      `id "${id}": "${builtin.alias}" is the alias of built-in rule "${builtin.id}" — choose another id.`,
+    );
+  }
+
+  if (registry.has(id)) {
     throw invalid(
       ["id"],
       `id "${id}": "${prefix}" is a reserved built-in prefix — use your own namespace, e.g. "REQ-100".`,

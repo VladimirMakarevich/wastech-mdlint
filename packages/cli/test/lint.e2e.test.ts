@@ -335,6 +335,84 @@ describe("lint command", () => {
     expect(written).not.toContain("\r\r");
   });
 
+  // The three fixes added together — REF-002 case-only fragments, REF-009 unused definitions,
+  // CTX-003 aliases — through the command a user runs, on LF and on a runtime-built CRLF copy. The
+  // second `--fix` is the idempotency guard: any byte it changes is a fix that does not converge.
+  it.each([
+    ["LF", "\n"],
+    ["CRLF", "\r\n"],
+  ])(
+    "applies the REF-002, REF-009 and CTX-003 fixes once, then changes nothing (%s)",
+    async (_label, eol) => {
+      const lines = (...parts: string[]) => parts.join(eol);
+      const cwd = await fixtureRepo({
+        "glossary.md": lines(
+          "| Term | Aliases |",
+          "| --- | --- |",
+          "| GraphQL | gql |",
+          "",
+        ),
+        "a.md": lines(
+          "## Setup",
+          "",
+          "Use the gql API, see [setup](#Setup) and [docs][d].",
+          "",
+          "[d]: ./glossary.md",
+          "[unused]: ./nowhere.md",
+          "",
+        ),
+        "wastech-mdlint.config.json": JSON.stringify({
+          rules: [
+            { rule: "REF-002" },
+            { rule: "REF-009" },
+            {
+              rule: "CTX-003",
+              options: {
+                glossary: "glossary.md",
+                termColumn: "Term",
+                aliasColumn: "Aliases",
+              },
+            },
+          ],
+        }),
+      });
+
+      const before = await run(["lint", cwd, "--format", "json"], cwd);
+      expect(
+        (
+          JSON.parse(before.stdout) as {
+            messages: { ruleId: string; fixable?: boolean }[];
+          }
+        ).messages.map((message) => [message.ruleId, message.fixable]),
+      ).toEqual([
+        ["CTX-003", true],
+        ["REF-002", true],
+        ["REF-009", true],
+      ]);
+
+      const first = await run(["lint", cwd, "--fix"], cwd);
+      expect(first.exitCode).toBe(EXIT_CODE_SUCCESS);
+      expect(first.stdout).toContain("No problems found.");
+      const fixed = await readFile(path.join(cwd, "a.md"), "utf8");
+      expect(fixed).toBe(
+        lines(
+          "## Setup",
+          "",
+          "Use the GraphQL API, see [setup](#setup) and [docs][d].",
+          "",
+          "[d]: ./glossary.md",
+          "",
+        ),
+      );
+
+      const second = await run(["lint", cwd, "--fix"], cwd);
+      expect(second.exitCode).toBe(EXIT_CODE_SUCCESS);
+      await expect(readFile(path.join(cwd, "a.md"), "utf8")).resolves.toBe(
+        fixed,
+      );
+    },
+  );
+
   // An operational failure must be distinguishable from findings (exit 2,
   // not 1) and must never print an absolute host path. `not.toContain(cwd)` is the portable form of
   // that second assertion — matching an absolute prefix would be platform-specific.
@@ -404,7 +482,7 @@ describe("lint command", () => {
     const result = await run(["lint", cwd], cwd);
     expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
     expect(result.stderr).toMatch(
-      /Unknown rule "REF-999"\. Did you mean "REF-001"\?/,
+      /Unknown rule "REF-999"\. Did you mean "REF-009"\?/,
     );
   });
 

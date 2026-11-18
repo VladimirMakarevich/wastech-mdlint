@@ -1,5 +1,6 @@
 import { RuleRegistry, type RuleDefinition } from "../registry.js";
 import { CTX_RULES } from "./ctx.js";
+import { FM_RULES } from "./fm.js";
 import { GRP_RULES } from "./grp.js";
 import { LLM_RULES } from "./llm.js";
 import { REF_RULES } from "./ref.js";
@@ -18,6 +19,7 @@ export const BUILTIN_RULE_DEFINITIONS: readonly RuleDefinition[] = [
   ...REF_RULES,
   ...CTX_RULES,
   ...GRP_RULES,
+  ...FM_RULES,
 ];
 
 // The process-wide registry over the built-ins. Config loading, schema generation, and the CLI all

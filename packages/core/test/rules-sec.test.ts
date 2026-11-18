@@ -8,6 +8,7 @@ import type { ConfiguredRule } from "../src/config/load-config.js";
 import { compareStrings } from "../src/deterministic-sort.js";
 import { applyFixes } from "../src/engine/fix.js";
 import { lintFiles } from "../src/engine/lint-files.js";
+import { RuleResolutionError } from "../src/engine/registry.js";
 import { ruleRegistry } from "../src/engine/rules/index.js";
 
 const tempDirs: string[] = [];
@@ -264,6 +265,164 @@ describe("SEC-003 template conformance", () => {
   });
 });
 
+describe("SEC-003 strict outline", () => {
+  const TEMPLATE = "# T\n\n## Context\n\n## Decision\n\n## Consequences\n";
+
+  async function strictLint(files: Record<string, string>, extra = {}) {
+    const cwd = await fixtureRepo({ "template.md": TEMPLATE, ...files });
+    return lint(cwd, [
+      rule("SEC-003", {
+        template: "template.md",
+        files: ["adr/**/*.md"],
+        strict: true,
+        ...extra,
+      }),
+    ]);
+  }
+
+  it("accepts a document matching the template exactly", async () => {
+    const result = await strictLint({ "adr/a.md": TEMPLATE });
+    expect(result.messages).toEqual([]);
+  });
+
+  it("reports a missing section once, naming expected and actual headings", async () => {
+    const result = await strictLint({
+      "adr/a.md": "# T\n\n## Context\n\n## Consequences\n",
+    });
+    expect(result.messages).toEqual([
+      expect.objectContaining({
+        filePath: "adr/a.md",
+        line: 5,
+        message:
+          'Outline diverges from template template.md: expected "## Decision" (template line 5), found "## Consequences".',
+        data: {
+          template: "template.md",
+          expected: { text: "Decision", depth: 2, line: 5 },
+          actual: { text: "Consequences", depth: 2, line: 5 },
+        },
+      }),
+    ]);
+  });
+
+  it("reports a reordered section once", async () => {
+    const result = await strictLint({
+      "adr/a.md": "# T\n\n## Decision\n\n## Context\n\n## Consequences\n",
+    });
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]).toMatchObject({
+      line: 3,
+      data: {
+        expected: { text: "Context", depth: 2 },
+        actual: { text: "Decision", depth: 2 },
+      },
+    });
+    expect(result.messages[0]?.message).toContain('expected "## Context"');
+    expect(result.messages[0]?.message).toContain('found "## Decision"');
+  });
+
+  it("reports an extra section once", async () => {
+    const result = await strictLint({
+      "adr/a.md": `${TEMPLATE}\n## Appendix\n`,
+    });
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]).toMatchObject({
+      line: 9,
+      data: { expected: null, actual: { text: "Appendix", depth: 2 } },
+    });
+    expect(result.messages[0]?.message).toMatch(
+      /expected no further heading, found "## Appendix"\.$/,
+    );
+  });
+
+  it("reports a document that ends early at line 0", async () => {
+    const result = await strictLint({
+      "adr/a.md": "# T\n\n## Context\n\n## Decision\n",
+    });
+    expect(result.messages).toHaveLength(1);
+    expect(result.messages[0]).toMatchObject({
+      line: 0,
+      data: { expected: { text: "Consequences" }, actual: null },
+    });
+    expect(result.messages[0]?.message).toMatch(/found end of document\.$/);
+  });
+
+  it("with `level`, ignores headings at other depths on both sides", async () => {
+    const result = await strictLint(
+      {
+        "adr/a.md":
+          "# Other Title\n\n## Context\n\n### Note\n\n## Decision\n\n## Consequences\n",
+      },
+      { level: 2 },
+    );
+    expect(result.messages).toEqual([]);
+  });
+
+  it("supports wildcard headings for a per-document title and optional middle sections", async () => {
+    const cwd = await fixtureRepo({
+      "template.md": "# ?\n\n## Context\n\n## *\n\n## Decision\n",
+      "adr/a.md": "# First\n\n## Context\n\n## Decision\n",
+      "adr/b.md":
+        "# Second\n\n## Context\n\n## Options\n\n### One\n\n## Notes\n\n## Decision\n",
+      "adr/c.md": "# Third\n\n## Decision\n",
+    });
+    const result = await lint(cwd, [
+      rule("SEC-003", {
+        template: "template.md",
+        files: ["adr/**/*.md"],
+        strict: true,
+      }),
+    ]);
+    expect(result.messages).toEqual([
+      expect.objectContaining({
+        filePath: "adr/c.md",
+        data: {
+          template: "template.md",
+          expected: { text: "Context", depth: 2, line: 3 },
+          actual: { text: "Decision", depth: 2, line: 3 },
+        },
+      }),
+    ]);
+  });
+
+  it("keeps the single config-attributed finding for a missing or escaping template", async () => {
+    const cwd = await fixtureRepo({ "adr/a.md": "# A\n" });
+
+    const missing = await lint(cwd, [
+      rule("SEC-003", { template: "nope.md", strict: true }),
+    ]);
+    expect(missing.messages).toHaveLength(1);
+    expect(missing.messages[0]?.message).toMatch(/was not found/);
+
+    const escaping = await lint(cwd, [
+      rule("SEC-003", { template: "../secret.md", strict: true }),
+    ]);
+    expect(escaping.messages).toHaveLength(1);
+    expect(escaping.messages[0]?.message).toMatch(/escapes the analyzed root/);
+  });
+
+  // `strict: false` must take the presence-only path untouched, so its output is identical to
+  // omitting the option — the guarantee existing configs rely on when the option appears.
+  it("leaves default results identical when `strict` is false", async () => {
+    const cwd = await fixtureRepo({
+      "template.md": "# T\n## Context\n## Decision\n",
+      "adr/one.md": "# One\n## Context\n",
+      "adr/two.md": "# Two\n## Decision\n## Context\n## Extra\n",
+    });
+    const options = { template: "template.md", files: ["adr/**/*.md"] };
+
+    const omitted = await lint(cwd, [rule("SEC-003", options)]);
+    const disabled = await lint(cwd, [
+      rule("SEC-003", { ...options, strict: false }),
+    ]);
+    expect(disabled).toEqual(omitted);
+    expect(omitted.messages.map((message) => message.data)).toEqual([
+      { section: "Decision", template: "template.md" },
+      { section: "T", template: "template.md" },
+      { section: "T", template: "template.md" },
+    ]);
+  });
+});
+
 // Frontmatter used to parse as a setext H2, so a template carrying it demanded that invented
 // heading of every document (SEC-003 at level 2), and a fix appended after it could have been
 // tempted to treat it as content. Both now see only the real outline.
@@ -312,16 +471,269 @@ describe("SEC-* on documents with frontmatter", () => {
   });
 });
 
-// The SEC half of the shared `exclude` matrix. One fixture serves all three cases: both
-// documents violate every case, while `templates/t.md` satisfies SEC-001/SEC-002 (it has `Summary`,
-// and neither `Overview` nor `Usage`, which `sectionOrder` skips) and is self-skipped by SEC-003.
-const SECTION_DOC = "# Title\n\n## Usage\n\n## Overview\n";
+describe("SEC-004 heading levels", () => {
+  it("reports a skipped level, a second H1 and a prose start at the offending line", async () => {
+    const cwd = await fixtureRepo({
+      "skip.md": "# Title\n\n## A\n\n#### Deep\n",
+      "twice.md": "# One\n\ntext\n\n# Two\n",
+      "prose.md": "Intro text.\n\n# Title\n",
+    });
+
+    const result = await lint(cwd, [rule("SEC-004")]);
+    expect(
+      result.messages.map(({ ruleId, filePath, line, message }) => ({
+        ruleId,
+        filePath,
+        line,
+        message,
+      })),
+    ).toEqual([
+      {
+        ruleId: "SEC-004",
+        filePath: "prose.md",
+        line: 1,
+        message:
+          'Document does not start with an H1 heading or declare a front matter "title" key.',
+      },
+      {
+        ruleId: "SEC-004",
+        filePath: "skip.md",
+        line: 5,
+        message: "Heading level skips from H2 to H4; expected H3 or shallower.",
+      },
+      {
+        ruleId: "SEC-004",
+        filePath: "twice.md",
+        line: 5,
+        message:
+          "Document has more than one H1 heading; the first is on line 1.",
+      },
+    ]);
+  });
+
+  it("validates its options and resolves bare", () => {
+    expect(() => ruleRegistry.resolveRule("SEC-004")).not.toThrow();
+    for (const options of [
+      { increment: "yes" },
+      { level: 7 },
+      { level: 0 },
+      { titleKey: "" },
+      { bogus: true },
+    ]) {
+      expect(() => ruleRegistry.resolveRule("SEC-004", options)).toThrow(
+        RuleResolutionError,
+      );
+    }
+  });
+
+  // The directive suppresses the skip it precedes, and as a comment it renders nothing, so the
+  // document still starts with its H1 and the title check stays quiet.
+  it("honours an inline disable without the directive counting as first content", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "<!-- wastech-mdlint-disable-next-line SEC-004 -->\n# Title\n\n### Deep\n",
+      "b.md":
+        "# Title\n\n<!-- wastech-mdlint-disable-next-line SEC-004 -->\n### Deep\n",
+    });
+
+    const result = await lint(cwd, [rule("SEC-004")]);
+    expect(
+      result.messages.map(({ filePath, line }) => ({ filePath, line })),
+    ).toEqual([{ filePath: "a.md", line: 4 }]);
+  });
+});
+
+describe("SEC-005 duplicate headings", () => {
+  it("reports a repeated heading at the repeat, naming the first line", async () => {
+    const cwd = await fixtureRepo({
+      "dup.md": "# Title\n\n## Usage\n\n## **Usage**\n",
+      "nested.md": "# T\n\n## A\n\n### Added\n\n## B\n\n### Added\n",
+      "clean.md": "# T\n\n## A\n\n## B\n",
+    });
+
+    const result = await lint(cwd, [rule("SEC-005")]);
+    expect(
+      result.messages.map(({ ruleId, filePath, line, message }) => ({
+        ruleId,
+        filePath,
+        line,
+        message,
+      })),
+    ).toEqual([
+      {
+        ruleId: "SEC-005",
+        filePath: "dup.md",
+        line: 5,
+        message: 'Heading "Usage" duplicates the heading on line 3.',
+      },
+      {
+        ruleId: "SEC-005",
+        filePath: "nested.md",
+        line: 9,
+        message: 'Heading "Added" duplicates the heading on line 5.',
+      },
+    ]);
+
+    const siblings = await lint(cwd, [rule("SEC-005", { siblingsOnly: true })]);
+    expect(
+      siblings.messages.map(({ filePath, line }) => ({ filePath, line })),
+    ).toEqual([{ filePath: "dup.md", line: 5 }]);
+  });
+
+  it("validates its options and resolves bare", () => {
+    expect(() => ruleRegistry.resolveRule("SEC-005")).not.toThrow();
+    for (const options of [{ siblingsOnly: "yes" }, { bogus: true }]) {
+      expect(() => ruleRegistry.resolveRule("SEC-005", options)).toThrow(
+        RuleResolutionError,
+      );
+    }
+  });
+
+  it("honours an inline disable on the repeat", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "# T\n\n## Usage\n\n<!-- wastech-mdlint-disable-next-line SEC-005 -->\n## Usage\n",
+    });
+
+    const result = await lint(cwd, [rule("SEC-005")]);
+    expect(result.messages).toEqual([]);
+  });
+});
+
+describe("SEC-006 emphasis as heading", () => {
+  it("reports a standalone emphasis paragraph, but not a sentence or one inside a container", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": [
+        "# Title",
+        "",
+        "**Installation**",
+        "",
+        "_Usage_",
+        "",
+        "**A bold sentence.**",
+        "",
+        "- **In a list**",
+        "",
+        "> **In a quote**",
+        "",
+        "| Col |",
+        "| --- |",
+        "| **In a cell** |",
+        "",
+      ].join("\n"),
+    });
+
+    const result = await lint(cwd, [rule("SEC-006")]);
+    expect(
+      result.messages.map(({ ruleId, filePath, line, message }) => ({
+        ruleId,
+        filePath,
+        line,
+        message,
+      })),
+    ).toEqual([
+      {
+        ruleId: "SEC-006",
+        filePath: "a.md",
+        line: 3,
+        message: 'Emphasis used instead of a heading: "Installation".',
+      },
+      {
+        ruleId: "SEC-006",
+        filePath: "a.md",
+        line: 5,
+        message: 'Emphasis used instead of a heading: "Usage".',
+      },
+    ]);
+  });
+
+  it("validates its options and resolves bare", () => {
+    expect(() => ruleRegistry.resolveRule("SEC-006")).not.toThrow();
+    expect(() =>
+      ruleRegistry.resolveRule("SEC-006", { punctuation: "" }),
+    ).not.toThrow();
+    for (const options of [{ punctuation: 1 }, { bogus: true }]) {
+      expect(() => ruleRegistry.resolveRule("SEC-006", options)).toThrow(
+        RuleResolutionError,
+      );
+    }
+  });
+
+  it("honours an inline disable on the paragraph", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "# T\n\n<!-- wastech-mdlint-disable-next-line SEC-006 -->\n**Installation**\n",
+    });
+
+    const result = await lint(cwd, [rule("SEC-006")]);
+    expect(result.messages).toEqual([]);
+  });
+
+  // STR-001 is a project-scope existence check that never reads paragraphs, so the two rules cannot
+  // describe the same defect; this pins that running both yields each rule's own finding once.
+  it("does not double-report with STR-001", async () => {
+    const cwd = await fixtureRepo({ "a.md": "# T\n\n**Installation**\n" });
+
+    const both = await lint(cwd, [
+      rule("STR-001", { files: ["MISSING.md"] }),
+      rule("SEC-006"),
+    ]);
+    expect(
+      both.messages.map(({ ruleId, filePath, line }) => ({
+        ruleId,
+        filePath,
+        line,
+      })),
+    ).toEqual([
+      { ruleId: "STR-001", filePath: "MISSING.md", line: 0 },
+      { ruleId: "SEC-006", filePath: "a.md", line: 3 },
+    ]);
+
+    const strOnly = await lint(cwd, [
+      rule("STR-001", { files: ["MISSING.md"] }),
+    ]);
+    expect(strOnly.messages.map((message) => message.filePath)).toEqual([
+      "MISSING.md",
+    ]);
+  });
+
+  // A document opening with `**Title**` has two separate defects — no title heading, and emphasis
+  // standing in for one — so SEC-004 and SEC-006 both report line 1 by design.
+  it("co-reports with SEC-004 on an emphasis title", async () => {
+    const cwd = await fixtureRepo({ "a.md": "**Title**\n\nText.\n" });
+
+    const result = await lint(cwd, [rule("SEC-004"), rule("SEC-006")]);
+    expect(
+      result.messages
+        .map(({ ruleId, line }) => `${ruleId}:${line}`)
+        .sort(compareStrings),
+    ).toEqual(["SEC-004:1", "SEC-006:1"]);
+  });
+});
+
+// The SEC half of the shared `exclude` matrix. One fixture serves every case: both documents
+// violate each one (the `#### Overview` jump from H2 is what trips SEC-004, and the sibling
+// `## Usage` repeat trips SEC-005 in both of its modes, and the `**Stand-in**` paragraph trips
+// SEC-006), while `templates/t.md` satisfies SEC-001/SEC-002 (it has `Summary`, and neither
+// `Overview` nor `Usage`, which `sectionOrder` skips), passes SEC-004 (one leading H1, levels step
+// by one), SEC-005 (no repeated heading) and SEC-006 (no emphasis paragraph), and is self-skipped
+// by SEC-003.
+const SECTION_DOC =
+  "# Title\n\n## Usage\n\n#### Overview\n\n## Usage\n\n**Stand-in**\n";
 const SECTION_TEMPLATE = "# T\n\n## Context\n\n## Summary\n";
 
 const SEC_SCOPE_CASES: readonly { id: string; options: object }[] = [
   { id: "SEC-001", options: { sections: ["Summary"] } },
   { id: "SEC-002", options: { order: ["Overview", "Usage"] } },
   { id: "SEC-003", options: { template: "templates/t.md", level: 2 } },
+  {
+    id: "SEC-003",
+    options: { template: "templates/t.md", level: 2, strict: true },
+  },
+  { id: "SEC-004", options: {} },
+  { id: "SEC-005", options: {} },
+  { id: "SEC-005", options: { siblingsOnly: true } },
+  { id: "SEC-006", options: {} },
 ];
 
 describe("SEC file scope (exclude)", () => {

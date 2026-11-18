@@ -33,7 +33,8 @@ const CATEGORY_DETAILS = {
   GRP: { label: "Graph Integrity", order: 5 },
   SIZE: { label: "Size", order: 6 },
   LLM: { label: "LLM", order: 7 },
-  custom: { label: "Custom", order: 8 },
+  FM: { label: "Front Matter", order: 8 },
+  custom: { label: "Custom", order: 9 },
 } as const satisfies Record<RuleCategory, { label: string; order: number }>;
 
 const CATEGORY_ORDER = (
@@ -141,6 +142,12 @@ function summarizeAssertion(assertion: Assertion): string {
       return `requires links to resolve${assertion.exclude === undefined ? "" : `, excluding configured patterns ${formatList(assertion.exclude)}`}`;
     case "imageResolves":
       return `requires images to resolve${assertion.exclude === undefined ? "" : `, excluding configured patterns ${formatList(assertion.exclude)}`}`;
+    case "frontmatterRequired":
+      return `requires front matter keys ${formatList(assertion.keys)}`;
+    case "frontmatterInSet":
+      return `requires front matter key ${quote(assertion.key)} to be one of ${formatList(assertion.values)}`;
+    case "frontmatterMatches":
+      return `requires front matter key ${quote(assertion.key)} to match ${formatPattern(assertion.pattern, assertion.flags)}`;
     default: {
       const exhaustiveCheck: never = assertion;
       return exhaustiveCheck;
@@ -192,7 +199,9 @@ export function describeRules(
         ];
       }
 
-      const metadata = metadataById.get(canonicalizeRuleId(entry.rule));
+      // `resolveId` rather than `canonicalizeRuleId`: an entry written by its alias must find the
+      // same metadata as one written by its id.
+      const metadata = metadataById.get(registry.resolveId(entry.rule));
 
       if (metadata === undefined) {
         throw new Error(

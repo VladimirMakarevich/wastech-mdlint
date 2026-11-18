@@ -13,30 +13,31 @@ This guide is the full reference. For a one-page summary see the top-level [READ
 - [CLI reference](cli.md) — every command, flag, and exit code.
 - [Configuration](configuration.md) — how the config file is found, loaded, and validated.
 - [Annotated config reference](config-reference.md) — one config with **every** option, commented.
+- [Running alongside markdownlint](markdownlint.md) — which tool owns which checks, the overlapping rules, and a ready markdownlint config.
 
 ## Capabilities
 
 | Area | What it does | Doc |
 | --- | --- | --- |
-| **Rules & rule engine** | 27 built-in rules + a declarative `custom` rule over one parse pass. | [Rules](rules/README.md) |
+| **Rules & rule engine** | 35 built-in rules + a declarative `custom` rule over one parse pass. | [Rules](rules/README.md) |
 | **Configuration** | JSONC config, local `$schema`, per-rule severity/options, shared settings. | [Configuration](configuration.md) |
 | **Context graph** | `graph` / `slice` / `impact` over the reference graph between documents. | [Context graph](context-graph.md) |
 | **Context compiler** | `compile` generates a deterministic `SKILL.md` from the graph + rules + config. | [Compile](compile.md) |
 | **MCP server** | 6 read-only stdio tools exposing the same pipeline to AI agents. | [MCP server](mcp-server.md) |
 | **Agent skills** | 4 hand-authored, host-neutral Agent Skills (`-init`, `-fix`, `-impact`, `-docs`). | [Skills](skills.md) |
-| **Inline suppression** | `disable` / `disable-next-line` directives per rule. | [Suppression](suppression.md) |
+| **Inline suppression** | `disable` / `disable-next-line` / `disable-file` and `capture` / `restore` directives, per rule or per category. | [Suppression](suppression.md) |
 | **Output & exit codes** | Text and JSON reports; CI-friendly exit codes. | [Output](output.md) |
 | **Concepts** | Parse model, determinism, path handling, token estimation. | [Concepts](concepts.md) |
 
 ## Rules at a glance
 
-27 built-in rules across 8 categories, plus the declarative `custom` rule. See the [rules index](rules/README.md) for the full table with a page per rule.
+35 built-in rules across 9 categories, plus the declarative `custom` rule. See the [rules index](rules/README.md) for the full table with a page per rule.
 
 - **TBL** (tables) — [TBL-001](rules/TBL-001.md) … [TBL-007](rules/TBL-007.md)
-- **SEC** (sections) — [SEC-001](rules/SEC-001.md) … [SEC-003](rules/SEC-003.md)
+- **SEC** (sections) — [SEC-001](rules/SEC-001.md) … [SEC-006](rules/SEC-006.md)
 - **STR** (structure) — [STR-001](rules/STR-001.md)
-- **REF** (references) — [REF-001](rules/REF-001.md) … [REF-008](rules/REF-008.md)
-- **CTX** (content quality) — [CTX-001](rules/CTX-001.md) … [CTX-003](rules/CTX-003.md)
+- **REF** (references) — [REF-001](rules/REF-001.md) … [REF-009](rules/REF-009.md)
+- **CTX** (content quality) — [CTX-001](rules/CTX-001.md) … [CTX-006](rules/CTX-006.md)
 - **GRP** (graph integrity) — [GRP-001](rules/GRP-001.md) … [GRP-003](rules/GRP-003.md)
 - **SIZE** / **LLM** (context hygiene) — [SIZE-001](rules/SIZE-001.md) · [LLM-001](rules/LLM-001.md)
 - **custom** (declarative) — [custom](rules/custom.md)

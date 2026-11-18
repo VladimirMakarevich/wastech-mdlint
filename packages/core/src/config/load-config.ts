@@ -8,7 +8,12 @@ import {
 } from "jsonc-parser";
 
 import { normalizeRelativePath } from "../discovery/globs.js";
-import { RuleResolutionError, type RuleRegistry } from "../engine/registry.js";
+import {
+  findMixedRuleSpellings,
+  mixedRuleSpellingMessage,
+  RuleResolutionError,
+  type RuleRegistry,
+} from "../engine/registry.js";
 import {
   duplicateCustomIdMessage,
   findDuplicateCustomIds,
@@ -154,6 +159,14 @@ function resolveRules(
       collision,
     ]),
   );
+  // Same shape for a rule spelled by id in one entry and by alias in another: a cross-entry
+  // property no single resolution can see, reported in entry order with the other diagnostics.
+  const mixedByIndex = new Map(
+    findMixedRuleSpellings(entries, registry).map((mixed) => [
+      mixed.index,
+      mixed,
+    ]),
+  );
 
   entries.forEach((entry, index) => {
     try {
@@ -176,6 +189,22 @@ function resolveRules(
             message: duplicateCustomIdMessage({
               id: collision.id,
               siblingPath: `config.rules[${collision.firstIndex}]`,
+            }),
+          }),
+        );
+        return;
+      }
+
+      const mixed = mixedByIndex.get(index);
+      if (mixed !== undefined) {
+        errors.push(
+          formatConfigIssue({
+            path: ["rules", index, "rule"],
+            message: mixedRuleSpellingMessage({
+              ruleId: mixed.ruleId,
+              spelling: mixed.spelling,
+              firstSpelling: mixed.firstSpelling,
+              siblingPath: `config.rules[${mixed.firstIndex}]`,
             }),
           }),
         );
@@ -209,8 +238,9 @@ function resolveRules(
  *
  * Two-stage validation: the root shape is checked by `lintConfigSchema` (diagnostics for unknown
  * keys), then each `rules[]` entry is resolved through the registry, which validates its options and
- * surfaces path-prefixed / did-you-mean errors. Returns the validated config, the resolved rules
- * (with severity overrides), and the resolved settings.
+ * surfaces path-prefixed / did-you-mean errors. A built-in `rule` may be written as its id or its
+ * alias; the resolved rules always carry the canonical id. Returns the validated config, the
+ * resolved rules (with severity overrides), and the resolved settings.
  *
  * **One base for `explicitConfigPath`: `params.cwd`** — the directory being analyzed,
  * which is `[path]` for `lint`/`graph`, the CLI's own cwd for `slice`/`impact`, `--cwd` for `compile`,

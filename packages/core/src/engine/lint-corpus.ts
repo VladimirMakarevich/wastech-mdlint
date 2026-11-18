@@ -1,8 +1,13 @@
 import { compareStrings } from "../deterministic-sort.js";
 import type { ContextGraph } from "../graph/context-graph-types.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
+import { SUPPRESSION_DOCS_URL } from "./rule-docs-url.js";
 import { runRules } from "./run-rules.js";
-import { createSuppressionChecker } from "./suppression.js";
+import {
+  analyzeDirectives,
+  DIRECTIVE_DIAGNOSTIC_RULE_ID,
+  type DirectiveAnalysis,
+} from "./suppression.js";
 import type {
   LintMessage,
   ResolvedRule,
@@ -105,25 +110,49 @@ export function lintCorpus(input: LintCorpusInput): LintResult {
     rawMessages.push(...runRules(projectRules, sharedContext));
   }
 
+  // Every document's directives are analyzed, not only those of files with findings, because a
+  // malformed directive is worth reporting even in a file that is otherwise clean.
+  const analysisByFile = new Map<string, DirectiveAnalysis>();
+  for (const filePath of projectFiles) {
+    analysisByFile.set(
+      filePath,
+      analyzeDirectives(input.documents.get(filePath)!.directives),
+    );
+  }
+
   // Inline-disable suppression: drop each message whose (ruleId, line) is disabled in its file. A
   // message attributed to a path outside the corpus (SEC-003 naming its own `template`, STR-001
   // naming a required file) has no document to read directives from and is never suppressed.
-  const suppressionByFile = new Map<
-    string,
-    ReturnType<typeof createSuppressionChecker>
-  >();
   const messages = rawMessages.filter((message) => {
-    const document = input.documents.get(message.filePath);
-    if (document === undefined) {
-      return true;
-    }
-    let checker = suppressionByFile.get(message.filePath);
-    if (checker === undefined) {
-      checker = createSuppressionChecker(document.directives);
-      suppressionByFile.set(message.filePath, checker);
-    }
-    return !checker(message.ruleId, message.line);
+    const analysis = analysisByFile.get(message.filePath);
+    return (
+      analysis === undefined ||
+      !analysis.isSuppressed(message.ruleId, message.line)
+    );
   });
+
+  // Directive diagnostics are engine-emitted and always on rather than a registered rule: every
+  // rule here is opt-in, so a rule a user never enabled would give them exactly the silent ignore
+  // these diagnostics exist to prevent. Severity is `error` because a typo'd category or a stray
+  // `restore` can leave a range disabled, which is a green report hiding findings. They are added
+  // after the suppression filter, since letting a directive silence a report about a broken
+  // directive would be circular. And they appear only when some rule is active: with no rules there
+  // is no finding a directive could hide or fail to hide, and a zero-config run stays a clean pass.
+  if (input.rules.length > 0) {
+    for (const [filePath, analysis] of analysisByFile) {
+      for (const diagnostic of analysis.diagnostics) {
+        messages.push({
+          ruleId: DIRECTIVE_DIAGNOSTIC_RULE_ID,
+          severity: "error",
+          message: diagnostic.message,
+          filePath,
+          line: diagnostic.line,
+          data: diagnostic.data,
+          helpUri: SUPPRESSION_DOCS_URL,
+        });
+      }
+    }
+  }
 
   messages.sort(compareMessages);
 

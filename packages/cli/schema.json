@@ -93,7 +93,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "CTX-001"
+                "enum": [
+                  "CTX-001",
+                  "no-empty-sections"
+                ]
               },
               "severity": {
                 "enum": [
@@ -139,7 +142,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "CTX-002"
+                "enum": [
+                  "CTX-002",
+                  "checklist-complete"
+                ]
               },
               "severity": {
                 "enum": [
@@ -179,7 +185,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "CTX-003"
+                "enum": [
+                  "CTX-003",
+                  "glossary-terms"
+                ]
               },
               "severity": {
                 "enum": [
@@ -235,7 +244,223 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "GRP-001"
+                "enum": [
+                  "CTX-004",
+                  "descriptive-link-text"
+                ]
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "properties": {
+                  "phrases": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalPhrases": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
+                "enum": [
+                  "CTX-005",
+                  "image-alt-text"
+                ]
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
+                "enum": [
+                  "CTX-006",
+                  "code-block-language"
+                ]
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "properties": {
+                  "allowed": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^\\S+$"
+                    }
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
+                "enum": [
+                  "FM-001",
+                  "valid-front-matter"
+                ]
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "properties": {
+                  "required": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "allowed": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "additionalProperties": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "patterns": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
+                "enum": [
+                  "GRP-001",
+                  "no-circular-references"
+                ]
               },
               "severity": {
                 "enum": [
@@ -266,7 +491,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "GRP-002"
+                "enum": [
+                  "GRP-002",
+                  "no-orphan-documents"
+                ]
               },
               "severity": {
                 "enum": [
@@ -315,7 +543,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "GRP-003"
+                "enum": [
+                  "GRP-003",
+                  "ids-carried-forward"
+                ]
               },
               "severity": {
                 "enum": [
@@ -380,7 +611,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "LLM-001"
+                "enum": [
+                  "LLM-001",
+                  "context-token-budget"
+                ]
               },
               "severity": {
                 "enum": [
@@ -421,7 +655,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "REF-001"
+                "enum": [
+                  "REF-001",
+                  "no-broken-links"
+                ]
               },
               "severity": {
                 "enum": [
@@ -467,7 +704,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "REF-002"
+                "enum": [
+                  "REF-002",
+                  "no-broken-anchors"
+                ]
               },
               "severity": {
                 "enum": [
@@ -526,7 +766,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "REF-003"
+                "enum": [
+                  "REF-003",
+                  "no-broken-images"
+                ]
               },
               "severity": {
                 "enum": [
@@ -557,7 +800,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "REF-004"
+                "enum": [
+                  "REF-004",
+                  "declared-zone-dependencies"
+                ]
               },
               "severity": {
                 "enum": [
@@ -592,7 +838,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "REF-005"
+                "enum": [
+                  "REF-005",
+                  "traceable-ids"
+                ]
               },
               "severity": {
                 "enum": [
@@ -644,7 +893,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "REF-006"
+                "enum": [
+                  "REF-006",
+                  "stable-dependencies"
+                ]
               },
               "severity": {
                 "enum": [
@@ -709,7 +961,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "REF-007"
+                "enum": [
+                  "REF-007",
+                  "no-undefined-references"
+                ]
               },
               "severity": {
                 "enum": [
@@ -750,7 +1005,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "REF-008"
+                "enum": [
+                  "REF-008",
+                  "no-malformed-links"
+                ]
               },
               "severity": {
                 "enum": [
@@ -787,7 +1045,59 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "SEC-001"
+                "enum": [
+                  "REF-009",
+                  "no-unused-definitions"
+                ]
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "properties": {
+                  "ignoredDefinitions": {
+                    "default": [
+                      "//"
+                    ],
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
+                "enum": [
+                  "SEC-001",
+                  "required-sections"
+                ]
               },
               "severity": {
                 "enum": [
@@ -835,7 +1145,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "SEC-002"
+                "enum": [
+                  "SEC-002",
+                  "section-order"
+                ]
               },
               "severity": {
                 "enum": [
@@ -891,7 +1204,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "SEC-003"
+                "enum": [
+                  "SEC-003",
+                  "section-template"
+                ]
               },
               "severity": {
                 "enum": [
@@ -911,6 +1227,9 @@
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "strict": {
+                    "type": "boolean"
                   },
                   "files": {
                     "type": "array",
@@ -940,7 +1259,154 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "SIZE-001"
+                "enum": [
+                  "SEC-004",
+                  "heading-increment"
+                ]
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "properties": {
+                  "increment": {
+                    "type": "boolean"
+                  },
+                  "singleTitle": {
+                    "type": "boolean"
+                  },
+                  "title": {
+                    "type": "boolean"
+                  },
+                  "level": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 6
+                  },
+                  "titleKey": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
+                "enum": [
+                  "SEC-005",
+                  "no-duplicate-headings"
+                ]
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "properties": {
+                  "siblingsOnly": {
+                    "type": "boolean"
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
+                "enum": [
+                  "SEC-006",
+                  "no-emphasis-as-heading"
+                ]
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "properties": {
+                  "punctuation": {
+                    "type": "string"
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
+                "enum": [
+                  "SIZE-001",
+                  "file-size-budget"
+                ]
               },
               "severity": {
                 "enum": [
@@ -1077,7 +1543,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "STR-001"
+                "enum": [
+                  "STR-001",
+                  "required-files"
+                ]
               },
               "severity": {
                 "enum": [
@@ -1113,7 +1582,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "TBL-001"
+                "enum": [
+                  "TBL-001",
+                  "table-required-columns"
+                ]
               },
               "severity": {
                 "enum": [
@@ -1164,7 +1636,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "TBL-002"
+                "enum": [
+                  "TBL-002",
+                  "table-no-empty-cells"
+                ]
               },
               "severity": {
                 "enum": [
@@ -1212,7 +1687,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "TBL-003"
+                "enum": [
+                  "TBL-003",
+                  "table-allowed-values"
+                ]
               },
               "severity": {
                 "enum": [
@@ -1271,7 +1749,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "TBL-004"
+                "enum": [
+                  "TBL-004",
+                  "table-cell-pattern"
+                ]
               },
               "severity": {
                 "enum": [
@@ -1325,7 +1806,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "TBL-005"
+                "enum": [
+                  "TBL-005",
+                  "table-conditional-columns"
+                ]
               },
               "severity": {
                 "enum": [
@@ -1413,7 +1897,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "TBL-006"
+                "enum": [
+                  "TBL-006",
+                  "table-unique-ids"
+                ]
               },
               "severity": {
                 "enum": [
@@ -1463,7 +1950,10 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
-                "const": "TBL-007"
+                "enum": [
+                  "TBL-007",
+                  "table-row-cell-count"
+                ]
               },
               "severity": {
                 "enum": [
@@ -1507,7 +1997,7 @@
               },
               "id": {
                 "type": "string",
-                "pattern": "^(?!(CTX|GRP|LLM|REF|SEC|SIZE|STR|TBL)-)[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$"
+                "pattern": "^(?!(CTX|FM|GRP|LLM|REF|SEC|SIZE|STR|TBL)-)(?!(CHECKLIST-COMPLETE|CODE-BLOCK-LANGUAGE|CONTEXT-TOKEN-BUDGET|DECLARED-ZONE-DEPENDENCIES|DESCRIPTIVE-LINK-TEXT|FILE-SIZE-BUDGET|GLOSSARY-TERMS|HEADING-INCREMENT|IDS-CARRIED-FORWARD|IMAGE-ALT-TEXT|NO-BROKEN-ANCHORS|NO-BROKEN-IMAGES|NO-BROKEN-LINKS|NO-CIRCULAR-REFERENCES|NO-DUPLICATE-HEADINGS|NO-EMPHASIS-AS-HEADING|NO-EMPTY-SECTIONS|NO-MALFORMED-LINKS|NO-ORPHAN-DOCUMENTS|NO-UNDEFINED-REFERENCES|NO-UNUSED-DEFINITIONS|REQUIRED-FILES|REQUIRED-SECTIONS|SECTION-ORDER|SECTION-TEMPLATE|STABLE-DEPENDENCIES|TABLE-ALLOWED-VALUES|TABLE-CELL-PATTERN|TABLE-CONDITIONAL-COLUMNS|TABLE-NO-EMPTY-CELLS|TABLE-REQUIRED-COLUMNS|TABLE-ROW-CELL-COUNT|TABLE-UNIQUE-IDS|TRACEABLE-IDS|VALID-FRONT-MATTER)$)[A-Z][A-Z0-9]*(-[A-Z0-9]+)+$"
               },
               "description": {
                 "type": "string"
@@ -1523,6 +2013,7 @@
                 "enum": [
                   "checklist",
                   "content",
+                  "frontmatter",
                   "link",
                   "section",
                   "table"
@@ -1884,6 +2375,79 @@
                         },
                         "required": [
                           "kind"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "frontmatterRequired"
+                          },
+                          "keys": {
+                            "minItems": 1,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "keys"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "frontmatterInSet"
+                          },
+                          "key": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "values": {
+                            "minItems": 1,
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "key",
+                          "values"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "frontmatterMatches"
+                          },
+                          "key": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "pattern": {
+                            "type": "string"
+                          },
+                          "flags": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "key",
+                          "pattern"
                         ],
                         "additionalProperties": false
                       }
