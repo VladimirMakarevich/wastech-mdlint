@@ -1553,3 +1553,93 @@ describe("parseDocument · fix offsets", () => {
     ]);
   });
 });
+
+// A UTF-8 byte order mark only marks the encoding: the file means the same with or without it.
+// micromark drops it before tokenizing, while `content` keeps it, so the fixture is parsed both ways
+// and every result must agree — values, lines and columns as they are, source offsets one later.
+describe("parseDocument · byte order mark", () => {
+  const BOM = "\uFEFF";
+  const body = [
+    "---",
+    "title: T",
+    "---",
+    "# Title",
+    "",
+    "See [docs](other.md#Some-Anchor), [text][missing] and (text)[./a.md] [gql].",
+    "",
+    "```",
+    "plain",
+    "```",
+    "",
+    "~~~ts",
+    "x",
+    "~~~",
+    "",
+    "    indented",
+    "",
+    "[unused]: https://example.com",
+    "",
+  ].join("\n");
+
+  function shift<T extends { start: number; end: number }>(range: T): T {
+    return { ...range, start: range.start + 1, end: range.end + 1 };
+  }
+
+  it("reads the same values, lines and columns as the file without the mark", () => {
+    const plain = parse(body);
+    const marked = parse(BOM + body);
+    expect(marked.codeFences.map((fence) => fence.language)).toEqual([
+      "",
+      "ts",
+    ]);
+    expect(marked.codeFences).toEqual(plain.codeFences);
+    expect(marked.headings).toEqual(plain.headings);
+    expect(marked.frontmatter).toEqual(plain.frontmatter);
+    expect(marked.undefinedReferences).not.toEqual([]);
+    expect(marked.undefinedReferences).toEqual(plain.undefinedReferences);
+    expect(marked.reversedLinks).not.toEqual([]);
+    expect(marked.reversedLinks).toEqual(plain.reversedLinks);
+  });
+
+  it("points every source offset into the content it was given, mark included", () => {
+    const plain = parse(body);
+    const marked = parse(BOM + body);
+    expect(plain.literalBrackets).not.toEqual([]);
+    expect(marked.literalBrackets).toEqual(
+      plain.literalBrackets.map((offset) => offset + 1),
+    );
+    expect(plain.textSpans).not.toEqual([]);
+    expect(marked.textSpans).toEqual(plain.textSpans.map(shift));
+    expect(marked.referenceDefinitions).toEqual(
+      plain.referenceDefinitions.map(shift),
+    );
+    expect(marked.links.map((link) => link.fragmentRange)).toEqual(
+      plain.links.map(
+        (link) => link.fragmentRange && shift(link.fragmentRange),
+      ),
+    );
+
+    const definition = marked.referenceDefinitions[0]!;
+    expect(marked.content.slice(definition.start, definition.end)).toBe(
+      "[unused]: https://example.com",
+    );
+    const fragment = marked.links[0]!.fragmentRange!;
+    expect(marked.content.slice(fragment.start, fragment.end)).toBe(
+      "Some-Anchor",
+    );
+  });
+
+  // Only offset 0 holds a byte order mark. Anywhere else U+FEFF is a zero-width no-break space that
+  // micromark keeps as text, so no offset moves for it.
+  it("does not move offsets for a U+FEFF after the start of the file", () => {
+    const content = `Text${BOM}.\n\n[unused]: https://example.com\n`;
+    const doc = parse(content);
+    const definition = doc.referenceDefinitions[0]!;
+    expect(content.slice(definition.start, definition.end)).toBe(
+      "[unused]: https://example.com",
+    );
+    expect(
+      doc.textSpans.map((span) => content.slice(span.start, span.end)),
+    ).toEqual([`Text${BOM}.`]);
+  });
+});

@@ -6,6 +6,7 @@ import {
   matchesConfigGlob,
   normalizeRelativePath,
 } from "../../discovery/globs.js";
+import { byteOrderMarkLength } from "../../markdown/byte-order-mark.js";
 import type {
   ParsedDocument,
   ParsedLink,
@@ -718,6 +719,17 @@ export const ref008: RuleDefinition = defineRule({
 // Markdown comment that renders nothing, and it is unused by design.
 const DEFAULT_REF009_IGNORED_DEFINITIONS = ["//"];
 
+// The offset where the line holding `offset` starts. A leading byte order mark is not part of the
+// first line: it marks the file's encoding, so the first line starts after it. Otherwise a
+// definition right after the mark would be reported one column late, and deleting its line would
+// delete the mark with it — `"\uFEFF".trim()` is empty, so the mark alone never stops the deletion.
+function lineStartOf(content: string, offset: number): number {
+  return Math.max(
+    content.lastIndexOf("\n", offset - 1) + 1,
+    byteOrderMarkLength(content),
+  );
+}
+
 // The bytes to delete to remove `definition` with the whole lines it occupies, or undefined when the
 // definition does not own those lines. Only a top-level definition alone on its lines qualifies: one
 // inside a blockquote or list item shares its lines with the container's `>` or list marker, and
@@ -729,7 +741,7 @@ function definitionLineRange(
   if (!definition.topLevel) {
     return undefined;
   }
-  const lineStart = content.lastIndexOf("\n", definition.start - 1) + 1;
+  const lineStart = lineStartOf(content, definition.start);
   const newlineAt = content.indexOf("\n", definition.end);
   const lineEnd = newlineAt === -1 ? content.length : newlineAt;
   if (
@@ -767,7 +779,9 @@ function unusedDefinitions(
 // edit. Merging is what makes a single `--fix` run complete: two separate edits that both reach for
 // the same line terminator overlap, `applyEdits` drops one, and a second run would still change the
 // file. A merged block that ends the file without a terminator takes the preceding line terminator
-// instead, so the file does not end with a stray blank line it did not have.
+// instead, so the file does not end with a stray blank line it did not have. A block on the first
+// line has no preceding terminator to take: what precedes it is nothing, or a byte order mark that
+// must stay.
 function definitionRemovalEdits(
   content: string,
   definitions: readonly ParsedReferenceDefinition[],
@@ -789,7 +803,11 @@ function definitionRemovalEdits(
 
   return merged.map((range) => {
     let start = range.start;
-    if (range.end === content.length && !content.endsWith("\n") && start > 0) {
+    if (
+      range.end === content.length &&
+      !content.endsWith("\n") &&
+      content[start - 1] === "\n"
+    ) {
       start -= content[start - 2] === "\r" ? 2 : 1;
     }
     return { start, end: range.end, newText: "" };
@@ -830,7 +848,7 @@ export const ref009: RuleDefinition = defineRule({
   check: (options) => (context) => {
     const content = context.document!.content;
     for (const definition of unusedDefinitions(options, context)) {
-      const lineStart = content.lastIndexOf("\n", definition.start - 1) + 1;
+      const lineStart = lineStartOf(content, definition.start);
       context.report({
         message: `Reference definition "[${definition.label}]" is not used by any reference link or image in this document; remove it or link to it.`,
         line: definition.line,

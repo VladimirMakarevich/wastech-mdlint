@@ -97,9 +97,10 @@ MCP is stricter than the CLI about what it will name. A failure whose path falls
 
 `lint --fix` applies deterministic fixes in place, then re-reports what remains. Only rules with a fix hook change files — currently [SEC-001](rules/SEC-001.md) (scaffold missing sections), [TBL-002](rules/TBL-002.md) (empty target cell → `TODO`), [REF-002](rules/REF-002.md) (a fragment that differs from its anchor only by case → the exact anchor), [REF-009](rules/REF-009.md) (delete an unused link reference definition) and [CTX-003](rules/CTX-003.md) (glossary alias → canonical term). Each rewrites only the findings it reports as `fixable`; everything else is reported, never rewritten. A second `--fix` run over the result changes nothing.
 
-Two properties hold for every file `--fix` touches:
+Three properties hold for every file `--fix` touches:
 
 - **Line endings are preserved.** Each document's own style is detected from its bytes (whatever terminates its first line wins; a file with none, or with lone classic-Mac `\r`, is treated as LF), and inserted content adopts it. A CRLF file stays CRLF on a Linux runner, and no fix ever leaves a file with mixed endings.
+- **A byte order mark stays.** A file that starts with a UTF-8 byte order mark keeps it: every fix places its edits by offsets into the file as read, mark included, and none ever adds or removes the mark.
 - **A failed write never damages the file.** Each document is written to a temp file beside it and then renamed into place, so the file on disk is either the old content or the new content, never a truncated mix. If a write fails, `--fix` stops at that file and exits `2`, naming the file it could not write (with its errno), stating that it is unchanged on disk, and listing the files it had already fixed. Durability across a power loss is not claimed — the guarantee is against truncation, not an un-`fsync`ed page cache.
 
 Replacing a file by rename has one visible consequence: on Linux/macOS a **read-only document no longer blocks a fix**, because `rename` checks write permission on the containing directory, not on the file (the replacement does inherit the original's mode). Keep a file out of `--fix` with [`exclude`](configuration.md#top-level-shape) rather than with its file mode.

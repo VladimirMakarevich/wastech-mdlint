@@ -27,6 +27,7 @@ import { visit } from "unist-util-visit";
 
 import { findLineNumber } from "../engine/text-position.js";
 import { canonicalizeRuleId } from "../rule-id.js";
+import { byteOrderMarkLength } from "./byte-order-mark.js";
 import type {
   InlineDirective,
   InlineDirectiveKind,
@@ -194,8 +195,9 @@ function getReferenceDefinitions(tree: Root): Map<string, string> {
   return definitions;
 }
 
-// Only the first child can be frontmatter: the micromark extension matches the opening fence at
-// document offset 0 and nowhere else, so a `---` later in the file stays a thematic break.
+// Only the first child can be frontmatter: the micromark extension matches the opening fence at the
+// very start of the document and nowhere else, so a `---` later in the file stays a thematic break.
+// After a byte order mark counts as the start, since micromark drops the mark before it tokenizes.
 function extractFrontmatter(tree: Root): ParsedFrontmatter | null {
   const first = tree.children[0];
 
@@ -617,6 +619,29 @@ function normalizeLineEndings(value: string): string {
   return value.replace(/\r\n?/g, "\n");
 }
 
+type SourcePoint = NonNullable<Root["position"]>["start"];
+
+// Move every offset in `tree` past a leading byte order mark. micromark drops the mark before it
+// tokenizes, so its offsets count from the character after it, while everything in this module
+// indexes `params.content`, mark included: left alone, each offset lands one character early, and a
+// fence is read as its preceding newline, a definition's range loses its last byte, and so on.
+// Shifting once here, before anything reads the tree, keeps every consumer a plain index into
+// `content`. Lines and columns are left as they are: an editor does not count the invisible mark,
+// and micromark already reports the character after it at column 1. A point object is shifted at
+// most once, because nothing in the mdast utilities promises two nodes never share one.
+function shiftOffsetsPastByteOrderMark(tree: Root, markLength: number): void {
+  const shifted = new Set<SourcePoint>();
+  visit(tree, (node) => {
+    for (const point of [node.position?.start, node.position?.end]) {
+      if (point?.offset === undefined || shifted.has(point)) {
+        continue;
+      }
+      shifted.add(point);
+      point.offset += markLength;
+    }
+  });
+}
+
 /**
  * Parse one Markdown document into the full `ParsedDocument` in a single traversal.
  *
@@ -629,6 +654,10 @@ export function parseDocument(params: {
   content: string;
 }): ParsedDocument {
   const tree = markdownProcessor.parse(params.content) as Root;
+  const markLength = byteOrderMarkLength(params.content);
+  if (markLength > 0) {
+    shiftOffsetsPastByteOrderMark(tree, markLength);
+  }
   const definitions = getReferenceDefinitions(tree);
   const slugger = new GithubSlugger();
 

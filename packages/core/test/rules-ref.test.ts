@@ -1004,6 +1004,14 @@ describe("REF-002 --fix (case-only fragments)", () => {
     expect(first.replace(/\r\n/g, "")).not.toContain("\n");
     expect(second).toBe(first);
   });
+  it("rewrites only the fragment in a file that starts with a byte order mark, keeping the mark", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "\uFEFF## Demo\n\nSee [demo](#DEMO).\n",
+    });
+    const { first, second } = await fixTwice(cwd, [rule("REF-002")], "a.md");
+    expect(first).toBe("\uFEFF## Demo\n\nSee [demo](#demo).\n");
+    expect(second).toBe(first);
+  });
 });
 
 describe("REF-009 unused link reference definitions", () => {
@@ -1112,5 +1120,29 @@ describe("REF-009 unused link reference definitions", () => {
     ]);
     const { first } = await fixTwice(cwd, [rule("REF-009")], "a.md");
     expect(first).toBe(content);
+  });
+
+  // A byte order mark is not part of the first line: it marks the file's encoding, so a definition
+  // right after it starts at column 1 and deleting that definition's line keeps the mark.
+  it("removes a first-line definition after a byte order mark, keeping the mark", async () => {
+    const cwd = await fixtureRepo({ "a.md": "\uFEFF[old]: old.md\nText.\n" });
+    const result = await lint(cwd, [rule("REF-009")]);
+    expect(
+      result.messages.map((message) => [
+        message.line,
+        message.column,
+        message.fixable,
+      ]),
+    ).toEqual([[1, 1, true]]);
+    const { first, second } = await fixTwice(cwd, [rule("REF-009")], "a.md");
+    expect(first).toBe("\uFEFFText.\n");
+    expect(second).toBe(first);
+  });
+
+  it("keeps the byte order mark when the removed definition is the whole file", async () => {
+    const cwd = await fixtureRepo({ "a.md": "\uFEFF[old]: old.md" });
+    const { first, second } = await fixTwice(cwd, [rule("REF-009")], "a.md");
+    expect(first).toBe("\uFEFF");
+    expect(second).toBe(first);
   });
 });

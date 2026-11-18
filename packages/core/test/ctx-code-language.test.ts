@@ -63,6 +63,14 @@ describe("CTX-006 fenced code language", () => {
     ).toEqual(["{.python}"]);
   });
 
+  // micromark drops a leading byte order mark before it parses, while the fenced/indented test reads
+  // the byte at the node's offset in the file's own text, mark included.
+  it("reports a fence in a file that starts with a byte order mark", () => {
+    expect(findings("\uFEFF```\nls\n```\n\n```bash\nls\n```\n")).toEqual([
+      { message: MISSING, line: 1, column: 1, data: { language: "" } },
+    ]);
+  });
+
   it("gives the same positions for a CRLF document", () => {
     expect(findings("# T\r\n\r\n```\r\nx\r\n```\r\n")).toEqual([
       { message: MISSING, line: 3, column: 1, data: { language: "" } },

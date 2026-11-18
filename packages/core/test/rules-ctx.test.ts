@@ -665,6 +665,19 @@ describe("CTX-003 --fix", () => {
     );
   });
 
+  // The alias right after the mark is the case a one-character offset error would hit: its prose
+  // span must still be found, and the rewrite must land on the alias and leave the mark in place.
+  it("replaces an alias right after a byte order mark and keeps the mark", async () => {
+    const cwd = await fixtureRepo({
+      "glossary.md": GLOSSARY,
+      "a.md": "\uFEFFgql first, then gql.\n",
+    });
+    const { first, afterFirst, afterSecond } = await fixTwice(cwd);
+    expect(first.fixedFiles).toEqual(["a.md"]);
+    expect(afterFirst).toBe("\uFEFFGraphQL first, then GraphQL.\n");
+    expect(afterSecond).toBe(afterFirst);
+  });
+
   it("skips code spans, code blocks, link and definition targets, HTML and front matter, but fixes link text", async () => {
     const content = [
       "---",
