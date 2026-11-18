@@ -742,6 +742,50 @@ describe("REF-007 undefined reference labels", () => {
       "REF-001",
     ]);
   });
+
+  // A CRLF break must count as one line break with no column. If the `\r` were counted as an extra
+  // line or as a trailing character, every finding after the first break would drift, including one
+  // on a paragraph's continuation line, so both files must report identical positions.
+  it("reports the same positions for CRLF content as for LF content", async () => {
+    const lf =
+      "# A\n\nSee [text][missing] here\nand ![alt][Gone] there.\n\n[x][third]\n";
+    const cwd = await fixtureRepo({
+      "lf.md": lf,
+      "crlf.md": lf.replace(/\n/g, "\r\n"),
+    });
+    const result = await lint(cwd, [rule("REF-007")]);
+    const positions = (filePath: string) =>
+      result.messages
+        .filter((message) => message.filePath === filePath)
+        .map((message) => [message.line, message.column, message.data?.label]);
+
+    const expected = [
+      [3, 5, "missing"],
+      [4, 5, "Gone"],
+      [6, 1, "third"],
+    ];
+    expect(positions("lf.md")).toEqual(expected);
+    expect(positions("crlf.md")).toEqual(expected);
+  });
+
+  // One long CRLF-separated paragraph stresses the parser's line cursor at scale: a per-break
+  // off-by-one would accumulate into a wrong line for the last reference.
+  it("keeps line numbers exact across many CRLF-separated references", async () => {
+    const count = 2000;
+    const content =
+      Array.from({ length: count }, (_, i) => `[t][missing-${i}]`).join(
+        "\r\n",
+      ) + "\r\n";
+    const cwd = await fixtureRepo({ "a.md": content });
+    const result = await lint(cwd, [rule("REF-007")]);
+    expect(result.messages).toHaveLength(count);
+    const last = result.messages.at(-1);
+    expect([last?.line, last?.column, last?.data?.label]).toEqual([
+      count,
+      1,
+      `missing-${count - 1}`,
+    ]);
+  });
 });
 
 describe("REF-008 empty targets and reversed link syntax", () => {
