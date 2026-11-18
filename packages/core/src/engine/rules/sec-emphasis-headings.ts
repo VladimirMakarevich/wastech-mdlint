@@ -36,7 +36,11 @@ export function emphasisHeadingFindings(
     if (paragraph.text.includes("\n")) {
       continue;
     }
-    const text = paragraph.text.trim();
+    // Only trailing whitespace is dropped, so the punctuation check sees the last visible character
+    // (`**Note:&#32;**` still ends in `:`). Leading whitespace can only reach the parsed text through
+    // a character reference the author wrote on purpose, so it is kept and the message and
+    // `data.text` report the text exactly as decoded.
+    const text = paragraph.text.trimEnd();
     const last = Array.from(text).at(-1);
     if (last === undefined || punctuation.has(last)) {
       continue;

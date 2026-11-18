@@ -32,6 +32,18 @@ describe("SEC-006 default punctuation", () => {
     ]);
   });
 
+  it("keeps leading whitespace from a character reference but trims trailing whitespace", () => {
+    expect(findings("**&#32;Title**\n")).toEqual([
+      {
+        message: 'Emphasis used instead of a heading: " Title".',
+        line: 1,
+        data: { text: " Title", kind: "strong" },
+      },
+    ]);
+    expect(lines("**Note:&#32;**\n")).toEqual([]);
+    expect(lines("**&#32;**\n")).toEqual([]);
+  });
+
   it("passes a bold sentence ending in punctuation", () => {
     expect(lines("**A bold sentence.**\n")).toEqual([]);
   });
