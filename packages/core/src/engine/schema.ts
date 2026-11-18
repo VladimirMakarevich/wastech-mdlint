@@ -98,7 +98,8 @@ function customOptionsSchema(): JsonSchema {
 // with a negative lookahead excluding built-in prefixes (and any project-local custom ids, which get
 // their own dedicated branch) so the generic branch never overlaps a specific one under `oneOf`.
 // Upper-cased built-in aliases (`NO-BROKEN-ANCHORS`) are excluded too, because the loader rejects
-// them: such an id would make one suppression token name two rules.
+// them: a suppression directive resolves such a token to the built-in rule in any case, so the
+// custom rule's id would be ambiguous and the rule unsuppressible by it.
 function customIdPattern(
   reservedPrefixes: string[],
   reservedAliases: string[],

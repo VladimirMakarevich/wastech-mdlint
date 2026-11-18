@@ -575,7 +575,8 @@ describe("identifyExistingRule", () => {
       { rule: "custom", id: "foo" },
       { rule: "custom", id: "SEC-100" },
       // An upper-cased built-in alias owns no reserved prefix, but the loader rejects it because a
-      // suppression token would then name two rules.
+      // suppression directive resolves that token to the built-in rule, leaving the custom rule
+      // unsuppressible by its own id.
       { rule: "custom", id: "NO-BROKEN-ANCHORS" },
     ]) {
       expect(identifyExistingRule(entry)).toEqual({ kind: "invalid" });

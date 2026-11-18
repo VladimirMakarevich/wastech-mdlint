@@ -59,7 +59,7 @@ Every built-in rule has an alias, such as `no-broken-anchors` for `REF-002`. An 
 - config.rules[0].id: id "NO-BROKEN-ANCHORS": "no-broken-anchors" is the alias of built-in rule "REF-002" — choose another id.
 ```
 
-A [suppression directive](../suppression.md) accepts an alias wherever it accepts an ID, so `no-broken-anchors` would otherwise name both rules and silence both.
+A [suppression directive](../suppression.md) accepts an alias wherever it accepts an ID, and resolves it to the built-in rule in any case. A custom rule with that ID would therefore be ambiguous (its findings look like the built-in's) and could not be suppressed: `no-broken-anchors`, in any case, would silence `REF-002` and never the custom rule.
 
 ## Assertion kinds
 
