@@ -17,7 +17,8 @@
 // links → REF-001/002 link resolution, link/anchor graph edges, edge explainability, REF-008
 //              empty and bare-`#` targets; `fragmentRange` → the REF-002 case-only fix, which has to
 //              rewrite the fragment bytes exactly where they sit in `content`
-// images → REF-003 image resolution, image graph edges, REF-008 empty targets
+// images → REF-003 image resolution, image graph edges, REF-008 empty targets, CTX-005
+//               alt-text check (reads `alt`)
 //   undefinedReferences → REF-007. Deliberately no graph edge: an undefined label has no target,
 //                and an edge would have to invent one.
 //   reversedLinks → REF-008. Deliberately no graph edge: the target is unrendered text on the page,
