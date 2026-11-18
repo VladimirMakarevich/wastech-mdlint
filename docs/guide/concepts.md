@@ -21,7 +21,7 @@ Each Markdown file is parsed **once** (remark + GitHub-flavored Markdown + YAML 
 
 Rules, the [context graph](context-graph.md), [`compile`](compile.md), and inline [suppression](suppression.md) all read this one structure — nothing re-parses Markdown ad hoc.
 
-Frontmatter is excluded from the outline: it produces no heading, section, slug, link, image, import or inline directive, so it never appears as an anchor target, in `slice` or `impact` results, or in a compiled outline. Without it, the YAML lines of a `SKILL.md` or agent file would read as a setext heading, which is why it is recognised. Three edges to know:
+Frontmatter is excluded from the outline: it produces no heading, section, slug, link, image, import or inline directive, so it never appears as an anchor target, as a heading or section that `slice` or `impact` resolves, or in a compiled outline. Raw-content ID references are the exception: with [`settings.idRef`](configuration.md#settingsidref) configured, `id-ref` edges are scanned from the file's raw text, so an ID written inside front matter still creates an edge that can widen `slice` and `impact` results (see [Context graph — Limitations](context-graph.md#limitations)). Without it, the YAML lines of a `SKILL.md` or agent file would read as a setext heading, which is why it is recognised. Three edges to know:
 
 - The block is recognised only when `---` is the very first line. A file whose first line is `---` is treated as frontmatter up to the next `---` line, whatever lies between — so use `***` or `___` for a horizontal rule on line 1.
 - An opening `---` with no closing `---` line is not frontmatter; it stays an ordinary horizontal rule.
