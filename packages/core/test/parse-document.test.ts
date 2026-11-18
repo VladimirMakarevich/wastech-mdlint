@@ -1369,6 +1369,59 @@ describe("parseDocument · emphasis paragraphs", () => {
   });
 });
 
+describe("parseDocument · code fences", () => {
+  const fences = (content: string) => parse(content).codeFences;
+
+  it("records the language word, line and column of each fence in document order", () => {
+    expect(
+      fences("```bash\nls\n```\n\n~~~ js meta\nx\n~~~\n\n```BASH\nx\n```\n"),
+    ).toEqual([
+      { language: "bash", line: 1, column: 1 },
+      { language: "js", line: 5, column: 1 },
+      { language: "BASH", line: 9, column: 1 },
+    ]);
+  });
+
+  it("records an empty language for a bare or whitespace-only info string", () => {
+    expect(fences("```\nx\n```\n\n``` \nx\n```\n")).toEqual([
+      { language: "", line: 1, column: 1 },
+      { language: "", line: 5, column: 1 },
+    ]);
+  });
+
+  // The fenced/indented split reads the byte at the node's start offset, so these pin that it
+  // lands on the fence character wherever the fence sits.
+  it("records indented fences, fences in containers and an unclosed fence", () => {
+    expect(fences("   ```py\nx\n```\n")).toEqual([
+      { language: "py", line: 1, column: 4 },
+    ]);
+    expect(fences("> ```sh\n> x\n> ```\n")).toEqual([
+      { language: "sh", line: 1, column: 3 },
+    ]);
+    expect(fences("- item\n\n  ```json\n  {}\n  ```\n")).toEqual([
+      { language: "json", line: 3, column: 3 },
+    ]);
+    expect(fences("```txt\nnever closed\n")).toEqual([
+      { language: "txt", line: 1, column: 1 },
+    ]);
+  });
+
+  it("does not record indented code blocks, with spaces, a tab or inside a list", () => {
+    expect(fences("Text.\n\n    code\n")).toEqual([]);
+    expect(fences("Text.\n\n\tcode\n")).toEqual([]);
+    expect(fences("- item\n\n      code\n")).toEqual([]);
+  });
+
+  it("ignores fence-like text in front matter and reports real lines after it and under CRLF", () => {
+    expect(fences("---\nx: |\n  ```\n---\n\n```yaml\nk\n```\n")).toEqual([
+      { language: "yaml", line: 6, column: 1 },
+    ]);
+    expect(fences("# T\r\n\r\n```\r\nx\r\n```\r\n")).toEqual([
+      { language: "", line: 3, column: 1 },
+    ]);
+  });
+});
+
 // The source offsets a `--fix` writes to. Each one is asserted by slicing `content` with it, because
 // that is exactly what a fix does: an offset that is right on paper but wrong against the real
 // bytes is the defect these fields exist to prevent.

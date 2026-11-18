@@ -1,5 +1,6 @@
 import GithubSlugger from "github-slugger";
 import type {
+  Code,
   Definition,
   Emphasis,
   Heading,
@@ -30,6 +31,7 @@ import type {
   InlineDirective,
   InlineDirectiveKind,
   ParsedCheckItem,
+  ParsedCodeFence,
   ParsedDocument,
   ParsedEmphasisParagraph,
   ParsedFirstBlock,
@@ -648,6 +650,7 @@ export function parseDocument(params: {
   const referencedIdentifiers = new Set<string>();
   const textSpans: ParsedTextSpan[] = [];
   const literalBrackets: number[] = [];
+  const codeFences: ParsedCodeFence[] = [];
   // Heading text nodes mapped to their heading's slug. Filled when the walk reaches the heading,
   // which a pre-order walk does before any of its descendants, so the `text` case can look its
   // node up without tracking ancestors.
@@ -806,6 +809,27 @@ export function parseDocument(params: {
         });
         return;
       }
+      case "code": {
+        const code = node as Code;
+        const start = code.position?.start.offset;
+        if (start === undefined) {
+          return;
+        }
+        // mdast has no fenced/indented flag on `code`, but the node's start offset lands on the
+        // first fence character for a fenced block (past any 1-3 space indent and past `>` or list
+        // markers of a container) and on the indentation itself for an indented block. So the byte
+        // there decides it, without re-scanning the block.
+        const first = params.content[start];
+        if (first !== "`" && first !== "~") {
+          return;
+        }
+        codeFences.push({
+          language: code.lang ?? "",
+          line: code.position?.start.line ?? 0,
+          column: code.position?.start.column ?? 0,
+        });
+        return;
+      }
       case "text": {
         const textNode = node as Text;
         imports.push(...extractImports(textNode));
@@ -864,6 +888,7 @@ export function parseDocument(params: {
     frontmatter: extractFrontmatter(tree),
     firstBlock: extractFirstBlock(tree),
     emphasisParagraphs: extractEmphasisParagraphs(tree),
+    codeFences,
     content: params.content,
   };
 }

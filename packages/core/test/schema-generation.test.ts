@@ -230,4 +230,41 @@ describe("generateConfigSchema", () => {
     expect(pattern.test("TEAM-STYLE")).toBe(true);
     expect(pattern.test("REQ-OWNER")).toBe(false);
   });
+
+  // Config loading rejects a CTX-006 `allowed` entry with whitespace. The schema must reject it too,
+  // or an editor validating against schema.json passes a config the linter then refuses: a Zod
+  // `.refine` would enforce the rule at load but emit nothing here, and the byte-sync test above
+  // cannot notice a constraint that was never generated.
+  it("rejects whitespace in a CTX-006 `allowed` entry, as config loading does", () => {
+    const schema = JSON.parse(generateConfigSchema()) as {
+      properties: {
+        rules: {
+          items: {
+            oneOf: Array<{
+              properties?: {
+                rule?: { const?: string };
+                options?: {
+                  properties?: Record<
+                    string,
+                    { items?: { pattern?: string; minLength?: number } }
+                  >;
+                };
+              };
+            }>;
+          };
+        };
+      };
+    };
+    const items = schema.properties.rules.items.oneOf.find(
+      (candidate) => candidate.properties?.rule?.const === "CTX-006",
+    )?.properties?.options?.properties?.allowed?.items;
+
+    expect(items?.pattern).toBeDefined();
+    expect(items?.minLength).toBe(1);
+    const pattern = new RegExp(items!.pattern!);
+    expect(pattern.test("bash")).toBe(true);
+    expect(pattern.test("{.python}")).toBe(true);
+    expect(pattern.test("shell script")).toBe(false);
+    expect(pattern.test("bash\t")).toBe(false);
+  });
 });

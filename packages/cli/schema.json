@@ -322,6 +322,52 @@
             "additionalProperties": false,
             "properties": {
               "rule": {
+                "const": "CTX-006"
+              },
+              "severity": {
+                "enum": [
+                  "error",
+                  "warning",
+                  "off"
+                ]
+              },
+              "options": {
+                "type": "object",
+                "properties": {
+                  "allowed": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^\\S+$"
+                    }
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "exclude": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "rule"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "rule": {
                 "const": "FM-001"
               },
               "severity": {

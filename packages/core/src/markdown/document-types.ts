@@ -43,6 +43,9 @@
 //                definitions, and a rule doing that over raw text would be re-parsing Markdown.
 //   emphasisParagraphs → SEC-006. A parse-pass fact because telling `**x**` from `**x** y` or
 //                `**x `y`**` is inline Markdown parsing, which a rule scanning `content` would redo.
+//   codeFences → CTX-006. A parse-pass fact because telling a fenced block from an indented one
+//                and splitting the info string is block parsing, which a rule scanning `content`
+//                would redo. Indented blocks are deliberately absent: they cannot carry a language.
 //   content    → CTX-001 placeholder scan, size/token estimation, raw fallbacks. Still the whole
 //                file, frontmatter bytes included, so byte/line counts match `wc` and every
 //                offset a fix or line lookup computes against it stays a true source offset.
@@ -182,6 +185,20 @@ export type ParsedImage = {
   column?: number;
 };
 
+// A fenced code block (``` or ~~~). Indented code blocks are never recorded: they have no info
+// string, so they cannot carry a language, and the one consumer only asks about languages.
+export type ParsedCodeFence = {
+  // The first word of the info string exactly as the mdast `code` node carries it: case kept, not
+  // normalised, and an attribute-style word such as `{.python}` left as written. `""` when the
+  // fence has no info string or only whitespace. Required rather than optional for the same reason
+  // as `ParsedImage.alt`: the parser always has a value, so no consumer has to tell `undefined`
+  // from `""`.
+  language: string;
+  // 1-based source position of the first character of the opening fence.
+  line: number;
+  column: number;
+};
+
 // A reference-style link or image whose label has no definition. micromark leaves such a construct
 // as plain text, so it never reaches `links` or `images`; without this field no rule and no edge
 // would ever see it, and it renders on the page as the literal brackets.
@@ -314,5 +331,7 @@ export type ParsedDocument = {
   firstBlock: ParsedFirstBlock | null;
   // Document order.
   emphasisParagraphs: ParsedEmphasisParagraph[];
+  // Document order.
+  codeFences: ParsedCodeFence[];
   content: string;
 };

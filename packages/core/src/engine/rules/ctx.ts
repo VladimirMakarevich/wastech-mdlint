@@ -12,6 +12,7 @@ import { escapeRegExp } from "../regex.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
 import { createLineNumberLookup, lineStartOffsets } from "../text-position.js";
 import type { RuleContext, TextEdit } from "../types.js";
+import { codeLanguageFindings } from "./ctx-code-language.js";
 import { imageAltFindings } from "./ctx-image-alt.js";
 import {
   DEFAULT_NON_DESCRIPTIVE_LINK_TEXT,
@@ -663,10 +664,64 @@ export const ctx005: RuleDefinition = defineRule({
   },
 });
 
+// A fence language is a single word, so an entry containing whitespace could never match one and
+// would leave the list silently narrower than written; config rejects it at load instead. Written
+// as `.regex` rather than `.refine` because `z.toJSONSchema` carries a regex into the generated
+// schema.json as `pattern`, while a refine predicate is invisible there — the editor would accept
+// an entry that config loading then rejects. No `g` flag: a shared `g`-flagged RegExp carries
+// `lastIndex` between `test` calls.
+const codeLanguageSchema = z.string().min(1).regex(/^\S+$/, {
+  message: "a code language must be a single word without whitespace",
+});
+
+// CTX-006 — fenced code blocks declare a language. The language tells an agent whether a block is
+// a command, a config or output; a bare fence leaves it guessing. `allowed` narrows the accepted
+// languages for a project that wants one name per language (`bash`, not `sh` and `shell`); it has
+// `.min(1)` because an empty list would report every fence, which no one means to configure, and
+// no Zod `.default()`, matching CTX-004, so the generated schema keeps it optional. Not fixable:
+// choosing a language is a judgment call.
+export const ctx006: RuleDefinition = defineRule({
+  metadata: {
+    id: "CTX-006",
+    category: "CTX",
+    description: "Fenced code blocks declare a language.",
+    // Writing hygiene meant to be enabled bare across a corpus, so a warning is proportionate.
+    defaultSeverity: "warning",
+    scope: "document",
+    fixable: false,
+  },
+  optionsSchema: z
+    .object({
+      allowed: z.array(codeLanguageSchema).min(1).optional(),
+      ...fileScopeShape,
+    })
+    .strict(),
+  check: (options) => {
+    // Lower-cased once per configured rule rather than once per document: the list is fixed for
+    // the run, and the comparison is case-insensitive on both sides.
+    const allowed =
+      options.allowed === undefined
+        ? undefined
+        : new Set(options.allowed.map((language) => language.toLowerCase()));
+    return (context) => {
+      if (!matchesFileScope(context.filePath!, options)) {
+        return;
+      }
+      for (const finding of codeLanguageFindings(
+        context.document!,
+        allowed === undefined ? {} : { allowed },
+      )) {
+        context.report(finding);
+      }
+    };
+  },
+});
+
 export const CTX_RULES: readonly RuleDefinition[] = [
   ctx001,
   ctx002,
   ctx003,
   ctx004,
   ctx005,
+  ctx006,
 ];

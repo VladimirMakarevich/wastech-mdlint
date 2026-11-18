@@ -471,12 +471,97 @@ describe("CTX-005 image alt text", () => {
   });
 });
 
-// The CTX half of the shared `exclude` matrix. Both documents trip all five rules at once
-// (an empty section, an unchecked box, an alias, a "here" link, an image with no alt);
-// `glossary.md` has no headings, no checklist, no links and no images, so it stays clean under
-// CTX-001/CTX-002/CTX-004/CTX-005 and is self-skipped by CTX-003.
+describe("CTX-006 fenced code language", () => {
+  function summary(messages: Awaited<ReturnType<typeof lint>>["messages"]) {
+    return messages.map(
+      ({ ruleId, severity, filePath, line, column, message }) => ({
+        ruleId,
+        severity,
+        filePath,
+        line,
+        column,
+        message,
+      }),
+    );
+  }
+
+  it("reports a bare fence at its opening line and passes a fence with a language", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "# T\n\n```\nnpm test\n```\n\n```bash\nnpm test\n```\n\n    indented\n",
+    });
+
+    const result = await lint(cwd, [rule("CTX-006")]);
+    expect(summary(result.messages)).toEqual([
+      {
+        ruleId: "CTX-006",
+        severity: "warning",
+        filePath: "a.md",
+        line: 3,
+        column: 1,
+        message:
+          "Fenced code block has no language; name one after the opening fence, such as `bash`.",
+      },
+    ]);
+    expect(result.errorCount).toBe(0);
+  });
+
+  it("reports a language outside `allowed`, case-insensitively", async () => {
+    const cwd = await fixtureRepo({
+      "a.md": "```BASH\nx\n```\n\n```python\nx\n```\n\n```json\n{}\n```\n",
+    });
+
+    const result = await lint(cwd, [
+      rule("CTX-006", { allowed: ["bash", "JSON"] }),
+    ]);
+    expect(summary(result.messages)).toEqual([
+      {
+        ruleId: "CTX-006",
+        severity: "warning",
+        filePath: "a.md",
+        line: 5,
+        column: 1,
+        message:
+          'Fenced code block language "python" is not in the allowed list.',
+      },
+    ]);
+  });
+
+  it("validates its options and resolves bare", () => {
+    expect(() => ruleRegistry.resolveRule("CTX-006")).not.toThrow();
+    expect(() =>
+      ruleRegistry.resolveRule("CTX-006", { allowed: ["bash"] }),
+    ).not.toThrow();
+    for (const options of [
+      { bogus: true },
+      { allowed: [] },
+      { allowed: [""] },
+      { allowed: ["shell script"] },
+    ]) {
+      expect(() => ruleRegistry.resolveRule("CTX-006", options)).toThrow(
+        RuleResolutionError,
+      );
+    }
+  });
+
+  it("honours an inline disable on the line before the fence", async () => {
+    const cwd = await fixtureRepo({
+      "a.md":
+        "<!-- wastech-mdlint-disable-next-line CTX-006 -->\n```\nx\n```\n\n```\ny\n```\n",
+    });
+
+    const result = await lint(cwd, [rule("CTX-006")]);
+    expect(result.messages.map((message) => message.line)).toEqual([6]);
+  });
+});
+
+// The CTX half of the shared `exclude` matrix. Both documents trip all six rules at once
+// (an empty section, an unchecked box, an alias, a "here" link, an image with no alt, a fence
+// with no language); the fence sits under `## Tasks` so `## Empty` stays empty for CTX-001.
+// `glossary.md` has no headings, no checklist, no links, no images and no fences, so it stays
+// clean under CTX-001/CTX-002/CTX-004/CTX-005/CTX-006 and is self-skipped by CTX-003.
 const CONTENT_DOC =
-  "## Empty\n\n## Tasks\n\n- [ ] wire gql\n\nSee [here](a.md).\n\n![](x.png)\n";
+  "## Empty\n\n## Tasks\n\n- [ ] wire gql\n\nSee [here](a.md).\n\n![](x.png)\n\n```\nx\n```\n";
 const GLOSSARY = "| Term | Aliases |\n| --- | --- |\n| GraphQL | gql |\n";
 
 const CTX_SCOPE_CASES: readonly { id: string; options: object }[] = [
@@ -492,6 +577,7 @@ const CTX_SCOPE_CASES: readonly { id: string; options: object }[] = [
   },
   { id: "CTX-004", options: {} },
   { id: "CTX-005", options: {} },
+  { id: "CTX-006", options: {} },
 ];
 
 describe("CTX file scope (exclude)", () => {
