@@ -1325,7 +1325,8 @@ function formatAgentRuleLine(
     case "written":
       return (
         `Wrote agent rule ${agentRule.path} — how coding agents should lint this repository's ` +
-        "Markdown and split a document instead of cutting it when it outgrows a size budget. " +
+        "Markdown and answer a size budget: compress a document while no meaning is lost, then " +
+        "split it, never cut its content. " +
         "Nothing loads it yet: reference it from AGENTS.md or CLAUDE.md — an @ import loads it " +
         "into every session and counts toward LLM-001, an ordinary link lets an agent read it " +
         "on demand."

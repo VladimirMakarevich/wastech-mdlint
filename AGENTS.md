@@ -59,6 +59,16 @@ A comment is read by somebody sitting in the code, long after it was written, wi
 
 Naming other code — a source or test file, a symbol, an upstream library's behavior — is allowed, because those move together with the comment under review. State the fact first anyway, so the comment survives that file being renamed.
 
+## Document Size
+
+When a Markdown file outgrows its `SIZE-001` or `LLM-001` budget, or an edit will not fit in it:
+
+1. **Compress first**, for as long as no meaning and no quality is lost: repetition, restatement and filler go; every fact, constraint, example and reason stays, and the text stays as clear as it was.
+2. **Only then split**, into finer-grained files or a continuation file beside the original.
+3. **Never cut content to fit, and never raise a threshold on your own.**
+
+Who may do this for which files, and what a split in this repository must also update, is in [`.agents/rules/document-size.md`](.agents/rules/document-size.md).
+
 ## Testing And Verification
 
 Prefer focused fixtures over this repository's real Markdown files.

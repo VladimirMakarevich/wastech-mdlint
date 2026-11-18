@@ -76,6 +76,28 @@ describe("buildAgentRuleMarkdown", () => {
     expect(text).not.toContain("pnpm exec");
   });
 
+  // The budget policy is an order, not a list of options: compress while nothing is lost, and split
+  // only what that cannot fit. Each assertion guards one way an edit to the page could quietly break
+  // it — permitting compression without its floor reads as licence to drop examples and reasons
+  // until a file fits, and swapping the order sends agents into needless splits of redundant text.
+  it("orders the budget policy: compress without loss first, split only after", () => {
+    const text = buildAgentRuleMarkdown(ROOT_INSTALLED);
+    const compress = text.indexOf("**First compress");
+    const floor = text.indexOf("**Compressing stops where meaning or quality");
+    const split = text.indexOf("**Only then split.**");
+    expect(compress).toBeGreaterThan(-1);
+    expect(floor).toBeGreaterThan(compress);
+    expect(split).toBeGreaterThan(floor);
+    expect(text).toContain("**A budget is never a reason to drop content.**");
+    // Both forms a split may take, so an agent with a single-topic document is not forced into an
+    // artificial topic split.
+    expect(text).toContain("**Finer-grained files**");
+    expect(text).toContain("**A continuation file**");
+    // The ownership table covers compressing too: rewording a user's rules is their decision just as
+    // restructuring them is.
+    expect(text).toContain("### Who decides on compressing or splitting");
+  });
+
   it("pins the companion skill to the CLI version writing the page", () => {
     expect(buildAgentRuleMarkdown(ROOT_INSTALLED)).toContain(
       "`gh skill install VladimirMakarevich/wastech-mdlint mdlint-docs --pin v9.8.7`",

@@ -9,7 +9,7 @@
 | [`mdlint-init`](../../skills/mdlint-init/SKILL.md) | Bootstrap: scan the repo and produce a sensible `wastech-mdlint.config.json` via `init`. |
 | [`mdlint-fix`](../../skills/mdlint-fix/SKILL.md) | Fix findings by rule prefix — delegating mechanical fixes to the deterministic `--fix`, reserving judgement for the AI. |
 | [`mdlint-impact`](../../skills/mdlint-impact/SKILL.md) | Explain the blast radius of a change using `impact` / the graph. |
-| [`mdlint-docs`](../../skills/mdlint-docs/SKILL.md) | Split a document that outgrows its `SIZE-001` / `LLM-001` budget by meaning, never by cutting content. |
+| [`mdlint-docs`](../../skills/mdlint-docs/SKILL.md) | Bring a document that outgrows its `SIZE-001` / `LLM-001` budget back under it, never by cutting content: compress the wording while no meaning or quality is lost, then split it by meaning or continue it in a file beside it. |
 
 ## Host-neutral by design
 
