@@ -13,6 +13,7 @@ This guide is the full reference. For a one-page summary see the top-level [READ
 - [CLI reference](cli.md) — every command, flag, and exit code.
 - [Configuration](configuration.md) — how the config file is found, loaded, and validated.
 - [Annotated config reference](config-reference.md) — one config with **every** option, commented.
+- [Running alongside markdownlint](markdownlint.md) — which tool owns which checks, the overlapping rules, and a ready markdownlint config.
 
 ## Capabilities
 
