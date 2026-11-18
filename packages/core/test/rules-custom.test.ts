@@ -145,8 +145,9 @@ describe("declarative custom rule", () => {
   });
 
   it("rejects a custom id that is a built-in alias, naming the rule it belongs to", async () => {
-    // `NO-BROKEN-ANCHORS` fits the grammar and owns no reserved prefix, but a directive token
-    // `no-broken-anchors` would then silence this rule and REF-002 at once.
+    // `NO-BROKEN-ANCHORS` fits the grammar and owns no reserved prefix, but a directive resolves
+    // that token, in any case, to REF-002 — so this rule's id would be ambiguous and the rule could
+    // never be suppressed by it.
     const cwd = await repo({
       "a.md": "# A\n",
       "wastech-mdlint.config.json": JSON.stringify({

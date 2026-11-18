@@ -137,10 +137,12 @@ export function resolveCustomRule(
     );
   }
 
-  // An upper-cased alias (`NO-BROKEN-ANCHORS`) passes the grammar and owns no reserved prefix, yet a
-  // suppression token `no-broken-anchors` would then name two rules at once — the built-in through
-  // its alias and this custom rule through its id — and silence both. Checked before the `has`
-  // fallback below, which is alias-aware too, so the message names the actual collision.
+  // An upper-cased alias (`NO-BROKEN-ANCHORS`) passes the grammar and owns no reserved prefix, yet it
+  // would make this rule's id ambiguous: a finding reported under it reads as the built-in's alias,
+  // and suppression directives resolve the token through `resolveId` to the built-in in any case, so
+  // `wastech-mdlint-disable no-broken-anchors` would silence the built-in and never this rule. That
+  // leaves the custom rule unsuppressible by its own id. Checked before the `has` fallback below,
+  // which is alias-aware too, so the message names the actual collision.
   if (registry.isAlias(id)) {
     const builtin = registry.getMetadata(id)!;
     throw invalid(
