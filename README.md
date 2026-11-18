@@ -233,6 +233,7 @@ The following table is generated from the rule metadata (`npm run generate:docs`
 
 ## Inline suppression
 
+<!-- prettier-ignore -->
 ```md
 <!-- wastech-mdlint-disable REF-001 -->
 
@@ -240,12 +241,11 @@ The following table is generated from the rule metadata (`npm run generate:docs`
 
 <!-- wastech-mdlint-enable REF-001 -->
 
-<!-- wastech-mdlint-disable-next-line TBL-002 -->
-
-| REQ-1 | |
+<!-- wastech-mdlint-disable-next-line REF-001 -->
+[also intentionally broken](missing.md)
 ```
 
-A directive with no rule IDs applies to all rules. `disable` runs until a matching `enable` or end of file; `disable-next-line` covers only the next line.
+A `disable`, `enable`, `disable-next-line` or `disable-file` directive with no rule IDs applies to all rules. `disable` runs until a matching `enable`, a `restore` of a state captured before it, or end of file; `disable-next-line` covers only the next line. `disable-file` covers the whole file wherever it is written, `capture`/`restore` save and return to the current state, and a category such as `REF` stands for every rule in that family — see [Inline suppression](docs/guide/suppression.md).
 
 ## Output
 

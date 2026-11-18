@@ -69,10 +69,10 @@ const markdownProcessor = remark()
 // import set does not shift across the cutover: leading boundary, `@`, then a `.md` target.
 const IMPORT_PATTERN = /(^|[\s(])@(?<target>\/?[^\s@]+?\.md)\b/gm;
 
-// Directive grammar. `disable-next-line` precedes `disable` in the alternation so
-// the longer keyword wins; trailing tokens (if any) are the rule IDs.
+// Directive grammar. `disable-next-line` and `disable-file` precede `disable` in the alternation
+// so the longer keyword wins; trailing tokens (if any) are the rule IDs or categories.
 const DIRECTIVE_PATTERN =
-  /^wastech-mdlint-(disable-next-line|disable|enable)(?:\s+([\s\S]*?))?$/;
+  /^wastech-mdlint-(disable-next-line|disable-file|disable|enable|capture|restore)(?:\s+([\s\S]*?))?$/;
 const HTML_COMMENT_PATTERN = /^<!--([\s\S]*?)-->$/;
 
 // HTML anchor extraction is a deliberately small heuristic over `html` node text, not an HTML

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import type { LintMessage } from "@wastech-mdlint/core";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { lintMessageSchema } from "../src/shared/lint-message-schema.js";
 import { handleLint } from "../src/tools/lint.js";
 import {
   lintMessagesAsRows,
@@ -366,6 +367,29 @@ describe("handleLint", () => {
     expect(
       (structured(unsuppressed).messages as LintMessage[]).length,
     ).toBeGreaterThan(0);
+  });
+
+  it("returns a malformed directive as a DIRECTIVE finding that fits the wire schema", () => {
+    // Directive diagnostics are produced in core, so this tool gets them with no code of its own;
+    // what this pins is that the message crosses the tool's output schema intact.
+    const result = handleLint({
+      content: "# Title\n\n<!-- wastech-mdlint-disable FOO -->\n",
+      rules: [{ rule: "REF-001" }],
+    });
+
+    expect(result.isError).toBeFalsy();
+    const output = structured(result);
+    const messages = output.messages as LintMessage[];
+    expect(messages).toHaveLength(1);
+    expect(lintMessageSchema.parse(messages[0])).toEqual(messages[0]);
+    expect(messages[0]).toMatchObject({
+      ruleId: "DIRECTIVE",
+      severity: "error",
+      line: 3,
+      helpUri:
+        "https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/suppression.md",
+    });
+    expect(output.errorCount).toBe(1);
   });
 
   it("reports SEC-003's config-attributed finding for a missing template (no crash)", () => {

@@ -138,6 +138,26 @@ describe("lintContent agrees with lintFiles on the same document", () => {
     expect(result.messages).toEqual([]);
     expect(result.files).toEqual([AD_HOC_PATH]);
   });
+
+  it("reports a malformed directive and applies a category on the ad-hoc path too", () => {
+    // Directive diagnostics are produced inside the shared step order, so the MCP `lint` tool gets
+    // them without assembling anything; this pins that for the entry point that tool calls.
+    const result = lintContent({
+      path: AD_HOC_PATH,
+      content: [
+        "<!-- wastech-mdlint-disable REF, FOO -->",
+        "[suppressed](#nope)",
+        "",
+      ].join("\n"),
+      rules: [{ rule: ruleRegistry.resolveRule("REF-002", {}) }],
+      rootDir: process.cwd(),
+    });
+
+    expect(
+      result.messages.map((message) => [message.line, message.ruleId]),
+    ).toEqual([[1, "DIRECTIVE"]]);
+    expect(result.errorCount).toBe(1);
+  });
 });
 
 // Frontmatter occupies source lines without producing nodes a rule sees, so the risk is that a line

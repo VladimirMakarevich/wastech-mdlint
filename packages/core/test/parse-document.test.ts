@@ -444,6 +444,28 @@ describe("parseDocument · inline-disable directives", () => {
     expect(doc.directives[0]?.ruleIds).toEqual(["REF-001", "TBL-2"]);
   });
 
+  it("extracts disable-file / capture / restore and category tokens", () => {
+    // `disable-file` must not be read as `disable` with a `-file` token, and a category is kept as
+    // a canonical dash-less token for the engine to resolve.
+    const doc = parse(
+      [
+        "<!-- wastech-mdlint-capture -->",
+        "<!-- wastech-mdlint-disable ref -->",
+        "<!-- wastech-mdlint-restore -->",
+        "<!-- wastech-mdlint-disable-file size-001, Tbl -->",
+        "<!-- wastech-mdlint-capture REF-001 -->",
+      ].join("\n"),
+    );
+
+    expect(doc.directives).toEqual([
+      { kind: "capture", ruleIds: [], line: 1 },
+      { kind: "disable", ruleIds: ["REF"], line: 2 },
+      { kind: "restore", ruleIds: [], line: 3 },
+      { kind: "disable-file", ruleIds: ["SIZE-001", "TBL"], line: 4 },
+      { kind: "capture", ruleIds: ["REF-001"], line: 5 },
+    ]);
+  });
+
   it("tolerates malformed or unknown directives (ignored, not fatal)", () => {
     const doc = parse(
       [

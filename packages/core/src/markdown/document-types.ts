@@ -237,10 +237,19 @@ export type ParsedImport = {
   column?: number;
 };
 
-export type InlineDirectiveKind = "disable" | "enable" | "disable-next-line";
+export type InlineDirectiveKind =
+  | "disable"
+  | "enable"
+  | "disable-next-line"
+  | "disable-file"
+  | "capture"
+  | "restore";
 
-// Inline-disable directive. The parser only records position + kind + canonical rule IDs;
-// range/scope resolution is engine-side. `ruleIds` empty ⇒ applies to all rules.
+// Inline-disable directive. The parser only records position + kind + canonical tokens; range and
+// scope resolution is engine-side. Each `ruleIds` entry is a canonical rule ID or a dash-less
+// category (`REF`); telling them apart and validating categories needs the rule registry, which
+// the parser stays independent of. `ruleIds` empty ⇒ applies to all rules. `capture`/`restore` take
+// no IDs, but any written are still recorded so the engine can report them.
 export type InlineDirective = {
   kind: InlineDirectiveKind;
   ruleIds: string[];

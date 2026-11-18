@@ -254,8 +254,16 @@ export type { LintFilesInput, LintResult } from "./engine/lint-files.js";
 // re-assembling the discovery half the split exists to keep in one place.
 export { lintContent } from "./engine/lint-content.js";
 export type { LintContentInput } from "./engine/lint-content.js";
-export { createSuppressionChecker } from "./engine/suppression.js";
-export type { SuppressionChecker } from "./engine/suppression.js";
+export {
+  analyzeDirectives,
+  createSuppressionChecker,
+  DIRECTIVE_DIAGNOSTIC_RULE_ID,
+} from "./engine/suppression.js";
+export type {
+  DirectiveAnalysis,
+  DirectiveDiagnostic,
+  SuppressionChecker,
+} from "./engine/suppression.js";
 export {
   formatLintResultJson,
   formatLintResultText,

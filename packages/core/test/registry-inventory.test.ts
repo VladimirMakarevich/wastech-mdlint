@@ -10,6 +10,7 @@ import {
   CUSTOM_RULE_DOCS_URL,
   RULE_DOCS_BASE_URL,
   ruleDocsUrl,
+  SUPPRESSION_DOCS_URL,
 } from "../src/engine/rule-docs-url.js";
 import { BUILTIN_RULE_DEFINITIONS } from "../src/engine/rules/index.js";
 import type { RuleScope, Severity } from "../src/engine/types.js";
@@ -148,6 +149,22 @@ describe("rule documentation URLs", () => {
         path.join(
           RULE_DOCS_DIR,
           CUSTOM_RULE_DOCS_URL.slice(RULE_DOCS_BASE_URL.length),
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  // Directive diagnostics come from the engine, not a rule, so their `helpUri` is the directive
+  // grammar page one level above the rule pages; a rename of that page would 404 every one of them.
+  it("points directive diagnostics at the suppression page, which exists", () => {
+    const guideBase = new URL("..", RULE_DOCS_BASE_URL).href;
+    expect(SUPPRESSION_DOCS_URL).toBe(`${guideBase}suppression.md`);
+    expect(
+      existsSync(
+        path.join(
+          RULE_DOCS_DIR,
+          "..",
+          SUPPRESSION_DOCS_URL.slice(guideBase.length),
         ),
       ),
     ).toBe(true);

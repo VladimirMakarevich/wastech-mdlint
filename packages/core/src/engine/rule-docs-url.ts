@@ -22,3 +22,11 @@ export function ruleDocsUrl(ruleId: string): string {
 // A user-authored custom id has no page of its own, so its findings point at the page documenting
 // the mechanism instead of at a URL that would 404.
 export const CUSTOM_RULE_DOCS_URL = ruleDocsUrl("custom");
+
+// A malformed inline directive is reported by the engine rather than by a rule, so its findings
+// point at the page documenting the directive grammar. Resolved relative to the rules directory so
+// the repository host and branch are spelled exactly once.
+export const SUPPRESSION_DOCS_URL = new URL(
+  "../suppression.md",
+  RULE_DOCS_BASE_URL,
+).href;
