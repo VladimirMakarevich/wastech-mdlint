@@ -189,6 +189,7 @@ describe("rule documentation URLs", () => {
   it("declares exactly the metadata fields something reads (no vacuous `messages`)", () => {
     for (const { metadata } of BUILTIN_RULE_DEFINITIONS) {
       expect(Object.keys(metadata).sort(compareStrings)).toEqual([
+        "alias",
         "category",
         "defaultSeverity",
         "description",
@@ -198,6 +199,105 @@ describe("rule documentation URLs", () => {
         "optionsSchema",
         "scope",
       ]);
+    }
+  });
+});
+
+// The shipped alias set, pinned the way `EXPECTED` pins scope and severity: an alias is user input
+// written into configs and suppression comments, so renaming one silently breaks every file that
+// used it, and the schema/README sync tests regenerate from the same registry and cannot notice.
+const EXPECTED_ALIASES: Record<string, string> = {
+  "CTX-001": "no-empty-sections",
+  "CTX-002": "checklist-complete",
+  "CTX-003": "glossary-terms",
+  "CTX-004": "descriptive-link-text",
+  "CTX-005": "image-alt-text",
+  "CTX-006": "code-block-language",
+  "FM-001": "valid-front-matter",
+  "GRP-001": "no-circular-references",
+  "GRP-002": "no-orphan-documents",
+  "GRP-003": "ids-carried-forward",
+  "LLM-001": "context-token-budget",
+  "REF-001": "no-broken-links",
+  "REF-002": "no-broken-anchors",
+  "REF-003": "no-broken-images",
+  "REF-004": "declared-zone-dependencies",
+  "REF-005": "traceable-ids",
+  "REF-006": "stable-dependencies",
+  "REF-007": "no-undefined-references",
+  "REF-008": "no-malformed-links",
+  "REF-009": "no-unused-definitions",
+  "SEC-001": "required-sections",
+  "SEC-002": "section-order",
+  "SEC-003": "section-template",
+  "SEC-004": "heading-increment",
+  "SEC-005": "no-duplicate-headings",
+  "SEC-006": "no-emphasis-as-heading",
+  "SIZE-001": "file-size-budget",
+  "STR-001": "required-files",
+  "TBL-001": "table-required-columns",
+  "TBL-002": "table-no-empty-cells",
+  "TBL-003": "table-allowed-values",
+  "TBL-004": "table-cell-pattern",
+  "TBL-005": "table-conditional-columns",
+  "TBL-006": "table-unique-ids",
+  "TBL-007": "table-row-cell-count",
+};
+
+// Lowercase kebab-case with at least one dash. The dash is load-bearing, not style: a dash-less
+// suppression token is read as a category (`REF`), so a dash-less alias would be ambiguous there.
+const ALIAS_FORMAT = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)+$/;
+
+describe("rule aliases", () => {
+  it("pins the exact alias of every built-in rule", () => {
+    expect(
+      Object.fromEntries(
+        BUILTIN_RULE_DEFINITIONS.map(({ metadata }) => [
+          metadata.id,
+          metadata.alias,
+        ]),
+      ),
+    ).toEqual(EXPECTED_ALIASES);
+  });
+
+  it("gives every built-in a lowercase kebab-case alias with at least one dash", () => {
+    for (const { metadata } of BUILTIN_RULE_DEFINITIONS) {
+      expect(metadata.alias, metadata.id).toMatch(ALIAS_FORMAT);
+    }
+  });
+
+  it("keeps aliases unique", () => {
+    const aliases = BUILTIN_RULE_DEFINITIONS.map(
+      ({ metadata }) => metadata.alias,
+    );
+    expect(new Set(aliases).size).toBe(aliases.length);
+  });
+
+  // An alias equal to an id would make one spelling mean two rules, and one equal to a reserved
+  // prefix would be read as a category in a suppression directive. Compared upper-cased because both
+  // ids and directive tokens are canonicalized that way before anything matches them.
+  it("never collides with a rule id or a reserved category prefix", () => {
+    const ids = new Set(
+      BUILTIN_RULE_DEFINITIONS.map(({ metadata }) => metadata.id),
+    );
+    const prefixes = new Set([...ids].map((id) => id.split("-")[0]!));
+    for (const { metadata } of BUILTIN_RULE_DEFINITIONS) {
+      const upper = metadata.alias.toUpperCase();
+      expect(ids.has(upper), metadata.alias).toBe(false);
+      expect(prefixes.has(upper), metadata.alias).toBe(false);
+    }
+  });
+
+  // The rule pages are hand-written, so nothing regenerates them when an alias changes; this is the
+  // drift guard that keeps each page's header naming the alias the registry actually accepts.
+  it("names the alias in each rule page's header line", () => {
+    for (const { metadata } of BUILTIN_RULE_DEFINITIONS) {
+      const page = readFileSync(
+        path.join(RULE_DOCS_DIR, `${metadata.id}.md`),
+        "utf8",
+      );
+      const header = page.split("\n")[2] ?? "";
+      expect(header, metadata.id).toContain(`Alias **\`${metadata.alias}\`**`);
     }
   });
 });

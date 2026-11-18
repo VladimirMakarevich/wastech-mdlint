@@ -30,6 +30,7 @@ import type { TextEdit } from "../types.js";
 export const tbl001: RuleDefinition = defineRule({
   metadata: {
     id: "TBL-001",
+    alias: "table-required-columns",
     category: "TBL",
     description: "Tables declare their required columns.",
     defaultSeverity: "error",
@@ -133,6 +134,7 @@ function emptyCellEdits(
 export const tbl002: RuleDefinition = defineRule({
   metadata: {
     id: "TBL-002",
+    alias: "table-no-empty-cells",
     category: "TBL",
     description: "Target table cells are not empty.",
     defaultSeverity: "warning",
@@ -172,6 +174,7 @@ export const tbl002: RuleDefinition = defineRule({
 export const tbl003: RuleDefinition = defineRule({
   metadata: {
     id: "TBL-003",
+    alias: "table-allowed-values",
     category: "TBL",
     description: "Cell values fall within an allowed set.",
     defaultSeverity: "error",
@@ -208,6 +211,7 @@ export const tbl003: RuleDefinition = defineRule({
 export const tbl004: RuleDefinition = defineRule({
   metadata: {
     id: "TBL-004",
+    alias: "table-cell-pattern",
     category: "TBL",
     description: "Cell values match a required pattern.",
     defaultSeverity: "error",
@@ -243,6 +247,7 @@ export const tbl004: RuleDefinition = defineRule({
 export const tbl005: RuleDefinition = defineRule({
   metadata: {
     id: "TBL-005",
+    alias: "table-conditional-columns",
     category: "TBL",
     description: "Cross-column conditional holds (when → then).",
     defaultSeverity: "error",
@@ -275,6 +280,7 @@ export const tbl005: RuleDefinition = defineRule({
 export const tbl006: RuleDefinition = defineRule({
   metadata: {
     id: "TBL-006",
+    alias: "table-unique-ids",
     category: "TBL",
     description: "Column IDs are unique across files.",
     defaultSeverity: "error",
@@ -312,6 +318,7 @@ export const tbl006: RuleDefinition = defineRule({
 export const tbl007: RuleDefinition = defineRule({
   metadata: {
     id: "TBL-007",
+    alias: "table-row-cell-count",
     category: "TBL",
     description: "Table rows have as many cells as the header.",
     defaultSeverity: "error",

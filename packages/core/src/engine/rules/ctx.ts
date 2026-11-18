@@ -28,6 +28,7 @@ import { fileScopeShape, matchesFileScope } from "./scope.js";
 export const ctx001: RuleDefinition = defineRule({
   metadata: {
     id: "CTX-001",
+    alias: "no-empty-sections",
     category: "CTX",
     description: "Sections are not empty or placeholder-only.",
     defaultSeverity: "warning",
@@ -58,6 +59,7 @@ export const ctx001: RuleDefinition = defineRule({
 export const ctx002: RuleDefinition = defineRule({
   metadata: {
     id: "CTX-002",
+    alias: "checklist-complete",
     category: "CTX",
     description: "All checklist items are checked.",
     defaultSeverity: "warning",
@@ -452,6 +454,7 @@ function collectAliasMatches(
 export const ctx003: RuleDefinition = defineRule({
   metadata: {
     id: "CTX-003",
+    alias: "glossary-terms",
     category: "CTX",
     description: "Content uses canonical glossary terms instead of aliases.",
     defaultSeverity: "warning",
@@ -605,6 +608,7 @@ const linkTextPhraseSchema = z
 export const ctx004: RuleDefinition = defineRule({
   metadata: {
     id: "CTX-004",
+    alias: "descriptive-link-text",
     category: "CTX",
     description: "Link text describes its target.",
     // Writing hygiene meant to be enabled bare across a corpus, so a warning is proportionate.
@@ -646,6 +650,7 @@ export const ctx004: RuleDefinition = defineRule({
 export const ctx005: RuleDefinition = defineRule({
   metadata: {
     id: "CTX-005",
+    alias: "image-alt-text",
     category: "CTX",
     description: "Images have alt text.",
     // Writing hygiene meant to be enabled bare across a corpus, so a warning is proportionate.
@@ -683,6 +688,7 @@ const codeLanguageSchema = z.string().min(1).regex(/^\S+$/, {
 export const ctx006: RuleDefinition = defineRule({
   metadata: {
     id: "CTX-006",
+    alias: "code-block-language",
     category: "CTX",
     description: "Fenced code blocks declare a language.",
     // Writing hygiene meant to be enabled bare across a corpus, so a warning is proportionate.

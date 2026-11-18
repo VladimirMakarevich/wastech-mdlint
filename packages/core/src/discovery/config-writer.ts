@@ -262,7 +262,9 @@ function toRuleEntry(rule: InferredRule): Record<string, unknown> {
 // A written config always emits canonical ids. A merged existing entry keeps its
 // severity/options verbatim but has its id canonicalized (built-in `rule` or `custom.id`) so an
 // accepted noncanonical input like `ref001`/`req-owner` is not re-emitted noncanonically — and so a
-// custom entry's id agrees with the `const` the generated project schema is built from. Spreading
+// custom entry's id agrees with the `const` the generated project schema is built from. A built-in
+// written by its alias (`no-broken-anchors`) is rewritten to its id too: the merge appends entries
+// by id, and leaving the alias beside them would mix spellings the loader rejects. Spreading
 // preserves the original key order (reassigning an existing key keeps its position).
 function canonicalizeExistingEntry(entry: unknown): unknown {
   if (entry === null || typeof entry !== "object") {
@@ -275,7 +277,7 @@ function canonicalizeExistingEntry(entry: unknown): unknown {
       : entry;
   }
   return typeof record.rule === "string"
-    ? { ...record, rule: canonicalizeRuleId(record.rule) }
+    ? { ...record, rule: ruleRegistry.resolveId(record.rule) }
     : entry;
 }
 
@@ -311,7 +313,8 @@ function renderRulesValue(items: RuleItem[]): string {
 
 // Mirrors resolveCustomRule's authoritative id checks (custom.ts): the namespaced grammar (imported
 // from custom.ts, not re-declared, so the two can never silently drift) plus the reserved-prefix /
-// built-in-collision guard. A preserved custom entry whose id fails these is rejected by
+// built-in-collision guard, which through `ruleRegistry.has` also rejects an id that is an upper-cased
+// built-in alias (`NO-BROKEN-ANCHORS`). A preserved custom entry whose id fails these is rejected by
 // loadConfiguration at runtime, so it must not seed a project schema that claims it is valid —
 // feeding such an id to generateConfigSchema would make the written `$schema` disagree with the
 // loader. The id is already canonicalized (matching resolveCustomRule's own normalization).
@@ -326,7 +329,8 @@ function isResolvableCustomId(canonicalId: string): boolean {
   );
 }
 
-// The merge identity of an existing `rules[]` entry. A built-in is keyed by its canonical `rule`; a
+// The merge identity of an existing `rules[]` entry. A built-in is keyed by its canonical `rule` (an
+// alias resolved to its id, so an existing alias entry is recognized as the rule `init` proposes); a
 // custom rule is keyed by its canonical `id` (NOT the literal `"custom"`), so it can be diffed and
 // schema-wired. `invalid` marks anything a safe additive merge cannot identify — a non-object, a
 // non-string `rule`, or a `rule: "custom"` whose `id` is missing/non-string/not schemaable (fails
@@ -371,7 +375,7 @@ export function identifyExistingRule(entry: unknown): ExistingRuleIdentity {
       },
     };
   }
-  return { kind: "builtin", canonicalId: canonicalizeRuleId(record.rule) };
+  return { kind: "builtin", canonicalId: ruleRegistry.resolveId(record.rule) };
 }
 
 // Deduped custom-rule descriptors from the final rule entries, for the project-local schema. Reuses

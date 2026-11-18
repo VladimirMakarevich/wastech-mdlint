@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import {
   defineRule,
+  findMixedRuleSpellings,
+  mixedRuleSpellingMessage,
   RuleRegistry,
   RuleResolutionError,
 } from "../src/engine/registry.js";
@@ -10,6 +12,7 @@ import {
 const refRule = defineRule({
   metadata: {
     id: "REF-001",
+    alias: "no-broken-links",
     category: "REF",
     description: "relative links resolve",
     defaultSeverity: "error",
@@ -23,6 +26,7 @@ const refRule = defineRule({
 const sizeRule = defineRule({
   metadata: {
     id: "SIZE-001",
+    alias: "file-size-budget",
     category: "SIZE",
     description: "file size budget",
     defaultSeverity: "warning",
@@ -88,6 +92,144 @@ describe("RuleRegistry metadata", () => {
   it("rejects duplicate rule ids at construction", () => {
     expect(() => new RuleRegistry([refRule, refRule])).toThrow(
       /Duplicate rule id/,
+    );
+  });
+});
+
+// Builds a one-off definition with a chosen id and alias, for the constructor's collision guards.
+function ruleWith(id: string, alias: string) {
+  return defineRule({
+    metadata: {
+      id,
+      alias,
+      category: "REF",
+      description: id,
+      defaultSeverity: "error",
+      scope: "document",
+      fixable: false,
+    },
+    optionsSchema: z.object({}).strict(),
+    check: () => () => {},
+  });
+}
+
+describe("RuleRegistry aliases", () => {
+  it("resolves an alias in any case to the canonical rule id", () => {
+    for (const spelling of [
+      "no-broken-links",
+      "No-Broken-Links",
+      "NO-BROKEN-LINKS",
+    ]) {
+      expect(registry.resolveRule(spelling, {}).id).toBe("REF-001");
+      expect(registry.resolveId(spelling)).toBe("REF-001");
+    }
+  });
+
+  it("answers has and getMetadata by alias", () => {
+    expect(registry.has("file-size-budget")).toBe(true);
+    expect(registry.getMetadata("file-size-budget")?.id).toBe("SIZE-001");
+  });
+
+  it("tells an alias apart from an id spelling", () => {
+    expect(registry.isAlias("no-broken-links")).toBe(true);
+    expect(registry.isAlias("REF-001")).toBe(false);
+    expect(registry.isAlias("ref001")).toBe(false);
+  });
+
+  it("passes an unknown name through resolveId canonicalized", () => {
+    expect(registry.resolveId("req-owner")).toBe("REQ-OWNER");
+  });
+
+  it("suggests the alias spelling for a near-miss alias", () => {
+    try {
+      registry.resolveRule("no-broken-link", {});
+      expect.unreachable("should have thrown");
+    } catch (error) {
+      expect((error as RuleResolutionError).suggestion).toBe("no-broken-links");
+    }
+  });
+
+  it("rejects a duplicate alias at construction", () => {
+    expect(
+      () =>
+        new RuleRegistry([
+          ruleWith("REF-001", "same-alias"),
+          ruleWith("REF-002", "same-alias"),
+        ]),
+    ).toThrow(/Duplicate rule alias/);
+  });
+
+  it("rejects an alias that is another rule's id at construction", () => {
+    expect(
+      () =>
+        new RuleRegistry([
+          ruleWith("REF-001", "ref-002"),
+          ruleWith("REF-002", "some-alias"),
+        ]),
+    ).toThrow(/collides with a rule id/);
+  });
+});
+
+describe("findMixedRuleSpellings", () => {
+  it("reports an entry spelling a rule differently from the first entry naming it", () => {
+    expect(
+      findMixedRuleSpellings(
+        [
+          { rule: "REF-001" },
+          { rule: "SIZE-001" },
+          { rule: "no-broken-links" },
+        ],
+        registry,
+      ),
+    ).toEqual([
+      {
+        index: 2,
+        firstIndex: 0,
+        ruleId: "REF-001",
+        spelling: "no-broken-links",
+        firstSpelling: "REF-001",
+      },
+    ]);
+  });
+
+  it("allows one rule repeated under the same spelling kind", () => {
+    expect(
+      findMixedRuleSpellings(
+        [
+          { rule: "REF-001" },
+          { rule: "ref001" },
+          { rule: "file-size-budget" },
+          { rule: "FILE-SIZE-BUDGET" },
+        ],
+        registry,
+      ),
+    ).toEqual([]);
+  });
+
+  it("skips custom, non-string and unknown entries", () => {
+    expect(
+      findMixedRuleSpellings(
+        [
+          { rule: "custom" },
+          { rule: 42 },
+          { rule: "no-such-rule" },
+          { rule: "REF-001" },
+        ],
+        registry,
+      ),
+    ).toEqual([]);
+  });
+
+  it("names both spellings, the rule id and the sibling in its message", () => {
+    expect(
+      mixedRuleSpellingMessage({
+        ruleId: "REF-001",
+        spelling: "no-broken-links",
+        firstSpelling: "REF-001",
+        siblingPath: "config.rules[0]",
+      }),
+    ).toBe(
+      'rule "no-broken-links" names "REF-001", which config.rules[0] names as "REF-001" — spell every entry for one rule the same way.',
     );
   });
 });

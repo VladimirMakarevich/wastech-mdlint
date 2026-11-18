@@ -23,6 +23,7 @@ import { fileScopeShape, matchesFileScope } from "./scope.js";
 export const fm001: RuleDefinition = defineRule({
   metadata: {
     id: "FM-001",
+    alias: "valid-front-matter",
     category: "FM",
     description:
       "Front matter is valid YAML and matches the declared keys, values and patterns.",

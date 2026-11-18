@@ -31,6 +31,7 @@ Suppress findings inline with HTML-comment directives. Use this for intentional 
 
 - **Rule IDs are optional.** A `disable`, `enable`, `disable-next-line` or `disable-file` directive with **no** IDs applies to **all** rules. `capture` and `restore` take no IDs at all.
 - IDs are canonicalized like config (`ref-001` → `REF-001`) and can be space-separated.
+- A built-in rule's **alias** works wherever its ID does, in any case, so a suppression can say what it silences: `<!-- wastech-mdlint-disable-next-line no-broken-anchors -->` is the same directive as one naming `REF-002`. Each rule's alias is in the [rules index](rules/README.md). Findings still report the ID.
 - `disable` runs until a matching `enable`, a `restore` that returns to a state captured before it, or the end of the file.
 - `disable-next-line` covers only the single line that follows it, so write the content directly below it: a blank line in between is the line it covers.
 - Wherever an ID is accepted, a [category](#categories) such as `REF` can be written instead.
@@ -97,7 +98,8 @@ A rule category — the part of a built-in rule ID before the dash — selects e
 - Categories work in `disable`, `enable`, `disable-next-line` and `disable-file`, and can be mixed with IDs in one directive.
 - They are case-insensitive like IDs (`ref` is `REF`).
 - Only the built-in families are categories: `CTX`, `FM`, `GRP`, `LLM`, `REF`, `SEC`, `SIZE`, `STR`, `TBL`. A `custom` rule is not part of a family, so its IDs have to be listed one by one; a token such as `REQ` is reported as an unknown category even when a custom `REQ-OWNER` rule exists.
-- IDs are canonicalized before anything else, so a built-in ID written without its dash (`REF001`) is still the rule ID `REF-001`. A token that has no dash _after_ canonicalization is always read as a category, never as a rule ID — built-in IDs are `PREFIX-DIGITS` and custom IDs must contain a dash.
+- IDs are canonicalized before anything else, so a built-in ID written without its dash (`REF001`) is still the rule ID `REF-001`. A token that has no dash _after_ canonicalization is always read as a category, never as a rule ID — built-in IDs are `PREFIX-DIGITS`, custom IDs must contain a dash, and every alias contains a dash too.
+- A custom rule ID can never be an alias written in uppercase (`NO-BROKEN-ANCHORS`): the config rejects it, because `no-broken-anchors` in a directive would then silence two rules at once.
 
 ## Directive diagnostics
 

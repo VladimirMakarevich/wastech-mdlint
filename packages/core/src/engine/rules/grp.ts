@@ -41,6 +41,7 @@ export const DEFAULT_GRP002_ENTRY_POINTS = [
 export const grp001: RuleDefinition = defineRule({
   metadata: {
     id: "GRP-001",
+    alias: "no-circular-references",
     category: "GRP",
     description: "No circular references between documents.",
     defaultSeverity: "error",
@@ -98,6 +99,7 @@ export const grp001: RuleDefinition = defineRule({
 export const grp002: RuleDefinition = defineRule({
   metadata: {
     id: "GRP-002",
+    alias: "no-orphan-documents",
     category: "GRP",
     description:
       "Documents have at least one incoming reference (except entry points).",
@@ -154,6 +156,7 @@ const chainStageSchema = z
 export const grp003: RuleDefinition = defineRule({
   metadata: {
     id: "GRP-003",
+    alias: "ids-carried-forward",
     category: "GRP",
     description: "IDs are carried forward across pipeline stages.",
     defaultSeverity: "warning",

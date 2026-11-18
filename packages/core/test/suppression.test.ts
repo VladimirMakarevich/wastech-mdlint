@@ -235,6 +235,51 @@ describe("analyzeDirectives · categories", () => {
   });
 });
 
+describe("analyzeDirectives · rule aliases", () => {
+  it("suppresses the next line by alias", () => {
+    const { isSuppressed, diagnostics } = analyze([
+      "<!-- wastech-mdlint-disable-next-line no-broken-anchors -->",
+      "x",
+      "x",
+    ]);
+
+    expect(isSuppressed("REF-002", 2)).toBe(true);
+    expect(isSuppressed("REF-002", 3)).toBe(false);
+    expect(isSuppressed("REF-001", 2)).toBe(false);
+    // An alias is dashed, so it is never mistaken for an unknown category.
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("works in disable, enable and disable-file, in any case", () => {
+    const { isSuppressed, diagnostics } = analyze([
+      "<!-- wastech-mdlint-disable No-Broken-Links -->",
+      "x",
+      "<!-- wastech-mdlint-enable NO-BROKEN-LINKS -->",
+      "x",
+      "<!-- wastech-mdlint-disable-file file-size-budget -->",
+    ]);
+
+    expect(suppressedLines(isSuppressed, "REF-001", 4)).toEqual([
+      true,
+      true,
+      false,
+      false,
+    ]);
+    expect(isSuppressed("SIZE-001", 0)).toBe(true);
+    expect(diagnostics).toEqual([]);
+  });
+
+  it("an id and its alias name the same rule", () => {
+    const { isSuppressed } = analyze([
+      "<!-- wastech-mdlint-disable REF-002 -->",
+      "<!-- wastech-mdlint-enable no-broken-anchors -->",
+      "x",
+    ]);
+
+    expect(isSuppressed("REF-002", 3)).toBe(false);
+  });
+});
+
 describe("analyzeDirectives · diagnostics", () => {
   it("reports an unknown category with the known ones in code-point order", () => {
     const { isSuppressed, diagnostics } = analyze([

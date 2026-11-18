@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_EXCLUDE_GLOBS } from "../src/config/corpus-scope.js";
 import { DEFAULT_GRP002_ENTRY_POINTS } from "../src/engine/rules/grp.js";
 import { ASSERTION_TARGETS } from "../src/engine/primitives/assert.js";
+import { ruleRegistry } from "../src/engine/rules/index.js";
 import { generateConfigSchema } from "../src/engine/schema.js";
 
 // The shipped schema lives in the CLI package (its path is the config's default local `$schema`).
@@ -56,7 +57,7 @@ describe("generateConfigSchema", () => {
           items: {
             oneOf: Array<{
               properties?: {
-                rule?: { const?: string };
+                rule?: { enum?: string[] };
                 options?: {
                   properties?: Record<string, { default?: unknown }>;
                   required?: string[];
@@ -68,7 +69,7 @@ describe("generateConfigSchema", () => {
       };
     };
     const branch = schema.properties.rules.items.oneOf.find(
-      (candidate) => candidate.properties?.rule?.const === id,
+      (candidate) => candidate.properties?.rule?.enum?.[0] === id,
     );
 
     expect(branch?.properties?.options?.properties?.[key]?.default).toEqual(
@@ -229,6 +230,34 @@ describe("generateConfigSchema", () => {
     // Namespaced custom id passes; a known custom id and reserved-prefix ids are excluded.
     expect(pattern.test("TEAM-STYLE")).toBe(true);
     expect(pattern.test("REQ-OWNER")).toBe(false);
+    // An upper-cased built-in alias is rejected by the loader, so the schema must reject it too —
+    // but only the whole id: a longer id that merely starts with an alias is still a valid custom id.
+    expect(pattern.test("NO-BROKEN-ANCHORS")).toBe(false);
+    expect(pattern.test("NO-BROKEN-ANCHORS-2")).toBe(true);
+  });
+
+  // Each built-in branch accepts exactly two spellings, the canonical id first and the alias second,
+  // read from the registry so a renamed alias moves the expectation with it.
+  it("accepts each built-in rule by its id or its alias, and nothing else", () => {
+    const schema = JSON.parse(generateConfigSchema()) as {
+      properties: {
+        rules: {
+          items: {
+            oneOf: Array<{
+              properties?: { rule?: { enum?: string[]; const?: string } };
+            }>;
+          };
+        };
+      };
+    };
+    const enums = schema.properties.rules.items.oneOf
+      .map((branch) => branch.properties?.rule?.enum)
+      .filter((value): value is string[] => value !== undefined);
+    expect(enums).toEqual(
+      ruleRegistry
+        .getAllMetadata()
+        .map((metadata) => [metadata.id, metadata.alias]),
+    );
   });
 
   // Config loading rejects a CTX-006 `allowed` entry with whitespace. The schema must reject it too,
@@ -242,7 +271,7 @@ describe("generateConfigSchema", () => {
           items: {
             oneOf: Array<{
               properties?: {
-                rule?: { const?: string };
+                rule?: { enum?: string[] };
                 options?: {
                   properties?: Record<
                     string,
@@ -256,7 +285,7 @@ describe("generateConfigSchema", () => {
       };
     };
     const items = schema.properties.rules.items.oneOf.find(
-      (candidate) => candidate.properties?.rule?.const === "CTX-006",
+      (candidate) => candidate.properties?.rule?.enum?.[0] === "CTX-006",
     )?.properties?.options?.properties?.allowed?.items;
 
     expect(items?.pattern).toBeDefined();

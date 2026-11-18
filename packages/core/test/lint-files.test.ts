@@ -22,6 +22,7 @@ const registry = new RuleRegistry([
   defineRule({
     metadata: {
       id: "TST-001",
+      alias: "test-rule",
       category: "custom",
       description: "flags lines containing BAD",
       defaultSeverity: "error",
@@ -40,6 +41,7 @@ const registry = new RuleRegistry([
   defineRule({
     metadata: {
       id: "GRP-001",
+      alias: "no-circular-references",
       category: "GRP",
       description: "reports once over the corpus",
       defaultSeverity: "warning",

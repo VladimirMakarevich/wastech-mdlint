@@ -5,6 +5,7 @@ import {
   DEFAULT_EXCLUDE_GLOBS,
   DEFAULT_RESPECT_GITIGNORE,
 } from "../config/corpus-scope.js";
+import { compareStrings } from "../deterministic-sort.js";
 import { ASSERTION_TARGETS, assertionSchema } from "./primitives/assert.js";
 import { ruleRegistry } from "./rules/index.js";
 
@@ -59,13 +60,20 @@ function targetProperty(): JsonSchema {
   return { enum: [...ASSERTION_TARGET_ENUM] };
 }
 
-// One `rules[]` branch per built-in rule: the canonical id as a const plus its options schema.
-function builtinRuleBranch(id: string, optionsSchema: z.ZodType): JsonSchema {
+// One `rules[]` branch per built-in rule: the canonical id or its alias plus its options schema. The
+// enum lists exactly those two spellings — the lower-case and dash-less id spellings the loader also
+// accepts stay out, so an editor steers toward the two a reader can search for. The enums are
+// disjoint across rules, so `oneOf` stays unambiguous.
+function builtinRuleBranch(
+  id: string,
+  alias: string,
+  optionsSchema: z.ZodType,
+): JsonSchema {
   return {
     type: "object",
     additionalProperties: false,
     properties: {
-      rule: { const: id },
+      rule: { enum: [id, alias] },
       severity: severityProperty(),
       options: optionsToJsonSchema(optionsSchema),
     },
@@ -89,13 +97,19 @@ function customOptionsSchema(): JsonSchema {
 // Namespaced custom-id pattern: uppercase dash-separated segments, at least one dash,
 // with a negative lookahead excluding built-in prefixes (and any project-local custom ids, which get
 // their own dedicated branch) so the generic branch never overlaps a specific one under `oneOf`.
+// Upper-cased built-in aliases (`NO-BROKEN-ANCHORS`) are excluded too, because the loader rejects
+// them: such an id would make one suppression token name two rules.
 function customIdPattern(
   reservedPrefixes: string[],
+  reservedAliases: string[],
   knownCustomIds: string[],
 ): string {
   const lookaheads: string[] = [];
   if (reservedPrefixes.length > 0) {
     lookaheads.push(`(?!(${reservedPrefixes.join("|")})-)`);
+  }
+  if (reservedAliases.length > 0) {
+    lookaheads.push(`(?!(${reservedAliases.join("|")})$)`);
   }
   if (knownCustomIds.length > 0) {
     lookaheads.push(`(?!(${knownCustomIds.join("|")})$)`);
@@ -147,11 +161,18 @@ export function generateConfigSchema(opts?: {
   const reservedPrefixes = [...ruleRegistry.getReservedPrefixes()].sort();
   const customRules = opts?.customRules ?? [];
   const knownCustomIds = customRules.map((rule) => rule.id).sort();
+  const reservedAliases = metadata
+    .map((rule) => rule.alias.toUpperCase())
+    .sort(compareStrings);
 
   const ruleBranches: JsonSchema[] = [
-    ...metadata.map((rule) => builtinRuleBranch(rule.id, rule.optionsSchema)),
+    ...metadata.map((rule) =>
+      builtinRuleBranch(rule.id, rule.alias, rule.optionsSchema),
+    ),
     ...knownCustomIds.map((id) => knownCustomBranch(id)),
-    genericCustomBranch(customIdPattern(reservedPrefixes, knownCustomIds)),
+    genericCustomBranch(
+      customIdPattern(reservedPrefixes, reservedAliases, knownCustomIds),
+    ),
   ];
 
   const schema: JsonSchema = {

@@ -47,6 +47,7 @@ const siteRouterOptionSchema = z
 export const ref001: RuleDefinition = defineRule({
   metadata: {
     id: "REF-001",
+    alias: "no-broken-links",
     category: "REF",
     description: "Relative links resolve to a file.",
     defaultSeverity: "error",
@@ -224,6 +225,7 @@ function compileIgnoredPattern(options: Ref002Options): RegExp | undefined {
 export const ref002: RuleDefinition = defineRule({
   metadata: {
     id: "REF-002",
+    alias: "no-broken-anchors",
     category: "REF",
     description: "Link anchors match a heading or HTML anchor.",
     defaultSeverity: "error",
@@ -273,6 +275,7 @@ export const ref002: RuleDefinition = defineRule({
 export const ref003: RuleDefinition = defineRule({
   metadata: {
     id: "REF-003",
+    alias: "no-broken-images",
     category: "REF",
     description: "Image targets resolve to a file.",
     defaultSeverity: "error",
@@ -312,6 +315,7 @@ function zoneOf(relPath: string, zonesDir: string): string | undefined {
 export const ref004: RuleDefinition = defineRule({
   metadata: {
     id: "REF-004",
+    alias: "declared-zone-dependencies",
     category: "REF",
     description:
       "Cross-zone links are declared in the zone's Dependencies section.",
@@ -416,6 +420,7 @@ function describeScope(globs: readonly string[]): string {
 export const ref005: RuleDefinition = defineRule({
   metadata: {
     id: "REF-005",
+    alias: "traceable-ids",
     category: "REF",
     description: "IDs are traceable between definitions and references.",
     defaultSeverity: "error",
@@ -489,6 +494,7 @@ export const ref005: RuleDefinition = defineRule({
 export const ref006: RuleDefinition = defineRule({
   metadata: {
     id: "REF-006",
+    alias: "stable-dependencies",
     category: "REF",
     description: "References do not depend on less-stable entities.",
     defaultSeverity: "warning",
@@ -601,6 +607,7 @@ const DEFAULT_REF007_INCLUDE_SHORTCUT = false;
 export const ref007: RuleDefinition = defineRule({
   metadata: {
     id: "REF-007",
+    alias: "no-undefined-references",
     category: "REF",
     description: "Reference links and images use a defined label.",
     defaultSeverity: "error",
@@ -653,6 +660,7 @@ const EMPTY_TARGETS: ReadonlySet<string> = new Set(["", "#"]);
 export const ref008: RuleDefinition = defineRule({
   metadata: {
     id: "REF-008",
+    alias: "no-malformed-links",
     category: "REF",
     description:
       "Links and images have a target and use link syntax in the right order.",
@@ -830,6 +838,7 @@ function definitionRemovalEdits(
 export const ref009: RuleDefinition = defineRule({
   metadata: {
     id: "REF-009",
+    alias: "no-unused-definitions",
     category: "REF",
     description: "Link reference definitions are used.",
     defaultSeverity: "warning",

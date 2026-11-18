@@ -144,6 +144,16 @@ describe("describeRules", () => {
     ]);
   });
 
+  it("describes a built-in written by its alias under the canonical id", () => {
+    const [group] = describeRules(
+      [{ rule: "context-token-budget" }],
+      ruleRegistry,
+    );
+    expect(group?.rules).toEqual([
+      { id: "LLM-001", description: descriptionOf("LLM-001") },
+    ]);
+  });
+
   it("describes custom document and project rules from their target plus assertion summary", () => {
     const configuredRules: CustomRuleConfigEntry[] = [
       {

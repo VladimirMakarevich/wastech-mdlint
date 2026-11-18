@@ -490,6 +490,37 @@ describe("init command · existing config handling", () => {
     );
   });
 
+  it("--on-existing merge recognizes an existing rule written by its alias and does not add it again", async () => {
+    // Keyed by the canonical id, the alias entry is the REF-001 inference proposes. Missed, the merge
+    // would append a second REF-001 beside it — and the loader rejects one rule spelled two ways.
+    const cwd = await fixtureRepo(
+      withInstalledSchema({
+        ...CROSS_LINKED_DOCS_FIXTURE,
+        "wastech-mdlint.config.json": JSON.stringify({
+          rules: [{ rule: "no-broken-links" }],
+        }),
+      }),
+    );
+
+    const result = await run(
+      ["init", cwd, "--yes", "--on-existing", "merge"],
+      cwd,
+    );
+
+    expect(result.exitCode).toBe(EXIT_CODE_SUCCESS);
+    const written = readConfig(
+      await readFile(path.join(cwd, CONFIG_FILE), "utf8"),
+    );
+    const ruleIds = (written.rules as { rule: string }[]).map(
+      (entry) => entry.rule,
+    );
+    // Rewritten to the canonical id, because a written config always emits ids.
+    expect(ruleIds[0]).toBe("REF-001");
+    expect(ruleIds.filter((id) => id === "REF-001")).toHaveLength(1);
+    expect(ruleIds).not.toContain("no-broken-links");
+    expect(ruleIds).toContain("REF-002");
+  });
+
   it("--on-existing merge appends no rule whose only evidence sits outside the preserved include", async () => {
     // Two correct behaviors used to meet badly here. A merge preserves `include` exactly, and it
     // says so; inference read the whole repository scan. So the merge appended REF-003 and TBL-002

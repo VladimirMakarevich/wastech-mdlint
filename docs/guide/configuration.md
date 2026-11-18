@@ -164,6 +164,13 @@ Each entry names a `rule` and may set `severity` and `options`:
 ```
 
 - **Rule IDs are case-insensitive and dash-optional** — `ref-001` and `REF001` both canonicalize to `REF-001`.
+- **Every built-in rule also has an alias**, a readable name such as `no-broken-anchors` for `REF-002`, listed in the [rules index](rules/README.md). `rule` accepts the alias anywhere it accepts the ID, in any case. Findings always report the ID, and a config written or merged by `init` always writes the ID.
+- **Spell one rule one way.** Repeating a rule under the same spelling is fine, but naming it by ID in one entry and by alias in another is a config error that names both entries, because a reader searching the config for one spelling misses the other:
+
+  ```text
+  - config.rules[1].rule: rule "no-broken-anchors" names "REF-002", which config.rules[0] names as "REF-002" — spell every entry for one rule the same way.
+  ```
+
 - `severity` is `"error" | "warning" | "off"`. `"off"` documents but disables a rule. Omitting `severity` uses the rule's built-in default (see each rule page). A config written by [`init`](cli.md#the-rule-set-init-proposes-and-why-your-first-lint-is-green) uses both spellings deliberately: a rule your corpus already satisfies is written with no `severity` at all, and one it does not is written `"off"` with the finding count in the comment beside it, so the first run is green and the work is still on the page.
 - `options` must match that rule's schema; unknown option keys are rejected.
 - The **same rule can appear multiple times** with different `files`/`exclude`/options — e.g. one [TBL-001](rules/TBL-001.md) column set for `docs/requirements/**` and another elsewhere.

@@ -32,6 +32,7 @@ Frontmatter is excluded from the outline: it produces no heading, section, slug,
 The engine is **registry-driven**: each rule declares structured metadata (category, scope, default severity), a Zod options schema, and a factory that produces findings. Rules are **pure** where practical — parsed inputs in, structured findings (or deterministic edits) out.
 
 - **Scope** is `document` (evaluated per file) or `project` (evaluated once over the whole corpus, with file-attributed findings). Each rule's page states its scope.
+- **Alias** is a rule's readable second name (`no-broken-anchors` for `REF-002`), accepted as input wherever an ID is — config and suppression directives — so a suppression explains itself. Output only ever carries the ID: one rule with two names in reports would read as two rules. Every alias contains a dash, which keeps it from being mistaken for a suppression category such as `REF`.
 - **Severity** resolves as `config override ?? per-finding ?? rule default`; `"off"` drops the rule.
 - **Assertion primitives** are the shared building blocks (table/section/content/checklist/link checks) that both built-in rules and the declarative [`custom`](rules/custom.md) rule compose.
 

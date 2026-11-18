@@ -313,6 +313,34 @@ describe("handleLint", () => {
     expect(output.hint).toMatch(/already used by rules\[0\]/);
   });
 
+  it("accepts a rule alias and reports its findings under the canonical id", () => {
+    const result = handleLint({
+      content: "# Title\n\nsome body\nmore body\n",
+      rules: [{ rule: "file-size-budget", options: { lines: { error: 1 } } }],
+    });
+
+    expect(result.isError).toBeFalsy();
+    const messages = structured(result).messages as LintMessage[];
+    expect(messages.map((message) => message.ruleId)).toEqual(["SIZE-001"]);
+  });
+
+  it("rejects one rule spelled by id and by alias, naming both spellings and indices", () => {
+    // The config loader runs the same check from the same core helper; this tool never reaches the
+    // loader, so without its own call a request could mix spellings that a config cannot.
+    const result = handleLint({
+      content: "# Title\n",
+      rules: [{ rule: "REF-002" }, { rule: "no-broken-anchors" }],
+    });
+
+    expect(result.isError).toBe(true);
+    const output = structured(result);
+    expect(output.code).toBe("INVALID_INPUT");
+    expect(output.message).toMatch(/spelled one way/);
+    expect(output.hint).toBe(
+      'rules[1].rule: rule "no-broken-anchors" names "REF-002", which rules[0] names as "REF-002" — spell every entry for one rule the same way.',
+    );
+  });
+
   it("selects nothing when a custom rule's `files` glob misses the synthetic path", () => {
     // The document is always `content.md`, so a caller-supplied glob scoped to a directory silently
     // matches no file — the foot-gun the tool description now discloses.

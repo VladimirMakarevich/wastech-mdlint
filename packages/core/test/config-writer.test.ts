@@ -343,6 +343,25 @@ describe("generateInitConfig · merge", () => {
     );
   });
 
+  it("rewrites an existing alias entry to the canonical id on merge", () => {
+    const result = generateInitConfig({
+      action: "merge",
+      existing: {
+        raw: {
+          rules: [{ rule: "no-broken-anchors", severity: "warning" }],
+        },
+      },
+      include: [],
+      newRules: [buildRule({ rule: "REF-001", category: "REF" })],
+      packageSchemaRef: PACKAGE_SCHEMA_REF,
+    });
+    const rules = parse(result.configText).rules as Record<string, unknown>[];
+
+    // Left as written, the alias would sit beside id-spelled entries the merge appends, and a later
+    // `REF-002` proposal would mix spellings the loader rejects.
+    expect(rules[0]).toEqual({ rule: "REF-002", severity: "warning" });
+  });
+
   it("does not seed a project schema from a custom id the loader would reject", () => {
     // `foo` has no dash and `REF-OWNER` reuses a reserved built-in prefix — both fail
     // resolveCustomRule's grammar/prefix checks, so a project schema claiming they are valid would
@@ -524,6 +543,13 @@ describe("identifyExistingRule", () => {
     });
   });
 
+  it("keys a built-in entry written by its alias by the rule's canonical id", () => {
+    expect(identifyExistingRule({ rule: "no-broken-anchors" })).toEqual({
+      kind: "builtin",
+      canonicalId: "REF-002",
+    });
+  });
+
   it('keys a custom entry by its canonical id, not the literal "custom"', () => {
     expect(
       identifyExistingRule({
@@ -548,6 +574,9 @@ describe("identifyExistingRule", () => {
       { rule: "custom", id: 1 },
       { rule: "custom", id: "foo" },
       { rule: "custom", id: "SEC-100" },
+      // An upper-cased built-in alias owns no reserved prefix, but the loader rejects it because a
+      // suppression token would then name two rules.
+      { rule: "custom", id: "NO-BROKEN-ANCHORS" },
     ]) {
       expect(identifyExistingRule(entry)).toEqual({ kind: "invalid" });
     }

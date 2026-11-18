@@ -17,6 +17,12 @@ import type {
 // so those never drift from each other.
 export type RuleMetadata = {
   id: string;
+  // A human-readable second spelling of `id` (lowercase kebab-case with at least one dash, e.g.
+  // `no-broken-anchors`), accepted wherever a rule id is read as input: config `rules[].rule` and
+  // inline suppression tokens. It is input only — findings, written configs and every report keep
+  // the canonical `id`, so output has one name per rule. The dash is what keeps an alias from ever
+  // being read as a dash-less suppression category token.
+  alias: string;
   category: RuleCategory;
   description: string;
   defaultSeverity: Severity;
@@ -171,6 +177,12 @@ function fileScopeHint(
 
 export class RuleRegistry {
   private readonly byId = new Map<string, RuleDefinition>();
+  // Keyed by the alias's canonical (upper-cased) form, which is exactly what the Markdown parser
+  // already emits for a directive token, so suppression resolves a token with one lookup and no
+  // second normalization. Alias resolution lives here rather than in `canonicalizeRuleId`: that
+  // helper is a leaf the registry imports, and teaching it the registry would close an import cycle
+  // through the rule modules.
+  private readonly idByAlias = new Map<string, string>();
 
   constructor(definitions: readonly RuleDefinition[]) {
     for (const definition of definitions) {
@@ -180,14 +192,44 @@ export class RuleRegistry {
       }
       this.byId.set(canonical, definition);
     }
+
+    // A second pass, so an alias is checked against every id regardless of definition order: an
+    // alias that canonicalizes to an id, or one shared by two rules, would make one spelling mean two
+    // rules depending on which map is consulted first.
+    for (const definition of definitions) {
+      const key = canonicalizeRuleId(definition.metadata.alias);
+      if (this.byId.has(key)) {
+        throw new Error(
+          `Rule alias collides with a rule id in registry: ${key}`,
+        );
+      }
+      if (this.idByAlias.has(key)) {
+        throw new Error(`Duplicate rule alias in registry: ${key}`);
+      }
+      this.idByAlias.set(key, canonicalizeRuleId(definition.metadata.id));
+    }
+  }
+
+  /**
+   * The canonical id a rule spelling stands for: an alias (any case) maps to its rule's id; any other
+   * spelling is normalized by `canonicalizeRuleId` and returned whether or not it is registered, so a
+   * custom id or an unknown name passes through unchanged for the caller to judge.
+   */
+  resolveId(name: string): string {
+    const canonical = canonicalizeRuleId(name);
+    return this.idByAlias.get(canonical) ?? canonical;
+  }
+
+  isAlias(name: string): boolean {
+    return this.idByAlias.has(canonicalizeRuleId(name));
   }
 
   has(name: string): boolean {
-    return this.byId.has(canonicalizeRuleId(name));
+    return this.byId.has(this.resolveId(name));
   }
 
   getMetadata(name: string): RuleMetadata | undefined {
-    return this.byId.get(canonicalizeRuleId(name))?.metadata;
+    return this.byId.get(this.resolveId(name))?.metadata;
   }
 
   // All built-in metadata, sorted by canonical id for deterministic schema/README generation.
@@ -204,30 +246,41 @@ export class RuleRegistry {
   }
 
   private suggest(canonical: string): string | undefined {
-    let best: { id: string; distance: number } | undefined;
+    let best: { key: string; spelling: string; distance: number } | undefined;
 
-    for (const id of this.byId.keys()) {
-      const distance = editDistance(canonical, id);
+    // Aliases are candidates too, and are suggested in their authored lower-case spelling: someone
+    // who mistyped `no-broken-anchor` meant the alias, and offering `REF-002` would not show them
+    // what they got wrong.
+    const candidates: { key: string; spelling: string }[] = [
+      ...[...this.byId.keys()].map((id) => ({ key: id, spelling: id })),
+      ...[...this.idByAlias.entries()].map(([key, id]) => ({
+        key,
+        spelling: this.byId.get(id)!.metadata.alias,
+      })),
+    ];
+
+    for (const candidate of candidates) {
+      const distance = editDistance(canonical, candidate.key);
       if (best === undefined || distance < best.distance) {
-        best = { id, distance };
+        best = { ...candidate, distance };
       }
     }
 
     // Only suggest when the typo is plausibly close (≤ ~40% of the id length).
     return best !== undefined &&
-      best.distance <= Math.ceil(best.id.length * 0.4)
-      ? best.id
+      best.distance <= Math.ceil(best.key.length * 0.4)
+      ? best.spelling
       : undefined;
   }
 
   /**
    * Resolve a config rule entry to a runnable `Rule`. Accepts any ID spelling (canonical,
-   * lower-case, dash-optional), validates options via the rule's Zod schema, and throws a
-   * `RuleResolutionError` (unknown rule → did-you-mean; bad options → issue list) that the config
-   * loader renders as a diagnostic.
+   * lower-case, dash-optional) or the rule's alias, validates options via the rule's Zod schema, and
+   * throws a `RuleResolutionError` (unknown rule → did-you-mean; bad options → issue list) that the
+   * config loader renders as a diagnostic. The returned `Rule.id` is always the canonical id.
    */
   resolveRule(name: string, rawOptions: unknown): Rule {
-    const canonical = canonicalizeRuleId(name);
+    const canonical = this.resolveId(name);
     const definition = this.byId.get(canonical);
 
     if (definition === undefined) {
@@ -286,4 +339,83 @@ export class RuleRegistry {
       fix: definition.createFix?.(parsed.data),
     };
   }
+}
+
+// One entry that spells a built-in rule differently from the first entry naming that rule. Both
+// positions and both spellings are carried, because the point of the diagnostic is to let a reader
+// find the entry they did not know was there.
+export type MixedRuleSpelling = {
+  index: number;
+  firstIndex: number;
+  ruleId: string;
+  spelling: string;
+  firstSpelling: string;
+};
+
+/**
+ * Find built-in rule entries that name one rule by its id in one place and by its alias in another.
+ *
+ * Repetition itself is supported — two `REF-001` entries with different `files` scopes apply one rule
+ * differently to two parts of a repository — so this compares spelling *kinds*, not counts: two `REF-002`
+ * entries, or two `no-broken-anchors` entries, stay valid. Mixing them is rejected because a reader
+ * searching the config for one spelling misses the entry written in the other, so the rule looks
+ * configured once while it runs twice.
+ *
+ * `custom` entries, non-string `rule` values and names the registry does not know are skipped: each
+ * already has its own diagnostic, and a spelling report about an entry that fails anyway buries it.
+ *
+ * Returns one report per offending entry, in entry order, each naming the first entry for that rule.
+ */
+export function findMixedRuleSpellings(
+  entries: readonly { rule?: unknown }[],
+  registry: RuleRegistry,
+): MixedRuleSpelling[] {
+  const firstById = new Map<
+    string,
+    { index: number; spelling: string; isAlias: boolean }
+  >();
+  const mixed: MixedRuleSpelling[] = [];
+
+  entries.forEach((entry, index) => {
+    if (
+      typeof entry.rule !== "string" ||
+      entry.rule === "custom" ||
+      !registry.has(entry.rule)
+    ) {
+      return;
+    }
+    const ruleId = registry.resolveId(entry.rule);
+    const isAlias = registry.isAlias(entry.rule);
+    const first = firstById.get(ruleId);
+    if (first === undefined) {
+      firstById.set(ruleId, { index, spelling: entry.rule, isAlias });
+      return;
+    }
+    if (first.isAlias !== isAlias) {
+      mixed.push({
+        index,
+        firstIndex: first.index,
+        ruleId,
+        spelling: entry.rule,
+        firstSpelling: first.spelling,
+      });
+    }
+  });
+
+  return mixed;
+}
+
+/**
+ * The message for a mixed id/alias spelling: both spellings, the canonical id they share, and the
+ * earlier entry's position. `siblingPath` is rendered by the caller because the config loader anchors
+ * paths at `config` while the MCP tool anchors them at the request's own `rules` array, and a
+ * cross-reference the reader cannot paste back into what they are editing is worse than none.
+ */
+export function mixedRuleSpellingMessage(params: {
+  ruleId: string;
+  spelling: string;
+  firstSpelling: string;
+  siblingPath: string;
+}): string {
+  return `rule "${params.spelling}" names "${params.ruleId}", which ${params.siblingPath} names as "${params.firstSpelling}" — spell every entry for one rule the same way.`;
 }

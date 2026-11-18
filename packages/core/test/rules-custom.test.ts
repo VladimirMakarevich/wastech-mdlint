@@ -144,6 +144,27 @@ describe("declarative custom rule", () => {
     );
   });
 
+  it("rejects a custom id that is a built-in alias, naming the rule it belongs to", async () => {
+    // `NO-BROKEN-ANCHORS` fits the grammar and owns no reserved prefix, but a directive token
+    // `no-broken-anchors` would then silence this rule and REF-002 at once.
+    const cwd = await repo({
+      "a.md": "# A\n",
+      "wastech-mdlint.config.json": JSON.stringify({
+        rules: [
+          {
+            rule: "custom",
+            id: "no-broken-anchors",
+            options: { assert: { kind: "allChecked" } },
+          },
+        ],
+      }),
+    });
+
+    await expect(loadConfiguration({ cwd })).rejects.toThrow(
+      /id "NO-BROKEN-ANCHORS": "no-broken-anchors" is the alias of built-in rule "REF-002" — choose another id\./,
+    );
+  });
+
   it("rejects a custom id that violates the namespaced grammar", async () => {
     const cwd = await repo({
       "a.md": "# A\n",

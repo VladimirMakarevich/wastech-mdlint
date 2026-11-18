@@ -51,6 +51,16 @@ This applies to `custom` entries only. Listing the **same built-in rule** twice 
 
 The MCP ad-hoc [`lint`](../mcp-server.md) tool enforces the same constraint on its `rules` array, refusing the whole request rather than one entry of it.
 
+### A `custom` id cannot be a built-in alias
+
+Every built-in rule has an alias, such as `no-broken-anchors` for `REF-002`. An `id` that is one of those aliases (`NO-BROKEN-ANCHORS` once canonicalized) fits the pattern and owns no reserved prefix, but it is rejected at config load, and the generated schema excludes it too:
+
+```text
+- config.rules[0].id: id "NO-BROKEN-ANCHORS": "no-broken-anchors" is the alias of built-in rule "REF-002" — choose another id.
+```
+
+A [suppression directive](../suppression.md) accepts an alias wherever it accepts an ID, so `no-broken-anchors` would otherwise name both rules and silence both.
+
 ## Assertion kinds
 
 `options.assert.kind` selects one assertion. Each kind operates on a fixed target and mirrors a built-in rule's behavior, calling the same underlying primitive. Fields marked **req** are required; the rest are optional.

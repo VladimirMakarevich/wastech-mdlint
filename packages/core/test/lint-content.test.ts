@@ -194,3 +194,32 @@ describe("lintContent on a document with frontmatter", () => {
     ).toEqual([[11, "nope-two"]]);
   });
 });
+
+// An alias is input only: the rule resolved from one, and the directive spelled with one, still
+// produce findings under the canonical id, so a report never names one rule two ways.
+describe("lintContent with rule aliases", () => {
+  it("suppresses by alias and reports the remaining finding under the canonical id", () => {
+    const result = lintContent({
+      path: AD_HOC_PATH,
+      content: [
+        "# Title",
+        "",
+        "<!-- wastech-mdlint-disable-next-line no-broken-anchors -->",
+        "[suppressed](#nope-one)",
+        "",
+        "[reported](#nope-two)",
+        "",
+      ].join("\n"),
+      rules: [{ rule: ruleRegistry.resolveRule("no-broken-anchors", {}) }],
+      rootDir: process.cwd(),
+    });
+
+    expect(
+      result.messages.map((message) => [
+        message.line,
+        message.ruleId,
+        message.data?.anchor,
+      ]),
+    ).toEqual([[6, "REF-002", "nope-two"]]);
+  });
+});

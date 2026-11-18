@@ -199,7 +199,9 @@ export function describeRules(
         ];
       }
 
-      const metadata = metadataById.get(canonicalizeRuleId(entry.rule));
+      // `resolveId` rather than `canonicalizeRuleId`: an entry written by its alias must find the
+      // same metadata as one written by its id.
+      const metadata = metadataById.get(registry.resolveId(entry.rule));
 
       if (metadata === undefined) {
         throw new Error(

@@ -38,6 +38,7 @@ import type { TextEdit } from "../types.js";
 export const sec001: RuleDefinition = defineRule({
   metadata: {
     id: "SEC-001",
+    alias: "required-sections",
     category: "SEC",
     description: "Required sections are present.",
     defaultSeverity: "error",
@@ -89,6 +90,7 @@ export const sec001: RuleDefinition = defineRule({
 export const sec002: RuleDefinition = defineRule({
   metadata: {
     id: "SEC-002",
+    alias: "section-order",
     category: "SEC",
     description: "Sections appear in the required order.",
     defaultSeverity: "error",
@@ -153,6 +155,7 @@ function headingData(
 export const sec003: RuleDefinition = defineRule({
   metadata: {
     id: "SEC-003",
+    alias: "section-template",
     category: "SEC",
     description:
       "Sections conform to a reference template's heading structure.",
@@ -294,6 +297,7 @@ export const sec003: RuleDefinition = defineRule({
 export const sec004: RuleDefinition = defineRule({
   metadata: {
     id: "SEC-004",
+    alias: "heading-increment",
     category: "SEC",
     description:
       "Heading levels increment by one, with a single title at the start.",
@@ -341,6 +345,7 @@ export const sec004: RuleDefinition = defineRule({
 export const sec005: RuleDefinition = defineRule({
   metadata: {
     id: "SEC-005",
+    alias: "no-duplicate-headings",
     category: "SEC",
     description: "Heading text is not repeated within a document.",
     // Outline hygiene meant to be enabled bare, like SEC-004, so a warning is proportionate.
@@ -378,6 +383,7 @@ export const sec005: RuleDefinition = defineRule({
 export const sec006: RuleDefinition = defineRule({
   metadata: {
     id: "SEC-006",
+    alias: "no-emphasis-as-heading",
     category: "SEC",
     description: "Emphasis is not used in place of a heading.",
     // Outline hygiene meant to be enabled bare, like SEC-004 and SEC-005, so a warning is
@@ -417,6 +423,7 @@ export const sec006: RuleDefinition = defineRule({
 export const str001: RuleDefinition = defineRule({
   metadata: {
     id: "STR-001",
+    alias: "required-files",
     category: "STR",
     description: "Required files exist in the project.",
     defaultSeverity: "error",

@@ -189,43 +189,43 @@ The following table is generated from the rule metadata (`npm run generate:docs`
 
 <!-- BEGIN GENERATED RULES -->
 <!-- prettier-ignore -->
-| Rule | Category | Default severity | Scope | Fixable | Description |
-| --- | --- | --- | --- | --- | --- |
-| [`CTX-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-001.md) | CTX | warning | document | no | Sections are not empty or placeholder-only. |
-| [`CTX-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-002.md) | CTX | warning | document | no | All checklist items are checked. |
-| [`CTX-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-003.md) | CTX | warning | project | yes | Content uses canonical glossary terms instead of aliases. |
-| [`CTX-004`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-004.md) | CTX | warning | document | no | Link text describes its target. |
-| [`CTX-005`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-005.md) | CTX | warning | document | no | Images have alt text. |
-| [`CTX-006`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-006.md) | CTX | warning | document | no | Fenced code blocks declare a language. |
-| [`FM-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/FM-001.md) | FM | error | document | no | Front matter is valid YAML and matches the declared keys, values and patterns. |
-| [`GRP-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/GRP-001.md) | GRP | error | project | no | No circular references between documents. |
-| [`GRP-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/GRP-002.md) | GRP | warning | project | no | Documents have at least one incoming reference (except entry points). |
-| [`GRP-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/GRP-003.md) | GRP | warning | project | no | IDs are carried forward across pipeline stages. |
-| [`LLM-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/LLM-001.md) | LLM | warning | project | no | Eager-import context stays within the per-entrypoint token budget. |
-| [`REF-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-001.md) | REF | error | document | no | Relative links resolve to a file. |
-| [`REF-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-002.md) | REF | error | document | yes | Link anchors match a heading or HTML anchor. |
-| [`REF-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-003.md) | REF | error | document | no | Image targets resolve to a file. |
-| [`REF-004`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-004.md) | REF | error | document | no | Cross-zone links are declared in the zone's Dependencies section. |
-| [`REF-005`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-005.md) | REF | error | project | no | IDs are traceable between definitions and references. |
-| [`REF-006`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-006.md) | REF | warning | project | no | References do not depend on less-stable entities. |
-| [`REF-007`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-007.md) | REF | error | document | no | Reference links and images use a defined label. |
-| [`REF-008`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-008.md) | REF | error | document | no | Links and images have a target and use link syntax in the right order. |
-| [`REF-009`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-009.md) | REF | warning | document | yes | Link reference definitions are used. |
-| [`SEC-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-001.md) | SEC | error | document | yes | Required sections are present. |
-| [`SEC-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-002.md) | SEC | error | document | no | Sections appear in the required order. |
-| [`SEC-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-003.md) | SEC | error | project | no | Sections conform to a reference template's heading structure. |
-| [`SEC-004`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-004.md) | SEC | warning | document | no | Heading levels increment by one, with a single title at the start. |
-| [`SEC-005`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-005.md) | SEC | warning | document | no | Heading text is not repeated within a document. |
-| [`SEC-006`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-006.md) | SEC | warning | document | no | Emphasis is not used in place of a heading. |
-| [`SIZE-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SIZE-001.md) | SIZE | warning | document | no | File stays within byte / line / token budgets. |
-| [`STR-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/STR-001.md) | STR | error | project | no | Required files exist in the project. |
-| [`TBL-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-001.md) | TBL | error | document | no | Tables declare their required columns. |
-| [`TBL-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-002.md) | TBL | warning | document | yes | Target table cells are not empty. |
-| [`TBL-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-003.md) | TBL | error | document | no | Cell values fall within an allowed set. |
-| [`TBL-004`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-004.md) | TBL | error | document | no | Cell values match a required pattern. |
-| [`TBL-005`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-005.md) | TBL | error | document | no | Cross-column conditional holds (when → then). |
-| [`TBL-006`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-006.md) | TBL | error | project | no | Column IDs are unique across files. |
-| [`TBL-007`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-007.md) | TBL | error | document | no | Table rows have as many cells as the header. |
+| Rule | Alias | Category | Default severity | Scope | Fixable | Description |
+| --- | --- | --- | --- | --- | --- | --- |
+| [`CTX-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-001.md) | `no-empty-sections` | CTX | warning | document | no | Sections are not empty or placeholder-only. |
+| [`CTX-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-002.md) | `checklist-complete` | CTX | warning | document | no | All checklist items are checked. |
+| [`CTX-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-003.md) | `glossary-terms` | CTX | warning | project | yes | Content uses canonical glossary terms instead of aliases. |
+| [`CTX-004`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-004.md) | `descriptive-link-text` | CTX | warning | document | no | Link text describes its target. |
+| [`CTX-005`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-005.md) | `image-alt-text` | CTX | warning | document | no | Images have alt text. |
+| [`CTX-006`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/CTX-006.md) | `code-block-language` | CTX | warning | document | no | Fenced code blocks declare a language. |
+| [`FM-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/FM-001.md) | `valid-front-matter` | FM | error | document | no | Front matter is valid YAML and matches the declared keys, values and patterns. |
+| [`GRP-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/GRP-001.md) | `no-circular-references` | GRP | error | project | no | No circular references between documents. |
+| [`GRP-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/GRP-002.md) | `no-orphan-documents` | GRP | warning | project | no | Documents have at least one incoming reference (except entry points). |
+| [`GRP-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/GRP-003.md) | `ids-carried-forward` | GRP | warning | project | no | IDs are carried forward across pipeline stages. |
+| [`LLM-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/LLM-001.md) | `context-token-budget` | LLM | warning | project | no | Eager-import context stays within the per-entrypoint token budget. |
+| [`REF-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-001.md) | `no-broken-links` | REF | error | document | no | Relative links resolve to a file. |
+| [`REF-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-002.md) | `no-broken-anchors` | REF | error | document | yes | Link anchors match a heading or HTML anchor. |
+| [`REF-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-003.md) | `no-broken-images` | REF | error | document | no | Image targets resolve to a file. |
+| [`REF-004`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-004.md) | `declared-zone-dependencies` | REF | error | document | no | Cross-zone links are declared in the zone's Dependencies section. |
+| [`REF-005`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-005.md) | `traceable-ids` | REF | error | project | no | IDs are traceable between definitions and references. |
+| [`REF-006`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-006.md) | `stable-dependencies` | REF | warning | project | no | References do not depend on less-stable entities. |
+| [`REF-007`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-007.md) | `no-undefined-references` | REF | error | document | no | Reference links and images use a defined label. |
+| [`REF-008`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-008.md) | `no-malformed-links` | REF | error | document | no | Links and images have a target and use link syntax in the right order. |
+| [`REF-009`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/REF-009.md) | `no-unused-definitions` | REF | warning | document | yes | Link reference definitions are used. |
+| [`SEC-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-001.md) | `required-sections` | SEC | error | document | yes | Required sections are present. |
+| [`SEC-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-002.md) | `section-order` | SEC | error | document | no | Sections appear in the required order. |
+| [`SEC-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-003.md) | `section-template` | SEC | error | project | no | Sections conform to a reference template's heading structure. |
+| [`SEC-004`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-004.md) | `heading-increment` | SEC | warning | document | no | Heading levels increment by one, with a single title at the start. |
+| [`SEC-005`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-005.md) | `no-duplicate-headings` | SEC | warning | document | no | Heading text is not repeated within a document. |
+| [`SEC-006`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SEC-006.md) | `no-emphasis-as-heading` | SEC | warning | document | no | Emphasis is not used in place of a heading. |
+| [`SIZE-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/SIZE-001.md) | `file-size-budget` | SIZE | warning | document | no | File stays within byte / line / token budgets. |
+| [`STR-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/STR-001.md) | `required-files` | STR | error | project | no | Required files exist in the project. |
+| [`TBL-001`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-001.md) | `table-required-columns` | TBL | error | document | no | Tables declare their required columns. |
+| [`TBL-002`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-002.md) | `table-no-empty-cells` | TBL | warning | document | yes | Target table cells are not empty. |
+| [`TBL-003`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-003.md) | `table-allowed-values` | TBL | error | document | no | Cell values fall within an allowed set. |
+| [`TBL-004`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-004.md) | `table-cell-pattern` | TBL | error | document | no | Cell values match a required pattern. |
+| [`TBL-005`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-005.md) | `table-conditional-columns` | TBL | error | document | no | Cross-column conditional holds (when → then). |
+| [`TBL-006`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-006.md) | `table-unique-ids` | TBL | error | project | no | Column IDs are unique across files. |
+| [`TBL-007`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/TBL-007.md) | `table-row-cell-count` | TBL | error | document | no | Table rows have as many cells as the header. |
 
 <!-- END GENERATED RULES -->
 

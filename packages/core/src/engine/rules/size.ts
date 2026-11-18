@@ -94,6 +94,7 @@ function countLines(content: string): number {
 export const size001: RuleDefinition = defineRule({
   metadata: {
     id: "SIZE-001",
+    alias: "file-size-budget",
     category: "SIZE",
     description: "File stays within byte / line / token budgets.",
     defaultSeverity: "warning",

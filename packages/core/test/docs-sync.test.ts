@@ -40,7 +40,7 @@ describe("README rule table", () => {
     const fixable = generateRuleDocs()
       .split("\n")
       .filter((line) => line.startsWith("| [`"))
-      .filter((line) => line.split("|")[5]?.trim() === "yes")
+      .filter((line) => line.split("|")[6]?.trim() === "yes")
       .map((line) => /^\| \[`([^`]+)`\]/.exec(line)?.[1]);
     expect(fixable.sort()).toEqual([
       "CTX-003",
@@ -66,5 +66,21 @@ describe("README rule table", () => {
         `https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/rules/${match![1]}.md`,
       );
     }
+  });
+
+  it("shows each rule's alias in the column right after the rule id", () => {
+    const rows = generateRuleDocs()
+      .split("\n")
+      .filter((line) => line.startsWith("| [`"));
+    const aliases = rows.map((row) => {
+      const match = /^\| \[`([^`]+)`\]\(\S+\) \| `([^`]+)` \|/.exec(row);
+      expect(match, row).not.toBeNull();
+      return [match![1], match![2]];
+    });
+    expect(aliases).toEqual(
+      ruleRegistry
+        .getAllMetadata()
+        .map((metadata) => [metadata.id, metadata.alias]),
+    );
   });
 });

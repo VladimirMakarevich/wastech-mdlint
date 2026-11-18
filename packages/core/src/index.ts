@@ -299,11 +299,14 @@ export type {
 // Registry + rules
 export {
   defineRule,
+  findMixedRuleSpellings,
+  mixedRuleSpellingMessage,
   RuleRegistry,
   RuleResolutionError,
 } from "./engine/registry.js";
 export type {
   ConfigIssue,
+  MixedRuleSpelling,
   RuleDefinition,
   RuleMetadata,
   RuleResolutionCode,

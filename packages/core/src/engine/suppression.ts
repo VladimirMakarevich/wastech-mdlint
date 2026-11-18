@@ -18,6 +18,8 @@ import { ruleRegistry } from "./rules/index.js";
 //     Pairs nest; an unclosed `capture` is harmless and simply leaves the state as it is.
 //   - An empty rule list applies to ALL rules; a specific `enable RULE` after a bare `disable`
 //     re-enables just that rule.
+//   - A token may be a rule's alias (`no-broken-anchors`) as well as its id. The parser cannot
+//     resolve an alias because it does not know the registry, so `analyzeDirectives` does.
 //   - A canonical token without a dash is a category: `REF` selects every `REF-*` rule. Tokens are
 //     canonicalized by the parser first, so a dash-optional built-in id like `REF001` has already
 //     become `REF-001`; what is still dash-less can never be a rule id, because built-in ids are
@@ -89,7 +91,23 @@ export function analyzeDirectives(
   const diagnostics: DirectiveDiagnostic[] = [];
   // `Array.prototype.sort` is stable, and directives arrive in source order, so two on one line
   // keep their written order.
-  const ordered = [...directives].sort((left, right) => left.line - right.line);
+  // Tokens are resolved through the registry here, once, because the parser canonicalizes them
+  // without knowing the registry: an alias arrives upper-cased (`NO-BROKEN-ANCHORS`) and only the
+  // registry can say it means `REF-002`. Every step below then compares canonical ids. A dash-less
+  // token passes through unchanged, since no alias is dash-less, so category semantics hold.
+  // `capture`/`restore` tokens are left as written: they are only ever echoed back in a diagnostic.
+  const ordered = [...directives]
+    .sort((left, right) => left.line - right.line)
+    .map((directive) =>
+      directive.kind === "capture" || directive.kind === "restore"
+        ? directive
+        : {
+            ...directive,
+            ruleIds: directive.ruleIds.map((token) =>
+              ruleRegistry.resolveId(token),
+            ),
+          },
+    );
   const knownCategories = ruleRegistry.getReservedPrefixes();
   const categoryList = [...knownCategories].sort(compareStrings).join(", ");
 
