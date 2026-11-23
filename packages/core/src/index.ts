@@ -277,6 +277,8 @@ export {
   formatLintResultText,
 } from "./engine/format-lint-result.js";
 export { estimateTokens } from "./engine/tokens.js";
+export { measureDocument } from "./engine/document-metrics.js";
+export type { DocumentMetrics } from "./engine/document-metrics.js";
 export { applyEdits, applyFixes, FixWriteError } from "./engine/fix.js";
 export type { ApplyFixesResult } from "./engine/fix.js";
 export { extractColumnIds, extractDefinedIds } from "./engine/defined-ids.js";

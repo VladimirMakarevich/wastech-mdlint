@@ -2,7 +2,8 @@ import { z } from "zod";
 
 import { matchesConfigGlob } from "../../discovery/globs.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
-import { estimateTokens, TOKEN_ESTIMATE_NOTE } from "../tokens.js";
+import { measureDocument } from "../document-metrics.js";
+import { TOKEN_ESTIMATE_NOTE } from "../tokens.js";
 
 // SIZE-001 — per-file byte / line / token budget. Each metric is independently optional;
 // omitting one disables that check. Metrics stay independent of each other, but the two severities
@@ -80,17 +81,6 @@ const METRIC_UNIT: Record<Metric, string> = {
   tokens: "tokens",
 };
 
-function countLines(content: string): number {
-  // Count newline occurrences: matches the legacy line metric.
-  let count = 0;
-  for (let index = 0; index < content.length; index += 1) {
-    if (content.charCodeAt(index) === 10) {
-      count += 1;
-    }
-  }
-  return count;
-}
-
 export const size001: RuleDefinition = defineRule({
   metadata: {
     id: "SIZE-001",
@@ -104,11 +94,7 @@ export const size001: RuleDefinition = defineRule({
   optionsSchema: size001OptionsSchema,
   check: (options) => (context) => {
     const document = context.document!;
-    const actuals: Record<Metric, number> = {
-      bytes: Buffer.byteLength(document.content, "utf8"),
-      lines: countLines(document.content),
-      tokens: estimateTokens(document.content),
-    };
+    const actuals: Record<Metric, number> = measureDocument(document.content);
 
     // First matching override supplies per-metric thresholds; unspecified metrics fall back to the
     // top-level option.
