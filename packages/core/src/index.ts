@@ -173,6 +173,25 @@ export type {
 } from "./graph/impact-analysis.js";
 export { loadContext } from "./graph/load-context.js";
 export type { GraphContext } from "./graph/load-context.js";
+
+// Git — read-only access to the repository a host was pointed at, for comparing the corpus with a
+// base branch. In core rather than in a host because what it feeds (which documents changed, and
+// how) is shared computation: two hosts asking git separately would disagree on the base, the
+// prefix or the rename rules. The process runner and its environment stay internal, so no caller
+// can start git without the settings that keep repository config from running programs.
+export {
+  GitRepository,
+  MINIMUM_GIT_VERSION,
+  openGitRepository,
+} from "./git/git-repository.js";
+export type {
+  GitBase,
+  GitChange,
+  GitUnavailable,
+  GitUnavailableReason,
+  OpenGitRepositoryOptions,
+} from "./git/git-repository.js";
+export { GitCommandError } from "./git/git-command.js";
 export {
   renderContextGraphDot,
   renderContextGraphMermaid,

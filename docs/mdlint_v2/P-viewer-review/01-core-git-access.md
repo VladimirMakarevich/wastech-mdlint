@@ -1,55 +1,43 @@
 # 01 · Read-only git access in core
 
-> Part of the [viewer review plan](index.md).
+> Part of the [viewer review plan](index.md). Status **Implemented** in `packages/core/src/git/`, pending the rules discussion below.
 
 ## Goal
 
-One core module answers the few questions the review needs from git — is this a repository, where its root is, what the base is, what changed, what a file's text was at a commit — without a shell, without writing anything under `.git`, and without ever running a program that a repository's own configuration names. Today neither core nor any host runs `git`; this module is the only place that will.
+One core module answers the few questions the review needs from git — is this a repository, where its root is, what the base is, what changed, what a file's text was at a commit — without a shell, without writing anything under `.git`, and without ever running a program that a repository's own configuration names. Before it, neither core nor any host ran `git`; this module is the only place that does.
 
-## Steps
+## What was built
 
-1. **Module and contract.** A new `packages/core/src/git/` with a small typed API, for example `openGitRepository(rootDir)` returning either a `GitRepository` with `resolveBase(ref?)`, `mergeBase(left, right)`, `changedPaths(from, { worktree })` and `readBlobs(commit, paths)`, or a `GitUnavailable` with a reason code — `no-git-binary`, `git-too-old`, `not-a-repository`, `dubious-ownership`, `base-not-found`, `shallow-history` — and a hint. That is the pattern `ImpactAnalysisError` already follows (a code plus a hint), so a host renders the reason instead of a stack trace.
+1. **Contract.** `openGitRepository(rootDir, { env? })` returns a `GitRepository` — `headCommit()`, `resolveBase(ref?)`, `mergeBase(base)`, `changedPaths(from, { worktree })`, `readBlobs(commit, paths)` and `commonDir` — or a `GitUnavailable` with a reason (`no-git-binary`, `git-too-old`, `not-a-repository`, `dubious-ownership`, `invalid-ref`, `base-not-found`, `shallow-history`), a message and a hint. Hints are generic ("name the branch to compare with"), so each host adds its own flag name. Anything else is a thrown `GitCommandError`, whose message never carries git's stderr, because git quotes absolute paths there.
 
-2. **Process hygiene.** Every call is `execFile("git", argv, { cwd, env, windowsHide: true, timeout, maxBuffer })`, never a shell, so a path with a space, an ampersand or a quote is data. Every call carries fixed options, each closing a way a cloned repository could make git run its program:
-   - `-c core.fsmonitor=false`: an fsmonitor hook set in repository config is a program git starts on status and diff;
-   - `--no-ext-diff --no-textconv` on every diff: both run programs the repository's config names;
-   - `-c core.quotePath=false` and `-z` output, so a path with Cyrillic letters or a space comes back verbatim;
-   - `--ignore-submodules`, so a submodule is neither walked nor reported.
+2. **Environment.** Every inherited `GIT_*` variable is dropped except the user's config-file selectors (`GIT_CONFIG_GLOBAL`, `GIT_CONFIG_SYSTEM`, `GIT_CONFIG_NOSYSTEM`) and `GIT_CEILING_DIRECTORIES`. Then the module sets `GIT_OPTIONAL_LOCKS=0`, `GIT_TERMINAL_PROMPT=0`, `GIT_PAGER=cat`, `GIT_LITERAL_PATHSPECS=1` and `LC_ALL=C`; the last keeps git's error text untranslated, since "not a repository" and "dubious ownership" are told apart by it. `PATH` keeps only absolute entries, so an empty or `.` entry can never resolve `git` inside the repository.
 
-   The environment drops every inherited `GIT_*` variable — a viewer started from a git hook would otherwise read the repository named by `GIT_DIR` rather than the one it was pointed at — and then sets `GIT_OPTIONAL_LOCKS=0` (so a diff against the work tree never refreshes and rewrites `.git/index`), `GIT_TERMINAL_PROMPT=0` and `GIT_PAGER=cat`.
+3. **Settings through environment config, not `-c`.** `core.fsmonitor=false`, `core.quotePath=false`, and empty `clean`, `smudge` and `process` commands plus `required=false` for every filter driver any config defines, are passed as `GIT_CONFIG_COUNT`/`KEY`/`VALUE`. Checked on a real repository: a planted filter driver and an fsmonitor hook both run on a plain `git diff`; `-c` cannot override a driver whose name contains `=` (it splits at the first `=`), while environment config can. A legitimate driver such as git-lfs is emptied too, so a Markdown file kept in LFS compares as its pointer text.
 
-3. **Ref validation.** A ref from `--base` that starts with `-` is refused before git sees it, and every other ref is resolved with `rev-parse --verify --end-of-options <ref>^{commit}`, so a ref can never be read as an option. Pathspecs always follow `--`. `--end-of-options` arrived in git 2.24; an older git reports `git-too-old` with the version found.
+4. **Minimum git 2.31**, for `GIT_CONFIG_COUNT`. `rev-parse --end-of-options` (2.30) resolves every ref, and a ref starting with `-` is refused before git sees it.
 
-4. **Repository geometry.** One `rev-parse --show-toplevel --show-prefix --git-common-dir --is-shallow-repository` call. The viewer root may be a subdirectory of the work tree — a package of a monorepo — while git reports paths from the top level, so paths cross that prefix in this module and nowhere else, and changes outside the prefix are dropped here. The realpath of the git common directory is the identity phase 06 keys review state on, shared by every worktree of one clone.
+5. **Geometry.** One `rev-parse --show-toplevel --show-prefix --git-common-dir`; every later call runs at the top level, and paths cross the prefix inside `GitRepository` only, which keeps the prefix private. `commonDir` is the realpath of the common git directory: the identity phase 06 keys review state on.
 
-5. **Base resolution.** An explicit `--base` wins. Otherwise the target of `refs/remotes/origin/HEAD` (`symbolic-ref --quiet`), then a local `main`, then `master`; none of them is `base-not-found`, whose hint names `--base`. On the base branch itself the merge-base is `HEAD` and only uncommitted work shows — a valid state, not an error.
+6. **Base.** An explicit ref, else the target of `origin/HEAD`, then `main`, then `master`. Shallow history is checked when `merge-base` fails, not at open, so a clone deepened while a host runs is seen as deepened.
 
-6. **Changed paths.** `diff --name-status -z -M <merge-base>` against the work tree, plus `ls-files --others --exclude-standard -z` for untracked files, which no diff lists; or `diff --name-status -z -M <merge-base> HEAD` when the view is limited to commits. The result is `{ status: "A" | "M" | "D" | "R", path, oldPath? }[]`, sorted with core's comparator rather than left in git's order.
+7. **Changed paths: `diff-tree` plus `status`, composed.** Porcelain `git diff <commit>` against the work tree rewrites `.git/index` whenever a file's stat changed but its content did not, and `GIT_OPTIONAL_LOCKS=0` does not stop it; a test demonstrates both. So commits come from `diff-tree -r -M <merge-base> HEAD`, which never looks at the work tree, and uncommitted work from `status --porcelain=v1 -z --untracked-files=all --find-renames`, the command that variable is defined for. `composeChanges` joins the two: a rename of a rename is one rename, an addition later deleted is nothing, a deletion re-created at the same path is a modification. A path changed and changed back reads as modified; phase 02's text diff shows it has no hunks.
 
-7. **Blob reading.** One `cat-file --batch` process fed `<commit>:<path>` lines reads every requested file, decoded as UTF-8 the way `loadDocuments` decodes the work tree: one process for fifty files instead of fifty.
-
-8. **Shallow history.** `merge-base` fails in a shallow clone when the fork point is not fetched. That reports `shallow-history`, with `git fetch --deepen` or `--unshallow` as the hint, instead of a generic failure.
+8. **Blobs.** One `cat-file --batch` for all requested paths, decoded as UTF-8; absent paths, directories, and names containing a line break (which the protocol cannot express) are left out.
 
 ## Tests
 
-Each test builds its own repository in a temporary directory, with `git` spawned from an argument list:
+`packages/core/test/git-repository.test.ts`, on repositories built in temporary directories with isolated config: environment and PATH filtering; the name-status and status parsers and the composition, as pure tables; not a repository; no git on PATH; added, modified, deleted, renamed (Cyrillic and spaces), staged, untracked and ignored files; committed-only; the base branch itself; a root below the top level; blob reading; an fsmonitor hook, a required filter, a filter named with `=`, a textconv driver and an external diff, each shown to run in a control and never to run through the module; a planted `git` with `.` on PATH; an inherited `GIT_DIR`; `.git/index` byte-identical, with a control showing porcelain `diff` rewrites it; invalid and unknown refs; base detection order; no commits; a shallow clone.
 
-- not a repository; the viewer root a subdirectory, so paths carry the prefix and changes outside it are dropped;
-- added, modified, deleted, renamed and untracked files; a path with a space and Cyrillic letters;
-- a ref starting with `-` refused before any git call; an unknown ref reported as `base-not-found`;
-- a repository whose config sets `core.fsmonitor`, `diff.external` and a `textconv` driver to a script that writes a marker file — the marker never appears;
-- `GIT_DIR` pointing at another repository in the parent environment — ignored;
-- `.git/index` unchanged (bytes and mtime) after a diff against a work tree with touched files;
-- a shallow clone reports `shallow-history`; HEAD on the base branch shows only uncommitted work;
-- output order identical however git orders it.
+Not covered by a test: `dubious-ownership`, because simulating another owner needs a second account; the branch matches git's untranslated message.
 
-## Docs
+## Still open
 
-Nothing user-facing yet: the module has no caller until phase 03. Draft the change to `.agents/rules/security.md` — its Command Execution section gains read-only `git` with the fixed options above as the one command core runs — and to `.agents/rules/architecture.md` (core owns git access), and discuss both with the user before phase 03 merges.
+Draft the change to `.agents/rules/security.md` — its Command Execution section gains read-only `git` with the environment above as the one command core runs — and to `.agents/rules/architecture.md` (core owns git access), and discuss both with the user before phase 03 merges.
 
 ## Done when
 
-- [ ] Core exports the git module with typed results and typed unavailability reasons.
-- [ ] No git call goes through a shell, writes under `.git`, or runs a program from repository config, and a test proves each.
-- [ ] Paths are repository-relative POSIX from the viewer root, prefix applied in one place.
-- [ ] Base resolution, merge-base, changed paths and blob reading are covered on fixture repositories.
+- [x] Core exports the git module with typed results and typed unavailability reasons.
+- [x] No git call goes through a shell, writes under `.git`, or runs a program from repository config, and a test proves each.
+- [x] Paths are repository-relative POSIX from the viewer root, prefix applied in one place.
+- [x] Base resolution, merge-base, changed paths and blob reading are covered on fixture repositories.
+- [ ] The rules changes are agreed with the user.
