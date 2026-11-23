@@ -98,6 +98,73 @@ export function headChanges(diff: TextDiff): HeadChanges {
 }
 
 /**
+ * Where each base line is in the head: an unchanged line wherever the lines added and removed above
+ * it moved it, an edited line where its paired counterpart is, and a line removed without a
+ * counterpart nowhere. Line 0, which findings about a whole file use, stays 0.
+ *
+ * Edited lines are followed too, so a finding that survives an edit to its paragraph — the same
+ * rule, the same message, on the line that replaced it — matches its earlier self instead of reading
+ * as one finding removed and another added.
+ */
+export function baseLineMap(
+  diff: TextDiff,
+): (line: number) => number | undefined {
+  const inHunks = new Map<number, number | undefined>();
+  // From base line `from` on, a line outside every hunk moved by `offset`. The last entry at or
+  // before a line applies to it.
+  const shifts: { from: number; offset: number }[] = [{ from: 1, offset: 0 }];
+  for (const hunk of diff.hunks) {
+    let removed: number[] = [];
+    let added: number[] = [];
+    // Lines are paired in order within a change block, so the n-th paired removed line became the
+    // n-th paired added one.
+    const pair = () => {
+      removed.forEach((baseLine, index) => {
+        inHunks.set(baseLine, added[index]);
+      });
+      removed = [];
+      added = [];
+    };
+    for (const line of hunk.lines) {
+      if (line.kind === "context") {
+        pair();
+        inHunks.set(line.baseLine, line.headLine);
+      } else if (line.kind === "removed") {
+        inHunks.set(line.baseLine, undefined);
+        if (line.segments !== undefined) {
+          removed.push(line.baseLine);
+        }
+      } else if (line.segments !== undefined) {
+        added.push(line.headLine);
+      }
+    }
+    pair();
+    // A side the hunk shows no line of has its start at the line after which its lines would sit.
+    const baseEnd =
+      hunk.baseLines > 0 ? hunk.baseStart + hunk.baseLines - 1 : hunk.baseStart;
+    const headEnd =
+      hunk.headLines > 0 ? hunk.headStart + hunk.headLines - 1 : hunk.headStart;
+    shifts.push({ from: baseEnd + 1, offset: headEnd - baseEnd });
+  }
+  return (line) => {
+    if (line === 0) {
+      return 0;
+    }
+    if (inHunks.has(line)) {
+      return inHunks.get(line);
+    }
+    let offset = 0;
+    for (const shift of shifts) {
+      if (shift.from > line) {
+        break;
+      }
+      offset = shift.offset;
+    }
+    return line + offset;
+  };
+}
+
+/**
  * The headings whose section holds a change: a new or edited line, or the place removed lines stood.
  * A section runs from its heading to the line before the next heading of the same or a higher level,
  * so a change deep inside a subsection marks every heading above it as well — which is what lets an

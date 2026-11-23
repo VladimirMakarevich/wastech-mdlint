@@ -23,7 +23,27 @@ export function explicitAnchors(document: ParsedDocument): string[] {
 // length: the grammar alone is what separates a line fragment from a mistyped slug, and a range
 // check would turn every edit that shortens a file into a finding in some other document.
 const LINE_FRAGMENT_PATTERN =
-  /^L[1-9]\d*(?:C[1-9]\d*)?(?:-L[1-9]\d*(?:C[1-9]\d*)?)?$/;
+  /^L([1-9]\d*)(?:C[1-9]\d*)?(?:-L([1-9]\d*)(?:C[1-9]\d*)?)?$/;
+
+/**
+ * The lines a GitHub line fragment selects, first to last whichever end it names first, or
+ * `undefined` for any other fragment. Columns are dropped: whoever asks compares whole lines.
+ *
+ * The page script that marks a linked range in the browser cannot import this module and parses
+ * the fragment itself; a viewer test runs both through one table of fragments, so they read every
+ * fragment the same way.
+ */
+export function parseLineFragment(
+  fragment: string,
+): { start: number; end: number } | undefined {
+  const match = LINE_FRAGMENT_PATTERN.exec(fragment);
+  if (match === null) {
+    return undefined;
+  }
+  const first = Number(match[1]);
+  const second = match[2] === undefined ? first : Number(match[2]);
+  return { start: Math.min(first, second), end: Math.max(first, second) };
+}
 
 // Fragments that resolve in every document without a declaring heading or element. `top` follows
 // HTML's rule that a missing `top` fragment scrolls to the start of the document, and HTML compares

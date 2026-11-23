@@ -196,8 +196,12 @@ export { GitCommandError } from "./git/git-command.js";
 // Changes — what a branch changed in the corpus, and the diff a reviewer reads. The sequence diff
 // under them stays internal: hosts compare texts, not arbitrary sequences.
 export { classifyChanges, collectChangeSet } from "./changes/change-set.js";
-export { eagerContextPaths, rankByInfluence } from "./changes/influence.js";
-export type { RankedChange } from "./changes/influence.js";
+export {
+  eagerContextBudgets,
+  eagerContextPaths,
+  rankByInfluence,
+} from "./changes/influence.js";
+export type { EagerContextBudget, RankedChange } from "./changes/influence.js";
 export type {
   ChangeSet,
   ClassifiedChanges,
@@ -218,12 +222,41 @@ export type {
   TextDiff,
   TextDiffOptions,
 } from "./changes/text-diff.js";
-export { changedSections, headChanges } from "./changes/head-changes.js";
+export {
+  baseLineMap,
+  changedSections,
+  headChanges,
+} from "./changes/head-changes.js";
 export type {
   HeadChanges,
   HeadLineChange,
   HeadRemoval,
 } from "./changes/head-changes.js";
+export { compareFindings } from "./changes/findings-delta.js";
+export type {
+  FindingLocator,
+  FindingsDelta,
+} from "./changes/findings-delta.js";
+export { replaceDocuments } from "./changes/snapshot.js";
+export type { DocumentSwap } from "./changes/snapshot.js";
+export { compareEdges, linksIntoChangedLines } from "./changes/link-delta.js";
+export type { CodeLineLink, EdgesDelta } from "./changes/link-delta.js";
+export {
+  computeContextDelta,
+  lineLinkTargets,
+  swapsTowardBase,
+  swapsTowardHead,
+} from "./changes/context-delta.js";
+export type {
+  AffectedDocuments,
+  ChangedDocument,
+  ContextDelta,
+  ContextSide,
+  DocumentContextDelta,
+  EagerContextChange,
+} from "./changes/context-delta.js";
+export { parseLineFragment } from "./engine/anchor-resolve.js";
+export { eagerContextTokens } from "./engine/rules/llm.js";
 export {
   renderContextGraphDot,
   renderContextGraphMermaid,

@@ -5,6 +5,8 @@ import {
   compareStrings,
   query,
   type ContextGraph,
+  type EdgesDelta,
+  type GitChange,
   type ParsedDocument,
 } from "@wastech-mdlint/core";
 
@@ -26,11 +28,20 @@ export type GraphViewNode = {
   // does not change because the view shows part of it.
   inDegree: number;
   outDegree: number;
+  // With the branch's changes shown: the letter of a document the branch changed, or `affected` for
+  // an unchanged one the change reaches.
+  change?: GitChange["status"] | "affected";
 };
 
 // One per linked pair, whatever the number and kind of links between them: the picture draws one
 // line either way, and three thousand parallel edges would cost the layout for nothing.
-export type GraphViewEdge = { from: string; to: string };
+// With the branch's changes shown, `added` marks a pair the branch linked and `removed` one it
+// unlinked; a removed pair is drawn but never pulls its documents together, being no link any more.
+export type GraphViewEdge = {
+  from: string;
+  to: string;
+  change?: "added" | "removed";
+};
 
 export type GraphView = {
   // `""` is the whole corpus.
@@ -113,6 +124,77 @@ export function buildGraphView(
   };
 }
 
+/** What the branch did to the graph, from the review of its changes. */
+export type GraphChanges = {
+  // Head paths of the changed documents, with their letters.
+  status: ReadonlyMap<string, GitChange["status"]>;
+  // Unchanged documents the change reaches.
+  affected: ReadonlySet<string>;
+  links: EdgesDelta;
+  // Base path to head path, for documents the branch renamed.
+  renamed: ReadonlyMap<string, string>;
+};
+
+/**
+ * `view` with the branch's changes marked: changed and affected documents, the pairs it linked, and
+ * the pairs it unlinked whose documents are both in view. A pair counts as linked only when every
+ * link between the two is new, and as unlinked only when none is left, so a pair that only changed
+ * the kind of its link reads as unchanged, as its line does.
+ */
+export function withChanges(
+  view: GraphView,
+  graph: ContextGraph,
+  changes: GraphChanges,
+): GraphView {
+  const pair = (from: string, to: string) => `${from}\u0000${to}`;
+  const count = (keys: string[]) => {
+    const counts = new Map<string, number>();
+    for (const key of keys) {
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
+  };
+  const now = count(graph.edges.map((edge) => pair(edge.from, edge.to)));
+  const added = count(
+    changes.links.added.map((edge) => pair(edge.from, edge.to)),
+  );
+  const moved = (relPath: string) => changes.renamed.get(relPath) ?? relPath;
+  const inView = new Set(view.nodes.map((node) => node.path));
+
+  const removed = new Map<string, GraphViewEdge>();
+  for (const edge of changes.links.removed) {
+    const from = moved(edge.from);
+    const to = moved(edge.to);
+    const key = pair(from, to);
+    if (!now.has(key) && inView.has(from) && inView.has(to) && from !== to) {
+      removed.set(key, { from, to, change: "removed" });
+    }
+  }
+
+  return {
+    ...view,
+    nodes: view.nodes.map((node) => {
+      const change =
+        changes.status.get(node.path) ??
+        (changes.affected.has(node.path) ? "affected" : undefined);
+      return change === undefined ? node : { ...node, change };
+    }),
+    edges: [
+      ...view.edges.map((edge) => {
+        const key = pair(edge.from, edge.to);
+        return added.get(key) === now.get(key)
+          ? { ...edge, change: "added" as const }
+          : edge;
+      }),
+      ...[...removed.values()].sort(
+        (left, right) =>
+          compareStrings(left.from, right.from) ||
+          compareStrings(left.to, right.to),
+      ),
+    ],
+  };
+}
+
 /**
  * The small graph beside a document: the document, the documents it links to and the ones linking
  * to it, and every link among them — so two neighbors that link to each other show it too. The
@@ -161,10 +243,26 @@ export function renderGraphArticle(
   view: GraphView,
   folders: readonly string[],
   focus: string | undefined,
+  // Set in a git work tree, where the graph can show the branch's changes: whether it does.
+  changes?: { shown: boolean },
 ): ElementContent[] {
+  const links = view.edges.filter((edge) => edge.change !== "removed");
   const summary = [
-    `${plural(view.nodes.length, "document")}, ${plural(view.edges.length, "link")} between them.`,
+    `${plural(view.nodes.length, "document")}, ${plural(links.length, "link")} between them.`,
   ];
+  if (changes?.shown === true) {
+    const changed = view.nodes.filter(
+      (node) => node.change !== undefined && node.change !== "affected",
+    ).length;
+    const affected = view.nodes.filter(
+      (node) => node.change === "affected",
+    ).length;
+    const added = view.edges.filter((edge) => edge.change === "added").length;
+    const removed = view.edges.length - links.length;
+    summary.push(
+      `This branch changed ${plural(changed, "document")} here and reaches ${affected} more; it linked ${plural(added, "pair")} and unlinked ${removed}.`,
+    );
+  }
   if (view.focus !== null) {
     summary.push(
       `${view.focus.path} is highlighted with ${plural(view.focus.neighbors.length, "neighbor")}.`,
@@ -195,21 +293,49 @@ export function renderGraphArticle(
       focus === undefined
         ? undefined
         : h("input", { type: "hidden", name: "focus", value: focus }),
+      changes === undefined
+        ? undefined
+        : h("label.graph-changes", [
+            h("input", {
+              type: "checkbox",
+              name: "changes",
+              value: "1",
+              checked: changes.shown,
+            }),
+            " Show the branch's changes",
+          ]),
       h("button", { type: "submit" }, "Show"),
     ]),
     h("p.graph-summary", summary.join(" ")),
-    h("div.graph-canvas", { dataFolder: view.folder, dataFocus: focus }, [
-      h(
-        "p.graph-placeholder",
-        "The picture is drawn by the page's script. The documents in this view are listed below.",
-      ),
-    ]),
+    h(
+      "div.graph-canvas",
+      {
+        dataFolder: view.folder,
+        dataFocus: focus,
+        dataChanges: changes?.shown === true ? "1" : undefined,
+      },
+      [
+        h(
+          "p.graph-placeholder",
+          "The picture is drawn by the page's script. The documents in this view are listed below.",
+        ),
+      ],
+    ),
     h("details.graph-list", [
       h("summary", `Documents in this view (${view.nodes.length})`),
       h(
         "ul",
         view.nodes.map((node) =>
           h("li", [
+            node.change === undefined || node.change === "affected"
+              ? undefined
+              : h(
+                  `span.change-status.change-status-${node.change}`,
+                  node.change,
+                ),
+            node.change === undefined || node.change === "affected"
+              ? undefined
+              : " ",
             h("a", { href: node.href }, node.title),
             " ",
             h("span.graph-list-path", node.path),

@@ -3159,6 +3159,125 @@ a:hover {
   white-space: nowrap;
 }
 
+/* What the change does to the context: findings added and removed, every session's budget, and the
+   approximations behind them, under the summary; findings beside each row of the list. */
+.markdown-body .changes-findings,
+.markdown-body .changes-eager {
+  margin: 0 0 var(--space-1);
+  font-size: 14px;
+}
+
+.markdown-body .changes-eager-over {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.markdown-body .changes-note {
+  margin: 0 0 var(--space-1);
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+
+.change-findings {
+  margin-left: var(--space-1);
+  color: var(--warning);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* A card's context, between its header and its diff: size, findings and links, each when moved. */
+.markdown-body .change-context {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  letter-spacing: normal;
+  text-align: start;
+}
+
+.markdown-body .change-context p,
+.markdown-body .change-context ul {
+  margin: 0 0 var(--space-1);
+}
+
+.markdown-body .change-context ul {
+  padding-left: 0;
+  list-style: none;
+}
+
+.markdown-body .change-size {
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.markdown-body .change-context-title {
+  font-weight: 600;
+}
+
+.change-finding-sign {
+  display: inline-block;
+  width: 1em;
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.change-finding-added .change-finding-sign,
+.change-link-added .change-finding-sign {
+  color: var(--diff-added);
+}
+
+.change-finding-removed .change-finding-sign,
+.change-link-removed .change-finding-sign {
+  color: var(--diff-removed);
+}
+
+.severity-error {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.severity-warning {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+/* Unchanged documents the change reaches, after the list of changed ones. */
+.markdown-body .changes-affected {
+  margin: var(--space-6) 0;
+  font-size: 14px;
+}
+
+.markdown-body .changes-affected h2 {
+  font-size: 1.15em;
+}
+
+.markdown-body .changes-affected h3 {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: 1em;
+}
+
+.markdown-body .changes-affected ul ul {
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+
+/* The dashboard's Branch column and the graph's switch for the branch's changes. */
+.dashboard-change {
+  white-space: nowrap;
+}
+
+.dashboard-change .change-findings {
+  margin-left: var(--space-1);
+}
+
+.graph-changes {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 13px;
+}
+
 /* One changed file: a header with its letter, path and line counts, and its diff below. The header
    leaves room under the sticky top bar when a link from the list jumps to the card. */
 .markdown-body .change-card {

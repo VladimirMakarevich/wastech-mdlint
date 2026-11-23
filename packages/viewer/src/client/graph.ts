@@ -34,14 +34,17 @@ export function initGraph(): void {
   if (form !== null) {
     // Picking a folder is the whole interaction, so it submits at once; the button is only for a page
     // without this script.
-    form
-      .querySelector("select")
-      ?.addEventListener("change", () => form.requestSubmit());
+    for (const field of form.querySelectorAll("select, input[type=checkbox]")) {
+      field.addEventListener("change", () => form.requestSubmit());
+    }
     form.querySelector("button")?.setAttribute("hidden", "");
   }
   const params = new URLSearchParams({ folder: canvas.dataset.folder ?? "" });
   if (canvas.dataset.focus !== undefined) {
     params.set("focus", canvas.dataset.focus);
+  }
+  if (canvas.dataset.changes === "1") {
+    params.set("changes", "1");
   }
   void draw(canvas, `/api/graph?${params.toString()}`, "page");
 }
@@ -69,11 +72,12 @@ export function initLocalGraph(): void {
       return;
     }
     sized.disconnect();
-    void draw(
-      canvas,
-      `/api/neighbors?${new URLSearchParams({ path }).toString()}`,
-      "local",
-    );
+    const params = new URLSearchParams({ path });
+    // Set on a changed document's page while it shows its changes.
+    if (canvas.dataset.changes === "1") {
+      params.set("changes", "1");
+    }
+    void draw(canvas, `/api/neighbors?${params.toString()}`, "local");
   });
   sized.observe(canvas);
 }
@@ -295,6 +299,10 @@ type GraphColors = {
   muted: string;
   accent: string;
   surface: string;
+  // The branch's changes, in the colors the tree's letters and the diffs use for them.
+  added: string;
+  removed: string;
+  changed: string;
 };
 
 function readColors(): GraphColors {
@@ -314,6 +322,9 @@ function readColors(): GraphColors {
       muted: read("--border"),
       accent: read("--accent"),
       surface: read("--bg-subtle"),
+      added: read("--diff-added"),
+      removed: read("--diff-removed"),
+      changed: read("--warning"),
     };
   } finally {
     probe.remove();
@@ -331,6 +342,35 @@ const SETTLED_FRICTION = 0.02;
 // at the second, so names come in gradually as the reader zooms rather than all at once.
 const LABEL_SPACING_FROM = 26;
 const LABEL_SPACING_TO = 40;
+
+const CHANGE_NAMES: Record<NonNullable<GraphNode["change"]>, string> = {
+  A: "Added in this branch",
+  M: "Modified in this branch",
+  D: "Deleted in this branch",
+  R: "Renamed in this branch",
+  affected: "Reached by this branch's changes",
+};
+
+// A changed document keeps its folder's fill and gets a ring in its change's color, so the folders
+// still read; an affected one gets a dashed ring, being touched by the change rather than part of it.
+function changeStyle(node: GraphNode, colors: GraphColors): object | undefined {
+  switch (node.change) {
+    case undefined:
+      return undefined;
+    case "affected":
+      return {
+        borderColor: colors.changed,
+        borderWidth: 1.5,
+        borderType: "dashed",
+      };
+    case "A":
+      return { borderColor: colors.added, borderWidth: 2.5 };
+    case "R":
+      return { borderColor: colors.accent, borderWidth: 2.5 };
+    default:
+      return { borderColor: colors.changed, borderWidth: 2.5 };
+  }
+}
 
 function graphOption(
   view: GraphView,
@@ -379,10 +419,20 @@ function graphOption(
           const node = view.nodes[dataIndex];
           return node === undefined
             ? ""
-            : `${node.title}\n${node.path}\n${node.inDegree} in · ${node.outDegree} out`;
+            : `${node.title}\n${node.path}\n${node.inDegree} in · ${node.outDegree} out${
+                node.change === undefined
+                  ? ""
+                  : `\n${CHANGE_NAMES[node.change]}`
+              }`;
         }
         const edge = view.edges[dataIndex];
-        return edge === undefined ? "" : `${edge.from}\n→ ${edge.to}`;
+        return edge === undefined
+          ? ""
+          : `${edge.from}\n→ ${edge.to}${
+              edge.change === undefined
+                ? ""
+                : `\n${edge.change === "added" ? "Linked" : "Unlinked"} in this branch`
+            }`;
       },
     },
     legend:
@@ -435,7 +485,7 @@ function graphOption(
               ? { color: colors.muted }
               : isFocus
                 ? { borderColor: colors.accent, borderWidth: 2 }
-                : undefined,
+                : changeStyle(node, colors),
             label: {
               show: !dimmed,
               fontWeight: isFocus ? "bold" : undefined,
@@ -447,7 +497,18 @@ function graphOption(
         // direction of any link is in its tooltip.
         links: view.edges.map((edge, index) => ({
           ...laidOut.links[index],
-          ...(isOwnLink(edge, focus)
+          ...(edge.change === undefined
+            ? {}
+            : {
+                lineStyle: {
+                  color:
+                    edge.change === "added" ? colors.added : colors.removed,
+                  type: edge.change === "removed" ? "dashed" : "solid",
+                  width: local ? 0.9 : 1.2,
+                  opacity: 0.9,
+                },
+              }),
+          ...(isOwnLink(edge, focus) && edge.change === undefined
             ? {
                 symbol: ["none", "arrow"],
                 symbolSize: local ? 4 : 6,

@@ -6,14 +6,19 @@ import { h } from "hastscript";
 import {
   type ChangeSet,
   collectChangeSet,
+  type ContextGraph,
+  type CorpusMembership,
   type DiffLine,
   diffText,
+  type DocumentContextDelta,
   eagerContextPaths,
   type GitChange,
   type GitRepository,
   type GitUnavailable,
+  type LoadedConfiguration,
   openGitRepository,
   parseDocument,
+  type ParsedDocument,
   type RankedChange,
   rankByInfluence,
   tableRowLines,
@@ -22,6 +27,17 @@ import {
 
 import type { Corpus } from "./corpus.js";
 import { documentHref } from "./render-document.js";
+import {
+  contextPayload,
+  documentContextPayload,
+  findingsPayload,
+  findingsText,
+  renderAffected,
+  renderConfigOnly,
+  renderContextSummary,
+  renderDocumentContext,
+} from "./context-view.js";
+import { computeReviewContext, type ReviewContext } from "./review-context.js";
 
 // The review of a branch's changes to the corpus: which documents changed against the base branch,
 // most influential first, each with its diff. Everything computed here comes from core — the change
@@ -34,18 +50,34 @@ export type DocumentReview = RankedChange & {
   // whether this diff describes the very text it is rendering.
   baseText: string;
   headText: string;
+  // Each side parsed, where it exists: the diff needs their table rows, and the review of the
+  // context lints them, so neither parses a changed document a second time.
+  baseDocument?: ParsedDocument;
+  headDocument?: ParsedDocument;
 };
 
 export type ConfigReview = {
   path: string;
   status: GitChange["status"];
   diff: TextDiff;
+  // The config's text on each side it exists on: the base side's is what the base was linted with.
+  baseText?: string;
+  headText?: string;
+};
+
+/** The corpus as the review read it: one moment, whatever updates land while it is computed. */
+export type ReviewSnapshot = {
+  documents: ReadonlyMap<string, ParsedDocument>;
+  graph: ContextGraph;
+  configuration: LoadedConfiguration;
+  membership: CorpusMembership;
 };
 
 export type Review = {
   set: ChangeSet;
   documents: DocumentReview[];
   config?: ConfigReview;
+  snapshot: ReviewSnapshot;
 };
 
 export type ReviewResult = Review | GitUnavailable;
@@ -74,6 +106,10 @@ export class ChangeTracker {
   // Bumped by `invalidate`, so a review that was already running when the work tree changed is
   // neither cached nor joined: it describes the files as they were before.
   private generation = 0;
+  private readonly contexts = new WeakMap<
+    Review,
+    Promise<ReviewContext | undefined>
+  >();
 
   private constructor(
     private readonly corpus: Corpus,
@@ -149,6 +185,46 @@ export class ChangeTracker {
     return computing;
   }
 
+  /**
+   * What `review`'s change does to the context, computed on first request and kept with the review,
+   * so it lasts exactly as long as the review does. Apart from the review because only the Changes
+   * page and its JSON need it: a document's page, which waits for the review, never waits for a lint
+   * of two corpora as well. `undefined` when the work-tree review it is built on cannot be made.
+   */
+  context(review: Review): Promise<ReviewContext | undefined> {
+    let pending = this.contexts.get(review);
+    if (pending === undefined) {
+      pending = this.computeContext(review);
+      this.contexts.set(review, pending);
+      // A failure is not kept, so the next request tries again rather than showing nothing forever.
+      pending.catch(() => this.contexts.delete(review));
+    }
+    return pending;
+  }
+
+  private async computeContext(
+    review: Review,
+  ): Promise<ReviewContext | undefined> {
+    const repository = this.repository;
+    const worktree = review.set.worktree ? review : await this.review(true);
+    if (
+      !repository.available ||
+      "available" in worktree ||
+      worktree.set.mergeBase !== review.set.mergeBase
+    ) {
+      // The two reviews disagree about the merge-base only while one of them is being replaced;
+      // the next request finds both new.
+      this.contexts.delete(review);
+      return undefined;
+    }
+    return computeReviewContext({
+      repository,
+      rootDir: this.corpus.rootDir,
+      review,
+      worktree,
+    });
+  }
+
   private async compute(
     repository: GitRepository,
     worktree: boolean,
@@ -200,19 +276,19 @@ export class ChangeTracker {
       const basePath = change.oldPath ?? change.path;
       const base = change.status === "A" ? "" : (baseTexts.get(basePath) ?? "");
       const head = change.status === "D" ? "" : (headText(change.path) ?? "");
+      const baseDocument = parseDocument({ path: basePath, content: base });
       const headDocument =
-        headBlobs === undefined ? documents.get(change.path) : undefined;
+        (headBlobs === undefined ? documents.get(change.path) : undefined) ??
+        parseDocument({ path: change.path, content: head });
       return {
         ...change,
         baseText: base,
         headText: head,
+        ...(change.status === "A" ? {} : { baseDocument }),
+        ...(change.status === "D" ? {} : { headDocument }),
         diff: diffText(base, head, {
-          baseTableRows: tableRowLines(
-            parseDocument({ path: basePath, content: base }),
-          ),
-          headTableRows: tableRowLines(
-            headDocument ?? parseDocument({ path: change.path, content: head }),
-          ),
+          baseTableRows: tableRowLines(baseDocument),
+          headTableRows: tableRowLines(headDocument),
         }),
       };
     });
@@ -228,10 +304,17 @@ export class ChangeTracker {
         path: configPath,
         status: base === undefined ? "A" : head === undefined ? "D" : "M",
         diff: diffText(base ?? "", head ?? ""),
+        ...(base === undefined ? {} : { baseText: base }),
+        ...(head === undefined ? {} : { headText: head }),
       };
     }
 
-    return { set, documents: reviews, config };
+    return {
+      set,
+      documents: reviews,
+      config,
+      snapshot: { documents, graph, configuration, membership },
+    };
   }
 }
 
@@ -243,8 +326,15 @@ async function readConfigText(
     : readFile(absolutePath, "utf8").catch(() => undefined);
 }
 
-/** `/api/changes`: what the page lists, as data. Diffs are left to `/api/changes/diff`. */
-export function changesPayload(result: ReviewResult): unknown {
+/**
+ * `/api/changes`: what the page lists, as data. Diffs are left to `/api/changes/diff`. With the
+ * review's context, every document carries its findings, size and links, and the list is in the
+ * page's order; without it — it could not be computed — those are `null`.
+ */
+export function changesPayload(
+  result: ReviewResult,
+  context?: ReviewContext,
+): unknown {
   if ("available" in result) {
     return {
       status: "unavailable",
@@ -270,21 +360,50 @@ export function changesPayload(result: ReviewResult): unknown {
             status: result.config.status,
             added: result.config.diff.added,
             removed: result.config.diff.removed,
+            findings:
+              context?.delta.configOnly === undefined
+                ? null
+                : findingsPayload(context.delta.configOnly),
           },
-    documents: result.documents.map((review) => ({
-      path: review.path,
-      ...(review.oldPath === undefined ? {} : { oldPath: review.oldPath }),
-      status: review.status,
-      eager: review.eager,
-      reach: review.reach,
-      added: review.diff.added,
-      removed: review.diff.removed,
-      // The id of its card on the Changes page, so a page script links to it without deriving the
-      // id a second way.
-      anchor: changeCardId(review.path),
-    })),
+    documents: ordered(result, context).map((review) => {
+      const delta = documentContext(context, review.path);
+      return {
+        path: review.path,
+        ...(review.oldPath === undefined ? {} : { oldPath: review.oldPath }),
+        status: review.status,
+        eager: review.eager,
+        reach: review.reach,
+        added: review.diff.added,
+        removed: review.diff.removed,
+        // The id of its card on the Changes page, so a page script links to it without deriving
+        // the id a second way.
+        anchor: changeCardId(review.path),
+        context: delta === undefined ? null : documentContextPayload(delta),
+      };
+    }),
     outsideCorpus: set.outsideCorpus,
+    context: context === undefined ? null : contextPayload(context),
   };
+}
+
+// The review's documents in the order to read them: with its context, the order that also moves
+// documents given new errors up; without it, the review's own.
+function ordered(review: Review, context?: ReviewContext): DocumentReview[] {
+  if (context === undefined) {
+    return review.documents;
+  }
+  const byPath = new Map(review.documents.map((entry) => [entry.path, entry]));
+  return context.order.flatMap((relPath) => {
+    const entry = byPath.get(relPath);
+    return entry === undefined ? [] : [entry];
+  });
+}
+
+function documentContext(
+  context: ReviewContext | undefined,
+  relPath: string,
+): DocumentContextDelta | undefined {
+  return context?.delta.documents.find((entry) => entry.path === relPath);
 }
 
 /**
@@ -415,10 +534,15 @@ export function renderHunkTemplate(diff: TextDiff): Element {
   );
 }
 
-/** The Changes page's article, rendered on the server so it reads the same without script. */
+/**
+ * The Changes page's article, rendered on the server so it reads the same without script. With the
+ * review's context, the summary also says what the change does to findings and every session's
+ * budget, the documents it reaches follow the list, and each card shows its document's context.
+ */
 export function renderChangesArticle(
   result: ReviewResult,
   worktree: boolean,
+  context?: ReviewContext,
 ): ElementContent[] {
   const article: ElementContent[] = [
     h("h1", "Changes"),
@@ -467,7 +591,9 @@ export function renderChangesArticle(
         ? ", including uncommitted and untracked files."
         : ", up to the last commit.",
     ]),
+    ...(context === undefined ? [] : renderContextSummary(context)),
   );
+  const documents = ordered(result, context);
 
   if (set.outsideCorpus.length > 0) {
     article.push(
@@ -497,8 +623,11 @@ export function renderChangesArticle(
         { ariaLabel: "Changed documents" },
         h(
           "ol",
-          result.documents.map((review) =>
-            h("li", [
+          documents.map((review) => {
+            const delta = documentContext(context, review.path);
+            const findings =
+              delta === undefined ? undefined : findingsText(delta.findings);
+            return h("li", [
               statusBadge(review.status),
               " ",
               h("a", { href: `#${changeCardId(review.path)}` }, review.path),
@@ -511,11 +640,23 @@ export function renderChangesArticle(
                     "every session",
                   )
                 : undefined,
-            ]),
-          ),
+              findings === undefined
+                ? undefined
+                : h(
+                    "span.change-findings",
+                    { title: "Findings the change adds and removes" },
+                    findings,
+                  ),
+            ]);
+          }),
         ),
       ),
     );
+  }
+  const affected =
+    context === undefined ? undefined : renderAffected(context.delta);
+  if (affected !== undefined) {
+    article.push(affected);
   }
 
   if (result.config !== undefined) {
@@ -526,10 +667,15 @@ export function renderChangesArticle(
         path: result.config.path,
         note: "The config decides which files are documents and which rules run.",
         diff: result.config.diff,
+        context:
+          context === undefined
+            ? undefined
+            : renderConfigOnly(context.delta.configOnly),
       }),
     );
   }
-  for (const review of result.documents) {
+  for (const review of documents) {
+    const delta = documentContext(context, review.path);
     article.push(
       changeCard({
         id: changeCardId(review.path),
@@ -539,6 +685,7 @@ export function renderChangesArticle(
         oldPath: review.oldPath,
         eager: review.eager,
         diff: review.diff,
+        context: delta === undefined ? undefined : renderDocumentContext(delta),
       }),
     );
   }
@@ -554,6 +701,7 @@ function changeCard(card: {
   eager?: boolean;
   note?: string;
   diff: TextDiff;
+  context?: Element;
 }): Element {
   const lineCount = card.diff.hunks.reduce(
     (sum, hunk) => sum + hunk.lines.length,
@@ -578,6 +726,7 @@ function changeCard(card: {
       h("span.change-stats", stats(card.diff)),
     ]),
     card.note === undefined ? undefined : h("p.change-note", card.note),
+    card.context,
     h("details.change-diff", { open: lineCount <= FOLDED_DIFF_LINES }, [
       h(
         "summary",

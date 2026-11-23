@@ -9,12 +9,14 @@ export type GraphNode = {
   group: string;
   inDegree: number;
   outDegree: number;
+  // With the branch's changes shown: its letter, or `affected` for an unchanged document it reaches.
+  change?: "A" | "M" | "D" | "R" | "affected";
 };
 
 export type GraphView = {
   folder: string;
   nodes: GraphNode[];
-  edges: { from: string; to: string }[];
+  edges: { from: string; to: string; change?: "added" | "removed" }[];
   focus: { path: string; neighbors: string[] } | null;
 };
 
@@ -253,7 +255,10 @@ export function forceSeries(view: GraphView, layout: Layout): ForceSeries {
         size.get(edge.from) ?? 0,
         size.get(edge.to) ?? 0,
       ),
-      ...(layout.kind === "local" && !isOwnLink(edge, focus)
+      // A link the branch removed is drawn for the reader but is no link any more, so it must not
+      // pull its documents together and make the picture differ from the one without changes.
+      ...((layout.kind === "local" && !isOwnLink(edge, focus)) ||
+      edge.change === "removed"
         ? { ignoreForceLayout: true }
         : {}),
     })),

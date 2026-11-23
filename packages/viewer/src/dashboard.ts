@@ -4,6 +4,7 @@ import { h } from "hastscript";
 import {
   compareStrings,
   getComponents,
+  type GitChange,
   measureDocument,
   ruleRegistry,
   type ContextGraph,
@@ -76,7 +77,20 @@ export type DashboardQuery = {
   flag: LinkFlag[];
   sort: SortKey;
   dir: SortDirection;
+  // Only the documents the branch changed; set by `changed=1`.
+  changed?: boolean;
 } & Partial<Record<NumericParam, number>>;
+
+/**
+ * What the branch did to a document: its letter, when the branch changed it, and the findings the
+ * change gave it and took from it — which an unchanged document can have too, when a link of its
+ * broke.
+ */
+export type DashboardChange = {
+  status?: GitChange["status"];
+  findingsAdded: number;
+  findingsRemoved: number;
+};
 
 export type DashboardRow = {
   path: string;
@@ -92,6 +106,8 @@ export type DashboardRow = {
   linkedFrom: number;
   linksTo: number;
   flags: LinkFlag[];
+  // Present only in a review of a branch: what it did to the document, `null` for nothing.
+  change?: DashboardChange | null;
 };
 
 export type DashboardTotals = {
@@ -119,6 +135,9 @@ export type DashboardSource = {
   // The rules a reader can filter by: the configured ones and any other id a finding carries.
   ruleIds: readonly string[];
   folders: readonly string[];
+  // By path, in a review of a branch; `undefined` without one, and then the dashboard has no
+  // Branch column and refuses the Changed filter.
+  changes?: ReadonlyMap<string, DashboardChange>;
 };
 
 export type ParsedDashboardQuery =
@@ -145,7 +164,7 @@ function defaultDirection(sort: SortKey): SortDirection {
  */
 export function parseDashboardQuery(
   params: URLSearchParams,
-  source: Pick<DashboardSource, "ruleIds" | "folders">,
+  source: Pick<DashboardSource, "ruleIds" | "folders" | "changes">,
   allowed: readonly string[] = [],
 ): ParsedDashboardQuery {
   const known = new Set<string>([
@@ -156,6 +175,7 @@ export function parseDashboardQuery(
     "flag",
     "sort",
     "dir",
+    "changed",
     ...NUMERIC_PARAMS,
     ...allowed,
   ]);
@@ -223,6 +243,21 @@ export function parseDashboardQuery(
     };
   }
 
+  const changed = values("changed")[0];
+  if (changed !== undefined && changed !== "1") {
+    return {
+      ok: false,
+      message: `"changed" takes 1, got "${changed}".`,
+    };
+  }
+  if (changed !== undefined && source.changes === undefined) {
+    return {
+      ok: false,
+      message:
+        "There is no branch to compare: the Changed filter needs a git work tree and a base branch.",
+    };
+  }
+
   const query: DashboardQuery = {
     severity: SEVERITIES.filter((value) => severity.has(value)),
     rule: [...rule].sort(compareStrings),
@@ -231,6 +266,7 @@ export function parseDashboardQuery(
     flag: LINK_FLAGS.filter((value) => flag.has(value)),
     sort,
     dir: dirValue,
+    ...(changed === undefined ? {} : { changed: true }),
   };
   for (const key of NUMERIC_PARAMS) {
     const value = values(key)[0];
@@ -267,6 +303,9 @@ export function dashboardSearchParams(query: DashboardQuery): URLSearchParams {
   }
   if (query.path !== "") {
     params.set("path", query.path);
+  }
+  if (query.changed === true) {
+    params.set("changed", "1");
   }
   for (const key of NUMERIC_PARAMS) {
     const value = query[key];
@@ -391,6 +430,9 @@ export function buildDashboard(
         linkedFrom,
         linksTo,
         flags,
+        ...(source.changes === undefined
+          ? {}
+          : { change: source.changes.get(document.path) ?? null }),
       },
     });
   }
@@ -398,6 +440,9 @@ export function buildDashboard(
   const rows = candidates
     .filter(({ row, messages }) => {
       if (!row.path.startsWith(folderPrefix)) {
+        return false;
+      }
+      if (query.changed === true && row.change?.status === undefined) {
         return false;
       }
       if (pathNeedle !== "" && !row.path.toLowerCase().includes(pathNeedle)) {
@@ -506,6 +551,8 @@ const CSV_COLUMNS = [
   "flags",
 ] as const;
 
+const BRANCH_CSV_COLUMNS = ["change", "findingsAdded", "findingsRemoved"];
+
 /**
  * The selection as CSV: RFC 4180 quoting and CRLF rows, sizes in bytes as measured.
  *
@@ -514,7 +561,11 @@ const CSV_COLUMNS = [
  * the repository's to choose, and opening an export must not run what someone named a file.
  */
 export function dashboardCsv(result: DashboardResult): string {
-  const lines = [CSV_COLUMNS.join(",")];
+  // The branch's columns only in a review of one, where every row carries its change.
+  const branch = result.rows.some((row) => row.change !== undefined);
+  const lines = [
+    [...CSV_COLUMNS, ...(branch ? BRANCH_CSV_COLUMNS : [])].join(","),
+  ];
   for (const row of result.rows) {
     lines.push(
       [
@@ -528,6 +579,13 @@ export function dashboardCsv(result: DashboardResult): string {
         row.linkedFrom,
         row.linksTo,
         csvText(row.flags.join(" ")),
+        ...(branch
+          ? [
+              row.change?.status ?? "",
+              row.change?.findingsAdded ?? 0,
+              row.change?.findingsRemoved ?? 0,
+            ]
+          : []),
       ].join(","),
     );
   }
@@ -562,7 +620,11 @@ export function renderDashboardArticle(page: DashboardPage): ElementContent[] {
     h(
       "div.dashboard-results",
       page.ok
-        ? renderResults(page.query, page.result)
+        ? renderResults(
+            page.query,
+            page.result,
+            page.source.changes !== undefined,
+          )
         : [h("p.dashboard-error", page.message)],
     ),
   ];
@@ -683,6 +745,9 @@ function renderFilters(
             ),
           ]),
         ]),
+        source.changes === undefined
+          ? undefined
+          : checkbox("changed", "1", "Changed in this branch"),
         h("label.filter-field", [
           "Path contains",
           h("input", {
@@ -742,7 +807,32 @@ const COLUMNS: { key: SortKey; label: string; numeric: boolean }[] = [
 function renderResults(
   query: DashboardQuery,
   result: DashboardResult,
+  branch: boolean,
 ): (ElementContent | undefined)[] {
+  const sortHeader = (column: (typeof COLUMNS)[number]): Element => {
+    const active = query.sort === column.key;
+    const dir: SortDirection = active
+      ? query.dir === "asc"
+        ? "desc"
+        : "asc"
+      : defaultDirection(column.key);
+    return h(
+      column.numeric ? "th.is-numeric" : "th",
+      {
+        scope: "col",
+        ariaSort: active
+          ? query.dir === "asc"
+            ? "ascending"
+            : "descending"
+          : undefined,
+      },
+      h(
+        "a.dashboard-sort",
+        { href: dashboardHref({ ...query, sort: column.key, dir }) },
+        column.label,
+      ),
+    );
+  };
   const exportParams = (format: string) => {
     const params = dashboardSearchParams(query);
     params.set("format", format);
@@ -764,36 +854,22 @@ function renderResults(
       : undefined,
     h("div.dashboard-table-wrap", [
       h("table.dashboard-table", [
-        h(
-          "thead",
-          h(
-            "tr",
-            COLUMNS.map((column) => {
-              const active = query.sort === column.key;
-              const dir: SortDirection = active
-                ? query.dir === "asc"
-                  ? "desc"
-                  : "asc"
-                : defaultDirection(column.key);
-              return h(
-                column.numeric ? "th.is-numeric" : "th",
-                {
-                  scope: "col",
-                  ariaSort: active
-                    ? query.dir === "asc"
-                      ? "ascending"
-                      : "descending"
-                    : undefined,
-                },
-                h(
-                  "a.dashboard-sort",
-                  { href: dashboardHref({ ...query, sort: column.key, dir }) },
-                  column.label,
-                ),
-              );
-            }),
-          ),
-        ),
+        h("thead", [
+          h("tr", [
+            ...COLUMNS.slice(0, 1).map(sortHeader),
+            branch
+              ? h(
+                  "th",
+                  {
+                    scope: "col",
+                    title: "What this branch did to the document",
+                  },
+                  "Branch",
+                )
+              : undefined,
+            ...COLUMNS.slice(1).map(sortHeader),
+          ]),
+        ]),
         h(
           "tbody",
           result.rows.length === 0
@@ -801,7 +877,7 @@ function renderResults(
                 h("tr", [
                   h(
                     "td.dashboard-empty",
-                    { colSpan: COLUMNS.length },
+                    { colSpan: COLUMNS.length + (branch ? 1 : 0) },
                     "No documents match these filters.",
                   ),
                 ]),
@@ -823,6 +899,7 @@ function renderRow(row: DashboardRow): Element {
     );
   return h("tr", [
     h("td.dashboard-path", h("a", { href: documentHref(row.path) }, row.path)),
+    row.change === undefined ? undefined : renderChange(row.change),
     count(row.errors, "has-errors"),
     count(row.warnings, "has-warnings"),
     h("td.dashboard-rules", [
@@ -853,6 +930,32 @@ function renderRow(row: DashboardRow): Element {
       "td.dashboard-flags",
       row.flags.map((flag) => LINK_FLAG_NAMES[flag]).join(", "),
     ),
+  ]);
+}
+
+// The branch's column: the document's letter, then the findings it gained and lost, as the Changes
+// page words them.
+function renderChange(change: DashboardChange | null): Element {
+  if (change === null) {
+    return h("td.dashboard-change");
+  }
+  const findings = [
+    change.findingsAdded > 0 ? `+${change.findingsAdded}` : undefined,
+    change.findingsRemoved > 0 ? `−${change.findingsRemoved}` : undefined,
+  ]
+    .filter((part) => part !== undefined)
+    .join(" ");
+  return h("td.dashboard-change", [
+    change.status === undefined
+      ? undefined
+      : h(`span.change-status.change-status-${change.status}`, change.status),
+    findings === ""
+      ? undefined
+      : h(
+          "span.change-findings",
+          { title: "Findings this branch added and removed" },
+          findings,
+        ),
   ]);
 }
 

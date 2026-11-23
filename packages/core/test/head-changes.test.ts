@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { changedSections, headChanges } from "../src/changes/head-changes.js";
+import {
+  baseLineMap,
+  changedSections,
+  headChanges,
+} from "../src/changes/head-changes.js";
 import { diffText } from "../src/changes/text-diff.js";
 import { parseDocument } from "../src/markdown/parse-document.js";
 
@@ -65,6 +69,42 @@ describe("headChanges", () => {
     const changes = changesOf("# T\n\nSame.\n", "# T\r\n\r\nSame.\r\n");
     expect(changes.lines.size).toBe(0);
     expect(changes.removals).toEqual([]);
+  });
+});
+
+describe("baseLineMap", () => {
+  const lines = (...text: string[]) => `${text.join("\n")}\n`;
+
+  it("moves an unchanged line by the lines added and removed above it", () => {
+    const map = baseLineMap(
+      diffText(
+        lines("a", "b", "c", "d", "e", "f", "g", "h", "i", "j"),
+        lines("new", "a", "b", "c", "d", "e", "f", "g", "i", "j"),
+      ),
+    );
+    expect(map(1)).toBe(2);
+    // Past the hunk around the insertion, and past the removal of `h` further down.
+    expect(map(7)).toBe(8);
+    expect(map(8)).toBeUndefined();
+    expect(map(10)).toBe(10);
+  });
+
+  // A finding that survives an edit to its paragraph stays on the line that replaced it.
+  it("follows an edited line to its counterpart, and a whole-file finding stays on line 0", () => {
+    const map = baseLineMap(
+      diffText(
+        lines("# T", "", "Write in the present tense."),
+        lines("# T", "", "Intro.", "", "Write in the past tense."),
+      ),
+    );
+    expect(map(3)).toBe(5);
+    expect(map(0)).toBe(0);
+  });
+
+  it("loses a line removed without a counterpart", () => {
+    const map = baseLineMap(diffText(lines("a", "gone", "b"), lines("a", "b")));
+    expect(map(2)).toBeUndefined();
+    expect(map(3)).toBe(2);
   });
 });
 

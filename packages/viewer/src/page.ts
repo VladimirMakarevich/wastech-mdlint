@@ -44,6 +44,8 @@ export type PageParams = {
   // How many documents the page's document links to or is linked from. The rail draws them as a
   // small graph, and leaves the graph out when there are none.
   neighborCount?: number;
+  // On a changed document that shows its changes: the small graph marks them too.
+  localGraphChanges?: boolean;
   frontmatter?: ParsedFrontmatter | null;
   frontmatterChange?: BlockChange;
   // Pre-fills the header's search box on a results page.
@@ -480,6 +482,7 @@ function renderRail(params: PageParams): Element | undefined {
             // Drawn by the page script, which shows the box once it has something to put in it.
             h("div.local-graph-canvas", {
               dataPath: params.documentPath,
+              dataChanges: params.localGraphChanges === true ? "1" : undefined,
               hidden: true,
             }),
             h(

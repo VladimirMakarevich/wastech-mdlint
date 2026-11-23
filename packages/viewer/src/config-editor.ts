@@ -6,6 +6,7 @@ import type { ElementContent } from "hast";
 import { h } from "hastscript";
 
 import {
+  compareFindings,
   compareStrings,
   ConfigError,
   editConfigText,
@@ -248,9 +249,9 @@ export function entryRuleIds(config: LintConfig): (string | null)[] {
 /**
  * What the candidate would report, compared with what the current config reports now.
  *
- * Findings are matched on file, rule, line, severity and message, as a multiset: one that changed
- * any of those — a budget message whose number moved, a warning made an error — is gone in its old
- * form and new in its new one, which is what the reader needs to see.
+ * Findings are matched by core's `compareFindings` — on file, rule, line, severity and message, as a
+ * multiset — the comparison the review of a branch uses too, so a config edit and a branch never
+ * disagree about what counts as the same finding.
  */
 export async function previewCandidate(params: {
   corpus: Corpus;
@@ -261,10 +262,9 @@ export async function previewCandidate(params: {
   const { result, documentCount } = await params.corpus.lintCandidate(
     params.candidate,
   );
-  const before = countByKey(params.current);
-  const after = countByKey(result.messages);
-  const added = difference(result.messages, before);
-  const removed = difference(params.current, after);
+  const delta = compareFindings(params.current, result.messages);
+  const added = previewFindings(delta.added);
+  const removed = previewFindings(delta.removed);
 
   const byRule = new Map<string, { before: number; after: number }>();
   for (const [messages, side] of [
@@ -302,47 +302,17 @@ export async function previewCandidate(params: {
   };
 }
 
-function findingKey(message: LintMessage): string {
-  return [
-    message.filePath,
-    message.ruleId,
-    message.line,
-    message.severity,
-    message.message,
-  ].join("\u0000");
-}
-
-function countByKey(messages: readonly LintMessage[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const message of messages) {
-    const key = findingKey(message);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  return counts;
-}
-
-// The messages in `messages` beyond as many of each as `other` holds, in a stable order.
-function difference(
-  messages: readonly LintMessage[],
-  other: ReadonlyMap<string, number>,
-): PreviewFinding[] {
-  const remaining = new Map(other);
-  const result: PreviewFinding[] = [];
-  for (const message of messages) {
-    const key = findingKey(message);
-    const left = remaining.get(key) ?? 0;
-    if (left > 0) {
-      remaining.set(key, left - 1);
-      continue;
-    }
-    result.push({
+// The findings as the preview lists them, in a stable order.
+function previewFindings(messages: readonly LintMessage[]): PreviewFinding[] {
+  const result = messages.map(
+    (message): PreviewFinding => ({
       filePath: message.filePath,
       line: message.line,
       ruleId: message.ruleId,
       severity: message.severity,
       message: message.message,
-    });
-  }
+    }),
+  );
   return result.sort(
     (left, right) =>
       compareStrings(left.filePath, right.filePath) ||

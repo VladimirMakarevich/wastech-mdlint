@@ -510,6 +510,352 @@ describe.skipIf(!hasGit)(
   },
 );
 
+// A branch whose change reaches past the files it touched. Committed: a heading renamed in a hub a
+// reader links into, a line inserted in code a notes page links to below and above the insertion, a
+// paragraph inserted above a broken link, and a style guide CLAUDE.md eagerly imports grown. Not
+// committed: a new broken link in the guide and a larger context budget in the config.
+const CONTEXT_CONFIG = (maxTokens: number) =>
+  `${JSON.stringify(
+    {
+      include: ["**/*.md"],
+      rules: [
+        { rule: "REF-001" },
+        { rule: "REF-002" },
+        {
+          rule: "LLM-001",
+          options: {
+            entrypoints: ["CLAUDE.md"],
+            maxTokensPerEntrypoint: maxTokens,
+          },
+        },
+      ],
+    },
+    null,
+    2,
+  )}\n`;
+
+const APP = `${Array.from({ length: 12 }, (_, index) => `line ${index + 1}`).join("\n")}\n`;
+
+async function contextBranch(): Promise<GitFixture> {
+  const fixture = await makeRepo();
+  await fixture.write("wastech-mdlint.config.json", CONTEXT_CONFIG(40));
+  await fixture.write("CLAUDE.md", "# Rules\n\n@rules/style.md\n");
+  await fixture.write("rules/style.md", "# Style\n\nShort.\n");
+  await fixture.write("docs/hub.md", "# Hub\n\n## Setup\n\nText.\n");
+  await fixture.write(
+    "docs/reader.md",
+    "# Reader\n\nSee [setup](hub.md#setup).\n",
+  );
+  await fixture.write(
+    "docs/code.md",
+    "# Code\n\nSee [start](../src/app.ts#L3-L4), [later](../src/app.ts#L10) and [top](../src/app.ts#L1).\n",
+  );
+  await fixture.write(
+    "docs/guide.md",
+    "# Guide\n\nSee [missing](nowhere.md).\n",
+  );
+  await fixture.write("src/app.ts", APP);
+  fixture.commit("base");
+
+  fixture.git("checkout", "-q", "-b", "feature");
+  await fixture.write("docs/hub.md", "# Hub\n\n## Installation\n\nText.\n");
+  await fixture.write(
+    "src/app.ts",
+    APP.replace("line 5\n", "line 5\ninserted\n"),
+  );
+  await fixture.write(
+    "docs/guide.md",
+    "# Guide\n\nA paragraph above.\n\nSee [missing](nowhere.md).\n",
+  );
+  await fixture.write(
+    "rules/style.md",
+    `# Style\n\n${"Write short sentences in the present tense. ".repeat(4)}\n`,
+  );
+  fixture.commit("feature work");
+
+  await fixture.write(
+    "docs/guide.md",
+    "# Guide\n\nA paragraph above.\n\nSee [missing](nowhere.md).\n\nAnd [another](gone.md).\n",
+  );
+  await fixture.write("wastech-mdlint.config.json", CONTEXT_CONFIG(45));
+  return fixture;
+}
+
+type Finding = { filePath: string; line: number; ruleId: string };
+
+type ContextPayload = ChangesPayload & {
+  config: (ChangesPayload["config"] & { findings: unknown }) | null;
+  documents: (ChangedDocument & {
+    context: {
+      findings: { added: Finding[]; removed: Finding[] };
+      size: {
+        base: { tokens: number } | null;
+        head: { tokens: number } | null;
+      };
+    } | null;
+  })[];
+  context: {
+    findings: {
+      added: { errors: number; warnings: number };
+      removed: { errors: number; warnings: number };
+    };
+    eagerContext: {
+      entrypoint: string;
+      base?: number;
+      head?: number;
+      maxTokens: number;
+    }[];
+    affected: {
+      findings: { path: string; added: Finding[] }[];
+      codeLinks: {
+        from: string;
+        line: number;
+        target: string;
+        start: number;
+        end: number;
+      }[];
+      linking: { path: string; targets: string[] }[];
+    };
+    notes: string[];
+  } | null;
+};
+
+describe.skipIf(!hasGit)(
+  "the context of a change (requires git on PATH)",
+  () => {
+    let fixture: GitFixture;
+    let viewer: RunningViewer;
+    let port: number;
+    let api: ContextPayload;
+
+    beforeAll(async () => {
+      fixture = await contextBranch();
+      viewer = await startViewer({
+        cwd: fixture.repo,
+        host: "127.0.0.1",
+        port: 0,
+        portExplicit: true,
+        watch: false,
+        gitEnv: fixture.env,
+      });
+      port = portOf(viewer);
+      api = JSON.parse(
+        (await get(port, "/api/changes")).body,
+      ) as ContextPayload;
+    }, 60_000);
+
+    afterAll(async () => {
+      await viewer?.close();
+    });
+
+    const document = (path: string) =>
+      api.documents.find((entry) => entry.path === path);
+
+    // The guide's old broken link moved down two lines under the new paragraph; mapped through the
+    // diff it is the same finding, and only the uncommitted new link is new.
+    it("follows a finding a change moved, and reports only what is new", () => {
+      expect(
+        document("docs/guide.md")?.context?.findings.added.map(
+          (finding) => `${finding.ruleId} ${finding.line}`,
+        ),
+      ).toEqual(["REF-001 7"]);
+      expect(document("docs/guide.md")?.context?.findings.removed).toEqual([]);
+    });
+
+    it("lists the unchanged documents the change reaches", () => {
+      const affected = api.context!.affected;
+      // CLAUDE.md did not change, but what it loads did: its budget finding names a new total. The
+      // reader's link lost the heading it pointed at.
+      expect(
+        affected.findings.map(
+          (entry) =>
+            `${entry.path} ${entry.added.map((finding) => finding.ruleId).join(" ")}`,
+        ),
+      ).toEqual(["CLAUDE.md LLM-001", "docs/reader.md REF-002"]);
+      // The insertion after line 5 moved line 10 and left lines 1 to 4 where they were.
+      expect(affected.codeLinks).toEqual([
+        {
+          from: "docs/code.md",
+          line: 3,
+          target: "src/app.ts",
+          start: 10,
+          end: 10,
+        },
+      ]);
+      expect(affected.linking).toContainEqual({
+        path: "docs/reader.md",
+        targets: ["docs/hub.md"],
+      });
+    });
+
+    it("moves a document given a new error up, after every session's context", () => {
+      expect(api.documents.map((entry) => entry.path)).toEqual([
+        "rules/style.md",
+        "docs/guide.md",
+        "docs/hub.md",
+      ]);
+    });
+
+    it("says what every session loads now against its budget", () => {
+      const [eager] = api.context!.eagerContext;
+      expect(eager).toMatchObject({ entrypoint: "CLAUDE.md", maxTokens: 45 });
+      expect(eager!.head).toBeGreaterThan(eager!.base!);
+    });
+
+    // @boundary-guard host-parity
+    // The page and `/api/changes` describe one context delta: the page's numbers are read back from
+    // its words — the findings beside each row, every session's budget line, the affected documents
+    // — and compared with the JSON, so a count worded on the page cannot drift from the data.
+    it("shows on the page the same delta the API lists", async () => {
+      const { body } = await get(port, "/changes");
+      const list =
+        /<nav class="changes-files"[\s\S]*?<\/nav>/.exec(body)?.[0] ?? "";
+      const rows = [
+        ...list.matchAll(
+          /<a href="#[^"]*">([^<]+)<\/a>[\s\S]*?(?:<span class="change-findings"[^>]*>([^<]+)<\/span>)?<\/li>/g,
+        ),
+      ].map((match) => {
+        const words = match[2] ?? "";
+        const count = (pattern: RegExp) =>
+          Number(pattern.exec(words)?.[1] ?? 0);
+        return {
+          path: match[1],
+          errors: count(/\+(\d+) errors?/),
+          warnings: count(/\+(\d+) warnings?/),
+          removed: count(/−(\d+) findings?/),
+        };
+      });
+      expect(rows).toEqual(
+        api.documents.map((entry) => {
+          const added = entry.context?.findings.added ?? [];
+          const errors = added.filter(
+            (finding) =>
+              (finding as Finding & { severity: string }).severity === "error",
+          ).length;
+          return {
+            path: entry.path,
+            errors,
+            warnings: added.length - errors,
+            removed: entry.context?.findings.removed.length ?? 0,
+          };
+        }),
+      );
+
+      const eagerLines = [
+        ...body.matchAll(
+          /<p class="changes-eager[^"]*">([^ ]+) eager context (\d+) → (\d+) tokens \([^,]+, budget (\d+)\)<\/p>/g,
+        ),
+      ].map((match) => ({
+        entrypoint: match[1],
+        base: Number(match[2]),
+        head: Number(match[3]),
+        maxTokens: Number(match[4]),
+      }));
+      expect(eagerLines).toEqual(api.context!.eagerContext);
+
+      const affected =
+        /<section class="changes-affected"[\s\S]*?<\/section>/.exec(
+          body,
+        )?.[0] ?? "";
+      const codeLinks = [
+        ...affected.matchAll(
+          /<a href="\/doc\/[^"]*">([^<]+)<\/a> line (\d+) → <a href="[^"]*">([^#<]+)#L(\d+)(?:-L(\d+))?<\/a>/g,
+        ),
+      ].map((match) => ({
+        from: match[1],
+        line: Number(match[2]),
+        target: match[3],
+        start: Number(match[4]),
+        end: Number(match[5] ?? match[4]),
+      }));
+      expect(codeLinks).toEqual(api.context!.affected.codeLinks);
+    });
+
+    it("shows what the config change alone does on the config's card", async () => {
+      const { body } = await get(port, "/changes");
+      const card =
+        /<section class="change-card" id="change\.wastech-mdlint\.config\.json">[\s\S]*?<\/section>/.exec(
+          body,
+        )?.[0];
+      expect(card).toContain(
+        "The config change alone, over the current documents: +1 warning, −1 finding",
+      );
+      expect(api.config?.findings).toMatchObject({
+        added: [{ ruleId: "LLM-001", filePath: "CLAUDE.md" }],
+        removed: [{ ruleId: "LLM-001", filePath: "CLAUDE.md" }],
+      });
+    });
+
+    it("leaves uncommitted work out of the delta with commits only", async () => {
+      const commits = JSON.parse(
+        (await get(port, "/api/changes?worktree=0")).body,
+      ) as ContextPayload;
+      const guide = commits.documents.find(
+        (entry) => entry.path === "docs/guide.md",
+      );
+      expect(guide?.context?.findings).toEqual({ added: [], removed: [] });
+      // The budget the commits were linted with is the committed config's.
+      expect(commits.context!.eagerContext[0]).toMatchObject({
+        maxTokens: 40,
+      });
+      expect(commits.config).toBeNull();
+    });
+
+    it("marks the change on the graph when asked, and only then", async () => {
+      type View = {
+        nodes: { path: string; change?: string }[];
+        edges: { from: string; to: string; change?: string }[];
+      };
+      const marked = JSON.parse(
+        (await get(port, "/api/graph?changes=1")).body,
+      ) as View;
+      const changeOf = (path: string) =>
+        marked.nodes.find((node) => node.path === path)?.change;
+      expect(changeOf("docs/hub.md")).toBe("M");
+      expect(changeOf("docs/reader.md")).toBe("affected");
+      expect(changeOf("docs/code.md")).toBe("affected");
+      // The broken anchor is no link any more, and is drawn as one the branch removed.
+      expect(marked.edges).toContainEqual({
+        from: "docs/reader.md",
+        to: "docs/hub.md",
+        change: "removed",
+      });
+      const plain = JSON.parse((await get(port, "/api/graph")).body) as View;
+      expect(plain.nodes.some((node) => node.change !== undefined)).toBe(false);
+      expect((await get(port, "/graph?changes=1")).body).toContain(
+        '<input type="checkbox" name="changes" value="1" checked>',
+      );
+    });
+
+    it("filters the dashboard to changed documents and counts their findings", async () => {
+      const result = JSON.parse(
+        (await get(port, "/api/dashboard?changed=1")).body,
+      ) as {
+        query: { changed?: boolean };
+        rows: {
+          path: string;
+          change: { status?: string; findingsAdded: number } | null;
+        }[];
+      };
+      expect(result.query.changed).toBe(true);
+      expect(
+        result.rows.map((row) => `${row.change?.status} ${row.path}`),
+      ).toEqual(["M docs/guide.md", "M docs/hub.md", "M rules/style.md"]);
+      expect(
+        result.rows.find((row) => row.path === "docs/guide.md")?.change,
+      ).toMatchObject({ findingsAdded: 1 });
+      const csv = (await get(port, "/api/dashboard?format=csv&changed=1")).body;
+      expect(csv.split("\r\n")[0]).toMatch(
+        /,change,findingsAdded,findingsRemoved$/,
+      );
+      const page = (await get(port, "/dashboard")).body;
+      expect(page).toContain(
+        '<input type="checkbox" name="changed" value="1"> Changed in this branch',
+      );
+    });
+  },
+);
+
 describe.skipIf(!hasGit)(
   "Changes without a base (requires git on PATH)",
   () => {
@@ -538,6 +884,17 @@ describe.skipIf(!hasGit)(
           JSON.parse((await get(port, "/api/changes")).body),
         ).toMatchObject({ status: "unavailable", reason: "base-not-found" });
         expect((await get(port, "/doc/README.md")).status).toBe(200);
+        // A filter that cannot apply says so rather than showing every document, or none.
+        const dashboard = await get(port, "/api/dashboard?changed=1");
+        expect(dashboard.status).toBe(400);
+        expect(JSON.parse(dashboard.body)).toEqual({
+          error:
+            "There is no branch to compare: the Changed filter needs a git work tree and a base branch.",
+        });
+        const plain = JSON.parse((await get(port, "/api/dashboard")).body) as {
+          rows: object[];
+        };
+        expect(plain.rows[0]).not.toHaveProperty("change");
       } finally {
         await viewer.close();
       }

@@ -33,7 +33,10 @@ import {
   renderChangesArticle,
   renderDiff,
   renderHunkTemplate,
+  type Review,
+  type ReviewResult,
 } from "./changes.js";
+import { dashboardChanges, graphChanges } from "./branch-changes.js";
 import {
   candidateText,
   configApi,
@@ -61,7 +64,9 @@ import {
   buildNeighborhoodView,
   documentNeighbors,
   graphFolders,
+  type GraphView,
   renderGraphArticle,
+  withChanges,
 } from "./graph-view.js";
 import { highlight, languageForPath, withCopyButton } from "./highlight.js";
 import {
@@ -78,6 +83,7 @@ import {
   type RenderedDocument,
 } from "./render-document.js";
 import { decodeRequestPath } from "./request-path.js";
+import type { ReviewContext } from "./review-context.js";
 import { DocumentSearch } from "./search.js";
 import {
   assetHeaders,
@@ -401,7 +407,7 @@ export async function startViewer(
         results: search.search(corpus.documents, query),
       });
     } else if (target === "/graph") {
-      sendGraphPage(request, response, params);
+      await sendGraphPage(request, response, params);
     } else if (target === "/api/graph") {
       const graphRequest = parseGraphRequest(params);
       if (graphRequest === undefined) {
@@ -409,11 +415,14 @@ export async function startViewer(
       } else {
         sendJson(
           response,
-          buildGraphView(
-            corpus.graph,
-            corpus.documents,
-            graphRequest.folder,
-            graphRequest.focus,
+          await graphWithChanges(
+            buildGraphView(
+              corpus.graph,
+              corpus.documents,
+              graphRequest.folder,
+              graphRequest.focus,
+            ),
+            params,
           ),
         );
       }
@@ -423,7 +432,10 @@ export async function startViewer(
       if (corpus.documents.has(path)) {
         sendJson(
           response,
-          buildNeighborhoodView(corpus.graph, corpus.documents, path),
+          await graphWithChanges(
+            buildNeighborhoodView(corpus.graph, corpus.documents, path),
+            params,
+          ),
         );
       } else {
         sendJson(
@@ -438,17 +450,15 @@ export async function startViewer(
       if (changes === undefined) {
         sendJson(response, { error: NO_CHANGES }, 404);
       } else {
-        sendJson(
-          response,
-          changesPayload(await changes.review(worktreeOf(params))),
-        );
+        const review = await changes.review(worktreeOf(params));
+        sendJson(response, changesPayload(review, await contextOf(review)));
       }
     } else if (target === "/api/changes/diff") {
       await sendChangeDiff(response, params);
     } else if (target === "/dashboard") {
-      sendDashboardPage(request, response, params);
+      await sendDashboardPage(request, response, params);
     } else if (target === "/api/dashboard") {
-      sendDashboardData(response, params);
+      await sendDashboardData(response, params);
     } else if (target === "/config") {
       sendHtml(
         response,
@@ -567,6 +577,7 @@ export async function startViewer(
       neighborCount: documentNeighbors(corpus.graph, relPath).length,
     };
     const review = await reviewOf(document);
+    const localGraphChanges = review !== undefined && view !== "off";
     let params: Omit<PageParams, "siteName" | "documentPaths" | "showChanges">;
     if (review !== undefined && view === "source") {
       // The diff takes the article's place. The outline is left out with the rendered text, since
@@ -574,6 +585,7 @@ export async function startViewer(
       const { title } = await render(document);
       params = {
         ...common,
+        localGraphChanges,
         title,
         changeBanner: renderChangeBanner(review, view),
         article: [h("div.change-source", renderDiff(review.diff))],
@@ -592,6 +604,7 @@ export async function startViewer(
       );
       params = {
         ...common,
+        localGraphChanges,
         title: rendered.title,
         changeBanner: renderChangeBanner(review, view),
         article: [...rawHtml(rendered.html), renderHunkTemplate(review.diff)],
@@ -604,6 +617,7 @@ export async function startViewer(
       const { html, title } = await render(document);
       params = {
         ...common,
+        localGraphChanges,
         title,
         changeBanner:
           review === undefined ? undefined : renderChangeBanner(review, view),
@@ -769,21 +783,62 @@ export async function startViewer(
     return { folder, focus };
   }
 
-  function sendGraphPage(
+  /**
+   * What the branch did, for the pages that show it beside everything else — the dashboard and the
+   * graph. The work-tree review, as both show the files on disk; `undefined` outside a git work tree
+   * or while there is nothing to compare.
+   */
+  async function workTreeChanges(): Promise<
+    { review: Review; context: ReviewContext } | undefined
+  > {
+    if (changes === undefined) {
+      return undefined;
+    }
+    const review = await changes.review(true);
+    if ("available" in review) {
+      return undefined;
+    }
+    const context = await contextOf(review);
+    return context === undefined ? undefined : { review, context };
+  }
+
+  // `changes=1` marks the branch's changes on a graph view; without it, or without a branch to
+  // compare, the view is the graph as it is.
+  async function graphWithChanges(
+    view: GraphView,
+    params: URLSearchParams,
+  ): Promise<GraphView> {
+    if (params.get("changes") !== "1") {
+      return view;
+    }
+    const branch = await workTreeChanges();
+    return branch === undefined
+      ? view
+      : withChanges(
+          view,
+          corpus.graph,
+          graphChanges(branch.review, branch.context),
+        );
+  }
+
+  async function sendGraphPage(
     request: IncomingMessage,
     response: ServerResponse,
     params: URLSearchParams,
-  ): void {
+  ): Promise<void> {
     const graphRequest = parseGraphRequest(params);
     if (graphRequest === undefined) {
       sendNotFound(request, response, GRAPH_NOT_FOUND);
       return;
     }
-    const view = buildGraphView(
-      corpus.graph,
-      corpus.documents,
-      graphRequest.folder,
-      graphRequest.focus,
+    const view = await graphWithChanges(
+      buildGraphView(
+        corpus.graph,
+        corpus.documents,
+        graphRequest.folder,
+        graphRequest.focus,
+      ),
+      params,
     );
     sendHtml(
       response,
@@ -795,6 +850,9 @@ export async function startViewer(
           view,
           graphFolders(corpus.documents.keys()),
           graphRequest.focus,
+          changes === undefined
+            ? undefined
+            : { shown: params.get("changes") === "1" },
         ),
       }),
       request.method === "HEAD",
@@ -811,16 +869,42 @@ export async function startViewer(
       return;
     }
     const worktree = worktreeOf(params);
+    const review = await changes.review(worktree);
     sendHtml(
       response,
       200,
       page({
         title: "Changes",
         section: "changes",
-        article: renderChangesArticle(await changes.review(worktree), worktree),
+        article: renderChangesArticle(
+          review,
+          worktree,
+          await contextOf(review),
+        ),
       }),
       request.method === "HEAD",
     );
+  }
+
+  /**
+   * The context of a review, or `undefined` when there is none to show. A failure to compute it is
+   * reported here and leaves the page with its diffs, which do not depend on it.
+   */
+  async function contextOf(
+    review: ReviewResult,
+  ): Promise<ReviewContext | undefined> {
+    if (changes === undefined || "available" in review) {
+      return undefined;
+    }
+    try {
+      return await changes.context(review);
+    } catch (error) {
+      process.stderr.write(
+        `wastech-mdlint-viewer: could not compare the context: ${(error as Error).message}
+`,
+      );
+      return undefined;
+    }
   }
 
   async function sendChangeDiff(
@@ -849,7 +933,7 @@ export async function startViewer(
     sendJson(response, answer);
   }
 
-  function dashboardSource(): DashboardSource {
+  async function dashboardSource(): Promise<DashboardSource> {
     const findings = diagnostics.messagesByFile;
     // The rules a reader can pick: the ones the config runs, plus any other id a finding carries,
     // such as the report about a malformed suppression comment.
@@ -863,21 +947,25 @@ export async function startViewer(
         ruleIds.add(message.ruleId);
       }
     }
+    const branch = await workTreeChanges();
     return {
       documents: corpus.documents,
       graph: corpus.graph,
       findings,
       ruleIds: [...ruleIds].sort(compareStrings),
       folders: graphFolders(corpus.documents.keys()),
+      ...(branch === undefined
+        ? {}
+        : { changes: dashboardChanges(branch.review, branch.context) }),
     };
   }
 
-  function sendDashboardPage(
+  async function sendDashboardPage(
     request: IncomingMessage,
     response: ServerResponse,
     params: URLSearchParams,
-  ): void {
-    const source = dashboardSource();
+  ): Promise<void> {
+    const source = await dashboardSource();
     const parsed = parseDashboardQuery(params, source);
     sendHtml(
       response,
@@ -901,11 +989,11 @@ export async function startViewer(
     );
   }
 
-  function sendDashboardData(
+  async function sendDashboardData(
     response: ServerResponse,
     params: URLSearchParams,
-  ): void {
-    const source = dashboardSource();
+  ): Promise<void> {
+    const source = await dashboardSource();
     const parsed = parseDashboardQuery(params, source, ["format"]);
     const format = params.get("format") ?? "";
     if (!parsed.ok || !["", "json", "csv"].includes(format)) {
