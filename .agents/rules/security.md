@@ -25,18 +25,19 @@ The security model is a deterministic, local-first Markdown analysis tool. Keep 
 
 ## Viewer Safety
 
-The viewer is the only host with a network listener, so any web page the user has open can make the browser send it requests. Its boundary is:
+The viewer is the only host with a network listener, and any open page can make the browser send it requests. Its boundary:
 
 - Bound to `127.0.0.1` by default; another address only through an explicit `--host`, which it announces.
-- Read-only unless asked: `GET` and `HEAD` only, but for the config page's `POST` preview (writes nothing) and save. A save needs `--allow-config-writes`, refused with a non-loopback `--host`, as anyone reaching the port could then rewrite the config.
+- Read-only unless asked: `GET` and `HEAD` only, but for the config page's `POST` preview (writes nothing), save and open. A save needs `--allow-config-writes`; save and open are refused with a non-loopback `--host`, as anyone reaching the port could then rewrite the config or start programs here.
 - A request with a body needs this server's `Origin`, same-origin fetch metadata if any, an `application/json` type (no HTML form can send it; a cross-origin `fetch` needs a preflight never approved) and the per-process token only the config page carries; bodies stop at 256 KiB.
-- A save writes only the config the corpus was loaded from, inside the repository, over the version the page edited, with text `parseConfiguration` accepts — atomically and read back, restoring the old text if the file differs.
-- Every request's `Host` must be localhost, an IP literal or the configured host (DNS rebinding), and a request carrying another origin, or a non-navigation from another site, is refused.
-- It serves corpus documents, plus only the non-Markdown files a corpus document links to or embeds. A request path is decoded segment by segment and refused if it could climb out of the repository; the real path of every file read is checked to be inside it.
-- Author HTML is sanitized before the viewer adds its own markup; pages carry a CSP that allows scripts from the viewer's origin only. SVG and other files served as-is are sandboxed.
-- A chart option is author data: an `echarts` block is parsed as JSON and never evaluated. ECharts writes an HTML tooltip's formatter template and the data view's `title`/`lang` into the page as `innerHTML`, and opens `link`/`sublink` with `window.open`, so before it sees an option every tooltip is switched to `richText`, those data-view labels are removed, and a link survives only as an http(s) URL.
-- The graph's `folder` and `focus` parameters are only compared against the corpus's own paths, never joined onto a filesystem path; a name that is not a folder holding documents, or not a document, is a 404.
-- No CDN or other network fetch: Mermaid, ECharts and every asset are served from the installed packages.
+- A save writes only the config the corpus was loaded from, inside the repository, over the version the page edited, with text `parseConfiguration` accepts — atomically and read back, the old text restored if the file differs.
+- Open runs the system's file manager or default app on that config alone, from an argv list; a path with a `"` is refused.
+- Every request's `Host` must be localhost, an IP literal or the configured host (DNS rebinding); one carrying another origin, or a non-navigation from another site, is refused.
+- It serves corpus documents and only the non-Markdown files they link to or embed. A request path is decoded per segment and refused if it could leave the repository; every file read must really resolve inside it.
+- Author HTML is sanitized before the viewer adds its own markup; pages carry a CSP allowing scripts from the viewer's origin only; SVG and other files served as-is are sandboxed.
+- An `echarts` block is author data, parsed as JSON and never evaluated. ECharts would insert a tooltip's formatter and the data view's `title`/`lang` as `innerHTML` and open `link`/`sublink` with `window.open`, so every tooltip becomes `richText`, those labels are dropped and a link survives only as an http(s) URL.
+- The graph's `folder` and `focus` and the prompts' `path` are only compared with the corpus's own paths, never joined onto a filesystem path; anything else is a 404.
+- No CDN or network fetch: Mermaid, ECharts and every asset come from the installed packages.
 
 ## Installation And File Writes
 
@@ -48,7 +49,7 @@ The viewer is the only host with a network listener, so any web page the user ha
 
 - Keep reports deterministic and bounded to the analyzed repository state.
 - Do not put secrets, environment variables, or unrelated local filesystem data into diagnostics, reports, generated docs, or test artifacts.
-- Absolute host paths do not belong in user-visible output: they leak the checkout location and break the repository-relative POSIX path convention. The one deliberate exception is a file a command has written outside the working directory, which has to be named by a path the user can actually open.
+- Absolute host paths do not belong in user-visible output: they leak the checkout location and break the repository-relative POSIX path convention. Two deliberate exceptions: a file a command has written outside the working directory, which has to be named by a path the user can actually open, and the viewer's copy-path button on a loopback binding.
 - When surfacing errors, prefer structured diagnostics that identify the failing config path or rule without exposing irrelevant system state.
 
 ## Command Execution
