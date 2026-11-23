@@ -344,6 +344,118 @@ describe("diagnostics", () => {
   });
 });
 
+type DashboardPayload = {
+  query: { severity: string[]; sort: string; dir: string };
+  findings: string;
+  corpusSize: number;
+  totals: { documents: number; errors: number };
+  rows: { path: string; errors: number | null; flags: string[] }[];
+};
+
+describe("dashboard", () => {
+  it("renders the filters and a row per document without script", async () => {
+    await diagnosticsReady();
+    const { status, body } = await get("/dashboard");
+    expect(status).toBe(200);
+    expect(body).toContain(
+      '<form class="dashboard-filters" action="/dashboard" method="get" aria-label="Filters">',
+    );
+    expect(body).toContain(
+      '<td class="dashboard-path"><a href="/doc/docs/guide.md">docs/guide.md</a></td>',
+    );
+    expect(body).toContain("4 of 4 documents · 1 error · 0 warnings");
+    // The configured rules are the ones to filter by.
+    expect(body).toContain('name="rule" value="REF-001"');
+    expect(body).toContain('name="rule" value="REF-002"');
+  });
+
+  it("links the header to the dashboard", async () => {
+    expect((await get("/doc/README.md")).body).toContain(
+      '<a class="topbar-link" href="/dashboard">Dashboard</a>',
+    );
+  });
+
+  it("applies the filters the form sends", async () => {
+    await diagnosticsReady();
+    const { body } = await get("/dashboard?severity=error&minKb=&path=");
+    expect(body).toContain("1 of 4 documents");
+    expect(body).toContain('<a href="/doc/README.md">README.md</a>');
+    expect(body).not.toContain(
+      '<a href="/doc/docs/guide.md">docs/guide.md</a>',
+    );
+    expect(body).toContain('name="severity" value="error" checked');
+  });
+
+  it("answers the same selection as JSON, echoing the query it applied", async () => {
+    await diagnosticsReady();
+    const response = await get("/api/dashboard?flag=orphan&sort=errors");
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toBe(
+      "application/json; charset=utf-8",
+    );
+    expect(response.headers["content-disposition"]).toBeUndefined();
+    const data = JSON.parse(response.body) as DashboardPayload;
+    expect(data.query).toMatchObject({ sort: "errors", dir: "desc" });
+    expect(data.findings).toBe("ready");
+    expect(data.corpusSize).toBe(4);
+    // Nothing links to either: the README reaches docs/README.md only through a folder link, which
+    // the graph does not count as a link to the folder index.
+    expect(data.rows.map((row) => row.path)).toEqual([
+      "docs/README.md",
+      "docs/charts.md",
+    ]);
+  });
+
+  it("downloads the selection as CSV or JSON", async () => {
+    await diagnosticsReady();
+    const csv = await get("/api/dashboard?severity=error&format=csv");
+    expect(csv.status).toBe(200);
+    expect(csv.headers["content-type"]).toBe("text/csv; charset=utf-8");
+    expect(csv.headers["content-disposition"]).toBe(
+      'attachment; filename="dashboard.csv"',
+    );
+    expect(csv.body.split("\r\n")[0]).toBe(
+      "path,errors,warnings,rules,bytes,lines,tokens,linkedFrom,linksTo,flags",
+    );
+    expect(csv.body).toMatch(/^README\.md,1,0,REF-001,/m);
+
+    const json = await get("/api/dashboard?format=json");
+    expect(json.headers["content-disposition"]).toBe(
+      'attachment; filename="dashboard.json"',
+    );
+    expect((JSON.parse(json.body) as DashboardPayload).rows).toHaveLength(4);
+  });
+
+  it.each([
+    ["rule=NOPE-001", 'Unknown rule "NOPE-001".'],
+    ["minKb=abc", '"minKb" must be a number of zero or more, got "abc".'],
+    ["folder=..", 'No folder ".." holds corpus documents.'],
+    ["format=xml", 'Unknown format "xml": use csv or json.'],
+  ])("refuses /api/dashboard?%s", async (search, message) => {
+    const response = await get(`/api/dashboard?${search}`);
+    expect(response.status).toBe(400);
+    expect(JSON.parse(response.body)).toEqual({ error: message });
+  });
+
+  // The page keeps the form, filled in as sent, so the reader can fix the value that was refused;
+  // the value is escaped both in the field and in the message.
+  it("refuses a bad filter on the page with the reason, escaped", async () => {
+    const { status, body } = await get(
+      `/dashboard?rule=${encodeURIComponent("<img src=x onerror=alert(1)>")}`,
+    );
+    expect(status).toBe(400);
+    expect(body).toContain(
+      '<p class="dashboard-error">Unknown rule "&#x3C;img src=x onerror=alert(1)>".</p>',
+    );
+    expect(body).not.toContain("<img src=x");
+    expect(body).toContain('<form class="dashboard-filters"');
+  });
+
+  it("does not take a format on the page", async () => {
+    expect((await get("/dashboard?format=csv")).status).toBe(400);
+  });
+});
+
 type GraphPayload = {
   folder: string;
   nodes: { path: string; title: string; group: string }[];

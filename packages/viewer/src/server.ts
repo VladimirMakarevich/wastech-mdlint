@@ -13,9 +13,16 @@ import { fileURLToPath } from "node:url";
 import type { ElementContent } from "hast";
 import { h } from "hastscript";
 
-import type { ParsedDocument } from "@wastech-mdlint/core";
+import { compareStrings, type ParsedDocument } from "@wastech-mdlint/core";
 
 import { Corpus } from "./corpus.js";
+import {
+  buildDashboard,
+  dashboardCsv,
+  parseDashboardQuery,
+  renderDashboardArticle,
+  type DashboardSource,
+} from "./dashboard.js";
 import { Diagnostics } from "./diagnostics.js";
 import {
   buildGraphView,
@@ -222,6 +229,10 @@ export async function startViewer(
           404,
         );
       }
+    } else if (target === "/dashboard") {
+      sendDashboardPage(request, response, params);
+    } else if (target === "/api/dashboard") {
+      sendDashboardData(response, params);
     } else if (target === "/api/diagnostics") {
       sendDiagnostics(response, params);
     } else if (target === "/events") {
@@ -494,6 +505,96 @@ export async function startViewer(
     );
   }
 
+  function dashboardSource(): DashboardSource {
+    const findings = diagnostics.messagesByFile;
+    // The rules a reader can pick: the ones the config runs, plus any other id a finding carries,
+    // such as the report about a malformed suppression comment.
+    const ruleIds = new Set(
+      corpus.configuration.rules
+        .filter(({ severity }) => severity !== "off")
+        .map(({ rule }) => rule.id),
+    );
+    for (const messages of findings?.values() ?? []) {
+      for (const message of messages) {
+        ruleIds.add(message.ruleId);
+      }
+    }
+    return {
+      documents: corpus.documents,
+      graph: corpus.graph,
+      findings,
+      ruleIds: [...ruleIds].sort(compareStrings),
+      folders: graphFolders(corpus.documents.keys()),
+    };
+  }
+
+  function sendDashboardPage(
+    request: IncomingMessage,
+    response: ServerResponse,
+    params: URLSearchParams,
+  ): void {
+    const source = dashboardSource();
+    const parsed = parseDashboardQuery(params, source);
+    sendHtml(
+      response,
+      parsed.ok ? 200 : 400,
+      page({
+        title: "Dashboard",
+        article: renderDashboardArticle(
+          parsed.ok
+            ? {
+                params,
+                source,
+                ok: true,
+                query: parsed.query,
+                result: buildDashboard(source, parsed.query),
+              }
+            : { params, source, ok: false, message: parsed.message },
+        ),
+      }),
+      request.method === "HEAD",
+    );
+  }
+
+  function sendDashboardData(
+    response: ServerResponse,
+    params: URLSearchParams,
+  ): void {
+    const source = dashboardSource();
+    const parsed = parseDashboardQuery(params, source, ["format"]);
+    const format = params.get("format") ?? "";
+    if (!parsed.ok || !["", "json", "csv"].includes(format)) {
+      sendJson(
+        response,
+        {
+          error: parsed.ok
+            ? `Unknown format "${format}": use csv or json.`
+            : parsed.message,
+        },
+        400,
+      );
+      return;
+    }
+    const result = buildDashboard(source, parsed.query);
+    if (format === "csv") {
+      response.writeHead(200, {
+        ...pageHeaders(),
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": 'attachment; filename="dashboard.csv"',
+      });
+      response.end(dashboardCsv(result));
+      return;
+    }
+    sendJson(
+      response,
+      { query: parsed.query, ...result },
+      200,
+      format === "json"
+        ? { "Content-Disposition": 'attachment; filename="dashboard.json"' }
+        : {},
+    );
+  }
+
   function sendDiagnostics(
     response: ServerResponse,
     params: URLSearchParams,
@@ -746,9 +847,15 @@ function sendHtml(
   response.end(headOnly ? undefined : html);
 }
 
-function sendJson(response: ServerResponse, data: unknown, status = 200): void {
+function sendJson(
+  response: ServerResponse,
+  data: unknown,
+  status = 200,
+  headers: Record<string, string> = {},
+): void {
   response.writeHead(status, {
     ...pageHeaders(),
+    ...headers,
     "Content-Type": "application/json; charset=utf-8",
   });
   response.end(JSON.stringify(data));

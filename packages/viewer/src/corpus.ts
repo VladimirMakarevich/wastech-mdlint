@@ -86,6 +86,11 @@ export class Corpus {
     return this.state.graph;
   }
 
+  /** The configuration the corpus was loaded with, replaced with it on a full reload. */
+  get configuration(): LoadedConfiguration {
+    return this.state.loaded;
+  }
+
   /** Reload configuration and every document from disk. */
   async reload(): Promise<void> {
     this.state = await loadState(this.root, this.configPathOption);

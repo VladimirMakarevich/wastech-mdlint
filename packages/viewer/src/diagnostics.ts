@@ -31,6 +31,13 @@ export class Diagnostics {
     return this.byFile !== undefined;
   }
 
+  /** Every finding, grouped by file; `undefined` until the first lint finishes. */
+  get messagesByFile():
+    | ReadonlyMap<string, readonly LintMessage[]>
+    | undefined {
+    return this.byFile;
+  }
+
   update(result: LintResult): void {
     const byFile = new Map<string, LintMessage[]>();
     for (const message of result.messages) {

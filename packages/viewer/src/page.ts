@@ -98,6 +98,7 @@ export function renderPage(params: PageParams): string {
               },
               "Graph",
             ),
+            h("a.topbar-link", { href: "/dashboard" }, "Dashboard"),
             // Hidden until the script that makes it work has run.
             h("button.theme-toggle", { type: "button", hidden: true }, "Theme"),
           ]),
