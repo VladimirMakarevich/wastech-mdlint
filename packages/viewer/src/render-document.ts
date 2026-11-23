@@ -15,7 +15,7 @@ import {
 } from "@wastech-mdlint/core";
 
 import { isExternalTarget, type ResolvedTarget } from "./corpus.js";
-import { highlight, languageForFence } from "./highlight.js";
+import { highlight, languageForFence, withCopyButton } from "./highlight.js";
 import { encodeRepoPath } from "./request-path.js";
 
 export type RenderedDocument = {
@@ -275,7 +275,9 @@ async function replaceCodeBlocks(tree: HastRoot): Promise<void> {
         ],
       };
     } else {
-      replacement = await highlight(block.code, languageForFence(block.info));
+      replacement = withCopyButton(
+        await highlight(block.code, languageForFence(block.info)),
+      );
     }
     block.parent.children[block.index] = replacement;
   }

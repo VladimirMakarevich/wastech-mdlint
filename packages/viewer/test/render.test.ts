@@ -113,6 +113,24 @@ describe("links", () => {
 });
 
 describe("code blocks", () => {
+  // Every highlighted block carries the button that copies it, beside the block rather than inside
+  // it, so it stays in the corner while the code scrolls sideways — in a list item as well as at the
+  // top level. Diagrams and charts are drawings, not code to paste, and get none.
+  it("gives every highlighted block a copy button, and diagrams none", async () => {
+    const nested = await renderText(
+      "# Steps\n\n1. Run it:\n\n   ```sh\n   npm test\n   ```\n",
+    );
+    expect(nested.html).toMatch(
+      /<li data-line="3">[\s\S]*<div class="code-block"><button class="code-copy" type="button" hidden title="Copy the code" aria-label="Copy the code">Copy<\/button><pre class="shiki/,
+    );
+    expect(guide.html).not.toMatch(
+      /<div class="mermaid-diagram"><div class="code-block">/,
+    );
+    expect(guide.html).not.toMatch(
+      /<div class="code-block"><button class="code-copy"[^>]*>Copy<\/button><pre class="mermaid-source/,
+    );
+  });
+
   it("highlights a known language on the server", () => {
     expect(guide.html).toContain(
       'class="shiki shiki-themes github-light github-dark"',
@@ -181,7 +199,7 @@ describe("source lines", () => {
       '<div class="source-line" data-line="34"><div class="mermaid-diagram">',
     );
     expect(guide.html).toMatch(
-      /<div class="source-line" data-line="39"><pre class="shiki/,
+      /<div class="source-line" data-line="39"><div class="code-block"><button class="code-copy"[^>]*>Copy<\/button><pre class="shiki/,
     );
     const table = await renderText("# T\n\n| a | b |\n| - | - |\n| 1 | 2 |\n");
     expect(table.html).toContain(

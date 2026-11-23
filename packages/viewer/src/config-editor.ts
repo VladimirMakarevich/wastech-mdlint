@@ -20,7 +20,7 @@ import {
 } from "@wastech-mdlint/core";
 
 import type { Corpus } from "./corpus.js";
-import { highlight } from "./highlight.js";
+import { highlight, withCopyButton } from "./highlight.js";
 import { copyPathButton } from "./page.js";
 
 // The config page: the config as it is on disk, the rules the registry offers, a preview of what a
@@ -536,7 +536,7 @@ export async function renderConfigArticle(
       ? undefined
       : h("section.config-current", { ariaLabel: "Current file" }, [
           h("h2", "Current file"),
-          await highlight(file.text, "jsonc"),
+          withCopyButton(await highlight(file.text, "jsonc")),
         ]),
     h("section.config-registry", { ariaLabel: "Rules" }, [
       h("h2", "Rules"),

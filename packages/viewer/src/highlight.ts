@@ -1,4 +1,5 @@
 import type { Element, Root } from "hast";
+import { h } from "hastscript";
 import {
   bundledLanguages,
   createHighlighter,
@@ -100,4 +101,27 @@ export async function highlight(
     throw new Error("Shiki returned no <pre> element");
   }
   return pre;
+}
+
+/**
+ * A highlighted block with a button the page script turns into "copy this code". The block scrolls
+ * sideways on its own, and a button inside it would scroll away with the text, so both sit in a
+ * wrapper that holds the button in the block's corner. Hidden without script, which the copying
+ * needs; the code itself is read from the block when the button is pressed, so the page does not
+ * carry every block twice.
+ */
+export function withCopyButton(block: Element): Element {
+  return h("div.code-block", [
+    h(
+      "button.code-copy",
+      {
+        type: "button",
+        hidden: true,
+        title: "Copy the code",
+        ariaLabel: "Copy the code",
+      },
+      "Copy",
+    ),
+    block,
+  ]);
 }

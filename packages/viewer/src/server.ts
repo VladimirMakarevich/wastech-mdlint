@@ -49,7 +49,7 @@ import {
   graphFolders,
   renderGraphArticle,
 } from "./graph-view.js";
-import { highlight, languageForPath } from "./highlight.js";
+import { highlight, languageForPath, withCopyButton } from "./highlight.js";
 import {
   launchDetached,
   openCommand,
@@ -495,7 +495,10 @@ export async function startViewer(
             lineAnchors: true,
           },
         );
-        article = [h("h1.source-title", relPath), h("div.source-view", [code])];
+        article = [
+          h("h1.source-title", relPath),
+          h("div.source-view", [withCopyButton(code)]),
+        ];
       }
     }
     sendHtml(

@@ -1,4 +1,5 @@
 import { initCharts } from "./charts.js";
+import { initCodeCopy } from "./code-copy.js";
 import { initColumnResize } from "./column-resize.js";
 import { initConfigEditor } from "./config-editor.js";
 import { initCopyPath } from "./copy-path.js";
@@ -28,6 +29,7 @@ initCopyPath();
 initColumnResize();
 initLiveReload(documentPath);
 initSourceLines();
+initCodeCopy();
 initDiagrams();
 initCharts();
 initGraph();

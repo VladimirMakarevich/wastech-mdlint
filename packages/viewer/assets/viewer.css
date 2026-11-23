@@ -1117,6 +1117,54 @@ a:hover {
   line-height: 1.5;
 }
 
+/* A code block and the copy button in its corner. The button shows while the block is hovered or the
+   button has focus — always on a screen without hover — and stays out of a selection of the text,
+   so copying a passage of the article does not pick up the word "Copy". */
+.code-block {
+  position: relative;
+}
+
+.code-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--fg-muted);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 22px;
+  cursor: pointer;
+  opacity: 0;
+  user-select: none;
+  transition: opacity 120ms ease;
+}
+
+.code-copy[hidden] {
+  display: none;
+}
+
+.code-block:hover .code-copy,
+.code-copy:focus-visible,
+.code-copy.is-done {
+  opacity: 1;
+}
+
+.code-copy:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+@media (hover: none) {
+  .code-copy {
+    opacity: 1;
+  }
+}
+
 .markdown-body pre code {
   padding: 0;
   background: none;
@@ -2261,12 +2309,16 @@ a:hover {
 
   .tree summary::before,
   .column-resizer::before,
-  .column-resizer::after {
+  .column-resizer::after,
+  .settings-panel,
+  .settings-panel.is-open,
+  .code-copy {
     transition: none;
   }
 }
 
 @media print {
+  .code-copy,
   .topbar,
   .sidebar-frame,
   .rail-frame,
