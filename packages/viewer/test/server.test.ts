@@ -185,6 +185,7 @@ describe("pages", () => {
       "charts.js",
       "chart-option.js",
       "echarts.js",
+      "graph.js",
       "viewer.css",
     ]) {
       expect((await get(`/assets/${name}`)).status, name).toBe(200);
@@ -208,6 +209,23 @@ describe("pages", () => {
       '<div class="echarts-chart"><pre class="echarts-source">',
     );
     expect(body).toContain('<div class="echarts-chart" data-state="invalid">');
+  });
+
+  it("gives a document with neighbors a small graph of them in the rail", async () => {
+    // The guide's only neighbor is the README, which links to it.
+    expect((await get("/doc/docs/guide.md")).body).toContain(
+      '<aside class="rail"><section class="local-graph" aria-label="Linked documents"><h2>Links (1)</h2><div class="local-graph-canvas" data-path="docs/guide.md" hidden></div><a class="local-graph-open" href="/graph?focus=docs%2Fguide.md">Open in the full graph</a></section>',
+    );
+  });
+
+  // From a document the link opens the graph on that document; elsewhere on the whole graph.
+  it("links the header to the graph, focused on the document being read", async () => {
+    expect((await get("/doc/docs/guide.md")).body).toContain(
+      '<a class="topbar-link" href="/graph?focus=docs%2Fguide.md">Graph</a>',
+    );
+    expect((await get("/search?q=x")).body).toContain(
+      '<a class="topbar-link" href="/graph">Graph</a>',
+    );
   });
 
   // The stored theme must be applied before the stylesheet paints anything, so the classic theme
@@ -296,6 +314,126 @@ describe("diagnostics", () => {
         anchor: "fixture-home",
       }),
     ]);
+  });
+});
+
+type GraphPayload = {
+  folder: string;
+  nodes: { path: string; title: string; group: string }[];
+  edges: { from: string; to: string }[];
+  focus: { path: string; neighbors: string[] } | null;
+};
+
+describe("graph", () => {
+  it("answers with the corpus graph, one edge per linked pair", async () => {
+    const response = await get("/api/graph");
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toBe(
+      "application/json; charset=utf-8",
+    );
+    const view = JSON.parse(response.body) as GraphPayload;
+    expect(view.nodes.map((node) => node.path)).toEqual([
+      "README.md",
+      "docs/README.md",
+      "docs/charts.md",
+      "docs/guide.md",
+    ]);
+    // `docs/charts.md` links to the README twice (a link and an anchor): one line in the picture.
+    expect(view.edges).toEqual([
+      { from: "README.md", to: "docs/guide.md" },
+      { from: "docs/README.md", to: "README.md" },
+      { from: "docs/charts.md", to: "README.md" },
+    ]);
+    expect(view.nodes.find((node) => node.path === "docs/charts.md")).toEqual(
+      expect.objectContaining({
+        title: 'Charts <b> & "quotes"',
+        group: "docs",
+      }),
+    );
+    expect(view.focus).toBeNull();
+  });
+
+  it("narrows to a folder and lights a focused document's neighbors", async () => {
+    const docs = JSON.parse(
+      (await get("/api/graph?folder=docs&focus=README.md")).body,
+    ) as GraphPayload;
+    expect(docs.nodes.every((node) => node.path.startsWith("docs/"))).toBe(
+      true,
+    );
+    expect(docs.edges).toEqual([]);
+    expect(docs.focus).toBeNull();
+
+    const focused = JSON.parse(
+      (await get("/api/graph?focus=README.md")).body,
+    ) as GraphPayload;
+    expect(focused.focus).toEqual({
+      path: "README.md",
+      neighbors: ["docs/README.md", "docs/charts.md", "docs/guide.md"],
+    });
+  });
+
+  // A folder must be one that holds documents and a focus must be a document. Neither is ever used
+  // as a filesystem path, and neither may answer with an empty graph that looks like a real one.
+  it.each([
+    "folder=nope",
+    "folder=..",
+    "folder=docs%2F",
+    "folder=%2Fdocs",
+    "folder=docs%2F..",
+    "focus=secret.txt",
+    "focus=src%2Fapp.ts",
+    "focus=..%2FREADME.md",
+    "focus=docs",
+  ])("refuses /api/graph?%s", async (query) => {
+    const response = await get(`/api/graph?${query}`);
+    expect(response.status).toBe(404);
+    expect(JSON.parse(response.body)).toHaveProperty("error");
+    expect((await get(`/graph?${query}`)).status).toBe(404);
+  });
+
+  it("answers a document's neighborhood with the links among it", async () => {
+    const response = await get("/api/neighbors?path=docs%2Fguide.md");
+    expect(response.status).toBe(200);
+    const view = JSON.parse(response.body) as GraphPayload;
+    expect(view.nodes.map((node) => node.path)).toEqual([
+      "README.md",
+      "docs/guide.md",
+    ]);
+    expect(view.edges).toEqual([{ from: "README.md", to: "docs/guide.md" }]);
+    expect(view.focus).toEqual({
+      path: "docs/guide.md",
+      neighbors: ["README.md"],
+    });
+  });
+
+  // Like the graph's parameters, the path is only ever compared against the corpus's documents.
+  it.each(["", "path=", "path=secret.txt", "path=..%2FREADME.md", "path=docs"])(
+    "refuses /api/neighbors?%s",
+    async (query) => {
+      const response = await get(`/api/neighbors?${query}`);
+      expect(response.status).toBe(404);
+      expect(JSON.parse(response.body)).toHaveProperty("error");
+    },
+  );
+
+  it("renders the graph page with its folder picker and a list for readers without script", async () => {
+    const { status, headers, body } = await get("/graph?focus=README.md");
+    expect(status).toBe(200);
+    expect(headers["content-security-policy"]).toContain("script-src 'self'");
+    expect(body).toContain("<title>Link graph · ");
+    expect(body).toContain(
+      '<option value="" selected>All documents</option><option value="docs">docs</option>',
+    );
+    expect(body).toContain(
+      '<input type="hidden" name="focus" value="README.md">',
+    );
+    expect(body).toContain(
+      '<div class="graph-canvas" data-folder="" data-focus="README.md">',
+    );
+    expect(body).toContain(
+      '<a href="/doc/docs/charts.md">Charts &#x3C;b> &#x26; "quotes"</a>',
+    );
+    expect(body).toContain("README.md is highlighted with 3 neighbors.");
   });
 });
 
@@ -393,6 +531,9 @@ describe("live reload", () => {
     await writeFile(path.join(workDir, "docs", "added.md"), "# Added\n");
     const payload = await event;
     expect(payload.structural).toBe(true);
-    expect((await get("/doc/docs/added.md")).status).toBe(200);
+    const added = await get("/doc/docs/added.md");
+    expect(added.status).toBe(200);
+    // It links nowhere and nothing links to it, so there is no neighborhood to draw.
+    expect(added.body).not.toContain('class="local-graph"');
   }, 15_000);
 });

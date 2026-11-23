@@ -1,6 +1,7 @@
 import { initCharts } from "./charts.js";
 import { initDiagnostics } from "./diagnostics.js";
 import { initDiagrams } from "./diagrams.js";
+import { initGraph, initLocalGraph } from "./graph.js";
 import { initLiveReload } from "./live-reload.js";
 import { initSearch } from "./search.js";
 import { initSourceLines } from "./source-lines.js";
@@ -20,5 +21,7 @@ initLiveReload(documentPath);
 initSourceLines();
 initDiagrams();
 initCharts();
+initGraph();
+initLocalGraph();
 initSearch();
 initDiagnostics(documentPath);

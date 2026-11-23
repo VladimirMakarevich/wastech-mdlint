@@ -250,7 +250,8 @@ a:hover {
   margin: 4px 0 0;
 }
 
-/* Theme switch */
+/* Graph link and theme switch: the same small control, one a link and one a button */
+.topbar-link,
 .theme-toggle {
   flex: none;
   height: 32px;
@@ -264,8 +265,15 @@ a:hover {
   cursor: pointer;
 }
 
+.topbar-link {
+  display: inline-flex;
+  align-items: center;
+}
+
+.topbar-link:hover,
 .theme-toggle:hover {
   background: var(--bg-subtle);
+  text-decoration: none;
 }
 
 /* Layout: tree, article, outline */
@@ -366,6 +374,21 @@ a:hover {
   background: var(--accent-bg);
   color: var(--accent);
   font-weight: 600;
+}
+
+/* Right rail. The small graph of the document's neighbors comes first. */
+.local-graph-canvas {
+  height: 240px;
+  margin: 0 0 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.local-graph-open {
+  display: inline-block;
+  margin: 0 0 24px;
+  font-size: 13px;
 }
 
 /* Right rail */
@@ -674,6 +697,60 @@ a:hover {
 .echarts-canvas {
   width: 100%;
   height: 400px;
+}
+
+/* Link graph: the picture takes the width the article would leave empty. */
+.markdown-body:has(.graph-canvas) {
+  max-width: none;
+}
+
+.graph-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.graph-controls select {
+  max-width: 100%;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-subtle);
+  color: var(--fg);
+  font: inherit;
+}
+
+.graph-summary {
+  color: var(--fg-muted);
+  font-size: 14px;
+}
+
+.graph-canvas {
+  height: max(420px, calc(100vh - var(--topbar-height) - 260px));
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+}
+
+.graph-placeholder {
+  padding: 16px;
+  color: var(--fg-muted);
+}
+
+.graph-list ul {
+  font-size: 14px;
+}
+
+.graph-list-path,
+.graph-list-degree {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.graph-list-path {
+  font-family: var(--font-mono);
 }
 
 /* Source view: line anchors from a document's `#L42` link */

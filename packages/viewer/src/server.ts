@@ -17,6 +17,13 @@ import type { ParsedDocument } from "@wastech-mdlint/core";
 
 import { Corpus } from "./corpus.js";
 import { Diagnostics } from "./diagnostics.js";
+import {
+  buildGraphView,
+  buildNeighborhoodView,
+  documentNeighbors,
+  graphFolders,
+  renderGraphArticle,
+} from "./graph-view.js";
 import { highlight, languageForPath } from "./highlight.js";
 import { rawHtml, renderPage, type PageParams } from "./page.js";
 import {
@@ -54,6 +61,9 @@ export type RunningViewer = {
 // How many ports above the default to try before giving up, so a second viewer started beside a
 // first one simply lands next to it.
 const PORT_ATTEMPTS = 20;
+
+const GRAPH_NOT_FOUND =
+  "The graph shows a folder that holds corpus documents, and can highlight a document in the corpus; this address names something else.";
 
 // A source file larger than this is a generated or vendored file, not something a document links to
 // for a reader; highlighting it would stall the page for nothing.
@@ -180,6 +190,38 @@ export async function startViewer(
         query,
         results: search.search(corpus.documents, query),
       });
+    } else if (target === "/graph") {
+      sendGraphPage(request, response, params);
+    } else if (target === "/api/graph") {
+      const graphRequest = parseGraphRequest(params);
+      if (graphRequest === undefined) {
+        sendJson(response, { error: GRAPH_NOT_FOUND }, 404);
+      } else {
+        sendJson(
+          response,
+          buildGraphView(
+            corpus.graph,
+            corpus.documents,
+            graphRequest.folder,
+            graphRequest.focus,
+          ),
+        );
+      }
+    } else if (target === "/api/neighbors") {
+      // Only ever compared against the corpus's own paths, like the graph's parameters.
+      const path = params.get("path") ?? "";
+      if (corpus.documents.has(path)) {
+        sendJson(
+          response,
+          buildNeighborhoodView(corpus.graph, corpus.documents, path),
+        );
+      } else {
+        sendJson(
+          response,
+          { error: "This path is not a document in the corpus." },
+          404,
+        );
+      }
     } else if (target === "/api/diagnostics") {
       sendDiagnostics(response, params);
     } else if (target === "/events") {
@@ -270,6 +312,7 @@ export async function startViewer(
         article: rawHtml(html),
         headings: document.headings,
         backlinks: corpus.backlinks(relPath),
+        neighborCount: documentNeighbors(corpus.graph, relPath).length,
         frontmatter: document.frontmatter,
       }),
       request.method === "HEAD",
@@ -397,6 +440,56 @@ export async function startViewer(
       response,
       200,
       page({ title: query ? `Search: ${query}` : "Search", article, query }),
+      request.method === "HEAD",
+    );
+  }
+
+  // The folder and focused document a graph request names, or `undefined` when either is not part of
+  // the corpus. Both are only compared against the corpus's own paths, never joined onto a
+  // filesystem path, so nothing a request writes here reaches the disk.
+  function parseGraphRequest(
+    params: URLSearchParams,
+  ): { folder: string; focus: string | undefined } | undefined {
+    const folder = params.get("folder") ?? "";
+    // `focus=` with nothing after it, as a hand-edited address may carry, focuses nothing.
+    const focus = params.get("focus") || undefined;
+    if (
+      (folder !== "" &&
+        !graphFolders(corpus.documents.keys()).includes(folder)) ||
+      (focus !== undefined && !corpus.documents.has(focus))
+    ) {
+      return undefined;
+    }
+    return { folder, focus };
+  }
+
+  function sendGraphPage(
+    request: IncomingMessage,
+    response: ServerResponse,
+    params: URLSearchParams,
+  ): void {
+    const graphRequest = parseGraphRequest(params);
+    if (graphRequest === undefined) {
+      sendNotFound(request, response, GRAPH_NOT_FOUND);
+      return;
+    }
+    const view = buildGraphView(
+      corpus.graph,
+      corpus.documents,
+      graphRequest.folder,
+      graphRequest.focus,
+    );
+    sendHtml(
+      response,
+      200,
+      page({
+        title: "Link graph",
+        article: renderGraphArticle(
+          view,
+          graphFolders(corpus.documents.keys()),
+          graphRequest.focus,
+        ),
+      }),
       request.method === "HEAD",
     );
   }
@@ -653,8 +746,8 @@ function sendHtml(
   response.end(headOnly ? undefined : html);
 }
 
-function sendJson(response: ServerResponse, data: unknown): void {
-  response.writeHead(200, {
+function sendJson(response: ServerResponse, data: unknown, status = 200): void {
+  response.writeHead(status, {
     ...pageHeaders(),
     "Content-Type": "application/json; charset=utf-8",
   });

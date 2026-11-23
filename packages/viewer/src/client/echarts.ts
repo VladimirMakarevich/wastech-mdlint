@@ -1,7 +1,7 @@
 import type { Theme } from "./theme-toggle.js";
 
-// ECharts, loaded on demand by the charts in a document. It is over a megabyte, so a page without
-// one never fetches it.
+// ECharts, loaded on demand by the two parts of the page that draw with it: the charts in a
+// document and the link graph. It is over a megabyte, so a page without either never fetches it.
 
 // The few calls the viewer makes, typed here rather than through the package's own declarations,
 // which describe every option of every chart type and would make this small project compile the
@@ -10,6 +10,14 @@ export type ECharts = {
   setOption(option: object, opts?: { notMerge?: boolean }): void;
   setTheme(theme: string): void;
   resize(): void;
+  on(
+    event: "click",
+    handler: (params: { dataType?: string; dataIndex: number }) => void,
+  ): void;
+  on(event: "finished", handler: () => void): void;
+  on(event: "graphroam", handler: (params: { zoom?: number }) => void): void;
+  dispatchAction(payload: object): void;
+  getZr(): { on(event: "mouseup", handler: () => void): void };
 };
 
 type EChartsModule = {

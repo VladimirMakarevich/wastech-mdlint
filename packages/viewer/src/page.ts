@@ -30,6 +30,9 @@ export type PageParams = {
   article: ElementContent[];
   headings?: readonly ParsedHeading[];
   backlinks?: readonly string[];
+  // How many documents the page's document links to or is linked from. The rail draws them as a
+  // small graph, and leaves the graph out when there are none.
+  neighborCount?: number;
   frontmatter?: ParsedFrontmatter | null;
   // Pre-fills the header's search box on a results page.
   query?: string;
@@ -83,6 +86,18 @@ export function renderPage(params: PageParams): string {
                 h("kbd.search-shortcut", { ariaHidden: "true" }, "Ctrl K"),
               ],
             ),
+            // From a document, the graph opens with that document and its neighbors lit, which is
+            // how a reader gets from a page to its place among the others.
+            h(
+              "a.topbar-link",
+              {
+                href:
+                  params.documentPath === undefined
+                    ? "/graph"
+                    : `/graph?${new URLSearchParams({ focus: params.documentPath }).toString()}`,
+              },
+              "Graph",
+            ),
             // Hidden until the script that makes it work has run.
             h("button.theme-toggle", { type: "button", hidden: true }, "Theme"),
           ]),
@@ -98,7 +113,7 @@ export function renderPage(params: PageParams): string {
                 ...params.article,
               ]),
             ]),
-            renderRail(params.headings ?? [], params.backlinks ?? []),
+            renderRail(params),
           ]),
         ]),
       ]),
@@ -188,19 +203,36 @@ function renderDirectory(
   ]);
 }
 
-function renderRail(
-  headings: readonly ParsedHeading[],
-  backlinks: readonly string[],
-): Element | undefined {
+function renderRail(params: PageParams): Element | undefined {
+  const backlinks = params.backlinks ?? [];
   // The document title is the page's own heading; the outline starts below it and stops at h3,
   // where entries become too fine-grained to scan in a side column.
-  const outline = headings.filter(
+  const outline = (params.headings ?? []).filter(
     (heading) => heading.depth === 2 || heading.depth === 3,
   );
-  if (outline.length === 0 && backlinks.length === 0) {
+  const neighborCount =
+    params.documentPath === undefined ? 0 : (params.neighborCount ?? 0);
+  if (outline.length === 0 && backlinks.length === 0 && neighborCount === 0) {
     return undefined;
   }
   return h("aside.rail", [
+    neighborCount === 0 || params.documentPath === undefined
+      ? undefined
+      : h("section.local-graph", { ariaLabel: "Linked documents" }, [
+          h("h2", `Links (${neighborCount})`),
+          // Drawn by the page script, which shows the box once it has something to put in it.
+          h("div.local-graph-canvas", {
+            dataPath: params.documentPath,
+            hidden: true,
+          }),
+          h(
+            "a.local-graph-open",
+            {
+              href: `/graph?${new URLSearchParams({ focus: params.documentPath }).toString()}`,
+            },
+            "Open in the full graph",
+          ),
+        ]),
     outline.length === 0
       ? undefined
       : h("nav.outline", { ariaLabel: "On this page" }, [
