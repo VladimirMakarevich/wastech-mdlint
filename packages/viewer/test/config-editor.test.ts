@@ -1,4 +1,13 @@
-import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  cp,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { request, type IncomingHttpHeaders } from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -530,30 +539,42 @@ describe("save", () => {
 });
 
 describe("saveCandidate", () => {
-  // A write that fails must say so and leave the config as it was. The target's folder does not
-  // exist, so the temp file the atomic write stages beside it cannot even be created.
-  it("reports a failed write and claims nothing was saved", async () => {
+  // @boundary-guard write-failure
+  //
+  // The viewer's one write path, failing partway: a directory in the config file's place lets the
+  // atomic write stage its temp file beside it and then makes the rename fail on every platform
+  // (POSIX EISDIR, Windows EPERM or EACCES). The save must say it failed, name no success, leave the
+  // target as it was and leave no temp file in the repository. The server answers such an outcome
+  // with a 500 and the same message; no test reaches that through HTTP, because nothing makes the
+  // write fail after the server has read the file it is about to replace without also making that
+  // read fail first.
+  it("reports a failed write, claims nothing was saved and leaves no temp file", async () => {
     const corpus = await Corpus.load({ cwd: fixtureRoot });
-    const missing = path.join(
-      os.tmpdir(),
-      "wastech-no-such-dir",
-      "config.json",
-    );
-    const outcome = await saveCandidate({
-      corpus,
-      file: {
-        absolutePath: missing,
-        displayPath: "config.json",
-        text: "{}",
-        hash: hashText("{}"),
-      },
-      text: '{ "rules": [] }',
-    });
-    expect(outcome).toEqual({
-      status: "failed",
-      message:
-        "The config could not be written (ENOENT); the file on disk is unchanged.",
-    });
+    const dir = await mkdtemp(path.join(os.tmpdir(), "wastech-viewer-save-"));
+    try {
+      const target = path.join(dir, "wastech-mdlint.config.json");
+      await mkdir(target);
+      const outcome = await saveCandidate({
+        corpus,
+        file: {
+          absolutePath: target,
+          displayPath: "wastech-mdlint.config.json",
+          text: "{}",
+          hash: hashText("{}"),
+        },
+        text: '{ "rules": [] }',
+      });
+      expect(outcome).toEqual({
+        status: "failed",
+        message: expect.stringMatching(
+          /^The config could not be written \([A-Z]+\); the file on disk is unchanged\.$/,
+        ),
+      });
+      expect((await stat(target)).isDirectory()).toBe(true);
+      expect(await readdir(dir)).toEqual(["wastech-mdlint.config.json"]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 

@@ -70,10 +70,12 @@ const BOUNDARY_GUARDS: Record<string, string[]> = {
     "packages/core/test/rules-custom.test.ts",
   ],
   // A write that fails partway must leave no temp file and no half-written target, and the command
-  // must report it and exit non-zero rather than claiming success.
+  // must report it and exit non-zero rather than claiming success. The viewer's config save is the
+  // one write a network request can cause, so its failure path is held to the same.
   "write-failure": [
     "packages/cli/test/init.e2e.test.ts",
     "packages/core/test/atomic-write.test.ts",
+    "packages/viewer/test/config-editor.test.ts",
   ],
   // Output must not depend on evaluation order or on state carried between calls (a `g`-flagged
   // RegExp's `lastIndex` being the concrete case that shipped).
