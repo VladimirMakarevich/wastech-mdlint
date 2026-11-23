@@ -369,7 +369,9 @@ export { ConfigError } from "./config/config-error.js";
 export { TOOL_ERROR_CODES, isStructuredError } from "./errors.js";
 export type { StructuredErrorInfo, ToolErrorCode } from "./errors.js";
 export { CONFIG_FILE_NAME, findConfig } from "./config/find-config.js";
-export { loadConfiguration } from "./config/load-config.js";
+export { loadConfiguration, parseConfiguration } from "./config/load-config.js";
+export { editConfigText } from "./config/edit-config.js";
+export type { ConfigEdit, ConfigEditPath } from "./config/edit-config.js";
 export type {
   ConfiguredRule,
   LoadedConfiguration,

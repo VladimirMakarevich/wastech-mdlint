@@ -280,9 +280,33 @@ export async function loadConfiguration(params: {
     return defaultConfiguration();
   }
 
+  return parseConfiguration({
+    text: await readFile(configPath, "utf8"),
+    cwd: params.cwd,
+    configPath,
+    registry,
+  });
+}
+
+/**
+ * Validate config text that is not, or not yet, on disk — everything `loadConfiguration` does after
+ * reading the file, with the same two stages and the same diagnostics.
+ *
+ * A host that lets a user edit the config checks the candidate here before writing it, so the file
+ * it writes is one `loadConfiguration` will accept and a preview of the candidate is linted with
+ * exactly the rules the next run would resolve. `configPath` is the absolute path the text is (or
+ * would be) read from; diagnostics name it relative to `cwd`, as they do for a loaded file.
+ */
+export function parseConfiguration(params: {
+  text: string;
+  cwd: string;
+  configPath: string;
+  registry?: RuleRegistry;
+}): LoadedConfiguration {
+  const registry = params.registry ?? ruleRegistry;
+  const { configPath } = params;
   const displayPath = displayConfigPath(params.cwd, configPath);
-  const text = await readFile(configPath, "utf8");
-  const raw = parseJsoncConfig(text, displayPath);
+  const raw = parseJsoncConfig(params.text, displayPath);
 
   const parsed = lintConfigSchema.safeParse(raw);
   if (!parsed.success) {
