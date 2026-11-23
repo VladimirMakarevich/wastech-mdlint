@@ -104,11 +104,19 @@ export function renderPage(params: PageParams): string {
           ]),
           h("div.layout", [
             h("div.sidebar-frame", [
-              h(
-                "nav.sidebar",
-                { ariaLabel: "Documents" },
+              h("nav.sidebar", { ariaLabel: "Documents" }, [
+                // Hidden until the script that knows the findings has run, like the theme switch.
+                h("label.tree-filter", { hidden: true }, [
+                  h("input", { type: "checkbox" }),
+                  " Only files with findings",
+                ]),
+                h(
+                  "p.tree-filter-empty",
+                  { hidden: true },
+                  "No file has findings.",
+                ),
                 renderTree(params.documentPaths, params.documentPath),
-              ),
+              ]),
               columnResizer("sidebar", "Resize the document tree"),
             ]),
             h("main.content#content", [

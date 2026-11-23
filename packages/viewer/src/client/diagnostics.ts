@@ -26,7 +26,11 @@ type Summary =
       files: Record<string, { errors: number; warnings: number }>;
     };
 
+// Remembered for this address, like the theme and the column widths.
+const TREE_FILTER_KEY = "wastech-mdlint-viewer:tree-findings-only";
+
 export function initDiagnostics(documentPath: string | undefined): void {
+  initTreeFilter();
   const refresh = () => {
     void refreshTree();
     if (documentPath !== undefined) {
@@ -120,6 +124,9 @@ async function refreshTree(): Promise<void> {
   for (const badge of document.querySelectorAll(".tree-badge")) {
     badge.remove();
   }
+  for (const item of document.querySelectorAll(".sidebar li[data-findings]")) {
+    item.removeAttribute("data-findings");
+  }
   for (const link of document.querySelectorAll<HTMLAnchorElement>(
     '.sidebar a[href^="/doc/"]',
   )) {
@@ -141,6 +148,88 @@ async function refreshTree(): Promise<void> {
       .filter(Boolean)
       .join(", ");
     link.append(badge);
+    // The file's row and every folder above it, so the filter below can keep the way to it open.
+    for (
+      let item = link.closest("li");
+      item !== null;
+      item = item.parentElement?.closest(".sidebar li") ?? null
+    ) {
+      item.dataset.findings = "";
+    }
+  }
+  treeFilterReady = true;
+  applyTreeFilter();
+}
+
+// Set once the first findings are in: before that "no findings" only means "not checked yet", and the
+// filter would hide the whole tree.
+let treeFilterReady = false;
+
+function treeFilterInput(): HTMLInputElement | null {
+  return document.querySelector<HTMLInputElement>(".tree-filter input");
+}
+
+function initTreeFilter(): void {
+  const label = document.querySelector<HTMLElement>(".tree-filter");
+  const input = treeFilterInput();
+  if (label === null || input === null) {
+    return;
+  }
+  // Rendered hidden by the server: without this script the switch could do nothing.
+  label.hidden = false;
+  input.checked = readStored() === "1";
+  input.addEventListener("change", () => {
+    writeStored(input.checked ? "1" : "0");
+    applyTreeFilter();
+  });
+}
+
+/**
+ * Show only the files with findings, and open the folders on the way to them. A folder this opened is
+ * marked, so turning the filter off closes it again and leaves the tree as the reader had it.
+ */
+function applyTreeFilter(): void {
+  const sidebar = document.querySelector<HTMLElement>(".sidebar");
+  const input = treeFilterInput();
+  if (sidebar === null || input === null) {
+    return;
+  }
+  const active = input.checked && treeFilterReady;
+  sidebar.classList.toggle("only-findings", active);
+  for (const details of sidebar.querySelectorAll<HTMLDetailsElement>(
+    "details",
+  )) {
+    const leadsToFindings =
+      details.parentElement?.hasAttribute("data-findings") === true;
+    if (active && leadsToFindings && !details.open) {
+      details.open = true;
+      details.dataset.openedByFilter = "";
+    } else if (!active && details.dataset.openedByFilter !== undefined) {
+      details.open = false;
+      delete details.dataset.openedByFilter;
+    }
+  }
+  const empty = sidebar.querySelector<HTMLElement>(".tree-filter-empty");
+  if (empty !== null) {
+    empty.hidden =
+      !active || sidebar.querySelector("li[data-findings]") !== null;
+  }
+}
+
+// Storage can be unavailable (private windows, blocked site data); the filter then starts off.
+function readStored(): string | null {
+  try {
+    return localStorage.getItem(TREE_FILTER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStored(value: string): void {
+  try {
+    localStorage.setItem(TREE_FILTER_KEY, value);
+  } catch {
+    // The choice holds for this page only.
   }
 }
 

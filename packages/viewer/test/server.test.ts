@@ -232,6 +232,15 @@ describe("pages", () => {
     );
   });
 
+  // The switch can do nothing until the page script knows the findings, so it starts hidden, above
+  // the tree it filters.
+  it("puts a hidden findings-only switch above the tree", async () => {
+    const { body } = await get("/doc/README.md");
+    expect(body).toContain(
+      '<nav class="sidebar" aria-label="Documents"><label class="tree-filter" hidden><input type="checkbox"> Only files with findings</label><p class="tree-filter-empty" hidden>No file has findings.</p><ul class="tree">',
+    );
+  });
+
   // A page with nothing for the rail has no rail, and so no edge to drag.
   it("leaves the rail and its handle out of a page without one", async () => {
     const { body } = await get("/search?q=x");

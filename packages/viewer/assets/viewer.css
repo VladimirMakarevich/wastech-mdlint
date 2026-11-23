@@ -497,6 +497,34 @@ a:hover {
 }
 
 /* A count of lint findings beside a file in the tree */
+/* "Only files with findings": every row without a finding below it is hidden. */
+.tree-filter {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0 0 8px;
+  padding: 0 4px;
+  color: var(--fg-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tree-filter[hidden],
+.tree-filter-empty[hidden] {
+  display: none;
+}
+
+.tree-filter-empty {
+  margin: 4px 0;
+  padding: 0 4px;
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+
+.sidebar.only-findings .tree li:not([data-findings]) {
+  display: none;
+}
+
 .tree-badge {
   flex: none;
   min-width: 18px;
