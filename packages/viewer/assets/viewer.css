@@ -932,9 +932,13 @@ a:hover {
   max-width: none;
 }
 
-/* The dashboard has no rail, so its table takes the rail's column too rather than leaving it empty. */
-.layout:has(.dashboard-filters) {
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+/* The dashboard has no rail, so its table takes the rail's column too rather than leaving it empty.
+   Only where the tree is a column of its own: on a narrow screen the tree folds above the article,
+   and this would bring its column back. */
+@media (min-width: 801px) {
+  .layout:has(.dashboard-filters) {
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  }
 }
 
 .visually-hidden {
@@ -1647,6 +1651,35 @@ a:hover {
   .current-path,
   .search-shortcut {
     display: none;
+  }
+
+  /* The header wraps instead of running off the screen: the site name, three links, the theme switch
+     and the search box do not fit one phone-width row. It scrolls away with the page rather than
+     staying put, since three rows pinned to the top would take a good part of a phone screen; with
+     nothing pinned there, a jump to a heading needs no room left for it either. */
+  :root {
+    --topbar-height: 0px;
+  }
+
+  .topbar {
+    position: static;
+    flex-wrap: wrap;
+    gap: 8px;
+    height: auto;
+    padding: 8px 16px;
+  }
+
+  .site-name {
+    flex: 1 0 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .search {
+    order: 1;
+    flex: 1 0 100%;
+    margin-left: 0;
   }
 
   .layout {
