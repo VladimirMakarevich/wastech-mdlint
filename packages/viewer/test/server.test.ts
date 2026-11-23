@@ -191,6 +191,7 @@ describe("pages", () => {
       "graph.js",
       "column-resize.js",
       "dashboard.js",
+      "tree-state.js",
       "viewer.css",
     ]) {
       expect((await get(`/assets/${name}`)).status, name).toBe(200);
@@ -230,6 +231,17 @@ describe("pages", () => {
     expect(body).toMatch(
       /<\/aside><div class="column-resizer" data-column="rail" role="separator" aria-orientation="vertical" aria-label="Resize the side column" tabindex="0" hidden><\/div><\/div><\/div><\/body>/,
     );
+  });
+
+  // The tree's open folders and scroll position have to be back before the tree is painted, so the
+  // script that restores them is a classic one placed right after the tree, not a deferred module;
+  // it finds each folder by the path it is kept under.
+  it("restores the tree's state from a blocking script right after it", async () => {
+    const { body } = await get("/doc/docs/guide.md");
+    expect(body).toContain(
+      '</ul></nav><script src="/assets/tree-state.js"></script><div class="column-resizer" data-column="sidebar"',
+    );
+    expect(body).toContain('<details open data-folder="docs">');
   });
 
   // The switch can do nothing until the page script knows the findings, so it starts hidden, above

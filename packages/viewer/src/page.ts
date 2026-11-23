@@ -127,6 +127,9 @@ export function renderPage(params: PageParams): string {
                 ),
                 renderTree(params.documentPaths, params.documentPath),
               ]),
+              // Classic and blocking, right after the tree, so the folders the reader had open and
+              // the tree's scroll position are back before the tree is first painted.
+              h("script", { src: "/assets/tree-state.js" }),
               columnResizer("sidebar", "Resize the document tree"),
             ]),
             h("main.content#content", [
@@ -205,7 +208,11 @@ function renderDirectory(
       h("li", [
         h(
           "details",
-          { open: currentPath?.startsWith(`${child.path}/`) === true },
+          {
+            open: currentPath?.startsWith(`${child.path}/`) === true,
+            // The name the tree-state script keeps an open folder under from page to page.
+            dataFolder: child.path,
+          },
           [
             // Names longer than the tree is wide end in an ellipsis; the full path is the tooltip.
             h("summary", { title: child.path }, [
