@@ -21,6 +21,7 @@ import {
 
 import type { Corpus } from "./corpus.js";
 import { highlight } from "./highlight.js";
+import { copyPathButton } from "./page.js";
 
 // The config page: the config as it is on disk, the rules the registry offers, a preview of what a
 // changed config would report, and — only when the viewer was started to allow it — saving the
@@ -470,10 +471,14 @@ function registryRules(): ConfigApi["rules"] {
  */
 export async function renderConfigArticle(
   corpus: Corpus,
-  allowWrites: boolean,
+  options: {
+    allowWrites: boolean;
+    // Whether the copy button may offer the file's absolute path (`exposesAbsolutePaths`).
+    showAbsolutePath: boolean;
+  },
 ): Promise<ElementContent[]> {
   const file = await readConfigFile(corpus);
-  const blocked = await writeBlockedReason(corpus, allowWrites);
+  const blocked = await writeBlockedReason(corpus, options.allowWrites);
   const configured = new Map(
     corpus.configuration.rules.map(({ rule, severity }) => [
       rule.id,
@@ -487,7 +492,15 @@ export async function renderConfigArticle(
           "p",
           "This repository has no wastech-mdlint config, so the linter runs with no rules. Create one with wastech-mdlint init, then reload this page to edit it.",
         )
-      : h("p.config-file", ["Config file: ", h("code", file.displayPath)]),
+      : h("p.config-file", [
+          "Config file: ",
+          h("code", file.displayPath),
+          " ",
+          copyPathButton(
+            file.displayPath,
+            options.showAbsolutePath ? file.absolutePath : undefined,
+          ),
+        ]),
     file === undefined
       ? undefined
       : h(

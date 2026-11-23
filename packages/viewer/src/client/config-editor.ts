@@ -4,6 +4,8 @@
 // `parseConfiguration`. Nothing here decides whether a config is valid: the preview shows core's
 // answer, and a save writes the exact text that was previewed.
 
+import { copyText } from "./clipboard.js";
+
 type JsonSchema = {
   type?: string;
   properties?: Record<string, JsonSchema>;
@@ -973,9 +975,8 @@ class ConfigEditor {
   private renderActions(text: string): void {
     const copy = button("Copy");
     copy.addEventListener("click", () => {
-      void navigator.clipboard.writeText(text).then(
-        () => (copy.textContent = "Copied"),
-        () => (copy.textContent = "Copy failed"),
+      void copyText(text).then(
+        (copied) => (copy.textContent = copied ? "Copied" : "Copy failed"),
       );
     });
     const download = button("Download");

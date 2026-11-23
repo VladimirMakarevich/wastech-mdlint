@@ -1,6 +1,6 @@
 import type { Element, ElementContent, Root } from "hast";
 import { toHtml } from "hast-util-to-html";
-import { h } from "hastscript";
+import { h, s } from "hastscript";
 
 import {
   compareStrings,
@@ -23,6 +23,10 @@ export type PageParams = {
   documentPaths: readonly string[];
   // The repo-relative path of what the page shows, for the top bar.
   displayPath?: string;
+  // The same file's absolute path on this machine, for the copy button beside `displayPath`. Set only
+  // when the viewer is bound to a loopback address (`exposesAbsolutePaths`): otherwise other machines
+  // read the page, and the checkout's location is not theirs to learn.
+  absolutePath?: string;
   // Set only on a document page. It opens the tree down to the document and marks it, and the
   // live-reload script reloads when this exact path changes. A linked source file is not in the
   // tree, so opening folders toward it would lead nowhere.
@@ -94,6 +98,9 @@ export function renderPage(params: PageParams): string {
             params.displayPath === undefined
               ? undefined
               : h("span.current-path", params.displayPath),
+            params.displayPath === undefined
+              ? undefined
+              : copyPathButton(params.displayPath, params.absolutePath),
             // A plain GET form, so search works as a results page even before (or without) the
             // script that turns it into a live list.
             h(
@@ -183,6 +190,47 @@ export function renderPage(params: PageParams): string {
     ],
   };
   return toHtml(tree, { allowDangerousHtml: true });
+}
+
+/**
+ * The button that copies a file's path, relative or absolute, through a menu the page script adds.
+ * Hidden without script, which the copying needs. `absolutePath` is left off unless the viewer is
+ * bound to a loopback address; the menu then says why that choice is missing.
+ */
+export function copyPathButton(
+  relativePath: string,
+  absolutePath: string | undefined,
+): Element {
+  return h(
+    "button.copy-path",
+    {
+      type: "button",
+      hidden: true,
+      title: "Copy the path",
+      ariaLabel: `Copy the path of ${relativePath}`,
+      dataPath: relativePath,
+      dataAbsolutePath: absolutePath,
+    },
+    // Two overlapping sheets, the usual mark for copying, drawn in the text color.
+    s(
+      "svg",
+      {
+        viewBox: "0 0 16 16",
+        width: 14,
+        height: 14,
+        fill: "none",
+        stroke: "currentColor",
+        strokeWidth: 1.5,
+        ariaHidden: "true",
+      },
+      [
+        s("rect", { x: 5.5, y: 5.5, width: 8, height: 8, rx: 1.5 }),
+        s("path", {
+          d: "M10.5 3.5v-1a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h1",
+        }),
+      ],
+    ),
+  );
 }
 
 function sectionLink(

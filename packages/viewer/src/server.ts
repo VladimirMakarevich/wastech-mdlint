@@ -61,6 +61,7 @@ import { DocumentSearch } from "./search.js";
 import {
   assetHeaders,
   changeRequestProblem,
+  exposesAbsolutePaths,
   isAllowedHostHeader,
   isForeignRequest,
   pageHeaders,
@@ -162,6 +163,7 @@ export async function startViewer(
   const search = new DocumentSearch();
   const diagnostics = new Diagnostics();
   const allowConfigWrites = options.allowConfigWrites === true;
+  const showAbsolutePaths = exposesAbsolutePaths(options.host);
   // Random per process and written only into the config page, so a change request that carries it
   // came from a page this server rendered.
   const changeToken = randomBytes(32).toString("hex");
@@ -185,6 +187,14 @@ export async function startViewer(
       pending.catch(() => rendered.delete(document));
     }
     return pending;
+  }
+
+  // A repository file's path on this machine, in the platform's own form, for the copy button — or
+  // nothing when pages are read from other machines.
+  function absolutePathOf(relPath: string): string | undefined {
+    return showAbsolutePaths
+      ? path.join(corpus.rootDir, ...relPath.split("/"))
+      : undefined;
   }
 
   function page(
@@ -297,7 +307,10 @@ export async function startViewer(
         page({
           title: "Linter config",
           section: "config",
-          article: await renderConfigArticle(corpus, allowConfigWrites),
+          article: await renderConfigArticle(corpus, {
+            allowWrites: allowConfigWrites,
+            showAbsolutePath: showAbsolutePaths,
+          }),
           changeToken,
         }),
         request.method === "HEAD",
@@ -390,6 +403,7 @@ export async function startViewer(
       page({
         title,
         displayPath: relPath,
+        absolutePath: absolutePathOf(relPath),
         documentPath: relPath,
         article: rawHtml(html),
         headings: document.headings,
@@ -459,7 +473,12 @@ export async function startViewer(
     sendHtml(
       response,
       200,
-      page({ title: relPath, article, displayPath: relPath }),
+      page({
+        title: relPath,
+        article,
+        displayPath: relPath,
+        absolutePath: absolutePathOf(relPath),
+      }),
       request.method === "HEAD",
     );
   }

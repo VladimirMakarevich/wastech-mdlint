@@ -322,13 +322,103 @@ a:hover {
    before the first paint — they are laid out from the first frame, so neither appears later and
    pushes the rest of the bar aside; the module that wires them runs whenever it runs. */
 .theme-toggle[hidden],
-.settings-toggle[hidden] {
+.settings-toggle[hidden],
+.copy-path[hidden] {
   display: none;
 }
 
 :root[data-script] .theme-toggle[hidden],
-:root[data-script] .settings-toggle[hidden] {
+:root[data-script] .settings-toggle[hidden],
+:root[data-script] .copy-path[hidden] {
   display: inline-flex;
+}
+
+/* The copy button beside a path: in the header after the page's path, and on the config page after
+   the config file's. A quiet square that takes the text color on hover. */
+.copy-path {
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--fg-muted);
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.copy-path:hover,
+.copy-path[aria-expanded="true"] {
+  border-color: var(--border);
+  background: var(--bg-subtle);
+  color: var(--fg);
+}
+
+/* The header's path gives up its width before the copy button beside it does. */
+.topbar .current-path + .copy-path {
+  margin-left: -10px;
+}
+
+/* A dropdown of actions, placed by the script under the button that opened it. */
+.menu {
+  position: fixed;
+  z-index: 7;
+  min-width: 220px;
+  max-width: min(520px, calc(100vw - 16px));
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 12px 32px var(--shadow);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.menu-item {
+  display: grid;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-item:hover:not(:disabled),
+.menu-item:focus-visible {
+  background: var(--accent-bg);
+  outline: none;
+}
+
+.menu-item:disabled {
+  color: var(--fg-muted);
+  cursor: default;
+}
+
+.menu-detail {
+  overflow: hidden;
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-item:disabled .menu-detail {
+  font-family: var(--font-sans);
+  white-space: normal;
+}
+
+.menu-note {
+  margin: 0;
+  padding: 6px 10px;
+  color: var(--fg-muted);
 }
 
 /* "Aa", the usual mark for text settings, set in a serif so it reads as type rather than a word. */
@@ -2020,6 +2110,13 @@ a:hover {
   .search-shortcut,
   /* The article's side padding is too narrow here to hold a number beside it. */
   .markdown-body [data-line]::after {
+    display: none;
+  }
+
+  /* With the path gone from the header, a copy button there would copy something the reader cannot
+     see. Stated with the script mark too, or the rule that lays script controls out early would win. */
+  .topbar .copy-path,
+  :root[data-script] .topbar .copy-path[hidden] {
     display: none;
   }
 

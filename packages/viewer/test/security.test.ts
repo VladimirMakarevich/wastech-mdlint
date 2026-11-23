@@ -1,6 +1,29 @@
 import { describe, expect, it } from "vitest";
 
-import { isAllowedHostHeader, isForeignRequest } from "../src/security.js";
+import {
+  exposesAbsolutePaths,
+  isAllowedHostHeader,
+  isForeignRequest,
+} from "../src/security.js";
+
+// The copy button's absolute path tells a reader where the checkout lives and under which account.
+// On a loopback binding the reader is on this machine; with any other `--host` the page is read from
+// elsewhere, and the path must not go with it.
+describe("exposesAbsolutePaths", () => {
+  it.each(["127.0.0.1", "localhost", "LocalHost", "::1"])(
+    "offers absolute paths when bound to %s",
+    (host) => {
+      expect(exposesAbsolutePaths(host)).toBe(true);
+    },
+  );
+
+  it.each(["0.0.0.0", "192.168.1.20", "::", "viewer.lan"])(
+    "withholds them when bound to %s",
+    (host) => {
+      expect(exposesAbsolutePaths(host)).toBe(false);
+    },
+  );
+});
 
 describe("isAllowedHostHeader", () => {
   const bound = { host: "127.0.0.1", port: 4180 };

@@ -1,6 +1,7 @@
 import { initCharts } from "./charts.js";
 import { initColumnResize } from "./column-resize.js";
 import { initConfigEditor } from "./config-editor.js";
+import { initCopyPath } from "./copy-path.js";
 import { initDashboard } from "./dashboard.js";
 import { initDiagnostics } from "./diagnostics.js";
 import { initDiagrams } from "./diagrams.js";
@@ -22,6 +23,7 @@ const documentPath =
 
 initThemeToggle();
 initDisplaySettings();
+initCopyPath();
 initColumnResize();
 initLiveReload(documentPath);
 initSourceLines();

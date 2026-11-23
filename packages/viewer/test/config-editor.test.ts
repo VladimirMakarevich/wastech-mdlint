@@ -162,7 +162,7 @@ describe("config page", () => {
     const { status, body } = await send(readOnly.port, "/config");
     expect(status).toBe(200);
     expect(body).toContain(
-      '<p class="config-file">Config file: <code>wastech-mdlint.config.json</code></p>',
+      '<p class="config-file">Config file: <code>wastech-mdlint.config.json</code> <button class="copy-path"',
     );
     expect(body).toContain(
       "Saving is off. Start the viewer with --allow-config-writes",

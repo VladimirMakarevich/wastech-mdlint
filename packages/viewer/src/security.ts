@@ -15,6 +15,18 @@ export function isLoopbackHost(host: string): boolean {
 }
 
 /**
+ * Whether pages may carry a file's absolute path, for the button that copies it.
+ *
+ * Absolute paths stay out of what the viewer shows by default: they say where the checkout lives and
+ * under which user account. A reader of a viewer bound to a loopback address is on this machine and
+ * already knows; one bound with `--host` to another address is read from other machines, which do
+ * not, so there the path is withheld and the copy menu says why.
+ */
+export function exposesAbsolutePaths(host: string): boolean {
+  return isLoopbackHost(host);
+}
+
+/**
  * Whether a request's `Host` header names this server.
  *
  * DNS rebinding works by pointing an attacker-controlled name at 127.0.0.1 after the page has loaded,

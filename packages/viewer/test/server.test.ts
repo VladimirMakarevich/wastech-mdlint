@@ -166,6 +166,26 @@ describe("pages", () => {
     expect(headers["cross-origin-resource-policy"]).toBe("same-origin");
   });
 
+  // The copy button carries the path relative to the repository and, the viewer being bound to
+  // loopback here, the absolute one in the platform's own form — for a document, a linked file and
+  // the config file alike.
+  it("offers each shown file's relative and absolute path to copy", async () => {
+    const button = (relPath: string, absolute: string): string =>
+      `<button class="copy-path" type="button" hidden title="Copy the path" aria-label="Copy the path of ${relPath}" data-path="${relPath}" data-absolute-path="${absolute}">`;
+    expect((await get("/doc/docs/guide.md")).body).toContain(
+      button("docs/guide.md", path.join(workDir, "docs", "guide.md")),
+    );
+    expect((await get("/file/src/app.ts")).body).toContain(
+      button("src/app.ts", path.join(workDir, "src", "app.ts")),
+    );
+    expect((await get("/config")).body).toContain(
+      button(
+        "wastech-mdlint.config.json",
+        path.join(workDir, "wastech-mdlint.config.json"),
+      ),
+    );
+  });
+
   it("shows a linked source file with line anchors", async () => {
     const response = await get("/file/src/app.ts");
     expect(response.status).toBe(200);
