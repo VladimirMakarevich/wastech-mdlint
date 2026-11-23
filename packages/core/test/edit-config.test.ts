@@ -23,22 +23,118 @@ const commented = `{
 `;
 
 describe("editConfigText", () => {
-  it("changes one value and keeps every comment around it", () => {
-    const edited = editConfigText(commented, [
-      { op: "set", path: ["rules", 0, "severity"], value: "warning" },
+  // Compared as whole text: every byte but the new property is the file as written, and the entry it
+  // lands in stays on its one line.
+  it("adds a property and changes nothing else", () => {
+    expect(
+      editConfigText(commented, [
+        { op: "set", path: ["rules", 0, "severity"], value: "warning" },
+      ]),
+    ).toBe(
+      commented.replace(
+        '{ "rule": "REF-001" }',
+        '{ "rule": "REF-001", "severity": "warning" }',
+      ),
+    );
+  });
+
+  it("replaces a value in place, keeping a one-line value on one line", () => {
+    expect(
+      editConfigText(commented, [
+        {
+          op: "set",
+          path: ["rules", 1, "options", "bytes"],
+          value: { warn: 2000, error: 4000 },
+        },
+      ]),
+    ).toBe(
+      commented.replace('{ "warn": 1000 }', '{"warn": 2000, "error": 4000}'),
+    );
+  });
+
+  // The case jsonc-parser's `modify` gets wrong: its formatter re-lays-out the line the insertion
+  // starts on, which is the last rule's.
+  it("appends after a commented last element without moving its comment or its layout", () => {
+    expect(
+      editConfigText(commented, [
+        { op: "insert", path: ["rules", 2], value: { rule: "GRP-001" } },
+      ]),
+    ).toBe(
+      commented.replace(
+        "} // budget agreed with the team\n",
+        '}, // budget agreed with the team\n    {\n      "rule": "GRP-001"\n    }\n',
+      ),
+    );
+  });
+
+  // The other case `modify` gets wrong: removing the last element took the comment trailing the one
+  // before it along with the comma.
+  it("removes the last element and keeps the comment of the one before", () => {
+    const twoRules = `{
+  "rules": [
+    { "rule": "REF-001" }, // the one that stays
+    { "rule": "GRP-001" } // the one that goes
+  ]
+}
+`;
+    expect(editConfigText(twoRules, [{ op: "remove", path: ["rules", 1] }]))
+      .toBe(`{
+  "rules": [
+    { "rule": "REF-001" } // the one that stays
+  ]
+}
+`);
+  });
+
+  // A comment above a removed element may describe the ones after it too, so it is kept; a comment
+  // on the element's own line goes with it.
+  it("removes an element's own lines and keeps the comment above it", () => {
+    expect(
+      editConfigText(commented, [{ op: "remove", path: ["rules", 0] }]),
+    ).toBe(commented.replace('    { "rule": "REF-001" },\n', ""));
+  });
+
+  it("joins a list written on one line, and leaves it on one line", () => {
+    const appended = editConfigText(commented, [
+      { op: "insert", path: ["include", 1], value: "notes/**/*.md" },
     ]);
-    expect(edited).toContain(
-      "// Why these files: the agent context is what this linter is for.",
+    expect(appended).toContain('"include": ["docs/**/*.md", "notes/**/*.md"],');
+    expect(
+      editConfigText(appended, [{ op: "remove", path: ["include", 0] }]),
+    ).toContain('"include": ["notes/**/*.md"],');
+    expect(
+      editConfigText(commented, [
+        { op: "insert", path: ["include", 0], value: "a.md" },
+      ]),
+    ).toContain('"include": ["a.md", "docs/**/*.md"],');
+  });
+
+  it("gives an element inserted into a list written one per line a line of its own", () => {
+    expect(
+      editConfigText(commented, [
+        { op: "insert", path: ["rules", 1], value: { rule: "GRP-001" } },
+      ]),
+    ).toBe(
+      commented.replace(
+        '    { "rule": "SIZE-001"',
+        '    {\n      "rule": "GRP-001"\n    },\n    { "rule": "SIZE-001"',
+      ),
     );
-    expect(edited).toContain("// Broken links fail the build.");
-    expect(edited).toContain("// budget agreed with the team");
-    // The object the edit lands in is laid out again; its neighbors are left as they were written.
-    expect(edited).toContain(
-      '{\n      "rule": "REF-001",\n      "severity": "warning"\n    },',
+  });
+
+  it("fills an empty list, keeping a comment inside it", () => {
+    expect(
+      editConfigText('{\n  "rules": [ // none yet\n  ]\n}\n', [
+        { op: "insert", path: ["rules", 0], value: { rule: "REF-001" } },
+      ]),
+    ).toBe(
+      '{\n  "rules": [ // none yet\n    {\n      "rule": "REF-001"\n    }\n  ]\n}\n',
     );
-    expect(edited).toContain(
-      '{ "rule": "SIZE-001", "options": { "bytes": { "warn": 1000 } } } // budget',
-    );
+    expect(
+      editConfigText('{\n  "rules": []\n}\n', [
+        { op: "insert", path: ["rules", 0], value: { rule: "REF-001" } },
+      ]),
+    ).toBe('{\n  "rules": [\n    {\n      "rule": "REF-001"\n    }\n  ]\n}\n');
   });
 
   it("appends a rule in the file's own indentation and removes another", () => {
@@ -138,6 +234,31 @@ describe("editConfigText", () => {
     expect((error as ConfigError).message).toMatch(
       /^Cannot apply config edit 1:\n- config\.include\.x: /,
     );
+  });
+
+  it.each([
+    [
+      { op: "insert" as const, path: ["rules", 5], value: {} },
+      "the list has 2 elements, so nothing can go before element 5",
+    ],
+    [
+      { op: "set" as const, path: ["rules", 3], value: {} },
+      "the list has 2 elements, so there is no element 3 to set",
+    ],
+    [
+      { op: "set" as const, path: ["rules", "first"], value: {} },
+      "a name cannot pick an element of a list",
+    ],
+    [
+      { op: "set" as const, path: ["compile", 1], value: {} },
+      "a list that does not exist yet has no element 1",
+    ],
+    [
+      { op: "insert" as const, path: ["include", 0, 0], value: "x" },
+      "an insert needs a list to insert into",
+    ],
+  ])("refuses an edit its path cannot reach: %j", (edit, message) => {
+    expect(() => editConfigText(commented, [edit])).toThrow(message);
   });
 
   it("refuses to edit text that is not valid JSONC", () => {
