@@ -48,9 +48,9 @@ class EditProblem extends Error {}
  * names what is there after the edits before it (removing `rules[2]` moves `rules[3]` to index 2).
  *
  * New text follows the layout around it: a member added to a list or object written one member per
- * line gets a line of its own at the indentation of the others, while one added to a list or object
- * written on one line joins that line, and a replaced value stays on one line if the value it
- * replaces did. Indentation is tabs or the width of the file's first indented line, and the newline
+ * line gets a line of its own at the indentation of the others, spread over lines or kept to one
+ * like its neighbor; one added to a list or object written on one line joins that line; and a
+ * replaced value stays on one line if the value it replaces did. Indentation is tabs or the width of the file's first indented line, and the newline
  * is the file's own, detected from its bytes rather than the platform, so an edit to a CRLF config on
  * Linux does not leave it with mixed endings. Deterministic: the same text and edits always give the
  * same bytes. The result is not validated here; `parseConfiguration` decides whether it is a config.
@@ -339,10 +339,12 @@ function appendMember(
     const at =
       after.lineBreak?.offset ??
       (after.comma !== undefined ? after.comma + 1 : lastEnd);
+    // Spread over lines like the member before it, or kept to one line like it: a list of one-line
+    // rule entries gets another one-line entry.
     edits.push({
       offset: at,
       length: 0,
-      content: `${eol}${indent}${member(indent)}`,
+      content: `${eol}${indent}${member(spansLines(text, last) ? indent : undefined)}`,
     });
     return applyTextEdits(text, edits);
   }
@@ -366,7 +368,7 @@ function insertBefore(
       text,
       start,
       start,
-      `${indent}${valueText(value, indent, style)},${style.eol}`,
+      `${indent}${valueText(value, spansLines(text, target) ? indent : undefined, style)},${style.eol}`,
     );
   }
   return splice(
@@ -447,6 +449,10 @@ function lineStart(text: string, offset: number): number {
     start -= 1;
   }
   return start;
+}
+
+function spansLines(text: string, node: Node): boolean {
+  return text.slice(node.offset, node.offset + node.length).includes("\n");
 }
 
 function startsLine(text: string, offset: number): boolean {

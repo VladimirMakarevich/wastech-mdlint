@@ -53,7 +53,7 @@ describe("editConfigText", () => {
   });
 
   // The case jsonc-parser's `modify` gets wrong: its formatter re-lays-out the line the insertion
-  // starts on, which is the last rule's.
+  // starts on, which is the last rule's. The new entry is one line, like the entry before it.
   it("appends after a commented last element without moving its comment or its layout", () => {
     expect(
       editConfigText(commented, [
@@ -62,9 +62,44 @@ describe("editConfigText", () => {
     ).toBe(
       commented.replace(
         "} // budget agreed with the team\n",
-        '}, // budget agreed with the team\n    {\n      "rule": "GRP-001"\n    }\n',
+        '}, // budget agreed with the team\n    {"rule": "GRP-001"}\n',
       ),
     );
+  });
+
+  it("spreads a new element over lines when the one before it is", () => {
+    const spread = `{
+    "rules": [
+        {
+            "rule": "REF-001"
+        }
+    ]
+}
+`;
+    expect(
+      editConfigText(spread, [
+        {
+          op: "insert",
+          path: ["rules", 1],
+          value: { rule: "SIZE-001", options: { lines: { warn: 400 } } },
+        },
+      ]),
+    ).toBe(`{
+    "rules": [
+        {
+            "rule": "REF-001"
+        },
+        {
+            "rule": "SIZE-001",
+            "options": {
+                "lines": {
+                    "warn": 400
+                }
+            }
+        }
+    ]
+}
+`);
   });
 
   // The other case `modify` gets wrong: removing the last element took the comment trailing the one
@@ -117,7 +152,7 @@ describe("editConfigText", () => {
     ).toBe(
       commented.replace(
         '    { "rule": "SIZE-001"',
-        '    {\n      "rule": "GRP-001"\n    },\n    { "rule": "SIZE-001"',
+        '    {"rule": "GRP-001"},\n    { "rule": "SIZE-001"',
       ),
     );
   });
@@ -149,7 +184,7 @@ describe("editConfigText", () => {
       { rule: "SIZE-001", options: { bytes: { warn: 1000 } } },
       { rule: "GRP-001" },
     ]);
-    expect(edited).toMatch(/\n {8}\{\n {12}"rule": "GRP-001"\n {8}\}/);
+    expect(edited).toContain('\n        {"rule": "GRP-001"}\n    ]');
   });
 
   // Each edit is applied to the text the one before it produced, so the second path already sees
