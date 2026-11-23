@@ -19,6 +19,7 @@ import { assertBuilt } from "../../core/test/support/assert-built.js";
 import { parseCliArgs } from "../src/cli-args.js";
 import { hashText, saveCandidate } from "../src/config-editor.js";
 import { Corpus } from "../src/corpus.js";
+import { openCommand, type LaunchCommand } from "../src/open-file.js";
 import { startViewer, type RunningViewer } from "../src/server.js";
 
 assertBuilt(
@@ -48,6 +49,10 @@ type Viewer = {
   viewer: RunningViewer;
   port: number;
   token: string;
+  // Every program the viewer was asked to start, in place of starting it, so a test run never opens
+  // a window; `failLaunch` makes the next start fail as a missing program would.
+  launched: LaunchCommand[];
+  failLaunch: boolean;
 };
 
 async function start(allowConfigWrites: boolean): Promise<Viewer> {
@@ -58,6 +63,8 @@ async function start(allowConfigWrites: boolean): Promise<Viewer> {
     COMMENTED_CONFIG,
     "utf8",
   );
+  const launched: LaunchCommand[] = [];
+  const state = { failLaunch: false };
   const viewer = await startViewer({
     cwd: dir,
     host: "127.0.0.1",
@@ -67,6 +74,14 @@ async function start(allowConfigWrites: boolean): Promise<Viewer> {
     // the corpus itself, which is the path that has nothing else to rely on.
     watch: false,
     allowConfigWrites,
+    launch: (command) => {
+      if (state.failLaunch) {
+        state.failLaunch = false;
+        return Promise.reject(new Error("spawn ENOENT"));
+      }
+      launched.push(command);
+      return Promise.resolve();
+    },
   });
   const port = Number(new URL(viewer.url).port);
   const page = await send(port, "/config");
@@ -77,7 +92,19 @@ async function start(allowConfigWrites: boolean): Promise<Viewer> {
   if (token === undefined) {
     throw new Error("the config page carries no change token");
   }
-  return { dir, viewer, port, token };
+  return {
+    dir,
+    viewer,
+    port,
+    token,
+    launched,
+    get failLaunch() {
+      return state.failLaunch;
+    },
+    set failLaunch(value: boolean) {
+      state.failLaunch = value;
+    },
+  };
 }
 
 function send(
@@ -119,7 +146,7 @@ function send(
 // A change request exactly as the config page's script sends one.
 function change(
   target: Viewer,
-  route: "preview" | "save",
+  route: "preview" | "save" | "open",
   body: unknown,
   headers: Record<string, string> = {},
 ): Promise<Response> {
@@ -155,6 +182,75 @@ afterAll(async () => {
       await rm(target.dir, { recursive: true, force: true });
     }
   }
+});
+
+// Showing the config in the file manager, or opening it in its default application, starts a program
+// on the machine running the viewer — so the request is held to every check a save is, may only pick
+// one of the two actions, and always applies to the config the corpus was loaded from.
+describe("opening the config", () => {
+  it("offers both actions on the config page of a loopback viewer", async () => {
+    const { body } = await send(readOnly.port, "/config");
+    expect(body).toContain(
+      '<p class="config-open" hidden><button class="config-open-button" type="button" data-open="reveal">Show in folder</button><button class="config-open-button" type="button" data-open="open">Open in default app</button>',
+    );
+  });
+
+  it.each(["reveal", "open"] as const)(
+    "starts the system's program to %s the config file, with no write flag needed",
+    async (action) => {
+      const before = readOnly.launched.length;
+      const response = await change(readOnly, "open", { action });
+      expect(response.status).toBe(200);
+      expect(JSON.parse(response.body)).toEqual({ status: "opened", action });
+      expect(readOnly.launched.slice(before)).toEqual([
+        openCommand(
+          process.platform,
+          action,
+          path.join(readOnly.dir, "wastech-mdlint.config.json"),
+        ),
+      ]);
+    },
+  );
+
+  it("refuses a request without the page's token, and starts nothing", async () => {
+    const before = readOnly.launched.length;
+    const response = await change(
+      readOnly,
+      "open",
+      { action: "open" },
+      { "X-Wastech-Viewer-Token": "0".repeat(64) },
+    );
+    expect(response.status).toBe(403);
+    const foreign = await change(
+      readOnly,
+      "open",
+      { action: "open" },
+      { Origin: "http://attacker.example" },
+    );
+    expect(foreign.status).toBe(403);
+    expect(readOnly.launched.length).toBe(before);
+  });
+
+  it("takes only a POST, and only one of the two actions", async () => {
+    const before = readOnly.launched.length;
+    expect((await send(readOnly.port, "/api/config/open")).status).toBe(405);
+    for (const body of [{ action: "delete" }, { action: ["open"] }, {}, null]) {
+      const response = await change(readOnly, "open", body);
+      expect(response.status, JSON.stringify(body)).toBe(400);
+    }
+    expect(readOnly.launched.length).toBe(before);
+  });
+
+  // A program that cannot be started is a failure the reader must hear about, not a silent success.
+  it("reports a program that could not be started", async () => {
+    readOnly.failLaunch = true;
+    const response = await change(readOnly, "open", { action: "reveal" });
+    expect(response.status).toBe(500);
+    expect(JSON.parse(response.body)).toMatchObject({
+      status: "failed",
+      error: expect.stringContaining("spawn ENOENT") as unknown,
+    });
+  });
 });
 
 describe("config page", () => {

@@ -475,6 +475,9 @@ export async function renderConfigArticle(
     allowWrites: boolean;
     // Whether the copy button may offer the file's absolute path (`exposesAbsolutePaths`).
     showAbsolutePath: boolean;
+    // Whether the file may be shown in the file manager or opened in its default application, which
+    // starts a program on the machine running the viewer.
+    canOpen: boolean;
   },
 ): Promise<ElementContent[]> {
   const file = await readConfigFile(corpus);
@@ -500,6 +503,23 @@ export async function renderConfigArticle(
             file.displayPath,
             options.showAbsolutePath ? file.absolutePath : undefined,
           ),
+        ]),
+    // Hidden until the script that sends them has run. Left out entirely where opening is off, since
+    // the server would refuse them.
+    file === undefined || !options.canOpen
+      ? undefined
+      : h("p.config-open", { hidden: true }, [
+          h(
+            "button.config-open-button",
+            { type: "button", dataOpen: "reveal" },
+            "Show in folder",
+          ),
+          h(
+            "button.config-open-button",
+            { type: "button", dataOpen: "open" },
+            "Open in default app",
+          ),
+          h("span.config-open-status", { role: "status" }),
         ]),
     file === undefined
       ? undefined

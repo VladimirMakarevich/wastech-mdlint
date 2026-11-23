@@ -50,6 +50,12 @@ import {
   renderGraphArticle,
 } from "./graph-view.js";
 import { highlight, languageForPath } from "./highlight.js";
+import {
+  launchDetached,
+  openCommand,
+  openRefusal,
+  type Launcher,
+} from "./open-file.js";
 import { rawHtml, renderPage, type PageParams } from "./page.js";
 import {
   renderDocument,
@@ -79,6 +85,9 @@ export type ViewerOptions = {
   watch: boolean;
   // Off unless the user asked for it: without it the viewer writes nothing to the repository.
   allowConfigWrites?: boolean;
+  // Starts the program that reveals or opens the config file. Replaced in tests, so a test run checks
+  // what would be started without opening a window on the machine running it.
+  launch?: Launcher;
 };
 
 export type RunningViewer = {
@@ -98,9 +107,13 @@ const GRAPH_NOT_FOUND =
 // into memory would cost the server for nothing.
 const MAX_CHANGE_BODY_BYTES = 256 * 1024;
 
-// The only requests with a body the server acts on. Each computes from or writes the config, so each
-// passes the checks in `changeRequestProblem` before its body is read.
-const CHANGE_ROUTES = new Set(["/api/config/preview", "/api/config/save"]);
+// The only requests with a body the server acts on. Each computes from the config, writes it or opens
+// it in another program, so each passes the checks in `changeRequestProblem` before its body is read.
+const CHANGE_ROUTES = new Set([
+  "/api/config/preview",
+  "/api/config/save",
+  "/api/config/open",
+]);
 
 // A source file larger than this is a generated or vendored file, not something a document links to
 // for a reader; highlighting it would stall the page for nothing.
@@ -164,6 +177,8 @@ export async function startViewer(
   const diagnostics = new Diagnostics();
   const allowConfigWrites = options.allowConfigWrites === true;
   const showAbsolutePaths = exposesAbsolutePaths(options.host);
+  const launch = options.launch ?? launchDetached;
+  const openRefused = openRefusal(options.host);
   // Random per process and written only into the config page, so a change request that carries it
   // came from a page this server rendered.
   const changeToken = randomBytes(32).toString("hex");
@@ -310,6 +325,7 @@ export async function startViewer(
           article: await renderConfigArticle(corpus, {
             allowWrites: allowConfigWrites,
             showAbsolutePath: showAbsolutePaths,
+            canOpen: openRefused === undefined,
           }),
           changeToken,
         }),
@@ -730,6 +746,10 @@ export async function startViewer(
       );
       return;
     }
+    if (target === "/api/config/open") {
+      await openConfig(response, json);
+      return;
+    }
     const parsed = parseChangeRequest(json);
     if (!parsed.ok) {
       sendJson(response, { status: "refused", error: parsed.message }, 400);
@@ -742,6 +762,70 @@ export async function startViewer(
       return;
     }
     await previewChange(response, parsed.request);
+  }
+
+  // Shows the config file in the file manager or opens it in its default application, on the
+  // machine running the viewer. The file is always the one the corpus was loaded from; the request
+  // only picks which of the two, so it can name no other file and pass no argument of its own.
+  async function openConfig(
+    response: ServerResponse,
+    body: unknown,
+  ): Promise<void> {
+    const action = (body as { action?: unknown } | null)?.action;
+    if (action !== "reveal" && action !== "open") {
+      sendJson(
+        response,
+        {
+          status: "refused",
+          error: 'The action must be "reveal" or "open".',
+        },
+        400,
+      );
+      return;
+    }
+    if (openRefused !== undefined) {
+      sendJson(response, { status: "refused", error: openRefused }, 403);
+      return;
+    }
+    const file = await readConfigFile(corpus);
+    if (file === undefined) {
+      sendJson(
+        response,
+        {
+          status: "refused",
+          error: "This repository has no config file to open.",
+        },
+        409,
+      );
+      return;
+    }
+    const command = openCommand(process.platform, action, file.absolutePath);
+    if (command === undefined) {
+      sendJson(
+        response,
+        {
+          status: "refused",
+          error:
+            "The config file's path cannot be passed to the system safely.",
+        },
+        409,
+      );
+      return;
+    }
+    try {
+      await launch(command);
+    } catch (error) {
+      sendJson(
+        response,
+        {
+          status: "failed",
+          error: `Could not start ${command.command}: ${(error as Error).message}`,
+        },
+        500,
+      );
+      return;
+    }
+    sendJson(response, { status: "opened", action });
   }
 
   // The file a change applies to, or `undefined` after answering why there is none to apply it to.
