@@ -96,7 +96,7 @@ async function draw(
   view.nodes = paintOrder(view);
   const echarts = await loadECharts();
   canvas.replaceChildren();
-  const layout = layoutFor(view, canvas, kind);
+  let layout = layoutFor(view, canvas, kind);
   const chart = echarts.init(canvas);
   // The zoom the reader has reached, kept here because ECharts hands its label callback no current
   // zoom: the node box it passes was measured when the labels were created and never again.
@@ -117,7 +117,36 @@ async function draw(
       location.href = node.href;
     }
   });
-  new ResizeObserver(() => chart.resize()).observe(canvas);
+  // The layout is sized for its box: its forces fill it and the focused document is pinned in its
+  // middle. When the box changes for good — the window resized, a side column dragged wider — the
+  // graph is laid out again for the new one, from where every document is and at the reader's zoom.
+  // A drag resizes the box every frame, so that waits until the size has held for a moment; the
+  // canvas itself follows every frame.
+  let laidOutFor = { width: canvas.clientWidth, height: canvas.clientHeight };
+  let resizeTimer: number | undefined;
+  new ResizeObserver(() => {
+    chart.resize();
+    clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(() => {
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      if (
+        Math.abs(width - laidOutFor.width) < RELAYOUT_MIN_CHANGE &&
+        Math.abs(height - laidOutFor.height) < RELAYOUT_MIN_CHANGE
+      ) {
+        return;
+      }
+      laidOutFor = { width, height };
+      layout = {
+        ...layoutFor(view, canvas, kind),
+        zoom: undefined,
+        minZoom: layout.minZoom,
+        maxZoom: layout.maxZoom,
+      };
+      settleUntil = performance.now() + LAYOUT_SETTLE_MS;
+      chart.setOption(graphOption(view, layout, readColors(), () => zoom));
+    }, RELAYOUT_DELAY_MS);
+  }).observe(canvas);
 
   // The reader's zoom arrives here after ECharts has already laid the labels out at the old one, so
   // they are laid out once more at the new one. The factor is clamped as ECharts clamps it; a pan
@@ -205,6 +234,10 @@ const LEGEND_HEIGHT = 40;
 // ECharts' force layout runs about five hundred steps of sixteen milliseconds before it stops.
 const LAYOUT_SETTLE_MS = 12_000;
 const LABEL_CHECK_INTERVAL_MS = 250;
+// A box that changes by less than this keeps its layout: a scrollbar coming and going is not worth
+// setting every document moving.
+const RELAYOUT_MIN_CHANGE = 8;
+const RELAYOUT_DELAY_MS = 200;
 
 // Links are thin and faint so the documents read first; with a document focused, the links that do
 // not touch it fade a little further and its own are drawn in the accent color.
