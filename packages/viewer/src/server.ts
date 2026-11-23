@@ -124,6 +124,10 @@ const IMAGE_TYPES: Record<string, string> = {
 const STYLESHEET = fileURLToPath(
   new URL("../assets/viewer.css", import.meta.url),
 );
+// The tab icon, so a viewer tab stands out among the others a reader has open.
+const FAVICON = fileURLToPath(
+  new URL("../assets/favicon.ico", import.meta.url),
+);
 const CLIENT_DIR = fileURLToPath(new URL("../dist/client/", import.meta.url));
 // The page scripts are the compiled client modules, which import one another by file name. A name
 // is one lowercase segment ending in `.js`, so a request can reach nothing but a compiled module.
@@ -304,7 +308,7 @@ export async function startViewer(
     } else if (target === "/events") {
       openEventStream(request, response);
     } else if (target === "/favicon.ico") {
-      response.writeHead(204, assetHeaders()).end();
+      await sendPackageAsset(request, response, "favicon.ico");
     } else if (target.startsWith("/assets/")) {
       await sendPackageAsset(
         request,
@@ -467,12 +471,14 @@ export async function startViewer(
     const asset =
       name === "viewer.css"
         ? { file: STYLESHEET, type: "text/css; charset=utf-8" }
-        : CLIENT_SCRIPT_NAME.test(name)
-          ? {
-              file: path.join(CLIENT_DIR, name),
-              type: "text/javascript; charset=utf-8",
-            }
-          : undefined;
+        : name === "favicon.ico"
+          ? { file: FAVICON, type: "image/x-icon" }
+          : CLIENT_SCRIPT_NAME.test(name)
+            ? {
+                file: path.join(CLIENT_DIR, name),
+                type: "text/javascript; charset=utf-8",
+              }
+            : undefined;
     const body =
       asset === undefined
         ? undefined

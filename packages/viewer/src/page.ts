@@ -64,6 +64,7 @@ export function renderPage(params: PageParams): string {
                 content: params.changeToken,
               }),
           h("title", `${params.title} · ${params.siteName}`),
+          h("link", { rel: "icon", href: "/favicon.ico" }),
           // Classic and blocking, ahead of the stylesheet, so a stored theme is applied before the
           // first paint; every other script is a deferred module.
           h("script", { src: "/assets/theme.js" }),

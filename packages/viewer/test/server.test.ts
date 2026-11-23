@@ -1,4 +1,4 @@
-import { cp, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { request, type IncomingHttpHeaders } from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -178,6 +178,23 @@ describe("pages", () => {
     expect(response.status).toBe(200);
     expect(response.headers["content-type"]).toBe("image/svg+xml");
     expect(response.headers["content-security-policy"]).toContain("sandbox");
+  });
+
+  // A browser asks for /favicon.ico whatever the page says; both that request and the page's own
+  // link must reach the viewer's icon, byte for byte, so the tab shows it rather than a blank.
+  it("serves the tab icon and links it from every page", async () => {
+    const icon = await readFile(
+      fileURLToPath(new URL("../assets/favicon.ico", import.meta.url)),
+    );
+    const response = await fetch(`http://127.0.0.1:${port}/favicon.ico`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/x-icon");
+    expect(Buffer.from(await response.arrayBuffer()).equals(icon)).toBe(true);
+    for (const page of ["/doc/README.md", "/graph", "/dashboard", "/config"]) {
+      expect((await get(page)).body, page).toContain(
+        '<link rel="icon" href="/favicon.ico">',
+      );
+    }
   });
 
   it("serves the page scripts, Mermaid and ECharts from the packages", async () => {
