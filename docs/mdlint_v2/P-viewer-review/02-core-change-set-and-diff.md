@@ -1,43 +1,37 @@
 # 02 · Change set and text diff in core
 
-> Part of the [viewer review plan](index.md).
+> Part of the [viewer review plan](index.md). Status **Implemented** in `packages/core/src/changes/`.
 
 ## Goal
 
-From git's list of changed paths and the corpus the viewer already holds, produce the data the review shows: which corpus documents changed and how, whether the config changed, which changed Markdown lies outside the corpus, which linked code lines moved, and a line-and-word diff of each document. Everything here is a pure function over text and paths, so it is deterministic, testable without git, and independent of the user's diff configuration.
+From git's list of changed paths and the corpus the viewer already holds, produce the data the review shows: which corpus documents changed and how, whether the config changed, which changed Markdown lies outside the corpus, which linked code lines moved, and a line-and-word diff of each document. Everything here except the one git sequence is a pure function over text and paths, so it is deterministic, testable without git, and independent of the user's diff configuration.
 
-## Steps
+## What was built
 
-1. **Classify changed paths against the corpus.** Given the head corpus (`loadContext`'s documents and graph) and its scope (`resolveCorpusScope`), split the changed paths into:
-   - corpus documents — added, modified, deleted or renamed (old and new path both kept). A deleted document is in the change set when its path matches the head scope's globs, since it no longer exists to be loaded; a rename that crosses the scope boundary is an add or a delete on the corpus side;
-   - the config file `wastech-mdlint.config.json`, as its own entry, since it changes what the corpus is;
-   - Markdown outside the corpus (`isMarkdownFile`), as a count and a list, so a narrowed scope never reads as "no changes";
-   - every other changed file, kept for step 6.
+1. **Classification — `classifyChanges(changes, corpus)`.** `corpus` is the documents the host loaded, its `ScopeTester` and the config's repository-relative path. Changes split into corpus `documents`, `configChanged`, `outsideCorpus` (changed Markdown the corpus does not hold, as changes with their status) and `otherFiles`, each sorted by path. A deleted or renamed-away document counts when the current scope would hold its path — the current config's view of the base, not the base config's. A rename that crosses the scope's edge becomes an addition or a deletion on the corpus side, with its other half reported where outside changes go. A renamed config is a config change.
 
-2. **Normalize text.** Before any diff or hash, CRLF becomes LF and a leading BOM is dropped, on both sides. With `core.autocrlf=true` on Windows the base blob holds LF and the work-tree file CRLF, and without this every line of every file would differ. Phase 06 hashes the same normalized text.
+2. **One sequence for every host — `collectChangeSet(repository, { base?, worktree, corpus })`.** It resolves the base, finds the merge-base, lists changes and classifies them, returning a `ChangeSet` (the classification plus `base`, `mergeBase`, `head` and `worktree`) or phase 01's `GitUnavailable` unchanged. `mergeBase` and `head` together tell a host when its copy is stale.
 
-3. **Line diff.** A Myers diff over lines, grouped into hunks with three lines of context, each line carrying its base and head line numbers. It is computed in JavaScript rather than taken from `git diff`, because phase 06 compares two texts git never stored (a reviewed snapshot and the current file), and because git's output follows the user's diff configuration. Choose in this phase between the `diff` package (jsdiff: mature, no dependencies) as a pinned core dependency and a small Myers implementation in core, which keeps the published package's dependency list unchanged. Either way the hunk format is core's own type, not the library's.
+3. **Normalization — `normalizeText`.** CRLF and a lone CR become LF and a leading BOM is dropped, before any diff and, in phase 06, any hash. A lone CR counts as a line ending as the Markdown parser counts it, so diff line numbers are the parsed document's.
 
-4. **Word diff inside changed lines.** Within a hunk, pair removed and added lines by order, or by similarity when the counts differ, and diff each pair by tokens: runs of Unicode letters and digits, so Cyrillic works; whitespace runs; punctuation; and Markdown markers such as `**`, `` ` ``, `[` and `](` as tokens of their own, so a changed link target highlights the target and not the whole link. A pair below a similarity threshold stays a whole-line removal and addition, because a rewritten paragraph highlighted word by word is noise.
+4. **Line diff without a new dependency.** `sequence-diff.ts` is Myers' algorithm over any sequence with a custom equality, trimming the common start and end first, and treating the middle as wholly replaced past 2000 edits, where the per-edit memory would otherwise grow with the square of the edits. Chosen over the `diff` package because core is published and the review needs equality jsdiff would have to be bent to (a table cell compared without its padding). A test checks the script is minimal on 300 generated cases against a longest-common-subsequence count.
 
-5. **Table rows.** A changed line that the parsed document places inside a GFM table (from its positions, not a regex) is diffed by cell, so the changed cell is what lights up.
+5. **`diffText(base, head, options)`** returns hunks with three lines of context (merged when they touch), every line numbered on the sides it exists on, `added` and `removed` counts, and `newlineAtEndChanged` for the one change no line shows. Removed lines come before added ones in a block, as `git diff` prints them.
 
-6. **Changed code lines.** For changed non-Markdown files that a corpus document links to, compute the head-side line ranges that were edited and the first line that moved, from the same line diff over their base and head text. That is all phase 05 needs to tell whether a link to `#L12-L20` points at edited lines or at lines a change above them shifted.
+6. **Words and cells.** In each change block, removed and added lines are paired by an order-preserving dynamic program that maximizes total similarity, kept only at 0.5 or above; past 400 comparisons a block is paired line by line instead. Paired lines carry `segments`, the changed ones marked. Words are runs of Unicode letters and digits, so Cyrillic works; Markdown markers (`**`, a run of backticks, `](`, `![` and the like) are tokens of their own, so a changed link target highlights only the target. Rows listed by `tableRowLines(document)` — header, delimiter and body rows from the parsed table, not a regex — are compared by cell, with the padding ignored, so a column realigned by a formatter highlights only the cell that changed.
 
-7. **Types and caching.** Explicit, JSON-serializable public types — `ChangeSet` (base ref, base commit, merge-base, head as work tree or commit, sorted entries, `configChanged`, `outsideCorpus`) and `TextDiff` (hunks of lines of segments) — so `/api/changes` returns them without reshaping. A change set is keyed by merge-base, `HEAD` and the work-tree state, and a single saved file is re-diffed against its cached base text rather than recomputing the whole set.
+7. **Code lines — `lineCorrespondence(base, head)` and `lineRangeKept(runs, start, end)`.** The runs of unchanged lines, as plain data, and whether a head range still shows what the same base range showed: false when a line in it was edited, or a change above shifted it, true again when changes above cancel out. The host picks which changed files to compute this for (those a document links to); core does not decide what is linked.
+
+## Moved to phase 03
+
+Caching. A change set and the base texts are cached for as long as the viewer process lives, keyed by `mergeBase` and `head`; a one-shot CLI run has nothing to keep. Core supplies what the cache needs — the key and a per-document `diffText` to re-run on a save — and phase 03 owns the cache.
 
 ## Tests
 
-Pure unit tests over string pairs, no git: CRLF against LF is no change; a BOM is no change; one changed Cyrillic word highlights that word; a changed link target highlights the target; a changed table cell; a rewritten paragraph stays whole lines; an empty file; a whole file added or deleted; hunk and segment order stable.
-
-Classification tests over an in-memory corpus and a synthetic changed-path list: added, modified, deleted and renamed documents; a rename into and out of the scope; a config change; Markdown outside the corpus counted and listed; a changed code file with the ranges a link would check.
-
-## Docs
-
-Internal until phase 03 renders it.
+`sequence-diff.test.ts` (empty, identical, the textbook example, 300 generated cases against a minimal count, custom equality, the edit limit, determinism); `text-diff.test.ts` (normalization; line endings and a BOM are no change; a Cyrillic word; a link target; a rewritten line left whole; pairing with the most similar of several lines; a realigned table; hunk grouping and numbering; added and deleted files; the final line break; table rows from a parsed document; kept and lost line ranges); `change-set.test.ts` (classification tables, renames across the scope's edge, a renamed config, and `collectChangeSet` on a fixture repository). The git fixture helpers moved to `test/support/git-fixture.ts`, shared with phase 01's tests.
 
 ## Done when
 
-- [ ] Core exports the change-set classification, text normalization, line and word diff, and the changed-code-range helper, with explicit types.
-- [ ] Every diff and classification is covered by unit tests that need no git.
-- [ ] A change set is cached and a single save re-diffs one file.
+- [x] Core exports the change-set classification and collection, text normalization, line and word diff, and the code-range helpers, with explicit types.
+- [x] Every diff and classification is covered by unit tests that need no git.
+- [ ] A change set is cached and a single save re-diffs one file — in phase 03.

@@ -192,6 +192,30 @@ export type {
   OpenGitRepositoryOptions,
 } from "./git/git-repository.js";
 export { GitCommandError } from "./git/git-command.js";
+
+// Changes — what a branch changed in the corpus, and the diff a reviewer reads. The sequence diff
+// under them stays internal: hosts compare texts, not arbitrary sequences.
+export { classifyChanges, collectChangeSet } from "./changes/change-set.js";
+export type {
+  ChangeSet,
+  ClassifiedChanges,
+  CorpusMembership,
+} from "./changes/change-set.js";
+export {
+  diffText,
+  lineCorrespondence,
+  lineRangeKept,
+  normalizeText,
+  tableRowLines,
+} from "./changes/text-diff.js";
+export type {
+  DiffHunk,
+  DiffLine,
+  DiffSegment,
+  LineRun,
+  TextDiff,
+  TextDiffOptions,
+} from "./changes/text-diff.js";
 export {
   renderContextGraphDot,
   renderContextGraphMermaid,
