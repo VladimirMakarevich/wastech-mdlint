@@ -23,6 +23,17 @@ The security model is a deterministic, local-first Markdown analysis tool. Keep 
 - Do not add mutating MCP tools, HTTP or SSE transports, or hidden side-channel behavior unless the user explicitly asks for that work.
 - CLI and MCP reuse core behavior rather than implementing separate security-sensitive code paths for config, parsing, or rule execution — a second implementation is a second thing to get right and a second thing to forget to fix.
 
+## Viewer Safety
+
+The viewer is the only host with a network listener, so any web page the user has open can make the browser send it requests. Its boundary is:
+
+- Bound to `127.0.0.1` by default; another address only through an explicit `--host`, which it announces.
+- Read-only: `GET` and `HEAD` only, nothing written to the repository.
+- Every request's `Host` must be localhost, an IP literal or the configured host (DNS rebinding), and a request carrying another origin, or a non-navigation from another site, is refused.
+- It serves corpus documents, plus only the non-Markdown files a corpus document links to or embeds. A request path is decoded segment by segment and refused if it could climb out of the repository; the real path of every file read is checked to be inside it.
+- Author HTML is sanitized before the viewer adds its own markup; pages carry a CSP that allows scripts from the viewer's origin only. SVG and other files served as-is are sandboxed.
+- No CDN or other network fetch: Mermaid and every asset are served from the installed packages.
+
 ## Installation And File Writes
 
 - No install-time file writes. `postinstall`-style config creation is not acceptable: installing a package must not modify the repository installing it.

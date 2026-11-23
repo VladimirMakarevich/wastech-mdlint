@@ -1,0 +1,22 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": ".",
+    // Lands beside the server's output, where the server resolves it relative to its own module.
+    "outDir": "../../dist/client",
+    // Kept out of `dist/`, which is the published payload; by default it would land in `outDir`
+    // because `rootDir` is this directory.
+    "tsBuildInfoFile": "../../tsconfig.client.tsbuildinfo",
+    // Browser globals only: a Node API used here would type-check under the base `types: ["node"]`
+    // and then fail in the page.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": [],
+    // Browser module rules, not Node's. Under the base `NodeNext`, this package's `"type": "module"`
+    // makes every file a module and TypeScript appends `export {}` to `theme.ts` — a syntax error in
+    // the classic script it has to be. Here only a file with `import`/`export` is a module.
+    "module": "ES2022",
+    "moduleResolution": "Bundler"
+  },
+  "include": ["*.ts"]
+}

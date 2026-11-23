@@ -26,13 +26,14 @@ The full user guide — capabilities grouped by area, a page per rule with examp
 
 ## Workspace layout
 
-`wastech-mdlint` is an npm-workspaces monorepo. `@wastech-mdlint/core` owns the entire pipeline; the CLI and MCP server are thin hosts over it.
+`wastech-mdlint` is an npm-workspaces monorepo. `@wastech-mdlint/core` owns the entire pipeline; the CLI, the MCP server and the viewer are thin hosts over it.
 
 | Package | Role | Bin |
 | --- | --- | --- |
 | [`@wastech-mdlint/core`](packages/core) | Parsing, config, rule engine, graph, and formatting — the whole pipeline. | — |
 | [`@wastech-mdlint/cli`](packages/cli) | commander CLI host: argument parsing, command dispatch, exit codes. | `wastech-mdlint` |
 | [`@wastech-mdlint/mcp-server`](packages/mcp-server) | stdio MCP host: six read-only tools — `lint`, `lint-files`, `context-graph`, `context-slice`, `impact-analysis`, `compile-context`. | `wastech-mdlint-mcp` |
+| [`@wastech-mdlint/viewer`](packages/viewer) | Local web viewer for the linted corpus: rendered pages, Mermaid diagrams, highlighted code, backlinks, search, lint findings on the page, live reload. Experimental and not yet published. | `wastech-mdlint-viewer` |
 
 Build and test the whole workspace from the repo root:
 

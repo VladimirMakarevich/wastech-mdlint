@@ -17,6 +17,13 @@ export default tseslint.config(
     },
   },
   {
+    // The viewer's page script runs in a browser, where Node's globals do not exist.
+    files: ["packages/viewer/src/client/**/*.ts"],
+    languageOptions: {
+      globals: globals.browser,
+    },
+  },
+  {
     files: ["**/*.{js,mjs,cjs}"],
     languageOptions: {
       ecmaVersion: "latest",

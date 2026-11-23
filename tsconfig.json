@@ -3,6 +3,8 @@
   "references": [
     { "path": "./packages/core" },
     { "path": "./packages/cli" },
-    { "path": "./packages/mcp-server" }
+    { "path": "./packages/mcp-server" },
+    { "path": "./packages/viewer" },
+    { "path": "./packages/viewer/src/client" }
   ]
 }

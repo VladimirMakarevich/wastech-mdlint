@@ -9,14 +9,16 @@ An npm-workspaces monorepo. All product code lives under `packages/*`; there is 
 - `@wastech-mdlint/core` — the engine.
 - `@wastech-mdlint/cli` — the CLI host. Bin: `wastech-mdlint`.
 - `@wastech-mdlint/mcp-server` — the stdio MCP host. Bin: `wastech-mdlint-mcp`.
+- `@wastech-mdlint/viewer` — the local web viewer host, experimental and `private` (not published). Bin: `wastech-mdlint-viewer`.
 
 ## Core Ownership
 
 - Core owns the parsing pipeline, config loading, lint orchestration, graph construction, compile logic, and result formatting.
-- CLI and MCP are thin host adapters over core. They must not fork or duplicate the core pipeline.
+- CLI, MCP and the viewer are thin host adapters over core. They must not fork or duplicate the core pipeline.
 - Host-specific behavior belongs at the boundary:
   - CLI: argument parsing, command dispatch, exit codes, file output.
   - MCP: tool registration, input validation, structured output, error wrapping.
+  - Viewer: HTTP serving, HTML rendering of the tree core parsed (`parseDocumentWithTree`), highlighting, live reload. It takes its corpus from `loadContext`, its findings from `lintContext` over that same corpus, its link targets from `resolveTargetCandidates` and its heading ids from core's slugs, so a page and the lint findings about it never disagree.
 - Shared computational behavior belongs in core, not in host packages.
 
 The reason is not tidiness. Two hosts that each compute an answer will eventually compute two different answers, and because each package's own tests pass, nothing reports the divergence — which is why a cross-host parity guard exists in the test suite as well.
@@ -35,7 +37,7 @@ The reason is not tidiness. Two hosts that each compute an answer will eventuall
 - Config uses a local `$schema` — a relative path into the installed package, never a URL. Schema resolution stays offline and version-matched, so an editor validates against the version actually installed rather than whatever the network serves.
 - No `.cjs`, `.mjs`, or runtime TypeScript config loading.
 - MCP stays stdio-only, and its six shipped tools stay read-only.
-- External HTTP link checking, external link caches, LSP, and docs-site work are outside scope unless explicitly requested.
+- External HTTP link checking, external link caches, LSP, and docs-site work are outside scope unless explicitly requested. The local viewer is the one requested exception: it serves a repository on this machine, not a published site.
 
 ## What Not To Do
 
