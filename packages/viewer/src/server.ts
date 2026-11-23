@@ -57,6 +57,7 @@ import {
   type Launcher,
 } from "./open-file.js";
 import { rawHtml, renderPage, type PageParams } from "./page.js";
+import { findingPrompts } from "./prompts.js";
 import {
   renderDocument,
   documentHref,
@@ -335,6 +336,17 @@ export async function startViewer(
       sendJson(response, await configApi(corpus, allowConfigWrites));
     } else if (target === "/api/diagnostics") {
       sendDiagnostics(response, params);
+    } else if (target === "/api/prompts") {
+      const line = params.get("line");
+      const answer = await findingPrompts({
+        corpus,
+        findings: diagnostics.messagesByFile,
+        // Only ever compared against the corpus's own paths and the findings' own rule ids.
+        filePath: params.get("path") ?? "",
+        ruleId: params.get("rule") ?? undefined,
+        line: line === null ? undefined : Number(line),
+      });
+      sendJson(response, answer.body, answer.status);
     } else if (target === "/events") {
       openEventStream(request, response);
     } else if (target === "/favicon.ico") {

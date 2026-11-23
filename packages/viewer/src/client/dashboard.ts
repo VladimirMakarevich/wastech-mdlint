@@ -1,4 +1,5 @@
 import { onServerEvent } from "./live-reload.js";
+import { initPromptButtons } from "./prompts.js";
 
 // Filters and sorts the dashboard as the reader types, without reloading. It does not filter on its
 // own: on every change it asks the server for the same page the form would open and swaps in that
@@ -17,6 +18,7 @@ export function initDashboard(): void {
   if (form === null || results === null || summary === null) {
     return;
   }
+  initPromptButtons(results);
   // Every change applies itself, so the button the form needs without script would do nothing.
   const apply = form.querySelector<HTMLButtonElement>('button[type="submit"]');
   if (apply !== null) {
@@ -46,6 +48,7 @@ export function initDashboard(): void {
       return;
     }
     results!.replaceChildren(...nextResults.childNodes);
+    initPromptButtons(results!);
     summary!.textContent = nextSummary.textContent;
     // The sort travels in hidden fields, and the server is what decides them, as it does for a
     // header link it renders; taking them from its answer keeps the next filter change on that sort.

@@ -1,4 +1,5 @@
 import { onServerEvent } from "./live-reload.js";
+import { initPromptButtons, promptButton } from "./prompts.js";
 
 // wastech-mdlint's findings, shown where they apply: a panel above the document they are about, and
 // a count beside every file in the tree that has any. The server lints in the background after a
@@ -62,10 +63,15 @@ async function refreshPanel(documentPath: string): Promise<void> {
     return;
   }
   const article = document.querySelector(".markdown-body");
-  article?.prepend(panel(data.findings));
+  const element = panel(documentPath, data.findings);
+  article?.prepend(element);
+  initPromptButtons(element);
 }
 
-function panel(findings: readonly Finding[]): HTMLElement {
+function panel(
+  documentPath: string,
+  findings: readonly Finding[],
+): HTMLElement {
   const errors = findings.filter(
     (finding) => finding.severity === "error",
   ).length;
@@ -80,6 +86,9 @@ function panel(findings: readonly Finding[]): HTMLElement {
   ]
     .filter(Boolean)
     .join(", ")}`;
+  if (findings.length > 1) {
+    summary.append(" ", promptButton(documentPath));
+  }
   const list = document.createElement("ul");
   for (const finding of findings) {
     const item = document.createElement("li");
@@ -109,7 +118,13 @@ function panel(findings: readonly Finding[]): HTMLElement {
     // Line 0 is how a rule reports a finding about the file as a whole, such as its size.
     where.textContent =
       finding.line > 0 ? `line ${finding.line}` : "whole file";
-    item.append(severity, rule, message, where);
+    item.append(
+      severity,
+      rule,
+      message,
+      where,
+      promptButton(documentPath, finding),
+    );
     list.append(item);
   }
   details.append(summary, list);

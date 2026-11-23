@@ -825,12 +825,25 @@ function renderRow(row: DashboardRow): Element {
     h("td.dashboard-path", h("a", { href: documentHref(row.path) }, row.path)),
     count(row.errors, "has-errors"),
     count(row.warnings, "has-warnings"),
-    h(
-      "td.dashboard-rules",
-      row.rules.flatMap((id, index) =>
+    h("td.dashboard-rules", [
+      ...row.rules.flatMap((id, index) =>
         index === 0 ? [h("code", id)] : [" ", h("code", id)],
       ),
-    ),
+      // Copies a prompt that answers every finding in the document; its menu is the page script's,
+      // so it is hidden without it.
+      row.rules.length === 0
+        ? undefined
+        : h(
+            "button.prompt-menu",
+            {
+              type: "button",
+              hidden: true,
+              dataPath: row.path,
+              title: "Copy a prompt that answers this document's findings",
+            },
+            "Prompt",
+          ),
+    ]),
     h("td.is-numeric", { title: `${row.bytes} bytes` }, kilobytes(row.bytes)),
     h("td.is-numeric", String(row.lines)),
     h("td.is-numeric", String(row.tokens)),

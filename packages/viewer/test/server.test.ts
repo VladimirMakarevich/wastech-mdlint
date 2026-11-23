@@ -434,6 +434,46 @@ describe("diagnostics", () => {
   });
 });
 
+// The route the "Prompt" menus fetch from. What the prompts say is core's; this pins that the page
+// can reach them, and that a request names a finding only by what the page shows of it.
+describe("fix prompts", () => {
+  it("answers a finding with a prompt to copy", async () => {
+    await diagnosticsReady();
+    const response = await get(
+      "/api/prompts?path=README.md&rule=REF-001&line=5",
+    );
+    expect(response.status).toBe(200);
+    const { prompts } = JSON.parse(response.body) as {
+      prompts: { strategy: string; label: string; text: string }[];
+    };
+    expect(prompts.map(({ strategy, label }) => ({ strategy, label }))).toEqual(
+      [{ strategy: "fix", label: "Fix it" }],
+    );
+    expect(prompts[0]!.text).toContain(
+      "# Fix the wastech-mdlint findings in `README.md`",
+    );
+    expect(prompts[0]!.text).toContain("- **error** `REF-001` (line 5):");
+  });
+
+  it("refuses a finding that is not reported and a path outside the corpus", async () => {
+    await diagnosticsReady();
+    expect(
+      (await get("/api/prompts?path=README.md&rule=REF-002&line=5")).status,
+    ).toBe(409);
+    expect((await get("/api/prompts?path=secret.txt")).status).toBe(404);
+    expect((await get("/api/prompts?path=..%2Fsecret.txt")).status).toBe(404);
+  });
+
+  it("puts a prompt button on each dashboard row with findings", async () => {
+    await diagnosticsReady();
+    const { body } = await get("/dashboard");
+    expect(body).toContain(
+      '<button class="prompt-menu" type="button" hidden data-path="README.md"',
+    );
+    expect(body).not.toContain('data-path="docs/guide.md"');
+  });
+});
+
 type DashboardPayload = {
   query: { severity: string[]; sort: string; dir: string };
   findings: string;

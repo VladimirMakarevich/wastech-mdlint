@@ -1207,6 +1207,37 @@ a:hover {
   white-space: nowrap;
 }
 
+/* "Prompt": copies a prompt that answers a finding (or, in the panel's summary and on the dashboard,
+   all of a document's findings). Small and quiet, so a list of findings still reads as findings. */
+.prompt-menu {
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.prompt-menu:hover,
+.prompt-menu[aria-expanded="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.prompt-menu[hidden] {
+  display: none;
+}
+
+.dashboard-rules .prompt-menu {
+  margin-left: 6px;
+}
+
 /* Front matter */
 .frontmatter {
   margin: 0 0 1.5em;
