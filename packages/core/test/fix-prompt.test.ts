@@ -175,6 +175,33 @@ describe("buildFindingPrompt", () => {
     expect(text).not.toContain("`tokens` `error`");
   });
 
+  // A config may list SIZE-001 twice, and each entry measures every file against its own budget. The
+  // finding's thresholds (16000/24000 for tokens) are those of the second entry's override, so that is
+  // the budget the prompt explains; describing the first entry, listed ahead of it, would send the
+  // agent to edit an entry whose budget the file already meets.
+  it("explains the budget of the SIZE-001 entry that reported, not the first one listed", () => {
+    const text = prompt({
+      strategy: "budget",
+      ruleEntries: [
+        { ruleId: "SIZE-001", options: { tokens: { warn: 30000 } } },
+        SIZE_ENTRY,
+      ],
+    });
+    expect(text).toContain(
+      "- `tokens`: warns above 16000, fails above 24000 — from the `overrides` entry with pattern `docs/tasks/**`.",
+    );
+    expect(text).not.toContain("warns above 30000");
+    expect(
+      prompt({
+        strategy: "split",
+        ruleEntries: [
+          { ruleId: "SIZE-001", options: { tokens: { warn: 30000 } } },
+          SIZE_ENTRY,
+        ],
+      }),
+    ).toContain("SIZE-001 budgets files by path");
+  });
+
   it("raises an exceeded error threshold above the new warning one", () => {
     const text = prompt({
       strategy: "budget",

@@ -115,11 +115,13 @@ function panel(
     message.className = "diagnostic-message";
     message.textContent = finding.message;
     // Findings carry a source line, not an element; the nearest heading above that line is the
-    // closest place on the rendered page to send the reader.
+    // closest place on the rendered page to send the reader. Above the first heading, that is the
+    // top of the main column, whose id (`viewer.content`, from `page.ts`) holds a `.` so no heading
+    // slug can take it.
     const where = document.createElement("a");
     where.className = "diagnostic-line";
     where.href =
-      finding.anchor === undefined ? "#content" : `#${finding.anchor}`;
+      finding.anchor === undefined ? "#viewer.content" : `#${finding.anchor}`;
     // Line 0 is how a rule reports a finding about the file as a whole, such as its size.
     where.textContent =
       finding.line > 0 ? `line ${finding.line}` : "whole file";

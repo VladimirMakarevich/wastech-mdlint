@@ -56,7 +56,10 @@ export {
 // Exported for the hosts, not only for core's own walks: `init`'s scan-exclusion disclosure suggests
 // an `include` pattern for a pruned directory, and it must splice the same tail every other proposal
 // does or it would advertise a narrower set than the scan counted.
-export { MARKDOWN_GLOB_SUFFIX } from "./discovery/markdown-extensions.js";
+export {
+  isMarkdownFile,
+  MARKDOWN_GLOB_SUFFIX,
+} from "./discovery/markdown-extensions.js";
 export { detectPackageManager } from "./discovery/package-manager.js";
 export type { DetectedPackageManager } from "./discovery/package-manager.js";
 export { detectWorkspacePackages } from "./discovery/workspace-packages.js";
@@ -399,3 +402,5 @@ export {
   DEFAULT_EXCLUDE_GLOBS,
   DEFAULT_INCLUDE_GLOBS,
 } from "./config/corpus-scope.js";
+export { createScopeTester } from "./config/scope-tester.js";
+export type { ScopeTester } from "./config/scope-tester.js";

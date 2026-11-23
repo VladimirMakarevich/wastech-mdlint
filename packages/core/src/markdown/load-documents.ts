@@ -10,6 +10,7 @@ import {
 import {
   matchesConfigGlob,
   normalizeRelativePath,
+  prunesDirectory,
 } from "../discovery/globs.js";
 import type { ParsedDocument } from "./document-types.js";
 import { parseDocument } from "./parse-document.js";
@@ -33,14 +34,6 @@ function isInsideRoot(candidatePath: string, rootRealPath: string): boolean {
     relative === "" ||
     (!relative.startsWith("..") && !path.isAbsolute(relative))
   );
-}
-
-function shouldPruneDirectory(
-  relDirectory: string,
-  exclude: string[],
-): boolean {
-  // Probe a synthetic child so directory patterns like `dist/**` prune the directory itself.
-  return matchesConfigGlob(`${relDirectory}/__directory_probe__`, exclude);
 }
 
 async function collectFiles(params: {
@@ -69,7 +62,7 @@ async function collectFiles(params: {
     );
 
     if (entry.isDirectory()) {
-      if (shouldPruneDirectory(relPath, params.exclude)) {
+      if (prunesDirectory(relPath, params.exclude)) {
         continue;
       }
       if (isGitIgnored(relPath, true, layers)) {

@@ -51,6 +51,17 @@ export type PageParams = {
 
 export type Section = "graph" | "dashboard" | "config";
 
+/**
+ * The id of the page's main column, the skip link's target and where a finding about the whole file
+ * jumps to.
+ *
+ * Every id the viewer gives its own elements contains a `.`: author headings get core's slugs as ids,
+ * verbatim so the anchors REF-002 accepts exist on the page, and a slug never contains a `.`. An id a
+ * heading could also have — `content` for a heading "Content" — would send that heading's outline
+ * entry to the first element with it, the viewer's own.
+ */
+export const CONTENT_ID = "viewer.content";
+
 // The theme switch's three choices, one segment each. The stylesheet marks the chosen one from the
 // choice `theme.js` applied before the first paint, so the control is right from the first frame
 // rather than once the module script has run. Each segment is an icon, drawn as SVG paths rather than
@@ -124,7 +135,7 @@ export function renderPage(params: PageParams): string {
           h("script", { type: "module", src: "/assets/viewer.js" }),
         ]),
         h("body", [
-          h("a.skip-link", { href: "#content" }, "Skip to content"),
+          h("a.skip-link", { href: `#${CONTENT_ID}` }, "Skip to content"),
           h("header.topbar", [
             h("a.site-name", { href: "/" }, params.siteName),
             params.displayPath === undefined
@@ -240,7 +251,7 @@ export function renderPage(params: PageParams): string {
               h("script", { src: "/assets/tree-state.js" }),
               columnResizer("sidebar", "Resize the document tree"),
             ]),
-            h("main.content#content", [
+            h("main.content", { id: CONTENT_ID }, [
               h("article.markdown-body", [
                 renderFrontmatter(params.frontmatter ?? null),
                 ...params.article,

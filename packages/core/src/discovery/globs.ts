@@ -144,3 +144,17 @@ export function matchesConfigGlob(
     ).length > 0
   );
 }
+
+/**
+ * True when `exclude` prunes the directory `relDirectory` together with everything under it.
+ *
+ * Probes a synthetic child rather than the directory's own path, so a directory pattern written the
+ * usual way, `dist/**`, prunes `dist` itself. The document walk and every check of a single path
+ * against the corpus scope ask this same question, so they cannot disagree about which trees are cut.
+ */
+export function prunesDirectory(
+  relDirectory: string,
+  exclude: string[],
+): boolean {
+  return matchesConfigGlob(`${relDirectory}/__directory_probe__`, exclude);
+}

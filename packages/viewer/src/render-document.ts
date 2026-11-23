@@ -3,7 +3,15 @@ import { raw } from "hast-util-raw";
 import { defaultSchema, sanitize, type Schema } from "hast-util-sanitize";
 import { toHtml } from "hast-util-to-html";
 import { h } from "hastscript";
-import type { Definition, Heading, Image, Link } from "mdast";
+import type {
+  Definition,
+  Heading,
+  Image,
+  ImageReference,
+  Link,
+  LinkReference,
+  Parent,
+} from "mdast";
 import { toHast } from "mdast-util-to-hast";
 import { normalizeUri } from "micromark-util-sanitize-uri";
 import { visit } from "unist-util-visit";
@@ -30,13 +38,46 @@ export type TargetResolver = (
   isImage: boolean,
 ) => ResolvedTarget;
 
-// GitHub's own allowlist, with one change. `clobberPrefix` is emptied because the prefix would
-// rename every heading and HTML anchor (`id="setup"` → `id="user-content-setup"`), and then the
-// anchors REF-002 validates — heading slugs and `<a id>`/`<a name>` targets alike — would not
-// exist on the page. The prefix guards against DOM clobbering, where an element id shadows a global
-// a script reads through `window.<name>`; the viewer's script reads nothing that way, so the
-// protection buys nothing here and costs every anchor.
-const SANITIZE_SCHEMA: Schema = { ...defaultSchema, clobberPrefix: "" };
+export type TargetResolvers = {
+  // A target the Markdown writes, as a link, an image or a reference definition.
+  resolve: TargetResolver;
+  // A target in the document's raw HTML. Asynchronous because whether a file there may be served is
+  // found on disk, which the Markdown targets had done for them when the corpus loaded.
+  resolveEmbedded: (
+    target: string,
+    isImage: boolean,
+  ) => Promise<ResolvedTarget>;
+};
+
+// GitHub's own allowlist, with two changes, both about DOM clobbering: an element whose `id` or
+// `name` makes it a property of `window` or `document`, shadowing what a script reads there.
+//
+// `clobberPrefix` is emptied because the prefix would rename every heading and HTML anchor
+// (`id="setup"` → `id="user-content-setup"`), and then the anchors REF-002 validates — heading slugs
+// and `<a id>`/`<a name>` targets alike — would not exist on the page. An `id` only shadows a global
+// read through `window.<name>`, which the viewer's scripts never do.
+//
+// `name` is therefore allowed on `<a>` alone, where it is an anchor and makes nothing a property of
+// `document`. On an `<img>`, the one other tag GitHub's list lets an author write that `document`
+// exposes by name, it would override the document's own members: `<img name="querySelector">` turns
+// `document.querySelector` into that image, and every script on the page fails at its first call.
+const SANITIZE_SCHEMA: Schema = {
+  ...defaultSchema,
+  clobberPrefix: "",
+  attributes: {
+    ...defaultSchema.attributes,
+    "*": (defaultSchema.attributes?.["*"] ?? []).filter(
+      (attribute) => attribute !== "name",
+    ),
+    a: [...(defaultSchema.attributes?.a ?? []), "name"],
+  },
+};
+
+// Set on every link and image the Markdown writes, whose target is rewritten on the Markdown tree, so
+// that after `raw` an `<a>` or `<img>` without it is one the author wrote as raw HTML. The sanitizer
+// strips it like any `data-*` attribute it does not list, so it never reaches the page; an author who
+// writes it on raw HTML only stops their own link from being rewritten.
+const FROM_MARKDOWN = "dataViewerFromMarkdown";
 
 /** The URL of a document page. */
 export function documentHref(relPath: string): string {
@@ -62,7 +103,7 @@ export function fileHref(relPath: string): string {
  */
 export async function renderDocument(
   document: ParsedDocument,
-  resolveTarget: TargetResolver,
+  resolvers: TargetResolvers,
 ): Promise<RenderedDocument> {
   const { document: parsed, tree } = parseDocumentWithTree({
     path: document.path,
@@ -83,29 +124,68 @@ export async function renderDocument(
     }
   });
 
+  // A reference (`[text][id]`, `![alt][id]`) becomes the link or image it stands for, with its
+  // definition's target. A definition is shared by every reference to it and does not say whether
+  // those are links or images, while a target resolves differently for each: an image never goes
+  // through the site router, which maps URLs to Markdown sources only. Core reads a reference's
+  // target from the same definition, the first one with its label, so the page and the linter still
+  // agree on it.
+  const definitions = new Map<string, Definition>();
+  visit(tree, "definition", (node: Definition) => {
+    if (!definitions.has(node.identifier)) {
+      definitions.set(node.identifier, node);
+    }
+  });
+  visit(tree, (node, index, parent: Parent | undefined) => {
+    if (
+      (node.type !== "linkReference" && node.type !== "imageReference") ||
+      parent === undefined ||
+      index === undefined
+    ) {
+      return;
+    }
+    const reference = node as LinkReference | ImageReference;
+    const definition = definitions.get(reference.identifier);
+    if (definition === undefined) {
+      return;
+    }
+    const common = {
+      url: definition.url,
+      title: definition.title,
+      position: reference.position,
+      data: reference.data,
+    };
+    parent.children[index] =
+      reference.type === "linkReference"
+        ? ({ type: "link", children: reference.children, ...common } as Link)
+        : ({ type: "image", alt: reference.alt, ...common } as Image);
+  });
+
   // Targets are rewritten on the Markdown tree, where `url` is still the target exactly as the
   // linter saw it, and before `toHast` percent-encodes it.
   const missingHrefs = new Set<string>();
   visit(tree, (node) => {
-    if (
-      node.type === "link" ||
-      node.type === "definition" ||
-      node.type === "image"
-    ) {
-      const target = node as Link | Definition | Image;
-      const rewritten = rewriteTarget(
-        document.path,
-        target.url,
-        node.type === "image",
-        resolveTarget,
-      );
-      if (rewritten !== undefined) {
-        target.url = rewritten.url;
-        if (rewritten.missing) {
-          // Recorded in the form `toHast` will write into `href`, so the lookup after sanitizing
-          // matches a target with spaces or non-ASCII characters too.
-          missingHrefs.add(normalizeUri(rewritten.url));
-        }
+    if (node.type !== "link" && node.type !== "image") {
+      return;
+    }
+    const target = node as Link | Image;
+    target.data = {
+      ...target.data,
+      hProperties: { ...target.data?.hProperties, [FROM_MARKDOWN]: "" },
+    };
+    if (!isLocalTarget(target.url)) {
+      return;
+    }
+    const rewritten = rewriteTarget(
+      target.url,
+      resolvers.resolve(document.path, target.url, node.type === "image"),
+    );
+    if (rewritten !== undefined) {
+      target.url = rewritten.url;
+      if (rewritten.missing) {
+        // Recorded in the form `toHast` will write into `href`, so the lookup after sanitizing
+        // matches a target with spaces or non-ASCII characters too.
+        missingHrefs.add(normalizeUri(rewritten.url));
       }
     }
   });
@@ -118,10 +198,11 @@ export async function renderDocument(
   }) as HastRoot;
   // The file lets `raw` keep each node's place in the source as it reparses the tree; without it
   // every position is dropped, and with them the line numbers the page shows beside each block.
-  const clean = sanitize(
-    raw(hast, { file: new VFile({ value: document.content }) }),
-    SANITIZE_SCHEMA,
-  ) as HastRoot;
+  const reparsed = raw(hast, {
+    file: new VFile({ value: document.content }),
+  }) as HastRoot;
+  await rewriteEmbeddedTargets(reparsed, resolvers, missingHrefs);
+  const clean = sanitize(reparsed, SANITIZE_SCHEMA) as HastRoot;
 
   markSourceLines(clean);
   await replaceCodeBlocks(clean);
@@ -159,19 +240,63 @@ export function documentTitle(document: ParsedDocument): string {
   );
 }
 
-function rewriteTarget(
-  fromPath: string,
-  url: string,
-  isImage: boolean,
-  resolveTarget: TargetResolver,
-): { url: string; missing: boolean } | undefined {
-  // A bare fragment stays on this page, and its slug already matches a heading id.
-  if (url.length === 0 || url.startsWith("#")) {
-    return undefined;
+// A bare fragment stays on this page, where its slug already matches a heading id, and an external
+// URL leaves the repository; only the rest name something the corpus can resolve.
+function isLocalTarget(url: string): boolean {
+  return url.length > 0 && !url.startsWith("#") && !isExternalTarget(url);
+}
+
+/**
+ * Point the `<a href>` and `<img src>` an author wrote as raw HTML where the same target written as
+ * Markdown would point: a document's page or the file route, resolved from the document's own
+ * folder. Left alone, a relative target resolves against the page's address under `/doc/`, where no
+ * image or source file is ever served. Done before sanitizing, so the sanitizer still judges every
+ * URL the page ends up with.
+ */
+async function rewriteEmbeddedTargets(
+  tree: HastRoot,
+  resolvers: TargetResolvers,
+  missingHrefs: Set<string>,
+): Promise<void> {
+  const targets: { node: Element; property: "href" | "src" }[] = [];
+  visit(tree, "element", (node: Element) => {
+    const property =
+      node.tagName === "a"
+        ? "href"
+        : node.tagName === "img"
+          ? "src"
+          : undefined;
+    const url = property === undefined ? undefined : node.properties[property];
+    if (
+      property !== undefined &&
+      node.properties[FROM_MARKDOWN] === undefined &&
+      typeof url === "string" &&
+      isLocalTarget(url)
+    ) {
+      targets.push({ node, property });
+    }
+  });
+  for (const { node, property } of targets) {
+    const url = node.properties[property] as string;
+    const rewritten = rewriteTarget(
+      url,
+      await resolvers.resolveEmbedded(url, property === "src"),
+    );
+    if (rewritten !== undefined) {
+      node.properties[property] = rewritten.url;
+      if (rewritten.missing && property === "href") {
+        missingHrefs.add(rewritten.url);
+      }
+    }
   }
+}
+
+function rewriteTarget(
+  url: string,
+  resolved: ResolvedTarget,
+): { url: string; missing: boolean } | undefined {
   const hashIndex = url.indexOf("#");
   const fragment = hashIndex === -1 ? "" : url.slice(hashIndex);
-  const resolved = resolveTarget(fromPath, url, isImage);
   switch (resolved.kind) {
     case "document":
       return {
@@ -181,8 +306,7 @@ function rewriteTarget(
     case "file":
       return { url: `${fileHref(resolved.path)}${fragment}`, missing: false };
     case "missing":
-      // External targets resolve to nothing too; only a local target that names no file is broken.
-      return isExternalTarget(url) ? undefined : { url, missing: true };
+      return { url, missing: true };
   }
 }
 
@@ -329,7 +453,10 @@ function markLinks(tree: HastRoot, missingHrefs: ReadonlySet<string>): void {
       node.properties.className = [...classNames(node), "link-external"];
     } else if (missingHrefs.has(href)) {
       node.properties.className = [...classNames(node), "link-missing"];
-      node.properties.title = "This target does not exist in the repository";
+      // Missing, or a file the viewer does not serve: Markdown outside the corpus, or a path an
+      // `exclude` pattern or a `.gitignore` covers.
+      node.properties.title =
+        "The viewer has no page for this target: it does not exist, or is outside what the viewer serves";
     }
   });
 }

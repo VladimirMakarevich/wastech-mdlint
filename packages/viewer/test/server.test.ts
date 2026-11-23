@@ -150,6 +150,15 @@ describe("pages", () => {
     expect(response.body).toContain("<dt>tags</dt><dd>alpha, beta</dd>");
   });
 
+  // Headings get core's slugs as ids, unprefixed; an id of the viewer's own that a heading could also
+  // have (`content` for "Content") would send that heading's outline entry to the viewer's element.
+  it("gives the viewer's own elements ids no heading slug can have", async () => {
+    const { body } = await get("/doc/README.md");
+    expect(body).toContain('<a class="skip-link" href="#viewer.content">');
+    expect(body).toContain('<main class="content" id="viewer.content">');
+    expect(body).not.toContain('id="content"');
+  });
+
   it("answers HEAD with headers only", async () => {
     const response = await get("/doc/README.md", { method: "HEAD" });
     expect(response.status).toBe(200);

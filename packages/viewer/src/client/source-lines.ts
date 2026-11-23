@@ -10,24 +10,42 @@ export function initSourceLines(): void {
   window.addEventListener("hashchange", highlightLineRange);
 }
 
+/**
+ * The lines a `#L<n>` or `#L<n>-L<m>` fragment selects in a file of `lineCount` lines, first to last,
+ * or `undefined` when it selects none. Either end may be written first. The range is cut to the
+ * file, so a fragment naming line 999999999 — in a link or typed into the address — costs as many
+ * steps as the file has lines, not a billion.
+ */
+export function lineRange(
+  hash: string,
+  lineCount: number,
+): { first: number; last: number } | undefined {
+  const match = /^#L(\d+)(?:-L(\d+))?$/.exec(hash);
+  if (match === null) {
+    return undefined;
+  }
+  const start = Number(match[1]);
+  const end = match[2] === undefined ? start : Number(match[2]);
+  const first = Math.max(1, Math.min(start, end));
+  const last = Math.min(lineCount, Math.max(start, end));
+  return first <= last ? { first, last } : undefined;
+}
+
 function highlightLineRange(): void {
   for (const line of document.querySelectorAll(".line.is-selected")) {
     line.classList.remove("is-selected");
   }
-  const match = /^#L(\d+)(?:-L(\d+))?$/.exec(location.hash);
-  if (match === null) {
+  const range = lineRange(
+    location.hash,
+    document.querySelectorAll(".source-view .line").length,
+  );
+  if (range === undefined) {
     return;
   }
-  const first = Number(match[1]);
-  const last = match[2] === undefined ? first : Number(match[2]);
-  for (
-    let number = Math.min(first, last);
-    number <= Math.max(first, last);
-    number += 1
-  ) {
+  for (let number = range.first; number <= range.last; number += 1) {
     document.getElementById(`L${number}`)?.classList.add("is-selected");
   }
   document
-    .getElementById(`L${Math.min(first, last)}`)
+    .getElementById(`L${range.first}`)
     ?.scrollIntoView({ block: "center" });
 }

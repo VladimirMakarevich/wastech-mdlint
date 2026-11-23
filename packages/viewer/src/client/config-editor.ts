@@ -117,6 +117,10 @@ class ConfigEditor {
   private previewController: AbortController | undefined;
   private previewRun: Promise<void> = Promise.resolve();
   private openRule: number | undefined;
+  // Set while a restored draft's form edits wait to be folded into its changed text. Only the server
+  // can apply edits to text, so until its preview does, the textarea holds the text without them and
+  // stays read-only: typing into it starts over from that text and would drop the edits.
+  private foldingDraft = false;
 
   private readonly formView = element("div", "config-form-view");
   private readonly textView = element("div", "config-text-view");
@@ -152,6 +156,7 @@ class ConfigEditor {
     this.textarea.className = "config-textarea";
     this.textarea.spellcheck = false;
     this.textarea.setAttribute("aria-label", "Config file text");
+    this.textarea.readOnly = this.foldingDraft;
     this.textarea.addEventListener("input", () => {
       this.text = this.textarea.value;
       this.edits = [];
@@ -174,6 +179,9 @@ class ConfigEditor {
     );
     const toolbar = element("div", "config-toolbar");
     toolbar.append(modes, this.status);
+    if (this.foldingDraft) {
+      this.status.textContent = "Restoring your unsaved change…";
+    }
 
     const previewSection = element("section", "config-preview");
     previewSection.id = "config-preview";
@@ -835,6 +843,9 @@ class ConfigEditor {
 
   private schedulePreview(delay: number): void {
     window.clearTimeout(this.previewTimer);
+    // A preview still on its way describes the config before this change. Let through, it would draw
+    // that older result — and a Save button carrying its text — until the new one arrives.
+    this.previewController?.abort();
     this.previewBody.replaceChildren(paragraph("Checking the change…"));
     this.actions.replaceChildren();
     this.showBar("Checking the change…");
@@ -859,23 +870,54 @@ class ConfigEditor {
     if (this.edits.length > 0) {
       body.edits = this.edits;
     }
+    let preview: Preview;
     try {
       const response = await this.post(
         "/api/config/preview",
         body,
         controller.signal,
       );
-      this.preview = (await response.json()) as Preview;
+      preview = (await response.json()) as Preview;
     } catch (error) {
       if ((error as Error).name === "AbortError") {
         return;
       }
-      this.preview = {
+      preview = {
         status: "failed",
         error: "The viewer did not answer; it may be restarting.",
       };
     }
+    // A newer change has started its own preview since; this answer is about an older config.
+    if (controller !== this.previewController) {
+      return;
+    }
+    this.preview = preview;
+    if (this.foldingDraft) {
+      this.foldDraft();
+    }
     this.renderPreview();
+  }
+
+  // Once the server has applied a restored draft's form edits to its text, the text it answers with
+  // replaces both, so the textarea shows the whole change and can be edited again. Edits it could not
+  // apply stay, with the preview saying why.
+  private foldDraft(): void {
+    const preview = this.preview;
+    const text =
+      preview?.status === "ok" || preview?.status === "invalid"
+        ? preview.text
+        : undefined;
+    if (text !== undefined) {
+      this.text = text;
+      this.edits = [];
+      if (this.mode === "text") {
+        this.textarea.value = text;
+      }
+      this.saveDraft();
+    }
+    this.foldingDraft = false;
+    this.textarea.readOnly = false;
+    this.status.textContent = "";
   }
 
   private post(
@@ -1133,10 +1175,11 @@ class ConfigEditor {
     this.text = draft.text;
     this.edits = draft.edits;
     if (this.text !== this.file.text) {
-      // The form's model would have to be rebuilt from text, which only the server can parse.
+      // The form's model would have to be rebuilt from text, which only the server can parse. Edits
+      // the form made on top of that text are kept and folded into it by the first preview.
       this.model = null;
       this.mode = "text";
-      this.edits = [];
+      this.foldingDraft = this.edits.length > 0;
       return;
     }
     for (const edit of this.edits) {

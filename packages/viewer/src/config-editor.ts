@@ -361,22 +361,29 @@ function severityCounts(messages: readonly LintMessage[]): PreviewCounts {
 
 export type SaveOutcome =
   | { status: "saved"; hash: string }
+  | { status: "conflict"; message: string }
   | { status: "failed"; message: string };
 
 /**
  * Write a validated candidate over the config, atomically, then read it back.
  *
  * `writeFileAtomic` replaces the file in one rename, so a failed write leaves the old file whole. The
- * read-back catches what it cannot: another process writing the file in the same moment. If what is
- * on disk afterwards is not the text written, or no longer loads, the previous text is put back, so
- * the viewer never leaves the repository with a config its next run would refuse.
+ * read-back catches what it cannot: another program writing the file in the same moment. Different
+ * text on disk after the rename can only have been written after it, so it is the newest version
+ * of the file and stays exactly as it is. Putting the version this page started from back over it
+ * would throw away that program's change to undo the reader's, and leave neither; the reader is told
+ * instead, and reloads to edit what is there now.
+ *
+ * `readBack` reads the file after the write; a test replaces it to stand in for the other program.
  */
 export async function saveCandidate(params: {
-  corpus: Corpus;
   file: ConfigFile;
   text: string;
+  readBack?: (absolutePath: string) => Promise<string>;
 }): Promise<SaveOutcome> {
-  const { corpus, file, text } = params;
+  const { file, text } = params;
+  const readBack =
+    params.readBack ?? ((absolutePath) => readFile(absolutePath, "utf8"));
   try {
     await writeFileAtomic(file.absolutePath, text);
   } catch (error) {
@@ -385,25 +392,21 @@ export async function saveCandidate(params: {
       message: `The config could not be written (${(error as NodeJS.ErrnoException).code ?? "write error"}); the file on disk is unchanged.`,
     };
   }
-  const written = await readFile(file.absolutePath, "utf8").catch(
-    () => undefined,
-  );
-  if (written === text && validateCandidate(corpus, file, written).ok) {
+  const written = await readBack(file.absolutePath).catch(() => undefined);
+  if (written === text) {
     return { status: "saved", hash: hashText(text) };
   }
-  try {
-    await writeFileAtomic(file.absolutePath, file.text);
-  } catch {
+  if (written === undefined) {
     return {
       status: "failed",
       message:
-        "The config changed while it was being saved, and the previous version could not be put back. Check the file before the next run.",
+        "The config was written but could not be read back, so whether it holds this change is unknown. Check the file before the next run.",
     };
   }
   return {
-    status: "failed",
+    status: "conflict",
     message:
-      "The config changed while it was being saved, so the previous version was put back. Reload the page and make the change again.",
+      "Another program changed the config while it was being saved, and its version is the one on disk now. Reload the page to see it, then make the change again.",
   };
 }
 

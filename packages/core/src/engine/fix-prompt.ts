@@ -38,8 +38,9 @@ export type PromptFinding = Pick<
   "ruleId" | "severity" | "message" | "line" | "data"
 >;
 
-// One rule entry of the config, with the canonical id of its rule. Custom rules and names the
-// registry does not know are left out by the host: there is no budget to read from them.
+// One rule entry of the config, with the canonical id of its rule. Custom rules, names the registry
+// does not know and entries switched `off` are left out by the host: there is no budget to read from
+// the first two, and the last reports nothing.
 export type PromptRuleEntry = { ruleId: string; options: unknown };
 
 export type FindingPromptInput = {
@@ -228,11 +229,11 @@ function splitSection(
     "",
     ...splitSteps(command),
   ];
-  const sizeEntry = input.ruleEntries.find(
-    (entry) => entry.ruleId === "SIZE-001",
-  );
-  const overrides = (sizeEntry?.options as { overrides?: unknown } | undefined)
-    ?.overrides;
+  const overrides = (
+    reportingSizeEntry(input, findings)?.options as
+      | { overrides?: unknown }
+      | undefined
+  )?.overrides;
   if (Array.isArray(overrides) && overrides.length > 0) {
     lines.push(
       "",
@@ -276,7 +277,7 @@ function sizeBudgetSteps(
   findings: readonly PromptFinding[],
 ): string[] {
   const file = codeSpan(input.filePath);
-  const entry = input.ruleEntries.find((each) => each.ruleId === "SIZE-001");
+  const entry = reportingSizeEntry(input, findings);
   const budget =
     entry === undefined
       ? undefined
@@ -309,6 +310,39 @@ function sizeBudgetSteps(
     ...findings.flatMap((finding) => raiseSteps(sizeData(finding)!)),
   );
   return lines;
+}
+
+/**
+ * The SIZE-001 entry the size findings came from. A config may list the rule more than once, and
+ * each entry measures every file against a budget of its own, so the first entry is not necessarily
+ * the one that reported: the one that did is the entry whose budget for this file has the
+ * thresholds the first size finding carries. Explaining any other entry's budget, or telling the
+ * agent to add an override there, would leave the finding exactly as it is. The first entry when
+ * none matches, which a finding computed under another config could cause.
+ */
+function reportingSizeEntry(
+  input: FindingPromptInput,
+  findings: readonly PromptFinding[],
+): PromptRuleEntry | undefined {
+  const entries = input.ruleEntries.filter(
+    (entry) => entry.ruleId === "SIZE-001",
+  );
+  const size = findings
+    .map(sizeData)
+    .find((data): data is SizeData => data !== undefined);
+  const reporting =
+    size === undefined
+      ? undefined
+      : entries.find((entry) => {
+          const thresholds = sizeBudgetForEntry(entry.options, input.filePath)
+            ?.metrics[size.metric];
+          return (
+            thresholds !== undefined &&
+            thresholds.warn === size.warnAt &&
+            thresholds.error === size.errorAt
+          );
+        });
+  return reporting ?? entries[0];
 }
 
 function raiseSteps(size: SizeData): string[] {

@@ -189,15 +189,19 @@ export async function startViewer(
 
   // Keyed by the document object, which the corpus replaces whenever the file changes, so an edit
   // misses the cache without any explicit invalidation. Link targets also depend on which other
-  // files exist, so a change to the set of documents starts a fresh cache.
+  // files exist, so a change to the set of documents starts a fresh cache, and a document the corpus
+  // reports changed without replacing it — a file it links to appeared or went — is dropped from it.
   let rendered = new WeakMap<ParsedDocument, Promise<RenderedDocument>>();
 
   function render(document: ParsedDocument): Promise<RenderedDocument> {
     let pending = rendered.get(document);
     if (pending === undefined) {
-      pending = renderDocument(document, (fromPath, target, isImage) =>
-        corpus.resolve(fromPath, target, isImage),
-      );
+      pending = renderDocument(document, {
+        resolve: (fromPath, target, isImage) =>
+          corpus.resolve(fromPath, target, isImage),
+        resolveEmbedded: (target, isImage) =>
+          corpus.resolveEmbedded(document, target, isImage),
+      });
       rendered.set(document, pending);
       // A failed render is not cached, so fixing the file (or a transient read error) recovers.
       pending.catch(() => rendered.delete(document));
@@ -946,9 +950,13 @@ export async function startViewer(
       sendJson(response, { status: "invalid", errors: validated.errors }, 422);
       return;
     }
-    const outcome = await saveCandidate({ corpus, file, text: change.text });
+    const outcome = await saveCandidate({ file, text: change.text });
     if (outcome.status === "failed") {
       sendJson(response, { status: "failed", error: outcome.message }, 500);
+      return;
+    }
+    if (outcome.status === "conflict") {
+      sendJson(response, { status: "conflict", error: outcome.message }, 409);
       return;
     }
     // The watcher sees the config change and reloads the corpus as it does for any edit; without
@@ -1096,6 +1104,12 @@ export async function startViewer(
             const change = await corpus.applyChanges(paths);
             if (change.structural) {
               rendered = new WeakMap();
+            }
+            for (const changedPath of change.changed) {
+              const document = corpus.documents.get(changedPath);
+              if (document !== undefined) {
+                rendered.delete(document);
+              }
             }
             if (change.changed.length > 0 || change.structural) {
               broadcast("change", {

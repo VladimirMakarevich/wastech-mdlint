@@ -1,15 +1,6 @@
 # Architecture Rules
 
-These invariants govern implementation work. They are stated here in full; the code and its tests are the only place to verify that they still hold.
-
-## Package Layout
-
-An npm-workspaces monorepo. All product code lives under `packages/*`; there is no root `src/`.
-
-- `@wastech-mdlint/core` — the engine.
-- `@wastech-mdlint/cli` — the CLI host. Bin: `wastech-mdlint`.
-- `@wastech-mdlint/mcp-server` — the stdio MCP host. Bin: `wastech-mdlint-mcp`.
-- `@wastech-mdlint/viewer` — the local web viewer host, experimental and `private` (not published). Bin: `wastech-mdlint-viewer`.
+These invariants govern implementation work. They are stated here in full; the code and its tests are the only place to verify that they still hold. The packages they name are listed under Project Shape in `AGENTS.md`.
 
 ## Core Ownership
 
@@ -18,7 +9,7 @@ An npm-workspaces monorepo. All product code lives under `packages/*`; there is 
 - Host-specific behavior belongs at the boundary:
   - CLI: argument parsing, command dispatch, exit codes, file output.
   - MCP: tool registration, input validation, structured output, error wrapping.
-  - Viewer: HTTP serving, HTML rendering of the tree core parsed (`parseDocumentWithTree`), highlighting, live reload. It takes its corpus from `loadContext`, its findings from `lintContext` over that same corpus, its link targets from `resolveTargetCandidates` and its heading ids from core's slugs, so a page and the lint findings about it never disagree. Its link graph is that corpus's `ContextGraph` and a document's neighbors come from core's `query`; the viewer only narrows the graph to a folder and merges a pair's parallel edges into one line for drawing. Its dashboard takes sizes from `measureDocument`, link flags from that graph (`cycles`, `getComponents`) and findings from the same lint run, and only filters, sorts and lays them out. Its config page reads, checks and changes the config only through `parseConfiguration`, the generated schema and `editConfigText`, so what it previews or saves is a config `loadConfiguration` accepts, comments intact.
+  - Viewer: HTTP serving, HTML rendering of the tree core parsed (`parseDocumentWithTree`), highlighting, live reload. It takes its corpus from `loadContext`, its findings from `lintContext` over that same corpus, its link targets from `resolveTargetCandidates`, which linked files it serves and which changed paths need a reload from `createScopeTester`, and its heading ids from core's slugs, so a page and the lint findings about it never disagree. Its link graph is that corpus's `ContextGraph` and a document's neighbors come from core's `query`; the viewer only narrows the graph to a folder and merges a pair's parallel edges into one line for drawing. Its dashboard takes sizes from `measureDocument`, link flags from that graph (`cycles`, `getComponents`) and findings from the same lint run, and only filters, sorts and lays them out. Its config page reads, checks and changes the config only through `parseConfiguration`, the generated schema and `editConfigText`, so what it previews or saves is a config `loadConfiguration` accepts, comments intact.
 - Shared computational behavior belongs in core, not in host packages.
 
 The reason is not tidiness. Two hosts that each compute an answer will eventually compute two different answers, and because each package's own tests pass, nothing reports the divergence — which is why a cross-host parity guard exists in the test suite as well.

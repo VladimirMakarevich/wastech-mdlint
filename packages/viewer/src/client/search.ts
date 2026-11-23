@@ -27,7 +27,9 @@ export function initSearch(): void {
 
   const list = document.createElement("ul");
   list.className = "search-results";
-  list.id = "search-results";
+  // With a `.`, which no heading slug contains, so a document's heading "Search results" cannot take
+  // the id the input's `aria-controls` names; the hits below follow the same rule.
+  list.id = "viewer.search-results";
   list.setAttribute("role", "listbox");
   list.hidden = true;
   form.append(list);
@@ -55,7 +57,10 @@ export function initSearch(): void {
       item.setAttribute("aria-selected", String(position === index));
     }
     if (index >= 0) {
-      input!.setAttribute("aria-activedescendant", `search-hit-${index}`);
+      input!.setAttribute(
+        "aria-activedescendant",
+        `viewer.search-hit-${index}`,
+      );
       list.children[index]?.scrollIntoView({ block: "nearest" });
     } else {
       input!.removeAttribute("aria-activedescendant");
@@ -76,6 +81,10 @@ export function initSearch(): void {
   async function run(): Promise<void> {
     const query = input!.value.trim();
     if (query.length < MIN_QUERY_LENGTH) {
+      // Outdates any answer still on its way: it is for the longer query the reader has just
+      // shortened, and would reopen the list with results for text the box no longer holds.
+      latestRequest += 1;
+      hits = [];
       close();
       return;
     }
@@ -150,7 +159,7 @@ export function initSearch(): void {
 
 function hitItem(hit: SearchHit, index: number): HTMLLIElement {
   const item = document.createElement("li");
-  item.id = `search-hit-${index}`;
+  item.id = `viewer.search-hit-${index}`;
   item.setAttribute("role", "option");
   const link = document.createElement("a");
   link.href = hit.href;

@@ -18,7 +18,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { assertBuilt } from "../../core/test/support/assert-built.js";
 import { parseCliArgs } from "../src/cli-args.js";
 import { hashText, saveCandidate } from "../src/config-editor.js";
-import { Corpus } from "../src/corpus.js";
 import { openCommand, type LaunchCommand } from "../src/open-file.js";
 import { startViewer, type RunningViewer } from "../src/server.js";
 
@@ -645,13 +644,11 @@ describe("saveCandidate", () => {
   // write fail after the server has read the file it is about to replace without also making that
   // read fail first.
   it("reports a failed write, claims nothing was saved and leaves no temp file", async () => {
-    const corpus = await Corpus.load({ cwd: fixtureRoot });
     const dir = await mkdtemp(path.join(os.tmpdir(), "wastech-viewer-save-"));
     try {
       const target = path.join(dir, "wastech-mdlint.config.json");
       await mkdir(target);
       const outcome = await saveCandidate({
-        corpus,
         file: {
           absolutePath: target,
           displayPath: "wastech-mdlint.config.json",
@@ -672,7 +669,141 @@ describe("saveCandidate", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  // Another program — an editor's autosave — writing the config in the same moment as the save. What
+  // is on disk after the viewer's rename was written after it, so it is the newest version and must
+  // be left alone: writing back the text the page started from would throw that program's change
+  // away to undo the reader's, and leave neither. `readBack` stands in for the other program by
+  // returning its text, so the file holding the viewer's own text afterwards proves nothing was put
+  // back over it.
+  it("leaves another program's newer version in place and reports a conflict", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "wastech-viewer-save-"));
+    try {
+      const target = path.join(dir, "wastech-mdlint.config.json");
+      await writeFile(target, "{}", "utf8");
+      const outcome = await saveCandidate({
+        file: {
+          absolutePath: target,
+          displayPath: "wastech-mdlint.config.json",
+          text: "{}",
+          hash: hashText("{}"),
+        },
+        text: '{ "rules": [] }',
+        readBack: () => Promise.resolve('{ "rules": [{ "rule": "REF-001" }] }'),
+      });
+      expect(outcome).toEqual({
+        status: "conflict",
+        message: expect.stringMatching(/^Another program changed the config/),
+      });
+      expect(await readFile(target, "utf8")).toBe('{ "rules": [] }');
+      expect(await readdir(dir)).toEqual(["wastech-mdlint.config.json"]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
+
+describe("save with watching on", () => {
+  // A config passed with `--config` may be called anything. With watching on — the default — the
+  // watcher is what reloads the corpus after a save, so a name it filtered out would leave every page
+  // on the old config's findings after the page said the change was saved.
+  it("reloads the corpus after saving a config with another name", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "wastech-viewer-named-"));
+    await cp(fixtureRoot, dir, { recursive: true });
+    await rm(path.join(dir, "wastech-mdlint.config.json"));
+    await writeFile(path.join(dir, "lint.jsonc"), COMMENTED_CONFIG, "utf8");
+    const viewer = await startViewer({
+      cwd: dir,
+      configPath: "lint.jsonc",
+      host: "127.0.0.1",
+      port: 0,
+      portExplicit: true,
+      watch: true,
+      allowConfigWrites: true,
+    });
+    try {
+      const port = Number(new URL(viewer.url).port);
+      const token =
+        /<meta name="wastech-change-token" content="([0-9a-f]{64})">/.exec(
+          (await send(port, "/config")).body,
+        )![1]!;
+      const target: Viewer = {
+        dir,
+        viewer,
+        port,
+        token,
+        launched: [],
+        failLaunch: false,
+      };
+      const base = hashText(COMMENTED_CONFIG);
+      const preview = JSON.parse(
+        (
+          await change(target, "preview", {
+            base,
+            edits: [
+              { op: "set", path: ["rules", 0, "severity"], value: "warning" },
+            ],
+          })
+        ).body,
+      ) as PreviewPayload;
+      const reloaded = nextStructuralChange(port);
+      await reloaded.ready;
+      const saved = await change(target, "save", { base, text: preview.text });
+      expect(saved.status).toBe(200);
+      // Beside the temp file the atomic write renamed over it, which the watcher reports too.
+      expect((await reloaded.event).paths).toContain("lint.jsonc");
+      const diagnostics = JSON.parse(
+        (await send(port, "/api/diagnostics?path=README.md")).body,
+      ) as { findings: { ruleId: string; severity: string }[] };
+      expect(diagnostics.findings).toEqual([
+        expect.objectContaining({ ruleId: "REF-001", severity: "warning" }),
+      ]);
+    } finally {
+      await viewer.close();
+      await rm(dir, { recursive: true, force: true });
+    }
+  }, 20_000);
+});
+
+// Resolves with the first structural `change` event; `ready` once the stream is open, so the test
+// saves only after the subscription exists and cannot miss the event.
+function nextStructuralChange(port: number): {
+  ready: Promise<void>;
+  event: Promise<{ paths: string[]; structural: boolean }>;
+} {
+  let markReady!: () => void;
+  const ready = new Promise<void>((resolve) => (markReady = resolve));
+  const event = new Promise<{ paths: string[]; structural: boolean }>(
+    (resolve, reject) => {
+      const outgoing = request(
+        { host: "127.0.0.1", port, path: "/events" },
+        (incoming) => {
+          let buffer = "";
+          incoming.setEncoding("utf8");
+          incoming.on("data", (chunk: string) => {
+            buffer += chunk;
+            markReady();
+            for (const match of buffer.matchAll(
+              /event: change\ndata: (.*)\n\n/g,
+            )) {
+              const payload = JSON.parse(match[1]!) as {
+                paths: string[];
+                structural: boolean;
+              };
+              if (payload.structural) {
+                outgoing.destroy();
+                resolve(payload);
+              }
+            }
+          });
+        },
+      );
+      outgoing.on("error", reject);
+      outgoing.end();
+    },
+  );
+  return { ready, event };
+}
 
 describe("--allow-config-writes", () => {
   it("is off by default and on when asked for", () => {

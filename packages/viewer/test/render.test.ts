@@ -1,6 +1,9 @@
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { parseDocument } from "@wastech-mdlint/core";
 
@@ -22,9 +25,12 @@ function render(relPath: string): Promise<RenderedDocument> {
   if (document === undefined) {
     throw new Error(`fixture has no ${relPath}`);
   }
-  return renderDocument(document, (fromPath, target, isImage) =>
-    corpus.resolve(fromPath, target, isImage),
-  );
+  return renderDocument(document, {
+    resolve: (fromPath, target, isImage) =>
+      corpus.resolve(fromPath, target, isImage),
+    resolveEmbedded: (target, isImage) =>
+      corpus.resolveEmbedded(document, target, isImage),
+  });
 }
 
 beforeAll(async () => {
@@ -169,9 +175,10 @@ describe("code blocks", () => {
 // A document rendered on its own, for cases the fixture corpus does not hold. Nothing in it links
 // anywhere, so every target resolves to nothing.
 function renderText(content: string): Promise<RenderedDocument> {
-  return renderDocument(parseDocument({ path: "doc.md", content }), () => ({
-    kind: "missing",
-  }));
+  return renderDocument(parseDocument({ path: "doc.md", content }), {
+    resolve: () => ({ kind: "missing" }),
+    resolveEmbedded: () => Promise.resolve({ kind: "missing" }),
+  });
 }
 
 describe("source lines", () => {
@@ -218,5 +225,105 @@ describe("source lines", () => {
     const { html } = await renderText('# T\n\n<p data-line="999">x</p>\n');
     expect(html).not.toContain("999");
     expect(html).toContain('<p data-line="3">x</p>');
+  });
+});
+
+describe("raw HTML targets", () => {
+  // A repository of its own, so the fixture's line numbers above stay as they are.
+  let dir: string;
+  let raw: Corpus;
+  let page: RenderedDocument;
+
+  beforeAll(async () => {
+    dir = await mkdtemp(path.join(os.tmpdir(), "wastech-viewer-render-"));
+    const files: Record<string, string> = {
+      "images/logo.png": "png",
+      "src/app.ts": "export {};\n",
+      "docs/other.md": "# Other\n",
+      "docs/page.md": [
+        "# Page",
+        "",
+        '<p align="center"><img src="../images/logo.png" alt="Logo"></p>',
+        "",
+        '<a href="../src/app.ts#L2">source</a> <a href="other.md">other</a> <a href="gone.md">gone</a>',
+        "",
+        "[markdown link](other.md)",
+        "",
+      ].join("\n"),
+    };
+    for (const [relPath, content] of Object.entries(files)) {
+      const absolutePath = path.join(dir, ...relPath.split("/"));
+      await mkdir(path.dirname(absolutePath), { recursive: true });
+      await writeFile(absolutePath, content, "utf8");
+    }
+    raw = await Corpus.load({ cwd: dir });
+    const document = raw.documents.get("docs/page.md")!;
+    page = await renderDocument(document, {
+      resolve: (fromPath, target, isImage) =>
+        raw.resolve(fromPath, target, isImage),
+      resolveEmbedded: (target, isImage) =>
+        raw.resolveEmbedded(document, target, isImage),
+    });
+  }, 30_000);
+
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  // Left relative, an image resolves against the page's address under /doc/, where no image is served.
+  it("points a raw <img> at the file route, and lets that route serve it", () => {
+    expect(page.html).toContain('src="/file/images/logo.png"');
+    expect(raw.isLinkedFile("images/logo.png")).toBe(true);
+  });
+
+  it("points raw links where the same Markdown links would point", () => {
+    expect(page.html).toContain('href="/file/src/app.ts#L2"');
+    expect(page.html).toContain('<a href="/doc/docs/other.md">other</a>');
+    expect(page.html).toMatch(/<a href="gone\.md" class="link-missing"/);
+  });
+
+  // The marker that tells Markdown links from raw ones is the viewer's own and never reaches the page.
+  it("rewrites a Markdown link once and leaves no marker on the page", () => {
+    expect(page.html).toContain(
+      '<a href="/doc/docs/other.md">markdown link</a>',
+    );
+    expect(page.html).not.toContain("data-viewer-from-markdown");
+  });
+});
+
+describe("references", () => {
+  // A definition does not say whether its references are links or images, and an image must not go
+  // through the site router; each reference is resolved as what it is.
+  it("resolves an image reference as an image and a link reference as a link", async () => {
+    const calls: [string, boolean][] = [];
+    await renderDocument(
+      parseDocument({
+        path: "doc.md",
+        content: "# T\n\n![logo][l] and [text][l]\n\n[l]: /assets/logo.png\n",
+      }),
+      {
+        resolve: (_fromPath, target, isImage) => {
+          calls.push([target, isImage]);
+          return { kind: "missing" };
+        },
+        resolveEmbedded: () => Promise.resolve({ kind: "missing" }),
+      },
+    );
+    expect(calls).toEqual([
+      ["/assets/logo.png", true],
+      ["/assets/logo.png", false],
+    ]);
+  });
+});
+
+describe("DOM clobbering", () => {
+  // A named <img> would become a property of `document`, overriding its own members:
+  // `document.querySelector` would be the image, and every script on the page would fail.
+  it("drops name from an image and keeps it on an anchor", async () => {
+    const { html } = await renderText(
+      '# T\n\n<img name="querySelector" src="x.png" alt="x">\n\n<a name="here"></a>\n',
+    );
+    expect(html).not.toContain('name="querySelector"');
+    expect(html).toContain('<a name="here"></a>');
   });
 });

@@ -101,7 +101,8 @@ export async function findingPrompts(params: {
   const ruleIds = entryRuleIds(config.config);
   const ruleEntries = (config.config.rules ?? []).flatMap((entry, index) => {
     const ruleId = ruleIds[index];
-    return ruleId === null || ruleId === undefined
+    // An entry switched off reports nothing, so no finding's budget can come from it.
+    return ruleId === null || ruleId === undefined || entry.severity === "off"
       ? []
       : [{ ruleId, options: "options" in entry ? entry.options : undefined }];
   });

@@ -1,20 +1,15 @@
 import { realpathSync, watch, type FSWatcher } from "node:fs";
 import path from "node:path";
 
-import { CONFIG_FILE_NAME } from "@wastech-mdlint/core";
-
-// Only these can change what the viewer shows: a Markdown file's text, or the config and
-// `.gitignore` files that decide which Markdown files are in the corpus. Everything else is ignored
-// at the event, so a build writing thousands of files into `dist/` never wakes the corpus.
+// Which paths reach the corpus. Almost any can change what the viewer shows, and none can be judged
+// by its name alone: a config passed with `--config` may be called anything; an image a document
+// embeds is no Markdown file; and a folder moved, renamed or deleted arrives as one event for the
+// folder, with nothing for the documents inside it. So the corpus decides, against core's scope.
+// Only git's own database and installed dependencies are dropped here, unseen: neither is ever part
+// of a corpus, and both churn by the thousand on an install or a checkout.
 export function isRelevantChange(relPath: string): boolean {
   const segments = relPath.split("/");
-  if (segments.includes("node_modules") || segments.includes(".git")) {
-    return false;
-  }
-  const name = segments[segments.length - 1] ?? "";
-  return (
-    /\.mdx?$/i.test(name) || name === CONFIG_FILE_NAME || name === ".gitignore"
-  );
+  return !segments.includes("node_modules") && !segments.includes(".git");
 }
 
 /**
