@@ -938,6 +938,12 @@ a:hover {
   background: var(--bg);
 }
 
+.local-graph-hint {
+  margin: 0 0 2px;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
 .local-graph-open {
   display: inline-block;
   margin: 0 0 4px;

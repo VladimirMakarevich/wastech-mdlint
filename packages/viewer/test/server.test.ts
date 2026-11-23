@@ -300,7 +300,7 @@ describe("pages", () => {
   it("gives a document with neighbors a small graph of them in the rail", async () => {
     // The guide's only neighbor is the README, which links to it.
     expect((await get("/doc/docs/guide.md")).body).toContain(
-      '<aside class="rail"><section class="local-graph" aria-label="Linked documents"><h2>Links (1)</h2><div class="local-graph-canvas" data-path="docs/guide.md" hidden></div><a class="local-graph-open" href="/graph?focus=docs%2Fguide.md">Open in the full graph</a></section>',
+      '<aside class="rail"><section class="local-graph" aria-label="Linked documents"><h2>Links (1)</h2><div class="local-graph-canvas" data-path="docs/guide.md" hidden></div><p class="local-graph-hint" hidden>Ctrl or ⌘ + scroll to zoom, drag to move</p><a class="local-graph-open" href="/graph?focus=docs%2Fguide.md">Open in the full graph</a></section>',
     );
   });
 

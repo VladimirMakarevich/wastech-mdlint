@@ -366,6 +366,11 @@ function renderRail(params: PageParams): Element | undefined {
               hidden: true,
             }),
             h(
+              "p.local-graph-hint",
+              { hidden: true },
+              "Ctrl or ⌘ + scroll to zoom, drag to move",
+            ),
+            h(
               "a.local-graph-open",
               {
                 href: `/graph?${new URLSearchParams({ focus: params.documentPath }).toString()}`,

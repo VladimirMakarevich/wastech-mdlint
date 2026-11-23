@@ -1,4 +1,14 @@
 import { loadECharts } from "./echarts.js";
+import {
+  forceSeries,
+  isOwnLink,
+  LABEL_FONT_SIZE,
+  layoutFor,
+  type GraphKind,
+  type GraphNode,
+  type GraphView,
+  type Layout,
+} from "./graph-layout.js";
 import { onServerEvent } from "./live-reload.js";
 import { onThemeChange } from "./theme-toggle.js";
 
@@ -7,27 +17,6 @@ import { onThemeChange } from "./theme-toggle.js";
 // that document and its direct neighbors. Both fetch their view as JSON and draw it as a
 // force-directed picture in which a click on a document opens it.
 
-type GraphNode = {
-  path: string;
-  title: string;
-  href: string;
-  group: string;
-  inDegree: number;
-  outDegree: number;
-};
-
-type GraphView = {
-  folder: string;
-  nodes: GraphNode[];
-  edges: { from: string; to: string }[];
-  focus: { path: string; neighbors: string[] } | null;
-};
-
-// The graph page has a legend, zooms and pans, and names documents as the reader zooms in. The local
-// graph is too small for a legend, names every document at once, and leaves the mouse wheel to
-// scroll the page it sits in.
-type GraphKind = "page" | "local";
-
 type ItemParams = { dataType?: string; dataIndex: number; name?: string };
 
 type LabelLayoutParams = { dataType?: string; dataIndex: number };
@@ -35,7 +24,6 @@ type LabelLayoutParams = { dataType?: string; dataIndex: number };
 // A name on every node of a graph this size is unreadable, so until the reader zooms in only the
 // most linked-to documents are named.
 const LABELED_NODES = 30;
-const LABEL_FONT_SIZE = 11;
 
 export function initGraph(): void {
   const canvas = document.querySelector<HTMLElement>(".graph-canvas");
@@ -69,6 +57,13 @@ export function initLocalGraph(): void {
   // time it has a size — at once on a wide screen, when the window widens on a narrow one, and never
   // on a phone, which then also never downloads ECharts for it.
   canvas.hidden = false;
+  // How to zoom is not what a reader expects of a box in a side column, so it says so; without this
+  // script there is no graph to zoom and the line stays hidden.
+  const hint =
+    canvas.parentElement?.querySelector<HTMLElement>(".local-graph-hint");
+  if (hint !== null && hint !== undefined) {
+    hint.hidden = false;
+  }
   const sized = new ResizeObserver(() => {
     if (canvas.clientWidth === 0) {
       return;
@@ -96,7 +91,7 @@ async function draw(
   view.nodes = paintOrder(view);
   const echarts = await loadECharts();
   canvas.replaceChildren();
-  let layout = layoutFor(view, canvas, kind);
+  let layout = layoutFor(view, boxOf(canvas), kind);
   const chart = echarts.init(canvas);
   // The zoom the reader has reached, kept here because ECharts hands its label callback no current
   // zoom: the node box it passes was measured when the labels were created and never again.
@@ -138,7 +133,7 @@ async function draw(
       }
       laidOutFor = { width, height };
       layout = {
-        ...layoutFor(view, canvas, kind),
+        ...layoutFor(view, boxOf(canvas), kind),
         zoom: undefined,
         minZoom: layout.minZoom,
         maxZoom: layout.maxZoom,
@@ -158,6 +153,33 @@ async function draw(
     zoom = Math.min(layout.maxZoom, Math.max(layout.minZoom, zoom * factor));
     relayoutLabels();
   });
+
+  // In the side column the plain wheel scrolls the page, as it does everywhere else in the rail: a
+  // graph that took it would stop the page whenever the pointer crossed the box. So the local graph
+  // zooms with Ctrl or ⌘ held, which is also what a trackpad pinch sends. ECharts' wheel zoom cannot
+  // be tied to a key, so this zooms through the same action ECharts' wheel dispatches, which applies
+  // the zoom limits and reaches the handler above like any other zoom.
+  if (kind === "local") {
+    canvas.addEventListener(
+      "wheel",
+      (event) => {
+        if (!event.ctrlKey && !event.metaKey) {
+          return;
+        }
+        // Held Ctrl and a wheel otherwise zoom the whole page.
+        event.preventDefault();
+        const box = canvas.getBoundingClientRect();
+        chart.dispatchAction({
+          type: "graphRoam",
+          seriesIndex: 0,
+          zoom: wheelZoom(event),
+          originX: event.clientX - box.left,
+          originY: event.clientY - box.top,
+        });
+      },
+      { passive: false },
+    );
+  }
 
   // ECharts settles a force layout over several seconds, but checks names for overlap only on the
   // first frame and on a zoom, so names that drift onto each other as documents move would stay
@@ -218,6 +240,21 @@ function paintOrder(view: GraphView): GraphNode[] {
   ];
 }
 
+// A notch of a mouse wheel arrives as about a hundred pixels, or as three lines in Firefox; a
+// trackpad pinch as many events of a few pixels each. Both zoom by the same amount per pixel, and a
+// notch by no more than the step ECharts' own wheel zoom takes on the graph page.
+function wheelZoom(event: WheelEvent): number {
+  const pixels =
+    event.deltaMode === WheelEvent.DOM_DELTA_LINE
+      ? event.deltaY * 33
+      : event.deltaY;
+  return Math.min(1.4, Math.max(1 / 1.4, Math.exp(-pixels / 300)));
+}
+
+function boxOf(canvas: HTMLElement): { width: number; height: number } {
+  return { width: canvas.clientWidth, height: canvas.clientHeight };
+}
+
 async function fetchText(url: string): Promise<string | undefined> {
   try {
     const response = await fetch(url);
@@ -227,9 +264,6 @@ async function fetchText(url: string): Promise<string | undefined> {
     return undefined;
   }
 }
-
-// Room above the page graph for the legend.
-const LEGEND_HEIGHT = 40;
 
 // ECharts' force layout runs about five hundred steps of sixteen milliseconds before it stops.
 const LAYOUT_SETTLE_MS = 12_000;
@@ -244,6 +278,12 @@ const RELAYOUT_DELAY_MS = 200;
 const LINK_OPACITY = 0.3;
 const FADED_LINK_OPACITY = 0.15;
 const LIT_LINK = { width: 1.2, opacity: 0.85 };
+// In the local graph every link is the focused document's own or one between its neighbors, so at
+// the page graph's weight the lit links alone fill the small box with solid accent color and the
+// names between them stop reading. There they are hairlines, and the links between neighbors,
+// which only add context, recede further.
+const LOCAL_LINK_OPACITY = 0.18;
+const LOCAL_LIT_LINK = { width: 0.8, opacity: 0.5 };
 
 // Every color of the graph that differs between the themes: text, links, the documents outside a
 // focused neighborhood, lit links, and the tooltip's box. Taken from the page's tokens rather than an
@@ -286,73 +326,6 @@ function readColors(): GraphColors {
 // weakly, since ECharts warms a drag up from the same starting value.
 const SETTLED_FRICTION = 0.02;
 
-// Nodes are laid out this many average node widths apart. Measured on the six hundred documents of a
-// real repository: at the spacing that merely fits the box, nine documents in ten touched a
-// neighbor; at four widths, with links one to two spacings long, one in twenty-five does.
-const SPACING_IN_NODE_WIDTHS = 4;
-
-type Layout = {
-  kind: GraphKind;
-  // The local graph sits in the narrow side column, so its documents and names are drawn smaller.
-  nodeScale: number;
-  fontSize: number;
-  top: number;
-  width: number;
-  height: number;
-  // The distance, in layout pixels, the layout keeps between documents.
-  spacing: number;
-  force: { gravity: number; repulsion: number; edgeLength: number[] };
-  // Set on the first option only: a later one that carried it would undo the reader's zoom.
-  zoom?: number;
-  // Out to half the starting view, in to six times the layout's own scale.
-  minZoom: number;
-  maxZoom: number;
-  friction?: number;
-};
-
-// Fixed forces suit one size of graph only: tuned for six hundred documents, a ten-document folder
-// huddles in the middle; tuned for ten, six hundred pile on one another. Measured on ECharts' layout,
-// n nodes under gravity g and repulsion r settle into a square about 2.7·√(n·r/g) pixels wide, so r is
-// solved for the square the layout needs: the box when the documents fit in it at their spacing, or
-// a larger square that the graph then starts zoomed out of, so the whole graph shows and nothing
-// overlaps. Nodes scale with the zoom, so the gaps between them stay as wide as the layout made them.
-function layoutFor(
-  view: GraphView,
-  canvas: HTMLElement,
-  kind: GraphKind,
-): Layout {
-  const top = kind === "page" ? LEGEND_HEIGHT : 0;
-  const nodeScale = kind === "page" ? 1 : 0.75;
-  const box = 0.85 * Math.min(canvas.clientWidth, canvas.clientHeight - top);
-  const count = Math.max(view.nodes.length, 1);
-  const meanSize =
-    (view.nodes.reduce((sum, node) => sum + nodeSize(node), 0) / count) *
-    nodeScale;
-  const spacing = SPACING_IN_NODE_WIDTHS * meanSize;
-  const side = Math.max(box, spacing * Math.sqrt(count));
-  const gravity = 0.2;
-  return {
-    kind,
-    nodeScale,
-    fontSize: kind === "page" ? LABEL_FONT_SIZE : 10,
-    top,
-    width: canvas.clientWidth,
-    height: canvas.clientHeight,
-    spacing,
-    force: {
-      gravity,
-      repulsion: gravity * (side / (2.7 * Math.sqrt(count))) ** 2,
-      // Most of a local graph is links from the document in its middle, so their length is what
-      // spreads the neighbors over the box rather than leaving them in a knot around it.
-      edgeLength:
-        kind === "page" ? [spacing, 2 * spacing] : [box * 0.3, box * 0.45],
-    },
-    zoom: box / side,
-    minZoom: box / side / 2,
-    maxZoom: 6,
-  };
-}
-
 // The page graph names a document once the zoom has opened the gaps between documents wide enough to
 // read a name in: its label grows from nothing at the first of these on-screen spacings to full size
 // at the second, so names come in gradually as the reader zooms rather than all at once.
@@ -369,26 +342,27 @@ function graphOption(
   const groups = [...new Set(view.nodes.map((node) => node.group))].sort();
   const groupIndex = new Map(groups.map((group, index) => [group, index]));
   const focus = view.focus;
+  const local = layout.kind === "local";
   const lit =
     focus === null ? undefined : new Set([focus.path, ...focus.neighbors]);
   // Named whatever the zoom: everything in the local graph, the neighborhood of a focused document,
   // and otherwise the most linked-to documents.
-  const named =
-    layout.kind === "local"
-      ? new Set(view.nodes.map((node) => node.path))
-      : (lit ??
-        new Set(
-          [...view.nodes]
-            .sort((left, right) => right.inDegree - left.inDegree)
-            .slice(0, LABELED_NODES)
-            .map((node) => node.path),
-        ));
-  const linkOpacity =
-    focus === null || layout.kind === "local"
+  const named = local
+    ? new Set(view.nodes.map((node) => node.path))
+    : (lit ??
+      new Set(
+        [...view.nodes]
+          .sort((left, right) => right.inDegree - left.inDegree)
+          .slice(0, LABELED_NODES)
+          .map((node) => node.path),
+      ));
+  const linkOpacity = local
+    ? LOCAL_LINK_OPACITY
+    : focus === null
       ? LINK_OPACITY
       : FADED_LINK_OPACITY;
-  const symbolSize = (node: GraphNode): number =>
-    (node.path === focus?.path ? 26 : nodeSize(node)) * layout.nodeScale;
+  const litLink = local ? LOCAL_LIT_LINK : LIT_LINK;
+  const laidOut = forceSeries(view, layout);
 
   return {
     // ECharts draws its labels on the canvas in a font of its own, which the stylesheet cannot reach;
@@ -428,8 +402,13 @@ function graphOption(
       {
         type: "graph",
         layout: "force",
-        top: layout.top,
-        roam: layout.kind === "page",
+        ...laidOut,
+        // The local graph pans by dragging; it zooms only by the wheel handler in `draw`.
+        roam: layout.kind === "page" ? true : "move",
+        // Anywhere in the box, not only over the view's own rectangle, which ECharts scales with
+        // the zoom: a graph that opens zoomed out to fit would otherwise answer the wheel and a drag
+        // only in a patch around its middle, and the box's edges would ignore them.
+        roamTrigger: "global",
         draggable: true,
         ...(layout.zoom === undefined
           ? {}
@@ -442,23 +421,13 @@ function graphOption(
         // on top of each other.
         nodeScaleRatio: 1,
         categories: groups.map((name) => ({ name })),
-        data: view.nodes.map((node) => {
+        data: view.nodes.map((node, index) => {
           const isFocus = node.path === focus?.path;
           const dimmed = lit !== undefined && !lit.has(node.path);
           return {
-            id: node.path,
+            ...laidOut.data[index],
             name: node.path,
             category: groupIndex.get(node.group),
-            // The focused document is pinned in the middle, so its neighbors gather where the reader
-            // is looking; left to the layout it lands anywhere, often at an edge.
-            ...(isFocus
-              ? {
-                  fixed: true,
-                  x: layout.width / 2,
-                  y: layout.top + (layout.height - layout.top) / 2,
-                }
-              : {}),
-            symbolSize: symbolSize(node),
             // Outside the focused neighborhood a document turns neutral gray rather than
             // transparent: see-through color washes out to pastel on a light page and the graph's
             // shape is lost, while gray keeps every document visible and lets the lit ones lead.
@@ -476,19 +445,22 @@ function graphOption(
         // Arrowheads only on a focused document's own links. A filled head is far heavier than a
         // hairline, and the dozens that meet at a much-linked document pile up into a dark blot; the
         // direction of any link is in its tooltip.
-        links: view.edges.map((edge) =>
-          focus !== null && (edge.from === focus.path || edge.to === focus.path)
+        links: view.edges.map((edge, index) => ({
+          ...laidOut.links[index],
+          ...(isOwnLink(edge, focus)
             ? {
-                source: edge.from,
-                target: edge.to,
                 symbol: ["none", "arrow"],
-                symbolSize: 6,
-                lineStyle: { color: colors.accent, ...LIT_LINK },
-                blur: { lineStyle: { opacity: LIT_LINK.opacity } },
+                symbolSize: local ? 4 : 6,
+                lineStyle: { color: colors.accent, ...litLink },
+                blur: { lineStyle: { opacity: litLink.opacity } },
               }
-            : { source: edge.from, target: edge.to },
-        ),
-        lineStyle: { color: colors.link, width: 0.7, opacity: linkOpacity },
+            : {}),
+        })),
+        lineStyle: {
+          color: colors.link,
+          width: local ? 0.5 : 0.7,
+          opacity: linkOpacity,
+        },
         label: {
           position: "right",
           fontSize: layout.fontSize,
@@ -527,21 +499,18 @@ function graphOption(
           focus: "adjacency",
           label: { show: true, fontSize: layout.fontSize },
           itemStyle: { borderColor: colors.accent, borderWidth: 1.5 },
-          lineStyle: { color: colors.accent, width: 1.5, opacity: 1 },
+          lineStyle: {
+            color: colors.accent,
+            width: local ? 1.1 : 1.5,
+            opacity: 1,
+          },
         },
         blur: {
           itemStyle: { opacity: 1 },
           lineStyle: { opacity: linkOpacity },
           label: { opacity: 1 },
         },
-        force: { ...layout.force, friction: layout.friction },
       },
     ],
   };
-}
-
-// By area rather than radius, so a document with four times the inbound links looks twice as wide
-// rather than four times; a few hubs would otherwise cover the rest.
-function nodeSize(node: GraphNode): number {
-  return Math.min(24, 5 + 2.2 * Math.sqrt(node.inDegree));
 }
