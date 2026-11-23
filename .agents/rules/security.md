@@ -32,7 +32,9 @@ The viewer is the only host with a network listener, so any web page the user ha
 - Every request's `Host` must be localhost, an IP literal or the configured host (DNS rebinding), and a request carrying another origin, or a non-navigation from another site, is refused.
 - It serves corpus documents, plus only the non-Markdown files a corpus document links to or embeds. A request path is decoded segment by segment and refused if it could climb out of the repository; the real path of every file read is checked to be inside it.
 - Author HTML is sanitized before the viewer adds its own markup; pages carry a CSP that allows scripts from the viewer's origin only. SVG and other files served as-is are sandboxed.
-- No CDN or other network fetch: Mermaid and every asset are served from the installed packages.
+- A chart option is author data: an `echarts` block is parsed as JSON and never evaluated. ECharts writes an HTML tooltip's formatter template and the data view's `title`/`lang` into the page as `innerHTML`, and opens `link`/`sublink` with `window.open`, so before it sees an option every tooltip is switched to `richText`, those data-view labels are removed, and a link survives only as an http(s) URL.
+- The graph's `folder` and `focus` parameters are only compared against the corpus's own paths, never joined onto a filesystem path; a name that is not a folder holding documents, or not a document, is a 404.
+- No CDN or other network fetch: Mermaid, ECharts and every asset are served from the installed packages.
 
 ## Installation And File Writes
 

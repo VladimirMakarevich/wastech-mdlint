@@ -18,7 +18,7 @@ An npm-workspaces monorepo. All product code lives under `packages/*`; there is 
 - Host-specific behavior belongs at the boundary:
   - CLI: argument parsing, command dispatch, exit codes, file output.
   - MCP: tool registration, input validation, structured output, error wrapping.
-  - Viewer: HTTP serving, HTML rendering of the tree core parsed (`parseDocumentWithTree`), highlighting, live reload. It takes its corpus from `loadContext`, its findings from `lintContext` over that same corpus, its link targets from `resolveTargetCandidates` and its heading ids from core's slugs, so a page and the lint findings about it never disagree.
+  - Viewer: HTTP serving, HTML rendering of the tree core parsed (`parseDocumentWithTree`), highlighting, live reload. It takes its corpus from `loadContext`, its findings from `lintContext` over that same corpus, its link targets from `resolveTargetCandidates` and its heading ids from core's slugs, so a page and the lint findings about it never disagree. Its link graph is that corpus's `ContextGraph` and a document's neighbors come from core's `query`; the viewer only narrows the graph to a folder and merges a pair's parallel edges into one line for drawing.
 - Shared computational behavior belongs in core, not in host packages.
 
 The reason is not tidiness. Two hosts that each compute an answer will eventually compute two different answers, and because each package's own tests pass, nothing reports the divergence — which is why a cross-host parity guard exists in the test suite as well.
@@ -28,7 +28,7 @@ The reason is not tidiness. Two hosts that each compute an answer will eventuall
 - One Markdown parse pass produces the `ParsedDocument` data that rules, graph, compile, and inline suppression handling all read. Nothing re-parses Markdown ad hoc.
 - The rule engine is registry-driven: rule metadata, options schema, scope, default severity, structured findings, and optional fixes are defined centrally.
 - Declarative custom rules are data-driven, closed over a fixed primitive vocabulary. No runtime user-code execution and no code plugins.
-- `ContextGraph` is shared infrastructure. Graph-aware rules, the `graph`, `slice` and `impact` commands, MCP tools, and compile analysis reuse the same graph and query layer.
+- `ContextGraph` is shared infrastructure. Graph-aware rules, the `graph`, `slice` and `impact` commands, MCP tools, compile analysis, and the viewer's link graph reuse the same graph and query layer.
 - Output is deterministic: stable sorting, normalized repository-relative POSIX paths, no timestamp-driven churn, no locale-dependent collation.
 
 ## Config And Surface Rules
