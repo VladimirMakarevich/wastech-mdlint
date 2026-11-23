@@ -28,9 +28,9 @@ The security model is a deterministic, local-first Markdown analysis tool. Keep 
 The viewer is the only host with a network listener, so any web page the user has open can make the browser send it requests. Its boundary is:
 
 - Bound to `127.0.0.1` by default; another address only through an explicit `--host`, which it announces.
-- Read-only unless asked: `GET` and `HEAD` only, except the config page's `POST` preview, which writes nothing, and `POST` save. A save needs `--allow-config-writes`, refused with a non-loopback `--host`, since anyone reaching the port could then rewrite the config.
-- A request with a body needs this server's `Origin`, same-origin fetch metadata if any, an `application/json` type (no HTML form can send it; a cross-origin `fetch` needs a preflight that is never approved) and the per-process token only the config page carries; bodies stop at 256 KiB.
-- A save writes only the config the corpus was loaded from, inside the repository, over the version the page edited, with text `parseConfiguration` accepts — atomically, read back, the old text restored if the file is not what was written.
+- Read-only unless asked: `GET` and `HEAD` only, but for the config page's `POST` preview (writes nothing) and save. A save needs `--allow-config-writes`, refused with a non-loopback `--host`, as anyone reaching the port could then rewrite the config.
+- A request with a body needs this server's `Origin`, same-origin fetch metadata if any, an `application/json` type (no HTML form can send it; a cross-origin `fetch` needs a preflight never approved) and the per-process token only the config page carries; bodies stop at 256 KiB.
+- A save writes only the config the corpus was loaded from, inside the repository, over the version the page edited, with text `parseConfiguration` accepts — atomically and read back, restoring the old text if the file differs.
 - Every request's `Host` must be localhost, an IP literal or the configured host (DNS rebinding), and a request carrying another origin, or a non-navigation from another site, is refused.
 - It serves corpus documents, plus only the non-Markdown files a corpus document links to or embeds. A request path is decoded segment by segment and refused if it could climb out of the repository; the real path of every file read is checked to be inside it.
 - Author HTML is sanitized before the viewer adds its own markup; pages carry a CSP that allows scripts from the viewer's origin only. SVG and other files served as-is are sandboxed.
