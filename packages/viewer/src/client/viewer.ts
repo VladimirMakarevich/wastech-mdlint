@@ -1,5 +1,6 @@
 import { initCharts } from "./charts.js";
 import { initColumnResize } from "./column-resize.js";
+import { initDashboard } from "./dashboard.js";
 import { initDiagnostics } from "./diagnostics.js";
 import { initDiagrams } from "./diagrams.js";
 import { initGraph, initLocalGraph } from "./graph.js";
@@ -27,3 +28,4 @@ initGraph();
 initLocalGraph();
 initSearch();
 initDiagnostics(documentPath);
+initDashboard();

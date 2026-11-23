@@ -190,6 +190,7 @@ describe("pages", () => {
       "echarts.js",
       "graph.js",
       "column-resize.js",
+      "dashboard.js",
       "viewer.css",
     ]) {
       expect((await get(`/assets/${name}`)).status, name).toBe(200);
