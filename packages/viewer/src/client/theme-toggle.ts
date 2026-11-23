@@ -8,16 +8,6 @@ export type Theme = "light" | "dark";
 // Shared with `theme.ts`, which applies the stored choice before the page paints.
 const STORAGE_KEY = "wastech-mdlint-viewer:theme";
 const ORDER: readonly ThemeChoice[] = ["system", "light", "dark"];
-const LABELS: Record<ThemeChoice, string> = {
-  system: "Auto",
-  light: "Light",
-  dark: "Dark",
-};
-const ICONS: Record<ThemeChoice, string> = {
-  system: "◐",
-  light: "☀",
-  dark: "☾",
-};
 const CHANGE_EVENT = "wastech-mdlint-viewer:theme-change";
 const systemDark = matchMedia("(prefers-color-scheme: dark)");
 
@@ -56,7 +46,23 @@ export function initThemeToggle(): void {
   }
   // Rendered hidden by the server: without this script the button could do nothing.
   button.hidden = false;
-  render(button, currentChoice());
+  // The visible label is the stylesheet's to pick, from the choice on <html>, so it is right before
+  // this script runs; the server renders one label per choice, and the tooltip reuses their words.
+  const labels = new Map<string, string>();
+  for (const label of button.querySelectorAll<HTMLElement>(".theme-choice")) {
+    labels.set(label.dataset.choice ?? "", label.dataset.label ?? "");
+  }
+  const render = (choice: ThemeChoice): void => {
+    const next = ORDER[(ORDER.indexOf(choice) + 1) % ORDER.length]!;
+    const current = labels.get(choice) ?? choice;
+    const following = labels.get(next) ?? next;
+    button.title = `Theme: ${current}. Click for ${following}.`;
+    button.setAttribute(
+      "aria-label",
+      `Theme: ${current}. Switch to ${following}`,
+    );
+  };
+  render(currentChoice());
   button.addEventListener("click", () => {
     const next = ORDER[(ORDER.indexOf(currentChoice()) + 1) % ORDER.length]!;
     if (next === "system") {
@@ -73,17 +79,7 @@ export function initThemeToggle(): void {
     } catch {
       // Not remembered across pages, but applied to this one.
     }
-    render(button, next);
+    render(next);
     document.dispatchEvent(new Event(CHANGE_EVENT));
   });
-}
-
-function render(button: HTMLButtonElement, choice: ThemeChoice): void {
-  const next = ORDER[(ORDER.indexOf(choice) + 1) % ORDER.length]!;
-  button.textContent = `${ICONS[choice]} ${LABELS[choice]}`;
-  button.title = `Theme: ${LABELS[choice]}. Click for ${LABELS[next]}.`;
-  button.setAttribute(
-    "aria-label",
-    `Theme: ${LABELS[choice]}. Switch to ${LABELS[next]}`,
-  );
 }

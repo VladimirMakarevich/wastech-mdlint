@@ -295,7 +295,8 @@ describe("pages", () => {
   });
 
   // The stored theme must be applied before the stylesheet paints anything, so the classic theme
-  // script comes first; the switch itself stays hidden until the module that drives it has run.
+  // script comes first. The switch is hidden for a page without script, and carries a label for every
+  // choice, so the stylesheet can show the right one before any module has run.
   it("puts search and the theme switch in the header", async () => {
     const { body } = await get("/doc/README.md");
     expect(
@@ -307,8 +308,38 @@ describe("pages", () => {
       /<form class="search" action="\/search" method="get" role="search"><input type="search" name="q"/,
     );
     expect(body).toContain(
-      '<button class="theme-toggle" type="button" hidden>',
+      '<button class="theme-toggle" type="button" hidden><span class="theme-choice" data-choice="system" data-label="Auto">◐ Auto</span><span class="theme-choice" data-choice="light" data-label="Light">☀ Light</span><span class="theme-choice" data-choice="dark" data-label="Dark">☾ Dark</span></button>',
     );
+  });
+
+  // Moving between the header's sections must leave the bar where it was. The pages are full loads,
+  // so the only way to guarantee that is for every one of them to render the same header: a control
+  // present on one and not another, or a label of another width, moves everything after it. The one
+  // permitted difference is which link is marked as the current section.
+  it("renders the same header on every section page, marking only its own link", async () => {
+    const sections = {
+      graph: "/graph",
+      dashboard: "/dashboard",
+      config: "/config",
+    };
+    const headers = new Map<string, string>();
+    for (const [name, address] of Object.entries(sections)) {
+      const header = /<header[\s\S]*?<\/header>/.exec(
+        (await get(address)).body,
+      )?.[0];
+      expect(header, address).toBeDefined();
+      const marked = [
+        ...header!.matchAll(
+          /<a class="topbar-link" href="([^"]*)" aria-current="page">/g,
+        ),
+      ];
+      expect(
+        marked.map((match) => match[1]),
+        address,
+      ).toEqual([address]);
+      headers.set(name, header!.replace(' aria-current="page"', ""));
+    }
+    expect(new Set(headers.values()).size).toBe(1);
   });
 });
 

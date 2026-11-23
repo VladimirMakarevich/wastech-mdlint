@@ -39,7 +39,23 @@ export type PageParams = {
   // Set on the config page only: the token its script sends with a change, so the server can tell a
   // request from its own page from one another page made the browser send.
   changeToken?: string;
+  // Which of the header's sections the page is, marked on its link. The only thing about the header
+  // that differs between those pages: everything else is byte-identical, so switching between them
+  // leaves the bar exactly where it was.
+  section?: Section;
 };
+
+export type Section = "graph" | "dashboard" | "config";
+
+// The theme switch's three states, each drawn as its own label inside the button. The stylesheet
+// shows the one matching the choice `theme.js` applied before the first paint, so the button has its
+// final label and width from the first frame, rather than taking them from the module script later
+// and pushing the rest of the bar aside. The script reads each label from here for its tooltip.
+const THEME_CHOICES = [
+  { choice: "system", icon: "◐", label: "Auto" },
+  { choice: "light", icon: "☀", label: "Light" },
+  { choice: "dark", icon: "☾", label: "Dark" },
+] as const;
 
 export function renderPage(params: PageParams): string {
   const tree: Root = {
@@ -98,20 +114,29 @@ export function renderPage(params: PageParams): string {
             ),
             // From a document, the graph opens with that document and its neighbors lit, which is
             // how a reader gets from a page to its place among the others.
-            h(
-              "a.topbar-link",
-              {
-                href:
-                  params.documentPath === undefined
-                    ? "/graph"
-                    : `/graph?${new URLSearchParams({ focus: params.documentPath }).toString()}`,
-              },
+            sectionLink(
+              params,
+              "graph",
+              params.documentPath === undefined
+                ? "/graph"
+                : `/graph?${new URLSearchParams({ focus: params.documentPath }).toString()}`,
               "Graph",
             ),
-            h("a.topbar-link", { href: "/dashboard" }, "Dashboard"),
-            h("a.topbar-link", { href: "/config" }, "Config"),
-            // Hidden until the script that makes it work has run.
-            h("button.theme-toggle", { type: "button", hidden: true }, "Theme"),
+            sectionLink(params, "dashboard", "/dashboard", "Dashboard"),
+            sectionLink(params, "config", "/config", "Config"),
+            // Hidden without script, which it needs to do anything. With script, the stylesheet lays
+            // it out from the first paint (see `theme.ts`), before the module that wires it has run.
+            h(
+              "button.theme-toggle",
+              { type: "button", hidden: true },
+              THEME_CHOICES.map(({ choice, icon, label }) =>
+                h(
+                  "span.theme-choice",
+                  { dataChoice: choice, dataLabel: label },
+                  `${icon} ${label}`,
+                ),
+              ),
+            ),
           ]),
           h("div.layout", [
             h("div.sidebar-frame", [
@@ -146,6 +171,22 @@ export function renderPage(params: PageParams): string {
     ],
   };
   return toHtml(tree, { allowDangerousHtml: true });
+}
+
+function sectionLink(
+  params: PageParams,
+  section: Section,
+  href: string,
+  text: string,
+): Element {
+  return h(
+    "a.topbar-link",
+    {
+      href,
+      ariaCurrent: params.section === section ? "page" : undefined,
+    },
+    text,
+  );
 }
 
 /** Article content for an already-sanitized HTML string. */

@@ -53,8 +53,35 @@
   box-sizing: border-box;
 }
 
+/* The scrollbar's room is kept on every page, whether or not it scrolls, so moving between a long page
+   and a short one never shifts the header's right-aligned controls by a scrollbar's width. */
 html {
   scroll-padding-top: calc(var(--topbar-height) + 16px);
+  scrollbar-gutter: stable;
+}
+
+/* Moving between pages is a full page load, so the header and the tree are rebuilt each time. Taken
+   as named parts of a cross-document view transition, they are carried over as they were instead of
+   being repainted with the rest: the bar and the tree stay still while only the content between them
+   changes. Browsers without cross-document transitions load the page as before. */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+}
+
+::view-transition-group(topbar),
+::view-transition-old(topbar),
+::view-transition-new(topbar),
+::view-transition-group(sidebar),
+::view-transition-old(sidebar),
+::view-transition-new(sidebar) {
+  animation: none;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 120ms;
 }
 
 body {
@@ -95,6 +122,7 @@ a:hover {
 
 /* Top bar */
 .topbar {
+  view-transition-name: topbar;
   position: sticky;
   top: 0;
   z-index: 5;
@@ -253,7 +281,7 @@ a:hover {
   margin: 4px 0 0;
 }
 
-/* Graph link and theme switch: the same small control, one a link and one a button */
+/* Section links and theme switch: the same small control, one a link and one a button */
 .topbar-link,
 .theme-toggle {
   flex: none;
@@ -268,7 +296,8 @@ a:hover {
   cursor: pointer;
 }
 
-.topbar-link {
+.topbar-link,
+.theme-toggle {
   display: inline-flex;
   align-items: center;
 }
@@ -277,6 +306,36 @@ a:hover {
 .theme-toggle:hover {
   background: var(--bg-subtle);
   text-decoration: none;
+}
+
+/* The section the page is: the one thing that differs between the header's pages. */
+.topbar-link[aria-current="page"] {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+/* Without script the switch is hidden, as it could do nothing. With script — marked on <html> before
+   the first paint — it is laid out from the first frame, so it never appears later and pushes the
+   rest of the bar aside; the module that wires it runs whenever it runs. */
+.theme-toggle[hidden] {
+  display: none;
+}
+
+:root[data-script] .theme-toggle[hidden] {
+  display: inline-flex;
+}
+
+/* One label per choice, the one shown picked by the choice on <html>, so the button has its final
+   label and width before any module script has run. */
+.theme-choice {
+  display: none;
+}
+
+:root:not([data-theme]) .theme-choice[data-choice="system"],
+:root[data-theme="light"] .theme-choice[data-choice="light"],
+:root[data-theme="dark"] .theme-choice[data-choice="dark"] {
+  display: inline;
 }
 
 /* Layout: tree, article, outline */
@@ -289,6 +348,7 @@ a:hover {
 /* The frame stays put while the tree inside it scrolls, so the width handle on its edge spans the
    full height wherever the tree is scrolled to. */
 .sidebar-frame {
+  view-transition-name: sidebar;
   position: sticky;
   top: var(--topbar-height);
   height: calc(100vh - var(--topbar-height));

@@ -296,6 +296,7 @@ export async function startViewer(
         200,
         page({
           title: "Linter config",
+          section: "config",
           article: await renderConfigArticle(corpus, allowConfigWrites),
           changeToken,
         }),
@@ -567,6 +568,7 @@ export async function startViewer(
       200,
       page({
         title: "Link graph",
+        section: "graph",
         article: renderGraphArticle(
           view,
           graphFolders(corpus.documents.keys()),
@@ -612,6 +614,7 @@ export async function startViewer(
       parsed.ok ? 200 : 400,
       page({
         title: "Dashboard",
+        section: "dashboard",
         article: renderDashboardArticle(
           parsed.ok
             ? {
