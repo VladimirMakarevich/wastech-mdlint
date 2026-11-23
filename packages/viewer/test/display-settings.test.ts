@@ -56,6 +56,10 @@ describe("parseSettings", () => {
     expect(parsed.textWidth).toBe(880);
     expect(parsed.paddingLeft).toBe(0);
     expect(parsed.blockSpacing).toBe(1.05);
+    expect(parseSettings({ letterSpacing: 0.333 }).letterSpacing).toBe(
+      NUMBER_RANGES.letterSpacing.max,
+    );
+    expect(parseSettings({ letterSpacing: 0.034 }).letterSpacing).toBe(0.03);
     expect(parseSettings({ fontSize: Number.NaN }).fontSize).toBe(16);
   });
 
@@ -141,6 +145,9 @@ describe("custom properties", () => {
       "--reader-font-size": "18px",
       "--reader-width": "none",
       "--reader-source-lines": "none",
+    });
+    expect(changedVariables(parseSettings({ letterSpacing: 0.05 }))).toEqual({
+      "--reader-letter-spacing": "0.05em",
     });
     expect(changedVariables(parseSettings({ align: "justify" }))).toEqual({
       "--reader-align": "justify",

@@ -753,6 +753,7 @@ a:hover {
   font-family: var(--reader-font, var(--font-sans));
   font-size: var(--reader-font-size, 16px);
   line-height: var(--reader-line-height, 1.6);
+  letter-spacing: var(--reader-letter-spacing, 0em);
   text-align: var(--reader-align, start);
   hyphens: var(--reader-hyphens, manual);
 }
@@ -1095,6 +1096,9 @@ a:hover {
 }
 
 .markdown-body code {
+  /* Code keeps the spacing its font was drawn with: spread out, an identifier reads as separate
+     letters and a monospaced block no longer looks like what an editor shows. */
+  letter-spacing: normal;
   padding: 0.15em 0.35em;
   border-radius: 4px;
   background: var(--code-bg);

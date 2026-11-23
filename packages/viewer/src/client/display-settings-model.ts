@@ -28,6 +28,8 @@ export type DisplaySettings = {
   fontSize: number;
   // A multiple of the font size.
   lineHeight: number;
+  // Extra space between letters, in multiples of the font size; code keeps its own spacing.
+  letterSpacing: number;
   // The article's greatest width in pixels, unless `fullWidth`.
   textWidth: number;
   fullWidth: boolean;
@@ -57,6 +59,7 @@ export const DEFAULT_SETTINGS: Readonly<DisplaySettings> = {
   customCodeFont: "",
   fontSize: 16,
   lineHeight: 1.6,
+  letterSpacing: 0,
   textWidth: 860,
   fullWidth: false,
   blockSpacing: 1,
@@ -81,6 +84,7 @@ export const NUMBER_RANGES: Readonly<
 > = {
   fontSize: { min: 12, max: 28, step: 1 },
   lineHeight: { min: 1.1, max: 2.4, step: 0.05 },
+  letterSpacing: { min: 0, max: 0.2, step: 0.01 },
   textWidth: { min: 480, max: 1800, step: 20 },
   blockSpacing: { min: 0, max: 3, step: 0.05 },
   codeScale: { min: 0.7, max: 1.4, step: 0.05 },
@@ -252,6 +256,7 @@ export function allVariables(
     ),
     "--reader-font-size": `${settings.fontSize}px`,
     "--reader-line-height": String(settings.lineHeight),
+    "--reader-letter-spacing": `${settings.letterSpacing}em`,
     "--reader-width": settings.fullWidth ? "none" : `${settings.textWidth}px`,
     "--reader-block-gap": `${settings.blockSpacing}em`,
     "--reader-code-scale": String(settings.codeScale),

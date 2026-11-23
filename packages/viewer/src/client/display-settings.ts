@@ -320,6 +320,7 @@ function buildPanel(): Panel {
       fontName("customTextFont", "textFont", "Font name"),
       range("fontSize", "Size", "px"),
       range("lineHeight", "Line height", "×"),
+      range("letterSpacing", "Letter spacing", "em"),
       range("blockSpacing", "Space between blocks", "em"),
       select("align", "Alignment", [
         ["start", "Left"],
