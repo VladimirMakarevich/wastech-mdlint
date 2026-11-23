@@ -326,6 +326,16 @@ function raiseSteps(size: SizeData): string[] {
     steps.push(
       `- ${codeSpan(size.metric)} \`error\`: above ${size.actual}${warnExceeded ? ` and above the new \`warn\`, for example ${roomAbove(size.actual, 1.3)}` : `, for example ${newWarn}`}.`,
     );
+  } else if (
+    warnExceeded &&
+    size.errorAt !== undefined &&
+    newWarn >= size.errorAt
+  ) {
+    // Not exceeded, but a warning threshold at or above the error one would never warn: the file
+    // would go straight from silent to failing.
+    steps.push(
+      `- ${codeSpan(size.metric)} \`error\`: not exceeded, but it has to stay above the new \`warn\`, for example ${roomAbove(size.actual, 1.3)}.`,
+    );
   }
   return steps;
 }

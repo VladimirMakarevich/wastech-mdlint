@@ -197,6 +197,29 @@ describe("buildFindingPrompt", () => {
     );
   });
 
+  // A warning threshold raised past an untouched error threshold would never warn again.
+  it("keeps the error threshold above a raised warning one", () => {
+    const text = prompt({
+      strategy: "budget",
+      findings: [
+        {
+          ...TOKENS_WARNING,
+          data: {
+            metric: "tokens",
+            actual: 23000,
+            warnAt: 16000,
+            errorAt: 24000,
+          },
+        },
+      ],
+    });
+    expect(text).toContain("- `tokens` `warn`: above 23000, for example 26000");
+    expect(text).toContain(
+      "- `tokens` `error`: not exceeded, but it has to stay above the new `warn`, for example 30000.",
+    );
+    expect(prompt({ strategy: "budget" })).not.toContain("`tokens` `error`");
+  });
+
   // LLM-001 has one limit for every entrypoint an entry matches, so raising it in place would raise
   // it for all of them.
   it("gives an LLM-001 entrypoint an entry of its own", () => {
