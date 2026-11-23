@@ -1,18 +1,15 @@
 import { onServerEvent } from "./live-reload.js";
 
-// The branch's changes, shown wherever a reader is: a count on the header's Changes section, a
-// letter beside each changed file in the tree with a switch to show only those, and on a changed
-// document a line above its text leading to its diff. The Changes page itself is rendered on the
-// server; these are fetched, like the findings, because every page shows them and none should wait
-// for git to answer before it is drawn.
+// The branch's changes, shown wherever a reader is: a count on the header's Changes section, and a
+// letter beside each changed file in the tree with a switch to show only those. Fetched, like the
+// findings, because every page shows them and none but a document's own page should wait for git to
+// answer before it is drawn. A changed document's page, which does wait, is marked on the server:
+// the line above its text, its changed blocks and its outline.
 
 type ChangedDocument = {
   path: string;
   oldPath?: string;
   status: "A" | "M" | "D" | "R";
-  added: number;
-  removed: number;
-  anchor: string;
 };
 
 type Changes =
@@ -29,7 +26,7 @@ const STATUS_NAMES: Record<ChangedDocument["status"], string> = {
 // Remembered for this address, like the findings switch.
 const FILTER_KEY = "wastech-mdlint-viewer:tree-changed-only";
 
-export function initChanges(documentPath: string | undefined): void {
+export function initChanges(): void {
   // Drawn by the server only in a git work tree; without it there is nothing to review.
   const section = document.querySelector<HTMLAnchorElement>(
     '.section-nav a[href="/changes"]',
@@ -39,16 +36,13 @@ export function initChanges(documentPath: string | undefined): void {
   }
   initFilter();
   const refresh = () => {
-    void load(section, documentPath);
+    void load(section);
   };
   refresh();
   onServerEvent("change", refresh);
 }
 
-async function load(
-  section: HTMLAnchorElement,
-  documentPath: string | undefined,
-): Promise<void> {
+async function load(section: HTMLAnchorElement): Promise<void> {
   let data: Changes;
   try {
     data = (await (await fetch("/api/changes")).json()) as Changes;
@@ -62,7 +56,6 @@ async function load(
       : new Map<string, ChangedDocument>();
   markSection(section, data.status === "ready" ? data.documents.length : 0);
   markTree(changed);
-  markDocument(documentPath, changed);
   filterReady = true;
   applyFilter();
 }
@@ -118,34 +111,6 @@ function markTree(changed: Map<string, ChangedDocument>): void {
       item.dataset.changed = "";
     }
   }
-}
-
-function markDocument(
-  documentPath: string | undefined,
-  changed: Map<string, ChangedDocument>,
-): void {
-  document.querySelector(".changes-banner")?.remove();
-  const entry =
-    documentPath === undefined ? undefined : changed.get(documentPath);
-  const article = document.querySelector(".markdown-body");
-  if (entry === undefined || article === null) {
-    return;
-  }
-  const banner = document.createElement("p");
-  banner.className = "changes-banner";
-  const label = document.createElement("span");
-  label.className = `tree-change tree-change-${entry.status}`;
-  label.textContent = entry.status;
-  const text = document.createElement("span");
-  text.textContent =
-    entry.oldPath === undefined
-      ? `${STATUS_NAMES[entry.status]} · +${entry.added} −${entry.removed}`
-      : `${STATUS_NAMES[entry.status]}, from ${entry.oldPath} · +${entry.added} −${entry.removed}`;
-  const link = document.createElement("a");
-  link.href = `/changes#${entry.anchor}`;
-  link.textContent = "View diff";
-  banner.append(label, text, link);
-  article.prepend(banner);
 }
 
 // Set once the first answer is in: before that "not changed" only means "not asked yet", and the

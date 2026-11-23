@@ -1,3 +1,4 @@
+import { initChangeMarks } from "./change-marks.js";
 import { initChanges } from "./changes.js";
 import { initCharts } from "./charts.js";
 import { initCodeCopy } from "./code-copy.js";
@@ -39,7 +40,8 @@ initLocalGraph();
 initOutlineSpy();
 initSearch();
 initDiagnostics(documentPath);
-initChanges(documentPath);
+initChanges();
+initChangeMarks();
 initDashboard();
 initConfigEditor();
 initOpenConfig();

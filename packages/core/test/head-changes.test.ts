@@ -1,0 +1,114 @@
+import { describe, expect, it } from "vitest";
+
+import { changedSections, headChanges } from "../src/changes/head-changes.js";
+import { diffText } from "../src/changes/text-diff.js";
+import { parseDocument } from "../src/markdown/parse-document.js";
+
+const changesOf = (base: string, head: string) =>
+  headChanges(diffText(base, head));
+
+describe("headChanges", () => {
+  it("calls a line paired with the one it replaced edited, and removes nothing", () => {
+    const changes = changesOf(
+      "# T\n\nWrite in the present tense.\n",
+      "# T\n\nWrite in the past tense.\n",
+    );
+    expect([...changes.lines]).toEqual([[3, { kind: "edited", hunk: 0 }]]);
+    expect(changes.removals).toEqual([]);
+  });
+
+  it("calls an inserted line added", () => {
+    const changes = changesOf("a\n\nb\n", "a\n\nnew\n\nb\n");
+    expect(changes.lines.get(3)).toEqual({ kind: "added", hunk: 0 });
+    expect(changes.removals).toEqual([]);
+  });
+
+  // Too little in common to pair: the old line left and a new one came, so the page can show the
+  // old paragraph removed beside the new one rather than one paragraph "edited" beyond recognition.
+  it("reads a rewrite as a removal where the old line stood and an added line", () => {
+    const changes = changesOf(
+      "# T\n\nThe quick brown fox.\n\nEnd.\n",
+      "# T\n\nNothing alike here at all.\n\nEnd.\n",
+    );
+    expect(changes.lines.get(3)).toEqual({ kind: "added", hunk: 0 });
+    expect(changes.removals).toEqual([{ after: 2, baseLines: [3], hunk: 0 }]);
+  });
+
+  it("places lines removed above the first line after line 0", () => {
+    const changes = changesOf("gone\nkept\n", "kept\n");
+    expect(changes.removals).toEqual([{ after: 0, baseLines: [1], hunk: 0 }]);
+  });
+
+  // Lines are paired in order, so a line removed between two edited ones stood after the first of
+  // them on the head side, not at the top of the block.
+  it("places a removed line after the edited counterpart of the line above it", () => {
+    const changes = changesOf(
+      "alpha one two\ngone entirely\nbeta three four\n",
+      "alpha one TWO\nbeta three FOUR\n",
+    );
+    expect(changes.lines.get(1)?.kind).toBe("edited");
+    expect(changes.lines.get(2)?.kind).toBe("edited");
+    expect(changes.removals).toEqual([{ after: 1, baseLines: [2], hunk: 0 }]);
+  });
+
+  it("numbers each change with the hunk that shows it", () => {
+    const base = `${Array.from({ length: 20 }, (_, index) => `line ${index}`).join("\n")}\n`;
+    const head = base
+      .replace("line 1\n", "line 1 changed\n")
+      .replace("line 18\n", "");
+    const changes = changesOf(base, head);
+    expect(changes.lines.get(2)).toEqual({ kind: "edited", hunk: 0 });
+    expect(changes.removals).toEqual([{ after: 18, baseLines: [19], hunk: 1 }]);
+  });
+
+  it("finds nothing in an unchanged text", () => {
+    const changes = changesOf("# T\n\nSame.\n", "# T\r\n\r\nSame.\r\n");
+    expect(changes.lines.size).toBe(0);
+    expect(changes.removals).toEqual([]);
+  });
+});
+
+describe("changedSections", () => {
+  const head = [
+    "# Title", // 1
+    "", // 2
+    "## One", // 3
+    "", // 4
+    "Unchanged.", // 5
+    "", // 6
+    "## Two", // 7
+    "", // 8
+    "### Two point one", // 9
+    "", // 10
+    "Edited here.", // 11
+    "", // 12
+    "## Three", // 13
+    "", // 14
+    "Last.", // 15
+    "",
+  ].join("\n");
+  const headings = parseDocument({ path: "doc.md", content: head }).headings;
+  const slugs = (base: string) =>
+    changedSections(headings, changesOf(base, head)).map(
+      (heading) => heading.slug,
+    );
+
+  // The outline lists only the upper levels, so the section above a changed subsection is marked
+  // as well, and so is the title whose section is the whole document.
+  it("marks the section holding a change and every section around it", () => {
+    expect(slugs(head.replace("Edited here.", "Edited there."))).toEqual([
+      "title",
+      "two",
+      "two-point-one",
+    ]);
+  });
+
+  it("marks the section removed lines stood at the end of, not the next one", () => {
+    const base = head.replace("Unchanged.\n", "Unchanged.\n\nRemoved.\n");
+    expect(slugs(base)).toEqual(["title", "one"]);
+  });
+
+  it("marks nothing when nothing changed", () => {
+    expect(slugs(head)).toEqual([]);
+  });
+});

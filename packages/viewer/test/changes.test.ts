@@ -11,7 +11,9 @@ import {
   hasGit,
   makeRepo,
 } from "../../core/test/support/git-fixture.js";
+import { ChangeTracker } from "../src/changes.js";
 import { parseCliArgs } from "../src/cli-args.js";
+import { Corpus } from "../src/corpus.js";
 import { startViewer, type RunningViewer } from "../src/server.js";
 
 // The server loads from source here, but the page script it serves is only ever compiled output, and
@@ -326,6 +328,187 @@ describe.skipIf(!hasGit)("the Changes section (requires git on PATH)", () => {
     expect(api.documents.map((entry) => entry.path)).toContain("docs/new.md");
   });
 });
+
+// A branch that edits a paragraph in one section of a document, removes a list item from another and
+// leaves a third alone, and adds a document of its own.
+async function documentBranch(): Promise<GitFixture> {
+  const fixture = await makeRepo();
+  const page = [
+    "---",
+    "title: Page",
+    "---",
+    "",
+    "# Page",
+    "",
+    "## Intro",
+    "",
+    "Write in the present tense.",
+    "",
+    "## Steps",
+    "",
+    "- one",
+    "- two",
+    "- three",
+    "",
+    "## Unchanged",
+    "",
+    "Nothing here moves.",
+    "",
+  ].join("\n");
+  await fixture.write("README.md", "# Fixture\n\nUnchanged.\n");
+  await fixture.write("docs/page.md", page);
+  fixture.commit("base");
+  fixture.git("checkout", "-q", "-b", "feature");
+  await fixture.write(
+    "docs/page.md",
+    page.replace("present tense", "past tense").replace("- two\n", ""),
+  );
+  await fixture.write("docs/added.md", "# Added\n\nAll new.\n");
+  fixture.commit("feature work");
+  return fixture;
+}
+
+const articleOf = (body: string) =>
+  /<article class="markdown-body">[\s\S]*<\/article>/.exec(body)?.[0] ?? "";
+
+describe.skipIf(!hasGit)(
+  "a changed document's page (requires git on PATH)",
+  () => {
+    let fixture: GitFixture;
+    let viewer: RunningViewer;
+    let port: number;
+
+    beforeAll(async () => {
+      fixture = await documentBranch();
+      viewer = await startViewer({
+        cwd: fixture.repo,
+        host: "127.0.0.1",
+        port: 0,
+        portExplicit: true,
+        watch: false,
+        gitEnv: fixture.env,
+      });
+      port = portOf(viewer);
+    }, 60_000);
+
+    afterAll(async () => {
+      await viewer?.close();
+    });
+
+    // What the server sends is what a reader without script sees, and what is on screen before any
+    // script has run, so nothing moves once the page has loaded.
+    it("marks the changed blocks and puts back the removed one in the HTML it serves", async () => {
+      const { status, body } = await get(port, "/doc/docs/page.md");
+      expect(status).toBe(200);
+      const article = articleOf(body);
+      expect(article).toMatch(
+        /<p data-line="9" data-line-end="9" data-change="changed" data-change-hunks="0">Write in the past tense\.<\/p>/,
+      );
+      expect(article).toMatch(
+        /<li data-line="13" data-line-end="13">one<\/li>\s*<li class="change-removed-item"><details class="change-removed"><summary>1 list item removed<\/summary><div class="change-removed-body"><ul><li>two<\/li><\/ul><\/div><\/details><\/li><li data-line="14"/,
+      );
+      // The paragraph and the list item sit in one hunk, which the template holds for the bar.
+      expect(article).toMatch(
+        /<template class="change-hunks"><div class="change-hunk" data-hunk="0">/,
+      );
+      expect(article).not.toContain('data-hunk="1"');
+    });
+
+    it("says above the text what changed, with the views one click apart", async () => {
+      const { body } = await get(port, "/doc/docs/page.md");
+      const article = articleOf(body);
+      expect(article.indexOf('<div class="changes-banner">')).toBeLessThan(
+        article.indexOf('<section class="frontmatter"'),
+      );
+      expect(article).toContain(
+        '<span class="changes-banner-text">Modified in this branch · +1 −2</span>',
+      );
+      expect(article).toContain(
+        '<a class="segment" href="/doc/docs/page.md" aria-current="page">Rendered</a><a class="segment" href="/doc/docs/page.md?diff=source">Source</a><a class="segment" href="/doc/docs/page.md?diff=off">Off</a>',
+      );
+      expect(article).toContain(
+        '<a class="changes-banner-link" href="/changes#change.docs%2Fpage.md">Changes page</a>',
+      );
+    });
+
+    it("marks the changed sections in the outline, and only those", async () => {
+      const { body } = await get(port, "/doc/docs/page.md");
+      const outline =
+        /<nav class="outline"[\s\S]*?<\/nav>/.exec(body)?.[0] ?? "";
+      const changed = [
+        ...outline.matchAll(
+          /<a href="#([^"]+)">[^<]*(<span class="outline-change")?/g,
+        ),
+      ].map((match) => `${match[1]}${match[2] === undefined ? "" : " *"}`);
+      expect(changed).toEqual(["intro *", "steps *", "unchanged"]);
+    });
+
+    it("shows the source diff in place of the text with ?diff=source", async () => {
+      const { body } = await get(port, "/doc/docs/page.md?diff=source");
+      const article = articleOf(body);
+      expect(article).toContain(
+        '<a class="segment" href="/doc/docs/page.md?diff=source" aria-current="page">Source</a>',
+      );
+      expect(article).toMatch(
+        /<div class="change-source"><div class="diff-wrap"><table class="diff">/,
+      );
+      expect(article).toContain("<del>present</del>");
+      expect(article).not.toContain("data-change");
+      expect(article).not.toContain('class="frontmatter"');
+      expect(body).not.toContain('<nav class="outline"');
+    });
+
+    it("leaves the text unmarked with ?diff=off, the switch still there", async () => {
+      const { body } = await get(port, "/doc/docs/page.md?diff=off");
+      const article = articleOf(body);
+      expect(article).toContain(
+        '<a class="segment" href="/doc/docs/page.md?diff=off" aria-current="page">Off</a>',
+      );
+      expect(article).toContain("Write in the past tense.");
+      expect(article).not.toContain("data-change");
+      expect(article).not.toContain("change-removed");
+      expect(article).not.toContain("change-hunks");
+      expect(body).not.toContain("outline-change");
+    });
+
+    it("leaves an unchanged document's page as it was", async () => {
+      const { body } = await get(port, "/doc/README.md");
+      expect(body).not.toContain("changes-banner");
+      expect(body).not.toContain("data-change");
+      expect(body).not.toContain("change-hunks");
+    });
+
+    // After a save the reloading page, every open page's script and every other tab ask at once; they
+    // must share one review, and one that was running when the files changed must not be kept.
+    it("shares a running review between requests, and drops one the work tree overtook", async () => {
+      const corpus = await Corpus.load({ cwd: fixture.repo });
+      const tracker = (await ChangeTracker.open(corpus, {
+        env: fixture.env,
+      }))!;
+      const [first, second] = await Promise.all([
+        tracker.review(true),
+        tracker.review(true),
+      ]);
+      expect(second).toBe(first);
+
+      tracker.invalidate();
+      const overtaken = tracker.review(true);
+      tracker.invalidate();
+      const fresh = tracker.review(true);
+      expect(await fresh).not.toBe(await overtaken);
+      expect(await tracker.review(true)).toBe(await fresh);
+    });
+
+    // Every block of a document the branch added is new; the line above the text says so once.
+    it("marks no blocks on a document the branch added", async () => {
+      const { body } = await get(port, "/doc/docs/added.md");
+      expect(articleOf(body)).toContain(
+        '<span class="changes-banner-text">Added in this branch · +3 −0</span>',
+      );
+      expect(body).not.toContain("data-change");
+    });
+  },
+);
 
 describe.skipIf(!hasGit)(
   "Changes without a base (requires git on PATH)",

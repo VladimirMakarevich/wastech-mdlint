@@ -218,6 +218,12 @@ export type {
   TextDiff,
   TextDiffOptions,
 } from "./changes/text-diff.js";
+export { changedSections, headChanges } from "./changes/head-changes.js";
+export type {
+  HeadChanges,
+  HeadLineChange,
+  HeadRemoval,
+} from "./changes/head-changes.js";
 export {
   renderContextGraphDot,
   renderContextGraphMermaid,

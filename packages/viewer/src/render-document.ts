@@ -18,10 +18,17 @@ import { visit } from "unist-util-visit";
 import { VFile } from "vfile";
 
 import {
+  type HeadChanges,
+  normalizeText,
   parseDocumentWithTree,
   type ParsedDocument,
 } from "@wastech-mdlint/core";
 
+import {
+  type BlockChange,
+  type MarkedSide,
+  markChanges,
+} from "./change-marks.js";
 import { isExternalTarget, type ResolvedTarget } from "./corpus.js";
 import { highlight, languageForFence, withCopyButton } from "./highlight.js";
 import { encodeRepoPath } from "./request-path.js";
@@ -30,6 +37,18 @@ export type RenderedDocument = {
   // Sanitized article markup, ready to place inside the page.
   html: string;
   title: string;
+  // Set when rendered with its changes and the front matter is among them. The page draws front
+  // matter as a card of its own, outside the article markup, so the mark travels beside it.
+  frontmatterChange?: BlockChange;
+};
+
+/** What the branch did to a document, for marking it on its rendered page. */
+export type DocumentChange = {
+  changes: HeadChanges;
+  // The document as the base holds it, at its path there: the source of the blocks the branch
+  // removed, which the page shows folded where they stood.
+  basePath: string;
+  baseText: string;
 };
 
 export type TargetResolver = (
@@ -100,11 +119,54 @@ export function fileHref(relPath: string): string {
  * tree. Only then are code blocks replaced with Shiki's output and the Mermaid and chart
  * placeholders, because that markup is the viewer's own: Shiki colors tokens with `style` attributes
  * the sanitizer would (rightly) strip from an author, and it escapes the code text itself.
+ *
+ * With `change`, the blocks the branch changed are marked and the ones it removed are put back,
+ * folded, where they stood. The base side goes through the same pipeline, so a removed block is
+ * sanitized like any other, and its links resolve against the current corpus: a link that only
+ * worked at the base shows as missing, which is what a reviewer needs to learn about it.
  */
 export async function renderDocument(
   document: ParsedDocument,
   resolvers: TargetResolvers,
+  change?: DocumentChange,
 ): Promise<RenderedDocument> {
+  const head = await renderTree(document, resolvers);
+  let frontmatterChange: BlockChange | undefined;
+  if (change !== undefined) {
+    const base = await renderTree(
+      { path: change.basePath, content: change.baseText },
+      resolvers,
+    );
+    for (const href of base.missingHrefs) {
+      head.missingHrefs.add(href);
+    }
+    frontmatterChange = markChanges(head, base, change.changes);
+  }
+  // After the removed blocks are in, so their code is highlighted and their links marked too.
+  await replaceCodeBlocks(head.tree);
+  markLinks(head.tree, head.missingHrefs);
+
+  return {
+    html: toHtml(head.tree),
+    title: documentTitle(head.parsed),
+    ...(frontmatterChange === undefined ? {} : { frontmatterChange }),
+  };
+}
+
+type RenderedTree = MarkedSide & {
+  parsed: ParsedDocument;
+  missingHrefs: Set<string>;
+};
+
+/**
+ * One side's sanitized tree, every block numbered with its source lines, before the viewer's own
+ * code-block markup goes in: everything about the author's content that does not depend on what
+ * else is shown beside it.
+ */
+async function renderTree(
+  document: { path: string; content: string },
+  resolvers: TargetResolvers,
+): Promise<RenderedTree> {
   const { document: parsed, tree } = parseDocumentWithTree({
     path: document.path,
     content: document.content,
@@ -203,12 +265,27 @@ export async function renderDocument(
   }) as HastRoot;
   await rewriteEmbeddedTargets(reparsed, resolvers, missingHrefs);
   const clean = sanitize(reparsed, SANITIZE_SCHEMA) as HastRoot;
-
   markSourceLines(clean);
-  await replaceCodeBlocks(clean);
-  markLinks(clean, missingHrefs);
 
-  return { html: toHtml(clean), title: documentTitle(parsed) };
+  // Numbered as the diff numbers them: the parser counts a lone `\r` as a line ending and a byte
+  // order mark as no line at all, and so does `normalizeText`.
+  const lines = normalizeText(document.content).split("\n");
+  const yaml = tree.children[0]?.type === "yaml" ? tree.children[0] : undefined;
+  return {
+    tree: clean,
+    parsed,
+    missingHrefs,
+    blank: (line) => (lines[line - 1] ?? "").trim() === "",
+    ...(yaml?.position === undefined || parsed.frontmatter === null
+      ? {}
+      : {
+          frontmatter: {
+            start: yaml.position.start.line,
+            end: yaml.position.end.line,
+            raw: parsed.frontmatter.raw,
+          },
+        }),
+  };
 }
 
 /**
@@ -317,9 +394,10 @@ const SCROLLING_BLOCKS = new Set(["table", "pre"]);
 /**
  * Give each block and each list item the line it starts on in the Markdown file, as `data-line`,
  * for the page to show beside it — so a reader can go from the page to the file, and from a
- * finding's "line 42" to the block it is about.
+ * finding's "line 42" to the block it is about — and the line it ends on, as `data-line-end`, so a
+ * block's whole range is known without guessing it from where the next block starts.
  *
- * Done on the sanitized tree: the attribute is the viewer's own, and the sanitizer has already
+ * Done on the sanitized tree: the attributes are the viewer's own, and the sanitizer has already
  * stripped any `data-*` an author wrote, so no document can label a block with a line it is not on.
  * A list gets no number of its own, since its first item carries the same line.
  */
@@ -334,15 +412,20 @@ function markSourceLines(tree: HastRoot): void {
       return node;
     }
     const line = node.position.start.line;
+    const lineEnd = node.position.end.line;
     if (SCROLLING_BLOCKS.has(node.tagName)) {
-      return h("div.source-line", { dataLine: line }, [node]);
+      return h("div.source-line", { dataLine: line, dataLineEnd: lineEnd }, [
+        node,
+      ]);
     }
     node.properties.dataLine = line;
+    node.properties.dataLineEnd = lineEnd;
     return node;
   });
   visit(tree, "element", (node: Element) => {
     if (node.tagName === "li" && node.position !== undefined) {
       node.properties.dataLine = node.position.start.line;
+      node.properties.dataLineEnd = node.position.end.line;
     }
   });
 }

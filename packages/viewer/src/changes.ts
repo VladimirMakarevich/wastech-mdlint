@@ -27,7 +27,14 @@ import { documentHref } from "./render-document.js";
 // most influential first, each with its diff. Everything computed here comes from core — the change
 // set, the order, the diff — and this module only keeps it between requests and lays it out.
 
-export type DocumentReview = RankedChange & { diff: TextDiff };
+export type DocumentReview = RankedChange & {
+  diff: TextDiff;
+  // The texts the diff compares, "" on the side a document does not exist. The base text holds the
+  // blocks the branch removed, which a document's page puts back; the head text tells that page
+  // whether this diff describes the very text it is rendering.
+  baseText: string;
+  headText: string;
+};
 
 export type ConfigReview = {
   path: string;
@@ -47,7 +54,7 @@ export type ReviewResult = Review | GitUnavailable;
 // list of what changed rather than on the first rewrite.
 const FOLDED_DIFF_LINES = 300;
 
-type Cached = { key: string; result: Promise<ReviewResult> };
+type Cached = { key: string; result: Review };
 
 /**
  * Keeps the review between requests, for as long as the viewer runs.
@@ -56,9 +63,17 @@ type Cached = { key: string; result: Promise<ReviewResult> };
  * passes on through `invalidate` — or when `HEAD` or the base moved without the work tree changing,
  * as a commit, a `reset --soft` or a fetch does. The second is asked of git on every request, in one
  * process: a few milliseconds, against the several processes and the diffs a full review costs.
+ *
+ * Requests that arrive while a review is being computed wait for that one rather than starting
+ * their own: after a save, the reloading document page, the open pages' scripts and every other tab
+ * all ask at once, and each would otherwise run the whole review again.
  */
 export class ChangeTracker {
   private readonly cache = new Map<boolean, Cached>();
+  private readonly pending = new Map<boolean, Promise<ReviewResult>>();
+  // Bumped by `invalidate`, so a review that was already running when the work tree changed is
+  // neither cached nor joined: it describes the files as they were before.
+  private generation = 0;
 
   private constructor(
     private readonly corpus: Corpus,
@@ -91,7 +106,9 @@ export class ChangeTracker {
 
   /** Forget every review; the next request computes a fresh one. */
   invalidate(): void {
+    this.generation += 1;
     this.cache.clear();
+    this.pending.clear();
   }
 
   async review(worktree: boolean): Promise<ReviewResult> {
@@ -100,26 +117,36 @@ export class ChangeTracker {
       return repository;
     }
     const cached = this.cache.get(worktree);
-    if (cached !== undefined) {
-      const result = await cached.result;
-      // A problem such as a missing base is asked again every time: a fetch or a new branch may
-      // have solved it, and nothing on disk the watcher sees would say so.
-      if (
-        !("available" in result) &&
-        (await repository.revisionKey(result.set.base)) === cached.key
-      ) {
+    if (
+      cached !== undefined &&
+      (await repository.revisionKey(cached.result.set.base)) === cached.key
+    ) {
+      return cached.result;
+    }
+    const running = this.pending.get(worktree);
+    if (running !== undefined) {
+      return running;
+    }
+    const generation = this.generation;
+    const computing: Promise<ReviewResult> = this.compute(repository, worktree)
+      .then((result) => {
+        // A problem such as a missing base is not kept, and is asked again every time: a fetch or
+        // a new branch may have solved it, and nothing on disk the watcher sees would say so.
+        if (!("available" in result) && generation === this.generation) {
+          this.cache.set(worktree, {
+            key: `${result.set.head}:${result.set.base.commit}`,
+            result,
+          });
+        }
         return result;
-      }
-    }
-    const result = this.compute(repository, worktree);
-    const settled = await result;
-    if (!("available" in settled)) {
-      this.cache.set(worktree, {
-        key: `${settled.set.head}:${settled.set.base.commit}`,
-        result,
+      })
+      .finally(() => {
+        if (this.pending.get(worktree) === computing) {
+          this.pending.delete(worktree);
+        }
       });
-    }
-    return settled;
+    this.pending.set(worktree, computing);
+    return computing;
   }
 
   private async compute(
@@ -177,6 +204,8 @@ export class ChangeTracker {
         headBlobs === undefined ? documents.get(change.path) : undefined;
       return {
         ...change,
+        baseText: base,
+        headText: head,
         diff: diffText(base, head, {
           baseTableRows: tableRowLines(
             parseDocument({ path: basePath, content: base }),
@@ -303,6 +332,88 @@ const STATUS_NAMES: Record<GitChange["status"], string> = {
   D: "Deleted",
   R: "Renamed",
 };
+
+/**
+ * How a changed document's page shows its changes: marked on the rendered text, as its source diff
+ * in place of the text, or not at all. Kept in the address (`?diff=`), so a reload and a shared link
+ * show the same view; anything else there is the default, `rendered`.
+ */
+export type DiffView = "rendered" | "source" | "off";
+
+export function diffViewOf(params: URLSearchParams): DiffView {
+  const value = params.get("diff");
+  return value === "source" || value === "off" ? value : "rendered";
+}
+
+const DIFF_VIEWS: readonly (readonly [DiffView, string])[] = [
+  ["rendered", "Rendered"],
+  ["source", "Source"],
+  ["off", "Off"],
+];
+
+/**
+ * The line above a changed document's text: what the branch did to it, the switch between the
+ * views of its changes, and the way to its card on the Changes page. Rendered with the page, from the
+ * review the page was marked with, so it is there without script and nothing below it moves once
+ * the page has loaded. The switch is a row of links, which work without script too.
+ */
+export function renderChangeBanner(
+  review: DocumentReview,
+  view: DiffView,
+): Element {
+  const page = documentHref(review.path);
+  return h("div.changes-banner", [
+    statusBadge(review.status),
+    h(
+      "span.changes-banner-text",
+      `${STATUS_NAMES[review.status]} in this branch${
+        review.oldPath === undefined ? "" : `, from ${review.oldPath}`
+      } · ${stats(review.diff)}`,
+    ),
+    h(
+      "nav.changes-view.segmented.is-compact",
+      { ariaLabel: "Show the changes" },
+      DIFF_VIEWS.map(([value, label]) =>
+        h(
+          "a.segment",
+          {
+            href: value === "rendered" ? page : `${page}?diff=${value}`,
+            ariaCurrent: value === view ? "page" : undefined,
+          },
+          label,
+        ),
+      ),
+    ),
+    h(
+      "a.changes-banner-link",
+      { href: `/changes#${changeCardId(review.path)}` },
+      "Changes page",
+    ),
+  ]);
+}
+
+/**
+ * Each hunk of a diff on its own, inert inside a `<template>` until the page script shows one beside
+ * the block it changed. Rendered here, by the code that renders the Changes page, so the browser
+ * never draws a diff of its own that could disagree with it.
+ */
+export function renderHunkTemplate(diff: TextDiff): Element {
+  return h(
+    "template.change-hunks",
+    diff.hunks.map((hunk, index) =>
+      h(
+        "div.change-hunk",
+        { dataHunk: index },
+        renderDiff({
+          hunks: [hunk],
+          added: 0,
+          removed: 0,
+          newlineAtEndChanged: false,
+        }),
+      ),
+    ),
+  );
+}
 
 /** The Changes page's article, rendered on the server so it reads the same without script. */
 export function renderChangesArticle(

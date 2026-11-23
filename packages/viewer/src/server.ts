@@ -15,7 +15,9 @@ import type { ElementContent } from "hast";
 import { h } from "hastscript";
 
 import {
+  changedSections,
   compareStrings,
+  headChanges,
   type LintMessage,
   type ParsedDocument,
 } from "@wastech-mdlint/core";
@@ -24,7 +26,13 @@ import {
   ChangeTracker,
   changesPayload,
   diffPayload,
+  diffViewOf,
+  type DiffView,
+  type DocumentReview,
+  renderChangeBanner,
   renderChangesArticle,
+  renderDiff,
+  renderHunkTemplate,
 } from "./changes.js";
 import {
   candidateText,
@@ -246,6 +254,76 @@ export async function startViewer(
     return pending;
   }
 
+  type MarkedDocument = {
+    rendered: RenderedDocument;
+    changedSections: Set<string>;
+  };
+
+  // A document rendered with its changes marked, kept for as long as the review it was marked from:
+  // the tracker replaces every review after the watcher's next batch, which is also what brings a new
+  // text or a change in which files the links reach, so an entry never outlives what it was made of.
+  const marked = new WeakMap<
+    DocumentReview,
+    { document: ParsedDocument; result: Promise<MarkedDocument> }
+  >();
+
+  function renderMarked(
+    document: ParsedDocument,
+    review: DocumentReview,
+  ): Promise<MarkedDocument> {
+    const entry = marked.get(review);
+    if (entry !== undefined && entry.document === document) {
+      return entry.result;
+    }
+    const changes = headChanges(review.diff);
+    const result = renderDocument(
+      document,
+      {
+        resolve: (fromPath, target, isImage) =>
+          corpus.resolve(fromPath, target, isImage),
+        resolveEmbedded: (target, isImage) =>
+          corpus.resolveEmbedded(document, target, isImage),
+      },
+      {
+        changes,
+        basePath: review.oldPath ?? review.path,
+        baseText: review.baseText,
+      },
+    ).then((rendered) => ({
+      rendered,
+      changedSections: new Set(
+        changedSections(document.headings, changes).map(
+          (heading) => heading.slug,
+        ),
+      ),
+    }));
+    marked.set(review, { document, result });
+    result.catch(() => marked.delete(review));
+    return result;
+  }
+
+  /**
+   * The review of a document page's own changes, or `undefined` when it has none to show. Always the
+   * work-tree review: the page renders the file on disk, and only that review's line numbers are its
+   * lines. Its head text is compared with the text being rendered, so a page requested between a
+   * save reaching the corpus and the review being rebuilt is never marked from the other text.
+   */
+  async function reviewOf(
+    document: ParsedDocument,
+  ): Promise<DocumentReview | undefined> {
+    if (changes === undefined) {
+      return undefined;
+    }
+    const review = await changes.review(true);
+    if ("available" in review) {
+      return undefined;
+    }
+    return review.documents.find(
+      (entry) =>
+        entry.path === document.path && entry.headText === document.content,
+    );
+  }
+
   // A repository file's path on this machine, in the platform's own form, for the copy button — or
   // nothing when pages are read from other machines.
   function absolutePathOf(relPath: string): string | undefined {
@@ -425,6 +503,7 @@ export async function startViewer(
         request,
         response,
         decodeRequestPath(target.slice("/doc/".length)),
+        diffViewOf(params),
       );
     } else if (target.startsWith("/file/")) {
       await sendLinkedFile(
@@ -468,6 +547,7 @@ export async function startViewer(
     request: IncomingMessage,
     response: ServerResponse,
     relPath: string | undefined,
+    view: DiffView,
   ): Promise<void> {
     const document =
       relPath === undefined ? undefined : corpus.documents.get(relPath);
@@ -479,23 +559,60 @@ export async function startViewer(
       );
       return;
     }
-    const { html, title } = await render(document);
-    sendHtml(
-      response,
-      200,
-      page({
+    const common = {
+      displayPath: relPath,
+      absolutePath: absolutePathOf(relPath),
+      documentPath: relPath,
+      backlinks: corpus.backlinks(relPath),
+      neighborCount: documentNeighbors(corpus.graph, relPath).length,
+    };
+    const review = await reviewOf(document);
+    let params: Omit<PageParams, "siteName" | "documentPaths" | "showChanges">;
+    if (review !== undefined && view === "source") {
+      // The diff takes the article's place. The outline is left out with the rendered text, since
+      // none of its headings is on this page to jump to.
+      const { title } = await render(document);
+      params = {
+        ...common,
         title,
-        displayPath: relPath,
-        absolutePath: absolutePathOf(relPath),
-        documentPath: relPath,
+        changeBanner: renderChangeBanner(review, view),
+        article: [h("div.change-source", renderDiff(review.diff))],
+      };
+    } else if (
+      review !== undefined &&
+      view === "rendered" &&
+      // On a document the branch added, every block would carry the same mark the line above it
+      // already gives the whole page.
+      review.status !== "A" &&
+      review.diff.hunks.length > 0
+    ) {
+      const { rendered, changedSections } = await renderMarked(
+        document,
+        review,
+      );
+      params = {
+        ...common,
+        title: rendered.title,
+        changeBanner: renderChangeBanner(review, view),
+        article: [...rawHtml(rendered.html), renderHunkTemplate(review.diff)],
+        headings: document.headings,
+        changedSections,
+        frontmatter: document.frontmatter,
+        frontmatterChange: rendered.frontmatterChange,
+      };
+    } else {
+      const { html, title } = await render(document);
+      params = {
+        ...common,
+        title,
+        changeBanner:
+          review === undefined ? undefined : renderChangeBanner(review, view),
         article: rawHtml(html),
         headings: document.headings,
-        backlinks: corpus.backlinks(relPath),
-        neighborCount: documentNeighbors(corpus.graph, relPath).length,
         frontmatter: document.frontmatter,
-      }),
-      request.method === "HEAD",
-    );
+      };
+    }
+    sendHtml(response, 200, page(params), request.method === "HEAD");
   }
 
   async function sendLinkedFile(
@@ -1215,6 +1332,12 @@ export async function startViewer(
               }
             }
             if (change.changed.length > 0 || change.structural) {
+              // Every open page answers this event — a document page by reloading and waiting for
+              // its review, every other page's script by asking for the changes — so the review
+              // they will all join is started before they ask.
+              if (changes !== undefined && eventClients.size > 0) {
+                void changes.review(true).catch(() => undefined);
+              }
               broadcast("change", {
                 paths: change.changed,
                 structural: change.structural,

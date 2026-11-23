@@ -9,6 +9,7 @@ import {
   type ParsedHeading,
 } from "@wastech-mdlint/core";
 
+import type { BlockChange } from "./change-marks.js";
 import { documentHref } from "./render-document.js";
 
 // Every page is assembled as a hast tree and serialized once, so text from the repository — file
@@ -32,12 +33,19 @@ export type PageParams = {
   // tree, so opening folders toward it would lead nowhere.
   documentPath?: string;
   article: ElementContent[];
+  // Above everything in the article, front matter included: on a changed document, what the branch
+  // did to it and how the page shows that.
+  changeBanner?: Element;
   headings?: readonly ParsedHeading[];
+  // Slugs of the headings whose section the branch changed, marked in the outline so a reader sees
+  // where the changes are before scrolling to them.
+  changedSections?: ReadonlySet<string>;
   backlinks?: readonly string[];
   // How many documents the page's document links to or is linked from. The rail draws them as a
   // small graph, and leaves the graph out when there are none.
   neighborCount?: number;
   frontmatter?: ParsedFrontmatter | null;
+  frontmatterChange?: BlockChange;
   // Pre-fills the header's search box on a results page.
   query?: string;
   // Set on the config page only: the token its script sends with a change, so the server can tell a
@@ -284,7 +292,11 @@ export function renderPage(params: PageParams): string {
             ]),
             h("main.content", { id: CONTENT_ID }, [
               h("article.markdown-body", [
-                renderFrontmatter(params.frontmatter ?? null),
+                params.changeBanner,
+                renderFrontmatter(
+                  params.frontmatter ?? null,
+                  params.frontmatterChange,
+                ),
                 ...params.article,
               ]),
             ]),
@@ -491,7 +503,16 @@ function renderRail(params: PageParams): Element | undefined {
               "ul",
               outline.map((heading) =>
                 h(`li.depth-${heading.depth}`, [
-                  h("a", { href: `#${heading.slug}` }, heading.text),
+                  h("a", { href: `#${heading.slug}` }, [
+                    heading.text,
+                    params.changedSections?.has(heading.slug) === true
+                      ? h("span.outline-change", {
+                          role: "img",
+                          ariaLabel: "changed in this branch",
+                          title: "Changed in this branch",
+                        })
+                      : undefined,
+                  ]),
                 ]),
               ),
             ),
@@ -527,29 +548,31 @@ function columnResizer(column: "sidebar" | "rail", label: string): Element {
 
 function renderFrontmatter(
   frontmatter: ParsedFrontmatter | null,
+  change: BlockChange | undefined,
 ): Element | undefined {
   if (frontmatter === null) {
     return undefined;
   }
+  // Marked like any block of the article, so the card shows a change the same way and the page
+  // script finds its hunks the same way.
+  const properties = {
+    ariaLabel: "Front matter",
+    dataChange: change?.kind,
+    dataChangeHunks: change?.hunks.join(" "),
+  };
   const { parsed } = frontmatter;
   if (!parsed.ok) {
     // Shown rather than hidden: a block the linter cannot parse is the block an author needs to see.
-    return h(
-      "section.frontmatter.frontmatter-invalid",
-      { ariaLabel: "Front matter" },
-      [
-        h("p", `Front matter is not valid YAML: ${parsed.error.message}`),
-        h("pre", frontmatter.raw),
-      ],
-    );
-  }
-  const value = parsed.value;
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    return h("section.frontmatter", { ariaLabel: "Front matter" }, [
+    return h("section.frontmatter.frontmatter-invalid", properties, [
+      h("p", `Front matter is not valid YAML: ${parsed.error.message}`),
       h("pre", frontmatter.raw),
     ]);
   }
-  return h("section.frontmatter", { ariaLabel: "Front matter" }, [
+  const value = parsed.value;
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return h("section.frontmatter", properties, [h("pre", frontmatter.raw)]);
+  }
+  return h("section.frontmatter", properties, [
     h(
       "dl",
       Object.entries(value).flatMap(([key, entry]) => [

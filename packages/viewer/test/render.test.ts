@@ -75,7 +75,7 @@ describe("sanitizing author content", () => {
 
   it("keeps collapsible sections", () => {
     expect(guide.html).toMatch(
-      /<details data-line="26">\s*<summary>More<\/summary>/,
+      /<details data-line="26" data-line-end="30">\s*<summary>More<\/summary>/,
     );
     expect(guide.html).toContain("Hidden text.");
   });
@@ -127,7 +127,7 @@ describe("code blocks", () => {
       "# Steps\n\n1. Run it:\n\n   ```sh\n   npm test\n   ```\n",
     );
     expect(nested.html).toMatch(
-      /<li data-line="3">[\s\S]*<div class="code-block"><button class="code-copy" type="button" hidden title="Copy the code" aria-label="Copy the code">Copy<\/button><pre class="shiki/,
+      /<li data-line="3" data-line-end="7">[\s\S]*<div class="code-block"><button class="code-copy" type="button" hidden title="Copy the code" aria-label="Copy the code">Copy<\/button><pre class="shiki/,
     );
     expect(guide.html).not.toMatch(
       /<div class="mermaid-diagram"><div class="code-block">/,
@@ -183,48 +183,58 @@ function renderText(content: string): Promise<RenderedDocument> {
 
 describe("source lines", () => {
   // Counted from the top of the file, front matter included, since that is the line an editor and
-  // a finding name.
-  it("labels each block with the line it starts on in the file", () => {
-    expect(guide.html).toContain('<h1 id="guide" data-line="6">Guide</h1>');
-    expect(guide.html).toContain('<h2 id="setup" data-line="8">Setup</h2>');
-    expect(guide.html).toContain('<p data-line="10">First setup section.</p>');
+  // a finding name. The last line is what a block's range needs: a change is matched to the block
+  // whose lines it falls on, and guessing the end from where the next block starts would hand the
+  // blank lines between them to the block above.
+  it("labels each block with the lines it starts and ends on in the file", () => {
+    expect(guide.html).toContain(
+      '<h1 id="guide" data-line="6" data-line-end="6">Guide</h1>',
+    );
+    expect(guide.html).toContain(
+      '<h2 id="setup" data-line="8" data-line-end="8">Setup</h2>',
+    );
+    expect(guide.html).toContain(
+      '<p data-line="10" data-line-end="10">First setup section.</p>',
+    );
   });
 
   // The list's first item carries the list's line, so the list itself carries none.
   it("labels each list item, and not the list", () => {
     expect(guide.html).toContain('<ul class="contains-task-list">');
     expect(guide.html).toMatch(
-      /<li class="task-list-item" data-line="43"><input type="checkbox" checked disabled> done item<\/li>/,
+      /<li class="task-list-item" data-line="43" data-line-end="43"><input type="checkbox" checked disabled> done item<\/li>/,
     );
-    expect(guide.html).toMatch(/<li class="task-list-item" data-line="44">/);
+    expect(guide.html).toMatch(
+      /<li class="task-list-item" data-line="44" data-line-end="44">/,
+    );
   });
 
   // A table or a code block scrolls sideways and would clip a number set beside it, so the number
   // goes on a wrapper, and the code is still replaced inside it.
   it("labels a code block, a diagram and a table through a wrapper", async () => {
     expect(guide.html).toContain(
-      '<div class="source-line" data-line="34"><div class="mermaid-diagram">',
+      '<div class="source-line" data-line="34" data-line-end="37"><div class="mermaid-diagram">',
     );
     expect(guide.html).toMatch(
-      /<div class="source-line" data-line="39"><div class="code-block"><button class="code-copy"[^>]*>Copy<\/button><pre class="shiki/,
+      /<div class="source-line" data-line="39" data-line-end="41"><div class="code-block"><button class="code-copy"[^>]*>Copy<\/button><pre class="shiki/,
     );
     const table = await renderText("# T\n\n| a | b |\n| - | - |\n| 1 | 2 |\n");
     expect(table.html).toContain(
-      '<div class="source-line" data-line="3"><table>',
+      '<div class="source-line" data-line="3" data-line-end="5"><table>',
     );
   });
 
   it("counts CRLF lines as lines", async () => {
     const { html } = await renderText("# T\r\n\r\nOne\r\n\r\nTwo\r\n");
-    expect(html).toContain('<p data-line="3">One</p>');
-    expect(html).toContain('<p data-line="5">Two</p>');
+    expect(html).toContain('<p data-line="3" data-line-end="3">One</p>');
+    expect(html).toContain('<p data-line="5" data-line-end="5">Two</p>');
   });
 
   // The attribute is added after sanitizing, so an author cannot set it to claim another line.
   it("ignores a line an author writes into raw HTML", async () => {
     const { html } = await renderText('# T\n\n<p data-line="999">x</p>\n');
     expect(html).not.toContain("999");
-    expect(html).toContain('<p data-line="3">x</p>');
+    expect(html).toContain('<p data-line="3" data-line-end="3">x</p>');
   });
 });
 

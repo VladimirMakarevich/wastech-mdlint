@@ -1547,9 +1547,12 @@ a:hover {
   margin: 0 0 var(--reader-block-gap, 1em);
 }
 
+/* The indent is a property of its own so an item's change bar can step out past its bullet to the
+   list's edge, wherever the list sits. */
 .markdown-body ul,
 .markdown-body ol {
-  padding-left: 1.75em;
+  --list-indent: 1.75em;
+  padding-left: var(--list-indent);
 }
 
 .markdown-body li + li {
@@ -1563,7 +1566,7 @@ a:hover {
 }
 
 .markdown-body .contains-task-list {
-  padding-left: 1.25em;
+  --list-indent: 1.25em;
   list-style: none;
 }
 
@@ -2971,7 +2974,8 @@ a:hover {
   text-align: center;
 }
 
-/* Above a changed document's text: what the branch did to it, and the way to its diff. */
+/* Above a changed document's text: what the branch did to it, how the page shows that, and the way
+   to its card on the Changes page. */
 .markdown-body .changes-banner {
   display: flex;
   flex-wrap: wrap;
@@ -2988,8 +2992,126 @@ a:hover {
   text-align: start;
 }
 
-.changes-banner a {
+.changes-view {
   margin-left: auto;
+}
+
+/* A changed block on a document's page: a bar along its left edge, in the color of the tree's
+   letter for the same change — amber for changed, green for added. It sits in the left margin, clear
+   of the source line numbers in the right one, and is drawn by the stylesheet, so it is there
+   without script; the page script lays a button over it that shows the block's hunks. */
+.markdown-body [data-change] {
+  --change-color: var(--warning);
+  position: relative;
+}
+
+.markdown-body [data-change="added"] {
+  --change-color: var(--diff-added);
+}
+
+.markdown-body [data-change]::before,
+.markdown-body .change-removed::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -14px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--change-color);
+}
+
+/* An item's own box starts after its bullet, so its bar steps out to the edge of its list. */
+.markdown-body li[data-change]::before,
+.markdown-body .change-removed-item > .change-removed::before {
+  left: calc(-1 * var(--list-indent) - 14px);
+}
+
+.change-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -19px;
+  width: 13px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+
+.markdown-body li > .change-bar {
+  left: calc(-1 * var(--list-indent) - 19px);
+}
+
+.change-bar:hover,
+.change-bar[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--change-color) 22%, transparent);
+}
+
+.change-bar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* A block's hunks, shown below it on a click on its bar. */
+.markdown-body .change-hunk-view {
+  margin: var(--space-2) 0 var(--reader-block-gap, 1em);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  font-family: var(--font-sans);
+  letter-spacing: normal;
+  text-align: start;
+}
+
+.change-hunk + .change-hunk {
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Blocks the branch removed, folded where they stood, under a red bar. */
+.markdown-body .change-removed {
+  --change-color: var(--diff-removed);
+  position: relative;
+  padding: 0;
+  border: 0;
+}
+
+.markdown-body .change-removed > summary {
+  color: var(--fg-muted);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: normal;
+}
+
+.markdown-body .change-removed-body {
+  padding: var(--space-2) var(--space-3) 1px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--diff-removed) 6%, transparent);
+}
+
+/* In a list the fold is an item, which an ordered list must not count. */
+.markdown-body .change-removed-item {
+  display: block;
+}
+
+/* A section of the outline the branch changed. */
+.outline-change {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--warning);
+  vertical-align: middle;
+}
+
+/* The Source view: the document's diff in place of its text. */
+.markdown-body .change-source {
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
 }
 
 .markdown-body .changes-mode {
@@ -3356,8 +3478,20 @@ a:hover {
   .topbar,
   .sidebar-frame,
   .rail-frame,
-  .markdown-body [data-line]::after {
+  .markdown-body [data-line]::after,
+  .changes-view,
+  .change-bar,
+  .change-hunk-view,
+  .markdown-body .change-removed,
+  .markdown-body .change-removed-item {
     display: none;
+  }
+
+  /* A printer drops background colors unless told otherwise, and a border it keeps. */
+  .markdown-body [data-change]::before {
+    width: 0;
+    border-left: 3px solid var(--change-color);
+    background: none;
   }
 
   .layout {
