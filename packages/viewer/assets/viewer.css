@@ -1584,7 +1584,57 @@ a:hover {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  margin-top: 10px;
+}
+
+.config-list-empty {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: center;
+  margin: 4px 0;
+}
+
+.config-list-empty[hidden] {
+  display: none;
+}
+
+.config-list-empty .config-hint {
+  margin: 0;
+  color: var(--warning);
+}
+
+/* Sits after the form and sticks to the bottom of the window while the form is scrolled, then
+   settles above the preview when the reader gets there. */
+.config-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  margin: 16px 0 0;
+  padding: 10px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--bg);
+  box-shadow: 0 -4px 16px var(--shadow);
+}
+
+.config-bar[hidden] {
+  display: none;
+}
+
+.config-bar-text {
+  flex: 1 1 18em;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.config-bar-text a {
+  font-weight: 400;
+  white-space: nowrap;
 }
 
 .config-save-off {

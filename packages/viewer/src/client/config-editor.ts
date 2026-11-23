@@ -125,6 +125,10 @@ class ConfigEditor {
   private readonly status = element("p", "config-status");
   private readonly previewBody = element("div", "config-preview-body");
   private readonly actions = element("div", "config-actions");
+  // Pinned to the bottom of the window while there is a change: the form is long, and Save at the
+  // end of it, below the preview, is a button a reader who changed one severity never scrolls to.
+  private readonly bar = element("div", "config-bar");
+  private readonly barText = element("p", "config-bar-text");
 
   constructor(
     private readonly root: HTMLElement,
@@ -169,16 +173,23 @@ class ConfigEditor {
     toolbar.append(modes, this.status);
 
     const previewSection = element("section", "config-preview");
+    previewSection.id = "config-preview";
     previewSection.setAttribute("aria-label", "Preview");
-    previewSection.setAttribute("aria-live", "polite");
     const heading = element("h2");
     heading.textContent = "Preview";
-    previewSection.append(heading, this.previewBody, this.actions);
+    previewSection.append(heading, this.previewBody);
+
+    this.bar.setAttribute("role", "region");
+    this.bar.setAttribute("aria-label", "Unsaved change");
+    this.barText.setAttribute("aria-live", "polite");
+    this.bar.hidden = true;
+    this.bar.append(this.barText, this.actions);
 
     this.root.replaceChildren(
       toolbar,
       this.formView,
       this.textView,
+      this.bar,
       previewSection,
     );
     this.render();
@@ -361,17 +372,22 @@ class ConfigEditor {
     card.open = this.openRule === index;
     const summary = document.createElement("summary");
     const name = element("code", "config-rule-id");
-    name.textContent = isCustom
-      ? String(entry.id || "custom rule")
-      : (id ?? String(entry.rule));
     const description = element("span", "config-rule-description");
-    description.textContent = isCustom
-      ? String(entry.description ?? "Custom rule")
-      : (info?.description ?? "");
     const severity = element("span", "config-rule-severity");
-    severity.textContent = String(
-      entry.severity ?? info?.defaultSeverity ?? "",
-    );
+    // The collapsed card has to say what the rule is set to now, not when the form was drawn: a
+    // severity changed below and still shown as "off" here reads as a change that did not take.
+    const describe = (current: JsonObject) => {
+      name.textContent = isCustom
+        ? String(current.id || "custom rule")
+        : (id ?? String(current.rule));
+      description.textContent = isCustom
+        ? String(current.description ?? "Custom rule")
+        : (info?.description ?? "");
+      severity.textContent = String(
+        current.severity ?? info?.defaultSeverity ?? "",
+      );
+    };
+    describe(entry);
     summary.append(name, description, severity);
     card.append(summary);
 
@@ -427,6 +443,11 @@ class ConfigEditor {
     });
     footer.append(remove);
     body.append(footer);
+    // The fields' own listeners update the model first; these run after them as the event bubbles.
+    const refresh = () =>
+      describe((getAt(this.model, path) ?? {}) as JsonObject);
+    body.addEventListener("input", refresh);
+    body.addEventListener("change", refresh);
     card.append(body);
     return card;
   }
@@ -621,9 +642,26 @@ class ConfigEditor {
     const add = button("Add", "config-add");
     const primitive = isPrimitive(items);
 
+    // An optional list that is present but empty is not the same as one left out: an empty `files`
+    // matches no file at all, so the rule it scopes checks nothing. Removing the last entry
+    // therefore removes the list, and an empty one already in the file is pointed out with a way to
+    // remove it.
+    const emptyNote = element("div", "config-list-empty");
+    const emptyText = paragraph(
+      "This list is empty, which is not the same as leaving it out: an empty list matches nothing.",
+      "config-hint",
+    );
+    const dropEmpty = button("Remove the empty list", "config-remove");
+    dropEmpty.addEventListener("click", () => {
+      this.remove(path);
+      render();
+    });
+    emptyNote.append(emptyText, dropEmpty);
+
     const render = (focusLast = false) => {
       const values = getAt(this.model, path);
       const array = Array.isArray(values) ? values : [];
+      emptyNote.hidden = required || !Array.isArray(values) || array.length > 0;
       list.replaceChildren(
         ...array.map((_, index) => {
           const row = element(
@@ -645,7 +683,7 @@ class ConfigEditor {
           const remove = button("Remove", "config-remove");
           remove.setAttribute("aria-label", `Remove ${label} ${index + 1}`);
           remove.addEventListener("click", () => {
-            this.remove(itemPath);
+            this.remove(!required && array.length === 1 ? path : itemPath);
             render();
           });
           row.append(control, remove);
@@ -674,7 +712,7 @@ class ConfigEditor {
     if (schema.description !== undefined) {
       group.append(hint(schema.description));
     }
-    group.append(list, add);
+    group.append(emptyNote, list, add);
     render();
     return group;
   }
@@ -757,6 +795,7 @@ class ConfigEditor {
     window.clearTimeout(this.previewTimer);
     this.previewBody.replaceChildren(paragraph("Checking the change…"));
     this.actions.replaceChildren();
+    this.showBar("Checking the change…");
     this.previewTimer = window.setTimeout(() => {
       this.previewRun = this.runPreview();
     }, delay);
@@ -822,6 +861,7 @@ class ConfigEditor {
           "No changes yet. Change a value and this shows what the linter would report with it.",
         ),
       );
+      this.showBar(undefined);
       return;
     }
     if (preview.status === "invalid") {
@@ -837,12 +877,14 @@ class ConfigEditor {
       );
       // The draft outlives a reload, so a change that does not load must be one the reader can drop.
       this.actions.append(this.discardButton());
+      this.showBar("The linter would not load this config.", true);
       return;
     }
     if (preview.status !== "ok") {
       this.previewBody.replaceChildren(
         paragraph(preview.error, "config-invalid"),
       );
+      this.showBar(preview.error);
       this.actions.append(
         preview.status === "conflict"
           ? this.discardButton("Reload the page")
@@ -905,7 +947,27 @@ class ConfigEditor {
     file.append(fileSummary, pre);
     parts.push(file);
     this.previewBody.replaceChildren(...parts);
+    this.showBar(
+      `With this change: ${counts(after)} — ${preview.addedCount} new, ${preview.removedCount} gone.`,
+      true,
+    );
     this.renderActions(preview.text);
+  }
+
+  // `undefined` hides the bar: with nothing changed there is nothing to save or drop.
+  private showBar(text: string | undefined, linkToPreview = false): void {
+    this.bar.hidden = text === undefined;
+    if (text === undefined) {
+      return;
+    }
+    const content: (string | Node)[] = [text];
+    if (linkToPreview) {
+      const link = document.createElement("a");
+      link.href = "#config-preview";
+      link.textContent = "See the preview";
+      content.push(" ", link);
+    }
+    this.barText.replaceChildren(...content);
   }
 
   private renderActions(text: string): void {
@@ -967,13 +1029,10 @@ class ConfigEditor {
       this.clearDraft();
       // The server reloads the corpus for the new config and tells every page, this one included,
       // to reload; until then the reader knows the write happened.
-      this.previewBody.replaceChildren(
-        paragraph(
-          `Saved to ${this.file.path}. The viewer is reloading the corpus with it.`,
-          "config-saved",
-        ),
-      );
+      const saved = `Saved to ${this.file.path}. The viewer is reloading the corpus with it.`;
+      this.previewBody.replaceChildren(paragraph(saved, "config-saved"));
       this.actions.replaceChildren();
+      this.showBar(saved);
       return;
     }
     control.disabled = false;
