@@ -586,41 +586,67 @@ a:hover {
 
 .local-graph-open {
   display: inline-block;
-  margin: 0 0 24px;
+  margin: 0 0 4px;
   font-size: 13px;
 }
 
-/* Right rail */
+/* The rail's sections — the local graph, the outline, the backlinks — each start below a hairline,
+   so a heading reads as the start of its own group rather than as one more line of the list above
+   it. A heading is small muted capitals; the entries under it are full-strength text set in from a
+   hairline of their own, the way the tree hangs a folder's files. */
+.rail > * + * {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
 .rail h2 {
   margin: 0 0 8px;
   color: var(--fg-muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .rail ul {
-  margin: 0 0 24px;
-  padding: 0;
+  margin: 0;
+  padding: 0 0 0 2px;
+  border-left: 1px solid var(--border-subtle);
   list-style: none;
 }
 
 .rail li {
-  margin: 4px 0;
+  margin: 0;
   overflow-wrap: anywhere;
 }
 
-.rail li.depth-3 {
-  padding-left: 12px;
+.rail li a {
+  display: block;
+  margin-left: -1px;
+  padding: 3px 8px 3px 10px;
+  border-left: 1px solid transparent;
+  border-radius: 0 4px 4px 0;
+  color: var(--fg);
+  line-height: 1.4;
 }
 
-.rail a {
+.rail li.depth-3 a {
+  padding-left: 22px;
   color: var(--fg-muted);
 }
 
-.rail a:hover {
+.rail li a:hover {
+  border-left-color: var(--accent);
+  background: var(--row-hover);
   color: var(--accent);
+  text-decoration: none;
+}
+
+/* Backlinks are repository paths, read for their file names. */
+.backlinks li a {
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 
 /* Article typography */
