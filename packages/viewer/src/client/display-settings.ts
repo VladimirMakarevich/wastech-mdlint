@@ -8,11 +8,12 @@ import {
   storedDisplay,
   type DisplaySettings,
 } from "./display-settings-model.js";
+import { segmentedControl } from "./segmented.js";
 
 // The header's display settings: a button at the right end of the bar opens a panel that slides in
 // from the right edge, where the reader sets the fonts of the whole site and the article's own fonts,
-// sizes, spacing, width and margins. Every change applies as it is made and is remembered for this address, like the theme;
-// `theme.ts` puts the stored values back before the first paint, so a page never shows the defaults
+// sizes, spacing, width and margins. Every change applies as it is made and is remembered for this
+// address, like the theme; `theme.ts` puts the stored values back before the first paint, so a page never shows the defaults
 // first and then jumps — not on the next page, not after the viewer restarts.
 
 type NumericKey = keyof typeof NUMBER_RANGES;
@@ -146,7 +147,22 @@ function buildPanel(): Panel {
   const closeButton = document.createElement("button");
   closeButton.type = "button";
   closeButton.className = "settings-close";
-  closeButton.textContent = "×";
+  // An × drawn as two strokes rather than the character, which sits off center in most fonts.
+  const cross = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  cross.setAttribute("viewBox", "0 0 16 16");
+  cross.setAttribute("width", "12");
+  cross.setAttribute("height", "12");
+  cross.setAttribute("aria-hidden", "true");
+  const strokes = document.createElementNS(
+    "http://www.w3.org/2000/svg",
+    "path",
+  );
+  strokes.setAttribute("d", "M3.5 3.5l9 9M12.5 3.5l-9 9");
+  strokes.setAttribute("stroke", "currentColor");
+  strokes.setAttribute("stroke-width", "2");
+  strokes.setAttribute("stroke-linecap", "round");
+  cross.append(strokes);
+  closeButton.append(cross);
   closeButton.setAttribute("aria-label", "Close display settings");
   head.append(title, closeButton);
 
@@ -170,7 +186,7 @@ function buildPanel(): Panel {
   };
 
   const select = <
-    K extends "siteFont" | "siteCodeFont" | "textFont" | "codeFont" | "align",
+    K extends "siteFont" | "siteCodeFont" | "textFont" | "codeFont",
   >(
     key: K,
     label: string,
@@ -184,7 +200,26 @@ function buildPanel(): Panel {
       change({ [key]: control.value } as Partial<DisplaySettings>),
     );
     renderers.push(() => (control.value = current[key]));
-    return field(label, control);
+    return field(label, control, "select");
+  };
+
+  // A choice of two or three short words, shown all at once rather than behind a select.
+  const segmented = <K extends "align">(
+    key: K,
+    label: string,
+    options: readonly [DisplaySettings[K], string][],
+  ): HTMLElement => {
+    const control = segmentedControl(label, options, (value) =>
+      change({ [key]: value } as Partial<DisplaySettings>),
+    );
+    renderers.push(() => control.render(current[key]));
+    const row = document.createElement("div");
+    row.className = "settings-field is-segmented";
+    const text = document.createElement("span");
+    text.className = "settings-label";
+    text.textContent = label;
+    row.append(text, control.element);
+    return row;
   };
 
   const fontName = (
@@ -206,7 +241,7 @@ function buildPanel(): Panel {
     control.addEventListener("input", () =>
       change({ [key]: control.value } as Partial<DisplaySettings>),
     );
-    const row = field(label, control);
+    const row = field(label, control, "text");
     renderers.push(() => {
       row.hidden = current[chooser] !== "custom";
       if (document.activeElement !== control) {
@@ -230,8 +265,13 @@ function buildPanel(): Panel {
     renderers.push(() => {
       control.value = String(current[key]);
       output.textContent = `${current[key]}${unit}`;
+      // How far along the track the value is, for the stylesheet to fill the track up to the thumb.
+      control.style.setProperty(
+        "--range-pct",
+        `${((current[key] - min) / (max - min)) * 100}%`,
+      );
     });
-    const row = field(label, control);
+    const row = field(label, control, "range");
     row.querySelector(".settings-label")?.append(output);
     return row;
   };
@@ -251,7 +291,7 @@ function buildPanel(): Panel {
       } as Partial<DisplaySettings>);
     });
     renderers.push(() => (control.value = String(current[key])));
-    return field(label, control);
+    return field(label, control, "number");
   };
 
   const checkbox = (
@@ -260,13 +300,18 @@ function buildPanel(): Panel {
   ): HTMLElement => {
     const control = document.createElement("input");
     control.type = "checkbox";
+    control.className = "switch";
+    // An on/off setting that applies at once is a switch, not a box to tick and then submit.
+    control.setAttribute("role", "switch");
     control.addEventListener("change", () =>
       change({ [key]: control.checked } as Partial<DisplaySettings>),
     );
     renderers.push(() => (control.checked = current[key]));
     const row = document.createElement("label");
-    row.className = "settings-check";
-    row.append(control, ` ${label}`);
+    row.className = "settings-switch switch-row";
+    const text = document.createElement("span");
+    text.textContent = label;
+    row.append(text, control);
     return row;
   };
 
@@ -322,7 +367,7 @@ function buildPanel(): Panel {
       range("lineHeight", "Line height", "×"),
       range("letterSpacing", "Letter spacing", "em"),
       range("blockSpacing", "Space between blocks", "em"),
-      select("align", "Alignment", [
+      segmented("align", "Alignment", [
         ["start", "Left"],
         ["justify", "Justified"],
       ]),
@@ -363,9 +408,15 @@ function buildPanel(): Panel {
   };
 }
 
-function field(label: string, control: HTMLElement): HTMLElement {
+// One row of a group's card. Its kind decides the layout: a select or a font name sits at the row's
+// right end, a slider takes the full width under its label, a margin is one of four small columns.
+function field(
+  label: string,
+  control: HTMLElement,
+  kind: "select" | "text" | "range" | "number",
+): HTMLElement {
   const row = document.createElement("label");
-  row.className = "settings-field";
+  row.className = `settings-field is-${kind}`;
   const text = document.createElement("span");
   text.className = "settings-label";
   text.textContent = label;
@@ -373,10 +424,14 @@ function field(label: string, control: HTMLElement): HTMLElement {
   return row;
 }
 
+// A titled group of rows: the title above, the rows on a rounded card, as Settings groups its own.
 function group(legend: string, children: HTMLElement[]): HTMLElement {
   const fieldset = document.createElement("fieldset");
   const title = document.createElement("legend");
   title.textContent = legend;
-  fieldset.append(title, ...children);
+  const card = document.createElement("div");
+  card.className = "settings-card";
+  card.append(...children);
+  fieldset.append(title, card);
   return fieldset;
 }

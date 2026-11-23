@@ -276,17 +276,18 @@ describe("pages", () => {
   it("restores the tree's state from a blocking script right after it", async () => {
     const { body } = await get("/doc/docs/guide.md");
     expect(body).toContain(
-      '</ul></nav><script src="/assets/tree-state.js"></script><div class="column-resizer" data-column="sidebar"',
+      '</ul></details></nav><script src="/assets/tree-state.js"></script><div class="column-resizer" data-column="sidebar"',
     );
     expect(body).toContain('<details open data-folder="docs">');
   });
 
   // The switch can do nothing until the page script knows the findings, so it starts hidden, above
-  // the tree it filters.
-  it("puts a hidden findings-only switch above the tree", async () => {
+  // the tree it filters. Both sit inside the disclosure a phone folds the tree behind, which is open
+  // as served, so a page without script shows the tree at every width.
+  it("puts a hidden findings-only switch above the tree, in an open disclosure", async () => {
     const { body } = await get("/doc/README.md");
     expect(body).toContain(
-      '<nav class="sidebar" aria-label="Documents"><label class="tree-filter" hidden><input type="checkbox"> Only files with findings</label><p class="tree-filter-empty" hidden>No file has findings.</p><ul class="tree">',
+      '<nav class="sidebar" aria-label="Documents"><details class="sidebar-disclosure" open><summary class="sidebar-summary">Documents</summary><label class="tree-filter switch-row" hidden><span>Only files with findings</span><input class="switch" type="checkbox" role="switch"></label><p class="tree-filter-empty" hidden>No file has findings.</p><ul class="tree">',
     );
   });
 
@@ -307,16 +308,16 @@ describe("pages", () => {
   // From a document the link opens the graph on that document; elsewhere on the whole graph.
   it("links the header to the graph, focused on the document being read", async () => {
     expect((await get("/doc/docs/guide.md")).body).toContain(
-      '<a class="topbar-link" href="/graph?focus=docs%2Fguide.md">Graph</a>',
+      '<a class="segment" href="/graph?focus=docs%2Fguide.md">Graph</a>',
     );
     expect((await get("/search?q=x")).body).toContain(
-      '<a class="topbar-link" href="/graph">Graph</a>',
+      '<a class="segment" href="/graph">Graph</a>',
     );
   });
 
   // The stored theme must be applied before the stylesheet paints anything, so the classic theme
-  // script comes first. The switch is hidden for a page without script, and carries a label for every
-  // choice, so the stylesheet can show the right one before any module has run.
+  // script comes first. The switch is hidden for a page without script, and is a radio group with a
+  // segment for every choice, so the stylesheet can mark the chosen one before any module has run.
   it("puts search and the theme switch in the header", async () => {
     const { body } = await get("/doc/README.md");
     expect(
@@ -328,7 +329,22 @@ describe("pages", () => {
       /<form class="search" action="\/search" method="get" role="search"><input type="search" name="q"/,
     );
     expect(body).toContain(
-      '<button class="theme-toggle" type="button" hidden><span class="theme-choice" data-choice="system" data-label="Auto">◐ Auto</span><span class="theme-choice" data-choice="light" data-label="Light">☀ Light</span><span class="theme-choice" data-choice="dark" data-label="Dark">☾ Dark</span></button>',
+      '<div class="theme-switch segmented" role="radiogroup" aria-label="Theme" hidden>',
+    );
+    const segments = [
+      ...body.matchAll(
+        /<button class="segment" type="button" role="radio" data-choice="([a-z]+)" title="([A-Za-z]+)" aria-label="\2"><svg /g,
+      ),
+    ].map((match) => `${match[1]}:${match[2]}`);
+    expect(segments).toEqual(["system:Auto", "light:Light", "dark:Dark"]);
+  });
+
+  // The three sections are one segmented control of plain links, in one named navigation landmark,
+  // so they work without script and a screen reader finds them as the page's sections.
+  it("groups the section links into one navigation segment", async () => {
+    const { body } = await get("/doc/docs/guide.md");
+    expect(body).toContain(
+      '<nav class="section-nav segmented" aria-label="Sections"><a class="segment" href="/graph?focus=docs%2Fguide.md">Graph</a><a class="segment" href="/dashboard">Dashboard</a><a class="segment" href="/config">Config</a></nav>',
     );
   });
 
@@ -350,7 +366,7 @@ describe("pages", () => {
       expect(header, address).toBeDefined();
       const marked = [
         ...header!.matchAll(
-          /<a class="topbar-link" href="([^"]*)" aria-current="page">/g,
+          /<a class="segment" href="([^"]*)" aria-current="page">/g,
         ),
       ];
       expect(
@@ -501,7 +517,7 @@ describe("dashboard", () => {
 
   it("links the header to the dashboard", async () => {
     expect((await get("/doc/README.md")).body).toContain(
-      '<a class="topbar-link" href="/dashboard">Dashboard</a>',
+      '<a class="segment" href="/dashboard">Dashboard</a>',
     );
   });
 

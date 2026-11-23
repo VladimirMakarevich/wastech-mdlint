@@ -1,37 +1,93 @@
 /* Every color is a token holding both a light and a dark value. `light-dark()` picks one from the
    element's `color-scheme`, which follows the operating system until the header switch pins it with
    `data-theme` on <html> — so one set of tokens serves all three modes, with no duplicated dark
-   block to drift out of step with the light one. */
+   block to drift out of step with the light one.
+
+   The palette is the one iOS and macOS draw their own controls in — grouped gray backgrounds, gray
+   fills instead of outlines, a green switch — with two deliberate departures: the light theme's blue
+   and red are a shade darker than the system's, because the system's own are below 4.5:1 on white
+   and here they carry small text (links, rule ids, error counts), not just glyphs. */
 :root {
   color-scheme: light dark;
-  --bg: light-dark(#ffffff, #0f1216);
-  --bg-subtle: light-dark(#f6f8fa, #161b22);
-  --bg-sidebar: light-dark(#fafbfc, #12161c);
-  --fg: light-dark(#1f2328, #e6edf3);
-  --fg-muted: light-dark(#59636e, #9198a1);
-  --border: light-dark(#d1d9e0, #30363d);
-  --border-subtle: light-dark(#e8ecf0, #21262d);
-  --accent: light-dark(#0a5cc2, #58a6ff);
-  --accent-bg: light-dark(#e8f0fb, #172a45);
-  --danger: light-dark(#c4252e, #f47067);
-  --warning: light-dark(#9a6700, #d29922);
-  --code-bg: light-dark(#f6f8fa, #161b22);
-  --shadow: light-dark(rgb(31 35 40 / 12%), rgb(0 0 0 / 45%));
+  --bg: light-dark(#ffffff, #1c1c1e);
+  --bg-subtle: light-dark(#f2f2f7, #2c2c2e);
+  --bg-sidebar: light-dark(#f5f5f7, #161618);
+  /* A panel's own backdrop and the cards laid on it, as a grouped list in Settings is drawn. */
+  --bg-grouped: light-dark(#f2f2f7, #111113);
+  --bg-card: light-dark(#ffffff, #2c2c2e);
+  /* A card inside a card: in the dark theme the subtle and the card shade are the same gray, so a
+     nested group needs a third one to stand apart from the group around it. */
+  --bg-raised: light-dark(#ffffff, #3a3a3c);
+  --fg: light-dark(#1d1d1f, #f5f5f7);
+  --fg-muted: light-dark(#6e6e73, #98989d);
+  --border: light-dark(#d1d1d6, #38383a);
+  --border-subtle: light-dark(#e5e5ea, #2c2c2e);
+  --accent: light-dark(#0066cc, #0a84ff);
+  --accent-bg: light-dark(rgb(0 102 204 / 10%), rgb(10 132 255 / 22%));
+  --danger: light-dark(#d70015, #ff453a);
+  --warning: light-dark(#b25000, #ff9f0a);
+  /* Only a switch's track: it is never text, so the system green needs no darker variant. */
+  --success: light-dark(#34c759, #30d158);
+  --code-bg: light-dark(#f5f5f7, #2c2c2e);
+  /* Control fills, translucent so one value reads on the page, the sidebar and a card alike. */
+  --fill: light-dark(rgb(120 120 128 / 12%), rgb(118 118 128 / 24%));
+  --fill-strong: light-dark(rgb(120 120 128 / 20%), rgb(118 118 128 / 36%));
+  --segment-thumb: light-dark(#ffffff, #636366);
+  --shadow: light-dark(rgb(0 0 0 / 12%), rgb(0 0 0 / 45%));
+  --shadow-sm:
+    0 1px 3px light-dark(rgb(0 0 0 / 12%), rgb(0 0 0 / 35%)),
+    0 1px 1px light-dark(rgb(0 0 0 / 4%), rgb(0 0 0 / 20%));
+  --shadow-lg:
+    0 12px 32px light-dark(rgb(0 0 0 / 14%), rgb(0 0 0 / 50%)),
+    0 0 0 0.5px light-dark(rgb(0 0 0 / 8%), rgb(255 255 255 / 10%));
+  /* A bar or a popover over scrolling content: the page shows through, blurred, as it does under a
+     navigation bar on iOS, so the reader keeps a sense of what is behind it. */
+  --material: color-mix(in srgb, var(--bg) 80%, transparent);
+  --material-filter: saturate(180%) blur(20px);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
   /* A hovered row: the text color thinned over whatever is behind it, so it reads on the sidebar's
      own background in both themes, where the subtle background is all but the same shade. */
-  --row-hover: color-mix(in srgb, var(--fg) 7%, transparent);
+  --row-hover: color-mix(in srgb, var(--fg) 6%, transparent);
+
+  /* One scale of spacings, radii and heights for the whole interface, on a 4px grid: a gap that is
+     not on it is the visible kind of inconsistency, two neighbors a pixel or two apart. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --control: 32px;
+  --control-sm: 28px;
+  --control-xs: 24px;
+  --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Glyphs drawn as masks in the text color, rather than as characters: ▶, × or ☀ sit at a
+     different height in every font, and the reader picks the font. */
+  --icon-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 3.5 4.5 4.5L6 12.5'/%3E%3C/svg%3E");
+  --icon-search: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round'%3E%3Ccircle cx='7' cy='7' r='4.75'/%3E%3Cpath d='m10.6 10.6 3.4 3.4'/%3E%3C/svg%3E");
+  /* A select's up-down chevrons, as a background image, so in a fixed gray that reads in both themes. */
+  --icon-select: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%238e8e93' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 6 3-3 3 3M5 10l3 3 3-3'/%3E%3C/svg%3E");
+
   --font-sans-system:
-    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-    sans-serif;
+    -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
   --font-mono-system:
-    ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+    ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
   /* The fonts the whole page reads: the site fonts the reader chose in the display settings, or the
      system's. Kept apart from the system stacks above so a chosen font can fall back to them. */
   --font-sans: var(--reader-site-font, var(--font-sans-system));
   --font-mono: var(--reader-site-mono, var(--font-mono-system));
   --sidebar-width: 280px;
-  --rail-width: 240px;
-  --topbar-height: 48px;
+  --rail-width: 248px;
+  --topbar-height: 52px;
 }
 
 :root[data-theme="light"] {
@@ -60,7 +116,7 @@
 /* The scrollbar's room is kept on every page, whether or not it scrolls, so moving between a long page
    and a short one never shifts the header's right-aligned controls by a scrollbar's width. */
 html {
-  scroll-padding-top: calc(var(--topbar-height) + 16px);
+  scroll-padding-top: calc(var(--topbar-height) + var(--space-4));
   scrollbar-gutter: stable;
 }
 
@@ -95,6 +151,7 @@ body {
   font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
@@ -104,6 +161,7 @@ a {
 
 a:hover {
   text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 :focus-visible {
@@ -117,14 +175,308 @@ a:hover {
 }
 
 .skip-link:focus {
-  left: 16px;
-  top: 8px;
+  left: var(--space-4);
+  top: var(--space-2);
   z-index: 10;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-xs);
   background: var(--bg);
-  padding: 4px 8px;
 }
 
-/* Top bar */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Controls. Every one is a fixed height with its label centered by flex rather than by a line
+   height worked out in pixels: the reader can set the whole site in a serif, a monospace or any
+   installed font, and a line-height that centers one font's letters leaves another's a pixel or
+   two high or low.
+   --------------------------------------------------------------------------------------------- */
+
+/* Gray: the ordinary button, a fill rather than an outline. */
+.prompt-menu,
+.code-copy,
+.config-open-button,
+.config-editor button:not(.segment),
+.filter-actions button,
+.graph-controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  height: var(--control-sm);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--fill);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 120ms var(--ease),
+    color 120ms var(--ease);
+}
+
+.prompt-menu:hover,
+.prompt-menu[aria-expanded="true"],
+.code-copy:hover,
+.config-open-button:hover:not(:disabled),
+.config-editor button:not(.segment):hover:not(:disabled),
+.filter-actions button:hover,
+.graph-controls button:hover {
+  background: var(--fill-strong);
+}
+
+.config-open-button:disabled,
+.config-editor button:not(.segment):disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Plain: an icon or a short mark on no fill until hovered, for the header's quiet controls. */
+.copy-path,
+.settings-toggle,
+.settings-close {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--fg-muted);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 120ms var(--ease),
+    color 120ms var(--ease);
+}
+
+.copy-path:hover,
+.copy-path[aria-expanded="true"],
+.settings-toggle:hover,
+.settings-close:hover {
+  background: var(--fill);
+  color: var(--fg);
+}
+
+/* Fields: a gray fill with no outline, the way iOS draws a text field; focus lifts the field onto
+   the page color and rings it. */
+.search input,
+.settings-field input[type="text"],
+.settings-field input[type="number"],
+.dashboard-filters input[type="number"],
+.dashboard-filters input[type="search"],
+.dashboard-filters select,
+.graph-controls select,
+.config-editor input,
+.config-editor select,
+.config-editor textarea {
+  min-width: 0;
+  max-width: 100%;
+  height: var(--control-sm);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background-color: var(--fill);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  transition:
+    background-color 120ms var(--ease),
+    box-shadow 120ms var(--ease);
+}
+
+.search input:focus,
+.settings-field input[type="text"]:focus,
+.settings-field input[type="number"]:focus,
+.dashboard-filters input:focus,
+.dashboard-filters select:focus,
+.graph-controls select:focus,
+.config-editor input:focus,
+.config-editor select:focus,
+.config-editor textarea:focus {
+  outline: none;
+  background-color: var(--bg);
+  box-shadow: var(--focus-ring);
+}
+
+::placeholder {
+  color: var(--fg-muted);
+  opacity: 1;
+}
+
+/* The browser's own select arrow sits at a different place on every platform; this one lines up
+   with the field's padding everywhere. */
+.dashboard-filters select,
+.graph-controls select,
+.config-editor select,
+.settings-field select {
+  appearance: none;
+  padding-right: var(--space-8);
+  background-image: var(--icon-select);
+  background-position: right var(--space-2) center;
+  background-repeat: no-repeat;
+  background-size: 14px 14px;
+  cursor: pointer;
+}
+
+/* Segmented control: a gray track with the chosen segment lifted onto a white (in the dark theme,
+   gray) thumb. Used wherever one of a few choices is picked — the header's sections, the theme, the
+   config's form or text view, an alignment, a severity — so every one-of-few choice looks alike. */
+.segmented {
+  display: inline-flex;
+  flex: none;
+  align-items: stretch;
+  gap: 2px;
+  height: var(--control);
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--fill);
+}
+
+.segment {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 150ms var(--ease),
+    box-shadow 150ms var(--ease);
+}
+
+.segment:hover {
+  background: var(--row-hover);
+  text-decoration: none;
+}
+
+.segment:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+.segment:is(
+  [aria-current="page"],
+  [aria-pressed="true"],
+  [aria-checked="true"]
+) {
+  background: var(--segment-thumb);
+  box-shadow: var(--shadow-sm);
+  cursor: default;
+}
+
+.segment svg {
+  flex: none;
+}
+
+/* Inside a form or a panel row: one step smaller, beside fields of that height. */
+.segmented.is-compact {
+  height: var(--control-sm);
+}
+
+.segmented.is-compact .segment {
+  padding: 0 var(--space-2);
+  font-size: 12px;
+}
+
+/* Switch: an on/off choice that applies at once, drawn as the iOS switch. A checkbox underneath with
+   `role="switch"`, so the keyboard, a form and a screen reader treat it as the control it is. */
+.switch {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 24px;
+  margin: 0;
+  border-radius: 12px;
+  background: var(--fill-strong);
+  cursor: pointer;
+  transition: background-color 200ms var(--ease);
+}
+
+.switch::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow:
+    0 2px 4px rgb(0 0 0 / 18%),
+    0 0 0 0.5px rgb(0 0 0 / 6%);
+  transition: transform 200ms var(--ease-out);
+}
+
+.switch:checked {
+  background: var(--success);
+}
+
+.switch:checked::before {
+  transform: translateX(16px);
+}
+
+.switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* A label and its switch on one row, the label first, as a row in Settings reads. */
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  cursor: pointer;
+}
+
+/* A disclosure chevron, for a summary whose own marker was hidden: it points right and turns down
+   when the section opens. */
+.chevron::before,
+.tree summary::before,
+.diagnostics > summary::before,
+.config-rule > summary::before,
+.sidebar-summary::after,
+.markdown-body details > summary::before {
+  content: "";
+  flex: none;
+  width: 12px;
+  height: 12px;
+  background: currentColor;
+  mask: var(--icon-chevron) center / contain no-repeat;
+  opacity: 0.6;
+  transition: transform 180ms var(--ease-out);
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Top bar
+   --------------------------------------------------------------------------------------------- */
 .topbar {
   view-transition-name: topbar;
   position: sticky;
@@ -132,20 +484,24 @@ a:hover {
   z-index: 5;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-3);
   height: var(--topbar-height);
-  padding: 0 16px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
-}
-
-.site-name {
-  color: var(--fg);
-  font-weight: 600;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--material);
+  backdrop-filter: var(--material-filter);
 }
 
 .site-name {
   flex: none;
+  color: var(--fg);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.site-name:hover {
+  text-decoration: none;
 }
 
 .current-path {
@@ -153,75 +509,107 @@ a:hover {
   overflow: hidden;
   color: var(--fg-muted);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Search, pushed to the right of whatever the bar holds */
+.copy-path {
+  width: var(--control-sm);
+  height: var(--control-sm);
+  vertical-align: middle;
+}
+
+/* The header's path gives up its width before the copy button beside it does, and the button sits
+   close to the path it copies rather than a full gap away. */
+.topbar .current-path + .copy-path {
+  margin-left: calc(var(--space-1) - var(--space-3));
+}
+
+/* Search: an iOS search field, a magnifier inside its left edge, pushed to the right of whatever the
+   bar holds. */
 .search {
   position: relative;
-  flex: 0 1 340px;
+  flex: 0 1 320px;
   min-width: 160px;
   margin-left: auto;
 }
 
+.search::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  background: var(--fg-muted);
+  mask: var(--icon-search) center / contain no-repeat;
+  pointer-events: none;
+}
+
 .search input {
   width: 100%;
-  height: 32px;
-  padding: 0 64px 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-subtle);
-  color: var(--fg);
-  font: inherit;
+  height: var(--control);
+  padding: 0 64px 0 var(--space-8);
+  border-radius: var(--radius-md);
   font-size: 14px;
 }
 
-.search input:focus {
-  border-color: var(--accent);
-  outline: none;
-  background: var(--bg);
+.search input::-webkit-search-cancel-button {
+  display: none;
 }
 
 .search-shortcut {
   position: absolute;
   top: 50%;
-  right: 8px;
-  padding: 1px 6px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  margin-top: -10px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--fill);
   color: var(--fg-muted);
   font-family: var(--font-sans);
   font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
   pointer-events: none;
-  transform: translateY(-50%);
 }
 
 .search input:focus + .search-shortcut {
   display: none;
 }
 
+/* Results and menus: an opaque card lifted off the page by its shadow. Not material: the search box
+   sits inside the header, whose own backdrop filter makes it the backdrop root, so a blur here would
+   sample the header rather than the page and leave the article's text showing through the results. */
+.search-results,
+.menu {
+  border: 0;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-lg);
+}
+
 .search-results {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + var(--space-2));
   right: 0;
-  width: min(560px, calc(100vw - 32px));
+  width: min(560px, calc(100vw - var(--space-8)));
   max-height: min(70vh, 560px);
   margin: 0;
   padding: 6px;
   overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  box-shadow: 0 12px 32px var(--shadow);
+  border-radius: var(--radius-lg);
   list-style: none;
 }
 
 .search-results li a {
   display: block;
-  padding: 8px 10px;
-  border-radius: 6px;
+  padding: var(--space-2) 10px;
+  border-radius: var(--radius-sm);
   color: var(--fg);
 }
 
@@ -233,7 +621,9 @@ a:hover {
 
 .search-hit-title {
   display: block;
+  font-size: 14px;
   font-weight: 600;
+  line-height: 1.4;
 }
 
 .search-hit-path {
@@ -242,6 +632,7 @@ a:hover {
   color: var(--fg-muted);
   font-family: var(--font-mono);
   font-size: 12px;
+  line-height: 1.5;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -256,14 +647,14 @@ a:hover {
 
 .search-results mark,
 .search-page-results mark {
-  border-radius: 2px;
+  border-radius: 3px;
   background: var(--accent-bg);
   color: inherit;
   font-weight: 600;
 }
 
 .search-empty {
-  padding: 8px 10px;
+  padding: var(--space-2) 10px;
   color: var(--fg-muted);
   font-size: 14px;
 }
@@ -282,88 +673,67 @@ a:hover {
 }
 
 .search-page-results .search-hit-snippet {
-  margin: 4px 0 0;
+  margin: var(--space-1) 0 0;
 }
 
-/* Section links, theme switch and display settings: the same small control, as a link or a button */
-.topbar-link,
-.theme-toggle,
-.settings-toggle {
-  flex: none;
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
+/* The header's sections, as one segmented control: the section the page is shows as the chosen
+   segment, and a document page, which is none of them, shows none chosen. Plain links underneath, so
+   they work without script. */
+.section-nav .segment {
   color: var(--fg);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
 }
 
-.topbar-link,
-.theme-toggle,
-.settings-toggle {
-  display: inline-flex;
-  align-items: center;
-}
-
-.topbar-link:hover,
-.theme-toggle:hover,
-.settings-toggle:hover {
-  background: var(--bg-subtle);
-  text-decoration: none;
-}
-
-/* The section the page is: the one thing that differs between the header's pages. */
-.topbar-link[aria-current="page"] {
-  border-color: var(--accent);
-  background: var(--accent-bg);
-  color: var(--accent);
-}
-
-/* Without script the two buttons are hidden, as they could do nothing. With script — marked on <html>
-   before the first paint — they are laid out from the first frame, so neither appears later and
-   pushes the rest of the bar aside; the module that wires them runs whenever it runs. */
-.theme-toggle[hidden],
+/* Without script the theme and settings controls are hidden, as they could do nothing. With script —
+   marked on <html> before the first paint — they are laid out from the first frame, so neither
+   appears later and pushes the rest of the bar aside; the module that wires them runs whenever it
+   runs. */
+.theme-switch[hidden],
 .settings-toggle[hidden],
 .copy-path[hidden] {
   display: none;
 }
 
-:root[data-script] .theme-toggle[hidden],
+:root[data-script] .theme-switch[hidden],
 :root[data-script] .settings-toggle[hidden],
 :root[data-script] .copy-path[hidden] {
   display: inline-flex;
 }
 
-/* The copy button beside a path: in the header after the page's path, and on the config page after
-   the config file's. A quiet square that takes the text color on hover. */
-.copy-path {
+/* The theme as three icon segments. Which one is chosen is read from the choice on <html>, which the
+   blocking theme script has set before the first paint, so the thumb is in place from the first frame
+   rather than moving once the module script marks the chosen button. */
+.theme-switch .segment {
   flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 32px;
   padding: 0;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: none;
   color: var(--fg-muted);
-  vertical-align: middle;
-  cursor: pointer;
 }
 
-.copy-path:hover,
-.copy-path[aria-expanded="true"] {
-  border-color: var(--border);
-  background: var(--bg-subtle);
+.theme-switch .segment:hover {
   color: var(--fg);
 }
 
-/* The header's path gives up its width before the copy button beside it does. */
-.topbar .current-path + .copy-path {
-  margin-left: -10px;
+:root:not([data-theme]) .theme-switch .segment[data-choice="system"],
+:root[data-theme="light"] .theme-switch .segment[data-choice="light"],
+:root[data-theme="dark"] .theme-switch .segment[data-choice="dark"] {
+  background: var(--segment-thumb);
+  box-shadow: var(--shadow-sm);
+  color: var(--fg);
+  cursor: default;
+}
+
+/* "Aa", the usual mark for text settings, set in a serif so it reads as type rather than a word. */
+.settings-toggle {
+  width: var(--control);
+  height: var(--control);
+  color: var(--fg);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
+}
+
+.settings-toggle[aria-expanded="true"] {
+  background: var(--accent-bg);
+  color: var(--accent);
 }
 
 /* A dropdown of actions, placed by the script under the button that opened it. */
@@ -371,22 +741,22 @@ a:hover {
   position: fixed;
   z-index: 7;
   min-width: 220px;
-  max-width: min(520px, calc(100vw - 16px));
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  box-shadow: 0 12px 32px var(--shadow);
+  max-width: min(520px, calc(100vw - var(--space-4)));
+  padding: 5px;
+  border-radius: 12px;
   font-size: 13px;
   line-height: 1.4;
 }
 
 .menu-item {
   display: grid;
+  gap: 2px;
   width: 100%;
+  min-height: var(--control);
+  align-content: center;
   padding: 6px 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--fg);
   font: inherit;
@@ -403,6 +773,10 @@ a:hover {
 .menu-item:disabled {
   color: var(--fg-muted);
   cursor: default;
+}
+
+.menu-label {
+  font-weight: 500;
 }
 
 .menu-detail {
@@ -425,95 +799,88 @@ a:hover {
   color: var(--fg-muted);
 }
 
-/* "Aa", the usual mark for text settings, set in a serif so it reads as type rather than a word. */
-.settings-toggle {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 15px;
-}
-
-.settings-toggle[aria-expanded="true"] {
-  border-color: var(--accent);
-  background: var(--accent-bg);
-  color: var(--accent);
-}
-
-/* Display settings: a column that slides in over the right edge, under the header, and leaves the
-   article in view beside it so a change is judged on the text it changes. Kept laid out while closed,
-   off screen and invisible, so opening it can slide rather than appear. */
+/* ---------------------------------------------------------------------------------------------
+   Display settings: a column that slides in over the right edge, under the header, and leaves the
+   article in view beside it so a change is judged on the text it changes. Laid out as a grouped
+   list — a small heading over a rounded card of rows — the way Settings lays out its own. Kept laid
+   out while closed, off screen and invisible, so opening it can slide rather than appear.
+   --------------------------------------------------------------------------------------------- */
 .settings-panel {
   position: fixed;
   top: var(--topbar-height);
   right: 0;
   bottom: 0;
   z-index: 6;
-  width: min(320px, 100vw);
+  width: min(340px, 100vw);
   overflow-y: auto;
-  padding: 12px 16px 24px;
-  border-left: 1px solid var(--border);
-  background: var(--bg);
+  padding: 0 var(--space-4) var(--space-6);
+  border-left: 1px solid var(--border-subtle);
+  background: var(--bg-grouped);
   box-shadow: -12px 0 32px var(--shadow);
   font-size: 14px;
   line-height: 1.4;
   transform: translateX(100%);
   visibility: hidden;
   transition:
-    transform 180ms ease,
-    visibility 0s linear 180ms;
+    transform 220ms var(--ease-out),
+    visibility 0s linear 220ms;
 }
 
 .settings-panel.is-open {
   transform: none;
   visibility: visible;
-  transition: transform 180ms ease;
+  transition: transform 220ms var(--ease-out);
 }
 
+/* The head stays at the top while the groups scroll under it. */
 .settings-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 4px;
+  height: 52px;
+  margin: 0 calc(-1 * var(--space-4));
+  padding: 0 var(--space-4);
+  background: var(--bg-grouped);
 }
 
 .settings-head h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: 17px;
+  font-weight: 600;
 }
 
 .settings-close {
-  width: 28px;
-  height: 28px;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  color: var(--fg-muted);
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.settings-close:hover {
-  background: var(--row-hover);
-  color: var(--fg);
+  width: var(--control-sm);
+  height: var(--control-sm);
+  border-radius: 50%;
+  background: var(--fill);
 }
 
 .settings-form fieldset {
-  margin: 12px 0 0;
-  padding: 12px 0 0;
+  min-width: 0;
+  margin: var(--space-5) 0 0;
+  padding: 0;
   border: 0;
-  border-top: 1px solid var(--border-subtle);
+}
+
+.settings-form fieldset:first-child {
+  margin-top: var(--space-1);
 }
 
 /* Floated out of the fieldset's border, where a legend is drawn by default, into a heading row of its
-   own; the control after it clears it rather than squeezing in beside it. */
+   own above the card; the card after it clears it rather than squeezing in beside it. */
 .settings-form legend {
   float: left;
   width: 100%;
-  margin-bottom: 8px;
-  padding: 0;
+  margin: 0 0 6px;
+  padding: 0 var(--space-4);
   color: var(--fg-muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
@@ -521,103 +888,214 @@ a:hover {
   clear: both;
 }
 
-.settings-field {
-  display: grid;
-  gap: 4px;
-  margin-bottom: 10px;
+/* The card: rows separated by hairlines that start where the text starts, not at the card's edge. */
+.settings-card {
+  padding-left: var(--space-4);
+  border-radius: 12px;
+  background: var(--bg-card);
 }
 
-.settings-field[hidden] {
+.settings-card > * + * {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.settings-field,
+.settings-switch {
+  min-height: 44px;
+  padding-right: var(--space-4);
+}
+
+/* Out-specifies the row layouts below, which would otherwise lay a hidden row out again. */
+.settings-card > .settings-field[hidden] {
   display: none;
+}
+
+/* A row with its value on the right: a select, a font name, a segmented choice. */
+.settings-field.is-select,
+.settings-field.is-text,
+.settings-field.is-segmented {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
 
 .settings-label {
   display: flex;
+  flex: none;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-2);
+}
+
+/* The select sits flush right on the card with no field of its own, as a menu row in Settings does:
+   its value, muted, then the chevrons. */
+.settings-field select {
+  min-width: 0;
+  max-width: 62%;
+  height: var(--control-sm);
+  padding: 0 22px 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-xs);
+  background-color: transparent;
+  background-position: right 2px center;
+  color: var(--fg-muted);
+  font: inherit;
+  text-align: end;
+  text-align-last: end;
+}
+
+.settings-field select:hover {
+  background-color: var(--row-hover);
+}
+
+.settings-field.is-text input[type="text"] {
+  flex: 1;
+  height: var(--control-sm);
+  text-align: end;
+}
+
+/* A slider row: the label and the value it is at on one line, the slider the full width under it. */
+.settings-field.is-range {
+  display: grid;
+  gap: 6px;
+  align-content: center;
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 
 .settings-label output {
   color: var(--fg-muted);
   font-family: var(--font-mono);
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
-.settings-field select,
-.settings-field input[type="text"],
-.settings-field input[type="number"] {
-  width: 100%;
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-subtle);
-  color: var(--fg);
-  font: inherit;
-}
-
+/* The slider as iOS draws it: a thin track filled up to the thumb, and a white round thumb. The fill
+   is `--range-pct`, which the panel's script sets as the value moves; a browser cannot style the two
+   sides of a native track apart. */
 .settings-field input[type="range"] {
+  --range-pct: 50%;
+  appearance: none;
   width: 100%;
-  accent-color: var(--accent);
-}
-
-.settings-check {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
+  height: 20px;
+  margin: 0;
+  background: none;
   cursor: pointer;
 }
 
-.settings-check input {
-  accent-color: var(--accent);
+.settings-field input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--accent) var(--range-pct),
+    var(--fill-strong) var(--range-pct)
+  );
 }
 
-/* The four margins side by side, as the four sides of one box. */
-.settings-margins {
+.settings-field input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--fill-strong);
+}
+
+.settings-field input[type="range"]::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.settings-field input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -8px;
+  border: 0;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow:
+    0 2px 5px rgb(0 0 0 / 20%),
+    0 0 0 0.5px rgb(0 0 0 / 8%);
+}
+
+.settings-field input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow:
+    0 2px 5px rgb(0 0 0 / 20%),
+    0 0 0 0.5px rgb(0 0 0 / 8%);
+}
+
+.settings-field input[type="range"]:focus-visible {
+  outline: none;
+}
+
+.settings-field input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: var(--focus-ring);
+}
+
+.settings-field input[type="range"]:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* The four margins side by side in one row, as the four sides of one box. */
+.settings-margins .settings-card {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0 8px;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
 }
 
-.settings-margins legend {
-  grid-column: 1 / -1;
+.settings-margins .settings-card > * + * {
+  border-top: 0;
+}
+
+.settings-margins .settings-field {
+  display: grid;
+  gap: var(--space-1);
+  min-height: 0;
+  padding: 0;
 }
 
 .settings-margins .settings-label {
+  justify-content: center;
   color: var(--fg-muted);
   font-size: 12px;
 }
 
-.settings-reset {
+.settings-margins input[type="number"] {
   width: 100%;
-  height: 32px;
-  margin-top: 16px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--fg);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Reset is a row of its own card, in red, as a destructive row in Settings is. */
+.settings-reset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 44px;
+  margin-top: var(--space-6);
+  border: 0;
+  border-radius: 12px;
+  background: var(--bg-card);
+  color: var(--danger);
   font: inherit;
   cursor: pointer;
 }
 
 .settings-reset:hover {
-  background: var(--bg-subtle);
+  background: color-mix(in srgb, var(--bg-card) 92%, var(--fg));
 }
 
-/* One label per choice, the one shown picked by the choice on <html>, so the button has its final
-   label and width before any module script has run. */
-.theme-choice {
-  display: none;
-}
-
-:root:not([data-theme]) .theme-choice[data-choice="system"],
-:root[data-theme="light"] .theme-choice[data-choice="light"],
-:root[data-theme="dark"] .theme-choice[data-choice="dark"] {
-  display: inline;
-}
-
-/* Layout: tree, article, outline */
+/* ---------------------------------------------------------------------------------------------
+   Layout: tree, article, outline
+   --------------------------------------------------------------------------------------------- */
 .layout {
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--rail-width);
@@ -639,10 +1117,15 @@ a:hover {
   height: 100%;
   /* Long names end in an ellipsis rather than scrolling the whole tree sideways. */
   overflow: hidden auto;
-  padding: 12px 8px 32px;
+  padding: var(--space-3) var(--space-2) var(--space-8);
   font-size: 14px;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
+}
+
+/* On a wide screen the tree is always shown, so the row that folds it on a phone is not drawn. */
+.sidebar-summary {
+  display: none;
 }
 
 /* The rail is framed the same way, with a hairline toward the article that marks the edge its handle
@@ -657,8 +1140,8 @@ a:hover {
 .rail {
   height: 100%;
   overflow-y: auto;
-  padding: 16px 12px 32px 16px;
-  font-size: 14px;
+  padding: var(--space-5) var(--space-3) var(--space-8) var(--space-4);
+  font-size: 13px;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
@@ -703,18 +1186,17 @@ a:hover {
   width: 11px;
   height: 32px;
   margin-top: -16px;
-  border: 1px solid var(--border);
   border-radius: 6px;
   background:
     radial-gradient(circle, var(--fg-muted) 0.9px, transparent 1.3px) center /
       4px 5px,
-    var(--bg);
-  box-shadow: 0 1px 3px var(--shadow);
+    var(--bg-card);
+  box-shadow: var(--shadow-sm);
   opacity: 0;
   transform: scale(0.85);
   transition:
     opacity 150ms ease-out,
-    transform 150ms cubic-bezier(0.2, 0, 0, 1);
+    transform 150ms var(--ease-out);
 }
 
 .column-resizer:hover::before,
@@ -785,13 +1267,16 @@ a:hover {
   display: var(--reader-source-lines, block);
   letter-spacing: 0;
   white-space: nowrap;
+  opacity: 0.7;
   pointer-events: none;
   user-select: none;
 }
 
-/* Document tree. Every row is one line: a folder is a chevron and its name, a file is its name set in
-   line with the folder names above it, and a nested level hangs from a hairline under its folder's
-   chevron, so depth reads at a glance even far down a long tree. */
+/* ---------------------------------------------------------------------------------------------
+   Document tree. Every row is one line: a folder is a chevron and its name, a file is its name set
+   in line with the folder names above it, and a nested level hangs from a hairline under its
+   folder's chevron, so depth reads at a glance even far down a long tree.
+   --------------------------------------------------------------------------------------------- */
 .tree {
   margin: 0;
   padding: 0;
@@ -800,7 +1285,7 @@ a:hover {
 
 .tree .tree {
   margin-left: 14px;
-  padding-left: 4px;
+  padding-left: var(--space-1);
   border-left: 1px solid var(--border-subtle);
 }
 
@@ -813,13 +1298,13 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 28px;
-  padding: 0 8px;
-  border-radius: 6px;
+  min-height: var(--control-sm);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
   white-space: nowrap;
   transition:
-    background-color 120ms ease-out,
-    color 120ms ease-out;
+    background-color 120ms var(--ease),
+    color 120ms var(--ease);
 }
 
 .tree summary {
@@ -833,26 +1318,19 @@ a:hover {
   display: none;
 }
 
-/* The chevron: two sides of a small square turned to point right, and down once the folder opens. */
 .tree summary::before {
-  content: "";
-  flex: none;
-  width: 6px;
-  height: 6px;
-  margin: 0 3px 0 2px;
-  border-right: 1.5px solid var(--fg-muted);
-  border-bottom: 1.5px solid var(--fg-muted);
-  transform: rotate(-45deg);
-  transition: transform 150ms cubic-bezier(0.2, 0, 0, 1);
+  width: 10px;
+  height: 10px;
+  margin: 0 1px 0 1px;
 }
 
 .tree details[open] > summary::before {
-  transform: rotate(45deg) translate(-1px, -1px);
+  transform: rotate(90deg);
 }
 
 .tree a {
-  /* In line with the folder names: the row's padding, the chevron and the gap after it. */
-  padding-left: 25px;
+  /* In line with the folder names: the row's padding, the chevron, its margins and the gap after it. */
+  padding-left: 26px;
   color: var(--fg-muted);
 }
 
@@ -876,17 +1354,20 @@ a:hover {
   outline-offset: -2px;
 }
 
-/* A count of lint findings beside a file in the tree */
-/* "Only files with findings": every row without a finding below it is hidden. */
+.tree a[aria-current="page"] {
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* "Only files with findings": a switch row over the tree; with it on, every row without a finding
+   below it is hidden. */
 .tree-filter {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  margin: 0 0 8px;
-  padding: 0 4px;
+  min-height: var(--control);
+  margin: 0 0 var(--space-2);
+  padding: 0 var(--space-2);
   color: var(--fg-muted);
   font-size: 13px;
-  cursor: pointer;
 }
 
 .tree-filter[hidden],
@@ -895,8 +1376,8 @@ a:hover {
 }
 
 .tree-filter-empty {
-  margin: 4px 0;
-  padding: 0 4px;
+  margin: var(--space-1) 0;
+  padding: 0 var(--space-2);
   color: var(--fg-muted);
   font-size: 13px;
 }
@@ -905,48 +1386,49 @@ a:hover {
   display: none;
 }
 
+/* A count of lint findings beside a file in the tree */
 .tree-badge {
+  display: inline-flex;
   flex: none;
+  align-items: center;
+  justify-content: center;
   min-width: 18px;
+  height: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background: color-mix(in srgb, var(--warning) 18%, transparent);
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
   color: var(--warning);
   font-size: 11px;
   font-weight: 600;
-  line-height: 18px;
-  text-align: center;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 .tree-badge-error {
-  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
   color: var(--danger);
 }
 
-.tree a[aria-current="page"] {
-  background: var(--accent-bg);
-  color: var(--accent);
-  font-weight: 600;
-}
-
-/* Right rail. The small graph of the document's neighbors comes first. */
+/* ---------------------------------------------------------------------------------------------
+   Right rail. The small graph of the document's neighbors comes first.
+   --------------------------------------------------------------------------------------------- */
 .local-graph-canvas {
   height: 240px;
-  margin: 0 0 6px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  background: var(--bg);
+  margin: 0 0 var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  overflow: hidden;
 }
 
 .local-graph-hint {
-  margin: 0 0 2px;
+  margin: 0 0 var(--space-1);
   color: var(--fg-muted);
   font-size: 12px;
+  line-height: 1.4;
 }
 
 .local-graph-open {
   display: inline-block;
-  margin: 0 0 4px;
   font-size: 13px;
 }
 
@@ -955,23 +1437,24 @@ a:hover {
    it. A heading is small muted capitals; the entries under it are full-strength text set in from a
    hairline of their own, the way the tree hangs a folder's files. */
 .rail > * + * {
-  margin-top: 16px;
-  padding-top: 16px;
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
   border-top: 1px solid var(--border-subtle);
 }
 
 .rail h2 {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
   color: var(--fg-muted);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
+  line-height: 1.4;
   text-transform: uppercase;
 }
 
 .rail ul {
   margin: 0;
-  padding: 0 0 0 2px;
+  padding: 0;
   border-left: 1px solid var(--border-subtle);
   list-style: none;
 }
@@ -984,23 +1467,33 @@ a:hover {
 .rail li a {
   display: block;
   margin-left: -1px;
-  padding: 3px 8px 3px 10px;
-  border-left: 1px solid transparent;
-  border-radius: 0 4px 4px 0;
+  padding: 5px var(--space-2) 5px var(--space-3);
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
   color: var(--fg);
-  line-height: 1.4;
+  line-height: 1.35;
+  transition:
+    background-color 120ms var(--ease),
+    color 120ms var(--ease),
+    border-color 120ms var(--ease);
 }
 
 .rail li.depth-3 a {
-  padding-left: 22px;
+  padding-left: var(--space-6);
   color: var(--fg-muted);
 }
 
 .rail li a:hover {
-  border-left-color: var(--accent);
   background: var(--row-hover);
-  color: var(--accent);
+  color: var(--fg);
   text-decoration: none;
+}
+
+/* The section being read, marked by the outline's script as the page scrolls. */
+.rail li a[aria-current="location"] {
+  border-left-color: var(--accent);
+  color: var(--accent);
+  font-weight: 500;
 }
 
 /* Backlinks are repository paths, read for their file names. */
@@ -1009,24 +1502,32 @@ a:hover {
   font-size: 12px;
 }
 
-/* Article typography */
+/* ---------------------------------------------------------------------------------------------
+   Article typography
+   --------------------------------------------------------------------------------------------- */
 .markdown-body h1,
 .markdown-body h2,
 .markdown-body h3,
 .markdown-body h4,
 .markdown-body h5,
 .markdown-body h6 {
-  margin: 1.6em 0 0.6em;
-  line-height: 1.3;
+  margin: 1.5em 0 0.5em;
   font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
 }
 
 .markdown-body h1 {
   margin-top: 0;
+  margin-bottom: 0.6em;
   font-size: 2em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 .markdown-body h2 {
+  margin-top: 1.75em;
   padding-bottom: 0.3em;
   border-bottom: 1px solid var(--border-subtle);
   font-size: 1.5em;
@@ -1048,11 +1549,17 @@ a:hover {
 
 .markdown-body ul,
 .markdown-body ol {
-  padding-left: 2em;
+  padding-left: 1.75em;
 }
 
 .markdown-body li + li {
   margin-top: 0.25em;
+}
+
+.markdown-body li > ul,
+.markdown-body li > ol {
+  margin-top: 0.25em;
+  margin-bottom: 0;
 }
 
 .markdown-body .contains-task-list {
@@ -1063,11 +1570,13 @@ a:hover {
 .markdown-body .task-list-item input {
   margin: 0 0.4em 0 -1.25em;
   vertical-align: middle;
+  accent-color: var(--accent);
 }
 
 .markdown-body blockquote {
   padding: 0 1em;
-  border-left: 4px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 2px;
   color: var(--fg-muted);
 }
 
@@ -1075,38 +1584,58 @@ a:hover {
   height: 1px;
   margin: 2em 0;
   border: 0;
-  background: var(--border);
+  background: var(--border-subtle);
 }
 
 .markdown-body img {
   max-width: 100%;
+  border-radius: var(--radius-xs);
 }
 
+/* A table is a rounded card: the outer edge is the table's own border, and the cells draw only the
+   lines between them, since collapsed borders cannot follow a rounded corner. */
 .markdown-body table {
   display: block;
+  width: max-content;
+  max-width: 100%;
   overflow-x: auto;
-  border-collapse: collapse;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  border-collapse: separate;
+  border-spacing: 0;
   /* 15px at the default text size, and scaled with the reader's. */
   font-size: 0.9375em;
 }
 
 .markdown-body th,
 .markdown-body td {
-  padding: 6px 12px;
-  border: 1px solid var(--border);
+  padding: 8px 12px;
+  border: 0;
+  border-right: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.markdown-body tr > :last-child {
+  border-right: 0;
+}
+
+.markdown-body tbody tr:last-child > *,
+.markdown-body table > tr:last-child > * {
+  border-bottom: 0;
 }
 
 .markdown-body th {
   background: var(--bg-subtle);
   font-weight: 600;
+  text-align: start;
 }
 
 .markdown-body code {
   /* Code keeps the spacing its font was drawn with: spread out, an identifier reads as separate
      letters and a monospaced block no longer looks like what an editor shows. */
   letter-spacing: normal;
-  padding: 0.15em 0.35em;
-  border-radius: 4px;
+  padding: 0.15em 0.4em;
+  border-radius: 5px;
   background: var(--code-bg);
   font-family: var(--reader-code-font, var(--font-mono));
   font-size: calc(0.875em * var(--reader-code-scale, 1));
@@ -1118,13 +1647,13 @@ a:hover {
 
 .markdown-body pre {
   overflow-x: auto;
-  padding: 14px 16px;
+  padding: var(--space-4) 18px;
   border: 1px solid var(--border-subtle);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--code-bg);
   /* 13.5px at the default text size, and scaled with the reader's text and code sizes. */
   font-size: calc(0.84375em * var(--reader-code-scale, 1));
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 /* A code block and the copy button in its corner. The button shows while the block is hovered or the
@@ -1136,22 +1665,22 @@ a:hover {
 
 .code-copy {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: var(--space-2);
+  right: var(--space-2);
   z-index: 1;
-  height: 24px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  background: var(--bg);
+  height: var(--control-xs);
+  padding: 0 10px;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  box-shadow: 0 0 0 1px var(--border-subtle);
+  backdrop-filter: blur(8px);
   color: var(--fg-muted);
   font-family: var(--font-sans);
   font-size: 12px;
-  line-height: 22px;
-  cursor: pointer;
   opacity: 0;
   user-select: none;
-  transition: opacity 120ms ease;
+  transition:
+    opacity 120ms var(--ease),
+    color 120ms var(--ease);
 }
 
 .code-copy[hidden] {
@@ -1165,7 +1694,11 @@ a:hover {
 }
 
 .code-copy:hover {
-  border-color: var(--accent);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.code-copy.is-done {
   color: var(--accent);
 }
 
@@ -1177,20 +1710,40 @@ a:hover {
 
 .markdown-body pre code {
   padding: 0;
+  border-radius: 0;
   background: none;
   font-size: inherit;
   overflow-wrap: normal;
 }
 
-.markdown-body details {
-  padding: 8px 12px;
+/* An author's own `<details>`: a card whose summary carries the same chevron as the tree. Written
+   with `:where()`, so the viewer's own disclosures in the article — the findings panel, a rule in the
+   config editor — restyle it with a plain class selector instead of out-specifying each rule here. */
+.markdown-body :where(details) {
+  padding: 10px var(--space-4);
   border: 1px solid var(--border-subtle);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
-.markdown-body summary {
+.markdown-body :where(details > summary) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  list-style: none;
   cursor: pointer;
   font-weight: 600;
+}
+
+.markdown-body :where(details > summary)::-webkit-details-marker {
+  display: none;
+}
+
+.markdown-body :where(details[open] > summary) {
+  margin-bottom: var(--space-2);
+}
+
+.markdown-body :where(details[open] > summary)::before {
+  transform: rotate(90deg);
 }
 
 .link-external::after {
@@ -1205,90 +1758,127 @@ a:hover {
   text-underline-offset: 3px;
 }
 
-/* Lint findings for this document */
-.diagnostics {
-  margin: 0 0 1.5em;
-  padding: 10px 14px;
-  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--warning) 7%, var(--bg));
+/* ---------------------------------------------------------------------------------------------
+   Lint findings for this document: a tinted card above the article. Each finding is one row of a
+   grid — severity, rule, message, where, prompt — with every short cell aligned to the message's
+   first line, so a message that wraps does not drag "whole file" and the button to its middle.
+   --------------------------------------------------------------------------------------------- */
+.markdown-body .diagnostics {
+  --tint: var(--warning);
+  margin: 0 0 var(--space-6);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--tint) 28%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--tint) 7%, var(--bg));
+  font-family: var(--font-sans);
   font-size: 14px;
+  letter-spacing: normal;
+  text-align: start;
 }
 
-.diagnostics.has-errors {
-  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
-  background: color-mix(in srgb, var(--danger) 6%, var(--bg));
+.markdown-body .diagnostics.has-errors {
+  --tint: var(--danger);
 }
 
-.diagnostics summary {
+.markdown-body .diagnostics > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-sm);
+  margin: 0;
+  list-style: none;
   cursor: pointer;
+}
+
+.diagnostics > summary::-webkit-details-marker {
+  display: none;
+}
+
+.diagnostics[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.diagnostics-title {
+  flex: 1;
   font-weight: 600;
 }
 
 .diagnostics ul {
-  margin: 8px 0 0;
+  margin: var(--space-2) 0 0;
   padding: 0;
   list-style: none;
 }
 
+/* A fixed 24px line for the message, so its first line and every short cell beside it share one
+   height whatever the text font is. */
 .diagnostic {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 10px;
-  padding: 4px 0;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  column-gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-2) 0;
+  line-height: 24px;
 }
 
-.diagnostic + .diagnostic {
-  border-top: 1px solid var(--border-subtle);
+.markdown-body .diagnostic + .diagnostic {
+  margin: 0;
+  border-top: 1px solid color-mix(in srgb, var(--tint) 18%, transparent);
+}
+
+.diagnostic-severity,
+.diagnostic-rule,
+.diagnostic-line,
+.diagnostic .prompt-menu {
+  display: inline-flex;
+  align-items: center;
+  align-self: start;
+  height: var(--control-xs);
+  white-space: nowrap;
 }
 
 .diagnostic-severity {
+  justify-self: start;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
   color: var(--warning);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1;
   text-transform: uppercase;
 }
 
 .diagnostic-error .diagnostic-severity {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
   color: var(--danger);
 }
 
 .diagnostic-rule {
   font-family: var(--font-mono);
   font-size: 13px;
+  font-weight: 500;
 }
 
 .diagnostic-message {
-  flex: 1 1 280px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .diagnostic-line {
   color: var(--fg-muted);
   font-size: 13px;
-  white-space: nowrap;
 }
 
 /* "Prompt": copies a prompt that answers a finding (or, in the panel's summary and on the dashboard,
    all of a document's findings). Small and quiet, so a list of findings still reads as findings. */
 .prompt-menu {
-  height: 22px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  background: var(--bg);
-  color: var(--fg-muted);
-  font: inherit;
+  height: var(--control-xs);
+  padding: 0 10px;
   font-size: 12px;
-  font-weight: 400;
-  line-height: 20px;
-  white-space: nowrap;
-  cursor: pointer;
 }
 
-.prompt-menu:hover,
 .prompt-menu[aria-expanded="true"] {
-  border-color: var(--accent);
   color: var(--accent);
 }
 
@@ -1298,28 +1888,32 @@ a:hover {
 
 .dashboard-rules .prompt-menu {
   margin-left: 6px;
+  vertical-align: middle;
 }
 
 /* Front matter */
 .frontmatter {
-  margin: 0 0 1.5em;
-  padding: 12px 16px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
+  margin: 0 0 var(--space-6);
+  padding: var(--space-3) var(--space-4);
+  border-radius: 12px;
   background: var(--bg-subtle);
+  font-family: var(--font-sans);
   font-size: 14px;
+  letter-spacing: normal;
+  text-align: start;
 }
 
 .frontmatter dl {
   display: grid;
   grid-template-columns: max-content 1fr;
-  gap: 4px 16px;
+  gap: 6px var(--space-4);
   margin: 0;
 }
 
 .frontmatter dt {
   color: var(--fg-muted);
   font-family: var(--font-mono);
+  font-size: 13px;
 }
 
 .frontmatter dd {
@@ -1327,8 +1921,13 @@ a:hover {
   overflow-wrap: anywhere;
 }
 
+.frontmatter pre {
+  margin: 0;
+}
+
 .frontmatter-invalid {
-  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 7%, var(--bg));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 35%, transparent);
 }
 
 /* Diagrams */
@@ -1353,7 +1952,7 @@ a:hover {
 
 .mermaid-error,
 .echarts-error {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
   color: var(--danger);
   font-size: 14px;
   text-align: left;
@@ -1373,7 +1972,9 @@ a:hover {
   height: 400px;
 }
 
-/* Link graph: the picture takes the width the article would leave empty. */
+/* ---------------------------------------------------------------------------------------------
+   Link graph: the picture takes the width the article would leave empty.
+   --------------------------------------------------------------------------------------------- */
 .markdown-body:has(.graph-canvas) {
   max-width: none;
 }
@@ -1381,36 +1982,47 @@ a:hover {
 .graph-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2) var(--space-3);
   align-items: center;
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
   font-size: 14px;
+}
+
+.graph-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--fg-muted);
 }
 
 .graph-controls select {
-  max-width: 100%;
-  height: 32px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-subtle);
-  color: var(--fg);
-  font: inherit;
+  min-width: 14em;
+}
+
+.graph-controls button[hidden] {
+  display: none;
 }
 
 .graph-summary {
+  margin: 0 0 var(--space-3);
   color: var(--fg-muted);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .graph-canvas {
   height: max(420px, calc(100vh - var(--topbar-height) - 260px));
   border: 1px solid var(--border-subtle);
-  border-radius: 6px;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 .graph-placeholder {
-  padding: 16px;
+  padding: var(--space-4);
   color: var(--fg-muted);
+}
+
+.markdown-body .graph-list {
+  margin-top: var(--space-4);
 }
 
 .graph-list ul {
@@ -1427,8 +2039,10 @@ a:hover {
   font-family: var(--font-mono);
 }
 
-/* Dashboard: the filters above, one table row per document below; the table takes the width the
-   article would leave empty, like the graph. */
+/* ---------------------------------------------------------------------------------------------
+   Dashboard: the filters above, one table row per document below; the table takes the width the
+   article would leave empty, like the graph.
+   --------------------------------------------------------------------------------------------- */
 .markdown-body:has(.dashboard-filters) {
   max-width: none;
 }
@@ -1442,64 +2056,103 @@ a:hover {
   }
 }
 
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
 .dashboard-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px 16px;
-  align-items: flex-start;
-  margin: 0 0 16px;
-  font-size: 14px;
+  gap: var(--space-3);
+  align-items: stretch;
+  margin: 0 0 var(--space-5);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
+/* Each group of filters is a card with its name in small capitals inside it, rather than a legend
+   cut into an outline. */
 .filter-group {
   min-width: 0;
   margin: 0;
-  padding: 8px 12px 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
+  padding: var(--space-3) var(--space-4) 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--bg-subtle);
 }
 
 .filter-group legend {
-  padding: 0 4px;
+  float: left;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 0;
   color: var(--fg-muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.filter-group legend + * {
+  clear: both;
 }
 
 .filter-options {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 12px;
+  gap: 6px;
 }
 
 .filter-options + .filter-options {
-  margin-top: 6px;
+  margin-top: var(--space-2);
 }
 
 .filter-rules {
-  max-width: 420px;
+  max-width: 440px;
 }
 
 .filter-options-column {
-  flex-direction: column;
+  max-width: 300px;
 }
 
+/* A filter that is on or off is a chip: the checkbox stays underneath, invisible but focusable and
+   still sent by the form, and the chip is tinted while it is checked. */
 .filter-check {
+  position: relative;
   display: inline-flex;
-  gap: 4px;
   align-items: center;
+  height: var(--control-sm);
+  padding: 0 var(--space-3);
+  border-radius: 14px;
+  background: var(--fill);
+  color: var(--fg);
   white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 120ms var(--ease),
+    color 120ms var(--ease),
+    box-shadow 120ms var(--ease);
+}
+
+.filter-check input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.filter-check:hover {
+  background: var(--fill-strong);
+}
+
+.filter-check:has(input:checked) {
+  background: var(--accent-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--accent);
+}
+
+.filter-check:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .filter-check code {
@@ -1509,13 +2162,13 @@ a:hover {
 
 .filter-range {
   display: grid;
-  grid-template-columns: 4em auto auto auto;
-  gap: 4px;
+  grid-template-columns: 3.5em auto auto auto;
+  gap: 6px;
   align-items: center;
 }
 
 .filter-range + .filter-range {
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .filter-range-label {
@@ -1524,6 +2177,7 @@ a:hover {
 
 .filter-range input {
   width: 6.5em;
+  font-variant-numeric: tabular-nums;
 }
 
 .filter-range-dash {
@@ -1533,70 +2187,40 @@ a:hover {
 .filter-field {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-1);
   color: var(--fg-muted);
 }
 
 .filter-field + .filter-field {
-  margin-top: 6px;
-}
-
-.dashboard-filters input[type="number"],
-.dashboard-filters input[type="search"],
-.dashboard-filters select {
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-subtle);
-  color: var(--fg);
-  font: inherit;
+  margin-top: 10px;
 }
 
 .dashboard-filters select,
 .dashboard-filters input[type="search"] {
   width: 16em;
-  max-width: 100%;
-}
-
-.dashboard-filters input:focus-visible,
-.dashboard-filters select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
 }
 
 .filter-actions {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
   align-items: center;
   align-self: flex-end;
-  padding-bottom: 10px;
+  padding-bottom: var(--space-3);
 }
 
-.filter-actions button {
-  height: 30px;
-  padding: 0 14px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-subtle);
-  color: var(--fg);
-  font: inherit;
-  cursor: pointer;
-}
-
-.filter-actions button:hover {
-  border-color: var(--accent);
+.filter-actions button[hidden] {
+  display: none;
 }
 
 .dashboard-summary {
-  margin: 0 0 4px;
-  font-size: 14px;
+  margin: 0 0 var(--space-1);
+  font-size: 15px;
   font-weight: 600;
 }
 
 .dashboard-export,
 .dashboard-notice {
-  margin: 0 0 12px;
+  margin: 0 0 var(--space-3);
   color: var(--fg-muted);
   font-size: 13px;
 }
@@ -1612,29 +2236,37 @@ a:hover {
 .dashboard-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--border-subtle);
-  border-radius: 6px;
+  border-radius: 12px;
 }
 
-.markdown-body table.dashboard-table {
+/* Inside the card the table needs no border or corners of its own. */
+.markdown-body .dashboard-table-wrap table {
   display: table;
   width: 100%;
+  max-width: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
   font-size: 13px;
 }
 
-.markdown-body .dashboard-table th,
-.markdown-body .dashboard-table td {
-  padding: 5px 10px;
+.markdown-body .dashboard-table-wrap th,
+.markdown-body .dashboard-table-wrap td {
+  padding: var(--space-2) var(--space-3);
   border: 0;
   border-bottom: 1px solid var(--border-subtle);
-  vertical-align: top;
+  vertical-align: baseline;
 }
 
-.markdown-body .dashboard-table th {
+.markdown-body .dashboard-table-wrap th {
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-weight: 600;
   text-align: left;
   white-space: nowrap;
 }
 
-.markdown-body .dashboard-table tbody tr:last-child td {
+.markdown-body .dashboard-table-wrap tbody tr:last-child td {
   border-bottom: 0;
 }
 
@@ -1648,6 +2280,10 @@ a:hover {
   white-space: nowrap;
 }
 
+.markdown-body .dashboard-table th.is-numeric {
+  text-align: right;
+}
+
 .dashboard-sort {
   color: inherit;
   text-decoration: none;
@@ -1655,6 +2291,7 @@ a:hover {
 
 .dashboard-sort:hover {
   color: var(--accent);
+  text-decoration: none;
 }
 
 .dashboard-table th[aria-sort] .dashboard-sort {
@@ -1693,7 +2330,7 @@ a:hover {
 }
 
 .markdown-body .dashboard-rules code {
-  padding: 0 0.3em;
+  padding: 1px 6px;
   font-size: 11px;
   white-space: nowrap;
 }
@@ -1704,29 +2341,32 @@ a:hover {
 }
 
 .dashboard-empty {
-  padding: 24px 10px !important;
+  padding: var(--space-6) var(--space-3) !important;
   color: var(--fg-muted);
   text-align: center;
 }
 
-/* Config page. The editor is a form of nested groups on the left of the reader's eye and a preview
-   under it; every control uses the same field look as the dashboard's filters. */
+/* ---------------------------------------------------------------------------------------------
+   Config page. The editor is a form of nested cards with a preview under it; every control uses the
+   same field look as the dashboard's filters.
+   --------------------------------------------------------------------------------------------- */
 .markdown-body:has(.config-editor) {
   max-width: 980px;
 }
 
-.config-file,
-.config-save-state {
-  margin: 0 0 8px;
+.config-file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
   font-size: 14px;
 }
 
 .config-save-state {
+  margin: var(--space-3) 0 0;
   color: var(--fg-muted);
-}
-
-.config-editor {
-  margin: 16px 0 32px;
+  font-size: 13px;
 }
 
 /* "Show in folder" and "Open in default app", under the config file's name, with what the last one
@@ -1735,32 +2375,21 @@ a:hover {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
+  margin: 0;
 }
 
 .config-open[hidden] {
   display: none;
 }
 
-.config-open-button {
-  height: 30px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  color: var(--fg);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.config-open-button:hover:not(:disabled) {
-  background: var(--bg-subtle);
-}
-
 .config-open-status {
   color: var(--fg-muted);
   font-size: 13px;
+}
+
+.config-editor {
+  margin: var(--space-6) 0 var(--space-8);
 }
 
 .config-editor[hidden] {
@@ -1770,36 +2399,13 @@ a:hover {
 .config-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--space-3);
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-4);
 }
 
-.config-modes {
-  display: inline-flex;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.config-mode {
-  padding: 4px 14px;
-  border: 0;
-  background: var(--bg-subtle);
-  color: var(--fg-muted);
-  font: inherit;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.config-mode + .config-mode {
-  border-left: 1px solid var(--border);
-}
-
-.config-mode[aria-pressed="true"] {
-  background: var(--accent-bg);
-  color: var(--accent);
-  font-weight: 600;
+.config-modes .segment {
+  min-width: 72px;
 }
 
 .config-status {
@@ -1809,7 +2415,7 @@ a:hover {
 }
 
 .config-section {
-  margin: 0 0 20px;
+  margin: 0 0 var(--space-8);
 }
 
 .markdown-body .config-section h2,
@@ -1817,36 +2423,70 @@ a:hover {
   margin: 0 0 2px;
   padding: 0;
   border: 0;
-  font-size: 16px;
+  font-size: 17px;
 }
 
 .config-hint {
-  margin: 2px 0 8px;
+  margin: 0 0 var(--space-3);
   color: var(--fg-muted);
   font-size: 12px;
+  line-height: 1.45;
 }
 
+/* A group of settings is a card. Its children are a grid with one gap between them, and the name is
+   the first row rather than a legend cut into an outline; a group inside a group is drawn a shade
+   lighter, and the one inside that a shade darker again, so nesting stays visible however deep. */
 .config-group {
-  margin: 8px 0;
-  padding: 6px 12px 8px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-3) var(--space-4) 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--bg-subtle);
+}
+
+.config-group .config-group {
+  background: var(--bg-raised);
+}
+
+.config-group .config-group .config-group {
+  background: var(--bg-subtle);
+}
+
+.config-section > .config-group + .config-group,
+.config-section > .config-field + .config-group,
+.config-section > .config-group + .config-field {
+  margin-top: var(--space-3);
 }
 
 .config-group legend {
-  padding: 0 4px;
+  float: left;
+  padding: 0;
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 600;
 }
 
+.config-group > .config-hint {
+  margin: 0;
+}
+
 .config-field {
   display: grid;
   grid-template-columns: minmax(8em, 12em) minmax(0, 1fr);
-  gap: 2px 12px;
+  gap: var(--space-1) var(--space-4);
   align-items: center;
-  margin: 4px 0;
+  min-height: var(--control-sm);
+  margin: 0;
   font-size: 13px;
+}
+
+.config-section > .config-field {
+  padding: var(--space-2) var(--space-4);
+  border-radius: 12px;
+  background: var(--bg-subtle);
 }
 
 .config-field > .config-hint {
@@ -1860,70 +2500,67 @@ a:hover {
   overflow-wrap: anywhere;
 }
 
-.config-editor input,
-.config-editor select,
-.config-editor textarea {
+/* A one-of-few choice in the form keeps to its content's width rather than stretching across. */
+.config-field > .segmented {
+  justify-self: start;
   max-width: 100%;
-  min-height: 28px;
-  padding: 2px 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-subtle);
-  color: var(--fg);
-  font: inherit;
-  font-size: 13px;
 }
 
-.config-editor input:focus-visible,
-.config-editor select:focus-visible,
-.config-editor textarea:focus-visible,
-.config-editor button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+.config-editor textarea {
+  height: auto;
+  padding: var(--space-2);
+  line-height: 1.5;
 }
 
-.config-editor button {
-  min-height: 28px;
-  padding: 2px 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-subtle);
-  color: var(--fg);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.config-editor button:hover {
-  border-color: var(--accent);
-}
-
-.config-editor button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.config-editor .config-primary {
-  border-color: var(--accent);
+/* Modifiers of the gray button, written with `button` so they match its own specificity and, coming
+   after it, win. */
+.config-editor button.config-primary {
   background: var(--accent);
-  color: var(--bg);
+  color: #ffffff;
   font-weight: 600;
 }
 
-.config-editor .config-danger {
+.config-editor button.config-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 88%, #000000);
+}
+
+.config-editor button.config-danger,
+.config-editor button.config-remove {
   color: var(--danger);
+}
+
+/* Adding is a tinted text button, apart from the gray ones that act on what is already there. */
+.config-editor button.config-add,
+.config-editor .config-rule-add button {
+  justify-self: start;
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.config-editor button.config-add:hover:not(:disabled),
+.config-editor .config-rule-add button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.config-editor button.config-add::before {
+  content: "+" / "";
+  font-size: 15px;
+  font-weight: 400;
 }
 
 .config-list-items {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin: 4px 0;
+  gap: 6px;
+}
+
+.config-list-items:empty {
+  display: none;
 }
 
 .config-list-row {
   display: flex;
-  gap: 6px;
+  gap: var(--space-2);
   align-items: center;
 }
 
@@ -1931,17 +2568,17 @@ a:hover {
 .config-list-row > label {
   flex: 1;
   font-family: var(--font-mono);
+  font-size: 12px;
 }
 
 .config-list-object {
   display: flex;
-  gap: 6px;
+  gap: var(--space-2);
   align-items: flex-start;
 }
 
 .config-list-object > .config-group {
   flex: 1;
-  margin: 0;
 }
 
 .config-json {
@@ -1957,69 +2594,117 @@ a:hover {
   font-size: 12px;
 }
 
+/* The rules: an inset list of cards, each folding open on its options. */
 .config-rule-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-
-.config-rule {
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
+  gap: var(--space-2);
 }
 
 .markdown-body .config-rule {
   margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: var(--bg-subtle);
 }
 
-.config-rule > summary {
+.markdown-body .config-rule > summary {
   display: flex;
-  gap: 10px;
-  align-items: baseline;
-  padding: 6px 12px;
-  cursor: pointer;
+  gap: var(--space-3);
+  align-items: center;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 var(--space-4);
   font-size: 13px;
+  font-weight: 400;
 }
 
 .config-rule[open] > summary {
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.config-rule-id {
+.config-rule[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.markdown-body .config-rule-id {
   flex: none;
+  padding: 0;
+  background: none;
+  font-size: 12px;
   font-weight: 600;
 }
 
 .config-rule-description {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
   color: var(--fg-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* What the rule is set to, as a pill in its severity's color. */
 .config-rule-severity {
+  display: inline-flex;
   flex: none;
+  align-items: center;
+  height: 20px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-xs);
+  background: var(--fill);
   color: var(--fg-muted);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.config-rule-severity[data-severity="error"] {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
+}
+
+.config-rule-severity[data-severity="warning"] {
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  color: var(--warning);
 }
 
 .config-rule-body {
-  padding: 6px 12px 10px;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+/* The rule card is itself the first level, so its groups alternate starting from the raised shade. */
+.config-rule-body .config-group {
+  background: var(--bg-raised);
+}
+
+.config-rule-body .config-group .config-group {
+  background: var(--bg-subtle);
+}
+
+.config-rule-body .config-group .config-group .config-group {
+  background: var(--bg-raised);
 }
 
 .config-rule-footer {
   display: flex;
-  gap: 16px;
+  gap: var(--space-4);
   align-items: center;
   justify-content: space-between;
-  margin-top: 8px;
+  margin-top: var(--space-1);
   font-size: 13px;
 }
 
 .config-rule-add {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 6px;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
 }
 
 .config-rule-add select {
@@ -2042,15 +2727,14 @@ a:hover {
 }
 
 .config-preview {
-  margin-top: 20px;
-  padding: 12px 16px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  margin-top: var(--space-5);
+  padding: var(--space-4);
+  border-radius: 12px;
   background: var(--bg-subtle);
 }
 
 .config-preview-body p {
-  margin: 4px 0;
+  margin: var(--space-1) 0;
   font-size: 14px;
 }
 
@@ -2064,7 +2748,7 @@ a:hover {
 }
 
 .config-errors {
-  margin: 4px 0;
+  margin: var(--space-1) 0;
   font-family: var(--font-mono);
   font-size: 12px;
 }
@@ -2075,23 +2759,23 @@ a:hover {
 }
 
 .markdown-body .config-by-rule {
-  display: table;
-  margin: 8px 0;
+  margin: var(--space-2) 0;
   font-size: 13px;
 }
 
 .markdown-body .config-by-rule th,
 .markdown-body .config-by-rule td {
-  padding: 3px 10px;
+  padding: 4px 10px;
 }
 
 .markdown-body .config-findings,
 .markdown-body .config-result {
   margin: 6px 0;
+  background: var(--bg-card);
 }
 
 .config-findings ul {
-  margin: 4px 0;
+  margin: var(--space-1) 0;
   padding-left: 18px;
   font-size: 12px;
 }
@@ -2117,16 +2801,15 @@ a:hover {
 .config-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
   align-items: center;
 }
 
 .config-list-empty {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 12px;
+  gap: var(--space-1) var(--space-3);
   align-items: center;
-  margin: 4px 0;
 }
 
 .config-list-empty[hidden] {
@@ -2139,21 +2822,22 @@ a:hover {
 }
 
 /* Sits after the form and sticks to the bottom of the window while the form is scrolled, then
-   settles above the preview when the reader gets there. */
+   settles above the preview when the reader gets there. Material, so the form stays faintly visible
+   under it. */
 .config-bar {
   position: sticky;
-  bottom: 0;
+  bottom: var(--space-3);
   z-index: 4;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 16px;
+  gap: var(--space-2) var(--space-4);
   align-items: center;
-  margin: 16px 0 0;
-  padding: 10px 14px;
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  background: var(--bg);
-  box-shadow: 0 -4px 16px var(--shadow);
+  margin: var(--space-4) 0 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--material);
+  backdrop-filter: var(--material-filter);
+  box-shadow: var(--shadow-lg);
 }
 
 .config-bar[hidden] {
@@ -2179,14 +2863,13 @@ a:hover {
   font-size: 12px;
 }
 
-.markdown-body .config-rules {
-  display: table;
-  width: 100%;
-  font-size: 13px;
-}
-
 .markdown-body .config-rules td:first-child {
   white-space: nowrap;
+}
+
+.markdown-body .config-current,
+.markdown-body .config-registry {
+  margin-top: var(--space-8);
 }
 
 /* Source view: line anchors from a document's `#L42` link */
@@ -2221,7 +2904,11 @@ a:hover {
   background: var(--accent-bg);
 }
 
-/* Narrow screens: the outline goes first, then the tree folds above the article. */
+/* ---------------------------------------------------------------------------------------------
+   Narrow screens
+   --------------------------------------------------------------------------------------------- */
+
+/* The outline goes first. */
 @media (max-width: 1200px) {
   .layout {
     grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
@@ -2232,25 +2919,27 @@ a:hover {
   }
 }
 
+/* Between a phone and a laptop the header's path is the first thing to give up its room. */
+@media (max-width: 1000px) {
+  .topbar .current-path,
+  .topbar .copy-path,
+  :root[data-script] .topbar .copy-path[hidden] {
+    display: none;
+  }
+}
+
 @media (max-width: 800px) {
-  .current-path,
   .search-shortcut,
   /* The article's side padding is too narrow here to hold a number beside it. */
   .markdown-body [data-line]::after {
     display: none;
   }
 
-  /* With the path gone from the header, a copy button there would copy something the reader cannot
-     see. Stated with the script mark too, or the rule that lays script controls out early would win. */
-  .topbar .copy-path,
-  :root[data-script] .topbar .copy-path[hidden] {
-    display: none;
-  }
-
-  /* The header wraps instead of running off the screen: the site name, three links, the theme switch
-     and the search box do not fit one phone-width row. It scrolls away with the page rather than
-     staying put, since three rows pinned to the top would take a good part of a phone screen; with
-     nothing pinned there, a jump to a heading needs no room left for it either. */
+  /* The header wraps instead of running off the screen: the site name with the theme and settings
+     beside it, then the sections as one full-width segmented control, then the search box. It
+     scrolls away with the page rather than staying put, since three rows pinned to the top would take
+     a good part of a phone screen; with nothing pinned there, a jump to a heading needs no room left
+     for it either. */
   :root {
     --topbar-height: 0px;
   }
@@ -2258,20 +2947,29 @@ a:hover {
   .topbar {
     position: static;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--space-2);
     height: auto;
-    padding: 8px 16px;
+    padding: 10px var(--space-4) var(--space-3);
+    background: var(--bg);
+    backdrop-filter: none;
   }
 
   .site-name {
-    flex: 1 0 100%;
+    flex: 1 1 0;
+    min-width: 0;
     overflow: hidden;
+    font-size: 17px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .search {
+  .section-nav {
     order: 1;
+    flex: 1 0 100%;
+  }
+
+  .search {
+    order: 2;
     flex: 1 0 100%;
     margin-left: 0;
   }
@@ -2280,17 +2978,49 @@ a:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* The tree folds above the article and takes the full width, so there is no edge to drag. */
+  /* The tree folds behind a "Documents" row above the article, so the article starts right under the
+     header; opened, it takes at most half the screen and scrolls on its own. */
   .sidebar-frame {
     position: static;
     height: auto;
-    max-height: 40vh;
     border-right: 0;
     border-bottom: 1px solid var(--border-subtle);
   }
 
   .sidebar {
-    max-height: 40vh;
+    height: auto;
+    padding: 0 var(--space-2);
+  }
+
+  .sidebar-summary {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 44px;
+    padding: 0 var(--space-2);
+    background: var(--bg-sidebar);
+    color: var(--fg);
+    font-size: 15px;
+    font-weight: 600;
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .sidebar-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .sidebar-disclosure[open] > .sidebar-summary::after {
+    transform: rotate(90deg);
+  }
+
+  .sidebar-disclosure[open] {
+    max-height: 50vh;
+    overflow-y: auto;
+    padding-bottom: var(--space-3);
   }
 
   .column-resizer {
@@ -2298,7 +3028,23 @@ a:hover {
   }
 
   .content {
-    padding: 24px 16px 64px;
+    padding: var(--space-6) var(--space-4) var(--space-12);
+  }
+
+  .markdown-body .diagnostic {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+  }
+
+  /* The message takes a row of its own under the severity, the rule and the actions. */
+  .diagnostic-message {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    line-height: 1.5;
+  }
+
+  .diagnostic-line {
+    grid-column: 3;
+    justify-self: end;
   }
 
   /* A field name above its input, so a long option name does not squeeze the input to nothing. */
@@ -2310,6 +3056,10 @@ a:hover {
   .config-json-problem {
     grid-column: 1;
   }
+
+  .settings-panel {
+    width: 100vw;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2317,12 +3067,20 @@ a:hover {
     scroll-behavior: auto;
   }
 
+  .chevron::before,
   .tree summary::before,
+  .diagnostics > summary::before,
+  .config-rule > summary::before,
+  .sidebar-summary::after,
+  .markdown-body details > summary::before,
   .column-resizer::before,
   .column-resizer::after,
   .settings-panel,
   .settings-panel.is-open,
-  .code-copy {
+  .code-copy,
+  .segment,
+  .switch,
+  .switch::before {
     transition: none;
   }
 }

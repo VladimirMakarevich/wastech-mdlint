@@ -5,6 +5,7 @@
 // answer, and a save writes the exact text that was previewed.
 
 import { copyText } from "./clipboard.js";
+import { segmentedControl } from "./segmented.js";
 
 type JsonSchema = {
   type?: string;
@@ -121,8 +122,8 @@ class ConfigEditor {
   private readonly textView = element("div", "config-text-view");
   private readonly textarea = document.createElement("textarea");
   private readonly modeButtons = {
-    form: button("Form", "config-mode"),
-    text: button("Text", "config-mode"),
+    form: button("Form", "config-mode segment"),
+    text: button("Text", "config-mode segment"),
   };
   private readonly status = element("p", "config-status");
   private readonly previewBody = element("div", "config-preview-body");
@@ -159,7 +160,7 @@ class ConfigEditor {
     });
     this.textView.append(this.textarea);
 
-    const modes = element("div", "config-modes");
+    const modes = element("div", "config-modes segmented");
     modes.setAttribute("role", "group");
     modes.setAttribute("aria-label", "Edit as");
     modes.append(this.modeButtons.form, this.modeButtons.text);
@@ -388,6 +389,8 @@ class ConfigEditor {
       severity.textContent = String(
         current.severity ?? info?.defaultSeverity ?? "",
       );
+      // Read by the stylesheet, which tints the pill in the severity's color.
+      severity.dataset.severity = severity.textContent;
     };
     describe(entry);
     summary.append(name, description, severity);
@@ -524,6 +527,43 @@ class ConfigEditor {
     }
     if (schema.enum !== undefined || schema.type === "boolean") {
       const choices = schema.enum ?? [true, false];
+      // A few choices — a boolean, a severity — are shown all at once as a segmented control, one
+      // click to change; a longer list stays a select, where a row of segments would run off the form.
+      if (choices.length <= 3) {
+        const unset =
+          options.unsetLabel ??
+          (schema.default === undefined
+            ? "not set"
+            : `default (${String(schema.default)})`);
+        const control = segmentedControl<string>(
+          labelText(label, required),
+          [
+            ["", unset],
+            ...choices.map(
+              (choice) => [JSON.stringify(choice), String(choice)] as const,
+            ),
+          ],
+          (chosen) => {
+            if (chosen === "") {
+              this.remove(path);
+            } else {
+              this.set(path, JSON.parse(chosen) as Json);
+            }
+            // Bubbled like a select's change, so a rule card's summary follows the new severity.
+            control.element.dispatchEvent(
+              new Event("change", { bubbles: true }),
+            );
+          },
+        );
+        control.render(value === undefined ? "" : JSON.stringify(value));
+        return labelled(
+          label,
+          required,
+          control.element,
+          schema.description,
+          "div",
+        );
+      }
       const select = document.createElement("select");
       select.append(
         new Option(
@@ -1179,13 +1219,18 @@ function labelText(label: string, required: boolean): string {
   return required ? `${label} *` : label;
 }
 
+// A field's name beside its control. The wrapper is a <label> for a single input, so a click on the
+// name focuses it; a segmented control is a group of buttons, and a label around it would pass a
+// click on the name to its first button, choosing that value, so it is wrapped in a <div> instead
+// and named by its own `aria-label`.
 function labelled(
   label: string,
   required: boolean,
   control: HTMLElement,
   description?: string,
+  wrapperTag: "label" | "div" = "label",
 ): HTMLElement {
-  const wrapper = element("label", "config-field");
+  const wrapper = element(wrapperTag, "config-field");
   const name = element("span", "config-field-name");
   name.textContent = labelText(label, required);
   wrapper.append(name, control);

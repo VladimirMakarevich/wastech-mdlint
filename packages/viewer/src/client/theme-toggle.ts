@@ -1,6 +1,8 @@
-// The header's theme switch. Three states rather than a light/dark flip, because "follow the system"
-// is a choice of its own: a reader who picked dark once should be able to hand control back to the
-// operating system without clearing site data.
+// The header's theme switch: a segmented control of three choices rather than a light/dark flip,
+// because "follow the system" is a choice of its own: a reader who picked dark once should be able to
+// hand control back to the operating system without clearing site data.
+
+import { arrowStep } from "./segmented.js";
 
 type ThemeChoice = "system" | "light" | "dark";
 export type Theme = "light" | "dark";
@@ -40,46 +42,63 @@ export function onThemeChange(listener: (theme: Theme) => void): void {
 }
 
 export function initThemeToggle(): void {
-  const button = document.querySelector<HTMLButtonElement>(".theme-toggle");
-  if (button === null) {
+  const group = document.querySelector<HTMLElement>(".theme-switch");
+  if (group === null) {
     return;
   }
-  // Rendered hidden by the server: without this script the button could do nothing.
-  button.hidden = false;
-  // The visible label is the stylesheet's to pick, from the choice on <html>, so it is right before
-  // this script runs; the server renders one label per choice, and the tooltip reuses their words.
-  const labels = new Map<string, string>();
-  for (const label of button.querySelectorAll<HTMLElement>(".theme-choice")) {
-    labels.set(label.dataset.choice ?? "", label.dataset.label ?? "");
-  }
+  // Rendered hidden by the server: without this script the control could do nothing.
+  group.hidden = false;
+  const segments = [
+    ...group.querySelectorAll<HTMLButtonElement>("button[data-choice]"),
+  ];
+  // The chosen segment's look is the stylesheet's, from the choice on <html>, so it is right before
+  // this script runs. What is left here is what CSS cannot set: which radio is checked for assistive
+  // technology, and that only the checked one is a tab stop, as in any radio group.
   const render = (choice: ThemeChoice): void => {
-    const next = ORDER[(ORDER.indexOf(choice) + 1) % ORDER.length]!;
-    const current = labels.get(choice) ?? choice;
-    const following = labels.get(next) ?? next;
-    button.title = `Theme: ${current}. Click for ${following}.`;
-    button.setAttribute(
-      "aria-label",
-      `Theme: ${current}. Switch to ${following}`,
-    );
+    for (const segment of segments) {
+      const checked = segment.dataset.choice === choice;
+      segment.setAttribute("aria-checked", String(checked));
+      segment.tabIndex = checked ? 0 : -1;
+    }
   };
-  render(currentChoice());
-  button.addEventListener("click", () => {
-    const next = ORDER[(ORDER.indexOf(currentChoice()) + 1) % ORDER.length]!;
-    if (next === "system") {
+  const choose = (choice: ThemeChoice, focus: boolean): void => {
+    if (choice === "system") {
       delete document.documentElement.dataset.theme;
     } else {
-      document.documentElement.dataset.theme = next;
+      document.documentElement.dataset.theme = choice;
     }
     try {
-      if (next === "system") {
+      if (choice === "system") {
         localStorage.removeItem(STORAGE_KEY);
       } else {
-        localStorage.setItem(STORAGE_KEY, next);
+        localStorage.setItem(STORAGE_KEY, choice);
       }
     } catch {
       // Not remembered across pages, but applied to this one.
     }
-    render(next);
+    render(choice);
+    if (focus) {
+      segments.find((segment) => segment.dataset.choice === choice)?.focus();
+    }
     document.dispatchEvent(new Event(CHANGE_EVENT));
+  };
+  render(currentChoice());
+  for (const segment of segments) {
+    segment.addEventListener("click", () => {
+      const choice = segment.dataset.choice as ThemeChoice;
+      if (choice !== currentChoice()) {
+        choose(choice, false);
+      }
+    });
+  }
+  // The arrow keys move the choice, the way they move it in a group of radio buttons.
+  group.addEventListener("keydown", (event) => {
+    const step = arrowStep(event);
+    if (step === 0) {
+      return;
+    }
+    event.preventDefault();
+    const index = ORDER.indexOf(currentChoice());
+    choose(ORDER[(index + step + ORDER.length) % ORDER.length]!, true);
   });
 }

@@ -276,7 +276,7 @@ describe("config page", () => {
 
   it("links the header to the config page", async () => {
     expect((await send(readOnly.port, "/doc/README.md")).body).toContain(
-      '<a class="topbar-link" href="/config">Config</a>',
+      '<a class="segment" href="/config">Config</a>',
     );
   });
 

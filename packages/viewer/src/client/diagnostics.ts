@@ -80,14 +80,19 @@ function panel(
   details.className = errors > 0 ? "diagnostics has-errors" : "diagnostics";
   details.open = true;
   const summary = document.createElement("summary");
-  summary.textContent = `wastech-mdlint: ${[
+  // The count in a span of its own, which takes the row's free width and so puts the prompt button
+  // for all findings at the row's right end, level with the per-finding buttons under it.
+  const title = document.createElement("span");
+  title.className = "diagnostics-title";
+  title.textContent = `wastech-mdlint: ${[
     errors > 0 ? plural(errors, "error") : "",
     warnings > 0 ? plural(warnings, "warning") : "",
   ]
     .filter(Boolean)
     .join(", ")}`;
+  summary.append(title);
   if (findings.length > 1) {
-    summary.append(" ", promptButton(documentPath));
+    summary.append(promptButton(documentPath));
   }
   const list = document.createElement("ul");
   for (const finding of findings) {

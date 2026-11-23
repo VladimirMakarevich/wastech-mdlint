@@ -51,14 +51,46 @@ export type PageParams = {
 
 export type Section = "graph" | "dashboard" | "config";
 
-// The theme switch's three states, each drawn as its own label inside the button. The stylesheet
-// shows the one matching the choice `theme.js` applied before the first paint, so the button has its
-// final label and width from the first frame, rather than taking them from the module script later
-// and pushing the rest of the bar aside. The script reads each label from here for its tooltip.
+// The theme switch's three choices, one segment each. The stylesheet marks the chosen one from the
+// choice `theme.js` applied before the first paint, so the control is right from the first frame
+// rather than once the module script has run. Each segment is an icon, drawn as SVG paths rather than
+// the ◐ ☀ ☾ characters, which sit at a different height in every font the reader can pick; its label
+// is the segment's name and tooltip.
 const THEME_CHOICES = [
-  { choice: "system", icon: "◐", label: "Auto" },
-  { choice: "light", icon: "☀", label: "Light" },
-  { choice: "dark", icon: "☾", label: "Dark" },
+  {
+    choice: "system",
+    label: "Auto",
+    // A circle, half filled: the system decides.
+    icon: [
+      s("circle", { cx: 8, cy: 8, r: 5.75 }),
+      s("path", {
+        d: "M8 2.25a5.75 5.75 0 0 1 0 11.5Z",
+        fill: "currentColor",
+        stroke: "none",
+      }),
+    ],
+  },
+  {
+    choice: "light",
+    label: "Light",
+    // A sun: a disc and eight rays.
+    icon: [
+      s("circle", { cx: 8, cy: 8, r: 3 }),
+      s("path", {
+        d: "M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.06 1.06M11.54 11.54l1.06 1.06M3.4 12.6l1.06-1.06M11.54 4.46l1.06-1.06",
+      }),
+    ],
+  },
+  {
+    choice: "dark",
+    label: "Dark",
+    // A crescent moon.
+    icon: [
+      s("path", {
+        d: "M13.5 9.6A5.75 5.75 0 1 1 6.4 2.5a4.6 4.6 0 0 0 7.1 7.1Z",
+      }),
+    ],
+  },
 ] as const;
 
 export function renderPage(params: PageParams): string {
@@ -119,28 +151,51 @@ export function renderPage(params: PageParams): string {
                 h("kbd.search-shortcut", { ariaHidden: "true" }, "Ctrl K"),
               ],
             ),
-            // From a document, the graph opens with that document and its neighbors lit, which is
-            // how a reader gets from a page to its place among the others.
-            sectionLink(
-              params,
-              "graph",
-              params.documentPath === undefined
-                ? "/graph"
-                : `/graph?${new URLSearchParams({ focus: params.documentPath }).toString()}`,
-              "Graph",
-            ),
-            sectionLink(params, "dashboard", "/dashboard", "Dashboard"),
-            sectionLink(params, "config", "/config", "Config"),
+            // The three sections as one segmented control of plain links: the page's own section is
+            // the chosen segment, and the links work without script.
+            h("nav.section-nav.segmented", { ariaLabel: "Sections" }, [
+              // From a document, the graph opens with that document and its neighbors lit, which is
+              // how a reader gets from a page to its place among the others.
+              sectionLink(
+                params,
+                "graph",
+                params.documentPath === undefined
+                  ? "/graph"
+                  : `/graph?${new URLSearchParams({ focus: params.documentPath }).toString()}`,
+                "Graph",
+              ),
+              sectionLink(params, "dashboard", "/dashboard", "Dashboard"),
+              sectionLink(params, "config", "/config", "Config"),
+            ]),
             // Hidden without script, which it needs to do anything. With script, the stylesheet lays
             // it out from the first paint (see `theme.ts`), before the module that wires it has run.
             h(
-              "button.theme-toggle",
-              { type: "button", hidden: true },
+              "div.theme-switch.segmented",
+              { role: "radiogroup", ariaLabel: "Theme", hidden: true },
               THEME_CHOICES.map(({ choice, icon, label }) =>
                 h(
-                  "span.theme-choice",
-                  { dataChoice: choice, dataLabel: label },
-                  `${icon} ${label}`,
+                  "button.segment",
+                  {
+                    type: "button",
+                    role: "radio",
+                    dataChoice: choice,
+                    title: label,
+                    ariaLabel: label,
+                  },
+                  s(
+                    "svg",
+                    {
+                      viewBox: "0 0 16 16",
+                      width: 16,
+                      height: 16,
+                      fill: "none",
+                      stroke: "currentColor",
+                      strokeWidth: 1.5,
+                      strokeLinecap: "round",
+                      ariaHidden: "true",
+                    },
+                    [...icon],
+                  ),
                 ),
               ),
             ),
@@ -160,17 +215,25 @@ export function renderPage(params: PageParams): string {
           h("div.layout", [
             h("div.sidebar-frame", [
               h("nav.sidebar", { ariaLabel: "Documents" }, [
-                // Hidden until the script that knows the findings has run, like the theme switch.
-                h("label.tree-filter", { hidden: true }, [
-                  h("input", { type: "checkbox" }),
-                  " Only files with findings",
+                // On a phone the tree folds behind this row, so the article starts under the header
+                // rather than below a screenful of file names; the tree-state script closes it there
+                // before the first paint. On a wider screen the row is not drawn and the tree stays
+                // open, and without script it is open everywhere, as a list that cannot be opened
+                // would be no list at all.
+                h("details.sidebar-disclosure", { open: true }, [
+                  h("summary.sidebar-summary", "Documents"),
+                  // Hidden until the script that knows the findings has run, like the theme switch.
+                  h("label.tree-filter.switch-row", { hidden: true }, [
+                    h("span", "Only files with findings"),
+                    h("input.switch", { type: "checkbox", role: "switch" }),
+                  ]),
+                  h(
+                    "p.tree-filter-empty",
+                    { hidden: true },
+                    "No file has findings.",
+                  ),
+                  renderTree(params.documentPaths, params.documentPath),
                 ]),
-                h(
-                  "p.tree-filter-empty",
-                  { hidden: true },
-                  "No file has findings.",
-                ),
-                renderTree(params.documentPaths, params.documentPath),
               ]),
               // Classic and blocking, right after the tree, so the folders the reader had open and
               // the tree's scroll position are back before the tree is first painted.
@@ -240,7 +303,7 @@ function sectionLink(
   text: string,
 ): Element {
   return h(
-    "a.topbar-link",
+    "a.segment",
     {
       href,
       ariaCurrent: params.section === section ? "page" : undefined,

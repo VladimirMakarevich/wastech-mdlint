@@ -11,10 +11,27 @@
 (() => {
   const STORAGE_KEY = "wastech-mdlint-viewer:tree";
   const tree = document.querySelector<HTMLElement>(".sidebar");
-  const list = tree?.querySelector<HTMLElement>(":scope > .tree");
+  const list = tree?.querySelector<HTMLElement>(
+    ":scope > .sidebar-disclosure > .tree",
+  );
   if (tree === null || list === null || list === undefined) {
     return;
   }
+
+  // On a phone the tree folds behind its "Documents" row, closed on every page so the article is what
+  // a page opens on; closed here, before the first paint, it never shows open and then collapses. The
+  // width is the stylesheet's narrow-screen breakpoint, where the row is drawn at all. A window
+  // widened past it opens the tree again, since there the row that would reopen it is not drawn.
+  const disclosure = list.parentElement as HTMLDetailsElement;
+  const narrow = matchMedia("(max-width: 800px)");
+  if (narrow.matches) {
+    disclosure.open = false;
+  }
+  narrow.addEventListener("change", () => {
+    if (!narrow.matches) {
+      disclosure.open = true;
+    }
+  });
 
   // The findings-only switch above the list is shown by the module that wires it, which runs after
   // this script; shown only then, it would push every row down by its height after the scroll had
