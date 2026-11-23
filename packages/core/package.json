@@ -40,6 +40,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@types/mdast": "^4.0.4",
     "github-slugger": "^2.0.0",
     "ignore": "^7.0.5",
     "jsonc-parser": "^3.3.1",

@@ -653,6 +653,23 @@ export function parseDocument(params: {
   path: string;
   content: string;
 }): ParsedDocument {
+  return parseDocumentWithTree(params).document;
+}
+
+/**
+ * The same single parse as `parseDocument`, also returning the mdast tree the facts were read from.
+ *
+ * For a host that renders the document rather than analyzing it. Handing out the tree from this
+ * parse — instead of letting that host run its own remark pipeline — is what keeps a rendered page
+ * and the lint findings about it in agreement: the heading at index `i` of `tree` in pre-order is
+ * `document.headings[i]`, so a renderer can take its slug verbatim and an anchor REF-002 accepts
+ * always lands on the page. The tree is not kept on `ParsedDocument` itself because a whole corpus
+ * of position-annotated trees is many times the size of the facts every other consumer needs.
+ */
+export function parseDocumentWithTree(params: {
+  path: string;
+  content: string;
+}): { document: ParsedDocument; tree: Root } {
   const tree = markdownProcessor.parse(params.content) as Root;
   const markLength = byteOrderMarkLength(params.content);
   if (markLength > 0) {
@@ -898,7 +915,7 @@ export function parseDocument(params: {
     definition.referenced = referencedIdentifiers.has(definition.identifier);
   }
 
-  return {
+  const document: ParsedDocument = {
     path: params.path,
     headings,
     htmlAnchors,
@@ -920,4 +937,5 @@ export function parseDocument(params: {
     codeFences,
     content: params.content,
   };
+  return { document, tree };
 }

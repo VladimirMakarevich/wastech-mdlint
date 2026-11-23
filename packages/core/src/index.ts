@@ -24,7 +24,10 @@ export type {
   ParsedTableRow,
   ParsedUndefinedReference,
 } from "./markdown/document-types.js";
-export { parseDocument } from "./markdown/parse-document.js";
+export {
+  parseDocument,
+  parseDocumentWithTree,
+} from "./markdown/parse-document.js";
 export { loadDocuments } from "./markdown/load-documents.js";
 export type { LoadDocumentsOptions } from "./markdown/load-documents.js";
 export { canonicalizeRuleId } from "./rule-id.js";
@@ -281,6 +284,11 @@ export {
 export { findLineNumber } from "./engine/text-position.js";
 export { extractSectionBody } from "./engine/section-body.js";
 export { resolveRoutedUrl } from "./engine/site-router.js";
+export {
+  candidateEscapesRoot,
+  filePart,
+  resolveTargetCandidates,
+} from "./engine/path-resolve.js";
 
 // Primitives
 export {
