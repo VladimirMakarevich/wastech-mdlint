@@ -2,6 +2,8 @@ import { fileURLToPath } from "node:url";
 
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { parseDocument } from "@wastech-mdlint/core";
+
 import { Corpus } from "../src/corpus.js";
 import {
   renderDocument,
@@ -66,7 +68,9 @@ describe("sanitizing author content", () => {
   });
 
   it("keeps collapsible sections", () => {
-    expect(guide.html).toMatch(/<details>\s*<summary>More<\/summary>/);
+    expect(guide.html).toMatch(
+      /<details data-line="26">\s*<summary>More<\/summary>/,
+    );
     expect(guide.html).toContain("Hidden text.");
   });
 
@@ -141,5 +145,60 @@ describe("code blocks", () => {
     expect(guide.html).toMatch(
       /<div class="mermaid-diagram"><pre class="mermaid-source">graph TD\n {2}A\["&#x3C;b>start&#x3C;\/b>"\] --> B\n<\/pre><\/div>/,
     );
+  });
+});
+
+// A document rendered on its own, for cases the fixture corpus does not hold. Nothing in it links
+// anywhere, so every target resolves to nothing.
+function renderText(content: string): Promise<RenderedDocument> {
+  return renderDocument(parseDocument({ path: "doc.md", content }), () => ({
+    kind: "missing",
+  }));
+}
+
+describe("source lines", () => {
+  // Counted from the top of the file, front matter included, since that is the line an editor and
+  // a finding name.
+  it("labels each block with the line it starts on in the file", () => {
+    expect(guide.html).toContain('<h1 id="guide" data-line="6">Guide</h1>');
+    expect(guide.html).toContain('<h2 id="setup" data-line="8">Setup</h2>');
+    expect(guide.html).toContain('<p data-line="10">First setup section.</p>');
+  });
+
+  // The list's first item carries the list's line, so the list itself carries none.
+  it("labels each list item, and not the list", () => {
+    expect(guide.html).toContain('<ul class="contains-task-list">');
+    expect(guide.html).toMatch(
+      /<li class="task-list-item" data-line="43"><input type="checkbox" checked disabled> done item<\/li>/,
+    );
+    expect(guide.html).toMatch(/<li class="task-list-item" data-line="44">/);
+  });
+
+  // A table or a code block scrolls sideways and would clip a number set beside it, so the number
+  // goes on a wrapper, and the code is still replaced inside it.
+  it("labels a code block, a diagram and a table through a wrapper", async () => {
+    expect(guide.html).toContain(
+      '<div class="source-line" data-line="34"><div class="mermaid-diagram">',
+    );
+    expect(guide.html).toMatch(
+      /<div class="source-line" data-line="39"><pre class="shiki/,
+    );
+    const table = await renderText("# T\n\n| a | b |\n| - | - |\n| 1 | 2 |\n");
+    expect(table.html).toContain(
+      '<div class="source-line" data-line="3"><table>',
+    );
+  });
+
+  it("counts CRLF lines as lines", async () => {
+    const { html } = await renderText("# T\r\n\r\nOne\r\n\r\nTwo\r\n");
+    expect(html).toContain('<p data-line="3">One</p>');
+    expect(html).toContain('<p data-line="5">Two</p>');
+  });
+
+  // The attribute is added after sanitizing, so an author cannot set it to claim another line.
+  it("ignores a line an author writes into raw HTML", async () => {
+    const { html } = await renderText('# T\n\n<p data-line="999">x</p>\n');
+    expect(html).not.toContain("999");
+    expect(html).toContain('<p data-line="3">x</p>');
   });
 });

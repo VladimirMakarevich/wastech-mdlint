@@ -409,6 +409,32 @@ a:hover {
   margin: 0 auto;
 }
 
+/* Source lines: the line each block and list item starts on in the Markdown file, in the article's
+   right margin, level with the block's first line of text. Drawn as generated content, so selecting
+   and copying the article never picks the numbers up. The line height is the body text's, which
+   puts a number on a paragraph's or an item's first line; a heading's taller line keeps its number
+   at its top. */
+.markdown-body [data-line] {
+  position: relative;
+}
+
+.markdown-body [data-line]::after {
+  content: attr(data-line);
+  position: absolute;
+  top: 0;
+  left: calc(100% + 14px);
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.6rem;
+  letter-spacing: 0;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
 /* Document tree. Every row is one line: a folder is a chevron and its name, a file is its name set in
    line with the folder names above it, and a nested level hangs from a hairline under its folder's
    chevron, so depth reads at a glance even far down a long tree. */
@@ -1699,7 +1725,9 @@ a:hover {
 
 @media (max-width: 800px) {
   .current-path,
-  .search-shortcut {
+  .search-shortcut,
+  /* The article's side padding is too narrow here to hold a number beside it. */
+  .markdown-body [data-line]::after {
     display: none;
   }
 
@@ -1783,7 +1811,8 @@ a:hover {
 @media print {
   .topbar,
   .sidebar-frame,
-  .rail-frame {
+  .rail-frame,
+  .markdown-body [data-line]::after {
     display: none;
   }
 

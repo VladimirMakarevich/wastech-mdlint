@@ -7,6 +7,7 @@ import type { Definition, Heading, Image, Link } from "mdast";
 import { toHast } from "mdast-util-to-hast";
 import { normalizeUri } from "micromark-util-sanitize-uri";
 import { visit } from "unist-util-visit";
+import { VFile } from "vfile";
 
 import {
   parseDocumentWithTree,
@@ -115,8 +116,14 @@ export async function renderDocument(
     // handler, the YAML block would render as a paragraph of raw text at the top of the article.
     handlers: { yaml: () => undefined },
   }) as HastRoot;
-  const clean = sanitize(raw(hast), SANITIZE_SCHEMA) as HastRoot;
+  // The file lets `raw` keep each node's place in the source as it reparses the tree; without it
+  // every position is dropped, and with them the line numbers the page shows beside each block.
+  const clean = sanitize(
+    raw(hast, { file: new VFile({ value: document.content }) }),
+    SANITIZE_SCHEMA,
+  ) as HastRoot;
 
+  markSourceLines(clean);
   await replaceCodeBlocks(clean);
   markLinks(clean, missingHrefs);
 
@@ -177,6 +184,43 @@ function rewriteTarget(
       // External targets resolve to nothing too; only a local target that names no file is broken.
       return isExternalTarget(url) ? undefined : { url, missing: true };
   }
+}
+
+// Blocks that scroll sideways. A number set beside one would be cut off by its own overflow, so it
+// goes on a wrapper around the block instead.
+const SCROLLING_BLOCKS = new Set(["table", "pre"]);
+
+/**
+ * Give each block and each list item the line it starts on in the Markdown file, as `data-line`,
+ * for the page to show beside it — so a reader can go from the page to the file, and from a
+ * finding's "line 42" to the block it is about.
+ *
+ * Done on the sanitized tree: the attribute is the viewer's own, and the sanitizer has already
+ * stripped any `data-*` an author wrote, so no document can label a block with a line it is not on.
+ * A list gets no number of its own, since its first item carries the same line.
+ */
+function markSourceLines(tree: HastRoot): void {
+  tree.children = tree.children.map((node) => {
+    if (
+      node.type !== "element" ||
+      node.position === undefined ||
+      node.tagName === "ul" ||
+      node.tagName === "ol"
+    ) {
+      return node;
+    }
+    const line = node.position.start.line;
+    if (SCROLLING_BLOCKS.has(node.tagName)) {
+      return h("div.source-line", { dataLine: line }, [node]);
+    }
+    node.properties.dataLine = line;
+    return node;
+  });
+  visit(tree, "element", (node: Element) => {
+    if (node.tagName === "li" && node.position !== undefined) {
+      node.properties.dataLine = node.position.start.line;
+    }
+  });
 }
 
 async function replaceCodeBlocks(tree: HastRoot): Promise<void> {
