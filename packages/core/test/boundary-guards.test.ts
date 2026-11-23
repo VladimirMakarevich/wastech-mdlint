@@ -48,6 +48,7 @@ const BOUNDARY_GUARDS: Record<string, string[]> = {
     "packages/mcp-server/test/host-parity.test.ts",
     "packages/mcp-server/test/lint-files.test.ts",
     "packages/mcp-server/test/lint.test.ts",
+    "packages/viewer/test/changes.test.ts",
   ],
   // Spawn the built entrypoint through an npm-style link. Only a real process can populate
   // `process.argv[1]`, which is what the entrypoint guard compares against `import.meta.url` — and
@@ -57,6 +58,7 @@ const BOUNDARY_GUARDS: Record<string, string[]> = {
     "packages/cli/test/bin.e2e.test.ts",
     "packages/mcp-server/test/bin-entrypoint.test.ts",
     "packages/mcp-server/test/stdio-integration.test.ts",
+    "packages/viewer/test/changes.test.ts",
   ],
   // The shared `files`/`exclude` option shape stays covered as rules are added: an inventory drift
   // guard plus a runtime assert-kind coverage check — plus the top-level scope's own

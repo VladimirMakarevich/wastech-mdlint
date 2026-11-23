@@ -188,11 +188,13 @@ async function refreshTree(): Promise<void> {
 let treeFilterReady = false;
 
 function treeFilterInput(): HTMLInputElement | null {
-  return document.querySelector<HTMLInputElement>(".tree-filter input");
+  return document.querySelector<HTMLInputElement>(
+    ".tree-filter-findings input",
+  );
 }
 
 function initTreeFilter(): void {
-  const label = document.querySelector<HTMLElement>(".tree-filter");
+  const label = document.querySelector<HTMLElement>(".tree-filter-findings");
   const input = treeFilterInput();
   if (label === null || input === null) {
     return;
@@ -231,7 +233,9 @@ function applyTreeFilter(): void {
       delete details.dataset.openedByFilter;
     }
   }
-  const empty = sidebar.querySelector<HTMLElement>(".tree-filter-empty");
+  const empty = sidebar.querySelector<HTMLElement>(
+    ".tree-filter-findings-empty",
+  );
   if (empty !== null) {
     empty.hidden =
       !active || sidebar.querySelector("li[data-findings]") !== null;

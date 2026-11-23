@@ -1,53 +1,47 @@
 # 03 · Changes page in the viewer
 
-> Part of the [viewer review plan](index.md).
+> Part of the [viewer review plan](index.md). Status **Implemented**, pending the rules discussion below.
 
 ## Goal
 
 A fourth section, **Changes**, where a person reviews only the documents that changed, the most influential first, as a stream of word-highlighted diffs — and sees that something changed outside the corpus too, instead of never learning about it.
 
-## Steps
+## What was built
 
-1. **Startup and options.** The viewer opens the repository through phase 01 when it loads the corpus and keeps a `GitUnavailable` reason for the page. `cli-args.ts` gains `--base <ref>`; an invalid ref is reported at startup with the hint, not as a crash, and the viewer still starts.
+1. **Startup.** `ChangeTracker.open` (`packages/viewer/src/changes.ts`) opens the repository through core. Outside a work tree or without `git` there is no tracker and no section; a repository git refuses (too old, another owner) gets a tracker whose page says why. The first review is computed at startup, so a `--base` that names nothing is printed to stderr there (`RunningViewer.notices`) and the viewer still serves. `cli-args.ts` gained `--base <ref>`; `ViewerOptions.gitEnv` lets a test isolate git from the machine's config.
 
-2. **Header.** `page.ts` adds a `changes` section beside Graph, Dashboard and Config, with the number of changed documents. The segment is drawn whenever the viewer root is inside a git work tree; outside one it is absent, since there is nothing to review.
+2. **Header and tree.** `page.ts` draws a `changes` section between Dashboard and Config, and a hidden "Only changed files" switch above the tree, whenever a tracker exists — identically on every page, so the header stays put. The findings switch's classes became `tree-filter-findings`, and `tree-state.ts` shows every switch before the first paint and keeps folders either switch opened out of the saved state.
 
-3. **The page.** `/changes` is rendered on the server, so it works without script, like the dashboard:
-   - a summary — base ref and short merge-base, head (work tree or `HEAD`), documents changed, lines added and removed, whether the config changed, and "N Markdown files changed outside the corpus" as a `<details>` list;
-   - a list of the changed files that jumps to their cards;
-   - one card per document in influence order: status (with the old path of a rename), the path linking to the document page, lines added and removed, and the source diff with word highlights. Per-line Markdown highlighting with Shiki under the word marks is the aim; if layering the two proves fragile, plain text with word marks ships first;
-   - a deleted document's card shows its removed text, with no page to link to;
-   - a card whose diff exceeds a line limit is collapsed and loads its diff from `/api/changes/diff?path=…` when opened, so a branch with fifty changed documents still paints at once.
+3. **The page.** `/changes`, rendered on the server: Work tree / Commits only as segmented links (`?worktree=0`), a summary (count, +/−, base ref and short merge-base), a folded list of Markdown changed outside the corpus, the ordered list of documents linking to their cards, then a card per file — the config first when it changed, then each document with its letter, a link to its page (none for a deleted one), _every session_ for eager context, and its diff as a table of line numbers, markers and lines, with changed words or cells as `del` and `ins`.
 
-4. **Ordering by influence.** A core function orders the change set, since a CLI `--since` would need the same order. Tiers, each sorted within itself by the next: the config file; eager agent context — the LLM-001 entrypoints when that rule is configured, plus their closure over the graph's `import` edges through `query` with `direction: "forward"`, so a rules file that `CLAUDE.md` imports sorts above a guide page; then the number of documents that reach the document (`impact` on the head graph, on the base graph for a deleted one), descending; then the path. Phase 05 inserts "has new errors" after the eager-context tier.
+4. **Order.** Core's `rankByInfluence` with `eagerContextPaths` (`packages/core/src/changes/influence.ts`): eager context, then reach through `impact` on the current graph, then path. A deleted document has reach 0, since the current graph no longer holds it; phase 05's base graph can do better.
 
-5. **Committed only.** An "Include uncommitted" switch, on by default; off, `?worktree=0` limits the set to `merge-base..HEAD`, and the right side of each diff is the `HEAD` text.
+5. **JSON.** `/api/changes` lists what the page lists, each document with its card's `anchor`, so a script never derives the id itself; `/api/changes/diff?path=…` gives one document's or the config's `TextDiff`, a path compared only with the review's own.
 
-6. **JSON.** `/api/changes` returns the ordered `ChangeSet` with each document's diff summary — the data the page renders, as `/api/dashboard` does for the dashboard. `/api/changes/diff?path=…` returns one document's `TextDiff`. A `path` is only compared with the change set's own paths and never joined onto a filesystem path, the rule the graph's `folder` and `focus` already follow; anything else is a 404.
+6. **Cache and freshness.** The tracker keeps one review per mode. The corpus watcher's every batch clears it — a Markdown file outside the corpus or a save back to the committed text changes the review too — and every request asks git, in one process (`GitRepository.revisionKey`, added to core), whether `HEAD` or the base moved, which a commit, `reset --soft` or a fetch does without touching the work tree. A review that could not be made (no base) is retried on each request.
 
-7. **Tree.** A "Changed only" switch above the document tree beside the findings-only switch, and a status letter (A, M or R) on each changed file.
+7. **Script.** `client/changes.ts` fetches `/api/changes` and adds the header count, the tree letters and switch, and on a changed document a line above its text — "Modified in this branch · +2 −1 · View diff" — linking to its card. It refreshes on every change event.
 
-8. **Banner on a changed document.** Above the article: "Changed in this branch · +12 −3 · View diff", linking to its card. Phase 04 adds the rendered markers and the mode switch to this banner.
+## Where it differs from the first plan
 
-9. **Freshness and the cache.** The viewer keeps the `ChangeSet` from core's `collectChangeSet`, the base texts it read and each document's `TextDiff`, keyed by `mergeBase` and `head` — the cache phase 02 left to the host, since only a long-lived process has anything to keep. A save already reaches `Corpus.applyChanges`; that file is re-diffed against its cached base text with `diffText` and the update goes out through the existing live-reload channel. A save can also move a document in or out of the change set (an edit undone, a new file), so its entry is reclassified with `classifyChanges` from a fresh `changedPaths` limited to that path. A moved `HEAD` or base — a commit, a checkout, a fetch — is noticed lazily: each `/changes` request and each corpus change batch compares `rev-parse HEAD <base>`, a few milliseconds, against the cached pair and recomputes when either moved. Watching `.git` is deliberately not done here: the watcher skips `.git` so a `git gc` or a fetch never wakes the corpus, and a worktree's git directory lies outside the work tree.
-
-10. **Unavailable states.** The Changes page shows the reason and the hint: a shallow clone names the fetch command, no base names `--base`, an old git names the version found.
+- **The count, tree letters and document line are drawn by script**, not on the server. Every page shows them, and none should wait for git on its way to the reader; the findings counts already load the same way. The Changes page itself needs no script.
+- **A long diff is folded in the page** (over 300 lines) rather than loaded on demand: one renderer, the server's, instead of a second one in the browser that could disagree with it.
+- **Diff lines are plain text with word marks**, without Shiki's Markdown highlighting under them; layering the two adds little to a diff of prose.
+- **No separate re-classification on save.** The watcher's batch clears the review, and the next request rebuilds it — a few git processes and the diffs of the changed documents, well under a second on this repository.
 
 ## Tests
 
-- Over temporary git fixtures: the segment present inside a work tree and absent outside; ordering — config first, eager context next (a file reached only through an `@` import of an entrypoint), impact count, then path; the outside-corpus count and list; `?worktree=0`; a deleted and a renamed document; an unknown `path` is a 404.
-- Host parity: the rows of the HTML page, parsed back, equal `/api/changes` — two formulations, not the renderer's own helper.
-- Without script, the page carries every diff it shows.
-- `bin.e2e.test.ts`: `--base` accepted; an invalid ref prints the hint and the viewer still serves.
+`packages/viewer/test/changes.test.ts`, on a feature branch built in a temporary repository: the header on every page, the hidden switch, the order (eager, reach, path) and the page's list read back from its HTML against `/api/changes` (`@boundary-guard host-parity`), the config card first and the outside-corpus count, the changed word and the changed cell with the text escaped, links for live documents and none for a deleted one, one diff by path and 404 for anything else, commits only, a new commit noticed with the work tree unchanged, a base that names nothing (startup notice, page, API), and the built bin printing that notice and still serving (`@boundary-guard installed-bin-spawn`). Both tags are in core's guard inventory. `server.test.ts` checks there is no section outside a work tree. Core: `influence.test.ts` (eager closure, rule off, ranking, `revisionKey`). Checked by hand on this repository in the browser, in both themes.
 
-## Docs
+## Still open
 
-`packages/viewer/README.md`: Run it (`--base`); What it shows (Changes, the tree switch and letters, the banner); Security (the viewer runs `git` read-only with the options that keep repository config from starting programs); Known limits (large diffs collapsed; a moved `HEAD` is picked up on the next request). Bring the drafted `.agents/rules/` changes from phase 01, plus the viewer bullet of `architecture.md` (its change set comes from core), to the user before merging.
+Before this merges, agree with the user on the drafted changes to `.agents/rules/`: `security.md` (core runs read-only `git` under the settings phase 01 describes; the viewer's Changes section uses it), `architecture.md` (the viewer's change set and order come from core) and `testing.md` (the guard table names `packages/viewer/test/changes.test.ts` under `installed-bin-spawn` and `host-parity`).
 
 ## Done when
 
-- [ ] Changes lists only corpus documents changed against the merge-base, ordered by influence, with the outside-corpus count.
-- [ ] Every card shows a word-highlighted source diff; large ones load on demand.
-- [ ] The page works without script, the JSON matches it, and the tree and the banner lead to it.
-- [ ] A save, a commit and a checkout are reflected without restarting the viewer.
-- [ ] Unavailable states explain themselves and leave every other page working.
+- [x] Changes lists only corpus documents changed against the merge-base, ordered by influence, with the outside-corpus count.
+- [x] Every card shows a word-highlighted source diff; large ones start folded.
+- [x] The page works without script, the JSON matches it, and the tree and the banner lead to it.
+- [x] A save, a commit and a checkout are reflected without restarting the viewer.
+- [x] Unavailable states explain themselves and leave every other page working.
+- [ ] The rules changes are agreed with the user.

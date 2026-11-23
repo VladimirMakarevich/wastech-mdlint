@@ -47,9 +47,13 @@ export type PageParams = {
   // that differs between those pages: everything else is byte-identical, so switching between them
   // leaves the bar exactly where it was.
   section?: Section;
+  // Whether the repository is a git work tree, where a branch's changes can be reviewed: the header
+  // then has a Changes section and the tree a switch for changed files. The same on every page, so
+  // the header still stays put between them.
+  showChanges?: boolean;
 };
 
-export type Section = "graph" | "dashboard" | "config";
+export type Section = "graph" | "dashboard" | "changes" | "config";
 
 /**
  * The id of the page's main column, the skip link's target and where a finding about the whole file
@@ -176,6 +180,9 @@ export function renderPage(params: PageParams): string {
                 "Graph",
               ),
               sectionLink(params, "dashboard", "/dashboard", "Dashboard"),
+              params.showChanges === true
+                ? sectionLink(params, "changes", "/changes", "Changes")
+                : undefined,
               sectionLink(params, "config", "/config", "Config"),
             ]),
             // Hidden without script, which it needs to do anything. With script, the stylesheet lays
@@ -234,15 +241,39 @@ export function renderPage(params: PageParams): string {
                 h("details.sidebar-disclosure", { open: true }, [
                   h("summary.sidebar-summary", "Documents"),
                   // Hidden until the script that knows the findings has run, like the theme switch.
-                  h("label.tree-filter.switch-row", { hidden: true }, [
-                    h("span", "Only files with findings"),
-                    h("input.switch", { type: "checkbox", role: "switch" }),
-                  ]),
                   h(
-                    "p.tree-filter-empty",
+                    "label.tree-filter.tree-filter-findings.switch-row",
+                    { hidden: true },
+                    [
+                      h("span", "Only files with findings"),
+                      h("input.switch", { type: "checkbox", role: "switch" }),
+                    ],
+                  ),
+                  h(
+                    "p.tree-filter-empty.tree-filter-findings-empty",
                     { hidden: true },
                     "No file has findings.",
                   ),
+                  params.showChanges === true
+                    ? h(
+                        "label.tree-filter.tree-filter-changes.switch-row",
+                        { hidden: true },
+                        [
+                          h("span", "Only changed files"),
+                          h("input.switch", {
+                            type: "checkbox",
+                            role: "switch",
+                          }),
+                        ],
+                      )
+                    : undefined,
+                  params.showChanges === true
+                    ? h(
+                        "p.tree-filter-empty.tree-filter-changes-empty",
+                        { hidden: true },
+                        "No document changed.",
+                      )
+                    : undefined,
                   renderTree(params.documentPaths, params.documentPath),
                 ]),
               ]),

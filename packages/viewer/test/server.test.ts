@@ -115,6 +115,12 @@ beforeAll(async () => {
     port: 0,
     portExplicit: true,
     watch: true,
+    // The copy is not a repository; the ceiling keeps git from finding one around the temporary
+    // directory — a home directory kept under git — and giving these pages a Changes section.
+    gitEnv: {
+      ...process.env,
+      GIT_CEILING_DIRECTORIES: path.dirname(workDir),
+    },
   });
   port = Number(new URL(viewer.url).port);
 }, 30_000);
@@ -296,8 +302,18 @@ describe("pages", () => {
   it("puts a hidden findings-only switch above the tree, in an open disclosure", async () => {
     const { body } = await get("/doc/README.md");
     expect(body).toContain(
-      '<nav class="sidebar" aria-label="Documents"><details class="sidebar-disclosure" open><summary class="sidebar-summary">Documents</summary><label class="tree-filter switch-row" hidden><span>Only files with findings</span><input class="switch" type="checkbox" role="switch"></label><p class="tree-filter-empty" hidden>No file has findings.</p><ul class="tree">',
+      '<nav class="sidebar" aria-label="Documents"><details class="sidebar-disclosure" open><summary class="sidebar-summary">Documents</summary><label class="tree-filter tree-filter-findings switch-row" hidden><span>Only files with findings</span><input class="switch" type="checkbox" role="switch"></label><p class="tree-filter-empty tree-filter-findings-empty" hidden>No file has findings.</p><ul class="tree">',
     );
+  });
+
+  // Outside a git work tree there is no branch to review, so nothing offers a review.
+  it("has no Changes section outside a git work tree", async () => {
+    const { body } = await get("/doc/README.md");
+    expect(body).not.toContain('href="/changes"');
+    expect(body).not.toContain("tree-filter-changes");
+    expect((await get("/changes")).status).toBe(404);
+    expect((await get("/api/changes")).status).toBe(404);
+    expect((await get("/api/changes/diff?path=README.md")).status).toBe(404);
   });
 
   // A page with nothing for the rail has no rail, and so no edge to drag.

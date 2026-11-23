@@ -21,6 +21,12 @@ import {
 } from "@wastech-mdlint/core";
 
 import {
+  ChangeTracker,
+  changesPayload,
+  diffPayload,
+  renderChangesArticle,
+} from "./changes.js";
+import {
   candidateText,
   configApi,
   parseChangeRequest,
@@ -89,11 +95,20 @@ export type ViewerOptions = {
   // Starts the program that reveals or opens the config file. Replaced in tests, so a test run checks
   // what would be started without opening a window on the machine running it.
   launch?: Launcher;
+  // The branch, tag or commit the Changes section compares with; the detected base branch when
+  // omitted.
+  base?: string;
+  // The environment git runs with — the process's own unless a test isolates it from the machine's
+  // git configuration.
+  gitEnv?: NodeJS.ProcessEnv;
 };
 
 export type RunningViewer = {
   url: string;
   documentCount: number;
+  // What the user should know about the startup that is not an error: why the Changes section has
+  // nothing to compare, for one.
+  notices: string[];
   close(): Promise<void>;
 };
 
@@ -103,6 +118,15 @@ const PORT_ATTEMPTS = 20;
 
 const GRAPH_NOT_FOUND =
   "The graph shows a folder that holds corpus documents, and can highlight a document in the corpus; this address names something else.";
+
+const NO_CHANGES =
+  "Changes compares the documents with a base branch, and this directory is not in a git work tree, or git is not on PATH.";
+
+// `worktree=0` limits a review to committed changes; anything else, or nothing, includes the work
+// tree, which is what a reader in the middle of an edit wants to see.
+function worktreeOf(params: URLSearchParams): boolean {
+  return params.get("worktree") !== "0";
+}
 
 // A config change is a few kilobytes of JSON; anything far beyond that is not one, and reading it
 // into memory would cost the server for nothing.
@@ -172,6 +196,19 @@ export async function startViewer(
     configPath: options.configPath,
   });
   const siteName = path.basename(corpus.rootDir) || "repository";
+  const notices: string[] = [];
+  const changes = await ChangeTracker.open(corpus, {
+    base: options.base,
+    env: options.gitEnv,
+  });
+  if (changes !== undefined) {
+    // Computed once now: a `--base` that names nothing is reported where it was typed, and the first
+    // visit to the Changes section finds the review ready.
+    const first = await changes.review(true);
+    if ("available" in first) {
+      notices.push(`changes: ${first.message} ${first.hint}`);
+    }
+  }
   const bound = { host: options.host, port: options.port };
   const eventClients = new Set<ServerResponse>();
   const search = new DocumentSearch();
@@ -218,12 +255,13 @@ export async function startViewer(
   }
 
   function page(
-    params: Omit<PageParams, "siteName" | "documentPaths">,
+    params: Omit<PageParams, "siteName" | "documentPaths" | "showChanges">,
   ): string {
     return renderPage({
       ...params,
       siteName,
       documentPaths: [...corpus.documents.keys()],
+      showChanges: changes !== undefined,
     });
   }
 
@@ -316,6 +354,19 @@ export async function startViewer(
           404,
         );
       }
+    } else if (target === "/changes") {
+      await sendChangesPage(request, response, params);
+    } else if (target === "/api/changes") {
+      if (changes === undefined) {
+        sendJson(response, { error: NO_CHANGES }, 404);
+      } else {
+        sendJson(
+          response,
+          changesPayload(await changes.review(worktreeOf(params))),
+        );
+      }
+    } else if (target === "/api/changes/diff") {
+      await sendChangeDiff(response, params);
     } else if (target === "/dashboard") {
       sendDashboardPage(request, response, params);
     } else if (target === "/api/dashboard") {
@@ -631,6 +682,54 @@ export async function startViewer(
       }),
       request.method === "HEAD",
     );
+  }
+
+  async function sendChangesPage(
+    request: IncomingMessage,
+    response: ServerResponse,
+    params: URLSearchParams,
+  ): Promise<void> {
+    if (changes === undefined) {
+      sendNotFound(request, response, NO_CHANGES);
+      return;
+    }
+    const worktree = worktreeOf(params);
+    sendHtml(
+      response,
+      200,
+      page({
+        title: "Changes",
+        section: "changes",
+        article: renderChangesArticle(await changes.review(worktree), worktree),
+      }),
+      request.method === "HEAD",
+    );
+  }
+
+  async function sendChangeDiff(
+    response: ServerResponse,
+    params: URLSearchParams,
+  ): Promise<void> {
+    if (changes === undefined) {
+      sendJson(response, { error: NO_CHANGES }, 404);
+      return;
+    }
+    const review = await changes.review(worktreeOf(params));
+    if ("available" in review) {
+      sendJson(response, changesPayload(review), 409);
+      return;
+    }
+    // Only ever compared against the review's own paths, like the graph's parameters.
+    const answer = diffPayload(review, params.get("path") ?? "");
+    if (answer === undefined) {
+      sendJson(
+        response,
+        { error: "This path is not among the changed documents." },
+        404,
+      );
+      return;
+    }
+    sendJson(response, answer);
   }
 
   function dashboardSource(): DashboardSource {
@@ -964,6 +1063,7 @@ export async function startViewer(
     if (!options.watch) {
       await corpus.reload();
       rendered = new WeakMap();
+      changes?.invalidate();
       broadcast("change", { paths: [], structural: true });
       relint();
     }
@@ -1102,6 +1202,9 @@ export async function startViewer(
         updates = updates
           .then(async () => {
             const change = await corpus.applyChanges(paths);
+            // Every reported path, even one that changed no document: a Markdown file outside the
+            // corpus, or a document saved back to its committed text, changes the review all the same.
+            changes?.invalidate();
             if (change.structural) {
               rendered = new WeakMap();
             }
@@ -1159,6 +1262,7 @@ export async function startViewer(
   return {
     url: `http://${displayHost(options.host)}:${bound.port}/`,
     documentCount: corpus.documents.size,
+    notices,
     async close() {
       clearImmediate(initialLint);
       stopWatching();

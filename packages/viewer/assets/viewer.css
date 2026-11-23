@@ -2909,6 +2909,272 @@ a:hover {
    --------------------------------------------------------------------------------------------- */
 
 /* The outline goes first. */
+/* ---------------------------------------------------------------------------------------------
+   Changes: the branch's changes to the documents. A letter marks each changed file — Added,
+   Modified, Deleted, Renamed — in the tree, on the document's page and on the Changes page, colored
+   like the diff lines it leads to.
+   --------------------------------------------------------------------------------------------- */
+:root {
+  --diff-added: light-dark(#1a7f37, #3fb950);
+  --diff-removed: light-dark(#cf222e, #f85149);
+}
+
+.tree-change,
+.change-status {
+  --change-color: var(--warning);
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--change-color) 16%, transparent);
+  color: var(--change-color);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tree-change-A,
+.change-status-A {
+  --change-color: var(--diff-added);
+}
+
+.tree-change-D,
+.change-status-D {
+  --change-color: var(--diff-removed);
+}
+
+.tree-change-R,
+.change-status-R {
+  --change-color: var(--accent);
+}
+
+.sidebar.only-changed .tree li:not([data-changed]) {
+  display: none;
+}
+
+/* The number of changed documents, on the header's Changes segment. */
+.segment-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--fill-strong);
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* Above a changed document's text: what the branch did to it, and the way to its diff. */
+.markdown-body .changes-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--bg-subtle);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  letter-spacing: normal;
+  text-align: start;
+}
+
+.changes-banner a {
+  margin-left: auto;
+}
+
+.markdown-body .changes-mode {
+  margin: 0 0 var(--space-4);
+}
+
+.markdown-body .changes-summary {
+  margin: 0 0 var(--space-1);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.markdown-body .changes-base,
+.markdown-body .changes-hint {
+  color: var(--fg-muted);
+  font-size: 14px;
+}
+
+.markdown-body .changes-unavailable {
+  margin-bottom: var(--space-1);
+  color: var(--warning);
+}
+
+.changes-outside ul,
+.changes-files ol {
+  font-size: 14px;
+}
+
+.change-stats {
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.change-eager {
+  margin-left: var(--space-1);
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* One changed file: a header with its letter, path and line counts, and its diff below. The header
+   leaves room under the sticky top bar when a link from the list jumps to the card. */
+.markdown-body .change-card {
+  margin: var(--space-6) 0;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  scroll-margin-top: calc(var(--topbar-height) + var(--space-4));
+}
+
+.change-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-subtle);
+  font-size: 14px;
+}
+
+.change-path {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.change-from {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.change-card-header .change-stats {
+  margin-left: auto;
+}
+
+.markdown-body .change-note {
+  margin: var(--space-2) var(--space-3) 0;
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+
+.markdown-body .change-diff {
+  margin: 0;
+}
+
+.markdown-body .change-diff > summary {
+  padding: var(--space-2) var(--space-3);
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+
+/* The diff itself: two columns of line numbers, a marker and the line, prose wrapped rather than
+   scrolled so a one-line paragraph stays readable. A changed word or table cell inside a paired line
+   is tinted more strongly than the line around it. */
+.diff-wrap {
+  overflow-x: auto;
+}
+
+.markdown-body table.diff {
+  display: table;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  font-family: var(--reader-code-font, var(--font-mono));
+  font-size: calc(0.8125em * var(--reader-code-scale, 1));
+  line-height: 1.5;
+}
+
+.markdown-body .diff td {
+  padding: 0 var(--space-2);
+  border: 0;
+  vertical-align: top;
+}
+
+.diff-number {
+  width: 1%;
+  color: var(--fg-muted);
+  text-align: right;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.diff-marker {
+  width: 1%;
+  color: var(--fg-muted);
+  user-select: none;
+}
+
+.diff-code {
+  letter-spacing: normal;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diff-added {
+  background: color-mix(in srgb, var(--diff-added) 10%, transparent);
+}
+
+.diff-removed {
+  background: color-mix(in srgb, var(--diff-removed) 10%, transparent);
+}
+
+.diff ins,
+.diff del {
+  border-radius: 3px;
+  text-decoration: none;
+}
+
+.diff ins {
+  background: color-mix(in srgb, var(--diff-added) 30%, transparent);
+}
+
+.diff del {
+  background: color-mix(in srgb, var(--diff-removed) 30%, transparent);
+}
+
+.markdown-body .diff-hunk td {
+  padding: var(--space-1) var(--space-2);
+  background: var(--bg-subtle);
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.diff-note td {
+  color: var(--fg-muted);
+  font-style: italic;
+}
+
+.markdown-body .diff-empty {
+  margin: var(--space-2) var(--space-3);
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+
 @media (max-width: 1200px) {
   .layout {
     grid-template-columns: var(--sidebar-width) minmax(0, 1fr);

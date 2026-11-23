@@ -7,6 +7,7 @@ import {
   candidateEscapesRoot,
   compareStrings,
   CONFIG_FILE_NAME,
+  type CorpusMembership,
   createScopeTester,
   filePart,
   isMarkdownFile,
@@ -121,6 +122,26 @@ export class Corpus {
   /** The configuration the corpus was loaded with, replaced with it on a full reload. */
   get configuration(): LoadedConfiguration {
     return this.state.loaded;
+  }
+
+  /**
+   * The corpus as core judges a change set against it: the documents held now, the scope a deleted
+   * document is tested with, and the config's repository-relative path — which matches no changed
+   * path when the config lives outside the repository.
+   */
+  membership(): CorpusMembership {
+    const { documents, scope, loaded } = this.state;
+    return {
+      documents,
+      scope,
+      configPath:
+        loaded.configPath === undefined
+          ? undefined
+          : path
+              .relative(this.root.rootDir, loaded.configPath)
+              .split(path.sep)
+              .join("/"),
+    };
   }
 
   /** Reload configuration and every document from disk. */

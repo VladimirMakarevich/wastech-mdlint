@@ -33,11 +33,11 @@
     }
   });
 
-  // The findings-only switch above the list is shown by the module that wires it, which runs after
-  // this script; shown only then, it would push every row down by its height after the scroll had
-  // been restored. Showing it here leaves nothing above the list to change size.
-  const filter = tree.querySelector<HTMLElement>(".tree-filter");
-  if (filter !== null) {
+  // The switches above the list — findings only, and changed files only where the repository has a
+  // branch to review — are wired by modules that run after this script; shown only then, they would
+  // push every row down by their height after the scroll had been restored. Showing them here leaves
+  // nothing above the list to change size.
+  for (const filter of tree.querySelectorAll<HTMLElement>(".tree-filter")) {
     filter.hidden = false;
   }
 
@@ -92,14 +92,17 @@
   }
 
   // Saved as the page goes, which covers a click in the tree, any other link, a reload and the
-  // back button alike. Folders the findings-only switch opened are its own and are left out, so
-  // turning the switch off still closes them.
+  // back button alike. Folders a switch opened are that switch's own and are left out, so turning it
+  // off still closes them.
   window.addEventListener("pagehide", () => {
     const open = [
       ...tree.querySelectorAll<HTMLDetailsElement>("details[data-folder]"),
     ]
       .filter(
-        (folder) => folder.open && folder.dataset.openedByFilter === undefined,
+        (folder) =>
+          folder.open &&
+          folder.dataset.openedByFilter === undefined &&
+          folder.dataset.openedByChangesFilter === undefined,
       )
       .map((folder) => folder.dataset.folder ?? "");
     try {

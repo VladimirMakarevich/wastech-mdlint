@@ -37,6 +37,11 @@ if (args.kind === "help") {
     process.stdout.write(
       `wastech-mdlint-viewer: ${viewer.documentCount} documents at ${viewer.url}\n`,
     );
+    // On stderr, like any problem: nothing is wrong with the viewer, but something the user asked
+    // for (a `--base`, say) cannot be done as asked.
+    for (const notice of viewer.notices) {
+      process.stderr.write(`wastech-mdlint-viewer: ${notice}\n`);
+    }
     if (args.allowConfigWrites) {
       process.stdout.write(
         "wastech-mdlint-viewer: the config page can save changes to the config file.\n",

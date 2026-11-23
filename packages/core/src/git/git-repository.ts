@@ -238,6 +238,31 @@ export class GitRepository {
   }
 
   /**
+   * The commits `HEAD` and `base.ref` name now, as one string — `undefined` when either names none.
+   * One process, so a long-lived host can ask on every request whether a commit, a checkout or a
+   * fetch has made what it computed from the two stale.
+   */
+  async revisionKey(base: GitBase): Promise<string | undefined> {
+    // Refused here rather than with `--end-of-options`: outside `--verify` mode `rev-parse` echoes
+    // that marker back as one more line of output instead of consuming it. Both arguments then end in
+    // `^{commit}`, and neither can start with `-`.
+    if (base.ref.length === 0 || base.ref.startsWith("-")) {
+      return undefined;
+    }
+    const output = await runGit(this.invocation, [
+      "rev-parse",
+      "HEAD^{commit}",
+      `${base.ref}^{commit}`,
+    ]);
+    const commits = output.stdout.toString("utf8").trim().split("\n");
+    return output.exitCode === 0 &&
+      commits.length === 2 &&
+      commits.every((commit) => OBJECT_NAME.test(commit))
+      ? commits.join(":")
+      : undefined;
+  }
+
+  /**
    * The branch or commit to compare with: `ref` when given, otherwise the branch `origin/HEAD`
    * points at, then a local `main`, then `master`.
    */

@@ -196,6 +196,8 @@ export { GitCommandError } from "./git/git-command.js";
 // Changes — what a branch changed in the corpus, and the diff a reviewer reads. The sequence diff
 // under them stays internal: hosts compare texts, not arbitrary sequences.
 export { classifyChanges, collectChangeSet } from "./changes/change-set.js";
+export { eagerContextPaths, rankByInfluence } from "./changes/influence.js";
+export type { RankedChange } from "./changes/influence.js";
 export type {
   ChangeSet,
   ClassifiedChanges,

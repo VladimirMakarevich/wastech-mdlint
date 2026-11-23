@@ -1,3 +1,4 @@
+import { initChanges } from "./changes.js";
 import { initCharts } from "./charts.js";
 import { initCodeCopy } from "./code-copy.js";
 import { initColumnResize } from "./column-resize.js";
@@ -38,6 +39,7 @@ initLocalGraph();
 initOutlineSpy();
 initSearch();
 initDiagnostics(documentPath);
+initChanges(documentPath);
 initDashboard();
 initConfigEditor();
 initOpenConfig();

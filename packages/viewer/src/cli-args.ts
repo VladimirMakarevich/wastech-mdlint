@@ -15,6 +15,8 @@ Options:
   -p, --port <n>     Port to listen on (default: ${DEFAULT_PORT}, or the next free one)
       --host <host>  Address to bind (default: ${DEFAULT_HOST}, this machine only)
   -c, --config <f>   wastech-mdlint config file (default: found in the repository)
+      --base <ref>   Branch, tag or commit the Changes section compares with
+                     (default: the branch origin/HEAD names, then main, then master)
       --no-watch     Do not reload pages when files change
       --allow-config-writes
                      Let the config page save changes to the config file
@@ -28,6 +30,7 @@ export type CliArgs =
       kind: "run";
       cwd: string;
       configPath?: string;
+      base?: string;
       host: string;
       port: number;
       portExplicit: boolean;
@@ -78,6 +81,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     kind: "run",
     cwd: positionals[0] ?? ".",
     configPath: values.config,
+    base: values.base,
     host,
     port,
     portExplicit: values.port !== undefined,
@@ -95,6 +99,7 @@ function parse(argv: readonly string[]) {
       port: { type: "string", short: "p" },
       host: { type: "string" },
       config: { type: "string", short: "c" },
+      base: { type: "string" },
       "no-watch": { type: "boolean" },
       "allow-config-writes": { type: "boolean" },
       help: { type: "boolean", short: "h" },
