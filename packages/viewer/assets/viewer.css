@@ -1204,6 +1204,402 @@ a:hover {
   text-align: center;
 }
 
+/* Config page. The editor is a form of nested groups on the left of the reader's eye and a preview
+   under it; every control uses the same field look as the dashboard's filters. */
+.markdown-body:has(.config-editor) {
+  max-width: 980px;
+}
+
+.config-file,
+.config-save-state {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.config-save-state {
+  color: var(--fg-muted);
+}
+
+.config-editor {
+  margin: 16px 0 32px;
+}
+
+.config-editor[hidden] {
+  display: none;
+}
+
+.config-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.config-modes {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.config-mode {
+  padding: 4px 14px;
+  border: 0;
+  background: var(--bg-subtle);
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.config-mode + .config-mode {
+  border-left: 1px solid var(--border);
+}
+
+.config-mode[aria-pressed="true"] {
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.config-status {
+  margin: 0;
+  color: var(--warning);
+  font-size: 13px;
+}
+
+.config-section {
+  margin: 0 0 20px;
+}
+
+.markdown-body .config-section h2,
+.markdown-body .config-preview h2 {
+  margin: 0 0 2px;
+  padding: 0;
+  border: 0;
+  font-size: 16px;
+}
+
+.config-hint {
+  margin: 2px 0 8px;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.config-group {
+  margin: 8px 0;
+  padding: 6px 12px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+}
+
+.config-group legend {
+  padding: 0 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.config-field {
+  display: grid;
+  grid-template-columns: minmax(8em, 12em) minmax(0, 1fr);
+  gap: 2px 12px;
+  align-items: center;
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+.config-field > .config-hint {
+  grid-column: 2;
+  margin: 0;
+}
+
+.config-field-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.config-editor input,
+.config-editor select,
+.config-editor textarea {
+  max-width: 100%;
+  min-height: 28px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-subtle);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+}
+
+.config-editor input:focus-visible,
+.config-editor select:focus-visible,
+.config-editor textarea:focus-visible,
+.config-editor button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.config-editor button {
+  min-height: 28px;
+  padding: 2px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-subtle);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.config-editor button:hover {
+  border-color: var(--accent);
+}
+
+.config-editor button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.config-editor .config-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.config-editor .config-danger {
+  color: var(--danger);
+}
+
+.config-list-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0;
+}
+
+.config-list-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.config-list-row > input,
+.config-list-row > label {
+  flex: 1;
+  font-family: var(--font-mono);
+}
+
+.config-list-object {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.config-list-object > .config-group {
+  flex: 1;
+  margin: 0;
+}
+
+.config-json {
+  width: 100%;
+  min-height: 5em;
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+}
+
+.config-json-problem {
+  grid-column: 2;
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.config-rule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.config-rule {
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+}
+
+.markdown-body .config-rule {
+  margin: 0;
+}
+
+.config-rule > summary {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.config-rule[open] > summary {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.config-rule-id {
+  flex: none;
+  font-weight: 600;
+}
+
+.config-rule-description {
+  flex: 1;
+  min-width: 0;
+  color: var(--fg-muted);
+}
+
+.config-rule-severity {
+  flex: none;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.config-rule-body {
+  padding: 6px 12px 10px;
+}
+
+.config-rule-footer {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.config-rule-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.config-rule-add select {
+  flex: 1;
+  min-width: 0;
+}
+
+.config-text-view[hidden],
+.config-form-view[hidden] {
+  display: none;
+}
+
+.config-textarea {
+  width: 100%;
+  min-height: 420px;
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  line-height: 1.5;
+  tab-size: 2;
+}
+
+.config-preview {
+  margin-top: 20px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-subtle);
+}
+
+.config-preview-body p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.config-summary {
+  font-weight: 600;
+}
+
+.config-invalid,
+.config-errors {
+  color: var(--danger);
+}
+
+.config-errors {
+  margin: 4px 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.config-saved {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.markdown-body .config-by-rule {
+  display: table;
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+.markdown-body .config-by-rule th,
+.markdown-body .config-by-rule td {
+  padding: 3px 10px;
+}
+
+.markdown-body .config-findings,
+.markdown-body .config-result {
+  margin: 6px 0;
+}
+
+.config-findings ul {
+  margin: 4px 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+
+.config-finding code {
+  font-size: 11px;
+}
+
+.config-finding-rule {
+  color: var(--fg-muted);
+}
+
+.config-finding-error .config-finding-rule {
+  color: var(--danger);
+}
+
+.config-result pre {
+  max-height: 360px;
+  overflow: auto;
+  font-size: 12px;
+}
+
+.config-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.config-save-off {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.markdown-body .config-rules {
+  display: table;
+  width: 100%;
+  font-size: 13px;
+}
+
+.markdown-body .config-rules td:first-child {
+  white-space: nowrap;
+}
+
 /* Source view: line anchors from a document's `#L42` link */
 .source-title {
   font-family: var(--font-mono);
@@ -1276,6 +1672,16 @@ a:hover {
 
   .content {
     padding: 24px 16px 64px;
+  }
+
+  /* A field name above its input, so a long option name does not squeeze the input to nothing. */
+  .config-field {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .config-field > .config-hint,
+  .config-json-problem {
+    grid-column: 1;
   }
 }
 
