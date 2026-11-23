@@ -720,6 +720,10 @@ a:hover {
   background: var(--code-bg);
   font-family: var(--font-mono);
   font-size: 0.875em;
+  /* An identifier path such as `a/b/c/d` has no space to break at, and unbroken it ran past the
+     article and made the whole page scroll sideways. Inside a code block it must not break, since
+     the block scrolls on its own and a wrapped line would read as two. */
+  overflow-wrap: anywhere;
 }
 
 .markdown-body pre {
@@ -736,6 +740,7 @@ a:hover {
   padding: 0;
   background: none;
   font-size: inherit;
+  overflow-wrap: normal;
 }
 
 .markdown-body details {
