@@ -1,10 +1,10 @@
 import { initCharts } from "./charts.js";
+import { initColumnResize } from "./column-resize.js";
 import { initDiagnostics } from "./diagnostics.js";
 import { initDiagrams } from "./diagrams.js";
 import { initGraph, initLocalGraph } from "./graph.js";
 import { initLiveReload } from "./live-reload.js";
 import { initSearch } from "./search.js";
-import { initSidebarResize } from "./sidebar-resize.js";
 import { initSourceLines } from "./source-lines.js";
 import { initThemeToggle } from "./theme-toggle.js";
 
@@ -18,7 +18,7 @@ const documentPath =
     ?.content ?? undefined;
 
 initThemeToggle();
-initSidebarResize();
+initColumnResize();
 initLiveReload(documentPath);
 initSourceLines();
 initDiagrams();

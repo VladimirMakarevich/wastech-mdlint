@@ -36,7 +36,7 @@ It prints the address, by default `http://127.0.0.1:4180/`. The root opens the r
 - **Lint findings.** The config's rules run over the corpus in the background. A document with findings shows them in a panel above its text — severity, rule, message and the heading to jump to — and the tree shows a count beside every file that has any. Both refresh on their own after each save.
 - **Live reload.** Saving a document reloads the pages showing it and keeps the scroll position. A new or deleted document, or a change to the config or a `.gitignore`, refreshes the tree on every open page.
 
-The theme switch in the header cycles through Auto (follow the operating system), Light and Dark, and the choice is remembered for this address. So is the width of the document tree: hovering its right edge shows a handle to drag (or focus it and use the arrow keys), and a double click on the handle restores the default width.
+The theme switch in the header cycles through Auto (follow the operating system), Light and Dark, and the choice is remembered for this address. So are the widths of the two side columns, the document tree and the rail with the local graph, outline and backlinks: hovering a column's edge toward the article shows a handle to drag (or focus it and use the arrow keys), a double click on the handle restores that column's default width, and the article always keeps room between them.
 
 ## Security
 

@@ -108,14 +108,7 @@ export function renderPage(params: PageParams): string {
                 { ariaLabel: "Documents" },
                 renderTree(params.documentPaths, params.documentPath),
               ),
-              // Hidden until the script that drags it has run, like the theme switch.
-              h("div.sidebar-resizer", {
-                role: "separator",
-                ariaOrientation: "vertical",
-                ariaLabel: "Resize the document tree",
-                tabIndex: 0,
-                hidden: true,
-              }),
+              columnResizer("sidebar", "Resize the document tree"),
             ]),
             h("main.content#content", [
               h("article.markdown-body", [
@@ -232,49 +225,66 @@ function renderRail(params: PageParams): Element | undefined {
   if (outline.length === 0 && backlinks.length === 0 && neighborCount === 0) {
     return undefined;
   }
-  return h("aside.rail", [
-    neighborCount === 0 || params.documentPath === undefined
-      ? undefined
-      : h("section.local-graph", { ariaLabel: "Linked documents" }, [
-          h("h2", `Links (${neighborCount})`),
-          // Drawn by the page script, which shows the box once it has something to put in it.
-          h("div.local-graph-canvas", {
-            dataPath: params.documentPath,
-            hidden: true,
-          }),
-          h(
-            "a.local-graph-open",
-            {
-              href: `/graph?${new URLSearchParams({ focus: params.documentPath }).toString()}`,
-            },
-            "Open in the full graph",
-          ),
-        ]),
-    outline.length === 0
-      ? undefined
-      : h("nav.outline", { ariaLabel: "On this page" }, [
-          h("h2", "On this page"),
-          h(
-            "ul",
-            outline.map((heading) =>
-              h(`li.depth-${heading.depth}`, [
-                h("a", { href: `#${heading.slug}` }, heading.text),
-              ]),
+  // Framed like the tree, so its width handle spans the full height wherever the rail is scrolled to.
+  return h("div.rail-frame", [
+    h("aside.rail", [
+      neighborCount === 0 || params.documentPath === undefined
+        ? undefined
+        : h("section.local-graph", { ariaLabel: "Linked documents" }, [
+            h("h2", `Links (${neighborCount})`),
+            // Drawn by the page script, which shows the box once it has something to put in it.
+            h("div.local-graph-canvas", {
+              dataPath: params.documentPath,
+              hidden: true,
+            }),
+            h(
+              "a.local-graph-open",
+              {
+                href: `/graph?${new URLSearchParams({ focus: params.documentPath }).toString()}`,
+              },
+              "Open in the full graph",
             ),
-          ),
-        ]),
-    backlinks.length === 0
-      ? undefined
-      : h("section.backlinks", { ariaLabel: "Linked from" }, [
-          h("h2", `Linked from (${backlinks.length})`),
-          h(
-            "ul",
-            backlinks.map((source) =>
-              h("li", [h("a", { href: documentHref(source) }, source)]),
+          ]),
+      outline.length === 0
+        ? undefined
+        : h("nav.outline", { ariaLabel: "On this page" }, [
+            h("h2", "On this page"),
+            h(
+              "ul",
+              outline.map((heading) =>
+                h(`li.depth-${heading.depth}`, [
+                  h("a", { href: `#${heading.slug}` }, heading.text),
+                ]),
+              ),
             ),
-          ),
-        ]),
+          ]),
+      backlinks.length === 0
+        ? undefined
+        : h("section.backlinks", { ariaLabel: "Linked from" }, [
+            h("h2", `Linked from (${backlinks.length})`),
+            h(
+              "ul",
+              backlinks.map((source) =>
+                h("li", [h("a", { href: documentHref(source) }, source)]),
+              ),
+            ),
+          ]),
+    ]),
+    columnResizer("rail", "Resize the side column"),
   ]);
+}
+
+// A column's width handle, on its edge toward the article. Hidden until the script that drags it has
+// run, like the theme switch, but rendered as the focusable separator it becomes.
+function columnResizer(column: "sidebar" | "rail", label: string): Element {
+  return h("div.column-resizer", {
+    dataColumn: column,
+    role: "separator",
+    ariaOrientation: "vertical",
+    ariaLabel: label,
+    tabIndex: 0,
+    hidden: true,
+  });
 }
 
 function renderFrontmatter(

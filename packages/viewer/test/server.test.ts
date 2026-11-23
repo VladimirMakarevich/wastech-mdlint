@@ -189,7 +189,7 @@ describe("pages", () => {
       "chart-option.js",
       "echarts.js",
       "graph.js",
-      "sidebar-resize.js",
+      "column-resize.js",
       "viewer.css",
     ]) {
       expect((await get(`/assets/${name}`)).status, name).toBe(200);
@@ -215,15 +215,27 @@ describe("pages", () => {
     expect(body).toContain('<div class="echarts-chart" data-state="invalid">');
   });
 
-  // The handle can do nothing without its script, so the server renders it hidden, but already as
-  // the focusable separator it becomes.
-  it("puts a width handle on the document tree's edge", async () => {
-    expect((await get("/doc/README.md")).body).toContain(
+  // A handle can do nothing without its script, so the server renders it hidden, but already as the
+  // focusable separator it becomes. Each sits in its column's frame, on the edge toward the article.
+  it("puts a width handle on the edge of each side column", async () => {
+    const { body } = await get("/doc/docs/guide.md");
+    expect(body).toContain(
       '<div class="sidebar-frame"><nav class="sidebar" aria-label="Documents">',
     );
-    expect((await get("/doc/README.md")).body).toContain(
-      '<div class="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="Resize the document tree" tabindex="0" hidden></div></div>',
+    expect(body).toContain(
+      '<div class="column-resizer" data-column="sidebar" role="separator" aria-orientation="vertical" aria-label="Resize the document tree" tabindex="0" hidden></div></div><main',
     );
+    expect(body).toContain('<div class="rail-frame"><aside class="rail">');
+    expect(body).toMatch(
+      /<\/aside><div class="column-resizer" data-column="rail" role="separator" aria-orientation="vertical" aria-label="Resize the side column" tabindex="0" hidden><\/div><\/div><\/div><\/body>/,
+    );
+  });
+
+  // A page with nothing for the rail has no rail, and so no edge to drag.
+  it("leaves the rail and its handle out of a page without one", async () => {
+    const { body } = await get("/search?q=x");
+    expect(body).not.toContain('class="rail-frame"');
+    expect(body).not.toContain('data-column="rail"');
   });
 
   it("gives a document with neighbors a small graph of them in the rail", async () => {
