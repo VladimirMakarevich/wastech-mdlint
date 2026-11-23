@@ -17,6 +17,9 @@
   --warning: light-dark(#9a6700, #d29922);
   --code-bg: light-dark(#f6f8fa, #161b22);
   --shadow: light-dark(rgb(31 35 40 / 12%), rgb(0 0 0 / 45%));
+  /* A hovered row: the text color thinned over whatever is behind it, so it reads on the sidebar's
+     own background in both themes, where the subtle background is all but the same shade. */
+  --row-hover: color-mix(in srgb, var(--fg) 7%, transparent);
   --font-sans:
     system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
     sans-serif;
@@ -283,7 +286,26 @@ a:hover {
   align-items: start;
 }
 
-.sidebar,
+/* The frame stays put while the tree inside it scrolls, so the width handle on its edge spans the
+   full height wherever the tree is scrolled to. */
+.sidebar-frame {
+  position: sticky;
+  top: var(--topbar-height);
+  height: calc(100vh - var(--topbar-height));
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
+}
+
+.sidebar {
+  height: 100%;
+  /* Long names end in an ellipsis rather than scrolling the whole tree sideways. */
+  overflow: hidden auto;
+  padding: 12px 8px 32px;
+  font-size: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
 .rail {
   position: sticky;
   top: var(--topbar-height);
@@ -291,14 +313,76 @@ a:hover {
   overflow-y: auto;
   padding: 16px 12px;
   font-size: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
 
-.sidebar {
-  /* Long folder names are clipped rather than scrolling the whole tree sideways. */
-  overflow-x: hidden;
-  background: var(--bg-sidebar);
-  border-right: 1px solid var(--border-subtle);
-  min-height: calc(100vh - var(--topbar-height));
+/* Width handle: a strip astride the tree's right edge that shows an accent line and a grip while the
+   pointer is over it or it has focus, and follows a drag. */
+.sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: -5px;
+  z-index: 3;
+  width: 9px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.sidebar-resizer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 2px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+}
+
+.sidebar-resizer::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -1px;
+  width: 11px;
+  height: 32px;
+  margin-top: -16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background:
+    radial-gradient(circle, var(--fg-muted) 0.9px, transparent 1.3px) center /
+      4px 5px,
+    var(--bg);
+  box-shadow: 0 1px 3px var(--shadow);
+  opacity: 0;
+  transform: scale(0.85);
+  transition:
+    opacity 150ms ease-out,
+    transform 150ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.sidebar-resizer:hover::before,
+.sidebar-resizer:hover::after,
+.sidebar-resizer:focus-visible::before,
+.sidebar-resizer:focus-visible::after,
+.is-resizing-sidebar .sidebar-resizer::before,
+.is-resizing-sidebar .sidebar-resizer::after {
+  opacity: 1;
+  transform: none;
+}
+
+/* The line and grip are the focus indicator. */
+.sidebar-resizer:focus-visible {
+  outline: none;
+}
+
+/* While dragging, the pointer keeps the resize cursor over the article and the drag selects nothing. */
+.is-resizing-sidebar {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .content {
@@ -311,50 +395,97 @@ a:hover {
   margin: 0 auto;
 }
 
-/* Document tree */
+/* Document tree. Every row is one line: a folder is a chevron and its name, a file is its name set in
+   line with the folder names above it, and a nested level hangs from a hairline under its folder's
+   chevron, so depth reads at a glance even far down a long tree. */
 .tree {
   margin: 0;
-  padding-left: 12px;
+  padding: 0;
   list-style: none;
 }
 
-.sidebar > .tree {
-  padding-left: 0;
+.tree .tree {
+  margin-left: 14px;
+  padding-left: 4px;
+  border-left: 1px solid var(--border-subtle);
 }
 
 .tree li {
   margin: 1px 0;
 }
 
-.tree summary {
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
-  color: var(--fg);
+.tree summary,
+.tree a {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
   white-space: nowrap;
+  transition:
+    background-color 120ms ease-out,
+    color 120ms ease-out;
+}
+
+.tree summary {
+  list-style: none;
+  color: var(--fg);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.tree summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The chevron: two sides of a small square turned to point right, and down once the folder opens. */
+.tree summary::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin: 0 3px 0 2px;
+  border-right: 1.5px solid var(--fg-muted);
+  border-bottom: 1.5px solid var(--fg-muted);
+  transform: rotate(-45deg);
+  transition: transform 150ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.tree details[open] > summary::before {
+  transform: rotate(45deg) translate(-1px, -1px);
 }
 
 .tree a {
-  display: block;
-  overflow: hidden;
-  padding: 2px 6px;
-  border-radius: 4px;
+  /* In line with the folder names: the row's padding, the chevron and the gap after it. */
+  padding-left: 25px;
   color: var(--fg-muted);
+}
+
+.tree-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .tree summary:hover,
 .tree a:hover {
-  background: var(--bg-subtle);
+  background: var(--row-hover);
+  color: var(--fg);
   text-decoration: none;
+}
+
+.tree summary:focus-visible,
+.tree a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 /* A count of lint findings beside a file in the tree */
 .tree-badge {
-  float: right;
+  flex: none;
   min-width: 18px;
-  margin-left: 6px;
   padding: 0 5px;
   border-radius: 9px;
   background: color-mix(in srgb, var(--warning) 18%, transparent);
@@ -806,12 +937,21 @@ a:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .sidebar {
+  /* The tree folds above the article and takes the full width, so there is no edge to drag. */
+  .sidebar-frame {
     position: static;
-    min-height: 0;
+    height: auto;
     max-height: 40vh;
     border-right: 0;
     border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .sidebar {
+    max-height: 40vh;
+  }
+
+  .sidebar-resizer {
+    display: none;
   }
 
   .content {
@@ -823,11 +963,17 @@ a:hover {
   html {
     scroll-behavior: auto;
   }
+
+  .tree summary::before,
+  .sidebar-resizer::before,
+  .sidebar-resizer::after {
+    transition: none;
+  }
 }
 
 @media print {
   .topbar,
-  .sidebar,
+  .sidebar-frame,
   .rail {
     display: none;
   }

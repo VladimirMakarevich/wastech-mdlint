@@ -102,11 +102,21 @@ export function renderPage(params: PageParams): string {
             h("button.theme-toggle", { type: "button", hidden: true }, "Theme"),
           ]),
           h("div.layout", [
-            h(
-              "nav.sidebar",
-              { ariaLabel: "Documents" },
-              renderTree(params.documentPaths, params.documentPath),
-            ),
+            h("div.sidebar-frame", [
+              h(
+                "nav.sidebar",
+                { ariaLabel: "Documents" },
+                renderTree(params.documentPaths, params.documentPath),
+              ),
+              // Hidden until the script that drags it has run, like the theme switch.
+              h("div.sidebar-resizer", {
+                role: "separator",
+                ariaOrientation: "vertical",
+                ariaLabel: "Resize the document tree",
+                tabIndex: 0,
+                hidden: true,
+              }),
+            ]),
             h("main.content#content", [
               h("article.markdown-body", [
                 renderFrontmatter(params.frontmatter ?? null),
@@ -184,7 +194,13 @@ function renderDirectory(
         h(
           "details",
           { open: currentPath?.startsWith(`${child.path}/`) === true },
-          [h("summary", child.name), renderDirectory(child, currentPath)],
+          [
+            // Names longer than the tree is wide end in an ellipsis; the full path is the tooltip.
+            h("summary", { title: child.path }, [
+              h("span.tree-name", child.name),
+            ]),
+            renderDirectory(child, currentPath),
+          ],
         ),
       ]),
     ),
@@ -194,9 +210,10 @@ function renderDirectory(
           "a",
           {
             href: documentHref(file),
+            title: file,
             ariaCurrent: file === currentPath ? "page" : undefined,
           },
-          file.split("/").pop() ?? file,
+          [h("span.tree-name", file.split("/").pop() ?? file)],
         ),
       ]),
     ),

@@ -4,6 +4,7 @@ import { initDiagrams } from "./diagrams.js";
 import { initGraph, initLocalGraph } from "./graph.js";
 import { initLiveReload } from "./live-reload.js";
 import { initSearch } from "./search.js";
+import { initSidebarResize } from "./sidebar-resize.js";
 import { initSourceLines } from "./source-lines.js";
 import { initThemeToggle } from "./theme-toggle.js";
 
@@ -17,6 +18,7 @@ const documentPath =
     ?.content ?? undefined;
 
 initThemeToggle();
+initSidebarResize();
 initLiveReload(documentPath);
 initSourceLines();
 initDiagrams();

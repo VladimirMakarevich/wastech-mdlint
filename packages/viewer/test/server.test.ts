@@ -138,7 +138,10 @@ describe("pages", () => {
     expect(response.status).toBe(200);
     expect(response.headers["content-type"]).toBe("text/html; charset=utf-8");
     expect(response.body).toContain(
-      '<a href="/doc/docs/guide.md" aria-current="page">guide.md</a>',
+      '<a href="/doc/docs/guide.md" title="docs/guide.md" aria-current="page"><span class="tree-name">guide.md</span></a>',
+    );
+    expect(response.body).toContain(
+      '<summary title="docs"><span class="tree-name">docs</span></summary>',
     );
     expect(response.body).toContain('<a href="#setup-1">Setup</a>');
     expect(response.body).toContain(
@@ -186,6 +189,7 @@ describe("pages", () => {
       "chart-option.js",
       "echarts.js",
       "graph.js",
+      "sidebar-resize.js",
       "viewer.css",
     ]) {
       expect((await get(`/assets/${name}`)).status, name).toBe(200);
@@ -209,6 +213,17 @@ describe("pages", () => {
       '<div class="echarts-chart"><pre class="echarts-source">',
     );
     expect(body).toContain('<div class="echarts-chart" data-state="invalid">');
+  });
+
+  // The handle can do nothing without its script, so the server renders it hidden, but already as
+  // the focusable separator it becomes.
+  it("puts a width handle on the document tree's edge", async () => {
+    expect((await get("/doc/README.md")).body).toContain(
+      '<div class="sidebar-frame"><nav class="sidebar" aria-label="Documents">',
+    );
+    expect((await get("/doc/README.md")).body).toContain(
+      '<div class="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="Resize the document tree" tabindex="0" hidden></div></div>',
+    );
   });
 
   it("gives a document with neighbors a small graph of them in the rail", async () => {
