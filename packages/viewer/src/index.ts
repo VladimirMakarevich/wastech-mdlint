@@ -37,6 +37,11 @@ if (args.kind === "help") {
     process.stdout.write(
       `wastech-mdlint-viewer: ${viewer.documentCount} documents at ${viewer.url}\n`,
     );
+    if (args.allowConfigWrites) {
+      process.stdout.write(
+        "wastech-mdlint-viewer: the config page can save changes to the config file.\n",
+      );
+    }
     if (!isLoopbackHost(args.host)) {
       process.stdout.write(
         `wastech-mdlint-viewer: bound to ${args.host}, so other machines on the network can read these documents.\n`,

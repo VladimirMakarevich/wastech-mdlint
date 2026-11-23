@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import {
   createServer,
@@ -13,8 +14,25 @@ import { fileURLToPath } from "node:url";
 import type { ElementContent } from "hast";
 import { h } from "hastscript";
 
-import { compareStrings, type ParsedDocument } from "@wastech-mdlint/core";
+import {
+  compareStrings,
+  type LintMessage,
+  type ParsedDocument,
+} from "@wastech-mdlint/core";
 
+import {
+  candidateText,
+  configApi,
+  parseChangeRequest,
+  previewCandidate,
+  readConfigFile,
+  renderConfigArticle,
+  saveCandidate,
+  validateCandidate,
+  writeBlockedReason,
+  type ChangeRequest,
+  type ConfigFile,
+} from "./config-editor.js";
 import { Corpus } from "./corpus.js";
 import {
   buildDashboard,
@@ -42,6 +60,7 @@ import { decodeRequestPath } from "./request-path.js";
 import { DocumentSearch } from "./search.js";
 import {
   assetHeaders,
+  changeRequestProblem,
   isAllowedHostHeader,
   isForeignRequest,
   pageHeaders,
@@ -57,6 +76,8 @@ export type ViewerOptions = {
   // An explicit port is a promise to the user; only the default may move to the next free one.
   portExplicit: boolean;
   watch: boolean;
+  // Off unless the user asked for it: without it the viewer writes nothing to the repository.
+  allowConfigWrites?: boolean;
 };
 
 export type RunningViewer = {
@@ -71,6 +92,14 @@ const PORT_ATTEMPTS = 20;
 
 const GRAPH_NOT_FOUND =
   "The graph shows a folder that holds corpus documents, and can highlight a document in the corpus; this address names something else.";
+
+// A config change is a few kilobytes of JSON; anything far beyond that is not one, and reading it
+// into memory would cost the server for nothing.
+const MAX_CHANGE_BODY_BYTES = 256 * 1024;
+
+// The only requests with a body the server acts on. Each computes from or writes the config, so each
+// passes the checks in `changeRequestProblem` before its body is read.
+const CHANGE_ROUTES = new Set(["/api/config/preview", "/api/config/save"]);
 
 // A source file larger than this is a generated or vendored file, not something a document links to
 // for a reader; highlighting it would stall the page for nothing.
@@ -128,6 +157,13 @@ export async function startViewer(
   const eventClients = new Set<ServerResponse>();
   const search = new DocumentSearch();
   const diagnostics = new Diagnostics();
+  const allowConfigWrites = options.allowConfigWrites === true;
+  // Random per process and written only into the config page, so a change request that carries it
+  // came from a page this server rendered.
+  const changeToken = randomBytes(32).toString("hex");
+  // Saves run one at a time: between checking that the file is the version the page edited and
+  // replacing it, a second save must not slip in.
+  let configWrites = Promise.resolve();
 
   // Keyed by the document object, which the corpus replaces whenever the file changes, so an edit
   // misses the cache without any explicit invalidation. Link targets also depend on which other
@@ -177,15 +213,32 @@ export async function startViewer(
       sendText(response, 403, "Forbidden: cross-site request.");
       return;
     }
-    if (request.method !== "GET" && request.method !== "HEAD") {
-      response.setHeader("Allow", "GET, HEAD");
-      sendText(response, 405, "Method not allowed: the viewer is read-only.");
-      return;
-    }
-
     const [target = "", queryString = ""] = (request.url ?? "")
       .split("#", 1)[0]!
       .split("?", 2);
+    if (CHANGE_ROUTES.has(target)) {
+      if (request.method !== "POST") {
+        response.setHeader("Allow", "POST");
+        sendText(
+          response,
+          405,
+          "Method not allowed: send the change as a POST.",
+        );
+        return;
+      }
+      await handleChange(request, response, target);
+      return;
+    }
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      response.setHeader("Allow", "GET, HEAD");
+      sendText(
+        response,
+        405,
+        "Method not allowed: only the config page's preview and save take a body.",
+      );
+      return;
+    }
+
     const params = new URLSearchParams(queryString);
     if (target === "/") {
       redirectToIndex(response);
@@ -233,6 +286,19 @@ export async function startViewer(
       sendDashboardPage(request, response, params);
     } else if (target === "/api/dashboard") {
       sendDashboardData(response, params);
+    } else if (target === "/config") {
+      sendHtml(
+        response,
+        200,
+        page({
+          title: "Linter config",
+          article: await renderConfigArticle(corpus, allowConfigWrites),
+          changeToken,
+        }),
+        request.method === "HEAD",
+      );
+    } else if (target === "/api/config") {
+      sendJson(response, await configApi(corpus, allowConfigWrites));
     } else if (target === "/api/diagnostics") {
       sendDiagnostics(response, params);
     } else if (target === "/events") {
@@ -595,6 +661,180 @@ export async function startViewer(
     );
   }
 
+  async function handleChange(
+    request: IncomingMessage,
+    response: ServerResponse,
+    target: string,
+  ): Promise<void> {
+    const problem = changeRequestProblem(
+      request.headers as Parameters<typeof changeRequestProblem>[0],
+      changeToken,
+    );
+    if (problem !== undefined) {
+      request.resume();
+      sendJson(
+        response,
+        { status: "refused", error: problem.message },
+        problem.status,
+      );
+      return;
+    }
+    const body = await readBody(request, MAX_CHANGE_BODY_BYTES);
+    if (body === undefined) {
+      sendJson(
+        response,
+        {
+          status: "refused",
+          error: "The request body is too large to be a config change.",
+        },
+        413,
+      );
+      return;
+    }
+    let json: unknown;
+    try {
+      json = JSON.parse(body);
+    } catch {
+      sendJson(
+        response,
+        { status: "refused", error: "The request body is not valid JSON." },
+        400,
+      );
+      return;
+    }
+    const parsed = parseChangeRequest(json);
+    if (!parsed.ok) {
+      sendJson(response, { status: "refused", error: parsed.message }, 400);
+      return;
+    }
+    if (target === "/api/config/save") {
+      const run = configWrites.then(() => saveChange(response, parsed.request));
+      configWrites = run.catch(() => undefined);
+      await run;
+      return;
+    }
+    await previewChange(response, parsed.request);
+  }
+
+  // The file a change applies to, or `undefined` after answering why there is none to apply it to.
+  async function changeBase(
+    response: ServerResponse,
+    base: string,
+  ): Promise<ConfigFile | undefined> {
+    const file = await readConfigFile(corpus);
+    if (file === undefined) {
+      sendJson(
+        response,
+        {
+          status: "refused",
+          error: "This repository has no config file to change.",
+        },
+        409,
+      );
+      return undefined;
+    }
+    if (file.hash !== base) {
+      sendJson(
+        response,
+        {
+          status: "conflict",
+          error:
+            "The config changed on disk since this page read it. Reload the page to edit the new version.",
+        },
+        409,
+      );
+      return undefined;
+    }
+    return file;
+  }
+
+  async function previewChange(
+    response: ServerResponse,
+    change: ChangeRequest,
+  ): Promise<void> {
+    const file = await changeBase(response, change.base);
+    if (file === undefined) {
+      return;
+    }
+    const candidate = candidateText(file, change);
+    if (!candidate.ok) {
+      sendJson(response, { status: "invalid", errors: candidate.errors }, 422);
+      return;
+    }
+    const validated = validateCandidate(corpus, file, candidate.text);
+    if (!validated.ok) {
+      sendJson(
+        response,
+        { status: "invalid", errors: validated.errors, text: candidate.text },
+        422,
+      );
+      return;
+    }
+    sendJson(
+      response,
+      await previewCandidate({
+        corpus,
+        current: currentFindings(),
+        candidate: validated.loaded,
+        text: candidate.text,
+      }),
+    );
+  }
+
+  // What the config reports now: the background lint's result when it is in, else a lint run here.
+  function currentFindings(): LintMessage[] {
+    const byFile = diagnostics.messagesByFile;
+    return byFile === undefined
+      ? corpus.lint().messages
+      : [...byFile.values()].flat();
+  }
+
+  async function saveChange(
+    response: ServerResponse,
+    change: ChangeRequest,
+  ): Promise<void> {
+    const blocked = await writeBlockedReason(corpus, allowConfigWrites);
+    if (blocked !== undefined) {
+      sendJson(response, { status: "refused", error: blocked }, 403);
+      return;
+    }
+    if (change.text === undefined || change.edits !== undefined) {
+      // A save writes exactly the text the reader previewed, never a result computed afresh here.
+      sendJson(
+        response,
+        {
+          status: "refused",
+          error: "A save carries the previewed text and no edits.",
+        },
+        400,
+      );
+      return;
+    }
+    const file = await changeBase(response, change.base);
+    if (file === undefined) {
+      return;
+    }
+    const validated = validateCandidate(corpus, file, change.text);
+    if (!validated.ok) {
+      sendJson(response, { status: "invalid", errors: validated.errors }, 422);
+      return;
+    }
+    const outcome = await saveCandidate({ corpus, file, text: change.text });
+    if (outcome.status === "failed") {
+      sendJson(response, { status: "failed", error: outcome.message }, 500);
+      return;
+    }
+    // The watcher sees the config change and reloads the corpus as it does for any edit; without
+    // one nothing else would, and every page would go on showing the old config's findings.
+    if (!options.watch) {
+      await corpus.reload();
+      rendered = new WeakMap();
+      broadcast("change", { paths: [], structural: true });
+      relint();
+    }
+    sendJson(response, outcome);
+  }
+
   function sendDiagnostics(
     response: ServerResponse,
     params: URLSearchParams,
@@ -875,6 +1115,37 @@ function markTerms(text: string, terms: readonly string[]): ElementContent[] {
     .map((part, index) =>
       index % 2 === 0 ? { type: "text", value: part } : h("mark", part),
     );
+}
+
+/**
+ * The request body as text, or `undefined` once it passes `limit` bytes. The rest is drained rather
+ * than kept, so the refusal can still be sent on the same connection.
+ */
+function readBody(
+  request: IncomingMessage,
+  limit: number,
+): Promise<string | undefined> {
+  return new Promise((resolve, reject) => {
+    if (Number(request.headers["content-length"] ?? "0") > limit) {
+      request.resume();
+      resolve(undefined);
+      return;
+    }
+    const chunks: Buffer[] = [];
+    let size = 0;
+    request.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size <= limit) {
+        chunks.push(chunk);
+      }
+    });
+    request.on("end", () =>
+      resolve(
+        size > limit ? undefined : Buffer.concat(chunks).toString("utf8"),
+      ),
+    );
+    request.on("error", reject);
+  });
 }
 
 function sendText(

@@ -36,6 +36,9 @@ export type PageParams = {
   frontmatter?: ParsedFrontmatter | null;
   // Pre-fills the header's search box on a results page.
   query?: string;
+  // Set on the config page only: the token its script sends with a change, so the server can tell a
+  // request from its own page from one another page made the browser send.
+  changeToken?: string;
 };
 
 export function renderPage(params: PageParams): string {
@@ -54,6 +57,12 @@ export function renderPage(params: PageParams): string {
           params.documentPath === undefined
             ? undefined
             : h("meta", { name: "wastech-doc", content: params.documentPath }),
+          params.changeToken === undefined
+            ? undefined
+            : h("meta", {
+                name: "wastech-change-token",
+                content: params.changeToken,
+              }),
           h("title", `${params.title} · ${params.siteName}`),
           // Classic and blocking, ahead of the stylesheet, so a stored theme is applied before the
           // first paint; every other script is a deferred module.
@@ -99,6 +108,7 @@ export function renderPage(params: PageParams): string {
               "Graph",
             ),
             h("a.topbar-link", { href: "/dashboard" }, "Dashboard"),
+            h("a.topbar-link", { href: "/config" }, "Config"),
             // Hidden until the script that makes it work has run.
             h("button.theme-toggle", { type: "button", hidden: true }, "Theme"),
           ]),

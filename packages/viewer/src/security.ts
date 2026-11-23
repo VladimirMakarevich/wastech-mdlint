@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { isIP } from "node:net";
 
 // A local server that reads the repository is a target for any web page the user has open: the page
@@ -136,4 +137,68 @@ export function rawFileHeaders(): Record<string, string> {
 /** Headers for the viewer's own scripts and styles, which change only with the package. */
 export function assetHeaders(): Record<string, string> {
   return { ...COMMON_HEADERS, "Cache-Control": "no-cache" };
+}
+
+// The header the config page's script sends its per-process token in. A custom header is also what
+// makes a cross-origin `fetch` carrying it a preflighted request, which this server never approves.
+export const TOKEN_HEADER = "x-wastech-viewer-token";
+
+/**
+ * Why a request that changes or computes from the config is refused, or `undefined` to let it in.
+ *
+ * Checked on top of the `Host` and cross-site checks every request passes, because these are the
+ * only requests with a body the server acts on. A browser always sends `Origin` on a POST, so a
+ * missing one is a request no page of ours made. Fetch metadata, when present, must say
+ * same-origin. The body must be declared JSON: an HTML form cannot send that type, and a page that
+ * sets it on a cross-origin `fetch` triggers a preflight. Last, the token: it is random per process
+ * and appears only in the config page, so a request that carries it was made by a page this server
+ * rendered.
+ */
+export function changeRequestProblem(
+  headers: {
+    origin?: string;
+    host?: string;
+    "sec-fetch-site"?: string;
+    "content-type"?: string;
+    [TOKEN_HEADER]?: string;
+  },
+  token: string,
+): { status: 403 | 415; message: string } | undefined {
+  if (
+    headers.origin === undefined ||
+    headers.origin !== `http://${headers.host ?? ""}`
+  ) {
+    return {
+      status: 403,
+      message: "Forbidden: a change must come from the viewer's own page.",
+    };
+  }
+  const site = headers["sec-fetch-site"];
+  if (site !== undefined && site !== "same-origin") {
+    return {
+      status: 403,
+      message: "Forbidden: a change must come from the viewer's own page.",
+    };
+  }
+  const mediaType = (headers["content-type"] ?? "")
+    .split(";", 1)[0]!
+    .trim()
+    .toLowerCase();
+  if (mediaType !== "application/json") {
+    return {
+      status: 415,
+      message: "The request body must be sent as application/json.",
+    };
+  }
+  const sent = Buffer.from(headers[TOKEN_HEADER] ?? "", "utf8");
+  const expected = Buffer.from(token, "utf8");
+  // Compared in constant time, so the response time says nothing about how much of a guess matched.
+  if (sent.length !== expected.length || !timingSafeEqual(sent, expected)) {
+    return {
+      status: 403,
+      message:
+        "Forbidden: the page that sent this change is out of date. Reload it and try again.",
+    };
+  }
+  return undefined;
 }

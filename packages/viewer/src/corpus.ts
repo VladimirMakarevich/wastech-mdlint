@@ -9,6 +9,7 @@ import {
   filePart,
   lintContext,
   loadConfiguration,
+  type GraphContext,
   loadContext,
   parseDocument,
   resolveTargetCandidates,
@@ -256,6 +257,80 @@ export class Corpus {
       settings: loaded.settings,
     });
   }
+
+  /**
+   * Lint the corpus a candidate configuration would produce, without adopting it.
+   *
+   * Parsing a document does not depend on the config, so only what the candidate changes is redone:
+   * new rules lint the documents already parsed, in a fraction of a second; new link settings
+   * (`siteRouter`, `idRef`) rebuild the graph over them; and only a new `include`, `exclude` or
+   * `respectGitignore` pays for core's discovery and a parse of the corpus that scope selects,
+   * because that is the one change that decides which files are documents.
+   */
+  async lintCandidate(
+    candidate: LoadedConfiguration,
+  ): Promise<{ result: LintResult; documentCount: number }> {
+    const { loaded, documents, graph } = this.state;
+    let context: GraphContext;
+    if (!sameValues(scopeOf(loaded), scopeOf(candidate))) {
+      context = await loadContext({
+        cwd: this.root.rootDir,
+        config: candidate.config,
+        settings: candidate.settings,
+      });
+    } else if (
+      !sameValues(graphSettingsOf(loaded), graphSettingsOf(candidate))
+    ) {
+      context = {
+        documents,
+        graph: buildContextGraph(documents, {
+          siteRouter: candidate.settings.siteRouter,
+          idRef: candidate.settings.idRef,
+        }),
+      };
+    } else {
+      context = { documents, graph };
+    }
+    return {
+      result: lintContext({
+        cwd: this.root.rootDir,
+        context,
+        rules: candidate.rules,
+        settings: candidate.settings,
+      }),
+      documentCount: context.documents.size,
+    };
+  }
+
+  /** Whether an absolute path is, through any symlinks, inside the repository. */
+  async contains(absolutePath: string): Promise<boolean> {
+    const real = await realpath(absolutePath).catch(() => undefined);
+    if (real === undefined) {
+      return false;
+    }
+    const relativeToRoot = path.relative(this.root.rootRealPath, real);
+    return !(
+      relativeToRoot === "" ||
+      relativeToRoot === ".." ||
+      relativeToRoot.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relativeToRoot)
+    );
+  }
+}
+
+function scopeOf(loaded: LoadedConfiguration): unknown[] {
+  const { include, exclude, respectGitignore } = loaded.config;
+  return [include, exclude, respectGitignore];
+}
+
+function graphSettingsOf(loaded: LoadedConfiguration): unknown[] {
+  return [loaded.settings.siteRouter, loaded.settings.idRef];
+}
+
+// Both sides come from the same JSON config through the same schema, so equal values serialize to
+// equal text; a difference in key order only costs a rebuild that was not needed.
+function sameValues(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 async function loadState(

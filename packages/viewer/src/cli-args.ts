@@ -1,6 +1,6 @@
 import { parseArgs } from "node:util";
 
-import { DEFAULT_HOST } from "./security.js";
+import { DEFAULT_HOST, isLoopbackHost } from "./security.js";
 
 export const DEFAULT_PORT = 4180;
 
@@ -16,6 +16,8 @@ Options:
       --host <host>  Address to bind (default: ${DEFAULT_HOST}, this machine only)
   -c, --config <f>   wastech-mdlint config file (default: found in the repository)
       --no-watch     Do not reload pages when files change
+      --allow-config-writes
+                     Let the config page save changes to the config file
   -h, --help         Show this help
 `;
 
@@ -30,6 +32,7 @@ export type CliArgs =
       port: number;
       portExplicit: boolean;
       watch: boolean;
+      allowConfigWrites: boolean;
     };
 
 /** Parse the command line into what to do. Pure, so every outcome is testable without a server. */
@@ -60,14 +63,26 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     }
   }
 
+  const host = values.host ?? DEFAULT_HOST;
+  const allowConfigWrites = values["allow-config-writes"] === true;
+  // Anyone who can open the config page can save from it. On this machine's loopback address that
+  // is the user; bound to a network address it would be anyone who can reach the port.
+  if (allowConfigWrites && !isLoopbackHost(host)) {
+    return {
+      kind: "error",
+      message: `--allow-config-writes works only on a loopback address, not with --host ${host}: anyone who can reach the viewer could rewrite the config.`,
+    };
+  }
+
   return {
     kind: "run",
     cwd: positionals[0] ?? ".",
     configPath: values.config,
-    host: values.host ?? DEFAULT_HOST,
+    host,
     port,
     portExplicit: values.port !== undefined,
     watch: values["no-watch"] !== true,
+    allowConfigWrites,
   };
 }
 
@@ -81,6 +96,7 @@ function parse(argv: readonly string[]) {
       host: { type: "string" },
       config: { type: "string", short: "c" },
       "no-watch": { type: "boolean" },
+      "allow-config-writes": { type: "boolean" },
       help: { type: "boolean", short: "h" },
     },
   });
