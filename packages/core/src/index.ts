@@ -83,7 +83,7 @@ export type {
 } from "./discovery/rule-inference.js";
 
 // Agent rule
-export { buildAgentRuleMarkdown } from "./discovery/agent-rule.js";
+export { buildAgentRuleMarkdown, cliRunner } from "./discovery/agent-rule.js";
 export type { AgentRuleParams } from "./discovery/agent-rule.js";
 
 // Config writer
@@ -278,6 +278,18 @@ export {
 } from "./engine/format-lint-result.js";
 export { estimateTokens } from "./engine/tokens.js";
 export { measureDocument } from "./engine/document-metrics.js";
+export {
+  buildFindingPrompt,
+  findingPromptStrategies,
+  isBudgetFinding,
+  PROMPT_STRATEGY_LABELS,
+} from "./engine/fix-prompt.js";
+export type {
+  FindingPromptInput,
+  PromptFinding,
+  PromptRuleEntry,
+  PromptStrategy,
+} from "./engine/fix-prompt.js";
 export type { DocumentMetrics } from "./engine/document-metrics.js";
 export { applyEdits, applyFixes, FixWriteError } from "./engine/fix.js";
 export type { ApplyFixesResult } from "./engine/fix.js";

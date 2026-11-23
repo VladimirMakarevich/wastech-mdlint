@@ -75,6 +75,64 @@ const size001OptionsSchema = z
     },
   );
 
+type Size001Options = z.infer<typeof size001OptionsSchema>;
+type Thresholds = z.infer<typeof thresholdSchema>;
+
+export type SizeMetric = Metric;
+
+/** The budget SIZE-001 holds one file to: which override matched it, and each metric's thresholds. */
+export type SizeBudget = {
+  // The first override whose pattern matches the file. Only the first counts: a later, broader one
+  // that also matches supplies nothing.
+  override?: { index: number; pattern: string };
+  // Per metric, the thresholds that apply and where they come from. A metric the matching override
+  // leaves out falls back to the top-level option — not to a broader override further down — and a
+  // metric set in neither place is not measured for this file at all.
+  metrics: Partial<
+    Record<Metric, Thresholds & { from: "override" | "top-level" }>
+  >;
+};
+
+/**
+ * The budget SIZE-001 applies to `filePath` under `options`. The rule measures against exactly this,
+ * and a host that explains a finding (the fix prompts) reads it from here too, so the explanation
+ * cannot describe a different budget from the one that produced the finding.
+ */
+export function sizeBudget(
+  options: Size001Options,
+  filePath: string,
+): SizeBudget {
+  const index = (options.overrides ?? []).findIndex((entry) =>
+    matchesConfigGlob(filePath, [entry.pattern]),
+  );
+  const override = index === -1 ? undefined : options.overrides![index]!;
+  const metrics: SizeBudget["metrics"] = {};
+  for (const metric of METRICS) {
+    const fromOverride = override?.[metric];
+    const thresholds = fromOverride ?? options[metric];
+    if (thresholds !== undefined) {
+      metrics[metric] = {
+        ...thresholds,
+        from: fromOverride === undefined ? "top-level" : "override",
+      };
+    }
+  }
+  return {
+    override:
+      override === undefined ? undefined : { index, pattern: override.pattern },
+    metrics,
+  };
+}
+
+/** `sizeBudget` for options as they stand in a config entry, or `undefined` when they do not parse. */
+export function sizeBudgetForEntry(
+  options: unknown,
+  filePath: string,
+): SizeBudget | undefined {
+  const parsed = size001OptionsSchema.safeParse(options);
+  return parsed.success ? sizeBudget(parsed.data, filePath) : undefined;
+}
+
 const METRIC_UNIT: Record<Metric, string> = {
   bytes: "bytes",
   lines: "lines",
@@ -96,14 +154,10 @@ export const size001: RuleDefinition = defineRule({
     const document = context.document!;
     const actuals: Record<Metric, number> = measureDocument(document.content);
 
-    // First matching override supplies per-metric thresholds; unspecified metrics fall back to the
-    // top-level option.
-    const override = (options.overrides ?? []).find((entry) =>
-      matchesConfigGlob(document.path, [entry.pattern]),
-    );
+    const budget = sizeBudget(options, document.path);
 
     for (const metric of METRICS) {
-      const thresholds = override?.[metric] ?? options[metric];
+      const thresholds = budget.metrics[metric];
       if (thresholds === undefined) {
         continue;
       }

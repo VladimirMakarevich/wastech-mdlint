@@ -47,7 +47,7 @@ const REPOSITORY_SLUG = "VladimirMakarevich/wastech-mdlint";
  * strips — needs one space of padding on each side to survive. A directory name is free to contain
  * any of these, and the page has to name it correctly anyway.
  */
-function codeSpan(text: string): string {
+export function codeSpan(text: string): string {
   const longestRun = Math.max(
     0,
     ...[...text.matchAll(/`+/g)].map((match) => match[0].length),
@@ -82,10 +82,72 @@ function installedRunner(packageManager: DetectedPackageManager): string {
   }
 }
 
-function cliRunner(params: AgentRuleParams): string {
+/**
+ * How a command line invokes the CLI in the repository: the installed copy through its package
+ * manager, or the pinned release fetched on demand when none is installed. Also used by the fix
+ * prompts a host builds (`buildFindingPrompt`), which tell an agent which command to run.
+ */
+export function cliRunner(
+  params: Pick<
+    AgentRuleParams,
+    "cliInstalled" | "packageManager" | "cliVersion"
+  >,
+): string {
   return params.cliInstalled
     ? installedRunner(params.packageManager)
     : `npx -y @wastech-mdlint/cli@${params.cliVersion}`;
+}
+
+/**
+ * Where to run the CLI so it picks up the config at `configPath` (repository-relative POSIX), as a
+ * phrase that follows "Run the linter". Every command resolves the config by walking up from the
+ * directory it runs in, so naming that directory is what makes the bare commands pick up the right
+ * config — a nested config is invisible from the repository root.
+ */
+export function runPlace(configPath: string): string {
+  // `configPath` is already POSIX-normalized, so `/` is the only separator it can contain.
+  const lastSeparator = configPath.lastIndexOf("/");
+  return lastSeparator === -1
+    ? "from the repository root, where the config lives"
+    : `from ${codeSpan(`${configPath.slice(0, lastSeparator)}/`)}, the directory that holds the config`;
+}
+
+// The parts of the budget policy that the fix prompts a host builds reuse word for word
+// (`buildFindingPrompt`): an agent told to compress or split one file there must meet the same floor
+// and follow the same method this page sets, or the product would teach two policies.
+
+/** The rule that an error is fixed, never silenced. */
+export const FIX_NOT_SILENCE =
+  "**An `error` gets fixed, not silenced.** Most often it is a broken link or anchor after a rename or a move: update every link to the file in the same change. Do not add an inline disable or switch the rule off to get a clean run.";
+
+/** Checking who links to a file before it moves, is renamed or is split. */
+export function blastRadius(command: (args: string) => string): string {
+  return `**Before you move, rename or split a file, check its blast radius:** ${command("impact <file>")} lists every document that links to it, directly or through others, with \`<file>\` relative to the directory you run it from.`;
+}
+
+/** Compressing without loss: why a budget never costs content, and where compressing stops. */
+export const COMPRESS_RULES: readonly string[] = [
+  "**A budget is never a reason to drop content.** The requested edit, detail, example or clarification goes in, in full. Refusing it, leaving part of it out, or deleting other useful text to make room are all forbidden. The budget limits the file, not the knowledge.",
+  "**First compress — for as long as no meaning and no quality is lost.** Tightening the wording is allowed, and it is the first answer to “it does not fit”: remove repetition and restatement, merge statements that say the same thing, cut filler, and turn a wordy passage into a shorter sentence, a list or a table that carries the same facts.",
+  "**Compressing stops where meaning or quality would start to go.** Every fact, constraint, example, edge case and the reason behind a rule stays, and the text stays as clear and unambiguous as before — no telegraphic fragments, private abbreviations, or a vaguer generalisation standing in for specific statements. The check: a reader of the compressed text learns everything the original taught them, just as easily. Once every remaining sentence carries something of its own, compressing is over.",
+];
+
+/** The two shapes a split takes. */
+export const SPLIT_FORMS: readonly string[] = [
+  "**Finer-grained files** when the document covers several topics that read on their own: each topic moves to a file of its own, and the original becomes a router to them.",
+  "**A continuation file** when the document is one topic that runs past its budget — a long reference, a growing list, a sequential procedure: the original keeps what fits, and a second file beside it carries the rest.",
+];
+
+/** The numbered steps of a split, ending with the lint run that verifies it. */
+export function splitSteps(command: (args: string) => string): string[] {
+  return [
+    "1. **Split by meaning, not by line count.** Each part is one coherent topic that reads without the others, and a continuation starts at a section boundary — never a cut in the middle of a thought.",
+    "2. **The original path stays the entry point.** It keeps the essentials and routes the reader on. A router says what lives where and when to read it, with a link to each part; a continued file says, where it ends, what the continuation holds, and links to it. Links into the original keep working; links to anchors that moved are updated in the same change.",
+    "3. **Each part goes next to what it came from.** A continuation file is named after the original, so the two stay side by side. A skill keeps its trigger `description`, its workflow and its hard constraints in `SKILL.md` and moves the details to supporting files beside it (for example `references/<topic>.md`), each linked with a line on when to read it; an agent or a command does the same. A rule becomes sibling files in its rules directory, registered wherever the rules are listed. `AGENTS.md` and `CLAUDE.md` move details to a file reached by an ordinary link, never by an `@` import, because `LLM-001` counts only what is imported eagerly. A document under `docs/` becomes sibling files, or a folder with an index page.",
+    "4. **Nothing is lost or duplicated.** Every statement of the original ends up in exactly one part — moved, not paraphrased away, and not copied into several parts.",
+    "5. **Each part lands well under its warning threshold**, so the next edit does not trigger the same split again.",
+    `6. **Verify:** ${command("lint")} is clean. Where the config enables them, \`REF-001\` and \`REF-002\` catch a broken link or anchor and \`GRP-001\` catches a new reference cycle.`,
+  ];
 }
 
 /**
@@ -107,19 +169,7 @@ export function buildAgentRuleMarkdown(params: AgentRuleParams): string {
 
   const runner = cliRunner(params);
   const command = (args: string): string => codeSpan(`${runner} ${args}`);
-  // `configPath` is already POSIX-normalized, so `/` is the only separator it can contain.
-  const lastSeparator = params.configPath.lastIndexOf("/");
-  const configDir =
-    lastSeparator === -1
-      ? undefined
-      : params.configPath.slice(0, lastSeparator);
-  // Every command below resolves the config by walking up from the directory it runs in, so naming
-  // that directory is what makes the bare commands pick up the right config — a nested config is
-  // invisible from the repository root.
-  const whereToRun =
-    configDir === undefined
-      ? "from the repository root, where the config lives"
-      : `from ${codeSpan(`${configDir}/`)}, the directory that holds the config`;
+  const whereToRun = runPlace(params.configPath);
 
   const lines: string[] = [
     "# Markdown documents and wastech-mdlint",
@@ -141,17 +191,15 @@ export function buildAgentRuleMarkdown(params: AgentRuleParams): string {
 
   lines.push(
     "- **Changed a Markdown file — lint before you finish.** A run fails on `error` findings, not on warnings.",
-    "- **An `error` gets fixed, not silenced.** Most often it is a broken link or anchor after a rename or a move: update every link to the file in the same change. Do not add an inline disable or switch the rule off to get a clean run.",
-    `- **Before you move, rename or split a file, check its blast radius:** ${command("impact <file>")} lists every document that links to it, directly or through others, with \`<file>\` relative to the directory you run it from.`,
+    `- ${FIX_NOT_SILENCE}`,
+    `- ${blastRadius(command)}`,
     "- When your host has the wastech-mdlint MCP server configured (`wastech-mdlint-mcp`, read-only), its `lint-files` and `impact-analysis` tools answer the same questions without a shell.",
     "",
     "## Size budgets: compress without loss, then split",
     "",
     `[\`SIZE-001\`](${ruleDocsUrl("SIZE-001")}) budgets each file — bytes, lines and estimated tokens. [\`LLM-001\`](${ruleDocsUrl("LLM-001")}) budgets everything an entrypoint such as \`CLAUDE.md\` pulls in through eager \`@\` imports, summed. If the config enables neither yet, this section applies from the moment one is added.`,
     "",
-    "- **A budget is never a reason to drop content.** The requested edit, detail, example or clarification goes in, in full. Refusing it, leaving part of it out, or deleting other useful text to make room are all forbidden. The budget limits the file, not the knowledge.",
-    "- **First compress — for as long as no meaning and no quality is lost.** Tightening the wording is allowed, and it is the first answer to “it does not fit”: remove repetition and restatement, merge statements that say the same thing, cut filler, and turn a wordy passage into a shorter sentence, a list or a table that carries the same facts.",
-    "- **Compressing stops where meaning or quality would start to go.** Every fact, constraint, example, edge case and the reason behind a rule stays, and the text stays as clear and unambiguous as before — no telegraphic fragments, private abbreviations, or a vaguer generalisation standing in for specific statements. The check: a reader of the compressed text learns everything the original taught them, just as easily. Once every remaining sentence carries something of its own, compressing is over.",
+    ...COMPRESS_RULES.map((rule) => `- ${rule}`),
     "- **Only then split.** A file still over budget once compressing is over is split into smaller, finer-grained files, or continued in a second file beside it — see “How to split a document” below.",
     "- **Do not raise the threshold.** A threshold moves only when a whole class of files grows, and only with the user's agreement.",
     "- **A warning** means the file is close to its budget: say so in your report and propose what to do — compressing, and a split if compressing is not enough (the table below decides who carries it out); the change itself is not blocked. **An error** means the file is brought back under budget — compressed, then split if that is not enough — before the change is finished.",
@@ -179,15 +227,9 @@ export function buildAgentRuleMarkdown(params: AgentRuleParams): string {
     "",
     "Split only what compressing could not bring under budget, in one of two forms, chosen by the shape of the document:",
     "",
-    "- **Finer-grained files** when the document covers several topics that read on their own: each topic moves to a file of its own, and the original becomes a router to them.",
-    "- **A continuation file** when the document is one topic that runs past its budget — a long reference, a growing list, a sequential procedure: the original keeps what fits, and a second file beside it carries the rest.",
+    ...SPLIT_FORMS.map((form) => `- ${form}`),
     "",
-    "1. **Split by meaning, not by line count.** Each part is one coherent topic that reads without the others, and a continuation starts at a section boundary — never a cut in the middle of a thought.",
-    "2. **The original path stays the entry point.** It keeps the essentials and routes the reader on. A router says what lives where and when to read it, with a link to each part; a continued file says, where it ends, what the continuation holds, and links to it. Links into the original keep working; links to anchors that moved are updated in the same change.",
-    "3. **Each part goes next to what it came from.** A continuation file is named after the original, so the two stay side by side. A skill keeps its trigger `description`, its workflow and its hard constraints in `SKILL.md` and moves the details to supporting files beside it (for example `references/<topic>.md`), each linked with a line on when to read it; an agent or a command does the same. A rule becomes sibling files in its rules directory, registered wherever the rules are listed. `AGENTS.md` and `CLAUDE.md` move details to a file reached by an ordinary link, never by an `@` import, because `LLM-001` counts only what is imported eagerly. A document under `docs/` becomes sibling files, or a folder with an index page.",
-    "4. **Nothing is lost or duplicated.** Every statement of the original ends up in exactly one part — moved, not paraphrased away, and not copied into several parts.",
-    "5. **Each part lands well under its warning threshold**, so the next edit does not trigger the same split again.",
-    `6. **Verify:** ${command("lint")} is clean. Where the config enables them, \`REF-001\` and \`REF-002\` catch a broken link or anchor and \`GRP-001\` catches a new reference cycle.`,
+    ...splitSteps(command),
     "",
     `The \`${DOCS_SKILL_ID}\` agent skill walks through compressing and splitting step by step. Install it with ${codeSpan(`gh skill install ${REPOSITORY_SLUG} ${DOCS_SKILL_ID} --pin v${params.cliVersion}`)}.`,
   );
