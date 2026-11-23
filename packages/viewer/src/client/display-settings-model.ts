@@ -1,5 +1,5 @@
-// What the reader can change about how text is set: fonts, sizes, spacing, the article's width and
-// the margins around it. Pure — no DOM, no storage — so the rules that turn a stored or typed value
+// What the reader can change about how text is set: the fonts of the whole site, and the article's
+// own fonts, sizes, spacing, width and margins. Pure — no DOM, no storage — so the rules that turn a stored or typed value
 // into CSS are tested on their own, and the panel in `display-settings.ts` only wires inputs to them.
 //
 // Every setting becomes one `--reader-*` custom property on <html>, and the stylesheet reads each one
@@ -12,6 +12,13 @@ export type CodeFont = "system" | "custom";
 export type Alignment = "start" | "justify";
 
 export type DisplaySettings = {
+  // The fonts of the whole site — header, tree, side column, panels, dashboard — and the ones the
+  // article uses while its own are left at "same as the site".
+  siteFont: TextFont;
+  customSiteFont: string;
+  siteCodeFont: CodeFont;
+  customSiteCodeFont: string;
+  // The article's text font; "system" here means the site's.
   textFont: TextFont;
   // An installed font's family name, used when `textFont` is "custom".
   customTextFont: string;
@@ -40,6 +47,10 @@ export type DisplaySettings = {
 };
 
 export const DEFAULT_SETTINGS: Readonly<DisplaySettings> = {
+  siteFont: "system",
+  customSiteFont: "",
+  siteCodeFont: "system",
+  customSiteCodeFont: "",
   textFont: "system",
   customTextFont: "",
   codeFont: "system",
@@ -91,15 +102,22 @@ const ALIGNMENTS: readonly Alignment[] = ["start", "justify"];
 
 // Font stacks of faces that ship with the common systems, since the viewer fetches nothing from the
 // network: Charter/Sitka/Cambria/Georgia for serif text, Verdana and its look-alikes for a wide sans
-// that stays legible at small sizes. The system and monospace choices reuse the stylesheet's own
-// stacks, so they track any change made there.
-const TEXT_FONT_STACKS: Record<Exclude<TextFont, "custom">, string> = {
-  system: "var(--font-sans)",
-  serif:
-    'Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, "Noto Serif", serif',
-  wide: 'Verdana, "DejaVu Sans", "Bitstream Vera Sans", Geneva, sans-serif',
-  mono: "var(--font-mono)",
+// that stays legible at small sizes.
+const SERIF_STACK =
+  'Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, "Noto Serif", serif';
+const WIDE_STACK =
+  'Verdana, "DejaVu Sans", "Bitstream Vera Sans", Geneva, sans-serif';
+
+// The two layers of stacks. The stylesheet keeps the system's own as `--font-sans-system` and
+// `--font-mono-system`, and makes `--font-sans` and `--font-mono` — which the whole page reads — the
+// site fonts, falling back to those. A site choice is built on the system stacks; an article choice
+// on the site's, so "same as the site" is the article's default. Building a site font on
+// `--font-sans` itself would make that property refer to itself, which CSS treats as invalid.
+const SITE_BASE = {
+  sans: "var(--font-sans-system)",
+  mono: "var(--font-mono-system)",
 };
+const ARTICLE_BASE = { sans: "var(--font-sans)", mono: "var(--font-mono)" };
 
 // A family name can hold letters of any script, digits, spaces and a little punctuation; anything
 // else is dropped rather than quoted, so a name can never close its quotes and carry a second value
@@ -144,10 +162,18 @@ export function parseSettings(value: unknown): DisplaySettings {
       ? (raw as T)
       : undefined;
   };
+  settings.siteFont = choice("siteFont", TEXT_FONTS) ?? settings.siteFont;
+  settings.siteCodeFont =
+    choice("siteCodeFont", CODE_FONTS) ?? settings.siteCodeFont;
   settings.textFont = choice("textFont", TEXT_FONTS) ?? settings.textFont;
   settings.codeFont = choice("codeFont", CODE_FONTS) ?? settings.codeFont;
   settings.align = choice("align", ALIGNMENTS) ?? settings.align;
-  for (const key of ["customTextFont", "customCodeFont"] as const) {
+  for (const key of [
+    "customSiteFont",
+    "customSiteCodeFont",
+    "customTextFont",
+    "customCodeFont",
+  ] as const) {
     const raw = input[key];
     if (typeof raw === "string") {
       settings[key] = cleanFontName(raw);
@@ -168,23 +194,35 @@ export function parseSettings(value: unknown): DisplaySettings {
   return settings;
 }
 
-function textFontStack(settings: DisplaySettings): string {
-  if (settings.textFont === "custom") {
-    const name = cleanFontName(settings.customTextFont);
-    // An installed face first, then the system stack, so a name the machine lacks still reads.
-    return name === ""
-      ? TEXT_FONT_STACKS.system
-      : `"${name}", var(--font-sans)`;
+function textFontStack(
+  choice: TextFont,
+  customName: string,
+  base: { sans: string; mono: string },
+): string {
+  switch (choice) {
+    case "serif":
+      return SERIF_STACK;
+    case "wide":
+      return WIDE_STACK;
+    case "mono":
+      return base.mono;
+    case "custom": {
+      const name = cleanFontName(customName);
+      // An installed face first, then the stack below it, so a name the machine lacks still reads.
+      return name === "" ? base.sans : `"${name}", ${base.sans}`;
+    }
+    case "system":
+      return base.sans;
   }
-  return TEXT_FONT_STACKS[settings.textFont];
 }
 
-function codeFontStack(settings: DisplaySettings): string {
-  const name =
-    settings.codeFont === "custom"
-      ? cleanFontName(settings.customCodeFont)
-      : "";
-  return name === "" ? "var(--font-mono)" : `"${name}", var(--font-mono)`;
+function codeFontStack(
+  choice: CodeFont,
+  customName: string,
+  base: string,
+): string {
+  const name = choice === "custom" ? cleanFontName(customName) : "";
+  return name === "" ? base : `"${name}", ${base}`;
 }
 
 /** Every custom property the settings define, defaults included, as the stylesheet reads them. */
@@ -192,8 +230,26 @@ export function allVariables(
   settings: DisplaySettings,
 ): Record<string, string> {
   return {
-    "--reader-font": textFontStack(settings),
-    "--reader-code-font": codeFontStack(settings),
+    "--reader-site-font": textFontStack(
+      settings.siteFont,
+      settings.customSiteFont,
+      SITE_BASE,
+    ),
+    "--reader-site-mono": codeFontStack(
+      settings.siteCodeFont,
+      settings.customSiteCodeFont,
+      SITE_BASE.mono,
+    ),
+    "--reader-font": textFontStack(
+      settings.textFont,
+      settings.customTextFont,
+      ARTICLE_BASE,
+    ),
+    "--reader-code-font": codeFontStack(
+      settings.codeFont,
+      settings.customCodeFont,
+      ARTICLE_BASE.mono,
+    ),
     "--reader-font-size": `${settings.fontSize}px`,
     "--reader-line-height": String(settings.lineHeight),
     "--reader-width": settings.fullWidth ? "none" : `${settings.textWidth}px`,

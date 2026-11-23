@@ -20,11 +20,15 @@
   /* A hovered row: the text color thinned over whatever is behind it, so it reads on the sidebar's
      own background in both themes, where the subtle background is all but the same shade. */
   --row-hover: color-mix(in srgb, var(--fg) 7%, transparent);
-  --font-sans:
+  --font-sans-system:
     system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
     sans-serif;
-  --font-mono:
+  --font-mono-system:
     ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+  /* The fonts the whole page reads: the site fonts the reader chose in the display settings, or the
+     system's. Kept apart from the system stacks above so a chosen font can fall back to them. */
+  --font-sans: var(--reader-site-font, var(--font-sans-system));
+  --font-mono: var(--reader-site-mono, var(--font-mono-system));
   --sidebar-width: 280px;
   --rail-width: 240px;
   --topbar-height: 48px;

@@ -92,6 +92,33 @@ describe("font names", () => {
     );
   });
 
+  // The site fonts are what the whole page reads as `--font-sans` and `--font-mono`, so they are built
+  // on the system stacks beneath those; built on `--font-sans` itself the property would refer to
+  // itself, which CSS discards. The article's "same as the site" is then the site's choice.
+  it("builds the site fonts on the system stacks and the article's on the site's", () => {
+    const vars = allVariables(
+      parseSettings({
+        siteFont: "custom",
+        customSiteFont: "Inter",
+        siteCodeFont: "custom",
+        customSiteCodeFont: "JetBrains Mono",
+      }),
+    );
+    expect(vars["--reader-site-font"]).toBe('"Inter", var(--font-sans-system)');
+    expect(vars["--reader-site-mono"]).toBe(
+      '"JetBrains Mono", var(--font-mono-system)',
+    );
+    expect(vars["--reader-font"]).toBe("var(--font-sans)");
+    expect(vars["--reader-code-font"]).toBe("var(--font-mono)");
+    expect(
+      allVariables(parseSettings({ siteFont: "mono" }))["--reader-site-font"],
+    ).toBe("var(--font-mono-system)");
+    expect(changedVariables(parseSettings({ siteFont: "serif" }))).toEqual({
+      "--reader-site-font":
+        'Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, "Noto Serif", serif',
+    });
+  });
+
   it("falls back to the system stack when the custom name is empty", () => {
     const vars = allVariables(
       parseSettings({ textFont: "custom", customTextFont: '";' }),

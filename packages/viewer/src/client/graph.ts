@@ -391,6 +391,9 @@ function graphOption(
     (node.path === focus?.path ? 26 : nodeSize(node)) * layout.nodeScale;
 
   return {
+    // ECharts draws its labels on the canvas in a font of its own, which the stylesheet cannot reach;
+    // handed the page's, they follow the site font the reader chose like the rest of the page.
+    textStyle: { fontFamily: getComputedStyle(document.body).fontFamily },
     // Text drawn on the canvas, never markup: titles and paths are repository content.
     tooltip: {
       renderMode: "richText",

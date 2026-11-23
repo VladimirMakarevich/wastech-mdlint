@@ -10,8 +10,8 @@ import {
 } from "./display-settings-model.js";
 
 // The header's display settings: a button at the right end of the bar opens a panel that slides in
-// from the right edge, where the reader sets the fonts, sizes, spacing, the article's width and its
-// margins. Every change applies as it is made and is remembered for this address, like the theme;
+// from the right edge, where the reader sets the fonts of the whole site and the article's own fonts,
+// sizes, spacing, width and margins. Every change applies as it is made and is remembered for this address, like the theme;
 // `theme.ts` puts the stored values back before the first paint, so a page never shows the defaults
 // first and then jumps — not on the next page, not after the viewer restarts.
 
@@ -169,7 +169,9 @@ function buildPanel(): Panel {
     }
   };
 
-  const select = <K extends "textFont" | "codeFont" | "align">(
+  const select = <
+    K extends "siteFont" | "siteCodeFont" | "textFont" | "codeFont" | "align",
+  >(
     key: K,
     label: string,
     options: readonly [DisplaySettings[K], string][],
@@ -186,8 +188,12 @@ function buildPanel(): Panel {
   };
 
   const fontName = (
-    key: "customTextFont" | "customCodeFont",
-    chooser: "textFont" | "codeFont",
+    key:
+      | "customSiteFont"
+      | "customSiteCodeFont"
+      | "customTextFont"
+      | "customCodeFont",
+    chooser: "siteFont" | "siteCodeFont" | "textFont" | "codeFont",
     label: string,
   ): HTMLElement => {
     const control = document.createElement("input");
@@ -288,9 +294,24 @@ function buildPanel(): Panel {
   reset.addEventListener("click", () => change({ ...DEFAULT_SETTINGS }));
 
   form.append(
+    group("Whole site", [
+      select("siteFont", "Font", [
+        ["system", "System"],
+        ["serif", "Serif"],
+        ["wide", "Wide sans"],
+        ["mono", "Monospace"],
+        ["custom", "Other…"],
+      ]),
+      fontName("customSiteFont", "siteFont", "Font name"),
+      select("siteCodeFont", "Monospace font", [
+        ["system", "System monospace"],
+        ["custom", "Other…"],
+      ]),
+      fontName("customSiteCodeFont", "siteCodeFont", "Font name"),
+    ]),
     group("Text", [
       select("textFont", "Font", [
-        ["system", "System"],
+        ["system", "Same as the site"],
         ["serif", "Serif"],
         ["wide", "Wide sans"],
         ["mono", "Monospace"],
@@ -313,7 +334,7 @@ function buildPanel(): Panel {
     margins,
     group("Code", [
       select("codeFont", "Font", [
-        ["system", "System monospace"],
+        ["system", "Same as the site"],
         ["custom", "Other…"],
       ]),
       fontName("customCodeFont", "codeFont", "Font name"),
