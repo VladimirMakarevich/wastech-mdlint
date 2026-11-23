@@ -13,6 +13,7 @@ const fixtureRoot = fileURLToPath(new URL("./fixtures/basic", import.meta.url));
 let corpus: Corpus;
 let guide: RenderedDocument;
 let home: RenderedDocument;
+let charts: RenderedDocument;
 
 function render(relPath: string): Promise<RenderedDocument> {
   const document = corpus.documents.get(relPath);
@@ -28,6 +29,7 @@ beforeAll(async () => {
   corpus = await Corpus.load({ cwd: fixtureRoot });
   guide = await render("docs/guide.md");
   home = await render("README.md");
+  charts = await render("docs/charts.md");
 }, 30_000);
 
 describe("anchors", () => {
@@ -112,6 +114,27 @@ describe("code blocks", () => {
       'class="shiki shiki-themes github-light github-dark"',
     );
     expect(guide.html).toContain("answer");
+  });
+
+  // The JSON's title tries to close the <pre> and open a script; as text inside the block it must
+  // stay text.
+  it("leaves a valid chart block as escaped source for the browser to draw", () => {
+    expect(charts.html).toContain(
+      '<div class="echarts-chart"><pre class="echarts-source">{\n  "title": { "text": "&#x3C;/pre>&#x3C;script>window.injected = true;&#x3C;/script>" },',
+    );
+    expect(charts.html).not.toContain("<script");
+  });
+
+  it("shows why a chart block that is not JSON cannot be drawn, beside its source", () => {
+    expect(charts.html).toMatch(
+      /<div class="echarts-chart" data-state="invalid"><p class="echarts-error">Chart could not be drawn: the option is not valid JSON: [^<]+<\/p><pre class="echarts-source">\{ title: "not JSON" \}\n<\/pre><\/div>/,
+    );
+  });
+
+  it("refuses chart JSON that is not an option object", () => {
+    expect(charts.html).toContain(
+      '<div class="echarts-chart" data-state="invalid"><p class="echarts-error">Chart could not be drawn: the option must be a JSON object</p><pre class="echarts-source">[1, 2, 3]\n</pre></div>',
+    );
   });
 
   it("leaves a Mermaid block as escaped source for the browser to draw", () => {

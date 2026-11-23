@@ -1,3 +1,4 @@
+import { initCharts } from "./charts.js";
 import { initDiagnostics } from "./diagnostics.js";
 import { initDiagrams } from "./diagrams.js";
 import { initLiveReload } from "./live-reload.js";
@@ -18,5 +19,6 @@ initThemeToggle();
 initLiveReload(documentPath);
 initSourceLines();
 initDiagrams();
+initCharts();
 initSearch();
 initDiagnostics(documentPath);

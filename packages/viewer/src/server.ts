@@ -92,6 +92,12 @@ const MERMAID_DIST = path.dirname(
 );
 const MERMAID_ENTRY = "mermaid.esm.min.mjs";
 const MERMAID_CHUNKS = "chunks/mermaid.esm.min/";
+// ECharts, for the same reasons. Its browser build is one self-contained module, so that one file
+// is the only thing served from the package; any other name under the prefix is not looked up.
+const ECHARTS_SCRIPT = path.join(
+  path.dirname(createRequire(import.meta.url).resolve("echarts")),
+  "echarts.esm.min.mjs",
+);
 
 export async function startViewer(
   options: ViewerOptions,
@@ -186,6 +192,8 @@ export async function startViewer(
         response,
         target.slice("/assets/".length),
       );
+    } else if (target === "/vendor/echarts/echarts.esm.min.mjs") {
+      await sendScript(request, response, ECHARTS_SCRIPT);
     } else if (target.startsWith("/vendor/mermaid/")) {
       await sendMermaid(
         request,
@@ -423,12 +431,26 @@ export async function startViewer(
       relPath === MERMAID_ENTRY ||
       (relPath?.startsWith(MERMAID_CHUNKS) === true &&
         relPath.endsWith(".mjs"));
-    const body =
+    await sendScript(
+      request,
+      response,
       allowed && relPath !== undefined
-        ? await readFile(path.join(MERMAID_DIST, ...relPath.split("/"))).catch(
-            () => undefined,
-          )
-        : undefined;
+        ? path.join(MERMAID_DIST, ...relPath.split("/"))
+        : undefined,
+    );
+  }
+
+  // A script from an installed package; `file` is undefined when the request named nothing the
+  // caller allows.
+  async function sendScript(
+    request: IncomingMessage,
+    response: ServerResponse,
+    file: string | undefined,
+  ): Promise<void> {
+    const body =
+      file === undefined
+        ? undefined
+        : await readFile(file).catch(() => undefined);
     if (body === undefined) {
       sendText(response, 404, "Not found.");
       return;

@@ -177,15 +177,37 @@ describe("pages", () => {
     expect(response.headers["content-security-policy"]).toContain("sandbox");
   });
 
-  it("serves the page scripts and Mermaid from the package", async () => {
-    for (const name of ["viewer.js", "theme.js", "search.js", "viewer.css"]) {
+  it("serves the page scripts, Mermaid and ECharts from the packages", async () => {
+    for (const name of [
+      "viewer.js",
+      "theme.js",
+      "search.js",
+      "charts.js",
+      "chart-option.js",
+      "echarts.js",
+      "viewer.css",
+    ]) {
       expect((await get(`/assets/${name}`)).status, name).toBe(200);
     }
-    const mermaid = await get("/vendor/mermaid/mermaid.esm.min.mjs");
-    expect(mermaid.status).toBe(200);
-    expect(mermaid.headers["content-type"]).toBe(
-      "text/javascript; charset=utf-8",
+    for (const vendor of [
+      "/vendor/mermaid/mermaid.esm.min.mjs",
+      "/vendor/echarts/echarts.esm.min.mjs",
+    ]) {
+      const response = await get(vendor);
+      expect(response.status, vendor).toBe(200);
+      expect(response.headers["content-type"], vendor).toBe(
+        "text/javascript; charset=utf-8",
+      );
+    }
+  });
+
+  it("leaves chart blocks in a document for the page script to draw", async () => {
+    const { status, body } = await get("/doc/docs/charts.md");
+    expect(status).toBe(200);
+    expect(body).toContain(
+      '<div class="echarts-chart"><pre class="echarts-source">',
     );
+    expect(body).toContain('<div class="echarts-chart" data-state="invalid">');
   });
 
   // The stored theme must be applied before the stylesheet paints anything, so the classic theme
@@ -298,6 +320,11 @@ describe("refusals", () => {
     "/vendor/mermaid/../package.json",
     "/vendor/mermaid/mermaid.core.mjs",
     "/vendor/mermaid/chunks/mermaid.esm.min/..%2f..%2fmermaid.d.ts",
+    "/vendor/echarts/../package.json",
+    "/vendor/echarts/%2e%2e/package.json",
+    "/vendor/echarts/echarts.js",
+    "/vendor/echarts/echarts.esm.min.mjs%00",
+    "/vendor/echarts/echarts.esm%2emin.mjs",
   ])("does not serve %s", async (rawPath) => {
     const response = await get(rawPath);
     expect(response.status).toBeGreaterThanOrEqual(400);

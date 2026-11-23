@@ -2,7 +2,7 @@
   "name": "@wastech-mdlint/viewer",
   "version": "0.3.0",
   "private": true,
-  "description": "Local web viewer for a repository's Markdown: the corpus wastech-mdlint lints, rendered with diagrams, highlighted code and backlinks, reloading as files change.",
+  "description": "Local web viewer for a repository's Markdown: the corpus wastech-mdlint lints, rendered with diagrams, charts, highlighted code and backlinks, reloading as files change.",
   "keywords": [
     "markdown",
     "viewer",
@@ -10,7 +10,8 @@
     "documentation",
     "docs",
     "mermaid",
-    "live-reload"
+    "live-reload",
+    "echarts"
   ],
   "license": "MIT",
   "repository": {
@@ -38,6 +39,7 @@
   "dependencies": {
     "@types/hast": "^3.0.5",
     "@wastech-mdlint/core": "0.3.0",
+    "echarts": "^6.1.0",
     "hast-util-raw": "^9.2.1",
     "hast-util-sanitize": "^5.0.2",
     "hast-util-to-html": "^9.0.7",

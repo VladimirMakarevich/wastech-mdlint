@@ -2,6 +2,7 @@ import type { Element, ElementContent, Root as HastRoot } from "hast";
 import { raw } from "hast-util-raw";
 import { defaultSchema, sanitize, type Schema } from "hast-util-sanitize";
 import { toHtml } from "hast-util-to-html";
+import { h } from "hastscript";
 import type { Definition, Heading, Image, Link } from "mdast";
 import { toHast } from "mdast-util-to-hast";
 import { normalizeUri } from "micromark-util-sanitize-uri";
@@ -54,9 +55,9 @@ export function fileHref(relPath: string): string {
  * REF-002 accepts is an anchor that exists on this page.
  *
  * Order matters. Author content — Markdown and the raw HTML inside it — is sanitized first, as one
- * tree. Only then are code blocks replaced with Shiki's output and Mermaid placeholders, because
- * that markup is the viewer's own: Shiki colors tokens with `style` attributes the sanitizer would
- * (rightly) strip from an author, and it escapes the code text itself.
+ * tree. Only then are code blocks replaced with Shiki's output and the Mermaid and chart
+ * placeholders, because that markup is the viewer's own: Shiki colors tokens with `style` attributes
+ * the sanitizer would (rightly) strip from an author, and it escapes the code text itself.
  */
 export async function renderDocument(
   document: ParsedDocument,
@@ -210,7 +211,10 @@ async function replaceCodeBlocks(tree: HastRoot): Promise<void> {
 
   for (const block of blocks) {
     let replacement: ElementContent;
-    if (block.info?.toLowerCase() === "mermaid") {
+    const language = block.info?.toLowerCase();
+    if (language === "echarts") {
+      replacement = chartBlock(block.code);
+    } else if (language === "mermaid") {
       // The diagram is drawn in the browser; the source stays readable as the fallback when the
       // script is blocked or the diagram fails to parse.
       replacement = {
@@ -231,6 +235,40 @@ async function replaceCodeBlocks(tree: HastRoot): Promise<void> {
     }
     block.parent.children[block.index] = replacement;
   }
+}
+
+/**
+ * An `echarts` block: a chart option written as JSON, drawn in the browser like a Mermaid diagram.
+ *
+ * JSON and nothing else — not a JavaScript object literal, never a function — because the option is
+ * author content and the page must not evaluate it. The block is checked here rather than only in
+ * the browser so that a block which can never become a chart shows its reason beside the source
+ * without script, and the browser skips it.
+ */
+function chartBlock(code: string): Element {
+  const problem = chartOptionProblem(code);
+  return h(
+    "div.echarts-chart",
+    { dataState: problem === undefined ? undefined : "invalid" },
+    [
+      problem === undefined
+        ? undefined
+        : h("p.echarts-error", `Chart could not be drawn: ${problem}`),
+      h("pre.echarts-source", code),
+    ],
+  );
+}
+
+function chartOptionProblem(code: string): string | undefined {
+  let option: unknown;
+  try {
+    option = JSON.parse(code);
+  } catch (error) {
+    return `the option is not valid JSON: ${(error as Error).message}`;
+  }
+  return typeof option === "object" && option !== null && !Array.isArray(option)
+    ? undefined
+    : "the option must be a JSON object";
 }
 
 function markLinks(tree: HastRoot, missingHrefs: ReadonlySet<string>): void {

@@ -1,6 +1,6 @@
 # @wastech-mdlint/viewer
 
-A local web viewer for a repository's Markdown. It serves exactly the corpus [wastech-mdlint](https://github.com/VladimirMakarevich/wastech-mdlint#readme) lints, as pages with the document tree, highlighted code, Mermaid diagrams, an outline, backlinks, full-text search and the linter's findings, and reloads an open page when its file changes.
+A local web viewer for a repository's Markdown. It serves exactly the corpus [wastech-mdlint](https://github.com/VladimirMakarevich/wastech-mdlint#readme) lints, as pages with the document tree, highlighted code, Mermaid diagrams, ECharts charts, an outline, backlinks, full-text search and the linter's findings, and reloads an open page when its file changes.
 
 **Experimental.** The package is `private` in this repository and is not published yet.
 
@@ -28,6 +28,7 @@ It prints the address, by default `http://127.0.0.1:4180/`. The root opens the r
 - **Links that agree with the linter.** A relative or root-relative link resolves the way REF-001 resolves it, and heading ids are the slugs REF-002 checks anchors against, so a link the linter accepts works on the page. A link to a folder opens that folder's `README.md`. A link whose target does not exist is underlined in red.
 - **Linked source files.** A link from a document to a non-Markdown file opens it as highlighted source with line numbers; `#L42` and GitHub's `#L12-L20` ranges land on and mark those lines. Images a document embeds are served as they are.
 - **Code and diagrams.** Fenced code is highlighted on the server with Shiki in light and dark themes. A `mermaid` block is drawn in the browser; if it cannot be drawn, its source stays on the page with the reason.
+- **Charts.** An `echarts` block holds an [ECharts option](https://echarts.apache.org/en/option.html) written as JSON — strict JSON, so no functions, comments or unquoted keys — and is drawn in the browser in the page's theme. A block that is not a JSON object says why above its source, with or without script. Tooltips are drawn as text on the chart, so markup in a `formatter` shows as written rather than as HTML, while `<br/>` still breaks the line.
 - **Front matter** as a card above the article, an **outline** of the document's `h2` and `h3` headings, and **backlinks**: the documents that link to this one, from the context graph.
 - **Search.** The box in the header searches titles, headings, paths and text, Cyrillic included, and matches a word while it is still being typed. `Ctrl+K` (or `/`) focuses it, the arrow keys pick a result and `Enter` opens it at the heading nearest the match. Without script, the same box opens a results page.
 - **Lint findings.** The config's rules run over the corpus in the background. A document with findings shows them in a panel above its text — severity, rule, message and the heading to jump to — and the tree shows a count beside every file that has any. Both refresh on their own after each save.
@@ -42,7 +43,8 @@ The viewer is read-only and bound to `127.0.0.1` unless `--host` says otherwise.
 - it answers only requests addressed to localhost, an IP address or the configured host, which defeats DNS rebinding, and refuses requests from other origins;
 - it serves documents in the corpus and only the files those documents link to or embed, so a request cannot read an arbitrary file by naming it; paths that could climb out of the repository are refused before any lookup, and symlinks that lead outside it are not followed;
 - raw HTML in Markdown is sanitized with GitHub's allowlist, every page carries a Content-Security-Policy that allows scripts from the viewer only, and images (SVG included) are served sandboxed;
-- nothing is fetched from the network: Mermaid and the page assets come from the installed packages.
+- a chart option is data: it is parsed as JSON and never evaluated, every tooltip in it is drawn as text, the data view's labels (which ECharts would insert as HTML) are dropped, and a `link` or `sublink` survives only as an `http(s)` URL;
+- nothing is fetched from the network: Mermaid, ECharts and the page assets come from the installed packages.
 
 ## Known limits
 

@@ -654,11 +654,26 @@ a:hover {
   text-align: left;
 }
 
-.mermaid-error {
+.mermaid-error,
+.echarts-error {
   margin: 0 0 8px;
   color: var(--danger);
   font-size: 14px;
   text-align: left;
+}
+
+/* Charts: ECharts sizes its canvas to this box, so the box sets the height. */
+.echarts-chart {
+  margin: 0 0 1em;
+}
+
+.echarts-chart[data-state="rendered"] .echarts-source {
+  display: none;
+}
+
+.echarts-canvas {
+  width: 100%;
+  height: 400px;
 }
 
 /* Source view: line anchors from a document's `#L42` link */
