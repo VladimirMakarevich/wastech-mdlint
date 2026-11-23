@@ -29,7 +29,10 @@ export function promptButton(
   button.dataset.path = path;
   if (finding !== undefined) {
     button.dataset.rule = finding.ruleId;
-    button.dataset.line = String(finding.line);
+    // Not `data-line`: inside the article that attribute is a block's source line, and the stylesheet
+    // draws it in the right margin of whatever element carries it — a finding's line there showed up
+    // as a stray number beside the button.
+    button.dataset.findingLine = String(finding.line);
   }
   return button;
 }
@@ -50,10 +53,10 @@ export function initPromptButtons(root: ParentNode): void {
     const query = new URLSearchParams({ path });
     if (
       button.dataset.rule !== undefined &&
-      button.dataset.line !== undefined
+      button.dataset.findingLine !== undefined
     ) {
       query.set("rule", button.dataset.rule);
-      query.set("line", button.dataset.line);
+      query.set("line", button.dataset.findingLine);
     }
     attachMenu(button, () => load(query));
   }
