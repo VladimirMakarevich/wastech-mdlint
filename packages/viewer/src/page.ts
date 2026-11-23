@@ -137,6 +137,18 @@ export function renderPage(params: PageParams): string {
                 ),
               ),
             ),
+            // Opens the display settings panel the page script builds; laid out like the theme
+            // switch, and for the same reason.
+            h(
+              "button.settings-toggle",
+              {
+                type: "button",
+                hidden: true,
+                title: "Display settings",
+                ariaLabel: "Display settings",
+              },
+              "Aa",
+            ),
           ]),
           h("div.layout", [
             h("div.sidebar-frame", [

@@ -281,9 +281,10 @@ a:hover {
   margin: 4px 0 0;
 }
 
-/* Section links and theme switch: the same small control, one a link and one a button */
+/* Section links, theme switch and display settings: the same small control, as a link or a button */
 .topbar-link,
-.theme-toggle {
+.theme-toggle,
+.settings-toggle {
   flex: none;
   height: 32px;
   padding: 0 10px;
@@ -297,13 +298,15 @@ a:hover {
 }
 
 .topbar-link,
-.theme-toggle {
+.theme-toggle,
+.settings-toggle {
   display: inline-flex;
   align-items: center;
 }
 
 .topbar-link:hover,
-.theme-toggle:hover {
+.theme-toggle:hover,
+.settings-toggle:hover {
   background: var(--bg-subtle);
   text-decoration: none;
 }
@@ -315,15 +318,197 @@ a:hover {
   color: var(--accent);
 }
 
-/* Without script the switch is hidden, as it could do nothing. With script — marked on <html> before
-   the first paint — it is laid out from the first frame, so it never appears later and pushes the
-   rest of the bar aside; the module that wires it runs whenever it runs. */
-.theme-toggle[hidden] {
+/* Without script the two buttons are hidden, as they could do nothing. With script — marked on <html>
+   before the first paint — they are laid out from the first frame, so neither appears later and
+   pushes the rest of the bar aside; the module that wires them runs whenever it runs. */
+.theme-toggle[hidden],
+.settings-toggle[hidden] {
   display: none;
 }
 
-:root[data-script] .theme-toggle[hidden] {
+:root[data-script] .theme-toggle[hidden],
+:root[data-script] .settings-toggle[hidden] {
   display: inline-flex;
+}
+
+/* "Aa", the usual mark for text settings, set in a serif so it reads as type rather than a word. */
+.settings-toggle {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 15px;
+}
+
+.settings-toggle[aria-expanded="true"] {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+/* Display settings: a column that slides in over the right edge, under the header, and leaves the
+   article in view beside it so a change is judged on the text it changes. Kept laid out while closed,
+   off screen and invisible, so opening it can slide rather than appear. */
+.settings-panel {
+  position: fixed;
+  top: var(--topbar-height);
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  width: min(320px, 100vw);
+  overflow-y: auto;
+  padding: 12px 16px 24px;
+  border-left: 1px solid var(--border);
+  background: var(--bg);
+  box-shadow: -12px 0 32px var(--shadow);
+  font-size: 14px;
+  line-height: 1.4;
+  transform: translateX(100%);
+  visibility: hidden;
+  transition:
+    transform 180ms ease,
+    visibility 0s linear 180ms;
+}
+
+.settings-panel.is-open {
+  transform: none;
+  visibility: visible;
+  transition: transform 180ms ease;
+}
+
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.settings-head h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.settings-close {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--fg-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.settings-close:hover {
+  background: var(--row-hover);
+  color: var(--fg);
+}
+
+.settings-form fieldset {
+  margin: 12px 0 0;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Floated out of the fieldset's border, where a legend is drawn by default, into a heading row of its
+   own; the control after it clears it rather than squeezing in beside it. */
+.settings-form legend {
+  float: left;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 0;
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.settings-form legend + * {
+  clear: both;
+}
+
+.settings-field {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.settings-field[hidden] {
+  display: none;
+}
+
+.settings-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-label output {
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.settings-field select,
+.settings-field input[type="text"],
+.settings-field input[type="number"] {
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-subtle);
+  color: var(--fg);
+  font: inherit;
+}
+
+.settings-field input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.settings-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.settings-check input {
+  accent-color: var(--accent);
+}
+
+/* The four margins side by side, as the four sides of one box. */
+.settings-margins {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 8px;
+}
+
+.settings-margins legend {
+  grid-column: 1 / -1;
+}
+
+.settings-margins .settings-label {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.settings-reset {
+  width: 100%;
+  height: 32px;
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings-reset:hover {
+  background: var(--bg-subtle);
 }
 
 /* One label per choice, the one shown picked by the choice on <html>, so the button has its final
@@ -459,14 +644,23 @@ a:hover {
   user-select: none;
 }
 
+/* Every `--reader-*` property below is a display setting the reader may change, set on <html> only
+   when it differs from the default written here as its fallback (`display-settings-model.ts` makes
+   them; a test holds each fallback equal to the default it computes). */
 .content {
   min-width: 0;
-  padding: 32px 48px 96px;
+  padding: var(--reader-pad-top, 32px) var(--reader-pad-right, 48px)
+    var(--reader-pad-bottom, 96px) var(--reader-pad-left, 48px);
 }
 
 .markdown-body {
-  max-width: 860px;
+  max-width: var(--reader-width, 860px);
   margin: 0 auto;
+  font-family: var(--reader-font, var(--font-sans));
+  font-size: var(--reader-font-size, 16px);
+  line-height: var(--reader-line-height, 1.6);
+  text-align: var(--reader-align, start);
+  hyphens: var(--reader-hyphens, manual);
 }
 
 /* Source lines: the line each block and list item starts on in the Markdown file, in the article's
@@ -488,7 +682,12 @@ a:hover {
   font-size: 11px;
   font-weight: 400;
   font-style: normal;
-  line-height: 1.6rem;
+  /* The body text's line, so the number sits on a paragraph's or an item's first line whatever size
+     and spacing the reader chose. */
+  line-height: calc(
+    var(--reader-font-size, 16px) * var(--reader-line-height, 1.6)
+  );
+  display: var(--reader-source-lines, block);
   letter-spacing: 0;
   white-space: nowrap;
   pointer-events: none;
@@ -743,7 +942,7 @@ a:hover {
 .markdown-body blockquote,
 .markdown-body pre,
 .markdown-body details {
-  margin: 0 0 1em;
+  margin: 0 0 var(--reader-block-gap, 1em);
 }
 
 .markdown-body ul,
@@ -786,7 +985,8 @@ a:hover {
   display: block;
   overflow-x: auto;
   border-collapse: collapse;
-  font-size: 15px;
+  /* 15px at the default text size, and scaled with the reader's. */
+  font-size: 0.9375em;
 }
 
 .markdown-body th,
@@ -804,8 +1004,8 @@ a:hover {
   padding: 0.15em 0.35em;
   border-radius: 4px;
   background: var(--code-bg);
-  font-family: var(--font-mono);
-  font-size: 0.875em;
+  font-family: var(--reader-code-font, var(--font-mono));
+  font-size: calc(0.875em * var(--reader-code-scale, 1));
   /* An identifier path such as `a/b/c/d` has no space to break at, and unbroken it ran past the
      article and made the whole page scroll sideways. Inside a code block it must not break, since
      the block scrolls on its own and a wrapped line would read as two. */
@@ -818,7 +1018,8 @@ a:hover {
   border: 1px solid var(--border-subtle);
   border-radius: 6px;
   background: var(--code-bg);
-  font-size: 13.5px;
+  /* 13.5px at the default text size, and scaled with the reader's text and code sizes. */
+  font-size: calc(0.84375em * var(--reader-code-scale, 1));
   line-height: 1.5;
 }
 

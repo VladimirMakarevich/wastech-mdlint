@@ -4,6 +4,7 @@ import { initConfigEditor } from "./config-editor.js";
 import { initDashboard } from "./dashboard.js";
 import { initDiagnostics } from "./diagnostics.js";
 import { initDiagrams } from "./diagrams.js";
+import { initDisplaySettings } from "./display-settings.js";
 import { initGraph, initLocalGraph } from "./graph.js";
 import { initLiveReload } from "./live-reload.js";
 import { initSearch } from "./search.js";
@@ -20,6 +21,7 @@ const documentPath =
     ?.content ?? undefined;
 
 initThemeToggle();
+initDisplaySettings();
 initColumnResize();
 initLiveReload(documentPath);
 initSourceLines();
