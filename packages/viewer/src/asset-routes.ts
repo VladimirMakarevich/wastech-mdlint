@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -67,17 +67,7 @@ export async function sendPackageAsset(
   response: ServerResponse,
   name: string,
 ): Promise<void> {
-  const asset = packageAsset(name);
-  const body =
-    asset === undefined
-      ? undefined
-      : await readFile(asset.file).catch(() => undefined);
-  if (asset === undefined || body === undefined) {
-    sendText(response, 404, "Not found.");
-    return;
-  }
-  response.writeHead(200, { ...assetHeaders(), "Content-Type": asset.type });
-  response.end(request.method === "HEAD" ? undefined : body);
+  await sendAsset(request, response, packageAsset(name));
 }
 
 export async function sendMermaid(
@@ -110,17 +100,62 @@ async function sendScript(
   response: ServerResponse,
   file: string | undefined,
 ): Promise<void> {
-  const body =
+  await sendAsset(
+    request,
+    response,
     file === undefined
       ? undefined
-      : await readFile(file).catch(() => undefined);
+      : { file, type: "text/javascript; charset=utf-8" },
+  );
+}
+
+/**
+ * One shipped file, or `304 Not Modified` when the browser already holds this version of it.
+ *
+ * Every page loads the stylesheet and three dozen script modules, the local graph a megabyte of
+ * ECharts. Answered in full each time, a page waited for the stylesheet before it was drawn and the
+ * graph for ECharts to be read and compiled again on every navigation. The browser still asks each
+ * time (`no-cache`), so files rebuilt while the viewer runs are what the next page gets; it is only
+ * told, from the file's size and modification time, that what it has is still current, and keeps the
+ * scripts it has compiled.
+ */
+async function sendAsset(
+  request: IncomingMessage,
+  response: ServerResponse,
+  asset: { file: string; type: string } | undefined,
+): Promise<void> {
+  const info =
+    asset === undefined
+      ? undefined
+      : await stat(asset.file).catch(() => undefined);
+  if (asset === undefined || info?.isFile() !== true) {
+    sendText(response, 404, "Not found.");
+    return;
+  }
+  const etag = `W/"${info.size.toString(16)}-${Math.trunc(info.mtimeMs).toString(16)}"`;
+  if (matches(request.headers["if-none-match"], etag)) {
+    response.writeHead(304, { ...assetHeaders(), ETag: etag }).end();
+    return;
+  }
+  const body = await readFile(asset.file).catch(() => undefined);
   if (body === undefined) {
     sendText(response, 404, "Not found.");
     return;
   }
   response.writeHead(200, {
     ...assetHeaders(),
-    "Content-Type": "text/javascript; charset=utf-8",
+    "Content-Type": asset.type,
+    ETag: etag,
   });
   response.end(request.method === "HEAD" ? undefined : body);
+}
+
+// Whether an `If-None-Match` header names this version; it may list several, or be `*`.
+function matches(header: string | undefined, etag: string): boolean {
+  return (
+    header?.split(",").some((tag) => {
+      const value = tag.trim();
+      return value === "*" || value === etag || `W/${value}` === etag;
+    }) === true
+  );
 }

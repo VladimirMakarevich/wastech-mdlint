@@ -260,6 +260,33 @@ describe("pages", () => {
     }
   });
 
+  // Every page loads the stylesheet, the page scripts and, beside a document, ECharts. Sent in full on
+  // every navigation, the page waited for the stylesheet and the graph for ECharts to be compiled
+  // again; a browser holding the current version is told so instead, and keeps what it compiled.
+  it("tells a browser holding the current version of a file that it is current", async () => {
+    for (const address of [
+      "/assets/viewer.css",
+      "/assets/viewer.js",
+      "/vendor/echarts/echarts.esm.min.mjs",
+    ]) {
+      const first = await get(address);
+      const etag = first.headers.etag;
+      expect(etag, address).toMatch(/^W\/"[0-9a-f]+-[0-9a-f]+"$/);
+      expect(first.headers["cache-control"], address).toBe("no-cache");
+      const again = await get(address, {
+        headers: { "If-None-Match": etag ?? "" },
+      });
+      expect(again.status, address).toBe(304);
+      expect(again.body, address).toBe("");
+      const other = await get(address, {
+        headers: { "If-None-Match": 'W/"0-0"' },
+      });
+      expect(other.status, address).toBe(200);
+      expect(other.body, address).toBe(first.body);
+    }
+    expect((await get("/assets/nope.js")).status).toBe(404);
+  });
+
   it("leaves chart blocks in a document for the page script to draw", async () => {
     const { status, body } = await get("/doc/docs/charts.md");
     expect(status).toBe(200);
