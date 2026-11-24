@@ -264,6 +264,45 @@ describe("buildFindingPrompt", () => {
     expect(text).toContain('add `"!./CLAUDE.md"` there when a glob matches it');
   });
 
+  // The general step removes the file from its entry; for an entry naming only this file that leaves
+  // `entrypoints: []`, which the schema's minimum of one refuses, so the agent's edit broke the config.
+  it("raises an LLM-001 entry in place when the entry names only this file", () => {
+    for (const entrypoints of [["CLAUDE.md"], ["./CLAUDE.md", "!drafts/**"]]) {
+      const text = prompt({
+        filePath: "CLAUDE.md",
+        findings: [CONTEXT_OVER],
+        strategy: "budget",
+        ruleEntries: [
+          {
+            ruleId: "LLM-001",
+            options: { entrypoints, maxTokensPerEntrypoint: 10000 },
+          },
+        ],
+      });
+      expect(text, entrypoints.join()).toContain(
+        "raise that entry's `maxTokensPerEntrypoint` from 10000 to above 10450 — for example 12000",
+      );
+      expect(text, entrypoints.join()).not.toContain("add a second `LLM-001`");
+    }
+
+    // An entry that also names another file keeps the general steps: an entry of its own.
+    const shared = prompt({
+      filePath: "CLAUDE.md",
+      findings: [CONTEXT_OVER],
+      strategy: "budget",
+      ruleEntries: [
+        {
+          ruleId: "LLM-001",
+          options: {
+            entrypoints: ["CLAUDE.md", "AGENTS.md"],
+            maxTokensPerEntrypoint: 10000,
+          },
+        },
+      ],
+    });
+    expect(shared).toContain("add a second `LLM-001` entry");
+  });
+
   // A config pattern without a `/` matches that name at any depth, so a root file's bare name would
   // give the raised budget to every nested file of the same name. The check runs each pattern the
   // prompt hands out through the config matcher itself, so it proves what the agent's edit would

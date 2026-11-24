@@ -7,6 +7,7 @@ import {
   runPlace,
   splitSteps,
 } from "../discovery/agent-rule.js";
+import { isGlobPattern, matchesConfigGlob } from "../discovery/globs.js";
 import { ruleRegistry } from "./rules/index.js";
 import { sizeBudgetForEntry, type SizeMetric } from "./rules/size.js";
 import type { LintMessage } from "./types.js";
@@ -381,9 +382,59 @@ function contextBudgetSteps(
   const file = codeSpan(input.filePath);
   const context = contextData(findings[0]!)!;
   const pattern = exactPattern(input.filePath);
+  // An entry that names this file alone is already its own budget, and taking the file out of it
+  // would leave `entrypoints: []`, which the config schema refuses — so the agent raises it there.
+  if (namesOnly(reportingContextEntry(input, context), input.filePath)) {
+    return [
+      `LLM-001 holds ${file} to an entry that names only this file, so raise that entry's \`maxTokensPerEntrypoint\` from ${context.maxTokens} to above ${context.totalTokens} — for example ${roomAbove(context.totalTokens, 1.1)}, some room above today's total. Do not take the file out of that entry: its \`entrypoints\` would be left empty, which the config refuses. A pattern without a \`/\` matches that name in every folder, so a same-named entrypoint elsewhere gets the raised budget too.`,
+    ];
+  }
   return [
     `LLM-001 holds every entrypoint an entry matches to that entry's one \`maxTokensPerEntrypoint\` (${context.maxTokens} today), so raising it there would raise it for every other entrypoint too. Instead, add a second \`LLM-001\` entry with \`"entrypoints": ["${pattern}"]\` and a \`maxTokensPerEntrypoint\` above ${context.totalTokens} — for example ${roomAbove(context.totalTokens, 1.1)}, some room above today's total — and make the existing entry stop matching ${file}: remove it from that entry's \`entrypoints\`, or add \`"!${pattern}"\` there when a glob matches it.`,
   ];
+}
+
+// The LLM-001 entry whose budget the file is reported against: one whose `entrypoints` select the
+// file, and of those the one whose limit is the one the finding names, since two entries can both
+// select it and the rule reports each.
+function reportingContextEntry(
+  input: FindingPromptInput,
+  context: { maxTokens: number },
+): { entrypoints: string[] } | undefined {
+  const entries = input.ruleEntries.flatMap((entry) => {
+    const options = entry.options as
+      | { entrypoints?: unknown; maxTokensPerEntrypoint?: unknown }
+      | undefined;
+    const entrypoints = options?.entrypoints;
+    return entry.ruleId === "LLM-001" &&
+      Array.isArray(entrypoints) &&
+      entrypoints.every((value) => typeof value === "string") &&
+      matchesConfigGlob(input.filePath, entrypoints)
+      ? [{ entrypoints, maxTokens: options?.maxTokensPerEntrypoint }]
+      : [];
+  });
+  return (
+    entries.find((entry) => entry.maxTokens === context.maxTokens) ?? entries[0]
+  );
+}
+
+// Whether every pattern an entry adds is a plain path selecting `filePath`: removing the file would
+// then leave nothing. A glob, even one that matches only this file today, is left to the general
+// steps, which tell the agent to exclude the file with a `!` pattern instead of emptying the list.
+function namesOnly(
+  entry: { entrypoints: string[] } | undefined,
+  filePath: string,
+): boolean {
+  const added = (entry?.entrypoints ?? []).filter(
+    (pattern) => !pattern.startsWith("!"),
+  );
+  return (
+    added.length > 0 &&
+    added.every(
+      (pattern) =>
+        !isGlobPattern(pattern) && matchesConfigGlob(filePath, [pattern]),
+    )
+  );
 }
 
 // The config pattern that matches `filePath` and nothing else. Config globs without a `/` are
