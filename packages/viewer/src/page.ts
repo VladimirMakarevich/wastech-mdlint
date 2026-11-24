@@ -94,11 +94,11 @@ export type PageParams = {
   // page is drawn once that much is read. A page that sets it but has no such element, being short
   // after all, is drawn once all of it is read.
   firstScreen?: boolean;
-};
   // Set by a page whose script builds part of what the page is laid out around — the config page's
   // editor, above the file — so it is not drawn before its script has run. Drawn first, the page
   // showed without that part and then pushed everything below it down when the script added it.
   scriptFirst?: boolean;
+};
 
 export type Section = "graph" | "dashboard" | "changes" | "config";
 
