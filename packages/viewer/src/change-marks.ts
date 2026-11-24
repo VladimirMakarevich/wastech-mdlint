@@ -74,7 +74,7 @@ export function markChanges(
   }
 
   const marks = new Map<Element, BlockChange>();
-  collectMarks(markable, changes, head.blank, lostBy, marks);
+  collectMarks(markable, { changes, blank: head.blank, lostBy }, marks);
   for (const [node, change] of marks) {
     if (node !== card?.node) {
       node.properties.dataChange = change.kind;
@@ -193,22 +193,29 @@ function innermost(blocks: Block[]): Block | undefined {
   return found;
 }
 
+// What every block is judged against: the head changes, which head lines are blank, and the hunks
+// whose removed lines each block lost.
+type MarkInputs = {
+  changes: HeadChanges;
+  blank: (line: number) => boolean;
+  lostBy: ReadonlyMap<Element, number[]>;
+};
+
 function collectMarks(
   blocks: Block[],
-  changes: HeadChanges,
-  blank: (line: number) => boolean,
-  lostBy: ReadonlyMap<Element, number[]>,
+  inputs: MarkInputs,
   marks: Map<Element, BlockChange>,
 ): void {
+  const { changes, blank, lostBy } = inputs;
   for (const block of blocks) {
     if (block.list) {
-      collectMarks(block.children, changes, blank, lostBy, marks);
+      collectMarks(block.children, inputs, marks);
       continue;
     }
     const change = classify(block, changes, blank, lostBy.get(block.node));
     // A wholly new block is marked once, not again on every new item inside it.
     if (change?.kind !== "added") {
-      collectMarks(block.children, changes, blank, lostBy, marks);
+      collectMarks(block.children, inputs, marks);
     }
     if (change !== undefined) {
       marks.set(block.node, change);
@@ -332,15 +339,35 @@ function compareWithBase(
     );
     lost.push({
       removal,
-      at: remaining.every((other) => other > line)
-        ? "start"
-        : remaining.every((other) => other < line)
-          ? "end"
-          : "middle",
+      at: lostAt(remaining, line),
     });
   }
   return { removed, lost };
 }
+
+// Where in its block a removed line was: before every line the block still has, after every one,
+// or between them.
+function lostAt(remaining: readonly number[], line: number): LostAt {
+  if (remaining.every((other) => other > line)) {
+    return "start";
+  }
+  if (remaining.every((other) => other < line)) {
+    return "end";
+  }
+  return "middle";
+}
+
+// Which blocks to look in, in order, for the one that lost lines: lines lost at a block's start
+// look first at the block that begins right after them, lines lost at its end at the block that
+// ends right before them, and lines lost in its middle at the block they were inside.
+const LOSING_ORDER: Record<
+  LostAt,
+  readonly ("before" | "inside" | "behind")[]
+> = {
+  start: ["before", "inside", "behind"],
+  end: ["behind", "inside", "before"],
+  middle: ["inside", "behind", "before"],
+};
 
 /** The head block that lines removed after head line `after` were part of. */
 function blockLosing(
@@ -349,16 +376,12 @@ function blockLosing(
   at: LostAt,
 ): Element | undefined {
   const candidates = markableBlocks(blocks);
-  const inside = (block: Block) => after >= block.start && after < block.end;
-  const before = (block: Block) => block.start === after + 1;
-  const behind = (block: Block) => block.end === after;
-  const order =
-    at === "start"
-      ? [before, inside, behind]
-      : at === "end"
-        ? [behind, inside, before]
-        : [inside, behind, before];
-  for (const test of order) {
+  const tests = {
+    inside: (block: Block) => after >= block.start && after < block.end,
+    before: (block: Block) => block.start === after + 1,
+    behind: (block: Block) => block.end === after,
+  };
+  for (const test of LOSING_ORDER[at].map((name) => tests[name])) {
     const found = innermost(candidates.filter(test));
     if (found !== undefined) {
       return found.node;

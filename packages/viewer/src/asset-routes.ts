@@ -42,22 +42,32 @@ const ECHARTS_SCRIPT = path.join(
   "echarts.esm.min.mjs",
 );
 
+// The shipped file an asset name stands for, and its type; `undefined` for any other name, so a
+// request can only ever reach the stylesheet, the icon and the page script's own modules.
+function packageAsset(
+  name: string,
+): { file: string; type: string } | undefined {
+  if (name === "viewer.css") {
+    return { file: STYLESHEET, type: "text/css; charset=utf-8" };
+  }
+  if (name === "favicon.ico") {
+    return { file: FAVICON, type: "image/x-icon" };
+  }
+  if (CLIENT_SCRIPT_NAME.test(name)) {
+    return {
+      file: path.join(CLIENT_DIR, name),
+      type: "text/javascript; charset=utf-8",
+    };
+  }
+  return undefined;
+}
+
 export async function sendPackageAsset(
   request: IncomingMessage,
   response: ServerResponse,
   name: string,
 ): Promise<void> {
-  const asset =
-    name === "viewer.css"
-      ? { file: STYLESHEET, type: "text/css; charset=utf-8" }
-      : name === "favicon.ico"
-        ? { file: FAVICON, type: "image/x-icon" }
-        : CLIENT_SCRIPT_NAME.test(name)
-          ? {
-              file: path.join(CLIENT_DIR, name),
-              type: "text/javascript; charset=utf-8",
-            }
-          : undefined;
+  const asset = packageAsset(name);
   const body =
     asset === undefined
       ? undefined

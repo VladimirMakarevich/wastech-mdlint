@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-import type { ElementContent } from "hast";
+import type { Element, ElementContent } from "hast";
 import { h } from "hastscript";
 
 import {
@@ -157,27 +157,9 @@ export function parseChangeRequest(body: unknown): ParsedChangeRequest {
   if (text !== undefined && typeof text !== "string") {
     return { ok: false, message: '"text" must be a string.' };
   }
-  if (edits !== undefined) {
-    if (!Array.isArray(edits)) {
-      return { ok: false, message: '"edits" must be a list.' };
-    }
-    for (const [index, edit] of edits.entries()) {
-      const { op, path: editPath } = (edit ?? {}) as Record<string, unknown>;
-      if (
-        typeof op !== "string" ||
-        !EDIT_OPS.has(op) ||
-        !Array.isArray(editPath) ||
-        !editPath.every(
-          (segment) =>
-            typeof segment === "string" || typeof segment === "number",
-        )
-      ) {
-        return {
-          ok: false,
-          message: `Edit ${index + 1} must have an "op" of set, remove or insert and a "path" of names and indexes.`,
-        };
-      }
-    }
+  const problem = edits === undefined ? undefined : editsProblem(edits);
+  if (problem !== undefined) {
+    return { ok: false, message: problem };
   }
   return {
     ok: true,
@@ -187,6 +169,27 @@ export function parseChangeRequest(body: unknown): ParsedChangeRequest {
       edits: edits as ConfigEdit[] | undefined,
     },
   };
+}
+
+// Why a request's `edits` is not a list of well-formed edits, or `undefined` when it is.
+function editsProblem(edits: unknown): string | undefined {
+  if (!Array.isArray(edits)) {
+    return '"edits" must be a list.';
+  }
+  for (const [index, edit] of edits.entries()) {
+    const { op, path: editPath } = (edit ?? {}) as Record<string, unknown>;
+    if (
+      typeof op !== "string" ||
+      !EDIT_OPS.has(op) ||
+      !Array.isArray(editPath) ||
+      !editPath.every(
+        (segment) => typeof segment === "string" || typeof segment === "number",
+      )
+    ) {
+      return `Edit ${index + 1} must have an "op" of set, remove or insert and a "path" of names and indexes.`;
+    }
+  }
+  return undefined;
 }
 
 /** The candidate text a request describes, or core's reason it cannot be built. */
@@ -455,12 +458,6 @@ export async function renderConfigArticle(
 ): Promise<ElementContent[]> {
   const file = await readConfigFile(corpus);
   const blocked = await writeBlockedReason(corpus, options.allowWrites);
-  const configured = new Map(
-    corpus.configuration.rules.map(({ rule, severity }) => [
-      rule.id,
-      severity ?? rule.defaultSeverity,
-    ]),
-  );
   const nodes: (ElementContent | undefined)[] = [
     h("h1", "Linter config"),
     file === undefined
@@ -511,46 +508,58 @@ export async function renderConfigArticle(
           h("h2", "Current file"),
           withCopyButton(await highlight(file.text, "jsonc")),
         ]),
-    h("section.config-registry", { ariaLabel: "Rules" }, [
-      h("h2", "Rules"),
-      h("div.dashboard-table-wrap", [
-        h("table.config-rules", [
-          h(
-            "thead",
-            h("tr", [
-              h("th", { scope: "col" }, "Rule"),
-              h("th", { scope: "col" }, "Description"),
-              h("th", { scope: "col" }, "Default"),
-              h("th", { scope: "col" }, "In this config"),
-            ]),
-          ),
-          h(
-            "tbody",
-            registryRules().map((rule) =>
-              h("tr", [
-                h(
-                  "td",
-                  rule.docsUrl === undefined
-                    ? h("code", rule.id)
-                    : h(
-                        "a",
-                        {
-                          href: rule.docsUrl,
-                          rel: "noopener noreferrer",
-                          target: "_blank",
-                        },
-                        h("code", rule.id),
-                      ),
-                ),
-                h("td", rule.description),
-                h("td", rule.defaultSeverity),
-                h("td", configured.get(rule.id) ?? "—"),
-              ]),
-            ),
-          ),
-        ]),
-      ]),
-    ]),
+    renderRegistry(corpus),
   ];
   return nodes.filter((node): node is ElementContent => node !== undefined);
+}
+
+// Every rule the registry knows, with the severity this config runs it at, or a dash where it does
+// not run it.
+function renderRegistry(corpus: Corpus): Element {
+  const configured = new Map(
+    corpus.configuration.rules.map(({ rule, severity }) => [
+      rule.id,
+      severity ?? rule.defaultSeverity,
+    ]),
+  );
+  return h("section.config-registry", { ariaLabel: "Rules" }, [
+    h("h2", "Rules"),
+    h("div.dashboard-table-wrap", [
+      h("table.config-rules", [
+        h(
+          "thead",
+          h("tr", [
+            h("th", { scope: "col" }, "Rule"),
+            h("th", { scope: "col" }, "Description"),
+            h("th", { scope: "col" }, "Default"),
+            h("th", { scope: "col" }, "In this config"),
+          ]),
+        ),
+        h(
+          "tbody",
+          registryRules().map((rule) =>
+            h("tr", [
+              h(
+                "td",
+                rule.docsUrl === undefined
+                  ? h("code", rule.id)
+                  : h(
+                      "a",
+                      {
+                        href: rule.docsUrl,
+                        rel: "noopener noreferrer",
+                        target: "_blank",
+                      },
+                      h("code", rule.id),
+                    ),
+              ),
+              h("td", rule.description),
+              h("td", rule.defaultSeverity),
+              h("td", configured.get(rule.id) ?? "—"),
+            ]),
+          ),
+        ),
+      ]),
+    ]),
+  ]);
 }

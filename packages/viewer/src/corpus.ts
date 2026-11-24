@@ -217,13 +217,12 @@ export class Corpus {
       }
       links.set(
         documentPath,
-        await collectLinks(
-          this.root,
-          document,
+        await collectLinks(document, {
+          root: this.root,
           documents,
-          state.loaded.settings.siteRouter,
-          state,
-        ),
+          siteRouter: state.loaded.settings.siteRouter,
+          membership: state,
+        }),
       );
       // Its raw HTML is resolved again when the page is next rendered.
       this.embedded.delete(document);
@@ -611,13 +610,12 @@ async function loadState(
         async (document) =>
           [
             document.path,
-            await collectLinks(
+            await collectLinks(document, {
               root,
-              document,
               documents,
-              loaded.settings.siteRouter,
+              siteRouter: loaded.settings.siteRouter,
               membership,
-            ),
+            }),
           ] as const,
       ),
     ),
@@ -625,13 +623,20 @@ async function loadState(
   return { loaded, documents, graph, links, ...membership };
 }
 
+// What a document's links are resolved against: the repository, the corpus's documents, the site
+// router that maps a site path to a file, and the scopes that decide which files may be served.
+type LinkScope = {
+  root: RepositoryRoot;
+  documents: ReadonlyMap<string, ParsedDocument>;
+  siteRouter: SiteRouter;
+  membership: Membership;
+};
+
 async function collectLinks(
-  root: RepositoryRoot,
   document: ParsedDocument,
-  documents: ReadonlyMap<string, ParsedDocument>,
-  siteRouter: SiteRouter,
-  membership: Membership,
+  scope: LinkScope,
 ): Promise<DocumentLinks> {
+  const { root, documents, siteRouter, membership } = scope;
   const links: DocumentLinks = { targets: new Set(), files: new Set() };
   const targets = [
     ...document.links

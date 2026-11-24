@@ -16,24 +16,9 @@ export function blameAnnotator(
   showAuthor: boolean,
 ): LineAnnotator {
   return (start, end) => {
-    let newest: BlameLine | undefined;
-    for (let line = start; line <= end; line += 1) {
-      const entry = lines[line - 1];
-      if (entry === undefined) {
-        continue;
-      }
-      if (entry.commit === undefined) {
-        return { text: "uncommitted", title: "Not committed yet" };
-      }
-      // By date, then by commit name, so two commits of one day always pick the same one.
-      if (
-        newest === undefined ||
-        compareStrings(entry.date ?? "", newest.date ?? "") > 0 ||
-        (entry.date === newest.date &&
-          compareStrings(entry.commit, newest.commit ?? "") > 0)
-      ) {
-        newest = entry;
-      }
+    const newest = newestLine(lines, start, end);
+    if (newest === "uncommitted") {
+      return { text: "uncommitted", title: "Not committed yet" };
     }
     if (newest?.commit === undefined) {
       return undefined;
@@ -49,4 +34,37 @@ export function blameAnnotator(
       title: `${short} · ${date}${author} — ${newest.subject ?? ""}`,
     };
   };
+}
+
+// The newest blamed line from `start` to `end`, one-based and inclusive, or "uncommitted" as soon as
+// one line is not committed yet.
+function newestLine(
+  lines: readonly (BlameLine | undefined)[],
+  start: number,
+  end: number,
+): BlameLine | "uncommitted" | undefined {
+  let newest: BlameLine | undefined;
+  for (let line = start; line <= end; line += 1) {
+    const entry = lines[line - 1];
+    if (entry === undefined) {
+      continue;
+    }
+    if (entry.commit === undefined) {
+      return "uncommitted";
+    }
+    if (isNewer(entry, newest)) {
+      newest = entry;
+    }
+  }
+  return newest;
+}
+
+// By date, then by commit name, so two commits of one day always pick the same one.
+function isNewer(entry: BlameLine, newest: BlameLine | undefined): boolean {
+  return (
+    newest === undefined ||
+    compareStrings(entry.date ?? "", newest.date ?? "") > 0 ||
+    (entry.date === newest.date &&
+      compareStrings(entry.commit ?? "", newest.commit ?? "") > 0)
+  );
 }

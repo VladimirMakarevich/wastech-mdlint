@@ -13,10 +13,10 @@ import {
   dashboardCsv,
   dashboardHref,
   parseDashboardQuery,
-  renderDashboardArticle,
   type DashboardQuery,
   type DashboardSource,
 } from "../src/dashboard.js";
+import { renderDashboardArticle } from "../src/dashboard-article.js";
 import { graphFolders } from "../src/graph-view.js";
 
 // Rows come in code-point order, where an upper-case name sorts before a lower-case one, so

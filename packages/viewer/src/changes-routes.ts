@@ -1,10 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { renderChangesArticle } from "./changes-article.js";
 import {
   changesPayload,
   diffPayload,
   type DocumentReview,
-  renderChangesArticle,
+  type Review,
 } from "./changes.js";
 import { sendHtml, sendJson } from "./http-send.js";
 import { contextOf, marksOf, sinceOf, worktreeOf } from "./review-queries.js";
@@ -12,9 +13,11 @@ import {
   baselineOf,
   markOf,
   markReview,
+  type MarkRequest,
   parseMarkRequest,
   parseResetRequest,
   parseSectionRequest,
+  type ResetRequest,
   sectionHashes,
   sectionMarksOf,
 } from "./review-state.js";
@@ -30,20 +33,21 @@ import { NO_CHANGES, type ViewerContext } from "./viewer-context.js";
 const REVIEW_OFF =
   "Review marks are off: they need a git work tree, and a viewer bound to a loopback address, since a mark records this user's review on this machine.";
 
-export function changesRoutes(ctx: ViewerContext) {
-  const { changes, reviewStore } = ctx;
+export class ChangesRoutes {
+  constructor(private readonly ctx: ViewerContext) {}
 
-  async function sendChangesPage(
+  async sendChangesPage(
     request: IncomingMessage,
     response: ServerResponse,
     params: URLSearchParams,
   ): Promise<void> {
-    if (changes === undefined) {
+    const { ctx } = this;
+    if (ctx.changes === undefined) {
       ctx.sendNotFound(request, response, NO_CHANGES);
       return;
     }
     const worktree = worktreeOf(params);
-    const review = await changes.review(worktree);
+    const review = await ctx.changes.review(worktree);
     const marks = await marksOf(ctx, review);
     const baseline = baselineOf(params);
     sendHtml(
@@ -74,15 +78,16 @@ export function changesRoutes(ctx: ViewerContext) {
     );
   }
 
-  async function sendChangesData(
+  async sendChangesData(
     response: ServerResponse,
     params: URLSearchParams,
   ): Promise<void> {
-    if (changes === undefined) {
+    const { ctx } = this;
+    if (ctx.changes === undefined) {
       sendJson(response, { error: NO_CHANGES }, 404);
       return;
     }
-    const review = await changes.review(worktreeOf(params));
+    const review = await ctx.changes.review(worktreeOf(params));
     sendJson(
       response,
       changesPayload(
@@ -93,10 +98,11 @@ export function changesRoutes(ctx: ViewerContext) {
     );
   }
 
-  async function sendChangeDiff(
+  async sendChangeDiff(
     response: ServerResponse,
     params: URLSearchParams,
   ): Promise<void> {
+    const { changes } = this.ctx;
     if (changes === undefined) {
       sendJson(response, { error: NO_CHANGES }, 404);
       return;
@@ -109,29 +115,7 @@ export function changesRoutes(ctx: ViewerContext) {
     // Only ever compared against the review's own paths, like the graph's parameters.
     const relPath = params.get("path") ?? "";
     if (baselineOf(params) === "review") {
-      const entry = review.documents.find(
-        (document) => document.path === relPath,
-      );
-      const marks = await marksOf(ctx, review);
-      const since =
-        entry === undefined
-          ? undefined
-          : (await sinceOf(ctx, review, marks)).get(relPath);
-      if (since === undefined) {
-        sendJson(
-          response,
-          {
-            error:
-              "This path has no reviewed version to compare with: it is not among the changed documents, was never reviewed, is reviewed as it is, or its reviewed text is no longer kept.",
-          },
-          404,
-        );
-        return;
-      }
-      sendJson(
-        response,
-        diffPayload({ ...review, documents: [since] }, relPath),
-      );
+      await this.sendDiffSinceReview(response, review, relPath);
       return;
     }
     const answer = diffPayload(review, relPath);
@@ -146,16 +130,45 @@ export function changesRoutes(ctx: ViewerContext) {
     sendJson(response, answer);
   }
 
+  // A document's diff from the version the reader last reviewed, rather than from the base branch.
+  private async sendDiffSinceReview(
+    response: ServerResponse,
+    review: Review,
+    relPath: string,
+  ): Promise<void> {
+    const entry = review.documents.find(
+      (document) => document.path === relPath,
+    );
+    const marks = await marksOf(this.ctx, review);
+    const since =
+      entry === undefined
+        ? undefined
+        : (await sinceOf(this.ctx, review, marks)).get(relPath);
+    if (since === undefined) {
+      sendJson(
+        response,
+        {
+          error:
+            "This path has no reviewed version to compare with: it is not among the changed documents, was never reviewed, is reviewed as it is, or its reviewed text is no longer kept.",
+        },
+        404,
+      );
+      return;
+    }
+    sendJson(response, diffPayload({ ...review, documents: [since] }, relPath));
+  }
+
   // Records that the reader reviewed a document, or takes that back, or forgets the marks of every
   // document a page listed. The text marked is always the one this server's review holds for the
   // page's comparison, never one the request supplies, and only when its hash is the one the page
   // showed: a reader can mark exactly the version they saw, as a config save applies only to the
   // version the page edited.
-  async function changeMarks(
+  async changeMarks(
     response: ServerResponse,
     target: string,
     body: unknown,
   ): Promise<void> {
+    const { reviewStore, changes } = this.ctx;
     if (reviewStore === undefined || changes === undefined) {
       sendJson(response, { status: "refused", error: REVIEW_OFF }, 403);
       return;
@@ -173,67 +186,21 @@ export function changesRoutes(ctx: ViewerContext) {
       sendJson(response, { status: "refused", error: review.message }, 409);
       return;
     }
-    const listed =
-      "documents" in parsed.request
-        ? parsed.request.documents
-        : [{ path: parsed.request.path, hash: parsed.request.hash }];
-    const entries: DocumentReview[] = [];
-    for (const { path: relPath, hash } of listed) {
-      // Only ever compared against the review's own paths.
-      const entry = review.documents.find(
-        (document) => document.path === relPath,
-      );
-      if (entry === undefined || contentHash(entry.headText) !== hash) {
-        sendJson(
-          response,
-          {
-            status: "conflict",
-            error:
-              entry === undefined
-                ? "This document is no longer among the changes. Reload the page to see what changed now."
-                : "The document changed since this page showed it. Reload the page to review the version there now.",
-          },
-          409,
-        );
-        return;
-      }
-      entries.push(entry);
+    const matched = listedEntries(review, parsed.request);
+    if (!matched.ok) {
+      sendJson(response, { status: "conflict", error: matched.message }, 409);
+      return;
     }
-    let change: MarkChange;
-    if ("documents" in parsed.request) {
-      change = {
-        kind: "reset",
-        documents: entries.map((entry) => ({
-          path: entry.path,
-          ...(entry.oldPath === undefined ? {} : { oldPath: entry.oldPath }),
-          hash: contentHash(entry.headText),
-        })),
-      };
-    } else {
-      const entry = entries[0]!;
-      change = parsed.request.reviewed
-        ? {
-            kind: "mark",
-            path: entry.path,
-            hash: parsed.request.hash,
-            text: entry.headText,
-            sections: sectionHashes(entry),
-          }
-        : {
-            kind: "unmark",
-            path: entry.path,
-            ...(entry.oldPath === undefined ? {} : { oldPath: entry.oldPath }),
-            hash: parsed.request.hash,
-            sections: sectionHashes(entry),
-          };
-    }
-    const outcome = await reviewStore.update(change);
+    const { entries } = matched;
+    const outcome = await reviewStore.update(
+      markChangeOf(parsed.request, entries),
+    );
     if (!outcome.ok) {
       sendUpdateFailure(response, outcome);
       return;
     }
     // Every open page counts what is left, so each is told; nothing on disk the watcher sees changed.
-    ctx.events.broadcast("review", {});
+    this.ctx.events.broadcast("review", {});
     const marks = markReview(review, { ok: true, marks: outcome.marks });
     sendJson(response, {
       status: "saved",
@@ -256,10 +223,11 @@ export function changesRoutes(ctx: ViewerContext) {
   // One section of a changed document marked reviewed or not, from its page's outline. Always the
   // work tree's review, the one a document's page shows; the section's text is the review's own, and
   // only the version the page showed may be marked, as for a whole document.
-  async function changeSectionMark(
+  async changeSectionMark(
     response: ServerResponse,
     body: unknown,
   ): Promise<void> {
+    const { reviewStore, changes } = this.ctx;
     if (reviewStore === undefined || changes === undefined) {
       sendJson(response, { status: "refused", error: REVIEW_OFF }, 403);
       return;
@@ -309,7 +277,7 @@ export function changesRoutes(ctx: ViewerContext) {
       sendUpdateFailure(response, outcome);
       return;
     }
-    ctx.events.broadcast("review", {});
+    this.ctx.events.broadcast("review", {});
     const marks = markReview(review, { ok: true, marks: outcome.marks });
     const mark = markOf(entry, outcome.marks);
     sendJson(response, {
@@ -325,26 +293,97 @@ export function changesRoutes(ctx: ViewerContext) {
       total: review.documents.length,
     });
   }
+}
 
+// The review's entries for the documents a mark or reset request lists, each still at the version
+// the page showed. The first one that is not answers for the whole request, so nothing is marked
+// from a page that no longer shows what is on disk.
+function listedEntries(
+  review: Review,
+  request: MarkRequest | ResetRequest,
+): { ok: true; entries: DocumentReview[] } | { ok: false; message: string } {
+  const listed =
+    "documents" in request
+      ? request.documents
+      : [{ path: request.path, hash: request.hash }];
+  const entries: DocumentReview[] = [];
+  for (const { path: relPath, hash } of listed) {
+    // Only ever compared against the review's own paths.
+    const entry = review.documents.find(
+      (document) => document.path === relPath,
+    );
+    if (entry === undefined) {
+      return {
+        ok: false,
+        message:
+          "This document is no longer among the changes. Reload the page to see what changed now.",
+      };
+    }
+    if (contentHash(entry.headText) !== hash) {
+      return {
+        ok: false,
+        message:
+          "The document changed since this page showed it. Reload the page to review the version there now.",
+      };
+    }
+    entries.push(entry);
+  }
+  return { ok: true, entries };
+}
+
+// What the store records for a request whose entries all matched: a reset forgets every listed
+// document's mark, a mark or an unmark changes the one document's.
+function markChangeOf(
+  request: MarkRequest | ResetRequest,
+  entries: DocumentReview[],
+): MarkChange {
+  if ("documents" in request) {
+    return {
+      kind: "reset",
+      documents: entries.map((entry) => ({
+        path: entry.path,
+        ...(entry.oldPath === undefined ? {} : { oldPath: entry.oldPath }),
+        hash: contentHash(entry.headText),
+      })),
+    };
+  }
+  const entry = entries[0]!;
+  if (request.reviewed) {
+    return {
+      kind: "mark",
+      path: entry.path,
+      hash: request.hash,
+      text: entry.headText,
+      sections: sectionHashes(entry),
+    };
+  }
   return {
-    sendChangesPage,
-    sendChangesData,
-    sendChangeDiff,
-    changeMarks,
-    changeSectionMark,
+    kind: "unmark",
+    path: entry.path,
+    ...(entry.oldPath === undefined ? {} : { oldPath: entry.oldPath }),
+    hash: request.hash,
+    sections: sectionHashes(entry),
   };
 }
+
+type UpdateFailure = Extract<WriteOutcome, { ok: false }>;
+
+const FAILURE_STATUS: Record<UpdateFailure["status"], number> = {
+  failed: 500,
+  busy: 503,
+  refused: 409,
+};
 
 // A mark the store could not write: a write that failed, another viewer holding the lock, or marks
 // it refused to change because it cannot read the ones already there — each its own status, so the
 // page can say which.
 function sendUpdateFailure(
   response: ServerResponse,
-  outcome: Extract<WriteOutcome, { ok: false }>,
+  outcome: UpdateFailure,
 ): void {
   sendJson(
     response,
     { status: outcome.status, error: outcome.message },
-    outcome.status === "failed" ? 500 : outcome.status === "busy" ? 503 : 409,
+    FAILURE_STATUS[outcome.status],
   );
 }

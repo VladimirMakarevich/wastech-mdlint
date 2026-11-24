@@ -2,7 +2,7 @@ import { diffText } from "@wastech-mdlint/core";
 import { toHtml } from "hast-util-to-html";
 import { describe, expect, it } from "vitest";
 
-import { renderDiff } from "../src/changes.js";
+import { renderDiff } from "../src/change-diff.js";
 
 const numbered = (count: number) =>
   Array.from({ length: count }, (_, index) => `Line ${String(index + 1)}`);

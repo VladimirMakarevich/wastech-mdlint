@@ -22,39 +22,43 @@ import type { ViewerContext } from "./viewer-context.js";
 // The config page and the three things it asks of the server: a preview of what a changed config
 // would report, a save, and showing the file in the system's own program.
 
-export function configRoutes(ctx: ViewerContext) {
-  const { corpus } = ctx;
+export class ConfigRoutes {
   // Saves run one at a time: between checking that the file is the version the page edited and
   // replacing it, a second save must not slip in.
-  let configWrites = Promise.resolve();
+  private configWrites = Promise.resolve();
 
-  async function sendConfigPage(
+  constructor(private readonly ctx: ViewerContext) {}
+
+  async sendConfigPage(
     request: IncomingMessage,
     response: ServerResponse,
   ): Promise<void> {
     sendHtml(
       response,
       200,
-      ctx.page({
+      this.ctx.page({
         title: "Linter config",
         section: "config",
-        article: await renderConfigArticle(corpus, {
-          allowWrites: ctx.allowConfigWrites,
-          showAbsolutePath: ctx.showAbsolutePaths,
-          canOpen: ctx.openRefused === undefined,
+        article: await renderConfigArticle(this.ctx.corpus, {
+          allowWrites: this.ctx.allowConfigWrites,
+          showAbsolutePath: this.ctx.showAbsolutePaths,
+          canOpen: this.ctx.openRefused === undefined,
         }),
-        changeToken: ctx.changeToken,
+        changeToken: this.ctx.changeToken,
       }),
       request.method === "HEAD",
     );
   }
 
-  async function sendConfigData(response: ServerResponse): Promise<void> {
-    sendJson(response, await configApi(corpus, ctx.allowConfigWrites));
+  async sendConfigData(response: ServerResponse): Promise<void> {
+    sendJson(
+      response,
+      await configApi(this.ctx.corpus, this.ctx.allowConfigWrites),
+    );
   }
 
   // A preview or a save, once its body has passed the checks every change request passes.
-  async function changeConfig(
+  async changeConfig(
     response: ServerResponse,
     target: string,
     body: unknown,
@@ -65,21 +69,20 @@ export function configRoutes(ctx: ViewerContext) {
       return;
     }
     if (target === "/api/config/save") {
-      const run = configWrites.then(() => saveChange(response, parsed.request));
-      configWrites = run.catch(() => undefined);
+      const run = this.configWrites.then(() =>
+        this.saveChange(response, parsed.request),
+      );
+      this.configWrites = run.catch(() => undefined);
       await run;
       return;
     }
-    await previewChange(response, parsed.request);
+    await this.previewChange(response, parsed.request);
   }
 
   // Shows the config file in the file manager or opens it in its default application, on the
   // machine running the viewer. The file is always the one the corpus was loaded from; the request
   // only picks which of the two, so it can name no other file and pass no argument of its own.
-  async function openConfig(
-    response: ServerResponse,
-    body: unknown,
-  ): Promise<void> {
+  async openConfig(response: ServerResponse, body: unknown): Promise<void> {
     const action = (body as { action?: unknown } | null)?.action;
     if (action !== "reveal" && action !== "open") {
       sendJson(
@@ -92,11 +95,15 @@ export function configRoutes(ctx: ViewerContext) {
       );
       return;
     }
-    if (ctx.openRefused !== undefined) {
-      sendJson(response, { status: "refused", error: ctx.openRefused }, 403);
+    if (this.ctx.openRefused !== undefined) {
+      sendJson(
+        response,
+        { status: "refused", error: this.ctx.openRefused },
+        403,
+      );
       return;
     }
-    const file = await readConfigFile(corpus);
+    const file = await readConfigFile(this.ctx.corpus);
     if (file === undefined) {
       sendJson(
         response,
@@ -122,7 +129,7 @@ export function configRoutes(ctx: ViewerContext) {
       return;
     }
     try {
-      await ctx.launch(command);
+      await this.ctx.launch(command);
     } catch (error) {
       sendJson(
         response,
@@ -138,11 +145,11 @@ export function configRoutes(ctx: ViewerContext) {
   }
 
   // The file a change applies to, or `undefined` after answering why there is none to apply it to.
-  async function changeBase(
+  private async changeBase(
     response: ServerResponse,
     base: string,
   ): Promise<ConfigFile | undefined> {
-    const file = await readConfigFile(corpus);
+    const file = await readConfigFile(this.ctx.corpus);
     if (file === undefined) {
       sendJson(
         response,
@@ -169,11 +176,11 @@ export function configRoutes(ctx: ViewerContext) {
     return file;
   }
 
-  async function previewChange(
+  private async previewChange(
     response: ServerResponse,
     change: ChangeRequest,
   ): Promise<void> {
-    const file = await changeBase(response, change.base);
+    const file = await this.changeBase(response, change.base);
     if (file === undefined) {
       return;
     }
@@ -182,7 +189,7 @@ export function configRoutes(ctx: ViewerContext) {
       sendJson(response, { status: "invalid", errors: candidate.errors }, 422);
       return;
     }
-    const validated = validateCandidate(corpus, file, candidate.text);
+    const validated = validateCandidate(this.ctx.corpus, file, candidate.text);
     if (!validated.ok) {
       sendJson(
         response,
@@ -194,8 +201,8 @@ export function configRoutes(ctx: ViewerContext) {
     sendJson(
       response,
       await previewCandidate({
-        corpus,
-        current: currentFindings(),
+        corpus: this.ctx.corpus,
+        current: this.currentFindings(),
         candidate: validated.loaded,
         text: candidate.text,
       }),
@@ -203,18 +210,21 @@ export function configRoutes(ctx: ViewerContext) {
   }
 
   // What the config reports now: the background lint's result when it is in, else a lint run here.
-  function currentFindings(): LintMessage[] {
-    const byFile = ctx.diagnostics.messagesByFile;
+  private currentFindings(): LintMessage[] {
+    const byFile = this.ctx.diagnostics.messagesByFile;
     return byFile === undefined
-      ? corpus.lint().messages
+      ? this.ctx.corpus.lint().messages
       : [...byFile.values()].flat();
   }
 
-  async function saveChange(
+  private async saveChange(
     response: ServerResponse,
     change: ChangeRequest,
   ): Promise<void> {
-    const blocked = await writeBlockedReason(corpus, ctx.allowConfigWrites);
+    const blocked = await writeBlockedReason(
+      this.ctx.corpus,
+      this.ctx.allowConfigWrites,
+    );
     if (blocked !== undefined) {
       sendJson(response, { status: "refused", error: blocked }, 403);
       return;
@@ -231,11 +241,11 @@ export function configRoutes(ctx: ViewerContext) {
       );
       return;
     }
-    const file = await changeBase(response, change.base);
+    const file = await this.changeBase(response, change.base);
     if (file === undefined) {
       return;
     }
-    const validated = validateCandidate(corpus, file, change.text);
+    const validated = validateCandidate(this.ctx.corpus, file, change.text);
     if (!validated.ok) {
       sendJson(response, { status: "invalid", errors: validated.errors }, 422);
       return;
@@ -251,15 +261,13 @@ export function configRoutes(ctx: ViewerContext) {
     }
     // The watcher sees the config change and reloads the corpus as it does for any edit; without
     // one nothing else would, and every page would go on showing the old config's findings.
-    if (!ctx.watch) {
-      await corpus.reload();
-      ctx.renders.clear();
-      ctx.changes?.invalidate();
-      ctx.events.broadcast("change", { paths: [], structural: true });
-      ctx.relint();
+    if (!this.ctx.watch) {
+      await this.ctx.corpus.reload();
+      this.ctx.renders.clear();
+      this.ctx.changes?.invalidate();
+      this.ctx.events.broadcast("change", { paths: [], structural: true });
+      this.ctx.relint();
     }
     sendJson(response, outcome);
   }
-
-  return { sendConfigPage, sendConfigData, changeConfig, openConfig };
 }

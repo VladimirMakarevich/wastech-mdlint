@@ -1,4 +1,4 @@
-import type { ElementContent } from "hast";
+import type { Element, ElementContent } from "hast";
 import { h } from "hastscript";
 
 import {
@@ -246,30 +246,6 @@ export function renderGraphArticle(
   // Set in a git work tree, where the graph can show the branch's changes: whether it does.
   changes?: { shown: boolean },
 ): ElementContent[] {
-  const links = view.edges.filter((edge) => edge.change !== "removed");
-  const summary = [
-    `${plural(view.nodes.length, "document")}, ${plural(links.length, "link")} between them.`,
-  ];
-  if (changes?.shown === true) {
-    const changed = view.nodes.filter(
-      (node) => node.change !== undefined && node.change !== "affected",
-    ).length;
-    const affected = view.nodes.filter(
-      (node) => node.change === "affected",
-    ).length;
-    const added = view.edges.filter((edge) => edge.change === "added").length;
-    const removed = view.edges.length - links.length;
-    summary.push(
-      `This branch changed ${plural(changed, "document")} here and reaches ${affected} more; it linked ${plural(added, "pair")} and unlinked ${removed}.`,
-    );
-  }
-  if (view.focus !== null) {
-    summary.push(
-      `${view.focus.path} is highlighted with ${plural(view.focus.neighbors.length, "neighbor")}.`,
-    );
-  } else if (focus !== undefined) {
-    summary.push(`${focus} is not in this folder.`);
-  }
   return [
     h("h1", "Link graph"),
     h("form.graph-controls", { action: "/graph", method: "get" }, [
@@ -306,7 +282,7 @@ export function renderGraphArticle(
           ]),
       h("button", { type: "submit" }, "Show"),
     ]),
-    h("p.graph-summary", summary.join(" ")),
+    h("p.graph-summary", graphSummary(view, focus, changes)),
     h(
       "div.graph-canvas",
       {
@@ -321,34 +297,70 @@ export function renderGraphArticle(
         ),
       ],
     ),
-    h("details.graph-list", [
-      h("summary", `Documents in this view (${view.nodes.length})`),
-      h(
-        "ul",
-        view.nodes.map((node) =>
-          h("li", [
-            node.change === undefined || node.change === "affected"
-              ? undefined
-              : h(
-                  `span.change-status.change-status-${node.change}`,
-                  node.change,
-                ),
-            node.change === undefined || node.change === "affected"
-              ? undefined
-              : " ",
-            h("a", { href: node.href }, node.title),
-            " ",
-            h("span.graph-list-path", node.path),
-            " ",
-            h(
-              "span.graph-list-degree",
-              `${node.inDegree} in · ${node.outDegree} out`,
-            ),
-          ]),
-        ),
-      ),
-    ]),
+    renderGraphList(view),
   ];
+}
+
+// The line under the controls: how much is in view, what the branch did to it when that is shown,
+// and which document is highlighted.
+function graphSummary(
+  view: GraphView,
+  focus: string | undefined,
+  changes: { shown: boolean } | undefined,
+): string {
+  const links = view.edges.filter((edge) => edge.change !== "removed");
+  const summary = [
+    `${plural(view.nodes.length, "document")}, ${plural(links.length, "link")} between them.`,
+  ];
+  if (changes?.shown === true) {
+    const changed = view.nodes.filter(
+      (node) => node.change !== undefined && node.change !== "affected",
+    ).length;
+    const affected = view.nodes.filter(
+      (node) => node.change === "affected",
+    ).length;
+    const added = view.edges.filter((edge) => edge.change === "added").length;
+    const removed = view.edges.length - links.length;
+    summary.push(
+      `This branch changed ${plural(changed, "document")} here and reaches ${affected} more; it linked ${plural(added, "pair")} and unlinked ${removed}.`,
+    );
+  }
+  if (view.focus !== null) {
+    summary.push(
+      `${view.focus.path} is highlighted with ${plural(view.focus.neighbors.length, "neighbor")}.`,
+    );
+  } else if (focus !== undefined) {
+    summary.push(`${focus} is not in this folder.`);
+  }
+  return summary.join(" ");
+}
+
+// The documents in view as a list of links: the graph for a keyboard or a screen reader.
+function renderGraphList(view: GraphView): Element {
+  return h("details.graph-list", [
+    h("summary", `Documents in this view (${view.nodes.length})`),
+    h(
+      "ul",
+      view.nodes.map((node) =>
+        h("li", [
+          node.change === undefined || node.change === "affected"
+            ? undefined
+            : h(`span.change-status.change-status-${node.change}`, node.change),
+          node.change === undefined || node.change === "affected"
+            ? undefined
+            : " ",
+          h("a", { href: node.href }, node.title),
+          " ",
+          h("span.graph-list-path", node.path),
+          " ",
+          h(
+            "span.graph-list-degree",
+            `${node.inDegree} in · ${node.outDegree} out`,
+          ),
+        ]),
+      ),
+    ),
+  ]);
 }
 
 function plural(count: number, noun: string): string {

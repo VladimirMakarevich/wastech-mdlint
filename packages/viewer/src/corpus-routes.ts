@@ -10,9 +10,9 @@ import {
   buildDashboard,
   dashboardCsv,
   parseDashboardQuery,
-  renderDashboardArticle,
   type DashboardSource,
 } from "./dashboard.js";
+import { renderDashboardArticle } from "./dashboard-article.js";
 import {
   buildGraphView,
   buildNeighborhoodView,
@@ -33,15 +33,15 @@ import type { ViewerContext } from "./viewer-context.js";
 const GRAPH_NOT_FOUND =
   "The graph shows a folder that holds corpus documents, and can highlight a document in the corpus; this address names something else.";
 
-export function corpusRoutes(ctx: ViewerContext) {
-  const { corpus, diagnostics } = ctx;
+export class CorpusRoutes {
+  constructor(private readonly ctx: ViewerContext) {}
 
-  function sendSearchPage(
+  sendSearchPage(
     request: IncomingMessage,
     response: ServerResponse,
     query: string,
   ): void {
-    const hits = ctx.search.search(corpus.documents, query);
+    const hits = this.ctx.search.search(this.ctx.corpus.documents, query);
     const article: ElementContent[] =
       query.trim().length === 0
         ? [h("h1", "Search"), h("p", "Type a word or phrase to search for.")]
@@ -67,7 +67,7 @@ export function corpusRoutes(ctx: ViewerContext) {
     sendHtml(
       response,
       200,
-      ctx.page({
+      this.ctx.page({
         title: query ? `Search: ${query}` : "Search",
         article,
         query,
@@ -76,17 +76,17 @@ export function corpusRoutes(ctx: ViewerContext) {
     );
   }
 
-  function sendSearchData(response: ServerResponse, query: string): void {
+  sendSearchData(response: ServerResponse, query: string): void {
     sendJson(response, {
       query,
-      results: ctx.search.search(corpus.documents, query),
+      results: this.ctx.search.search(this.ctx.corpus.documents, query),
     });
   }
 
   // The folder and focused document a graph request names, or `undefined` when either is not part of
   // the corpus. Both are only compared against the corpus's own paths, never joined onto a
   // filesystem path, so nothing a request writes here reaches the disk.
-  function parseGraphRequest(
+  private parseGraphRequest(
     params: URLSearchParams,
   ): { folder: string; focus: string | undefined } | undefined {
     const folder = params.get("folder") ?? "";
@@ -96,8 +96,8 @@ export function corpusRoutes(ctx: ViewerContext) {
       focusParam === null || focusParam === "" ? undefined : focusParam;
     if (
       (folder !== "" &&
-        !graphFolders(corpus.documents.keys()).includes(folder)) ||
-      (focus !== undefined && !corpus.documents.has(focus))
+        !graphFolders(this.ctx.corpus.documents.keys()).includes(folder)) ||
+      (focus !== undefined && !this.ctx.corpus.documents.has(focus))
     ) {
       return undefined;
     }
@@ -106,37 +106,37 @@ export function corpusRoutes(ctx: ViewerContext) {
 
   // `changes=1` marks the branch's changes on a graph view; without it, or without a branch to
   // compare, the view is the graph as it is.
-  async function graphWithChanges(
+  private async graphWithChanges(
     view: GraphView,
     params: URLSearchParams,
   ): Promise<GraphView> {
     if (params.get("changes") !== "1") {
       return view;
     }
-    const branch = await workTreeChanges(ctx);
+    const branch = await workTreeChanges(this.ctx);
     return branch === undefined
       ? view
       : withChanges(
           view,
-          corpus.graph,
+          this.ctx.corpus.graph,
           graphChanges(branch.review, branch.context),
         );
   }
 
-  async function sendGraphPage(
+  async sendGraphPage(
     request: IncomingMessage,
     response: ServerResponse,
     params: URLSearchParams,
   ): Promise<void> {
-    const graphRequest = parseGraphRequest(params);
+    const graphRequest = this.parseGraphRequest(params);
     if (graphRequest === undefined) {
-      ctx.sendNotFound(request, response, GRAPH_NOT_FOUND);
+      this.ctx.sendNotFound(request, response, GRAPH_NOT_FOUND);
       return;
     }
-    const view = await graphWithChanges(
+    const view = await this.graphWithChanges(
       buildGraphView(
-        corpus.graph,
-        corpus.documents,
+        this.ctx.corpus.graph,
+        this.ctx.corpus.documents,
         graphRequest.folder,
         graphRequest.focus,
       ),
@@ -145,14 +145,14 @@ export function corpusRoutes(ctx: ViewerContext) {
     sendHtml(
       response,
       200,
-      ctx.page({
+      this.ctx.page({
         title: "Link graph",
         section: "graph",
         article: renderGraphArticle(
           view,
-          graphFolders(corpus.documents.keys()),
+          graphFolders(this.ctx.corpus.documents.keys()),
           graphRequest.focus,
-          ctx.changes === undefined
+          this.ctx.changes === undefined
             ? undefined
             : { shown: params.get("changes") === "1" },
         ),
@@ -161,21 +161,21 @@ export function corpusRoutes(ctx: ViewerContext) {
     );
   }
 
-  async function sendGraphData(
+  async sendGraphData(
     response: ServerResponse,
     params: URLSearchParams,
   ): Promise<void> {
-    const graphRequest = parseGraphRequest(params);
+    const graphRequest = this.parseGraphRequest(params);
     if (graphRequest === undefined) {
       sendJson(response, { error: GRAPH_NOT_FOUND }, 404);
       return;
     }
     sendJson(
       response,
-      await graphWithChanges(
+      await this.graphWithChanges(
         buildGraphView(
-          corpus.graph,
-          corpus.documents,
+          this.ctx.corpus.graph,
+          this.ctx.corpus.documents,
           graphRequest.folder,
           graphRequest.focus,
         ),
@@ -184,13 +184,13 @@ export function corpusRoutes(ctx: ViewerContext) {
     );
   }
 
-  async function sendNeighbors(
+  async sendNeighbors(
     response: ServerResponse,
     params: URLSearchParams,
   ): Promise<void> {
     // Only ever compared against the corpus's own paths, like the graph's parameters.
     const relPath = params.get("path") ?? "";
-    if (!corpus.documents.has(relPath)) {
+    if (!this.ctx.corpus.documents.has(relPath)) {
       sendJson(
         response,
         { error: "This path is not a document in the corpus." },
@@ -200,19 +200,23 @@ export function corpusRoutes(ctx: ViewerContext) {
     }
     sendJson(
       response,
-      await graphWithChanges(
-        buildNeighborhoodView(corpus.graph, corpus.documents, relPath),
+      await this.graphWithChanges(
+        buildNeighborhoodView(
+          this.ctx.corpus.graph,
+          this.ctx.corpus.documents,
+          relPath,
+        ),
         params,
       ),
     );
   }
 
-  async function dashboardSource(): Promise<DashboardSource> {
-    const findings = diagnostics.messagesByFile;
+  private async dashboardSource(): Promise<DashboardSource> {
+    const findings = this.ctx.diagnostics.messagesByFile;
     // The rules a reader can pick: the ones the config runs, plus any other id a finding carries,
     // such as the report about a malformed suppression comment.
     const ruleIds = new Set(
-      corpus.configuration.rules
+      this.ctx.corpus.configuration.rules
         .filter(({ severity }) => severity !== "off")
         .map(({ rule }) => rule.id),
     );
@@ -221,30 +225,30 @@ export function corpusRoutes(ctx: ViewerContext) {
         ruleIds.add(message.ruleId);
       }
     }
-    const branch = await workTreeChanges(ctx);
+    const branch = await workTreeChanges(this.ctx);
     return {
-      documents: corpus.documents,
-      graph: corpus.graph,
+      documents: this.ctx.corpus.documents,
+      graph: this.ctx.corpus.graph,
       findings,
       ruleIds: [...ruleIds].sort(compareStrings),
-      folders: graphFolders(corpus.documents.keys()),
+      folders: graphFolders(this.ctx.corpus.documents.keys()),
       ...(branch === undefined
         ? {}
         : { changes: dashboardChanges(branch.review, branch.context) }),
     };
   }
 
-  async function sendDashboardPage(
+  async sendDashboardPage(
     request: IncomingMessage,
     response: ServerResponse,
     params: URLSearchParams,
   ): Promise<void> {
-    const source = await dashboardSource();
+    const source = await this.dashboardSource();
     const parsed = parseDashboardQuery(params, source);
     sendHtml(
       response,
       parsed.ok ? 200 : 400,
-      ctx.page({
+      this.ctx.page({
         title: "Dashboard",
         section: "dashboard",
         article: renderDashboardArticle(
@@ -263,11 +267,11 @@ export function corpusRoutes(ctx: ViewerContext) {
     );
   }
 
-  async function sendDashboardData(
+  async sendDashboardData(
     response: ServerResponse,
     params: URLSearchParams,
   ): Promise<void> {
-    const source = await dashboardSource();
+    const source = await this.dashboardSource();
     const parsed = parseDashboardQuery(params, source, ["format"]);
     const format = params.get("format") ?? "";
     if (!parsed.ok || !["", "json", "csv"].includes(format)) {
@@ -302,34 +306,35 @@ export function corpusRoutes(ctx: ViewerContext) {
     );
   }
 
-  function sendDiagnostics(
-    response: ServerResponse,
-    params: URLSearchParams,
-  ): void {
-    if (!diagnostics.ready) {
+  sendDiagnostics(response: ServerResponse, params: URLSearchParams): void {
+    if (!this.ctx.diagnostics.ready) {
       sendJson(response, { status: "pending" });
       return;
     }
     const relPath = params.get("path");
     if (relPath === null) {
-      sendJson(response, { status: "ready", files: diagnostics.summary() });
+      sendJson(response, {
+        status: "ready",
+        files: this.ctx.diagnostics.summary(),
+      });
       return;
     }
-    const document = corpus.documents.get(relPath);
+    const document = this.ctx.corpus.documents.get(relPath);
     sendJson(response, {
       status: "ready",
-      findings: document === undefined ? [] : diagnostics.findings(document),
+      findings:
+        document === undefined ? [] : this.ctx.diagnostics.findings(document),
     });
   }
 
-  async function sendPrompts(
+  async sendPrompts(
     response: ServerResponse,
     params: URLSearchParams,
   ): Promise<void> {
     const line = params.get("line");
     const answer = await findingPrompts({
-      corpus,
-      findings: diagnostics.messagesByFile,
+      corpus: this.ctx.corpus,
+      findings: this.ctx.diagnostics.messagesByFile,
       // Only ever compared against the corpus's own paths and the findings' own rule ids.
       filePath: params.get("path") ?? "",
       ruleId: params.get("rule") ?? undefined,
@@ -337,18 +342,6 @@ export function corpusRoutes(ctx: ViewerContext) {
     });
     sendJson(response, answer.body, answer.status);
   }
-
-  return {
-    sendSearchPage,
-    sendSearchData,
-    sendGraphPage,
-    sendGraphData,
-    sendNeighbors,
-    sendDashboardPage,
-    sendDashboardData,
-    sendDiagnostics,
-    sendPrompts,
-  };
 }
 
 // The server-rendered twin of the client's highlighting: matched words wrapped in <mark>, built as

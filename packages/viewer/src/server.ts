@@ -1,45 +1,29 @@
 import { randomBytes } from "node:crypto";
-import {
-  createServer,
-  type IncomingMessage,
-  type Server,
-  type ServerResponse,
-} from "node:http";
+import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
 
-import { sendEcharts, sendMermaid, sendPackageAsset } from "./asset-routes.js";
-import { ChangeTracker, diffViewOf } from "./changes.js";
-import { changesRoutes } from "./changes-routes.js";
-import { configRoutes } from "./config-routes.js";
+import type { GitRepository } from "@wastech-mdlint/core";
+
+import { ChangeTracker } from "./changes.js";
 import { Corpus } from "./corpus.js";
-import { corpusRoutes } from "./corpus-routes.js";
 import { Diagnostics } from "./diagnostics.js";
-import { documentRoutes } from "./document-routes.js";
 import { EventHub } from "./event-hub.js";
-import { readBody, sendJson, sendText } from "./http-send.js";
+import { sendText } from "./http-send.js";
 import { launchDetached, openRefusal, type Launcher } from "./open-file.js";
 import { RenderCache } from "./render-cache.js";
-import { decodeRequestPath } from "./request-path.js";
-import { baselineOf, SinceReview } from "./review-state.js";
+import { SinceReview } from "./review-state.js";
 import { ReviewStore } from "./review-store.js";
+import { type BoundAddress, ViewerRouter } from "./router.js";
 import { DocumentSearch } from "./search.js";
-import {
-  changeRequestProblem,
-  exposesAbsolutePaths,
-  isAllowedHostHeader,
-  isForeignRequest,
-  isLoopbackHost,
-} from "./security.js";
+import { exposesAbsolutePaths, isLoopbackHost } from "./security.js";
 import { defaultStateDir } from "./state-dir.js";
-import { viewerContext } from "./viewer-context.js";
+import { type ViewerContext, viewerContext } from "./viewer-context.js";
 import { watchGitRefs, watchRepository } from "./watch.js";
 
-// Starting the viewer, and the one place every request passes through: the checks that apply to all
-// of them, then the route that answers. What each route does lives with its group — a document's
-// page, the Changes page and review marks, the config page, the corpus-wide pages, the shipped
-// assets — over one shared `ViewerContext`, so every route reads the same corpus and review.
+// Starting the viewer: loading the corpus and its review, building the state every route shares,
+// keeping it current as the repository changes, and listening. Every request goes to the router.
 
 export type ViewerOptions = {
   cwd: string;
@@ -78,22 +62,6 @@ export type RunningViewer = {
 // first one simply lands next to it.
 const PORT_ATTEMPTS = 20;
 
-// A config change or a review mark is at most a few kilobytes of JSON; anything far beyond that is
-// not one, and reading it into memory would cost the server for nothing.
-const MAX_CHANGE_BODY_BYTES = 256 * 1024;
-
-// The only requests with a body the server acts on. Each computes from the config, writes it, opens
-// it in another program or records a review mark, so each passes the checks in
-// `changeRequestProblem` before its body is read.
-const CHANGE_ROUTES = new Set([
-  "/api/config/preview",
-  "/api/config/save",
-  "/api/config/open",
-  "/api/review/mark",
-  "/api/review/section",
-  "/api/review/reset",
-]);
-
 export async function startViewer(
   options: ViewerOptions,
 ): Promise<RunningViewer> {
@@ -114,281 +82,14 @@ export async function startViewer(
       notices.push(`changes: ${first.message} ${first.hint}`);
     }
   }
-  // Review marks, for a reader on this machine only: from another one, anyone who reached the port
-  // could record a review in this user's name and read which documents they have reviewed. Nothing
-  // is created here; the clone's folder appears with the first mark.
-  const git = changes?.git;
-  const reviewStore =
-    git !== undefined && isLoopbackHost(options.host)
-      ? new ReviewStore({
-          // A relative `--state-dir` is taken from where the viewer was started, as a shell user
-          // expects, and fixed now, so it means the same folder for as long as the viewer runs.
-          stateDir:
-            options.stateDir === undefined
-              ? defaultStateDir(process.platform, process.env, os.homedir())
-              : path.resolve(options.stateDir),
-          commonDir: git.commonDir,
-          keyOf: (relPath) => git.topLevelPath(relPath),
-        })
-      : undefined;
-  const events = new EventHub();
-  const ctx = viewerContext({
-    corpus,
-    changes,
-    git,
-    reviewStore,
-    sinceReviews:
-      reviewStore === undefined ? undefined : new SinceReview(reviewStore),
-    search: new DocumentSearch(),
-    diagnostics: new Diagnostics(),
-    renders: new RenderCache(corpus),
-    events,
-    allowConfigWrites: options.allowConfigWrites === true,
-    showAbsolutePaths: exposesAbsolutePaths(options.host),
-    watch: options.watch,
-    launch: options.launch ?? launchDetached,
-    openRefused: openRefusal(options.host),
-    changeToken: randomBytes(32).toString("hex"),
-  });
-  const documents = documentRoutes(ctx);
-  const review = changesRoutes(ctx);
-  const config = configRoutes(ctx);
-  const pages = corpusRoutes(ctx);
-  const bound = { host: options.host, port: options.port };
-
-  async function handle(
-    request: IncomingMessage,
-    response: ServerResponse,
-  ): Promise<void> {
-    if (!isAllowedHostHeader(request.headers.host, bound)) {
-      sendText(
-        response,
-        403,
-        "Forbidden: this server answers only to localhost.",
-      );
-      return;
-    }
-    if (isForeignRequest(request.headers)) {
-      sendText(response, 403, "Forbidden: cross-site request.");
-      return;
-    }
-    const [target = "", queryString = ""] = (request.url ?? "")
-      .split("#", 1)[0]!
-      .split("?", 2);
-    if (CHANGE_ROUTES.has(target)) {
-      if (request.method !== "POST") {
-        response.setHeader("Allow", "POST");
-        sendText(
-          response,
-          405,
-          "Method not allowed: send the change as a POST.",
-        );
-        return;
-      }
-      await handleChange(request, response, target);
-      return;
-    }
-    if (request.method !== "GET" && request.method !== "HEAD") {
-      response.setHeader("Allow", "GET, HEAD");
-      sendText(
-        response,
-        405,
-        "Method not allowed: only the config page's and the review marks' requests take a body.",
-      );
-      return;
-    }
-
-    const params = new URLSearchParams(queryString);
-    if (target === "/") {
-      documents.redirectToIndex(response);
-    } else if (target === "/search") {
-      pages.sendSearchPage(request, response, params.get("q") ?? "");
-    } else if (target === "/api/search") {
-      pages.sendSearchData(response, params.get("q") ?? "");
-    } else if (target === "/graph") {
-      await pages.sendGraphPage(request, response, params);
-    } else if (target === "/api/graph") {
-      await pages.sendGraphData(response, params);
-    } else if (target === "/api/neighbors") {
-      await pages.sendNeighbors(response, params);
-    } else if (target === "/changes") {
-      await review.sendChangesPage(request, response, params);
-    } else if (target === "/api/changes") {
-      await review.sendChangesData(response, params);
-    } else if (target === "/api/history") {
-      await documents.sendHistory(response, params);
-    } else if (target === "/api/changes/diff") {
-      await review.sendChangeDiff(response, params);
-    } else if (target === "/dashboard") {
-      await pages.sendDashboardPage(request, response, params);
-    } else if (target === "/api/dashboard") {
-      await pages.sendDashboardData(response, params);
-    } else if (target === "/config") {
-      await config.sendConfigPage(request, response);
-    } else if (target === "/api/config") {
-      await config.sendConfigData(response);
-    } else if (target === "/api/diagnostics") {
-      pages.sendDiagnostics(response, params);
-    } else if (target === "/api/prompts") {
-      await pages.sendPrompts(response, params);
-    } else if (target === "/events") {
-      events.open(request, response);
-    } else if (target === "/favicon.ico") {
-      await sendPackageAsset(request, response, "favicon.ico");
-    } else if (target.startsWith("/assets/")) {
-      await sendPackageAsset(
-        request,
-        response,
-        target.slice("/assets/".length),
-      );
-    } else if (target === "/vendor/echarts/echarts.esm.min.mjs") {
-      await sendEcharts(request, response);
-    } else if (target.startsWith("/vendor/mermaid/")) {
-      await sendMermaid(
-        request,
-        response,
-        target.slice("/vendor/mermaid/".length),
-      );
-    } else if (target.startsWith("/doc/")) {
-      await documents.sendDocument(
-        request,
-        response,
-        decodeRequestPath(target.slice("/doc/".length)),
-        diffViewOf(params),
-        baselineOf(params),
-        params.get("blame") === "1",
-      );
-    } else if (target.startsWith("/file/")) {
-      await documents.sendLinkedFile(
-        request,
-        response,
-        decodeRequestPath(target.slice("/file/".length)),
-      );
-    } else {
-      ctx.sendNotFound(request, response, "There is no page at this address.");
-    }
-  }
-
-  // A request with a body: refused before its body is read unless it came from a page this server
-  // rendered, then parsed once here, so every route that takes a body is guarded the same way.
-  async function handleChange(
-    request: IncomingMessage,
-    response: ServerResponse,
-    target: string,
-  ): Promise<void> {
-    const problem = changeRequestProblem(request.headers, ctx.changeToken);
-    if (problem !== undefined) {
-      request.resume();
-      sendJson(
-        response,
-        { status: "refused", error: problem.message },
-        problem.status,
-      );
-      return;
-    }
-    const body = await readBody(request, MAX_CHANGE_BODY_BYTES);
-    if (body === undefined) {
-      sendJson(
-        response,
-        {
-          status: "refused",
-          error:
-            "The request body is too large to be a config change or a review mark.",
-        },
-        413,
-      );
-      return;
-    }
-    let json: unknown;
-    try {
-      json = JSON.parse(body);
-    } catch {
-      sendJson(
-        response,
-        { status: "refused", error: "The request body is not valid JSON." },
-        400,
-      );
-      return;
-    }
-    if (target === "/api/config/open") {
-      await config.openConfig(response, json);
-    } else if (target === "/api/review/section") {
-      await review.changeSectionMark(response, json);
-    } else if (
-      target === "/api/review/mark" ||
-      target === "/api/review/reset"
-    ) {
-      await review.changeMarks(response, target, json);
-    } else {
-      await config.changeConfig(response, target, json);
-    }
-  }
-
-  // Changes are applied one batch at a time, in order: two overlapping updates could otherwise
-  // finish out of order and leave the older corpus in place.
-  let updates = Promise.resolve();
-  const stopWatching = options.watch
-    ? watchRepository(corpus.rootDir, (paths) => {
-        updates = updates
-          .then(async () => {
-            const change = await corpus.applyChanges(paths);
-            // Every reported path, even one that changed no document: a Markdown file outside the
-            // corpus, or a document saved back to its committed text, changes the review all the same.
-            changes?.invalidate();
-            if (change.structural) {
-              ctx.renders.clear();
-            }
-            for (const changedPath of change.changed) {
-              const document = corpus.documents.get(changedPath);
-              if (document !== undefined) {
-                ctx.renders.forget(document);
-              }
-            }
-            if (change.changed.length > 0 || change.structural) {
-              // Every open page answers this event — a document page by reloading and waiting for
-              // its review, every other page's script by asking for the changes — so the review
-              // they will all join is started before they ask.
-              if (changes !== undefined && events.size > 0) {
-                void changes.review(true).catch(() => undefined);
-              }
-              events.broadcast("change", {
-                paths: change.changed,
-                structural: change.structural,
-              });
-              ctx.relint();
-            }
-          })
-          .catch((error: unknown) => {
-            process.stderr.write(
-              `wastech-mdlint-viewer: could not apply changes: ${(error as Error).message}\n`,
-            );
-          });
-      })
-    : () => {};
-
-  // A commit, a checkout, a reset or a fetch moves what the review compares without touching the
-  // work tree. The review is rebuilt as soon as git records the move, and open pages are told only
-  // when it really is a different review: a ref of some other branch moving changes nothing they show.
-  const stopWatchingRefs =
-    options.watch && git !== undefined
-      ? watchGitRefs(git, () => {
-          void refreshAfterGitMove();
-        })
-      : () => {};
-
-  async function refreshAfterGitMove(): Promise<void> {
-    if (changes === undefined) {
-      return;
-    }
-    const before = changes.cached(true);
-    const after = await changes.review(true).catch(() => undefined);
-    if (after !== undefined && after !== before) {
-      events.broadcast("git", {});
-    }
-  }
+  const ctx = createContext(options, corpus, changes);
+  const bound: BoundAddress = { host: options.host, port: options.port };
+  const router = new ViewerRouter(ctx, bound);
+  const stopWatching = options.watch ? watchCorpus(ctx) : () => {};
+  const stopWatchingRefs = options.watch ? watchRefs(ctx) : () => {};
 
   const server = createServer((request, response) => {
-    handle(request, response).catch((error: unknown) => {
+    router.handle(request, response).catch((error: unknown) => {
       // Logged locally with the request path only; the response stays generic so an error message
       // carrying an absolute path never reaches the page.
       process.stderr.write(
@@ -426,7 +127,7 @@ export async function startViewer(
       clearImmediate(initialLint);
       stopWatching();
       stopWatchingRefs();
-      events.close();
+      ctx.events.close();
       await new Promise<void>((resolve) => {
         server.close(() => {
           resolve();
@@ -435,6 +136,130 @@ export async function startViewer(
       });
     },
   };
+}
+
+// The state every route shares, built once for the whole run.
+function createContext(
+  options: ViewerOptions,
+  corpus: Corpus,
+  changes: ChangeTracker | undefined,
+): ViewerContext {
+  const git = changes?.git;
+  const reviewStore = openReviewStore(options, git);
+  return viewerContext({
+    corpus,
+    changes,
+    git,
+    reviewStore,
+    sinceReviews:
+      reviewStore === undefined ? undefined : new SinceReview(reviewStore),
+    search: new DocumentSearch(),
+    diagnostics: new Diagnostics(),
+    renders: new RenderCache(corpus),
+    events: new EventHub(),
+    allowConfigWrites: options.allowConfigWrites === true,
+    showAbsolutePaths: exposesAbsolutePaths(options.host),
+    watch: options.watch,
+    launch: options.launch ?? launchDetached,
+    openRefused: openRefusal(options.host),
+    changeToken: randomBytes(32).toString("hex"),
+  });
+}
+
+// Review marks, for a reader on this machine only: from another one, anyone who reached the port
+// could record a review in this user's name and read which documents they have reviewed. Nothing
+// is created here; the clone's folder appears with the first mark.
+function openReviewStore(
+  options: ViewerOptions,
+  git: GitRepository | undefined,
+): ReviewStore | undefined {
+  if (git === undefined || !isLoopbackHost(options.host)) {
+    return undefined;
+  }
+  return new ReviewStore({
+    // A relative `--state-dir` is taken from where the viewer was started, as a shell user
+    // expects, and fixed now, so it means the same folder for as long as the viewer runs.
+    stateDir:
+      options.stateDir === undefined
+        ? defaultStateDir(process.platform, process.env, os.homedir())
+        : path.resolve(options.stateDir),
+    commonDir: git.commonDir,
+    keyOf: (relPath) => git.topLevelPath(relPath),
+  });
+}
+
+// Watches the work tree and applies what changed to the corpus. Changes are applied one batch at a
+// time, in order: two overlapping updates could otherwise finish out of order and leave the older
+// corpus in place.
+function watchCorpus(ctx: ViewerContext): () => void {
+  let updates = Promise.resolve();
+  return watchRepository(ctx.corpus.rootDir, (paths) => {
+    updates = updates
+      .then(() => applyChanges(ctx, paths))
+      .catch((error: unknown) => {
+        process.stderr.write(
+          `wastech-mdlint-viewer: could not apply changes: ${(error as Error).message}\n`,
+        );
+      });
+  });
+}
+
+async function applyChanges(
+  ctx: ViewerContext,
+  paths: readonly string[],
+): Promise<void> {
+  const { corpus, changes, events } = ctx;
+  const change = await corpus.applyChanges(paths);
+  // Every reported path, even one that changed no document: a Markdown file outside the corpus, or a
+  // document saved back to its committed text, changes the review all the same.
+  changes?.invalidate();
+  if (change.structural) {
+    ctx.renders.clear();
+  }
+  for (const changedPath of change.changed) {
+    const document = corpus.documents.get(changedPath);
+    if (document !== undefined) {
+      ctx.renders.forget(document);
+    }
+  }
+  if (change.changed.length === 0 && !change.structural) {
+    return;
+  }
+  // Every open page answers this event — a document page by reloading and waiting for its review,
+  // every other page's script by asking for the changes — so the review they will all join is
+  // started before they ask.
+  if (changes !== undefined && events.size > 0) {
+    void changes.review(true).catch(() => undefined);
+  }
+  events.broadcast("change", {
+    paths: change.changed,
+    structural: change.structural,
+  });
+  ctx.relint();
+}
+
+// A commit, a checkout, a reset or a fetch moves what the review compares without touching the work
+// tree. The review is rebuilt as soon as git records the move, and open pages are told only when it
+// really is a different review: a ref of some other branch moving changes nothing they show.
+function watchRefs(ctx: ViewerContext): () => void {
+  const { git, changes } = ctx;
+  if (git === undefined || changes === undefined) {
+    return () => {};
+  }
+  return watchGitRefs(git, () => {
+    void refreshAfterGitMove(ctx, changes);
+  });
+}
+
+async function refreshAfterGitMove(
+  ctx: ViewerContext,
+  changes: ChangeTracker,
+): Promise<void> {
+  const before = changes.cached(true);
+  const after = await changes.review(true).catch(() => undefined);
+  if (after !== undefined && after !== before) {
+    ctx.events.broadcast("git", {});
+  }
 }
 
 async function listen(

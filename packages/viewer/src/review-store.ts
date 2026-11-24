@@ -94,11 +94,10 @@ export class ReviewMarks {
         (relPath) =>
           this.sections.get(this.keyOf(relPath))?.get(entry.key) ?? [],
       );
-    return marked.includes(entry.hash)
-      ? "reviewed"
-      : marked.length > 0
-        ? "changed"
-        : "unreviewed";
+    if (marked.includes(entry.hash)) {
+      return "reviewed";
+    }
+    return marked.length > 0 ? "changed" : "unreviewed";
   }
 
   /**
@@ -461,17 +460,92 @@ export function cloneFolder(commonDir: string): string {
   return `${label === "" ? "repository" : label}-${digest}`;
 }
 
+type MarkState = { documents: Map<string, string[]>; sections: SectionMarks };
+
 function applyChange(
-  state: { documents: Map<string, string[]>; sections: SectionMarks },
+  state: MarkState,
   change: MarkChange,
   keyOf: (relPath: string) => string,
 ): void {
-  const { documents, sections } = state;
-  const keysOf = (entry: { path: string; oldPath?: string }) =>
-    [entry.path, entry.oldPath]
+  const editor = new MarkEditor(state, keyOf);
+  switch (change.kind) {
+    case "mark":
+      editor.mark(change);
+      break;
+    case "unmark":
+      editor.unmark(change);
+      break;
+    case "section":
+      editor.section(change);
+      break;
+    case "reset":
+      editor.reset(change);
+      break;
+  }
+  dropEmpty(state);
+}
+
+// The edits one change makes to the marks read from the index, before they are written back.
+class MarkEditor {
+  constructor(
+    private readonly state: MarkState,
+    private readonly keyOf: (relPath: string) => string,
+  ) {}
+
+  mark(change: Extract<MarkChange, { kind: "mark" }>): void {
+    const { documents } = this.state;
+    const key = this.keyOf(change.path);
+    const hashes = documents.get(key) ?? [];
+    documents.set(
+      key,
+      [change.hash, ...hashes.filter((hash) => hash !== change.hash)].slice(
+        0,
+        VERSIONS_PER_PATH,
+      ),
+    );
+    for (const section of change.sections ?? []) {
+      this.markSection(key, section);
+    }
+  }
+
+  unmark(change: Extract<MarkChange, { kind: "unmark" }>): void {
+    const keys = this.keysOf(change);
+    this.removeEverywhere(change.hash, keys);
+    for (const section of change.sections ?? []) {
+      this.unmarkSection(keys, section);
+    }
+  }
+
+  section(change: Extract<MarkChange, { kind: "section" }>): void {
+    if (change.reviewed) {
+      this.markSection(this.keyOf(change.path), change);
+    } else {
+      this.unmarkSection(this.keysOf(change), change);
+    }
+  }
+
+  // Starting over: the documents forget every version reviewed under their paths, not only the
+  // current one, or an older mark would leave them "changed since review" rather than unreviewed.
+  reset(change: Extract<MarkChange, { kind: "reset" }>): void {
+    const { documents, sections } = this.state;
+    for (const entry of change.documents) {
+      const keys = this.keysOf(entry);
+      for (const key of keys) {
+        documents.delete(key);
+        sections.delete(key);
+      }
+      this.removeEverywhere(entry.hash, keys);
+    }
+  }
+
+  private keysOf(entry: { path: string; oldPath?: string }): string[] {
+    return [entry.path, entry.oldPath]
       .filter((relPath): relPath is string => relPath !== undefined)
-      .map(keyOf);
-  const markSection = (documentKey: string, section: SectionHash) => {
+      .map(this.keyOf);
+  }
+
+  private markSection(documentKey: string, section: SectionHash): void {
+    const { sections } = this.state;
     let marks = sections.get(documentKey);
     if (marks === undefined) {
       marks = new Map();
@@ -485,13 +559,14 @@ function applyChange(
         VERSIONS_PER_PATH,
       ),
     );
-  };
-  const unmarkSection = (
+  }
+
+  private unmarkSection(
     documentKeys: readonly string[],
     section: SectionHash,
-  ) => {
+  ): void {
     for (const documentKey of documentKeys) {
-      const marks = sections.get(documentKey);
+      const marks = this.state.sections.get(documentKey);
       const hashes = marks?.get(section.key);
       if (marks !== undefined && hashes !== undefined) {
         marks.set(
@@ -500,10 +575,12 @@ function applyChange(
         );
       }
     }
-  };
+  }
+
   // Removing a text removes it under every path, since a text marked under one path counts under
   // all of them; the empty text of a deletion is the exception, counted under its own path only.
-  const removeEverywhere = (hash: string, keys: readonly string[]) => {
+  private removeEverywhere(hash: string, keys: readonly string[]): void {
+    const { documents } = this.state;
     for (const [key, hashes] of documents) {
       if (hash !== EMPTY_HASH || keys.includes(key)) {
         documents.set(
@@ -512,46 +589,11 @@ function applyChange(
         );
       }
     }
-  };
-  if (change.kind === "mark") {
-    const key = keyOf(change.path);
-    const hashes = documents.get(key) ?? [];
-    documents.set(
-      key,
-      [change.hash, ...hashes.filter((hash) => hash !== change.hash)].slice(
-        0,
-        VERSIONS_PER_PATH,
-      ),
-    );
-    for (const section of change.sections ?? []) {
-      markSection(key, section);
-    }
-  } else if (change.kind === "unmark") {
-    const keys = keysOf(change);
-    removeEverywhere(change.hash, keys);
-    for (const section of change.sections ?? []) {
-      unmarkSection(keys, section);
-    }
-  } else if (change.kind === "section") {
-    if (change.reviewed) {
-      markSection(keyOf(change.path), change);
-    } else {
-      unmarkSection(keysOf(change), change);
-    }
-  } else {
-    // Starting over: the documents forget every version reviewed under their paths, not only the
-    // current one, or an older mark would leave them "changed since review" rather than unreviewed.
-    for (const entry of change.documents) {
-      const keys = [entry.path, entry.oldPath]
-        .filter((relPath): relPath is string => relPath !== undefined)
-        .map(keyOf);
-      for (const key of keys) {
-        documents.delete(key);
-        sections.delete(key);
-      }
-      removeEverywhere(entry.hash, keys);
-    }
   }
+}
+
+// A path or a section left with no reviewed text is dropped, so the index holds no empty entries.
+function dropEmpty({ documents, sections }: MarkState): void {
   for (const [key, hashes] of documents) {
     if (hashes.length === 0) {
       documents.delete(key);
@@ -621,10 +663,10 @@ function parseIndex(text: string): ParsedIndex {
   } catch {
     return { ok: false, message: UNREADABLE };
   }
-  if (typeof json !== "object" || json === null || Array.isArray(json)) {
+  if (!isRecord(json)) {
     return { ok: false, message: UNREADABLE };
   }
-  const { format, documents, sections } = json as Record<string, unknown>;
+  const { format, documents, sections } = json;
   if (typeof format === "number" && format > FORMAT) {
     return {
       ok: false,
@@ -639,34 +681,55 @@ function parseIndex(text: string): ParsedIndex {
   ) {
     return { ok: false, message: UNREADABLE };
   }
+  const parsed = documentMarksOf(documents);
+  const parsedSections = sectionMarksOf(sections ?? {});
+  if (parsed === undefined || parsedSections === undefined) {
+    return { ok: false, message: UNREADABLE };
+  }
+  return { ok: true, documents: parsed, sections: parsedSections };
+}
+
+// Each path's reviewed texts, or `undefined` when one entry is not a list of hashes. A path with no
+// texts left is not kept.
+function documentMarksOf(
+  documents: Record<string, unknown>,
+): Map<string, readonly string[]> | undefined {
   const parsed = new Map<string, readonly string[]>();
   for (const [key, hashes] of Object.entries(documents)) {
     if (!isHashList(hashes)) {
-      return { ok: false, message: UNREADABLE };
+      return undefined;
     }
     if (hashes.length > 0) {
       parsed.set(key, hashes);
     }
   }
-  const parsedSections: SectionMarks = new Map();
-  for (const [key, marks] of Object.entries(sections ?? {})) {
+  return parsed;
+}
+
+// Each path's sections and their reviewed texts, or `undefined` when one entry is malformed. Empty
+// sections, and paths left with none, are not kept.
+function sectionMarksOf(
+  sections: Record<string, unknown>,
+): SectionMarks | undefined {
+  const parsed: SectionMarks = new Map();
+  for (const [key, marks] of Object.entries(sections)) {
     if (!isRecord(marks)) {
-      return { ok: false, message: UNREADABLE };
+      return undefined;
     }
     const entry = new Map<string, string[]>();
     for (const [section, hashes] of Object.entries(marks)) {
       if (!isHashList(hashes)) {
-        return { ok: false, message: UNREADABLE };
+        return undefined;
       }
       if (hashes.length > 0) {
         entry.set(section, hashes);
       }
     }
     if (entry.size > 0) {
-      parsedSections.set(key, entry);
+      parsed.set(key, entry);
     }
   }
-  return { ok: true, documents: parsed, sections: parsedSections };
+  return parsed;
 }
 
 function failed(error: unknown): WriteOutcome {

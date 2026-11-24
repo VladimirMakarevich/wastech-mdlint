@@ -142,200 +142,12 @@ export function renderPage(params: PageParams): string {
     children: [
       { type: "doctype" },
       h("html", { lang: "en" }, [
-        h("head", [
-          h("meta", { charSet: "utf-8" }),
-          h("meta", {
-            name: "viewport",
-            content: "width=device-width, initial-scale=1",
-          }),
-          h("meta", { name: "color-scheme", content: "light dark" }),
-          params.documentPath === undefined
-            ? undefined
-            : h("meta", { name: "wastech-doc", content: params.documentPath }),
-          params.changeToken === undefined
-            ? undefined
-            : h("meta", {
-                name: "wastech-change-token",
-                content: params.changeToken,
-              }),
-          h("title", `${params.title} · ${params.siteName}`),
-          h("link", { rel: "icon", href: "/favicon.ico" }),
-          // Classic and blocking, ahead of the stylesheet, so a stored theme is applied before the
-          // first paint; every other script is a deferred module.
-          h("script", { src: "/assets/theme.js" }),
-          h("link", { rel: "stylesheet", href: "/assets/viewer.css" }),
-          h("script", { type: "module", src: "/assets/viewer.js" }),
-        ]),
+        renderHead(params),
         h("body", [
           h("a.skip-link", { href: `#${CONTENT_ID}` }, "Skip to content"),
-          h("header.topbar", [
-            h("a.site-name", { href: "/" }, params.siteName),
-            params.displayPath === undefined
-              ? undefined
-              : h("span.current-path", params.displayPath),
-            params.displayPath === undefined
-              ? undefined
-              : copyPathButton(params.displayPath, params.absolutePath),
-            params.blameToggle === undefined
-              ? undefined
-              : h(
-                  "a.blame-toggle",
-                  {
-                    href: params.blameToggle.href,
-                    ariaPressed: params.blameToggle.on ? "true" : "false",
-                    title: params.blameToggle.on
-                      ? "Hide who last changed each block"
-                      : "Show who last changed each block, in the right margin",
-                  },
-                  "Blame",
-                ),
-            // A plain GET form, so search works as a results page even before (or without) the
-            // script that turns it into a live list.
-            h(
-              "form.search",
-              { action: "/search", method: "get", role: "search" },
-              [
-                h("input", {
-                  type: "search",
-                  name: "q",
-                  value: params.query,
-                  placeholder: "Search documents",
-                  ariaLabel: "Search documents",
-                  autoComplete: "off",
-                  spellCheck: false,
-                }),
-                h("kbd.search-shortcut", { ariaHidden: "true" }, "Ctrl K"),
-              ],
-            ),
-            // The three sections as one segmented control of plain links: the page's own section is
-            // the chosen segment, and the links work without script.
-            h("nav.section-nav.segmented", { ariaLabel: "Sections" }, [
-              // From a document, the graph opens with that document and its neighbors lit, which is
-              // how a reader gets from a page to its place among the others.
-              sectionLink(
-                params,
-                "graph",
-                params.documentPath === undefined
-                  ? "/graph"
-                  : `/graph?${new URLSearchParams({ focus: params.documentPath }).toString()}`,
-                "Graph",
-              ),
-              sectionLink(params, "dashboard", "/dashboard", "Dashboard"),
-              params.showChanges === true
-                ? sectionLink(params, "changes", "/changes", "Changes")
-                : undefined,
-              sectionLink(params, "config", "/config", "Config"),
-            ]),
-            // Hidden without script, which it needs to do anything. With script, the stylesheet lays
-            // it out from the first paint (see `theme.ts`), before the module that wires it has run.
-            h(
-              "div.theme-switch.segmented",
-              { role: "radiogroup", ariaLabel: "Theme", hidden: true },
-              THEME_CHOICES.map(({ choice, icon, label }) =>
-                h(
-                  "button.segment",
-                  {
-                    type: "button",
-                    role: "radio",
-                    dataChoice: choice,
-                    title: label,
-                    ariaLabel: label,
-                  },
-                  s(
-                    "svg",
-                    {
-                      viewBox: "0 0 16 16",
-                      width: 16,
-                      height: 16,
-                      fill: "none",
-                      stroke: "currentColor",
-                      strokeWidth: 1.5,
-                      strokeLinecap: "round",
-                      ariaHidden: "true",
-                    },
-                    [...icon],
-                  ),
-                ),
-              ),
-            ),
-            // Opens the display settings panel the page script builds; laid out like the theme
-            // switch, and for the same reason.
-            h(
-              "button.settings-toggle",
-              {
-                type: "button",
-                hidden: true,
-                title: "Display settings",
-                ariaLabel: "Display settings",
-              },
-              "Aa",
-            ),
-          ]),
+          renderTopbar(params),
           h("div.layout", [
-            h("div.sidebar-frame", [
-              h("nav.sidebar", { ariaLabel: "Documents" }, [
-                // On a phone the tree folds behind this row, so the article starts under the header
-                // rather than below a screenful of file names; the tree-state script closes it there
-                // before the first paint. On a wider screen the row is not drawn and the tree stays
-                // open, and without script it is open everywhere, as a list that cannot be opened
-                // would be no list at all.
-                h("details.sidebar-disclosure", { open: true }, [
-                  h("summary.sidebar-summary", "Documents"),
-                  // Hidden until the script that knows the findings has run, like the theme switch.
-                  h(
-                    "label.tree-filter.tree-filter-findings.switch-row",
-                    { hidden: true },
-                    [
-                      h("span", "Only files with findings"),
-                      h("input.switch", { type: "checkbox", role: "switch" }),
-                    ],
-                  ),
-                  h(
-                    "p.tree-filter-empty.tree-filter-findings-empty",
-                    { hidden: true },
-                    "No file has findings.",
-                  ),
-                  params.showChanges === true
-                    ? h(
-                        "label.tree-filter.tree-filter-changes.switch-row",
-                        { hidden: true },
-                        [
-                          h("span", "Only changed files"),
-                          h("input.switch", {
-                            type: "checkbox",
-                            role: "switch",
-                          }),
-                        ],
-                      )
-                    : undefined,
-                  params.showReview === true
-                    ? h(
-                        "label.tree-filter.tree-filter-unreviewed.switch-row",
-                        { hidden: true },
-                        [
-                          h("span", "Only files left to review"),
-                          h("input.switch", {
-                            type: "checkbox",
-                            role: "switch",
-                          }),
-                        ],
-                      )
-                    : undefined,
-                  params.showChanges === true
-                    ? h(
-                        "p.tree-filter-empty.tree-filter-changes-empty",
-                        { hidden: true },
-                        "No document changed.",
-                      )
-                    : undefined,
-                  renderTree(params.documentPaths, params.documentPath),
-                ]),
-              ]),
-              // Classic and blocking, right after the tree, so the folders the reader had open and
-              // the tree's scroll position are back before the tree is first painted.
-              h("script", { src: "/assets/tree-state.js" }),
-              columnResizer("sidebar", "Resize the document tree"),
-            ]),
+            renderSidebar(params),
             h("main.content", { id: CONTENT_ID }, [
               h(
                 `article.markdown-body${params.blameToggle?.on === true ? ".has-blame" : ""}`,
@@ -356,6 +168,198 @@ export function renderPage(params: PageParams): string {
     ],
   };
   return toHtml(tree, { allowDangerousHtml: true });
+}
+
+function renderHead(params: PageParams): Element {
+  return h("head", [
+    h("meta", { charSet: "utf-8" }),
+    h("meta", {
+      name: "viewport",
+      content: "width=device-width, initial-scale=1",
+    }),
+    h("meta", { name: "color-scheme", content: "light dark" }),
+    params.documentPath === undefined
+      ? undefined
+      : h("meta", { name: "wastech-doc", content: params.documentPath }),
+    params.changeToken === undefined
+      ? undefined
+      : h("meta", {
+          name: "wastech-change-token",
+          content: params.changeToken,
+        }),
+    h("title", `${params.title} · ${params.siteName}`),
+    h("link", { rel: "icon", href: "/favicon.ico" }),
+    // Classic and blocking, ahead of the stylesheet, so a stored theme is applied before the
+    // first paint; every other script is a deferred module.
+    h("script", { src: "/assets/theme.js" }),
+    h("link", { rel: "stylesheet", href: "/assets/viewer.css" }),
+    h("script", { type: "module", src: "/assets/viewer.js" }),
+  ]);
+}
+
+function renderTopbar(params: PageParams): Element {
+  return h("header.topbar", [
+    h("a.site-name", { href: "/" }, params.siteName),
+    params.displayPath === undefined
+      ? undefined
+      : h("span.current-path", params.displayPath),
+    params.displayPath === undefined
+      ? undefined
+      : copyPathButton(params.displayPath, params.absolutePath),
+    params.blameToggle === undefined
+      ? undefined
+      : h(
+          "a.blame-toggle",
+          {
+            href: params.blameToggle.href,
+            ariaPressed: params.blameToggle.on ? "true" : "false",
+            title: params.blameToggle.on
+              ? "Hide who last changed each block"
+              : "Show who last changed each block, in the right margin",
+          },
+          "Blame",
+        ),
+    // A plain GET form, so search works as a results page even before (or without) the
+    // script that turns it into a live list.
+    h("form.search", { action: "/search", method: "get", role: "search" }, [
+      h("input", {
+        type: "search",
+        name: "q",
+        value: params.query,
+        placeholder: "Search documents",
+        ariaLabel: "Search documents",
+        autoComplete: "off",
+        spellCheck: false,
+      }),
+      h("kbd.search-shortcut", { ariaHidden: "true" }, "Ctrl K"),
+    ]),
+    renderSectionNav(params),
+    renderThemeSwitch(),
+    // Opens the display settings panel the page script builds; laid out like the theme
+    // switch, and for the same reason.
+    h(
+      "button.settings-toggle",
+      {
+        type: "button",
+        hidden: true,
+        title: "Display settings",
+        ariaLabel: "Display settings",
+      },
+      "Aa",
+    ),
+  ]);
+}
+
+// The three sections as one segmented control of plain links: the page's own section is the chosen
+// segment, and the links work without script.
+function renderSectionNav(params: PageParams): Element {
+  return h("nav.section-nav.segmented", { ariaLabel: "Sections" }, [
+    // From a document, the graph opens with that document and its neighbors lit, which is
+    // how a reader gets from a page to its place among the others.
+    sectionLink(
+      params,
+      "graph",
+      params.documentPath === undefined
+        ? "/graph"
+        : `/graph?${new URLSearchParams({ focus: params.documentPath }).toString()}`,
+      "Graph",
+    ),
+    sectionLink(params, "dashboard", "/dashboard", "Dashboard"),
+    params.showChanges === true
+      ? sectionLink(params, "changes", "/changes", "Changes")
+      : undefined,
+    sectionLink(params, "config", "/config", "Config"),
+  ]);
+}
+
+// Hidden without script, which it needs to do anything. With script, the stylesheet lays it out
+// from the first paint (see `theme.ts`), before the module that wires it has run.
+function renderThemeSwitch(): Element {
+  return h(
+    "div.theme-switch.segmented",
+    { role: "radiogroup", ariaLabel: "Theme", hidden: true },
+    THEME_CHOICES.map(({ choice, icon, label }) =>
+      h(
+        "button.segment",
+        {
+          type: "button",
+          role: "radio",
+          dataChoice: choice,
+          title: label,
+          ariaLabel: label,
+        },
+        s(
+          "svg",
+          {
+            viewBox: "0 0 16 16",
+            width: 16,
+            height: 16,
+            fill: "none",
+            stroke: "currentColor",
+            strokeWidth: 1.5,
+            strokeLinecap: "round",
+            ariaHidden: "true",
+          },
+          [...icon],
+        ),
+      ),
+    ),
+  );
+}
+
+function renderSidebar(params: PageParams): Element {
+  return h("div.sidebar-frame", [
+    h("nav.sidebar", { ariaLabel: "Documents" }, [
+      // On a phone the tree folds behind this row, so the article starts under the header
+      // rather than below a screenful of file names; the tree-state script closes it there
+      // before the first paint. On a wider screen the row is not drawn and the tree stays
+      // open, and without script it is open everywhere, as a list that cannot be opened
+      // would be no list at all.
+      h("details.sidebar-disclosure", { open: true }, [
+        h("summary.sidebar-summary", "Documents"),
+        ...renderTreeFilters(params),
+        renderTree(params.documentPaths, params.documentPath),
+      ]),
+    ]),
+    // Classic and blocking, right after the tree, so the folders the reader had open and
+    // the tree's scroll position are back before the tree is first painted.
+    h("script", { src: "/assets/tree-state.js" }),
+    columnResizer("sidebar", "Resize the document tree"),
+  ]);
+}
+
+// The switches that narrow the tree, each with the line it shows when nothing is left. Hidden until
+// the script that knows the findings and the changes has run, like the theme switch.
+function renderTreeFilters(params: PageParams): (Element | undefined)[] {
+  return [
+    treeSwitch("findings", "Only files with findings"),
+    h(
+      "p.tree-filter-empty.tree-filter-findings-empty",
+      { hidden: true },
+      "No file has findings.",
+    ),
+    params.showChanges === true
+      ? treeSwitch("changes", "Only changed files")
+      : undefined,
+    params.showReview === true
+      ? treeSwitch("unreviewed", "Only files left to review")
+      : undefined,
+    params.showChanges === true
+      ? h(
+          "p.tree-filter-empty.tree-filter-changes-empty",
+          { hidden: true },
+          "No document changed.",
+        )
+      : undefined,
+  ];
+}
+
+function treeSwitch(name: string, label: string): Element {
+  return h(
+    `label.tree-filter.tree-filter-${name}.switch-row`,
+    { hidden: true },
+    [h("span", label), h("input.switch", { type: "checkbox", role: "switch" })],
+  );
 }
 
 /**

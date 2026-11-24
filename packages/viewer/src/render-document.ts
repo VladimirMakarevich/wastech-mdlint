@@ -9,6 +9,7 @@ import type {
   ImageReference,
   LinkReference,
   Parent,
+  Root as MdastRoot,
 } from "mdast";
 import { toHast } from "mdast-util-to-hast";
 import { normalizeUri } from "micromark-util-sanitize-uri";
@@ -181,22 +182,9 @@ type RenderedTree = MarkedSide & {
   missingHrefs: Set<string>;
 };
 
-/**
- * One side's sanitized tree, every block numbered with its source lines, before the viewer's own
- * code-block markup goes in: everything about the author's content that does not depend on what
- * else is shown beside it.
- */
-async function renderTree(
-  document: { path: string; content: string },
-  resolvers: TargetResolvers,
-): Promise<RenderedTree> {
-  const { document: parsed, tree } = parseDocumentWithTree({
-    path: document.path,
-    content: document.content,
-  });
-
-  // A pre-order walk meets headings in the order core recorded them, so the index pairs each node
-  // with its slug.
+// A pre-order walk meets headings in the order core recorded them, so the index pairs each node with
+// its slug.
+function assignHeadingIds(tree: MdastRoot, parsed: ParsedDocument): void {
   let headingIndex = 0;
   visit(tree, "heading", (node: Heading) => {
     const slug = parsed.headings[headingIndex]?.slug;
@@ -208,13 +196,15 @@ async function renderTree(
       };
     }
   });
+}
 
-  // A reference (`[text][id]`, `![alt][id]`) becomes the link or image it stands for, with its
-  // definition's target. A definition is shared by every reference to it and does not say whether
-  // those are links or images, while a target resolves differently for each: an image never goes
-  // through the site router, which maps URLs to Markdown sources only. Core reads a reference's
-  // target from the same definition, the first one with its label, so the page and the linter still
-  // agree on it.
+// A reference (`[text][id]`, `![alt][id]`) becomes the link or image it stands for, with its
+// definition's target. A definition is shared by every reference to it and does not say whether
+// those are links or images, while a target resolves differently for each: an image never goes
+// through the site router, which maps URLs to Markdown sources only. Core reads a reference's
+// target from the same definition, the first one with its label, so the page and the linter still
+// agree on it.
+function resolveReferences(tree: MdastRoot): void {
   const definitions = new Map<string, Definition>();
   visit(tree, "definition", (node: Definition) => {
     if (!definitions.has(node.identifier)) {
@@ -245,9 +235,15 @@ async function renderTree(
         ? { type: "link", children: reference.children, ...common }
         : { type: "image", alt: reference.alt, ...common };
   });
+}
 
-  // Targets are rewritten on the Markdown tree, where `url` is still the target exactly as the
-  // linter saw it, and before `toHast` percent-encodes it.
+// Targets are rewritten on the Markdown tree, where `url` is still the target exactly as the linter
+// saw it, and before `toHast` percent-encodes it. Returns the hrefs that point at nothing.
+function rewriteMarkdownTargets(
+  tree: MdastRoot,
+  relPath: string,
+  resolvers: TargetResolvers,
+): Set<string> {
   const missingHrefs = new Set<string>();
   visit(tree, (node) => {
     if (node.type !== "link" && node.type !== "image") {
@@ -263,7 +259,7 @@ async function renderTree(
     }
     const rewritten = rewriteTarget(
       target.url,
-      resolvers.resolve(document.path, target.url, node.type === "image"),
+      resolvers.resolve(relPath, target.url, node.type === "image"),
     );
     if (rewritten !== undefined) {
       target.url = rewritten.url;
@@ -274,6 +270,26 @@ async function renderTree(
       }
     }
   });
+  return missingHrefs;
+}
+
+/**
+ * One side's sanitized tree, every block numbered with its source lines, before the viewer's own
+ * code-block markup goes in: everything about the author's content that does not depend on what
+ * else is shown beside it.
+ */
+async function renderTree(
+  document: { path: string; content: string },
+  resolvers: TargetResolvers,
+): Promise<RenderedTree> {
+  const { document: parsed, tree } = parseDocumentWithTree({
+    path: document.path,
+    content: document.content,
+  });
+
+  assignHeadingIds(tree, parsed);
+  resolveReferences(tree);
+  const missingHrefs = rewriteMarkdownTargets(tree, document.path, resolvers);
 
   const hast = toHast(tree, {
     allowDangerousHtml: true,
@@ -353,6 +369,12 @@ function isLocalTarget(url: string): boolean {
  * image or source file is ever served. Done before sanitizing, so the sanitizer still judges every
  * URL the page ends up with.
  */
+// The raw HTML elements whose target is rewritten, and the property that holds it.
+const EMBEDDED_TARGETS: ReadonlyMap<string, "href" | "src"> = new Map([
+  ["a", "href"],
+  ["img", "src"],
+]);
+
 async function rewriteEmbeddedTargets(
   tree: HastRoot,
   resolvers: TargetResolvers,
@@ -360,12 +382,7 @@ async function rewriteEmbeddedTargets(
 ): Promise<void> {
   const targets: { node: Element; property: "href" | "src" }[] = [];
   visit(tree, "element", (node: Element) => {
-    const property =
-      node.tagName === "a"
-        ? "href"
-        : node.tagName === "img"
-          ? "src"
-          : undefined;
+    const property = EMBEDDED_TARGETS.get(node.tagName);
     const url = property === undefined ? undefined : node.properties[property];
     if (
       property !== undefined &&

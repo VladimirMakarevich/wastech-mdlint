@@ -1,6 +1,3 @@
-import type { Element, ElementContent } from "hast";
-import { h } from "hastscript";
-
 import {
   compareStrings,
   getComponents,
@@ -14,31 +11,15 @@ import {
   type Severity,
 } from "@wastech-mdlint/core";
 
-import { documentHref } from "./render-document.js";
-
 // The dashboard: one row per corpus document, with its findings, its size and its place in the link
 // graph, filtered and sorted by what the address asks for. Every number comes from core — findings
 // from the lint run, sizes from `measureDocument` (the counts SIZE-001 checks), links from the
-// corpus's `ContextGraph` and `getComponents` — and this module only selects, orders and lays them
-// out. The page script asks the server for the same page again rather than filtering on its own, so
+// corpus's `ContextGraph` and `getComponents` — and this module only selects and orders them, and
+// writes them as CSV; `dashboard-article.ts` lays them out as a page. The page script asks the server for the same page again rather than filtering on its own, so
 // the selection a reader sees with script is the one a link without script opens.
 
 export const LINK_FLAGS = ["orphan", "dead-end", "cycle", "detached"] as const;
 export type LinkFlag = (typeof LINK_FLAGS)[number];
-
-const LINK_FLAG_LABELS: Record<LinkFlag, string> = {
-  orphan: "Orphan: nothing links here",
-  "dead-end": "Dead end: links nowhere",
-  cycle: "In a link cycle",
-  detached: "Detached: outside the main group",
-};
-
-const LINK_FLAG_NAMES: Record<LinkFlag, string> = {
-  orphan: "orphan",
-  "dead-end": "dead end",
-  cycle: "cycle",
-  detached: "detached",
-};
 
 const SEVERITIES = ["error", "warning"] as const satisfies readonly Severity[];
 
@@ -65,7 +46,7 @@ const NUMERIC_PARAMS = [
   "minTokens",
   "maxTokens",
 ] as const;
-type NumericParam = (typeof NUMERIC_PARAMS)[number];
+export type NumericParam = (typeof NUMERIC_PARAMS)[number];
 
 // Field names are the query parameter names, so the query the JSON echoes back is the one the
 // address carries.
@@ -144,15 +125,30 @@ export type ParsedDashboardQuery =
   | { ok: true; query: DashboardQuery }
   | { ok: false; message: string };
 
-const DEFAULT_SORT: SortKey = "path";
+// One parameter read from the address: its value, or why it is refused.
+type Read<T> = { ok: true; value: T } | { ok: false; message: string };
+
+export const DEFAULT_SORT: SortKey = "path";
 
 // The direction a column sorts in when its header is first clicked: names read A to Z, while for a
 // count the interesting documents are the ones with the most.
-function defaultDirection(sort: SortKey): SortDirection {
+export function defaultDirection(sort: SortKey): SortDirection {
   return sort === "path" || sort === "rules" || sort === "flags"
     ? "asc"
     : "desc";
 }
+
+const KNOWN_PARAMS = [
+  "severity",
+  "rule",
+  "folder",
+  "path",
+  "flag",
+  "sort",
+  "dir",
+  "changed",
+  ...NUMERIC_PARAMS,
+];
 
 /**
  * Read a dashboard query from the address.
@@ -167,18 +163,7 @@ export function parseDashboardQuery(
   source: Pick<DashboardSource, "ruleIds" | "folders" | "changes">,
   allowed: readonly string[] = [],
 ): ParsedDashboardQuery {
-  const known = new Set<string>([
-    "severity",
-    "rule",
-    "folder",
-    "path",
-    "flag",
-    "sort",
-    "dir",
-    "changed",
-    ...NUMERIC_PARAMS,
-    ...allowed,
-  ]);
+  const known = new Set<string>([...KNOWN_PARAMS, ...allowed]);
   for (const key of new Set(params.keys())) {
     if (!known.has(key)) {
       return { ok: false, message: `Unknown filter "${key}".` };
@@ -187,8 +172,53 @@ export function parseDashboardQuery(
   const values = (key: string) =>
     params.getAll(key).filter((value) => value !== "");
 
+  const severity = readSeverities(values("severity"));
+  if (!severity.ok) {
+    return severity;
+  }
+  const rule = readRules(values("rule"), source.ruleIds);
+  if (!rule.ok) {
+    return rule;
+  }
+  const flag = readFlags(values("flag"));
+  if (!flag.ok) {
+    return flag;
+  }
+  const folder = values("folder")[0] ?? "";
+  if (folder !== "" && !source.folders.includes(folder)) {
+    return {
+      ok: false,
+      message: `No folder "${folder}" holds corpus documents.`,
+    };
+  }
+  const order = readSort(values("sort")[0], values("dir")[0]);
+  if (!order.ok) {
+    return order;
+  }
+  const changed = readChanged(values("changed")[0], source.changes);
+  if (!changed.ok) {
+    return changed;
+  }
+  const query: DashboardQuery = {
+    severity: severity.value,
+    rule: rule.value,
+    folder,
+    path: values("path")[0] ?? "",
+    flag: flag.value,
+    ...order.value,
+    ...(changed.value ? { changed: true } : {}),
+  };
+  const bounds = readBounds(values);
+  if (!bounds.ok) {
+    return bounds;
+  }
+  return { ok: true, query: { ...query, ...bounds.value } };
+}
+
+// In the order `SEVERITIES` lists them, whatever order the address gave.
+function readSeverities(values: readonly string[]): Read<Severity[]> {
   const severity = new Set<Severity>();
-  for (const value of values("severity")) {
+  for (const value of values) {
     if (!(SEVERITIES as readonly string[]).includes(value)) {
       return {
         ok: false,
@@ -197,19 +227,29 @@ export function parseDashboardQuery(
     }
     severity.add(value as Severity);
   }
+  return { ok: true, value: SEVERITIES.filter((value) => severity.has(value)) };
+}
 
+function readRules(
+  values: readonly string[],
+  ruleIds: readonly string[],
+): Read<string[]> {
   const rule = new Set<string>();
-  for (const value of values("rule")) {
+  for (const value of values) {
     // A built-in rule may be named by its alias, as in the config; it filters by its canonical id.
     const id = ruleRegistry.has(value) ? ruleRegistry.resolveId(value) : value;
-    if (!source.ruleIds.includes(id) && !ruleRegistry.has(id)) {
+    if (!ruleIds.includes(id) && !ruleRegistry.has(id)) {
       return { ok: false, message: `Unknown rule "${value}".` };
     }
     rule.add(id);
   }
+  return { ok: true, value: [...rule].sort(compareStrings) };
+}
 
+// In the order `LINK_FLAGS` lists them, whatever order the address gave.
+function readFlags(values: readonly string[]): Read<LinkFlag[]> {
   const flag = new Set<LinkFlag>();
-  for (const value of values("flag")) {
+  for (const value of values) {
     if (!(LINK_FLAGS as readonly string[]).includes(value)) {
       return {
         ok: false,
@@ -218,16 +258,15 @@ export function parseDashboardQuery(
     }
     flag.add(value as LinkFlag);
   }
+  return { ok: true, value: LINK_FLAGS.filter((value) => flag.has(value)) };
+}
 
-  const folder = values("folder")[0] ?? "";
-  if (folder !== "" && !source.folders.includes(folder)) {
-    return {
-      ok: false,
-      message: `No folder "${folder}" holds corpus documents.`,
-    };
-  }
-
-  const sortValue = values("sort")[0] ?? DEFAULT_SORT;
+// The sort column and direction; a direction left out is the column's own first one.
+function readSort(
+  sortParam: string | undefined,
+  dirValue: string | undefined,
+): Read<{ sort: SortKey; dir: SortDirection }> {
+  const sortValue = sortParam ?? DEFAULT_SORT;
   if (!(SORT_KEYS as readonly string[]).includes(sortValue)) {
     return {
       ok: false,
@@ -235,39 +274,40 @@ export function parseDashboardQuery(
     };
   }
   const sort = sortValue as SortKey;
-  const dirValue = values("dir")[0] ?? defaultDirection(sort);
-  if (dirValue !== "asc" && dirValue !== "desc") {
+  const dir = dirValue ?? defaultDirection(sort);
+  if (dir !== "asc" && dir !== "desc") {
     return {
       ok: false,
-      message: `Unknown sort direction "${dirValue}": use asc or desc.`,
+      message: `Unknown sort direction "${dir}": use asc or desc.`,
     };
   }
+  return { ok: true, value: { sort, dir } };
+}
 
-  const changed = values("changed")[0];
+function readChanged(
+  changed: string | undefined,
+  changes: DashboardSource["changes"],
+): Read<boolean> {
   if (changed !== undefined && changed !== "1") {
     return {
       ok: false,
       message: `"changed" takes 1, got "${changed}".`,
     };
   }
-  if (changed !== undefined && source.changes === undefined) {
+  if (changed !== undefined && changes === undefined) {
     return {
       ok: false,
       message:
         "There is no branch to compare: the Changed filter needs a git work tree and a base branch.",
     };
   }
+  return { ok: true, value: changed !== undefined };
+}
 
-  const query: DashboardQuery = {
-    severity: SEVERITIES.filter((value) => severity.has(value)),
-    rule: [...rule].sort(compareStrings),
-    folder,
-    path: values("path")[0] ?? "",
-    flag: LINK_FLAGS.filter((value) => flag.has(value)),
-    sort,
-    dir: dirValue,
-    ...(changed === undefined ? {} : { changed: true }),
-  };
+function readBounds(
+  values: (key: string) => string[],
+): Read<Partial<Record<NumericParam, number>>> {
+  const bounds: Partial<Record<NumericParam, number>> = {};
   for (const key of NUMERIC_PARAMS) {
     const value = values(key)[0];
     if (value === undefined) {
@@ -281,11 +321,10 @@ export function parseDashboardQuery(
         message: `"${key}" must be a number of zero or more, got "${value}".`,
       };
     }
-    query[key] = Number(value);
+    bounds[key] = Number(value);
   }
-  return { ok: true, query };
+  return { ok: true, value: bounds };
 }
-
 /** The query as URL parameters, in a fixed order and without the defaults, for links to share. */
 export function dashboardSearchParams(query: DashboardQuery): URLSearchParams {
   const params = new URLSearchParams();
@@ -392,88 +431,10 @@ export function buildDashboard(
 ): DashboardResult {
   const facts = graphFacts(source.graph);
   const ready = source.findings !== undefined;
-  const pathNeedle = query.path.toLowerCase();
-  const folderPrefix = query.folder === "" ? "" : `${query.folder}/`;
-  const filterFindings =
-    ready && (query.severity.length > 0 || query.rule.length > 0);
-
-  const candidates: Candidate[] = [];
-  for (const document of source.documents.values()) {
-    const messages = source.findings?.get(document.path) ?? [];
-    const metrics = metricsOf(document);
-    const linkedFrom = facts.linkedFrom.get(document.path) ?? 0;
-    const linksTo = facts.linksTo.get(document.path) ?? 0;
-    const flags = LINK_FLAGS.filter((flag) =>
-      flag === "orphan"
-        ? linkedFrom === 0
-        : flag === "dead-end"
-          ? linksTo === 0
-          : flag === "cycle"
-            ? facts.onCycle.has(document.path)
-            : !facts.mainComponent.has(document.path),
-    );
-    const errors = messages.filter(
-      (message) => message.severity === "error",
-    ).length;
-    candidates.push({
-      messages,
-      row: {
-        path: document.path,
-        errors: ready ? errors : null,
-        warnings: ready ? messages.length - errors : null,
-        rules: [...new Set(messages.map((message) => message.ruleId))].sort(
-          compareStrings,
-        ),
-        bytes: metrics.bytes,
-        lines: metrics.lines,
-        tokens: metrics.tokens,
-        linkedFrom,
-        linksTo,
-        flags,
-        ...(source.changes === undefined
-          ? {}
-          : { change: source.changes.get(document.path) ?? null }),
-      },
-    });
-  }
-
-  const rows = candidates
-    .filter(({ row, messages }) => {
-      if (!row.path.startsWith(folderPrefix)) {
-        return false;
-      }
-      if (query.changed === true && row.change?.status === undefined) {
-        return false;
-      }
-      if (pathNeedle !== "" && !row.path.toLowerCase().includes(pathNeedle)) {
-        return false;
-      }
-      // Severity and rule are judged on one finding together: "errors" with REF-001 is a document
-      // holding an error from REF-001, not one with an error from anything and a REF-001 warning.
-      if (
-        filterFindings &&
-        !messages.some(
-          (message) =>
-            (query.severity.length === 0 ||
-              query.severity.includes(message.severity)) &&
-            (query.rule.length === 0 || query.rule.includes(message.ruleId)),
-        )
-      ) {
-        return false;
-      }
-      if (
-        query.flag.length > 0 &&
-        !query.flag.some((flag) => row.flags.includes(flag))
-      ) {
-        return false;
-      }
-      // Both bounds inclusive; a kilobyte is 1024 bytes, the unit SIZE-001's byte budgets divide into.
-      return (
-        within(row.bytes, query.minKb, query.maxKb, 1024) &&
-        within(row.lines, query.minLines, query.maxLines, 1) &&
-        within(row.tokens, query.minTokens, query.maxTokens, 1)
-      );
-    })
+  const filter = rowFilter(query, ready);
+  const rows = [...source.documents.values()]
+    .map((document) => candidateOf(document, source, facts))
+    .filter(filter)
     .map(({ row }) => row);
 
   const direction = query.dir === "asc" ? 1 : -1;
@@ -482,7 +443,120 @@ export function buildDashboard(
       direction * compareBy(query.sort, left, right) ||
       compareStrings(left.path, right.path),
   );
+  return {
+    findings: ready ? "ready" : "pending",
+    corpusSize: source.documents.size,
+    totals: totalsOf(rows),
+    rows,
+  };
+}
 
+// One document's row, with the findings it was counted from for the finding filters to judge.
+function candidateOf(
+  document: ParsedDocument,
+  source: DashboardSource,
+  facts: GraphFacts,
+): Candidate {
+  const ready = source.findings !== undefined;
+  const messages = source.findings?.get(document.path) ?? [];
+  const metrics = metricsOf(document);
+  const linkedFrom = facts.linkedFrom.get(document.path) ?? 0;
+  const linksTo = facts.linksTo.get(document.path) ?? 0;
+  const errors = messages.filter(
+    (message) => message.severity === "error",
+  ).length;
+  return {
+    messages,
+    row: {
+      path: document.path,
+      errors: ready ? errors : null,
+      warnings: ready ? messages.length - errors : null,
+      rules: [...new Set(messages.map((message) => message.ruleId))].sort(
+        compareStrings,
+      ),
+      bytes: metrics.bytes,
+      lines: metrics.lines,
+      tokens: metrics.tokens,
+      linkedFrom,
+      linksTo,
+      flags: LINK_FLAGS.filter((flag) =>
+        hasFlag(flag, { path: document.path, linkedFrom, linksTo }, facts),
+      ),
+      ...(source.changes === undefined
+        ? {}
+        : { change: source.changes.get(document.path) ?? null }),
+    },
+  };
+}
+
+function hasFlag(
+  flag: LinkFlag,
+  links: { path: string; linkedFrom: number; linksTo: number },
+  facts: GraphFacts,
+): boolean {
+  switch (flag) {
+    case "orphan":
+      return links.linkedFrom === 0;
+    case "dead-end":
+      return links.linksTo === 0;
+    case "cycle":
+      return facts.onCycle.has(links.path);
+    case "detached":
+      return !facts.mainComponent.has(links.path);
+  }
+}
+
+// Whether a document's row is in the selection the query asks for.
+function rowFilter(
+  query: DashboardQuery,
+  ready: boolean,
+): (candidate: Candidate) => boolean {
+  const pathNeedle = query.path.toLowerCase();
+  const folderPrefix = query.folder === "" ? "" : `${query.folder}/`;
+  const filterFindings =
+    ready && (query.severity.length > 0 || query.rule.length > 0);
+  return ({ row, messages }) => {
+    if (!row.path.startsWith(folderPrefix)) {
+      return false;
+    }
+    if (query.changed === true && row.change?.status === undefined) {
+      return false;
+    }
+    if (pathNeedle !== "" && !row.path.toLowerCase().includes(pathNeedle)) {
+      return false;
+    }
+    if (
+      filterFindings &&
+      !messages.some((message) => matchesFinding(query, message))
+    ) {
+      return false;
+    }
+    if (
+      query.flag.length > 0 &&
+      !query.flag.some((flag) => row.flags.includes(flag))
+    ) {
+      return false;
+    }
+    // Both bounds inclusive; a kilobyte is 1024 bytes, the unit SIZE-001's byte budgets divide into.
+    return (
+      within(row.bytes, query.minKb, query.maxKb, 1024) &&
+      within(row.lines, query.minLines, query.maxLines, 1) &&
+      within(row.tokens, query.minTokens, query.maxTokens, 1)
+    );
+  };
+}
+
+// Severity and rule are judged on one finding together: "errors" with REF-001 is a document holding
+// an error from REF-001, not one with an error from anything and a REF-001 warning.
+function matchesFinding(query: DashboardQuery, message: LintMessage): boolean {
+  return (
+    (query.severity.length === 0 ||
+      query.severity.includes(message.severity)) &&
+    (query.rule.length === 0 || query.rule.includes(message.ruleId))
+  );
+}
+
+function totalsOf(rows: readonly DashboardRow[]): DashboardTotals {
   const totals: DashboardTotals = {
     documents: rows.length,
     errors: 0,
@@ -498,12 +572,7 @@ export function buildDashboard(
     totals.lines += row.lines;
     totals.tokens += row.tokens;
   }
-  return {
-    findings: ready ? "ready" : "pending",
-    corpusSize: source.documents.size,
-    totals,
-    rows,
-  };
+  return totals;
 }
 
 function within(
@@ -597,372 +666,4 @@ function csvText(value: string): string {
   return /[",\r\n]/.test(guarded)
     ? `"${guarded.replace(/"/g, '""')}"`
     : guarded;
-}
-
-export type DashboardPage = {
-  // What the address asked for, as written, so the form shows it back even when it was refused.
-  params: URLSearchParams;
-  source: DashboardSource;
-} & (
-  | { ok: true; query: DashboardQuery; result: DashboardResult }
-  | { ok: false; message: string }
-);
-
-export function renderDashboardArticle(page: DashboardPage): ElementContent[] {
-  return [
-    h("h1", "Dashboard"),
-    renderFilters(page.params, page.source, page.ok ? page.query : undefined),
-    h(
-      "p.dashboard-summary",
-      { role: "status" },
-      page.ok ? summaryText(page.result) : "These filters cannot be applied.",
-    ),
-    h(
-      "div.dashboard-results",
-      page.ok
-        ? renderResults(
-            page.query,
-            page.result,
-            page.source.changes !== undefined,
-          )
-        : [h("p.dashboard-error", page.message)],
-    ),
-  ];
-}
-
-function renderFilters(
-  params: URLSearchParams,
-  source: DashboardSource,
-  query: DashboardQuery | undefined,
-): Element {
-  const all = (key: string) => params.getAll(key);
-  const first = (key: string) => params.get(key) ?? "";
-  const checkbox = (
-    name: string,
-    value: string,
-    label: ElementContent | string,
-  ) =>
-    h("label.filter-check", [
-      h("input", {
-        type: "checkbox",
-        name,
-        value,
-        checked: all(name).includes(value),
-      }),
-      " ",
-      label,
-    ]);
-  const range = (
-    label: string,
-    min: NumericParam,
-    max: NumericParam,
-    step: string,
-  ) =>
-    h("div.filter-range", [
-      h("span.filter-range-label", label),
-      h("label", [
-        h("span.visually-hidden", `${label} from`),
-        h("input", {
-          type: "number",
-          name: min,
-          value: first(min),
-          min: "0",
-          step,
-          inputMode: "decimal",
-          placeholder: "from",
-        }),
-      ]),
-      h("span.filter-range-dash", { ariaHidden: "true" }, "–"),
-      h("label", [
-        h("span.visually-hidden", `${label} to`),
-        h("input", {
-          type: "number",
-          name: max,
-          value: first(max),
-          min: "0",
-          step,
-          inputMode: "decimal",
-          placeholder: "to",
-        }),
-      ]),
-    ]);
-  const sort = query?.sort ?? first("sort");
-  const dir = query?.dir ?? first("dir");
-  const sortIsDefault =
-    query === undefined
-      ? sort === "" && dir === ""
-      : query.sort === DEFAULT_SORT &&
-        query.dir === defaultDirection(query.sort);
-
-  return h(
-    "form.dashboard-filters",
-    { action: "/dashboard", method: "get", ariaLabel: "Filters" },
-    [
-      h("fieldset.filter-group", [
-        h("legend", "Findings"),
-        h("div.filter-options", [
-          checkbox("severity", "error", "Errors"),
-          checkbox("severity", "warning", "Warnings"),
-        ]),
-        source.ruleIds.length === 0
-          ? undefined
-          : h(
-              "div.filter-options.filter-rules",
-              source.ruleIds.map((id) => checkbox("rule", id, h("code", id))),
-            ),
-      ]),
-      h("fieldset.filter-group", [
-        h("legend", "Size"),
-        range("KB", "minKb", "maxKb", "any"),
-        range("Lines", "minLines", "maxLines", "1"),
-        range("Tokens", "minTokens", "maxTokens", "1"),
-      ]),
-      h("fieldset.filter-group", [
-        h("legend", "Graph"),
-        h(
-          "div.filter-options.filter-options-column",
-          LINK_FLAGS.map((flag) =>
-            checkbox("flag", flag, LINK_FLAG_LABELS[flag]),
-          ),
-        ),
-      ]),
-      h("fieldset.filter-group", [
-        h("legend", "Where"),
-        h("label.filter-field", [
-          "Folder",
-          h("select", { name: "folder" }, [
-            h(
-              "option",
-              { value: "", selected: first("folder") === "" },
-              "All documents",
-            ),
-            ...source.folders.map((folder) =>
-              h(
-                "option",
-                { value: folder, selected: first("folder") === folder },
-                folder,
-              ),
-            ),
-          ]),
-        ]),
-        source.changes === undefined
-          ? undefined
-          : checkbox("changed", "1", "Changed in this branch"),
-        h("label.filter-field", [
-          "Path contains",
-          h("input", {
-            type: "search",
-            name: "path",
-            value: first("path"),
-            autoComplete: "off",
-            spellCheck: false,
-          }),
-        ]),
-      ]),
-      // Kept across a filter change, so narrowing the list does not also undo the reader's sort.
-      sortIsDefault
-        ? undefined
-        : h("input", { type: "hidden", name: "sort", value: sort }),
-      sortIsDefault
-        ? undefined
-        : h("input", { type: "hidden", name: "dir", value: dir }),
-      h("div.filter-actions", [
-        h("button", { type: "submit" }, "Apply"),
-        h("a", { href: "/dashboard" }, "Reset"),
-      ]),
-    ],
-  );
-}
-
-function summaryText(result: DashboardResult): string {
-  const parts = [
-    `${result.totals.documents} of ${plural(result.corpusSize, "document")}`,
-  ];
-  if (result.findings === "ready") {
-    parts.push(
-      plural(result.totals.errors, "error"),
-      plural(result.totals.warnings, "warning"),
-    );
-  }
-  parts.push(
-    `${kilobytes(result.totals.bytes)} KB`,
-    plural(result.totals.lines, "line"),
-  );
-  return parts.join(" · ");
-}
-
-const COLUMNS: { key: SortKey; label: string; numeric: boolean }[] = [
-  { key: "path", label: "Document", numeric: false },
-  { key: "errors", label: "Errors", numeric: true },
-  { key: "warnings", label: "Warnings", numeric: true },
-  { key: "rules", label: "Rules", numeric: false },
-  { key: "bytes", label: "KB", numeric: true },
-  { key: "lines", label: "Lines", numeric: true },
-  { key: "tokens", label: "Tokens", numeric: true },
-  { key: "linkedFrom", label: "Linked from", numeric: true },
-  { key: "linksTo", label: "Links to", numeric: true },
-  { key: "flags", label: "Graph", numeric: false },
-];
-
-function renderResults(
-  query: DashboardQuery,
-  result: DashboardResult,
-  branch: boolean,
-): (ElementContent | undefined)[] {
-  const sortHeader = (column: (typeof COLUMNS)[number]): Element => {
-    const active = query.sort === column.key;
-    const dir: SortDirection = active
-      ? query.dir === "asc"
-        ? "desc"
-        : "asc"
-      : defaultDirection(column.key);
-    return h(
-      column.numeric ? "th.is-numeric" : "th",
-      {
-        scope: "col",
-        ariaSort: active
-          ? query.dir === "asc"
-            ? "ascending"
-            : "descending"
-          : undefined,
-      },
-      h(
-        "a.dashboard-sort",
-        { href: dashboardHref({ ...query, sort: column.key, dir }) },
-        column.label,
-      ),
-    );
-  };
-  const exportParams = (format: string) => {
-    const params = dashboardSearchParams(query);
-    params.set("format", format);
-    return `/api/dashboard?${params.toString()}`;
-  };
-  return [
-    h("p.dashboard-export", [
-      "Download this selection: ",
-      h("a", { href: exportParams("csv"), download: "" }, "CSV"),
-      " · ",
-      h("a", { href: exportParams("json"), download: "" }, "JSON"),
-    ]),
-    result.findings === "pending" &&
-    (query.severity.length > 0 || query.rule.length > 0)
-      ? h(
-          "p.dashboard-notice",
-          "The linter is still checking the corpus, so the finding filters are not applied yet.",
-        )
-      : undefined,
-    h("div.dashboard-table-wrap", [
-      h("table.dashboard-table", [
-        h("thead", [
-          h("tr", [
-            ...COLUMNS.slice(0, 1).map(sortHeader),
-            branch
-              ? h(
-                  "th",
-                  {
-                    scope: "col",
-                    title: "What this branch did to the document",
-                  },
-                  "Branch",
-                )
-              : undefined,
-            ...COLUMNS.slice(1).map(sortHeader),
-          ]),
-        ]),
-        h(
-          "tbody",
-          result.rows.length === 0
-            ? [
-                h("tr", [
-                  h(
-                    "td.dashboard-empty",
-                    { colSpan: COLUMNS.length + (branch ? 1 : 0) },
-                    "No documents match these filters.",
-                  ),
-                ]),
-              ]
-            : result.rows.map((row) => renderRow(row)),
-        ),
-      ]),
-    ]),
-  ];
-}
-
-function renderRow(row: DashboardRow): Element {
-  const count = (value: number | null, className: string) =>
-    h(
-      value !== null && value > 0
-        ? `td.is-numeric.${className}`
-        : "td.is-numeric",
-      value === null ? "—" : String(value),
-    );
-  return h("tr", [
-    h("td.dashboard-path", h("a", { href: documentHref(row.path) }, row.path)),
-    row.change === undefined ? undefined : renderChange(row.change),
-    count(row.errors, "has-errors"),
-    count(row.warnings, "has-warnings"),
-    h("td.dashboard-rules", [
-      ...row.rules.flatMap((id, index) =>
-        index === 0 ? [h("code", id)] : [" ", h("code", id)],
-      ),
-      // Copies a prompt that answers every finding in the document; its menu is the page script's,
-      // so it is hidden without it.
-      row.rules.length === 0
-        ? undefined
-        : h(
-            "button.prompt-menu",
-            {
-              type: "button",
-              hidden: true,
-              dataPath: row.path,
-              title: "Copy a prompt that answers this document's findings",
-            },
-            "Prompt",
-          ),
-    ]),
-    h("td.is-numeric", { title: `${row.bytes} bytes` }, kilobytes(row.bytes)),
-    h("td.is-numeric", String(row.lines)),
-    h("td.is-numeric", String(row.tokens)),
-    h("td.is-numeric", String(row.linkedFrom)),
-    h("td.is-numeric", String(row.linksTo)),
-    h(
-      "td.dashboard-flags",
-      row.flags.map((flag) => LINK_FLAG_NAMES[flag]).join(", "),
-    ),
-  ]);
-}
-
-// The branch's column: the document's letter, then the findings it gained and lost, as the Changes
-// page words them.
-function renderChange(change: DashboardChange | null): Element {
-  if (change === null) {
-    return h("td.dashboard-change");
-  }
-  const findings = [
-    change.findingsAdded > 0 ? `+${change.findingsAdded}` : undefined,
-    change.findingsRemoved > 0 ? `−${change.findingsRemoved}` : undefined,
-  ]
-    .filter((part) => part !== undefined)
-    .join(" ");
-  return h("td.dashboard-change", [
-    change.status === undefined
-      ? undefined
-      : h(`span.change-status.change-status-${change.status}`, change.status),
-    findings === ""
-      ? undefined
-      : h(
-          "span.change-findings",
-          { title: "Findings this branch added and removed" },
-          findings,
-        ),
-  ]);
-}
-
-function kilobytes(bytes: number): string {
-  return (bytes / 1024).toFixed(1);
-}
-
-function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
