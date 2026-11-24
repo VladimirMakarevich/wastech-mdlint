@@ -136,7 +136,15 @@ Split only what compressing could not bring under budget, in one of two forms, c
 npx wastech-mdlint lint
 ```
 
-The work is done when this reports no `SIZE-001` or `LLM-001` finding for the files you touched and nothing new besides. Where the config enables them, `REF-001` and `REF-002` catch a link or anchor a move broke, and `GRP-001` catches a reference cycle a new router or continuation link introduced — fix those in the same change.
+The work is done when this reports no `SIZE-001` or `LLM-001` finding for the files you touched and nothing new besides.
+
+On a branch, check "nothing new besides" against the branch the change will merge into (`main`, say) rather than by eye:
+
+```bash
+npx wastech-mdlint lint --since main --format json --fail-on off
+```
+
+`messages` then holds only the findings the work tree adds since the merge-base with `main` — on unchanged documents too, such as an anchor a moved section broke — and `since.removed` the findings it removes, where a budget finding the split resolved shows up. It needs a git work tree with history back to the merge-base; outside one it exits `2` with git's remedy, and the plain `lint` above is the check. Where the config enables them, `REF-001` and `REF-002` catch a link or anchor a move broke, and `GRP-001` catches a reference cycle a new router or continuation link introduced — fix those in the same change.
 
 Report what you tightened, the new files with their topics, the links you retargeted, and anything still over budget with the reason (a plan waiting on the user is a reason; running out of room is not).
 
