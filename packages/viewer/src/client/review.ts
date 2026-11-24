@@ -346,17 +346,8 @@ function onKey(
   toggles: readonly HTMLLabelElement[],
   documentPath: string | undefined,
 ): void {
-  if (
-    event.defaultPrevented ||
-    event.ctrlKey ||
-    event.metaKey ||
-    event.altKey ||
-    isTyping(event.target)
-  ) {
-    return;
-  }
-  const key = event.key.toLowerCase();
-  if (key !== "v" && key !== "n" && key !== "p") {
+  const key = reviewKey(event);
+  if (key === undefined) {
     return;
   }
   event.preventDefault();
@@ -364,12 +355,7 @@ function onKey(
     ...document.querySelectorAll<HTMLElement>(".change-card"),
   ].filter((card) => card.querySelector(".review-toggle") !== null);
   if (cards.length === 0) {
-    // A document's page: its own banner, and the list the Changes page would show.
-    if (key === "v") {
-      toggles[0]?.querySelector("input")?.click();
-    } else if (documentPath !== undefined && toggles[0] !== undefined) {
-      void goToDocument(toggles[0], documentPath, key === "n" ? 1 : -1);
-    }
+    onDocumentPageKey(key, toggles, documentPath);
     return;
   }
   const current = currentCard(cards);
@@ -378,6 +364,56 @@ function onKey(
     return;
   }
   const step = key === "n" ? 1 : -1;
+  if (stepToUnreviewedCard(cards, current, step)) {
+    return;
+  }
+  const toggle = current?.querySelector<HTMLLabelElement>(".review-toggle");
+  if (toggle !== null && toggle !== undefined) {
+    say(
+      toggle,
+      step === 1
+        ? "Nothing left to review below this one."
+        : "Nothing left to review above this one.",
+    );
+  }
+}
+
+// The review key a press stands for, or nothing when it is not one: a modifier held means another
+// shortcut, and text being typed must keep its letters.
+function reviewKey(event: KeyboardEvent): "v" | "n" | "p" | undefined {
+  if (
+    event.defaultPrevented ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey ||
+    isTyping(event.target)
+  ) {
+    return undefined;
+  }
+  const key = event.key.toLowerCase();
+  return key === "v" || key === "n" || key === "p" ? key : undefined;
+}
+
+// A document's page: its own banner, and the list the Changes page would show.
+function onDocumentPageKey(
+  key: "v" | "n" | "p",
+  toggles: readonly HTMLLabelElement[],
+  documentPath: string | undefined,
+): void {
+  if (key === "v") {
+    toggles[0]?.querySelector("input")?.click();
+  } else if (documentPath !== undefined && toggles[0] !== undefined) {
+    void goToDocument(toggles[0], documentPath, key === "n" ? 1 : -1);
+  }
+}
+
+// Brings the nearest card not yet reviewed, past `current` in the direction of `step`, to the top;
+// false when there is none, so the caller can say so.
+function stepToUnreviewedCard(
+  cards: readonly HTMLElement[],
+  current: HTMLElement | undefined,
+  step: 1 | -1,
+): boolean {
   const start = current === undefined ? -1 : cards.indexOf(current);
   for (
     let index = start + step;
@@ -391,18 +427,10 @@ function onKey(
       card
         .querySelector<HTMLInputElement>(".review-toggle input")
         ?.focus({ preventScroll: true });
-      return;
+      return true;
     }
   }
-  const toggle = current?.querySelector<HTMLLabelElement>(".review-toggle");
-  if (toggle !== null && toggle !== undefined) {
-    say(
-      toggle,
-      step === 1
-        ? "Nothing left to review below this one."
-        : "Nothing left to review above this one.",
-    );
-  }
+  return false;
 }
 
 function isTyping(target: EventTarget | null): boolean {

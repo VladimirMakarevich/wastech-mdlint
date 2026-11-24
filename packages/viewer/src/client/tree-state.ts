@@ -52,22 +52,58 @@
     tree.getBoundingClientRect().top +
     tree.scrollTop;
 
-  let saved: Saved | undefined;
-  try {
-    const parsed = JSON.parse(
-      sessionStorage.getItem(STORAGE_KEY) ?? "null",
-    ) as Saved | null;
-    if (
-      parsed !== null &&
-      Array.isArray(parsed.open) &&
-      typeof parsed.scrolledIntoList === "number"
-    ) {
-      saved = parsed;
+  // Declared inside the wrapper rather than at the top level: in a classic script a top-level
+  // function is a global, shared with every other classic script on the page.
+  function readSaved(): Saved | undefined {
+    try {
+      const parsed = JSON.parse(
+        sessionStorage.getItem(STORAGE_KEY) ?? "null",
+      ) as Saved | null;
+      if (
+        parsed !== null &&
+        Array.isArray(parsed.open) &&
+        typeof parsed.scrolledIntoList === "number"
+      ) {
+        return parsed;
+      }
+    } catch {
+      // Storage blocked or unreadable: the tree opens as the server drew it.
     }
-  } catch {
-    // Storage blocked or unreadable: the tree opens as the server drew it.
+    return undefined;
   }
 
+  // Reached some other way — a link in an article, search, the graph — the document may lie outside
+  // the restored view; then it is brought to the middle, leaving the tree alone when it is in sight.
+  function centerCurrent(scroller: HTMLElement): void {
+    const current = scroller.querySelector<HTMLElement>(
+      'a[aria-current="page"]',
+    );
+    if (current === null) {
+      return;
+    }
+    const view = scroller.getBoundingClientRect();
+    const row = current.getBoundingClientRect();
+    if (row.top < view.top || row.bottom > view.bottom) {
+      scroller.scrollTop += row.top - view.top - (view.height - row.height) / 2;
+    }
+  }
+
+  // Folders a switch opened are that switch's own and are left out, so turning it off still closes
+  // them.
+  function openFolders(scroller: HTMLElement): string[] {
+    return [
+      ...scroller.querySelectorAll<HTMLDetailsElement>("details[data-folder]"),
+    ]
+      .filter(
+        (folder) =>
+          folder.open &&
+          folder.dataset.openedByFilter === undefined &&
+          folder.dataset.openedByChangesFilter === undefined,
+      )
+      .map((folder) => folder.dataset.folder ?? "");
+  }
+
+  const saved = readSaved();
   if (saved !== undefined) {
     const open = new Set(saved.open);
     for (const folder of tree.querySelectorAll<HTMLDetailsElement>(
@@ -80,31 +116,12 @@
     tree.scrollTop = listStart() + saved.scrolledIntoList;
   }
 
-  // Reached some other way — a link in an article, search, the graph — the document may lie outside
-  // the restored view; then it is brought to the middle, leaving the tree alone when it is in sight.
-  const current = tree.querySelector<HTMLElement>('a[aria-current="page"]');
-  if (current !== null) {
-    const view = tree.getBoundingClientRect();
-    const row = current.getBoundingClientRect();
-    if (row.top < view.top || row.bottom > view.bottom) {
-      tree.scrollTop += row.top - view.top - (view.height - row.height) / 2;
-    }
-  }
+  centerCurrent(tree);
 
   // Saved as the page goes, which covers a click in the tree, any other link, a reload and the
-  // back button alike. Folders a switch opened are that switch's own and are left out, so turning it
-  // off still closes them.
+  // back button alike.
   window.addEventListener("pagehide", () => {
-    const open = [
-      ...tree.querySelectorAll<HTMLDetailsElement>("details[data-folder]"),
-    ]
-      .filter(
-        (folder) =>
-          folder.open &&
-          folder.dataset.openedByFilter === undefined &&
-          folder.dataset.openedByChangesFilter === undefined,
-      )
-      .map((folder) => folder.dataset.folder ?? "");
+    const open = openFolders(tree);
     try {
       sessionStorage.setItem(
         STORAGE_KEY,

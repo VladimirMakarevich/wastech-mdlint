@@ -19,7 +19,29 @@ export function initSearch(): void {
   if (form === null || input === null || input === undefined) {
     return;
   }
+  const box = new LiveSearch(input, resultList(form, input));
 
+  input.addEventListener("input", () => {
+    box.schedule();
+  });
+  input.addEventListener("keydown", (event) => {
+    box.onKey(event);
+  });
+  input.addEventListener("focus", () => {
+    box.reopen();
+  });
+  document.addEventListener("click", (event) => {
+    if (!form.contains(event.target as Node)) {
+      box.close();
+    }
+  });
+  bindShortcuts(input);
+}
+
+function resultList(
+  form: HTMLFormElement,
+  input: HTMLInputElement,
+): HTMLUListElement {
   const list = document.createElement("ul");
   list.className = "search-results";
   // With a `.`, which no heading slug contains, so a document's heading "Search results" cannot take
@@ -32,110 +54,12 @@ export function initSearch(): void {
   input.setAttribute("aria-controls", list.id);
   input.setAttribute("aria-autocomplete", "list");
   input.setAttribute("aria-expanded", "false");
+  return list;
+}
 
-  let hits: SearchHit[] = [];
-  let active = -1;
-  let timer: number | undefined;
-  // Responses can arrive out of order; only the newest query's answer is shown.
-  let latestRequest = 0;
-
-  function close(): void {
-    list.hidden = true;
-    input!.setAttribute("aria-expanded", "false");
-    input!.removeAttribute("aria-activedescendant");
-    active = -1;
-  }
-
-  function select(index: number): void {
-    active = index;
-    for (const [position, item] of [...list.children].entries()) {
-      item.setAttribute("aria-selected", String(position === index));
-    }
-    if (index >= 0) {
-      input!.setAttribute(
-        "aria-activedescendant",
-        `viewer.search-hit-${index}`,
-      );
-      list.children[index]?.scrollIntoView({ block: "nearest" });
-    } else {
-      input!.removeAttribute("aria-activedescendant");
-    }
-  }
-
-  function render(query: string): void {
-    list.replaceChildren(
-      ...(hits.length === 0
-        ? [emptyItem(`No documents match “${query}”.`)]
-        : hits.map((hit, index) => hitItem(hit, index))),
-    );
-    list.hidden = false;
-    input!.setAttribute("aria-expanded", "true");
-    select(-1);
-  }
-
-  async function run(): Promise<void> {
-    const query = input!.value.trim();
-    if (query.length < MIN_QUERY_LENGTH) {
-      // Outdates any answer still on its way: it is for the longer query the reader has just
-      // shortened, and would reopen the list with results for text the box no longer holds.
-      latestRequest += 1;
-      hits = [];
-      close();
-      return;
-    }
-    const request = ++latestRequest;
-    try {
-      const response = await fetch(
-        `/api/search?q=${encodeURIComponent(query)}`,
-      );
-      const data = (await response.json()) as { results: SearchHit[] };
-      if (request !== latestRequest) {
-        return;
-      }
-      hits = data.results;
-      render(query);
-    } catch {
-      // The server went away (it is restarting, or was stopped); the form still submits normally.
-    }
-  }
-
-  input.addEventListener("input", () => {
-    window.clearTimeout(timer);
-    timer = window.setTimeout(() => void run(), 120);
-  });
-
-  input.addEventListener("keydown", (event) => {
-    if (event.key === "ArrowDown" && !list.hidden && hits.length > 0) {
-      event.preventDefault();
-      select((active + 1) % hits.length);
-    } else if (event.key === "ArrowUp" && !list.hidden && hits.length > 0) {
-      event.preventDefault();
-      select(active <= 0 ? hits.length - 1 : active - 1);
-    } else if (event.key === "Enter" && active >= 0 && !list.hidden) {
-      // With nothing selected, Enter submits the form and opens the full results page instead.
-      event.preventDefault();
-      location.href = hits[active]!.href;
-    } else if (event.key === "Escape") {
-      close();
-      input.blur();
-    }
-  });
-
-  input.addEventListener("focus", () => {
-    if (hits.length > 0 && input.value.trim().length >= MIN_QUERY_LENGTH) {
-      list.hidden = false;
-      input.setAttribute("aria-expanded", "true");
-    }
-  });
-
-  document.addEventListener("click", (event) => {
-    if (!form.contains(event.target as Node)) {
-      close();
-    }
-  });
-
-  // Ctrl+K (Cmd+K on macOS) from anywhere, and `/` when the reader is not already typing — the two
-  // shortcuts documentation sites have taught people to reach for.
+// Ctrl+K (Cmd+K on macOS) from anywhere, and `/` when the reader is not already typing — the two
+// shortcuts documentation sites have taught people to reach for.
+function bindShortcuts(input: HTMLInputElement): void {
   document.addEventListener("keydown", (event) => {
     const typing =
       event.target instanceof HTMLElement &&
@@ -150,6 +74,114 @@ export function initSearch(): void {
       input.select();
     }
   });
+}
+
+// The state of one search box: the hits on show, which of them the keyboard has selected, and which
+// request is the newest.
+class LiveSearch {
+  private hits: SearchHit[] = [];
+  private active = -1;
+  private timer: number | undefined;
+  // Responses can arrive out of order; only the newest query's answer is shown.
+  private latestRequest = 0;
+
+  constructor(
+    private readonly input: HTMLInputElement,
+    private readonly list: HTMLUListElement,
+  ) {}
+
+  schedule(): void {
+    window.clearTimeout(this.timer);
+    this.timer = window.setTimeout(() => void this.run(), 120);
+  }
+
+  close(): void {
+    this.list.hidden = true;
+    this.input.setAttribute("aria-expanded", "false");
+    this.input.removeAttribute("aria-activedescendant");
+    this.active = -1;
+  }
+
+  reopen(): void {
+    if (
+      this.hits.length > 0 &&
+      this.input.value.trim().length >= MIN_QUERY_LENGTH
+    ) {
+      this.list.hidden = false;
+      this.input.setAttribute("aria-expanded", "true");
+    }
+  }
+
+  onKey(event: KeyboardEvent): void {
+    const listed = !this.list.hidden && this.hits.length > 0;
+    if (event.key === "ArrowDown" && listed) {
+      event.preventDefault();
+      this.select((this.active + 1) % this.hits.length);
+    } else if (event.key === "ArrowUp" && listed) {
+      event.preventDefault();
+      this.select(this.active <= 0 ? this.hits.length - 1 : this.active - 1);
+    } else if (event.key === "Enter" && this.active >= 0 && !this.list.hidden) {
+      // With nothing selected, Enter submits the form and opens the full results page instead.
+      event.preventDefault();
+      location.href = this.hits[this.active]!.href;
+    } else if (event.key === "Escape") {
+      this.close();
+      this.input.blur();
+    }
+  }
+
+  private select(index: number): void {
+    this.active = index;
+    for (const [position, item] of [...this.list.children].entries()) {
+      item.setAttribute("aria-selected", String(position === index));
+    }
+    if (index >= 0) {
+      this.input.setAttribute(
+        "aria-activedescendant",
+        `viewer.search-hit-${index}`,
+      );
+      this.list.children[index]?.scrollIntoView({ block: "nearest" });
+    } else {
+      this.input.removeAttribute("aria-activedescendant");
+    }
+  }
+
+  private render(query: string): void {
+    this.list.replaceChildren(
+      ...(this.hits.length === 0
+        ? [emptyItem(`No documents match “${query}”.`)]
+        : this.hits.map((hit, index) => hitItem(hit, index))),
+    );
+    this.list.hidden = false;
+    this.input.setAttribute("aria-expanded", "true");
+    this.select(-1);
+  }
+
+  private async run(): Promise<void> {
+    const query = this.input.value.trim();
+    if (query.length < MIN_QUERY_LENGTH) {
+      // Outdates any answer still on its way: it is for the longer query the reader has just
+      // shortened, and would reopen the list with results for text the box no longer holds.
+      this.latestRequest += 1;
+      this.hits = [];
+      this.close();
+      return;
+    }
+    const request = ++this.latestRequest;
+    try {
+      const response = await fetch(
+        `/api/search?q=${encodeURIComponent(query)}`,
+      );
+      const data = (await response.json()) as { results: SearchHit[] };
+      if (request !== this.latestRequest) {
+        return;
+      }
+      this.hits = data.results;
+      this.render(query);
+    } catch {
+      // The server went away (it is restarting, or was stopped); the form still submits normally.
+    }
+  }
 }
 
 function hitItem(hit: SearchHit, index: number): HTMLLIElement {

@@ -1,4 +1,4 @@
-import { loadECharts } from "./echarts.js";
+import { loadECharts, type ECharts } from "./echarts.js";
 import {
   forceSeries,
   isOwnLink,
@@ -97,77 +97,158 @@ async function draw(
   view.nodes = paintOrder(view);
   const echarts = await loadECharts();
   canvas.replaceChildren();
-  let layout = layoutFor(view, boxOf(canvas), kind);
+  const layout = layoutFor(view, boxOf(canvas), kind);
   const chart = echarts.init(canvas);
+  new DrawnGraph({ canvas, chart, view, kind, layout }).start();
+  // Saving a document can add or drop links without changing which documents exist, and that reloads
+  // no page. The view is fetched again and the page reloaded only when it differs, because a reload
+  // restarts the layout, and most saves change no link.
+  onServerEvent("change", () => {
+    void fetchText(url).then((next) => {
+      if (next !== undefined && next !== text) {
+        location.reload();
+      }
+    });
+  });
+}
+
+type DrawnGraphInit = {
+  canvas: HTMLElement;
+  chart: ECharts;
+  view: GraphView;
+  kind: GraphKind;
+  layout: Layout;
+};
+
+// One drawn graph and the state its handlers share: the layout it was last given, the zoom the reader
+// has reached, and how long the layout is still left to settle.
+class DrawnGraph {
+  private readonly canvas: HTMLElement;
+  private readonly chart: ECharts;
+  private readonly view: GraphView;
+  private readonly kind: GraphKind;
+  private layout: Layout;
   // The zoom the reader has reached, kept here because ECharts hands its label callback no current
   // zoom: the node box it passes was measured when the labels were created and never again.
-  let zoom = layout.zoom ?? 1;
-  chart.setOption(graphOption(view, layout, readColors(), () => zoom));
+  private zoom: number;
+  // ECharts settles a force layout over several seconds, but checks names for overlap only on the
+  // first frame and on a zoom, so names that drift onto each other as documents move would stay
+  // drawn on top of each other. Each check renders a frame and so raises `finished` again; the
+  // deadline is what ends the loop once the layout has had time to settle, and it starts over
+  // whenever the layout is set moving again: by a resize, a theme switch or a dragged document.
+  private settleUntil = performance.now() + LAYOUT_SETTLE_MS;
+  private lastCheck = 0;
+  private laidOutFor = { width: 0, height: 0 };
+  private resizeTimer: number | undefined;
+
+  constructor(init: DrawnGraphInit) {
+    this.canvas = init.canvas;
+    this.chart = init.chart;
+    this.view = init.view;
+    this.kind = init.kind;
+    this.layout = init.layout;
+    this.zoom = init.layout.zoom ?? 1;
+  }
+
+  start(): void {
+    this.chart.setOption(this.option(this.layout));
+    this.chart.on("click", ({ dataType, dataIndex }) => {
+      const node = dataType === "node" ? this.view.nodes[dataIndex] : undefined;
+      if (node !== undefined) {
+        location.href = node.href;
+      }
+    });
+    this.watchResize();
+    // The reader's zoom arrives here after ECharts has already laid the labels out at the old one, so
+    // they are laid out once more at the new one. The factor is clamped as ECharts clamps it; a pan
+    // carries no factor, and the factor of one is this code's own relayout.
+    this.chart.on("graphroam", ({ zoom: factor }) => {
+      if (factor === undefined || factor === 1) {
+        return;
+      }
+      this.zoom = Math.min(
+        this.layout.maxZoom,
+        Math.max(this.layout.minZoom, this.zoom * factor),
+      );
+      this.relayoutLabels();
+    });
+    if (this.kind === "local") {
+      this.zoomWithModifier();
+    }
+    this.keepLabelsApart();
+    // Every theme-dependent color of the graph comes from the page's tokens, so a theme switch only
+    // passes them in again. ECharts' own `setTheme` would rebuild the series and lay the graph out
+    // from scratch, scattering every document. The new option leaves the zoom out, so the reader's
+    // zoom stays, and restarts the layout cool, from where each document is.
+    onThemeChange(() => {
+      this.settleUntil = performance.now() + LAYOUT_SETTLE_MS;
+      this.chart.setOption(
+        this.option({
+          ...this.layout,
+          zoom: undefined,
+          friction: SETTLED_FRICTION,
+        }),
+      );
+    });
+  }
+
+  private option(layout: Layout): object {
+    return graphOption(this.view, layout, readColors(), () => this.zoom);
+  }
+
   // A zoom by a factor of one makes ECharts lay its labels out again and changes nothing else.
-  const relayoutLabels = (): void => {
-    chart.dispatchAction({
+  private relayoutLabels(): void {
+    this.chart.dispatchAction({
       type: "graphRoam",
       seriesIndex: 0,
       zoom: 1,
       originX: 0,
       originY: 0,
     });
-  };
-  chart.on("click", ({ dataType, dataIndex }) => {
-    const node = dataType === "node" ? view.nodes[dataIndex] : undefined;
-    if (node !== undefined) {
-      location.href = node.href;
-    }
-  });
+  }
+
   // The layout is sized for its box: its forces fill it and the focused document is pinned in its
   // middle. When the box changes for good — the window resized, a side column dragged wider — the
   // graph is laid out again for the new one, from where every document is and at the reader's zoom.
   // A drag resizes the box every frame, so that waits until the size has held for a moment; the
   // canvas itself follows every frame.
-  let laidOutFor = { width: canvas.clientWidth, height: canvas.clientHeight };
-  let resizeTimer: number | undefined;
-  new ResizeObserver(() => {
-    chart.resize();
-    clearTimeout(resizeTimer);
-    resizeTimer = window.setTimeout(() => {
-      const width = canvas.clientWidth;
-      const height = canvas.clientHeight;
-      if (
-        Math.abs(width - laidOutFor.width) < RELAYOUT_MIN_CHANGE &&
-        Math.abs(height - laidOutFor.height) < RELAYOUT_MIN_CHANGE
-      ) {
-        return;
-      }
-      laidOutFor = { width, height };
-      layout = {
-        ...layoutFor(view, boxOf(canvas), kind),
-        zoom: undefined,
-        minZoom: layout.minZoom,
-        maxZoom: layout.maxZoom,
-      };
-      settleUntil = performance.now() + LAYOUT_SETTLE_MS;
-      chart.setOption(graphOption(view, layout, readColors(), () => zoom));
-    }, RELAYOUT_DELAY_MS);
-  }).observe(canvas);
+  private watchResize(): void {
+    this.laidOutFor = boxOf(this.canvas);
+    new ResizeObserver(() => {
+      this.chart.resize();
+      clearTimeout(this.resizeTimer);
+      this.resizeTimer = window.setTimeout(() => {
+        this.relayoutForBox();
+      }, RELAYOUT_DELAY_MS);
+    }).observe(this.canvas);
+  }
 
-  // The reader's zoom arrives here after ECharts has already laid the labels out at the old one, so
-  // they are laid out once more at the new one. The factor is clamped as ECharts clamps it; a pan
-  // carries no factor, and the factor of one is this code's own relayout.
-  chart.on("graphroam", ({ zoom: factor }) => {
-    if (factor === undefined || factor === 1) {
+  private relayoutForBox(): void {
+    const { width, height } = boxOf(this.canvas);
+    if (
+      Math.abs(width - this.laidOutFor.width) < RELAYOUT_MIN_CHANGE &&
+      Math.abs(height - this.laidOutFor.height) < RELAYOUT_MIN_CHANGE
+    ) {
       return;
     }
-    zoom = Math.min(layout.maxZoom, Math.max(layout.minZoom, zoom * factor));
-    relayoutLabels();
-  });
+    this.laidOutFor = { width, height };
+    this.layout = {
+      ...layoutFor(this.view, boxOf(this.canvas), this.kind),
+      zoom: undefined,
+      minZoom: this.layout.minZoom,
+      maxZoom: this.layout.maxZoom,
+    };
+    this.settleUntil = performance.now() + LAYOUT_SETTLE_MS;
+    this.chart.setOption(this.option(this.layout));
+  }
 
   // In the side column the plain wheel scrolls the page, as it does everywhere else in the rail: a
   // graph that took it would stop the page whenever the pointer crossed the box. So the local graph
   // zooms with Ctrl or ⌘ held, which is also what a trackpad pinch sends. ECharts' wheel zoom cannot
   // be tied to a key, so this zooms through the same action ECharts' wheel dispatches, which applies
-  // the zoom limits and reaches the handler above like any other zoom.
-  if (kind === "local") {
-    canvas.addEventListener(
+  // the zoom limits and reaches the `graphroam` handler like any other zoom.
+  private zoomWithModifier(): void {
+    this.canvas.addEventListener(
       "wheel",
       (event) => {
         if (!event.ctrlKey && !event.metaKey) {
@@ -175,8 +256,8 @@ async function draw(
         }
         // Held Ctrl and a wheel otherwise zoom the whole page.
         event.preventDefault();
-        const box = canvas.getBoundingClientRect();
-        chart.dispatchAction({
+        const box = this.canvas.getBoundingClientRect();
+        this.chart.dispatchAction({
           type: "graphRoam",
           seriesIndex: 0,
           zoom: wheelZoom(event),
@@ -188,50 +269,22 @@ async function draw(
     );
   }
 
-  // ECharts settles a force layout over several seconds, but checks names for overlap only on the
-  // first frame and on a zoom, so names that drift onto each other as documents move would stay
-  // drawn on top of each other. Each check renders a frame and so raises `finished` again; the
-  // deadline is what ends the loop once the layout has had time to settle, and it starts over
-  // whenever the layout is set moving again: by a theme switch or by a dragged document.
-  let settleUntil = performance.now() + LAYOUT_SETTLE_MS;
-  let lastCheck = 0;
-  chart.on("finished", () => {
-    const now = performance.now();
-    if (now > settleUntil || now - lastCheck < LABEL_CHECK_INTERVAL_MS) {
-      return;
-    }
-    lastCheck = now;
-    relayoutLabels();
-  });
-  chart.getZr().on("mouseup", () => {
-    settleUntil = performance.now() + LAYOUT_SETTLE_MS;
-  });
-
-  // Every theme-dependent color of the graph comes from the page's tokens, so a theme switch only
-  // passes them in again. ECharts' own `setTheme` would rebuild the series and lay the graph out from
-  // scratch, scattering every document. The new option leaves the zoom out, so the reader's zoom
-  // stays, and restarts the layout cool, from where each document is.
-  onThemeChange(() => {
-    settleUntil = performance.now() + LAYOUT_SETTLE_MS;
-    chart.setOption(
-      graphOption(
-        view,
-        { ...layout, zoom: undefined, friction: SETTLED_FRICTION },
-        readColors(),
-        () => zoom,
-      ),
-    );
-  });
-  // Saving a document can add or drop links without changing which documents exist, and that reloads
-  // no page. The view is fetched again and the page reloaded only when it differs, because a reload
-  // restarts the layout, and most saves change no link.
-  onServerEvent("change", () => {
-    void fetchText(url).then((next) => {
-      if (next !== undefined && next !== text) {
-        location.reload();
+  private keepLabelsApart(): void {
+    this.chart.on("finished", () => {
+      const now = performance.now();
+      if (
+        now > this.settleUntil ||
+        now - this.lastCheck < LABEL_CHECK_INTERVAL_MS
+      ) {
+        return;
       }
+      this.lastCheck = now;
+      this.relayoutLabels();
     });
-  });
+    this.chart.getZr().on("mouseup", () => {
+      this.settleUntil = performance.now() + LAYOUT_SETTLE_MS;
+    });
+  }
 }
 
 // ECharts paints nodes in data order, so with a document focused its neighborhood goes last and no
@@ -375,6 +428,17 @@ function changeStyle(node: GraphNode, colors: GraphColors): object | undefined {
   }
 }
 
+// What every part of one graph option reads: the view, its layout and colors, and what the focus
+// lights.
+type OptionContext = {
+  view: GraphView;
+  layout: Layout;
+  colors: GraphColors;
+  local: boolean;
+  lit: Set<string> | undefined;
+  laidOut: ReturnType<typeof forceSeries>;
+};
+
 function graphOption(
   view: GraphView,
   layout: Layout,
@@ -383,29 +447,17 @@ function graphOption(
 ): object {
   // Sorted, so a folder keeps its color whichever document is focused.
   const groups = [...new Set(view.nodes.map((node) => node.group))].sort();
-  const groupIndex = new Map(groups.map((group, index) => [group, index]));
   const focus = view.focus;
   const local = layout.kind === "local";
-  const lit =
-    focus === null ? undefined : new Set([focus.path, ...focus.neighbors]);
-  // Named whatever the zoom: everything in the local graph, the neighborhood of a focused document,
-  // and otherwise the most linked-to documents.
-  const named = local
-    ? new Set(view.nodes.map((node) => node.path))
-    : (lit ??
-      new Set(
-        [...view.nodes]
-          .sort((left, right) => right.inDegree - left.inDegree)
-          .slice(0, LABELED_NODES)
-          .map((node) => node.path),
-      ));
-  const linkOpacity = local
-    ? LOCAL_LINK_OPACITY
-    : focus === null
-      ? LINK_OPACITY
-      : FADED_LINK_OPACITY;
-  const litLink = local ? LOCAL_LIT_LINK : LIT_LINK;
-  const laidOut = forceSeries(view, layout);
+  const context: OptionContext = {
+    view,
+    layout,
+    colors,
+    local,
+    lit: focus === null ? undefined : new Set([focus.path, ...focus.neighbors]),
+    laidOut: forceSeries(view, layout),
+  };
+  const linkOpacity = linkOpacityFor(local, focus !== null);
 
   return {
     // ECharts draws its labels on the canvas in a font of its own, which the stylesheet cannot reach;
@@ -417,46 +469,15 @@ function graphOption(
       backgroundColor: colors.surface,
       borderColor: colors.muted,
       textStyle: { color: colors.text },
-      formatter: ({ dataType, dataIndex }: ItemParams) => {
-        if (dataType === "node") {
-          const node = view.nodes[dataIndex];
-          return node === undefined
-            ? ""
-            : `${node.title}\n${node.path}\n${node.inDegree} in · ${node.outDegree} out${
-                node.change === undefined
-                  ? ""
-                  : `\n${CHANGE_NAMES[node.change]}`
-              }`;
-        }
-        const edge = view.edges[dataIndex];
-        return edge === undefined
-          ? ""
-          : `${edge.from}\n→ ${edge.to}${
-              edge.change === undefined
-                ? ""
-                : `\n${edge.change === "added" ? "Linked" : "Unlinked"} in this branch`
-            }`;
-      },
+      formatter: (params: ItemParams) => tooltipText(view, params),
     },
-    legend:
-      layout.kind === "page"
-        ? {
-            type: "scroll",
-            top: 0,
-            data: groups,
-            textStyle: { color: colors.text },
-            inactiveColor: colors.muted,
-            pageTextStyle: { color: colors.link },
-            pageIconColor: colors.text,
-            pageIconInactiveColor: colors.muted,
-          }
-        : { show: false },
+    legend: legendOption(layout, groups, colors),
     series: [
       {
         type: "graph",
         layout: "force",
-        ...laidOut,
-        // The local graph pans by dragging; it zooms only by the wheel handler in `draw`.
+        ...context.laidOut,
+        // The local graph pans by dragging; it zooms only by the wheel handler in `DrawnGraph`.
         roam: layout.kind === "page" ? true : "move",
         // Anywhere in the box, not only over the view's own rectangle, which ECharts scales with
         // the zoom: a graph that opens zoomed out to fit would otherwise answer the wheel and a drag
@@ -474,52 +495,8 @@ function graphOption(
         // on top of each other.
         nodeScaleRatio: 1,
         categories: groups.map((name) => ({ name })),
-        data: view.nodes.map((node, index) => {
-          const isFocus = node.path === focus?.path;
-          const dimmed = lit !== undefined && !lit.has(node.path);
-          return {
-            ...laidOut.data[index],
-            name: node.path,
-            category: groupIndex.get(node.group),
-            // Outside the focused neighborhood a document turns neutral gray rather than
-            // transparent: see-through color washes out to pastel on a light page and the graph's
-            // shape is lost, while gray keeps every document visible and lets the lit ones lead.
-            itemStyle: dimmed
-              ? { color: colors.muted }
-              : isFocus
-                ? { borderColor: colors.accent, borderWidth: 2 }
-                : changeStyle(node, colors),
-            label: {
-              show: !dimmed,
-              fontWeight: isFocus ? "bold" : undefined,
-            },
-          };
-        }),
-        // Arrowheads only on a focused document's own links. A filled head is far heavier than a
-        // hairline, and the dozens that meet at a much-linked document pile up into a dark blot; the
-        // direction of any link is in its tooltip.
-        links: view.edges.map((edge, index) => ({
-          ...laidOut.links[index],
-          ...(edge.change === undefined
-            ? {}
-            : {
-                lineStyle: {
-                  color:
-                    edge.change === "added" ? colors.added : colors.removed,
-                  type: edge.change === "removed" ? "dashed" : "solid",
-                  width: local ? 0.9 : 1.2,
-                  opacity: 0.9,
-                },
-              }),
-          ...(isOwnLink(edge, focus) && edge.change === undefined
-            ? {
-                symbol: ["none", "arrow"],
-                symbolSize: local ? 4 : 6,
-                lineStyle: { color: colors.accent, ...litLink },
-                blur: { lineStyle: { opacity: litLink.opacity } },
-              }
-            : {}),
-        })),
+        data: nodeData(context, groups),
+        links: linkData(context),
         lineStyle: {
           color: colors.link,
           width: local ? 0.5 : 0.7,
@@ -536,25 +513,7 @@ function graphOption(
             ? { width: 84, overflow: "truncate" }
             : {}),
         },
-        // ECharts runs this for every label whenever it lays labels out, a zoom included, which is
-        // what lets names come in with the zoom without a new option — and a new option would
-        // restart the layout.
-        labelLayout: ({ dataType, dataIndex }: LabelLayoutParams) => {
-          const node = dataType === "node" ? view.nodes[dataIndex] : undefined;
-          if (node === undefined || named.has(node.path)) {
-            return { hideOverlap: true };
-          }
-          const onScreenSpacing = zoomNow() * layout.spacing;
-          const shown = Math.min(
-            1,
-            Math.max(
-              0,
-              (onScreenSpacing - LABEL_SPACING_FROM) /
-                (LABEL_SPACING_TO - LABEL_SPACING_FROM),
-            ),
-          );
-          return { hideOverlap: true, fontSize: LABEL_FONT_SIZE * shown };
-        },
+        labelLayout: labelLayoutFor(context, zoomNow),
         // Hovering a document lights its links and names its neighbors, and leaves everything else as
         // it was. ECharts' default fades all the rest to a tenth of its opacity, which on a graph of
         // hundreds of documents flashes the whole picture dark and back at every move of the pointer;
@@ -577,4 +536,161 @@ function graphOption(
       },
     ],
   };
+}
+
+function linkOpacityFor(local: boolean, focused: boolean): number {
+  if (local) {
+    return LOCAL_LINK_OPACITY;
+  }
+  return focused ? FADED_LINK_OPACITY : LINK_OPACITY;
+}
+
+function tooltipText(
+  view: GraphView,
+  { dataType, dataIndex }: ItemParams,
+): string {
+  if (dataType === "node") {
+    const node = view.nodes[dataIndex];
+    return node === undefined
+      ? ""
+      : `${node.title}\n${node.path}\n${node.inDegree} in · ${node.outDegree} out${
+          node.change === undefined ? "" : `\n${CHANGE_NAMES[node.change]}`
+        }`;
+  }
+  const edge = view.edges[dataIndex];
+  return edge === undefined
+    ? ""
+    : `${edge.from}\n→ ${edge.to}${
+        edge.change === undefined
+          ? ""
+          : `\n${edge.change === "added" ? "Linked" : "Unlinked"} in this branch`
+      }`;
+}
+
+function legendOption(
+  layout: Layout,
+  groups: readonly string[],
+  colors: GraphColors,
+): object {
+  if (layout.kind !== "page") {
+    return { show: false };
+  }
+  return {
+    type: "scroll",
+    top: 0,
+    data: groups,
+    textStyle: { color: colors.text },
+    inactiveColor: colors.muted,
+    pageTextStyle: { color: colors.link },
+    pageIconColor: colors.text,
+    pageIconInactiveColor: colors.muted,
+  };
+}
+
+function nodeData(context: OptionContext, groups: readonly string[]): object[] {
+  const { view, colors, lit, laidOut } = context;
+  const groupIndex = new Map(groups.map((group, index) => [group, index]));
+  return view.nodes.map((node, index) => {
+    const isFocus = node.path === view.focus?.path;
+    const dimmed = lit !== undefined && !lit.has(node.path);
+    return {
+      ...laidOut.data[index],
+      name: node.path,
+      category: groupIndex.get(node.group),
+      itemStyle: nodeItemStyle(node, { isFocus, dimmed }, colors),
+      label: {
+        show: !dimmed,
+        fontWeight: isFocus ? "bold" : undefined,
+      },
+    };
+  });
+}
+
+// Outside the focused neighborhood a document turns neutral gray rather than transparent: see-through
+// color washes out to pastel on a light page and the graph's shape is lost, while gray keeps every
+// document visible and lets the lit ones lead.
+function nodeItemStyle(
+  node: GraphNode,
+  state: { isFocus: boolean; dimmed: boolean },
+  colors: GraphColors,
+): object | undefined {
+  if (state.dimmed) {
+    return { color: colors.muted };
+  }
+  if (state.isFocus) {
+    return { borderColor: colors.accent, borderWidth: 2 };
+  }
+  return changeStyle(node, colors);
+}
+
+// Arrowheads only on a focused document's own links. A filled head is far heavier than a hairline,
+// and the dozens that meet at a much-linked document pile up into a dark blot; the direction of any
+// link is in its tooltip.
+function linkData(context: OptionContext): object[] {
+  const { view, colors, local, laidOut } = context;
+  const litLink = local ? LOCAL_LIT_LINK : LIT_LINK;
+  return view.edges.map((edge, index) => ({
+    ...laidOut.links[index],
+    ...(edge.change === undefined
+      ? {}
+      : {
+          lineStyle: {
+            color: edge.change === "added" ? colors.added : colors.removed,
+            type: edge.change === "removed" ? "dashed" : "solid",
+            width: local ? 0.9 : 1.2,
+            opacity: 0.9,
+          },
+        }),
+    ...(isOwnLink(edge, view.focus) && edge.change === undefined
+      ? {
+          symbol: ["none", "arrow"],
+          symbolSize: local ? 4 : 6,
+          lineStyle: { color: colors.accent, ...litLink },
+          blur: { lineStyle: { opacity: litLink.opacity } },
+        }
+      : {}),
+  }));
+}
+
+// ECharts runs this for every label whenever it lays labels out, a zoom included, which is what lets
+// names come in with the zoom without a new option — and a new option would restart the layout.
+function labelLayoutFor(
+  context: OptionContext,
+  zoomNow: () => number,
+): (params: LabelLayoutParams) => object {
+  const { view, layout } = context;
+  const named = namedNodes(context);
+  return ({ dataType, dataIndex }: LabelLayoutParams) => {
+    const node = dataType === "node" ? view.nodes[dataIndex] : undefined;
+    if (node === undefined || named.has(node.path)) {
+      return { hideOverlap: true };
+    }
+    const onScreenSpacing = zoomNow() * layout.spacing;
+    const shown = Math.min(
+      1,
+      Math.max(
+        0,
+        (onScreenSpacing - LABEL_SPACING_FROM) /
+          (LABEL_SPACING_TO - LABEL_SPACING_FROM),
+      ),
+    );
+    return { hideOverlap: true, fontSize: LABEL_FONT_SIZE * shown };
+  };
+}
+
+// Named whatever the zoom: everything in the local graph, the neighborhood of a focused document, and
+// otherwise the most linked-to documents.
+function namedNodes({ view, local, lit }: OptionContext): Set<string> {
+  if (local) {
+    return new Set(view.nodes.map((node) => node.path));
+  }
+  return (
+    lit ??
+    new Set(
+      [...view.nodes]
+        .sort((left, right) => right.inDegree - left.inDegree)
+        .slice(0, LABELED_NODES)
+        .map((node) => node.path),
+    )
+  );
 }

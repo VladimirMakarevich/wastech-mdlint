@@ -49,13 +49,7 @@ async function show(
   items: () => MenuItem[] | Promise<MenuItem[]>,
   options: MenuOptions,
 ): Promise<void> {
-  const menu = document.createElement("div");
-  menu.className = "menu";
-  menu.setAttribute("role", "menu");
-  const waiting = document.createElement("p");
-  waiting.className = "menu-note";
-  waiting.textContent = "Loading…";
-  menu.append(waiting);
+  const menu = waitingMenu();
   document.body.append(menu);
   trigger.setAttribute("aria-expanded", "true");
   place(menu, trigger);
@@ -131,6 +125,19 @@ async function show(
   if (!menu.isConnected) {
     return;
   }
+  fill(menu, entries, options, close);
+  place(menu, trigger);
+  buttons()[0]?.focus();
+}
+
+// Replaces the waiting note with the entries, or with a note saying there are none, so an empty
+// menu still tells the reader why nothing is offered.
+function fill(
+  menu: HTMLElement,
+  entries: readonly MenuItem[],
+  options: MenuOptions,
+  close: (returnFocus: boolean) => void,
+): void {
   menu.replaceChildren();
   if (entries.length === 0) {
     const empty = document.createElement("p");
@@ -142,8 +149,18 @@ async function show(
   for (const entry of entries) {
     menu.append(item(entry, options, close));
   }
-  place(menu, trigger);
-  buttons()[0]?.focus();
+}
+
+// The menu opens at once, saying it is loading, so a slow item list still answers the click.
+function waitingMenu(): HTMLElement {
+  const menu = document.createElement("div");
+  menu.className = "menu";
+  menu.setAttribute("role", "menu");
+  const waiting = document.createElement("p");
+  waiting.className = "menu-note";
+  waiting.textContent = "Loading…";
+  menu.append(waiting);
+  return menu;
 }
 
 function item(

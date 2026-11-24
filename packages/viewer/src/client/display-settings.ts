@@ -147,7 +147,34 @@ function buildPanel(): Panel {
   element.id = "display-settings";
   element.setAttribute("aria-label", "Display settings");
   element.setAttribute("inert", "");
+  const { head, closeButton } = panelHead();
 
+  const form = document.createElement("form");
+  form.className = "settings-form";
+  // Nothing is submitted: every control applies itself.
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+  });
+  const controls = new PanelControls();
+  form.append(...panelSections(controls));
+  element.append(head, form);
+
+  return {
+    element,
+    closeButton,
+    render(settings) {
+      controls.render(settings);
+    },
+    focusFirst() {
+      form.querySelector<HTMLElement>("select, input")?.focus();
+    },
+    onChange(listener) {
+      controls.listeners.push(listener);
+    },
+  };
+}
+
+function panelHead(): { head: HTMLElement; closeButton: HTMLButtonElement } {
   const head = document.createElement("div");
   head.className = "settings-head";
   const title = document.createElement("h2");
@@ -173,57 +200,142 @@ function buildPanel(): Panel {
   closeButton.append(cross);
   closeButton.setAttribute("aria-label", "Close display settings");
   head.append(title, closeButton);
+  return { head, closeButton };
+}
 
-  const form = document.createElement("form");
-  form.className = "settings-form";
-  // Nothing is submitted: every control applies itself.
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
+// The panel's groups, in the order they are shown. The text-width slider and the margins are built
+// first, as their own variables, because the slider gets a second renderer and the margins a class.
+function panelSections(controls: PanelControls): HTMLElement[] {
+  const width = controls.range("textWidth", "Text width", "px");
+  controls.renderers.push(() => {
+    const slider = width.querySelector("input");
+    if (slider !== null) {
+      // A fixed width means nothing while the article fills the column.
+      slider.disabled = controls.current.fullWidth;
+    }
   });
 
-  const listeners: ((settings: DisplaySettings) => void)[] = [];
-  let current: DisplaySettings = { ...DEFAULT_SETTINGS };
-  // Each control reads its value out of `current` when drawn and writes it back on input.
-  const renderers: (() => void)[] = [];
-  const change = (patch: Partial<DisplaySettings>): void => {
-    current = parseSettings({ ...current, ...patch });
-    for (const render of renderers) {
+  const margins = group("Margins", [
+    controls.number("paddingTop", "Top"),
+    controls.number("paddingRight", "Right"),
+    controls.number("paddingBottom", "Bottom"),
+    controls.number("paddingLeft", "Left"),
+  ]);
+  margins.classList.add("settings-margins");
+
+  const reset = document.createElement("button");
+  reset.type = "button";
+  reset.className = "settings-reset";
+  reset.textContent = "Reset to defaults";
+  reset.addEventListener("click", () => {
+    controls.change({ ...DEFAULT_SETTINGS });
+  });
+
+  return [
+    group("Whole site", [
+      controls.select("siteFont", "Font", [
+        ["system", "System"],
+        ["serif", "Serif"],
+        ["wide", "Wide sans"],
+        ["mono", "Monospace"],
+        ["custom", "Other…"],
+      ]),
+      controls.fontName("customSiteFont", "siteFont", "Font name"),
+      controls.select("siteCodeFont", "Monospace font", [
+        ["system", "System monospace"],
+        ["custom", "Other…"],
+      ]),
+      controls.fontName("customSiteCodeFont", "siteCodeFont", "Font name"),
+    ]),
+    group("Text", [
+      controls.select("textFont", "Font", [
+        ["system", "Same as the site"],
+        ["serif", "Serif"],
+        ["wide", "Wide sans"],
+        ["mono", "Monospace"],
+        ["custom", "Other…"],
+      ]),
+      controls.fontName("customTextFont", "textFont", "Font name"),
+      controls.range("fontSize", "Size", "px"),
+      controls.range("lineHeight", "Line height", "×"),
+      controls.range("letterSpacing", "Letter spacing", "em"),
+      controls.range("blockSpacing", "Space between blocks", "em"),
+      controls.segmented("align", "Alignment", [
+        ["start", "Left"],
+        ["justify", "Justified"],
+      ]),
+    ]),
+    group("Layout", [
+      width,
+      controls.checkbox("fullWidth", "Fill the column"),
+      controls.checkbox("sourceLines", "Source line numbers"),
+    ]),
+    margins,
+    group("Code", [
+      controls.select("codeFont", "Font", [
+        ["system", "Same as the site"],
+        ["custom", "Other…"],
+      ]),
+      controls.fontName("customCodeFont", "codeFont", "Font name"),
+      controls.range("codeScale", "Size", "×"),
+    ]),
+    reset,
+  ];
+}
+
+type FontChooser = "siteFont" | "siteCodeFont" | "textFont" | "codeFont";
+
+/**
+ * The panel's controls and the settings they show. Each control reads its value out of `current`
+ * when drawn and writes it back on input; every change redraws all of them, since one setting can
+ * hide or disable another's control.
+ */
+class PanelControls {
+  current: DisplaySettings = { ...DEFAULT_SETTINGS };
+  readonly renderers: (() => void)[] = [];
+  readonly listeners: ((settings: DisplaySettings) => void)[] = [];
+
+  render(settings: DisplaySettings): void {
+    this.current = settings;
+    for (const render of this.renderers) {
       render();
     }
-    for (const listener of listeners) {
-      listener(current);
-    }
-  };
+  }
 
-  const select = <
-    K extends "siteFont" | "siteCodeFont" | "textFont" | "codeFont",
-  >(
+  change(patch: Partial<DisplaySettings>): void {
+    this.render(parseSettings({ ...this.current, ...patch }));
+    for (const listener of this.listeners) {
+      listener(this.current);
+    }
+  }
+
+  select<K extends FontChooser>(
     key: K,
     label: string,
     options: readonly [DisplaySettings[K], string][],
-  ): HTMLElement => {
+  ): HTMLElement {
     const control = document.createElement("select");
     for (const [value, text] of options) {
       control.append(new Option(text, value));
     }
     control.addEventListener("change", () => {
-      change({ [key]: control.value });
+      this.change({ [key]: control.value });
     });
-    renderers.push(() => (control.value = current[key]));
+    this.renderers.push(() => (control.value = this.current[key]));
     return field(label, control, "select");
-  };
+  }
 
   // A choice of two or three short words, shown all at once rather than behind a select.
-  const segmented = <K extends "align">(
+  segmented<K extends "align">(
     key: K,
     label: string,
     options: readonly [DisplaySettings[K], string][],
-  ): HTMLElement => {
+  ): HTMLElement {
     const control = segmentedControl(label, options, (value) => {
-      change({ [key]: value });
+      this.change({ [key]: value });
     });
-    renderers.push(() => {
-      control.render(current[key]);
+    this.renderers.push(() => {
+      control.render(this.current[key]);
     });
     const row = document.createElement("div");
     row.className = "settings-field is-segmented";
@@ -232,17 +344,17 @@ function buildPanel(): Panel {
     text.textContent = label;
     row.append(text, control.element);
     return row;
-  };
+  }
 
-  const fontName = (
+  fontName(
     key:
       | "customSiteFont"
       | "customSiteCodeFont"
       | "customTextFont"
       | "customCodeFont",
-    chooser: "siteFont" | "siteCodeFont" | "textFont" | "codeFont",
+    chooser: FontChooser,
     label: string,
-  ): HTMLElement => {
+  ): HTMLElement {
     const control = document.createElement("input");
     control.type = "text";
     control.placeholder = "An installed font, e.g. Inter";
@@ -251,19 +363,19 @@ function buildPanel(): Panel {
     // Applied as typed, but the typed text is left alone while the field has focus: rewriting it
     // with the cleaned name would move the caret under the reader's fingers.
     control.addEventListener("input", () => {
-      change({ [key]: control.value });
+      this.change({ [key]: control.value });
     });
     const row = field(label, control, "text");
-    renderers.push(() => {
-      row.hidden = current[chooser] !== "custom";
+    this.renderers.push(() => {
+      row.hidden = this.current[chooser] !== "custom";
       if (document.activeElement !== control) {
-        control.value = current[key];
+        control.value = this.current[key];
       }
     });
     return row;
-  };
+  }
 
-  const range = (key: NumericKey, label: string, unit: string): HTMLElement => {
+  range(key: NumericKey, label: string, unit: string): HTMLElement {
     const { min, max, step } = NUMBER_RANGES[key];
     const control = document.createElement("input");
     control.type = "range";
@@ -272,23 +384,24 @@ function buildPanel(): Panel {
     control.step = String(step);
     const output = document.createElement("output");
     control.addEventListener("input", () => {
-      change({ [key]: Number(control.value) });
+      this.change({ [key]: Number(control.value) });
     });
-    renderers.push(() => {
-      control.value = String(current[key]);
-      output.textContent = `${current[key]}${unit}`;
+    this.renderers.push(() => {
+      const value = this.current[key];
+      control.value = String(value);
+      output.textContent = `${value}${unit}`;
       // How far along the track the value is, for the stylesheet to fill the track up to the thumb.
       control.style.setProperty(
         "--range-pct",
-        `${((current[key] - min) / (max - min)) * 100}%`,
+        `${((value - min) / (max - min)) * 100}%`,
       );
     });
     const row = field(label, control, "range");
     row.querySelector(".settings-label")?.append(output);
     return row;
-  };
+  }
 
-  const number = (key: NumericKey, label: string): HTMLElement => {
+  number(key: NumericKey, label: string): HTMLElement {
     const { min, max, step } = NUMBER_RANGES[key];
     const control = document.createElement("input");
     control.type = "number";
@@ -298,128 +411,31 @@ function buildPanel(): Panel {
     control.inputMode = "numeric";
     control.addEventListener("change", () => {
       const value = Number(control.value);
-      change({
+      this.change({
         [key]: Number.isFinite(value) ? value : DEFAULT_SETTINGS[key],
       });
     });
-    renderers.push(() => (control.value = String(current[key])));
+    this.renderers.push(() => (control.value = String(this.current[key])));
     return field(label, control, "number");
-  };
+  }
 
-  const checkbox = (
-    key: "fullWidth" | "sourceLines",
-    label: string,
-  ): HTMLElement => {
+  checkbox(key: "fullWidth" | "sourceLines", label: string): HTMLElement {
     const control = document.createElement("input");
     control.type = "checkbox";
     control.className = "switch";
     // An on/off setting that applies at once is a switch, not a box to tick and then submit.
     control.setAttribute("role", "switch");
     control.addEventListener("change", () => {
-      change({ [key]: control.checked });
+      this.change({ [key]: control.checked });
     });
-    renderers.push(() => (control.checked = current[key]));
+    this.renderers.push(() => (control.checked = this.current[key]));
     const row = document.createElement("label");
     row.className = "settings-switch switch-row";
     const text = document.createElement("span");
     text.textContent = label;
     row.append(text, control);
     return row;
-  };
-
-  const width = range("textWidth", "Text width", "px");
-  renderers.push(() => {
-    const slider = width.querySelector("input");
-    if (slider !== null) {
-      // A fixed width means nothing while the article fills the column.
-      slider.disabled = current.fullWidth;
-    }
-  });
-
-  const margins = group("Margins", [
-    number("paddingTop", "Top"),
-    number("paddingRight", "Right"),
-    number("paddingBottom", "Bottom"),
-    number("paddingLeft", "Left"),
-  ]);
-  margins.classList.add("settings-margins");
-
-  const reset = document.createElement("button");
-  reset.type = "button";
-  reset.className = "settings-reset";
-  reset.textContent = "Reset to defaults";
-  reset.addEventListener("click", () => {
-    change({ ...DEFAULT_SETTINGS });
-  });
-
-  form.append(
-    group("Whole site", [
-      select("siteFont", "Font", [
-        ["system", "System"],
-        ["serif", "Serif"],
-        ["wide", "Wide sans"],
-        ["mono", "Monospace"],
-        ["custom", "Other…"],
-      ]),
-      fontName("customSiteFont", "siteFont", "Font name"),
-      select("siteCodeFont", "Monospace font", [
-        ["system", "System monospace"],
-        ["custom", "Other…"],
-      ]),
-      fontName("customSiteCodeFont", "siteCodeFont", "Font name"),
-    ]),
-    group("Text", [
-      select("textFont", "Font", [
-        ["system", "Same as the site"],
-        ["serif", "Serif"],
-        ["wide", "Wide sans"],
-        ["mono", "Monospace"],
-        ["custom", "Other…"],
-      ]),
-      fontName("customTextFont", "textFont", "Font name"),
-      range("fontSize", "Size", "px"),
-      range("lineHeight", "Line height", "×"),
-      range("letterSpacing", "Letter spacing", "em"),
-      range("blockSpacing", "Space between blocks", "em"),
-      segmented("align", "Alignment", [
-        ["start", "Left"],
-        ["justify", "Justified"],
-      ]),
-    ]),
-    group("Layout", [
-      width,
-      checkbox("fullWidth", "Fill the column"),
-      checkbox("sourceLines", "Source line numbers"),
-    ]),
-    margins,
-    group("Code", [
-      select("codeFont", "Font", [
-        ["system", "Same as the site"],
-        ["custom", "Other…"],
-      ]),
-      fontName("customCodeFont", "codeFont", "Font name"),
-      range("codeScale", "Size", "×"),
-    ]),
-    reset,
-  );
-  element.append(head, form);
-
-  return {
-    element,
-    closeButton,
-    render(settings) {
-      current = settings;
-      for (const render of renderers) {
-        render();
-      }
-    },
-    focusFirst() {
-      form.querySelector<HTMLElement>("select, input")?.focus();
-    },
-    onChange(listener) {
-      listeners.push(listener);
-    },
-  };
+  }
 }
 
 // One row of a group's card. Its kind decides the layout: a select or a font name sits at the row's

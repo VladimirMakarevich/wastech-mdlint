@@ -46,6 +46,25 @@ export function initColumnResize(): void {
   }
 }
 
+// Measured on every call rather than once: the window and the other column can change width
+// between two drags.
+function widestAllowed(
+  handle: HTMLElement,
+  handles: readonly HTMLElement[],
+): number {
+  const others = handles
+    .filter((other) => other !== handle)
+    .reduce(
+      (sum, other) =>
+        sum + (other.parentElement?.getBoundingClientRect().width ?? 0),
+      0,
+    );
+  return Math.max(
+    MIN_WIDTH,
+    Math.min(MAX_WIDTH, window.innerWidth - others - MIN_ARTICLE_WIDTH),
+  );
+}
+
 function attach(
   handle: HTMLElement,
   frame: HTMLElement,
@@ -57,19 +76,7 @@ function attach(
   const root = document.documentElement;
   const outward = column.edge === "end" ? 1 : -1;
   const width = (): number => Math.round(frame.getBoundingClientRect().width);
-  const maxWidth = (): number => {
-    const others = handles
-      .filter((other) => other !== handle)
-      .reduce(
-        (sum, other) =>
-          sum + (other.parentElement?.getBoundingClientRect().width ?? 0),
-        0,
-      );
-    return Math.max(
-      MIN_WIDTH,
-      Math.min(MAX_WIDTH, window.innerWidth - others - MIN_ARTICLE_WIDTH),
-    );
-  };
+  const maxWidth = (): number => widestAllowed(handle, handles);
 
   // A separator that can be focused is a control, and assistive technology reads its value.
   const describe = (current: number): void => {

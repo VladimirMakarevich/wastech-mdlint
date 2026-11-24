@@ -63,17 +63,7 @@ export function initDashboard(): void {
     history.replaceState(null, "", address);
   }
 
-  function formAddress(): string {
-    const params = new URLSearchParams();
-    for (const [key, value] of new FormData(form!)) {
-      // An empty field is "not set"; leaving it out keeps the address as short as the server's own.
-      if (typeof value === "string" && value !== "") {
-        params.append(key, value);
-      }
-    }
-    const search = params.toString();
-    return search === "" ? "/dashboard" : `/dashboard?${search}`;
-  }
+  const formAddress = (): string => dashboardAddress(form);
 
   function schedule(address: () => string): void {
     window.clearTimeout(timer);
@@ -110,4 +100,17 @@ export function initDashboard(): void {
   };
   onServerEvent("diagnostics", refresh);
   onServerEvent("change", refresh);
+}
+
+// The address the form itself would open when submitted, so a filtered dashboard can be bookmarked.
+function dashboardAddress(form: HTMLFormElement): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of new FormData(form)) {
+    // An empty field is "not set"; leaving it out keeps the address as short as the server's own.
+    if (typeof value === "string" && value !== "") {
+      params.append(key, value);
+    }
+  }
+  const search = params.toString();
+  return search === "" ? "/dashboard" : `/dashboard?${search}`;
 }

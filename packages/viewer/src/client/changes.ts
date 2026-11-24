@@ -212,6 +212,28 @@ function applyFilter(): void {
   const attribute = unreviewed ? "data-unreviewed" : "data-changed";
   sidebar.classList.toggle("only-changed", active && !unreviewed);
   sidebar.classList.toggle("only-unreviewed", unreviewed);
+  syncFilterFolders(sidebar, active, attribute);
+  const empty = sidebar.querySelector<HTMLElement>(
+    ".tree-filter-changes-empty",
+  );
+  if (empty !== null) {
+    empty.textContent = unreviewed
+      ? "Nothing left to review."
+      : "No document changed.";
+    empty.hidden =
+      !active || sidebar.querySelector(`li[${attribute}]`) !== null;
+  }
+}
+
+/**
+ * Open the folders leading to a marked file while a filter is on, and close again only those the
+ * filter itself opened once it is off, so a folder the reader opened by hand stays as they left it.
+ */
+function syncFilterFolders(
+  sidebar: HTMLElement,
+  active: boolean,
+  attribute: string,
+): void {
   for (const details of sidebar.querySelectorAll<HTMLDetailsElement>(
     "details",
   )) {
@@ -224,16 +246,6 @@ function applyFilter(): void {
       details.open = false;
       delete details.dataset.openedByChangesFilter;
     }
-  }
-  const empty = sidebar.querySelector<HTMLElement>(
-    ".tree-filter-changes-empty",
-  );
-  if (empty !== null) {
-    empty.textContent = unreviewed
-      ? "Nothing left to review."
-      : "No document changed.";
-    empty.hidden =
-      !active || sidebar.querySelector(`li[${attribute}]`) !== null;
   }
 }
 

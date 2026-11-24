@@ -5,82 +5,30 @@
 // answer, and a save writes the exact text that was previewed.
 
 import { copyText } from "./clipboard.js";
-import { segmentedControl } from "./segmented.js";
+import { button, element, paragraph, section } from "./config-dom.js";
+import { clearDraft, readDraft, storeDraft } from "./config-draft.js";
+import { FieldRenderer } from "./config-fields.js";
+import {
+  clone,
+  getAt,
+  insertAt,
+  removeAt,
+  replayEdits,
+  samePath,
+  setAt,
+} from "./config-json.js";
+import { counts, invalidPreview, okPreview } from "./config-preview.js";
+import { rulesList, type RuleListHost } from "./config-rules.js";
+import type {
+  ConfigApi,
+  Edit,
+  Json,
+  JsonObject,
+  JsonSchema,
+  Path,
+  Preview,
+} from "./config-types.js";
 
-type JsonSchema = {
-  type?: string;
-  properties?: Record<string, JsonSchema>;
-  required?: string[];
-  items?: JsonSchema;
-  enum?: unknown[];
-  const?: unknown;
-  oneOf?: JsonSchema[];
-  additionalProperties?: boolean | JsonSchema;
-  description?: string;
-  default?: unknown;
-  minimum?: number;
-  exclusiveMinimum?: number;
-  pattern?: string;
-};
-
-type RuleInfo = {
-  id: string;
-  alias: string;
-  category: string;
-  description: string;
-  defaultSeverity: string;
-  fixable: boolean;
-  docsUrl?: string;
-};
-
-type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
-type JsonObject = Record<string, Json>;
-type Path = (string | number)[];
-
-type ConfigApi = {
-  file: { path: string; text: string; hash: string } | null;
-  config: JsonObject | null;
-  ruleIds: (string | null)[];
-  errors: string[];
-  writeBlocked: string | null;
-  schema: JsonSchema;
-  rules: RuleInfo[];
-};
-
-type Edit = { op: "set" | "remove" | "insert"; path: Path; value?: Json };
-
-type Finding = {
-  filePath: string;
-  line: number;
-  ruleId: string;
-  severity: string;
-  message: string;
-};
-
-type Preview =
-  | {
-      status: "ok";
-      text: string;
-      config: JsonObject;
-      ruleIds: (string | null)[];
-      documents: { before: number; after: number };
-      findings: {
-        before: { errors: number; warnings: number };
-        after: { errors: number; warnings: number };
-      };
-      byRule: { ruleId: string; before: number; after: number }[];
-      added: Finding[];
-      removed: Finding[];
-      addedCount: number;
-      removedCount: number;
-    }
-  | { status: "invalid"; errors: string[]; text?: string }
-  | { status: "conflict" | "refused" | "failed"; error: string };
-
-// Unsaved work, kept across a reload — live reload refreshes the page whenever a document is added
-// or removed, and losing a half-made config change to that would be a trap. It is restored only
-// onto the same version of the file it was made to.
-const DRAFT_KEY = "wastech-mdlint-viewer:config-draft";
 // Long enough for a burst of typing to become one preview request.
 const PREVIEW_DELAY_MS = 400;
 
@@ -136,6 +84,19 @@ class ConfigEditor {
   // end of it, below the preview, is a button a reader who changed one severity never scrolls to.
   private readonly bar = element("div", "config-bar");
   private readonly barText = element("p", "config-bar-text");
+  // The form's inputs read the model and hand every change back as an edit.
+  private readonly fields = new FieldRenderer({
+    get: (path) => getAt(this.model, path),
+    set: (path, value) => {
+      this.set(path, value);
+    },
+    remove: (path) => {
+      this.remove(path);
+    },
+    insert: (path, value) => {
+      this.insert(path, value);
+    },
+  });
 
   constructor(
     private readonly root: HTMLElement,
@@ -288,528 +249,76 @@ class ConfigEditor {
     const schema = this.api.schema.properties ?? {};
     const files = section("Files", "Which Markdown files are documents.");
     for (const key of ["include", "exclude", "respectGitignore"]) {
-      files.append(this.field(schema[key] ?? {}, [key], key, false));
+      files.append(this.topField(schema[key] ?? {}, key));
     }
     const rules = section(
       "Rules",
       "The checks this config runs, in the order it lists them.",
     );
-    rules.append(this.rulesList(model));
+    rules.append(
+      rulesList(
+        this.ruleListHost(),
+        Array.isArray(model.rules) ? model.rules : [],
+      ),
+    );
     const settings = section(
       "Settings",
       "How root-relative links resolve and which ids link documents.",
     );
-    settings.append(
-      this.field(schema.settings ?? {}, ["settings"], "settings", false),
-    );
+    settings.append(this.topField(schema.settings ?? {}, "settings"));
     const compile = section("Compile", "What wastech-mdlint compile writes.");
-    compile.append(
-      this.field(schema.compile ?? {}, ["compile"], "compile", false),
-    );
+    compile.append(this.topField(schema.compile ?? {}, "compile"));
     this.formView.replaceChildren(files, rules, settings, compile);
   }
 
-  private rulesList(model: JsonObject): HTMLElement {
-    const container = element("div", "config-rule-list");
-    const entries = Array.isArray(model.rules) ? model.rules : [];
-    entries.forEach((entry, index) => {
-      container.append(this.ruleCard(entry as JsonObject, index));
+  private topField(schema: JsonSchema, key: string): HTMLElement {
+    return this.fields.field({
+      schema,
+      path: [key],
+      label: key,
+      required: false,
     });
-
-    const configured = new Set(
-      this.ruleIds.filter((id): id is string => id !== null),
-    );
-    const picker = document.createElement("select");
-    picker.setAttribute("aria-label", "Rule to add");
-    const categories = new Map<string, RuleInfo[]>();
-    for (const rule of this.api.rules) {
-      if (!configured.has(rule.id)) {
-        categories.set(rule.category, [
-          ...(categories.get(rule.category) ?? []),
-          rule,
-        ]);
-      }
-    }
-    for (const [category, rules] of categories) {
-      const group = document.createElement("optgroup");
-      group.label = category;
-      for (const rule of rules) {
-        const option = new Option(`${rule.id} — ${rule.description}`, rule.id);
-        option.title = rule.description;
-        group.append(option);
-      }
-      picker.append(group);
-    }
-    const custom = document.createElement("optgroup");
-    custom.label = "Custom";
-    custom.append(new Option("A declarative custom rule", "custom"));
-    picker.append(custom);
-
-    const add = button("Add rule");
-    add.addEventListener("click", () => {
-      const id = picker.value;
-      const entry: JsonObject =
-        id === "custom"
-          ? {
-              rule: "custom",
-              id: "",
-              options: { assert: { kind: this.firstAssertKind() } },
-            }
-          : { rule: id };
-      const length = entries.length;
-      if (Array.isArray(model.rules)) {
-        this.insert(["rules", length], entry);
-      } else {
-        this.set(["rules"], [entry]);
-      }
-      this.ruleIds.push(id === "custom" ? null : id);
-      this.openRule = length;
-      this.renderForm();
-    });
-    const adder = element("div", "config-rule-add");
-    adder.append(picker, add);
-    container.append(adder);
-    return container;
   }
 
-  private ruleCard(entry: JsonObject, index: number): HTMLElement {
-    const id = this.ruleIds[index] ?? null;
-    const isCustom = entry.rule === "custom";
-    const info =
-      id === null ? undefined : this.api.rules.find((rule) => rule.id === id);
-    const branch = isCustom
-      ? this.customBranch()
-      : this.builtinBranch(id ?? "");
-    const path: Path = ["rules", index];
-
-    const card = document.createElement("details");
-    card.className = "config-rule";
-    card.open = this.openRule === index;
-    const summary = document.createElement("summary");
-    const name = element("code", "config-rule-id");
-    const description = element("span", "config-rule-description");
-    const severity = element("span", "config-rule-severity");
-    // The collapsed card has to say what the rule is set to now, not when the form was drawn: a
-    // severity changed below and still shown as "off" here reads as a change that did not take.
-    const describe = (current: JsonObject) => {
-      const customId = displayText(current.id);
-      const customName = customId === "" ? "custom rule" : customId;
-      name.textContent = isCustom
-        ? customName
-        : (id ?? displayText(current.rule));
-      description.textContent = isCustom
-        ? displayText(current.description ?? "Custom rule")
-        : (info?.description ?? "");
-      severity.textContent = displayText(
-        current.severity ?? info?.defaultSeverity,
-      );
-      // Read by the stylesheet, which tints the pill in the severity's color.
-      severity.dataset.severity = severity.textContent;
+  // The rule cards' view of the editor. The rule ids and the open card live here, because a switch
+  // between the views or a restored draft replaces them, and the cards are drawn again after either.
+  private ruleListHost(): RuleListHost {
+    return {
+      api: this.api,
+      fields: this.fields,
+      ruleId: (index) => this.ruleIds[index] ?? null,
+      configuredIds: () =>
+        new Set(this.ruleIds.filter((id): id is string => id !== null)),
+      isOpen: (index) => this.openRule === index,
+      current: (path) => getAt(this.model, path),
+      addRule: (entry, id) => {
+        this.addRule(entry, id);
+      },
+      removeRule: (index) => {
+        this.removeRule(index);
+      },
     };
-    describe(entry);
-    summary.append(name, description, severity);
-    card.append(summary);
-
-    const body = element("div", "config-rule-body");
-    const severitySchema: JsonSchema = {
-      type: "string",
-      enum: ["error", "warning", "off"],
-    };
-    body.append(
-      this.field(severitySchema, [...path, "severity"], "severity", false, {
-        unsetLabel: `default (${info?.defaultSeverity ?? "per finding"})`,
-      }),
-    );
-    if (isCustom) {
-      const properties = branch?.properties ?? {};
-      body.append(
-        this.field({ type: "string" }, [...path, "id"], "id", true),
-        this.field(
-          { type: "string" },
-          [...path, "description"],
-          "description",
-          false,
-        ),
-        this.field(
-          properties.target ?? { type: "string" },
-          [...path, "target"],
-          "target",
-          false,
-        ),
-      );
-    }
-    const optionsSchema = branch?.properties?.options;
-    if (optionsSchema !== undefined) {
-      body.append(
-        this.field(optionsSchema, [...path, "options"], "options", isCustom),
-      );
-    }
-    const footer = element("div", "config-rule-footer");
-    if (info?.docsUrl !== undefined) {
-      const docs = document.createElement("a");
-      docs.href = info.docsUrl;
-      docs.target = "_blank";
-      docs.rel = "noopener noreferrer";
-      docs.textContent = "Rule documentation";
-      footer.append(docs);
-    }
-    const remove = button("Remove rule", "config-danger");
-    remove.addEventListener("click", () => {
-      this.remove(path);
-      this.ruleIds.splice(index, 1);
-      this.openRule = undefined;
-      this.renderForm();
-    });
-    footer.append(remove);
-    body.append(footer);
-    // The fields' own listeners update the model first; these run after them as the event bubbles.
-    const refresh = () => {
-      describe((getAt(this.model, path) ?? {}) as JsonObject);
-    };
-    body.addEventListener("input", refresh);
-    body.addEventListener("change", refresh);
-    card.append(body);
-    return card;
   }
 
-  private builtinBranch(id: string): JsonSchema | undefined {
-    return this.ruleBranches().find(
-      (branch) => branch.properties?.rule?.enum?.includes(id) === true,
-    );
+  // A new rule goes at the end of the list, or starts the list, and its card opens.
+  private addRule(entry: JsonObject, id: string | null): void {
+    const rules = this.model?.rules;
+    const length = Array.isArray(rules) ? rules.length : 0;
+    if (Array.isArray(rules)) {
+      this.insert(["rules", length], entry);
+    } else {
+      this.set(["rules"], [entry]);
+    }
+    this.ruleIds.push(id);
+    this.openRule = length;
+    this.renderForm();
   }
 
-  // The generic custom branch: `const: "custom"` with an id *pattern*. A project-local schema would
-  // add one branch per known custom id, but the package schema the server sends has only this one.
-  private customBranch(): JsonSchema | undefined {
-    return this.ruleBranches().find(
-      (branch) =>
-        branch.properties?.rule?.const === "custom" &&
-        branch.properties.id?.pattern !== undefined,
-    );
-  }
-
-  private ruleBranches(): JsonSchema[] {
-    return this.api.schema.properties?.rules?.items?.oneOf ?? [];
-  }
-
-  private firstAssertKind(): string {
-    const assert = this.customBranch()?.properties?.options?.properties?.assert;
-    return displayText(assert?.oneOf?.[0]?.properties?.kind?.const);
-  }
-
-  /** One input, or a group of them, for the value the schema describes at `path`. */
-  private field(
-    schema: JsonSchema,
-    path: Path,
-    label: string,
-    required: boolean,
-    options: { unsetLabel?: string; inList?: boolean } = {},
-  ): HTMLElement {
-    const value = getAt(this.model, path);
-    if (
-      schema.oneOf?.every(
-        (branch) => branch.properties?.kind?.const !== undefined,
-      ) === true
-    ) {
-      return this.kindField(schema.oneOf, path, label, required);
-    }
-    if (schema.type === "object" && schema.properties !== undefined) {
-      const group = element("fieldset", "config-group");
-      const legend = element("legend");
-      legend.textContent = labelText(label, required);
-      group.append(legend);
-      if (schema.description !== undefined) {
-        group.append(hint(schema.description));
-      }
-      const requiredKeys = new Set(schema.required ?? []);
-      for (const [key, child] of Object.entries(schema.properties)) {
-        group.append(
-          this.field(child, [...path, key], key, requiredKeys.has(key)),
-        );
-      }
-      return group;
-    }
-    if (schema.type === "array" && schema.items !== undefined) {
-      const items = schema.items;
-      if (
-        isPrimitive(items) ||
-        (items.type === "object" && items.properties !== undefined)
-      ) {
-        return this.listField(schema, items, path, label, required);
-      }
-      return this.jsonField(schema, path, label, required);
-    }
-    if (schema.enum !== undefined || schema.type === "boolean") {
-      const choices = schema.enum ?? [true, false];
-      // A few choices — a boolean, a severity — are shown all at once as a segmented control, one
-      // click to change; a longer list stays a select, where a row of segments would run off the form.
-      if (choices.length <= 3) {
-        const unset =
-          options.unsetLabel ??
-          (schema.default === undefined
-            ? "not set"
-            : `default (${displayText(schema.default)})`);
-        const control = segmentedControl<string>(
-          labelText(label, required),
-          [
-            ["", unset],
-            ...choices.map(
-              (choice) => [JSON.stringify(choice), String(choice)] as const,
-            ),
-          ],
-          (chosen) => {
-            if (chosen === "") {
-              this.remove(path);
-            } else {
-              this.set(path, JSON.parse(chosen) as Json);
-            }
-            // Bubbled like a select's change, so a rule card's summary follows the new severity.
-            control.element.dispatchEvent(
-              new Event("change", { bubbles: true }),
-            );
-          },
-        );
-        control.render(value === undefined ? "" : JSON.stringify(value));
-        return labelled(
-          label,
-          required,
-          control.element,
-          schema.description,
-          "div",
-        );
-      }
-      const select = document.createElement("select");
-      select.append(
-        new Option(
-          options.unsetLabel ??
-            (schema.default === undefined
-              ? "—"
-              : `default (${displayText(schema.default)})`),
-          "",
-        ),
-      );
-      for (const choice of choices) {
-        select.append(new Option(String(choice), JSON.stringify(choice)));
-      }
-      select.value = value === undefined ? "" : JSON.stringify(value);
-      select.addEventListener("change", () => {
-        if (select.value === "") {
-          this.remove(path);
-        } else {
-          this.set(path, JSON.parse(select.value) as Json);
-        }
-      });
-      return labelled(label, required, select, schema.description);
-    }
-    if (
-      schema.type === "string" ||
-      schema.type === "number" ||
-      schema.type === "integer"
-    ) {
-      const input = document.createElement("input");
-      const numeric = schema.type !== "string";
-      input.type = numeric ? "number" : "text";
-      if (numeric) {
-        input.step = schema.type === "integer" ? "1" : "any";
-        const min = schema.minimum ?? schema.exclusiveMinimum;
-        if (min !== undefined) {
-          input.min = String(min);
-        }
-      } else {
-        input.spellcheck = false;
-        if (schema.pattern !== undefined) {
-          input.title = `Pattern: ${schema.pattern}`;
-        }
-      }
-      input.value =
-        value === undefined || value === null ? "" : displayText(value);
-      input.addEventListener("input", () => {
-        if (input.value === "" && options.inList !== true) {
-          this.remove(path);
-          return;
-        }
-        if (numeric) {
-          const number = Number(input.value);
-          if (input.value !== "" && Number.isFinite(number)) {
-            this.set(path, number);
-          }
-        } else {
-          this.set(path, input.value);
-        }
-      });
-      return options.inList === true
-        ? input
-        : labelled(label, required, input, schema.description);
-    }
-    return this.jsonField(schema, path, label, required);
-  }
-
-  // A union told apart by its `kind`, such as a custom rule's assertion: pick the kind, then fill in
-  // that kind's fields. Picking another kind starts the value over, since the fields differ.
-  private kindField(
-    branches: JsonSchema[],
-    path: Path,
-    label: string,
-    required: boolean,
-  ): HTMLElement {
-    const group = element("fieldset", "config-group");
-    const legend = element("legend");
-    legend.textContent = labelText(label, required);
-    const current = getAt(this.model, path) as JsonObject | undefined;
-    const select = document.createElement("select");
-    for (const branch of branches) {
-      const kind = String(branch.properties!.kind!.const);
-      select.append(new Option(kind, kind));
-    }
-    select.value = displayText(current?.kind);
-    const fields = element("div");
-    const renderFields = () => {
-      const branch = branches.find(
-        (candidate) => candidate.properties!.kind!.const === select.value,
-      );
-      const requiredKeys = new Set(branch?.required ?? []);
-      fields.replaceChildren(
-        ...Object.entries(branch?.properties ?? {})
-          .filter(([key]) => key !== "kind")
-          .map(([key, child]) =>
-            this.field(child, [...path, key], key, requiredKeys.has(key)),
-          ),
-      );
-    };
-    select.addEventListener("change", () => {
-      this.set(path, { kind: select.value });
-      renderFields();
-    });
-    group.append(legend, labelled("kind", true, select), fields);
-    renderFields();
-    return group;
-  }
-
-  private listField(
-    schema: JsonSchema,
-    items: JsonSchema,
-    path: Path,
-    label: string,
-    required: boolean,
-  ): HTMLElement {
-    const group = element("fieldset", "config-group config-list");
-    const legend = element("legend");
-    legend.textContent = labelText(label, required);
-    const list = element("div", "config-list-items");
-    const add = button("Add", "config-add");
-    const primitive = isPrimitive(items);
-
-    // An optional list that is present but empty is not the same as one left out: an empty `files`
-    // matches no file at all, so the rule it scopes checks nothing. Removing the last entry
-    // therefore removes the list, and an empty one already in the file is pointed out with a way to
-    // remove it.
-    const emptyNote = element("div", "config-list-empty");
-    const emptyText = paragraph(
-      "This list is empty, which is not the same as leaving it out: an empty list matches nothing.",
-      "config-hint",
-    );
-    const dropEmpty = button("Remove the empty list", "config-remove");
-    dropEmpty.addEventListener("click", () => {
-      this.remove(path);
-      render();
-    });
-    emptyNote.append(emptyText, dropEmpty);
-
-    const render = (focusLast = false) => {
-      const values = getAt(this.model, path);
-      const array = Array.isArray(values) ? values : [];
-      emptyNote.hidden = required || !Array.isArray(values) || array.length > 0;
-      list.replaceChildren(
-        ...array.map((_, index) => {
-          const row = element(
-            "div",
-            primitive ? "config-list-row" : "config-list-object",
-          );
-          const itemPath = [...path, index];
-          const control = primitive
-            ? this.field(items, itemPath, `${label} ${index + 1}`, true, {
-                inList: true,
-              })
-            : this.field(items, itemPath, `${label} ${index + 1}`, true);
-          if (
-            control instanceof HTMLInputElement ||
-            control instanceof HTMLSelectElement
-          ) {
-            control.setAttribute("aria-label", `${label} ${index + 1}`);
-          }
-          const remove = button("Remove", "config-remove");
-          remove.setAttribute("aria-label", `Remove ${label} ${index + 1}`);
-          remove.addEventListener("click", () => {
-            this.remove(!required && array.length === 1 ? path : itemPath);
-            render();
-          });
-          row.append(control, remove);
-          return row;
-        }),
-      );
-      if (focusLast) {
-        list
-          .querySelector<HTMLElement>(
-            ".config-list-row:last-child input, .config-list-object:last-child input",
-          )
-          ?.focus();
-      }
-    };
-    add.addEventListener("click", () => {
-      const fresh: Json = primitive ? (items.type === "string" ? "" : 0) : {};
-      const values = getAt(this.model, path);
-      if (Array.isArray(values)) {
-        this.insert([...path, values.length], fresh);
-      } else {
-        this.set(path, [fresh]);
-      }
-      render(true);
-    });
-    group.append(legend);
-    if (schema.description !== undefined) {
-      group.append(hint(schema.description));
-    }
-    group.append(emptyNote, list, add);
-    render();
-    return group;
-  }
-
-  // For a value the form has no inputs for — a map from names to lists, say — the value itself, as
-  // JSON. It is applied when it parses, and core judges it like any other.
-  private jsonField(
-    schema: JsonSchema,
-    path: Path,
-    label: string,
-    required: boolean,
-  ): HTMLElement {
-    const textarea = document.createElement("textarea");
-    textarea.className = "config-json";
-    textarea.spellcheck = false;
-    const value = getAt(this.model, path);
-    textarea.value = value === undefined ? "" : JSON.stringify(value, null, 2);
-    const problem = element("span", "config-json-problem");
-    textarea.addEventListener("change", () => {
-      if (textarea.value.trim() === "") {
-        problem.textContent = "";
-        this.remove(path);
-        return;
-      }
-      try {
-        const parsed = JSON.parse(textarea.value) as Json;
-        problem.textContent = "";
-        this.set(path, parsed);
-      } catch {
-        problem.textContent = "Not valid JSON yet.";
-      }
-    });
-    const wrapper = labelled(
-      `${label} (JSON)`,
-      required,
-      textarea,
-      schema.description,
-    );
-    wrapper.append(problem);
-    return wrapper;
+  private removeRule(index: number): void {
+    this.remove(["rules", index]);
+    this.ruleIds.splice(index, 1);
+    this.openRule = undefined;
+    this.renderForm();
   }
 
   // --- Edits ---------------------------------------------------------------------------------
@@ -956,16 +465,7 @@ class ConfigEditor {
       return;
     }
     if (preview.status === "invalid") {
-      const list = element("ul", "config-errors");
-      for (const line of preview.errors) {
-        const item = element("li");
-        item.textContent = line.replace(/^- /, "");
-        list.append(item);
-      }
-      this.previewBody.replaceChildren(
-        paragraph("The linter would not load this config:", "config-invalid"),
-        list,
-      );
+      this.previewBody.replaceChildren(...invalidPreview(preview.errors));
       // The draft outlives a reload, so a change that does not load must be one the reader can drop.
       this.actions.append(this.discardButton());
       this.showBar("The linter would not load this config.", true);
@@ -983,63 +483,9 @@ class ConfigEditor {
       );
       return;
     }
-
-    const { before, after } = preview.findings;
-    const parts: HTMLElement[] = [
-      paragraph(
-        `Now: ${counts(before)}. With this config: ${counts(after)} — ${preview.addedCount} new, ${preview.removedCount} gone.`,
-        "config-summary",
-      ),
-    ];
-    if (preview.documents.before !== preview.documents.after) {
-      parts.push(
-        paragraph(
-          `The linted corpus would hold ${preview.documents.after} documents instead of ${preview.documents.before}.`,
-        ),
-      );
-    }
-    const changedRules = preview.byRule.filter(
-      (rule) => rule.before !== rule.after,
-    );
-    if (changedRules.length > 0) {
-      const table = element("table", "config-by-rule");
-      const head = element("tr");
-      for (const title of ["Rule", "Now", "With this config"]) {
-        const cell = element("th");
-        cell.textContent = title;
-        head.append(cell);
-      }
-      table.append(head);
-      for (const rule of changedRules) {
-        const row = element("tr");
-        for (const text of [
-          rule.ruleId,
-          String(rule.before),
-          String(rule.after),
-        ]) {
-          const cell = element("td");
-          cell.textContent = text;
-          row.append(cell);
-        }
-        table.append(row);
-      }
-      parts.push(table);
-    }
-    parts.push(
-      findingList("New findings", preview.added, preview.addedCount),
-      findingList("Gone findings", preview.removed, preview.removedCount),
-    );
-    const file = document.createElement("details");
-    file.className = "config-result";
-    const fileSummary = document.createElement("summary");
-    fileSummary.textContent = `${this.file.path} with this change`;
-    const pre = document.createElement("pre");
-    pre.textContent = preview.text;
-    file.append(fileSummary, pre);
-    parts.push(file);
-    this.previewBody.replaceChildren(...parts);
+    this.previewBody.replaceChildren(...okPreview(preview, this.file.path));
     this.showBar(
-      `With this change: ${counts(after)} — ${preview.addedCount} new, ${preview.removedCount} gone.`,
+      `With this change: ${counts(preview.findings.after)} — ${preview.addedCount} new, ${preview.removedCount} gone.`,
       true,
     );
     this.renderActions(preview.text);
@@ -1096,7 +542,7 @@ class ConfigEditor {
   private discardButton(label = "Discard changes"): HTMLButtonElement {
     const discard = button(label);
     discard.addEventListener("click", () => {
-      this.clearDraft();
+      clearDraft();
       location.reload();
     });
     return discard;
@@ -1116,7 +562,7 @@ class ConfigEditor {
       };
     }
     if (result.status === "saved") {
-      this.clearDraft();
+      clearDraft();
       // The server reloads the corpus for the new config and tells every page, this one included,
       // to reload; until then the reader knows the write happened.
       const saved = `Saved to ${this.file.path}. The viewer is reloading the corpus with it.`;
@@ -1139,47 +585,20 @@ class ConfigEditor {
   // --- Draft ---------------------------------------------------------------------------------
 
   private saveDraft(): void {
-    try {
-      if (this.hasChanges()) {
-        sessionStorage.setItem(
-          DRAFT_KEY,
-          JSON.stringify({
+    storeDraft(
+      this.hasChanges()
+        ? {
             base: this.file.hash,
             text: this.text,
             edits: this.edits,
             mode: this.mode,
-          }),
-        );
-      } else {
-        sessionStorage.removeItem(DRAFT_KEY);
-      }
-    } catch {
-      // Storage is unavailable; a reload loses the draft, as it would without this.
-    }
-  }
-
-  private clearDraft(): void {
-    try {
-      sessionStorage.removeItem(DRAFT_KEY);
-    } catch {
-      // Nothing was stored.
-    }
+          }
+        : undefined,
+    );
   }
 
   private restoreDraft(): void {
-    let draft:
-      | { base: string; text: string; edits: Edit[]; mode: "form" | "text" }
-      | undefined;
-    try {
-      const stored: unknown = JSON.parse(
-        sessionStorage.getItem(DRAFT_KEY) ?? "null",
-      );
-      // Written by this page alone, under a key only it uses; the hash check below decides whether
-      // it still applies.
-      draft = (stored ?? undefined) as typeof draft;
-    } catch {
-      return;
-    }
+    const draft = readDraft();
     if (draft?.base !== this.file.hash) {
       return;
     }
@@ -1193,18 +612,7 @@ class ConfigEditor {
       this.foldingDraft = this.edits.length > 0;
       return;
     }
-    for (const edit of this.edits) {
-      if (this.model === null) {
-        break;
-      }
-      if (edit.op === "set") {
-        this.model = setAt(this.model, edit.path, clone(edit.value ?? null));
-      } else if (edit.op === "remove") {
-        removeAt(this.model, edit.path);
-      } else {
-        insertAt(this.model, edit.path, clone(edit.value ?? null));
-      }
-    }
+    this.model = replayEdits(this.model, this.edits);
     this.ruleIds = (
       Array.isArray(this.model?.rules) ? this.model.rules : []
     ).map((entry) => this.resolveRuleId(entry));
@@ -1228,201 +636,5 @@ class ConfigEditor {
         candidate.alias === name.toLowerCase(),
     );
     return rule?.id ?? null;
-  }
-}
-
-// --- Small helpers -------------------------------------------------------------------------------
-
-function element<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  className?: string,
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (className !== undefined) {
-    node.className = className;
-  }
-  return node;
-}
-
-function button(text: string, className?: string): HTMLButtonElement {
-  const node = element("button", className);
-  node.type = "button";
-  node.textContent = text;
-  return node;
-}
-
-function paragraph(text: string, className?: string): HTMLParagraphElement {
-  const node = element("p", className);
-  node.textContent = text;
-  return node;
-}
-
-function hint(text: string): HTMLElement {
-  return paragraph(text, "config-hint");
-}
-
-function section(title: string, description: string): HTMLElement {
-  const node = element("section", "config-section");
-  const heading = element("h2");
-  heading.textContent = title;
-  node.append(heading, hint(description));
-  return node;
-}
-
-function labelText(label: string, required: boolean): string {
-  return required ? `${label} *` : label;
-}
-
-// A field's name beside its control. The wrapper is a <label> for a single input, so a click on the
-// name focuses it; a segmented control is a group of buttons, and a label around it would pass a
-// click on the name to its first button, choosing that value, so it is wrapped in a <div> instead
-// and named by its own `aria-label`.
-function labelled(
-  label: string,
-  required: boolean,
-  control: HTMLElement,
-  description?: string,
-  wrapperTag: "label" | "div" = "label",
-): HTMLElement {
-  const wrapper = element(wrapperTag, "config-field");
-  const name = element("span", "config-field-name");
-  name.textContent = labelText(label, required);
-  wrapper.append(name, control);
-  if (description !== undefined) {
-    wrapper.append(hint(description));
-  }
-  return wrapper;
-}
-
-function findingList(
-  title: string,
-  findings: Finding[],
-  total: number,
-): HTMLElement {
-  const details = document.createElement("details");
-  details.className = "config-findings";
-  const summary = document.createElement("summary");
-  summary.textContent = `${title} (${total})`;
-  const list = element("ul");
-  for (const finding of findings) {
-    const item = element(
-      "li",
-      `config-finding config-finding-${finding.severity}`,
-    );
-    const where = element("code");
-    where.textContent =
-      finding.line > 0
-        ? `${finding.filePath}:${finding.line}`
-        : finding.filePath;
-    const rule = element("span", "config-finding-rule");
-    rule.textContent = `${finding.ruleId} ${finding.severity}`;
-    const message = element("span");
-    message.textContent = finding.message;
-    item.append(where, " ", rule, " ", message);
-    list.append(item);
-  }
-  if (total > findings.length) {
-    const more = element("li", "config-hint");
-    more.textContent = `…and ${total - findings.length} more.`;
-    list.append(more);
-  }
-  details.append(summary, list);
-  return details;
-}
-
-function counts(side: { errors: number; warnings: number }): string {
-  return `${side.errors} error${side.errors === 1 ? "" : "s"}, ${side.warnings} warning${side.warnings === 1 ? "" : "s"}`;
-}
-
-function isPrimitive(schema: JsonSchema): boolean {
-  return (
-    schema.type === "string" ||
-    schema.type === "number" ||
-    schema.type === "integer" ||
-    schema.type === "boolean"
-  );
-}
-
-function clone<T>(value: T): T {
-  return value === undefined ? value : (JSON.parse(JSON.stringify(value)) as T);
-}
-
-function samePath(left: Path, right: Path): boolean {
-  return (
-    left.length === right.length &&
-    left.every((segment, index) => segment === right[index])
-  );
-}
-
-function getAt(root: Json | null, path: Path): Json | undefined {
-  let node: Json | undefined = root ?? undefined;
-  for (const segment of path) {
-    if (node === undefined || node === null || typeof node !== "object") {
-      return undefined;
-    }
-    node = (node as Record<string | number, Json>)[segment];
-  }
-  return node;
-}
-
-// The same shape `editConfigText` gives the file: objects created on the way down for a missing
-// name, so the form and the text agree on what an edit made.
-function setAt(root: JsonObject, path: Path, value: Json): JsonObject {
-  let node: Json = root;
-  path.forEach((segment, index) => {
-    const container = node as Record<string | number, Json>;
-    if (index === path.length - 1) {
-      container[segment] = value;
-      return;
-    }
-    const next = container[segment];
-    if (next === undefined || next === null || typeof next !== "object") {
-      container[segment] = typeof path[index + 1] === "number" ? [] : {};
-    }
-    node = container[segment]!;
-  });
-  return root;
-}
-
-function removeAt(root: JsonObject, path: Path): void {
-  const parent = getAt(root, path.slice(0, -1));
-  const last = path.at(-1)!;
-  if (Array.isArray(parent) && typeof last === "number") {
-    parent.splice(last, 1);
-  } else if (
-    parent !== undefined &&
-    parent !== null &&
-    typeof parent === "object"
-  ) {
-    Reflect.deleteProperty(parent, String(last));
-  }
-}
-
-/**
- * A JSON value as a label or a field shows it: a string as itself, another scalar as its literal,
- * nothing as empty, and an array or object as its JSON — never the `[object Object]` that `String`
- * would give it.
- */
-function displayText(value: unknown): string {
-  if (value === undefined) {
-    return "";
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-  if (
-    value === null ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  ) {
-    return String(value);
-  }
-  return JSON.stringify(value);
-}
-
-function insertAt(root: JsonObject, path: Path, value: Json): void {
-  const parent = getAt(root, path.slice(0, -1));
-  if (Array.isArray(parent)) {
-    parent.splice(Number(path.at(-1)), 0, value);
   }
 }

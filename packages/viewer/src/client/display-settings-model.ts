@@ -172,6 +172,18 @@ export function parseSettings(value: unknown): DisplaySettings {
   settings.textFont = choice("textFont", TEXT_FONTS) ?? settings.textFont;
   settings.codeFont = choice("codeFont", CODE_FONTS) ?? settings.codeFont;
   settings.align = choice("align", ALIGNMENTS) ?? settings.align;
+  copyFreeFields(input, settings);
+  return settings;
+}
+
+/**
+ * The fields that are not a choice among fixed options — font names, switches and numbers — each
+ * taken only when it has the right type, so a missing or mistyped one keeps its default.
+ */
+function copyFreeFields(
+  input: Record<string, unknown>,
+  settings: DisplaySettings,
+): void {
   for (const key of [
     "customSiteFont",
     "customSiteCodeFont",
@@ -195,7 +207,6 @@ export function parseSettings(value: unknown): DisplaySettings {
       settings[key] = clamp(raw, key);
     }
   }
-  return settings;
 }
 
 function textFontStack(
