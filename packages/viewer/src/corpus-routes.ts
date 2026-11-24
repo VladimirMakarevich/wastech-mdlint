@@ -24,6 +24,7 @@ import {
 } from "./graph-view.js";
 import { sendHtml, sendJson } from "./http-send.js";
 import { renderFindingsPanel } from "./findings-panel.js";
+import { renderFolderArticle } from "./folder-page.js";
 import { findingPrompts } from "./prompts.js";
 import { workTreeChanges } from "./review-queries.js";
 import { pageHeaders } from "./security.js";
@@ -31,6 +32,8 @@ import type { ViewerContext } from "./viewer-context.js";
 
 // The pages about the corpus as a whole — search, the link graph, the dashboard — and the findings
 // and fix prompts every document page asks for.
+
+const FOLDER_NOT_FOUND = "No folder at this address holds corpus documents.";
 
 const GRAPH_NOT_FOUND =
   "The graph shows a folder that holds corpus documents, and can highlight a document in the corpus; this address names something else.";
@@ -73,6 +76,33 @@ export class CorpusRoutes {
         title: query ? `Search: ${query}` : "Search",
         article,
         query,
+      }),
+      request.method === "HEAD",
+    );
+  }
+
+  /**
+   * The listing a link to a folder without a README opens. `folder` is only compared with the
+   * corpus's own folders, never joined onto a filesystem path, so a request cannot list a directory
+   * by naming it: what it lists is what the corpus already holds.
+   */
+  async sendFolderPage(
+    request: IncomingMessage,
+    response: ServerResponse,
+    folder: string | undefined,
+  ): Promise<void> {
+    const { corpus } = this.ctx;
+    if (folder === undefined || !corpus.folders.has(folder)) {
+      await this.ctx.sendNotFound(request, response, FOLDER_NOT_FOUND);
+      return;
+    }
+    sendHtml(
+      response,
+      200,
+      await this.ctx.page({
+        title: folder === "" ? "All documents" : `${folder}/`,
+        article: renderFolderArticle(folder, corpus.documents),
+        ...(folder === "" ? {} : { displayPath: `${folder}/` }),
       }),
       request.method === "HEAD",
     );

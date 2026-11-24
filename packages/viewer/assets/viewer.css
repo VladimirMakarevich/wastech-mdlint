@@ -750,6 +750,32 @@ a:hover {
   margin: var(--space-1) 0 0;
 }
 
+/* A folder without a README: its path to climb back up, then its subfolders and documents, each
+   document by its title with its file name beside it, as the tree names it. */
+.folder-crumbs {
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.folder-listing {
+  padding-left: 1.4em;
+}
+
+.folder-listing li + li {
+  margin-top: var(--space-1);
+}
+
+.folder-entry-folder a {
+  font-family: var(--font-mono);
+}
+
+.folder-entry-name {
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
 /* The header's sections, as one segmented control: the section the page is shows as the chosen
    segment, and a document page, which is none of them, shows none chosen. Plain links underneath, so
    they work without script. */

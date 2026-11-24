@@ -200,7 +200,7 @@ export class ViewerRouter {
   }
 
   private prefixRoutes(): readonly PrefixRoute[] {
-    const { documents } = this;
+    const { documents, pages } = this;
     return [
       [
         "/assets/",
@@ -219,6 +219,11 @@ export class ViewerRouter {
             baseline: baselineOf(params),
             blame: params.get("blame") === "1",
           }),
+      ],
+      [
+        "/folder/",
+        (request, response, rest) =>
+          pages.sendFolderPage(request, response, folderOf(rest)),
       ],
       [
         "/file/",
@@ -377,4 +382,14 @@ export class ViewerRouter {
       return undefined;
     }
   }
+}
+
+// The folder a `/folder/` address names. Its links end in `/`, as a folder's address does on GitHub,
+// and the bare prefix is the root; `decodeRequestPath` refuses an empty segment, so that one slash is
+// taken off before it judges the rest.
+function folderOf(rest: string): string | undefined {
+  if (rest === "") {
+    return "";
+  }
+  return decodeRequestPath(rest.endsWith("/") ? rest.slice(0, -1) : rest);
 }

@@ -32,6 +32,9 @@ import {
 export type ResolvedTarget =
   | { kind: "document"; path: string }
   | { kind: "file"; path: string }
+  // A folder that holds corpus documents, directly or further down, but no README or index to open:
+  // the viewer lists it, as GitHub does. `""` is the repository's root.
+  | { kind: "folder"; path: string }
   | { kind: "missing" };
 
 type RepositoryRoot = { rootDir: string; rootRealPath: string };
@@ -85,6 +88,12 @@ export class Corpus {
   // `/file/` serves an embedded image the page asks for next. Keyed by the document object, which the
   // corpus replaces when the file changes, so an edit drops the record with the page it came from.
   private readonly embedded = new WeakMap<ParsedDocument, DocumentLinks>();
+  // Keyed by the documents map, which the corpus replaces whenever the set of documents can change,
+  // so a folder gained or lost is never answered from an older listing.
+  private readonly folderSets = new WeakMap<
+    ReadonlyMap<string, ParsedDocument>,
+    Set<string>
+  >();
 
   private constructor(
     private readonly root: RepositoryRoot,
@@ -117,6 +126,26 @@ export class Corpus {
 
   get graph(): ContextGraph {
     return this.state.graph;
+  }
+
+  /**
+   * Every folder that holds a document, directly or further down, with `""` for the root of a
+   * corpus that has any. Worked out once per set of documents, as every folder link asks it.
+   */
+  get folders(): ReadonlySet<string> {
+    return this.foldersOfState(this.state);
+  }
+
+  private foldersOfState(state: CorpusState): ReadonlySet<string> {
+    let folders = this.folderSets.get(state.documents);
+    if (folders === undefined) {
+      folders = foldersOf(state.documents.keys());
+      if (state.documents.size > 0) {
+        folders.add("");
+      }
+      this.folderSets.set(state.documents, folders);
+    }
+    return folders;
   }
 
   /** The configuration the corpus was loaded with, replaced with it on a full reload. */
@@ -251,7 +280,9 @@ export class Corpus {
    * rules share, so a link the viewer can follow is a link REF-001 accepts and the reverse. Images
    * resolve without the site router for the same reason core gives: a router maps URLs to Markdown
    * sources, never to assets. A directory falls through to its README, which REF-001 does not do; a
-   * folder link that opens its README is what a reader expects from GitHub.
+   * folder link that opens its README is what a reader expects from GitHub. A folder without one
+   * opens as a listing when it holds documents: REF-001 accepts any folder that exists, so marking
+   * such a link missing would contradict the linter over a link that works on GitHub.
    */
   resolve(fromPath: string, target: string, isImage: boolean): ResolvedTarget {
     const { documents, links, loaded } = this.state;
@@ -268,6 +299,10 @@ export class Corpus {
       }
       if (linked?.has(candidate) === true) {
         return { kind: "file", path: candidate };
+      }
+      const folder = folderAt(candidate, this.folders);
+      if (folder !== undefined) {
+        return folder;
       }
     }
     return { kind: "missing" };
@@ -307,6 +342,10 @@ export class Corpus {
       if (await servableFile(this.root, state, candidate)) {
         record.files.add(candidate);
         return { kind: "file", path: candidate };
+      }
+      const folder = folderAt(candidate, this.foldersOfState(state));
+      if (folder !== undefined) {
+        return folder;
       }
     }
     return { kind: "missing" };
@@ -794,6 +833,17 @@ function documentAt(
     }
   }
   return undefined;
+}
+
+// The folder a candidate names, when documents are under it. Checked after the files, so a file and
+// a folder of the same name cannot both answer.
+function folderAt(
+  candidate: string,
+  folders: ReadonlySet<string>,
+): ResolvedTarget | undefined {
+  const directory = candidate.replace(/\/+$/, "");
+  const folder = directory === "." ? "" : directory;
+  return folders.has(folder) ? { kind: "folder", path: folder } : undefined;
 }
 
 // Every folder that holds a document, directly or further down.

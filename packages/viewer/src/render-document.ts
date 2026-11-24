@@ -102,6 +102,11 @@ export function documentHref(relPath: string): string {
   return `/doc/${encodeRepoPath(relPath)}`;
 }
 
+/** The URL of the listing of a corpus folder, `""` being the repository's root. */
+export function folderHref(relPath: string): string {
+  return relPath === "" ? "/folder/" : `/folder/${encodeRepoPath(relPath)}/`;
+}
+
 /** The URL of a non-Markdown repository file a document links to. */
 export function fileHref(relPath: string): string {
   return `/file/${encodeRepoPath(relPath)}`;
@@ -422,6 +427,9 @@ function rewriteTarget(
       };
     case "file":
       return { url: `${fileHref(resolved.path)}${fragment}`, missing: false };
+    // A listing has no headings, so a fragment would name nothing on it.
+    case "folder":
+      return { url: folderHref(resolved.path), missing: false };
     case "missing":
       return { url, missing: true };
   }
