@@ -285,6 +285,25 @@ describe("buildFindingPrompt", () => {
       expect(text, entrypoints.join()).not.toContain("add a second `LLM-001`");
     }
 
+    // A bare name reaching a nested file selects every file of that name, so it is not this file's
+    // own entry: the general steps exclude it with `!` and the list keeps the others.
+    const nested = prompt({
+      filePath: "docs/README.md",
+      findings: [CONTEXT_OVER],
+      strategy: "budget",
+      ruleEntries: [
+        {
+          ruleId: "LLM-001",
+          options: {
+            entrypoints: ["README.md"],
+            maxTokensPerEntrypoint: 10000,
+          },
+        },
+      ],
+    });
+    expect(nested).toContain("add a second `LLM-001` entry");
+    expect(nested).not.toContain("raise that entry's");
+
     // An entry that also names another file keeps the general steps: an entry of its own.
     const shared = prompt({
       filePath: "CLAUDE.md",

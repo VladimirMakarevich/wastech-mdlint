@@ -418,9 +418,11 @@ function reportingContextEntry(
   );
 }
 
-// Whether every pattern an entry adds is a plain path selecting `filePath`: removing the file would
-// then leave nothing. A glob, even one that matches only this file today, is left to the general
-// steps, which tell the agent to exclude the file with a `!` pattern instead of emptying the list.
+// Whether every pattern an entry adds names `filePath` itself: removing the file would then leave
+// nothing. A glob, even one that matches only this file today, is left to the general steps, which
+// tell the agent to exclude the file with a `!` pattern instead of emptying the list. So is a bare
+// name that reaches this file only through its depth-agnostic reading — `README.md` selecting
+// `docs/README.md` — since it selects every `README.md` and the `!` form leaves the rest of it.
 function namesOnly(
   entry: { entrypoints: string[] } | undefined,
   filePath: string,
@@ -432,7 +434,9 @@ function namesOnly(
     added.length > 0 &&
     added.every(
       (pattern) =>
-        !isGlobPattern(pattern) && matchesConfigGlob(filePath, [pattern]),
+        !isGlobPattern(pattern) &&
+        matchesConfigGlob(filePath, [pattern]) &&
+        (pattern.includes("/") || !filePath.includes("/")),
     )
   );
 }
