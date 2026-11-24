@@ -7,6 +7,7 @@
 ```bash
 wastech-mdlint impact docs/requirements/auth.md            # who references this, directly + transitively
 wastech-mdlint impact docs/requirements/auth.md --format json
+wastech-mdlint impact --since main                          # the same for everything this branch changed
 wastech-mdlint slice docs/index.md --depth 2               # what index.md reaches within 2 hops
 wastech-mdlint slice REQ-42                                 # everything reachable from an ID
 ```

@@ -14,10 +14,10 @@ Every check runs through [`@wastech-mdlint/core`](https://github.com/VladimirMak
 ## Commands
 
 ```bash
-wastech-mdlint lint [path] [--config <file>] [--format text|json] [--fail-on error|warning|off] [--fix]
+wastech-mdlint lint [path] [--config <file>] [--format text|json] [--fail-on error|warning|off] [--fix | --since <ref>]
 wastech-mdlint graph [path] [--config <file>] [--format human|json|mermaid|dot]
 wastech-mdlint slice <query> [--config <file>] [--depth <n>] [--format text|json]
-wastech-mdlint impact <file> [--config <file>] [--format text|json]
+wastech-mdlint impact <file> | --since <ref> [--config <file>] [--format text|json]
 wastech-mdlint schema [--out schema.json]
 wastech-mdlint compile [--config <file>] [--outdir <dir>] [--dry-run] [--cwd <dir>]
 wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-ci-workflow] [--with-agent-rule]
@@ -25,13 +25,20 @@ wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-
 
 `lint` is the default command, so a bare `wastech-mdlint` lints the current directory. Default only in that sense: an unrecognized subcommand is an error rather than a path, so a typo'd CI step fails loudly — which also means a bare path still needs its subcommand (`wastech-mdlint lint docs`).
 
+`lint --since <ref>` reports only the findings the work tree adds since where it left a branch, tag or commit — compared with their merge-base, as a pull request is — so CI can fail on new errors while old ones are paid down. `impact --since <ref>` gives the blast radius of every document changed since then. Both read git, read-only, and need git 2.31 or later.
+
+```bash
+wastech-mdlint lint . --since main     # fail CI only on what this branch adds
+wastech-mdlint impact --since main     # what the branch's changes reach
+```
+
 ## Exit codes
 
 | Code | Meaning |
 | --- | --- |
 | `0` | Clean — no findings at the `--fail-on` threshold |
 | `1` | Findings at that threshold |
-| `2` | Operational error — a nonexistent path, an unknown subcommand, an unreadable config, an unwritable file |
+| `2` | Operational error — a nonexistent path, an unknown subcommand, an unreadable config, an unwritable file; and for `--since`, `git` missing or older than 2.31, a `<ref>` that names no commit, a shallow clone without the history back to the merge-base, `--since` together with `--fix`, or `impact` given both or neither of `<file>` and `--since` |
 
 `1` is reserved exclusively for findings, so a CI step can tell a failing document from a broken step.
 

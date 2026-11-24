@@ -31,10 +31,10 @@ Node.js `>=24.17.0`. Readiness is announced on stderr; stdout carries only the p
 | Tool | What it does |
 | --- | --- |
 | `lint` | Lint ad-hoc Markdown content against an explicit rule list. Does not load project config. |
-| `lint-files` | Lint the project's Markdown files using the resolved config, or the zero-config default. |
+| `lint-files` | Lint the project's Markdown files using the resolved config, or the zero-config default. With `since` (a branch, tag or commit), only the findings the work tree adds since where it left that ref, read with git. |
 | `context-graph` | Build the project's context graph — nodes, edges, cycles, or a summary document. |
 | `context-slice` | The files reachable within `depth` hops of a query resolved by exact match. |
-| `impact-analysis` | The blast radius of changing one file: direct and transitive dependents. |
+| `impact-analysis` | The blast radius of changing one file: direct and transitive dependents. With `since` in place of `file`, the same for every document the work tree changed since where it left that ref. |
 | `compile-context` | Compile the project skill (`SKILL.md`) from `config.compile`. |
 
 All six carry a `readOnlyHint` annotation. Five return `structuredContent` alongside an `outputSchema`; `compile-context` returns two plain-text content blocks instead.
