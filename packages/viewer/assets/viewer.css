@@ -2217,7 +2217,9 @@ a:hover {
   color: var(--fg-muted);
 }
 
-.filter-field + .filter-field {
+.filter-field + .filter-field,
+.filter-field + .filter-check,
+.filter-check + .filter-field {
   margin-top: 10px;
 }
 
