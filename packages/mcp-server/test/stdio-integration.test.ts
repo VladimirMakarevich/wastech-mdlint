@@ -136,7 +136,7 @@ async function expectToolError(
 }
 
 function firstText(result: Awaited<ReturnType<Client["callTool"]>>): string {
-  const content = result.content as Array<{ type: string; text?: string }>;
+  const content = result.content as { type: string; text?: string }[];
   return content[0]?.text ?? "";
 }
 
@@ -146,7 +146,7 @@ function firstText(result: Awaited<ReturnType<Client["callTool"]>>): string {
 // pre-handler as a bare `InvalidParams` with no `structuredContent` — never reaching the guard.
 function fileBasedToolCalls(
   cwd: string,
-): Array<{ name: string; args: Record<string, unknown> }> {
+): { name: string; args: Record<string, unknown> }[] {
   return [
     { name: "lint-files", args: { cwd } },
     { name: "context-graph", args: { cwd } },
@@ -220,7 +220,7 @@ describe("mcp-server over stdio", () => {
     expect(ok.isError).toBeFalsy();
     const output = structuredOf(ok);
     expect(output.errorCount).toBe(1);
-    expect((output.messages as Array<{ ruleId: string }>)[0]!.ruleId).toBe(
+    expect((output.messages as { ruleId: string }[])[0]!.ruleId).toBe(
       "REQ-OWNER",
     );
 
@@ -239,7 +239,7 @@ describe("mcp-server over stdio", () => {
     expect(ok.isError).toBeFalsy();
     const output = structuredOf(ok);
     expect(output.errorCount).toBe(1);
-    expect((output.messages as Array<{ ruleId: string }>)[0]!.ruleId).toBe(
+    expect((output.messages as { ruleId: string }[])[0]!.ruleId).toBe(
       "REF-001",
     );
 
@@ -357,7 +357,7 @@ describe("mcp-server over stdio", () => {
     // one success path with no `structuredContent` — its output lives in two text blocks.
     const loaded = await loadConfiguration({ cwd: dir });
     const expected = await compileContext(loaded, dir);
-    const content = ok.content as Array<{ text: string }>;
+    const content = ok.content as { text: string }[];
     expect(content[0]!.text).toBe(expected.skillContent);
     expect(content[1]!.text).toBe(
       `Documents: ${expected.metadata.documentCount}, Rules: ${expected.metadata.ruleCount}, ` +

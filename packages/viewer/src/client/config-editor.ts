@@ -34,7 +34,7 @@ type RuleInfo = {
 };
 
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
-type JsonObject = { [key: string]: Json };
+type JsonObject = Record<string, Json>;
 type Path = (string | number)[];
 
 type ConfigApi = {
@@ -253,7 +253,11 @@ class ConfigEditor {
       if (this.edits.length > 0) {
         if (
           preview?.status !== "ok" &&
-          !(preview?.status === "invalid" && preview.text)
+          !(
+            preview?.status === "invalid" &&
+            preview.text !== undefined &&
+            preview.text !== ""
+          )
         ) {
           this.status.textContent =
             "These changes cannot be turned into text yet; see the preview below.";
@@ -388,14 +392,16 @@ class ConfigEditor {
     // The collapsed card has to say what the rule is set to now, not when the form was drawn: a
     // severity changed below and still shown as "off" here reads as a change that did not take.
     const describe = (current: JsonObject) => {
+      const customId = displayText(current.id);
+      const customName = customId === "" ? "custom rule" : customId;
       name.textContent = isCustom
-        ? String(current.id || "custom rule")
-        : (id ?? String(current.rule));
+        ? customName
+        : (id ?? displayText(current.rule));
       description.textContent = isCustom
-        ? String(current.description ?? "Custom rule")
+        ? displayText(current.description ?? "Custom rule")
         : (info?.description ?? "");
-      severity.textContent = String(
-        current.severity ?? info?.defaultSeverity ?? "",
+      severity.textContent = displayText(
+        current.severity ?? info?.defaultSeverity,
       );
       // Read by the stylesheet, which tints the pill in the severity's color.
       severity.dataset.severity = severity.textContent;
@@ -457,8 +463,9 @@ class ConfigEditor {
     footer.append(remove);
     body.append(footer);
     // The fields' own listeners update the model first; these run after them as the event bubbles.
-    const refresh = () =>
+    const refresh = () => {
       describe((getAt(this.model, path) ?? {}) as JsonObject);
+    };
     body.addEventListener("input", refresh);
     body.addEventListener("change", refresh);
     card.append(body);
@@ -466,8 +473,8 @@ class ConfigEditor {
   }
 
   private builtinBranch(id: string): JsonSchema | undefined {
-    return this.ruleBranches().find((branch) =>
-      branch.properties?.rule?.enum?.includes(id),
+    return this.ruleBranches().find(
+      (branch) => branch.properties?.rule?.enum?.includes(id) === true,
     );
   }
 
@@ -487,7 +494,7 @@ class ConfigEditor {
 
   private firstAssertKind(): string {
     const assert = this.customBranch()?.properties?.options?.properties?.assert;
-    return String(assert?.oneOf?.[0]?.properties?.kind?.const ?? "");
+    return displayText(assert?.oneOf?.[0]?.properties?.kind?.const);
   }
 
   /** One input, or a group of them, for the value the schema describes at `path`. */
@@ -500,10 +507,9 @@ class ConfigEditor {
   ): HTMLElement {
     const value = getAt(this.model, path);
     if (
-      schema.oneOf !== undefined &&
-      schema.oneOf.every(
+      schema.oneOf?.every(
         (branch) => branch.properties?.kind?.const !== undefined,
-      )
+      ) === true
     ) {
       return this.kindField(schema.oneOf, path, label, required);
     }
@@ -542,7 +548,7 @@ class ConfigEditor {
           options.unsetLabel ??
           (schema.default === undefined
             ? "not set"
-            : `default (${String(schema.default)})`);
+            : `default (${displayText(schema.default)})`);
         const control = segmentedControl<string>(
           labelText(label, required),
           [
@@ -578,7 +584,7 @@ class ConfigEditor {
           options.unsetLabel ??
             (schema.default === undefined
               ? "—"
-              : `default (${String(schema.default)})`),
+              : `default (${displayText(schema.default)})`),
           "",
         ),
       );
@@ -615,9 +621,10 @@ class ConfigEditor {
           input.title = `Pattern: ${schema.pattern}`;
         }
       }
-      input.value = value === undefined || value === null ? "" : String(value);
+      input.value =
+        value === undefined || value === null ? "" : displayText(value);
       input.addEventListener("input", () => {
-        if (input.value === "" && !options.inList) {
+        if (input.value === "" && options.inList !== true) {
           this.remove(path);
           return;
         }
@@ -654,7 +661,7 @@ class ConfigEditor {
       const kind = String(branch.properties!.kind!.const);
       select.append(new Option(kind, kind));
     }
-    select.value = String(current?.kind ?? "");
+    select.value = displayText(current?.kind);
     const fields = element("div");
     const renderFields = () => {
       const branch = branches.find(
@@ -1164,12 +1171,16 @@ class ConfigEditor {
       | { base: string; text: string; edits: Edit[]; mode: "form" | "text" }
       | undefined;
     try {
-      draft =
-        JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? "null") ?? undefined;
+      const stored: unknown = JSON.parse(
+        sessionStorage.getItem(DRAFT_KEY) ?? "null",
+      );
+      // Written by this page alone, under a key only it uses; the hash check below decides whether
+      // it still applies.
+      draft = (stored ?? undefined) as typeof draft;
     } catch {
       return;
     }
-    if (draft === undefined || draft.base !== this.file.hash) {
+    if (draft?.base !== this.file.hash) {
       return;
     }
     this.text = draft.text;
@@ -1383,8 +1394,30 @@ function removeAt(root: JsonObject, path: Path): void {
     parent !== null &&
     typeof parent === "object"
   ) {
-    delete (parent as Record<string, Json>)[String(last)];
+    Reflect.deleteProperty(parent, String(last));
   }
+}
+
+/**
+ * A JSON value as a label or a field shows it: a string as itself, another scalar as its literal,
+ * nothing as empty, and an array or object as its JSON — never the `[object Object]` that `String`
+ * would give it.
+ */
+function displayText(value: unknown): string {
+  if (value === undefined) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  if (
+    value === null ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return String(value);
+  }
+  return JSON.stringify(value);
 }
 
 function insertAt(root: JsonObject, path: Path, value: Json): void {

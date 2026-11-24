@@ -415,8 +415,8 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
         // unusable interactively as neither being one.
         const isTty =
           io.isTty ??
-          ((io.stdinIsTty ?? process.stdin.isTTY === true) &&
-            (io.stdoutIsTty ?? process.stdout.isTTY === true));
+          ((io.stdinIsTty ?? process.stdin.isTTY) &&
+            (io.stdoutIsTty ?? process.stdout.isTTY));
 
         // Cheap, important: without this, a piped/CI invocation that forgot --yes would otherwise
         // hang forever on the first inquirer prompt instead of failing fast.

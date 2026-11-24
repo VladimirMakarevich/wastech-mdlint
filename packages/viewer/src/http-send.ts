@@ -66,11 +66,11 @@ export function readBody(
         chunks.push(chunk);
       }
     });
-    request.on("end", () =>
+    request.on("end", () => {
       resolve(
         size > limit ? undefined : Buffer.concat(chunks).toString("utf8"),
-      ),
-    );
+      );
+    });
     request.on("error", reject);
   });
 }

@@ -305,10 +305,11 @@ async function post(
     });
     return (await response.json()) as { status: string };
   } catch {
-    return {
+    const failed: Refused = {
       status: "failed",
       error: "The viewer did not answer; the mark was not saved.",
-    } as Refused;
+    };
+    return failed;
   }
 }
 

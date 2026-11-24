@@ -13,7 +13,7 @@ import type { PrimitiveFinding } from "./types.js";
 // closing fence), because the parsed value carries no per-key positions and the block is short
 // enough that its range locates the problem.
 
-type FrontmatterMapping = { [key: string]: FrontmatterValue };
+type FrontmatterMapping = Record<string, FrontmatterValue>;
 
 type ResolvedFrontmatter =
   | { kind: "absent" }

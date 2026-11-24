@@ -71,7 +71,7 @@ export async function resolveToolCwd(input: ToolFileInput): Promise<string> {
   // the exact failure this guard exists to name. Not expressed as `.min(1)` on the tools'
   // `inputSchema`s: a schema rejection is refused before the handler runs, arriving as a bare
   // `InvalidParams` with no `structuredContent` and no `hint`.
-  if (input.cwd !== undefined && input.cwd.trim() === "") {
+  if (input.cwd?.trim() === "") {
     throw new ToolInputError("cwd must not be empty", hint);
   }
 

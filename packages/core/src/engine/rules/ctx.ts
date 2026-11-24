@@ -367,7 +367,7 @@ function collectAliasMatches(
     const text = content.slice(range.start, range.end);
     for (const [alias, canonical] of aliasToCanonical) {
       for (const match of text.matchAll(wholeWordRegex(alias))) {
-        const start = range.start + (match.index ?? 0) + match[1]!.length;
+        const start = range.start + match.index + match[1]!.length;
         matches.push({
           start,
           end: start + alias.length,
@@ -429,7 +429,7 @@ function collectAliasMatches(
 
     const createsAlias = [...aliasToCanonical.keys()].some((alias) =>
       [...replaced.matchAll(wholeWordRegex(alias))].some((found) => {
-        const foundStart = (found.index ?? 0) + found[1]!.length;
+        const foundStart = found.index + found[1]!.length;
         const foundEnd = foundStart + alias.length;
         return landed.some(
           (region) => foundStart < region.end && foundEnd > region.start,

@@ -22,11 +22,11 @@ const impactSkill = readFileSync(
   "utf8",
 );
 
-interface DocumentedTool {
+type DocumentedTool = {
   name: string;
   inputFields: string[];
   outputFields: string[];
-}
+};
 
 // Turn a documented `{ a, b?, c: "x" }` code span into its field names: drop the optional `?`, keep
 // only the key before any `:` value, ignore anything that is not a bare identifier.

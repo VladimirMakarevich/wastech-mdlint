@@ -665,11 +665,11 @@ function statusChange(
       ? { status: "D", path: source }
       : { status: "R", path: filePath, oldPath: source };
   }
-  if (xy[0] === "A" || xy[1] === "A") {
+  if (xy.startsWith("A") || xy[1] === "A") {
     // Staged as new, then removed from disk: it never existed at either end.
     return deletedOnDisk ? undefined : { status: "A", path: filePath };
   }
-  if (xy[0] === "D" || deletedOnDisk) {
+  if (xy.startsWith("D") || deletedOnDisk) {
     return { status: "D", path: filePath };
   }
   return { status: "M", path: filePath };

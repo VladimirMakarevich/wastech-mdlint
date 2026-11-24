@@ -16,12 +16,7 @@ const MIN_QUERY_LENGTH = 2;
 export function initSearch(): void {
   const form = document.querySelector<HTMLFormElement>("form.search");
   const input = form?.querySelector<HTMLInputElement>('input[name="q"]');
-  if (
-    form === null ||
-    form === undefined ||
-    input === null ||
-    input === undefined
-  ) {
+  if (form === null || input === null || input === undefined) {
     return;
   }
 

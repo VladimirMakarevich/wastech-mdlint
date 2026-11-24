@@ -127,7 +127,8 @@ async function show(
   } catch {
     entries = [];
   }
-  if (closed) {
+  // Closed while the entries loaded: `close` takes the menu out of the page.
+  if (!menu.isConnected) {
     return;
   }
   menu.replaceChildren();
@@ -174,7 +175,12 @@ function item(
       label.textContent = worked
         ? (options.doneLabel ?? "Copied")
         : "Could not copy";
-      window.setTimeout(() => close(true), worked ? 600 : 1500);
+      window.setTimeout(
+        () => {
+          close(true);
+        },
+        worked ? 600 : 1500,
+      );
     });
   });
   return button;

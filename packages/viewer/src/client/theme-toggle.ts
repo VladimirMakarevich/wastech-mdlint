@@ -33,7 +33,9 @@ export function effectiveTheme(): Theme {
  * its colors into each SVG — redraw on it.
  */
 export function onThemeChange(listener: (theme: Theme) => void): void {
-  document.addEventListener(CHANGE_EVENT, () => listener(effectiveTheme()));
+  document.addEventListener(CHANGE_EVENT, () => {
+    listener(effectiveTheme());
+  });
   systemDark.addEventListener("change", () => {
     if (currentChoice() === "system") {
       listener(effectiveTheme());

@@ -45,7 +45,9 @@ export function segmentedControl<T>(
     button.className = "segment";
     button.setAttribute("role", "radio");
     button.textContent = caption;
-    button.addEventListener("click", () => choose(value));
+    button.addEventListener("click", () => {
+      choose(value);
+    });
     return button;
   });
   element.append(...buttons);

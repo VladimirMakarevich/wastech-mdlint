@@ -82,9 +82,7 @@ export async function sendMermaid(
   await sendScript(
     request,
     response,
-    allowed && relPath !== undefined
-      ? path.join(MERMAID_DIST, ...relPath.split("/"))
-      : undefined,
+    allowed ? path.join(MERMAID_DIST, ...relPath.split("/")) : undefined,
   );
 }
 

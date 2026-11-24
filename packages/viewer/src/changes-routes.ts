@@ -285,11 +285,7 @@ export function changesRoutes(ctx: ViewerContext) {
         : sectionHashes(entry).find(
             (candidate) => candidate.key === asked.section,
           );
-    if (
-      entry === undefined ||
-      section === undefined ||
-      section.hash !== asked.hash
-    ) {
+    if (entry === undefined || section?.hash !== asked.hash) {
       sendJson(
         response,
         {

@@ -88,7 +88,7 @@ function markSection(section: HTMLAnchorElement, data: Changes): void {
   const badge = document.createElement("span");
   badge.className = "segment-count";
   const review = data.status === "ready" ? data.review : null;
-  if (review === null || review.state !== "ready") {
+  if (review?.state !== "ready") {
     badge.textContent = String(count);
     badge.title = `${count} changed ${count === 1 ? "document" : "documents"}`;
   } else {

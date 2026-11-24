@@ -8,12 +8,7 @@ export function initDiffExpand(): void {
   )) {
     const row = gap.querySelector<HTMLTableRowElement>("tr.diff-expand");
     const button = row?.querySelector<HTMLButtonElement>("button");
-    if (
-      row === null ||
-      row === undefined ||
-      button === null ||
-      button === undefined
-    ) {
+    if (row === null || button === null || button === undefined) {
       continue;
     }
     row.hidden = false;

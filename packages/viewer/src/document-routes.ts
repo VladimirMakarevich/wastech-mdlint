@@ -92,11 +92,7 @@ export function documentRoutes(ctx: ViewerContext) {
     annotate?: LineAnnotator,
   ): Promise<MarkedDocument> {
     const entry = marked.get(review);
-    if (
-      annotate === undefined &&
-      entry !== undefined &&
-      entry.document === document
-    ) {
+    if (annotate === undefined && entry?.document === document) {
       return entry.result;
     }
     const changes = headChanges(review.diff);

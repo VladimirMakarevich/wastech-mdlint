@@ -514,7 +514,7 @@ async function handleSchema(
     throw error;
   });
 
-  if (outputStats?.isDirectory()) {
+  if (outputStats?.isDirectory() === true) {
     throw new CliUsageError(
       `Cannot write schema output to directory path: ${command.out}`,
     );

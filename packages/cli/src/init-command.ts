@@ -271,7 +271,7 @@ async function parseExistingConfigFile(
   try {
     const text = await readFile(absoluteConfigPath, "utf8");
     const errors: ParseError[] = [];
-    const raw = parseJsonc(text, errors, {
+    const raw: unknown = parseJsonc(text, errors, {
       allowTrailingComma: true,
       disallowComments: false,
     });
@@ -1237,17 +1237,19 @@ function formatSchemaWriteLine(schema: SchemaWriteOutcome): string {
     case "kept":
       return (
         `Kept existing schema.json at ${schema.path} (${why}) — its contents ` +
-        "differ from what init would generate, so it was left in place. " +
-        describeKeptSchemaAdvice(schema.reason)
+        `differ from what init would generate, so it was left in place. ${describeKeptSchemaAdvice(
+          schema.reason,
+        )}`
       );
     case "overwritten":
       return `Overwrote schema.json at ${schema.path} (${why}), per --on-existing overwrite.`;
     case "unreadable":
       return (
         `Kept existing schema.json at ${schema.path} (${why}) — it exists but could ` +
-        "not be read, so init cannot tell whether it matches and will not replace a file it is " +
-        "unable to inspect (check its permissions). " +
-        describeKeptSchemaAdvice(schema.reason)
+        `not be read, so init cannot tell whether it matches and will not replace a file it is ` +
+        `unable to inspect (check its permissions). ${describeKeptSchemaAdvice(
+          schema.reason,
+        )}`
       );
     default: {
       const exhaustiveCheck: never = schema.kind;
@@ -1286,20 +1288,19 @@ function formatCiWorkflowLine(
       );
     }
     case "kept":
-      return (
-        `Kept the existing CI workflow ${ciWorkflow.path} — init never overwrites it. Check that ` +
-        (configState === "written"
+      return `Kept the existing CI workflow ${ciWorkflow.path} — init never overwrites it. Check that ${
+        configState === "written"
           ? "it still points at the config written above."
-          : "it still points at the existing config.")
-      );
+          : "it still points at the existing config."
+      }`;
     case "unsafe-config-path":
       return (
         `Skipped the CI workflow ${ciWorkflow.path} — the config path contains a line terminator, ` +
-        "which cannot be embedded safely in the workflow's shell command. " +
-        (configState === "written"
-          ? "The config above was still written"
-          : "The existing config was left untouched") +
-        "; add the workflow by hand, or rename the directory."
+        `which cannot be embedded safely in the workflow's shell command. ${
+          configState === "written"
+            ? "The config above was still written"
+            : "The existing config was left untouched"
+        }; add the workflow by hand, or rename the directory.`
       );
     default: {
       const exhaustiveCheck: never = ciWorkflow;
@@ -1346,11 +1347,11 @@ function formatAgentRuleLine(
     case "unsafe-config-path":
       return (
         `Skipped the agent rule ${agentRule.path} — the config path contains a line terminator, ` +
-        "which the page cannot name. " +
-        (configState === "written"
-          ? "The config above was still written"
-          : "The existing config was left untouched") +
-        "; rename the directory and re-run init to add it."
+        `which the page cannot name. ${
+          configState === "written"
+            ? "The config above was still written"
+            : "The existing config was left untouched"
+        }; rename the directory and re-run init to add it.`
       );
     default: {
       const exhaustiveCheck: never = agentRule;

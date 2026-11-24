@@ -416,7 +416,7 @@ export async function scanRepository(
   const noiseDirNames = options.noiseDirNames ?? DEFAULT_NOISE_DIR_NAMES;
 
   const rootStats = await stat(cwd).catch(() => undefined);
-  if (rootStats === undefined || !rootStats.isDirectory()) {
+  if (rootStats?.isDirectory() !== true) {
     return {
       clusters: [],
       packageManager: undefined,

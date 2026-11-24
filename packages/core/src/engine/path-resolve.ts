@@ -71,7 +71,7 @@ export function sourceLocale(
     return undefined;
   }
   const rest = sourcePath.slice(contentDir.length + 1);
-  const segment = rest.split("/")[0];
+  const [segment = ""] = rest.split("/");
   return segment.length > 0 && segment !== rest ? segment : undefined;
 }
 

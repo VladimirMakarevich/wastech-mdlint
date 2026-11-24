@@ -5,6 +5,14 @@
     "moduleResolution": "NodeNext",
     "composite": true,
     "strict": true,
+    // An index or a key lookup may miss, so its type says so: `lines[i]` is `string | undefined`.
+    // The code already reads every such lookup as one that can miss — a `!` where the bound is
+    // proven, a default where it is not — and this makes the compiler hold that rather than trust
+    // it, so a lookup that can miss can no longer be read as one that cannot.
+    "noUncheckedIndexedAccess": true,
+    // A function that returns a value on one path returns one on every path. Checked here rather
+    // than by a lint rule, because only the compiler knows that a switch over a union covers it.
+    "noImplicitReturns": true,
     "declaration": true,
     // Off, not absent: no package's `files` allowlist ships `src` — only built output plus
     // LICENSE/README (and schema.json for cli) — so a map emitted here shipped

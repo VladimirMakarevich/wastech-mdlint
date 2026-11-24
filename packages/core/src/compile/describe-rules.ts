@@ -156,8 +156,10 @@ function summarizeAssertion(assertion: Assertion): string {
 }
 
 function describeCustomRule(entry: CustomRuleConfigEntry): string {
+  // A target left blank names nothing, so it reads as the assertion's own default.
+  const named = entry.target?.trim() ?? "";
   const target =
-    entry.target?.trim() || ASSERTION_TARGETS[entry.options.assert.kind];
+    named === "" ? ASSERTION_TARGETS[entry.options.assert.kind] : named;
   const description = entry.description?.trim();
   const summary = summarizeAssertion(entry.options.assert);
 

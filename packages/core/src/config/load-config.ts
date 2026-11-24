@@ -115,7 +115,7 @@ function displayConfigPath(cwd: string, configPath: string): string {
 
 function parseJsoncConfig(text: string, displayPath: string): unknown {
   const errors: ParseError[] = [];
-  const value = parseJsonc(text, errors, {
+  const value: unknown = parseJsonc(text, errors, {
     allowTrailingComma: true,
     disallowComments: false,
   });
@@ -257,9 +257,10 @@ export async function loadConfiguration(params: {
   registry?: RuleRegistry;
 }): Promise<LoadedConfiguration> {
   const registry = params.registry ?? ruleRegistry;
-  const explicitConfigPath = params.explicitConfigPath
-    ? path.resolve(params.cwd, params.explicitConfigPath)
-    : undefined;
+  const explicitConfigPath =
+    params.explicitConfigPath !== undefined && params.explicitConfigPath !== ""
+      ? path.resolve(params.cwd, params.explicitConfigPath)
+      : undefined;
 
   if (
     explicitConfigPath !== undefined &&
@@ -326,6 +327,6 @@ export function parseConfiguration(params: {
     config,
     configPath,
     rules: resolveRules(config, registry, displayPath),
-    settings: (config.settings ?? {}) as ResolvedSettings,
+    settings: config.settings ?? {},
   };
 }

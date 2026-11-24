@@ -425,13 +425,14 @@ export class ReviewStore {
   ): Promise<void> {
     const referenced = new Set([...documents.values()].flat());
     const names = await readdir(this.textsDir).catch(() => [] as string[]);
+    const unreferenced = names.filter((name) => {
+      const hash = TEXT_FILE.exec(name)?.[1];
+      return hash !== undefined && !referenced.has(hash);
+    });
     await Promise.all(
-      names.map((name) => {
-        const hash = TEXT_FILE.exec(name)?.[1];
-        return hash === undefined || referenced.has(hash)
-          ? undefined
-          : unlink(path.join(this.textsDir, name)).catch(() => undefined);
-      }),
+      unreferenced.map((name) =>
+        unlink(path.join(this.textsDir, name)).catch(() => undefined),
+      ),
     );
   }
 }

@@ -143,7 +143,7 @@ function resolveOwnVerdict(
   layers: IgnoreLayer[],
 ): Verdict {
   for (let index = layers.length - 1; index >= 0; index -= 1) {
-    const verdict = layerVerdict(layers[index], relPath, isDirectory);
+    const verdict = layerVerdict(layers[index]!, relPath, isDirectory);
     if (verdict !== "no-opinion") {
       return verdict;
     }

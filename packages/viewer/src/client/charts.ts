@@ -40,7 +40,9 @@ async function draw(block: HTMLElement): Promise<ECharts | undefined> {
     chart.setOption(option);
     // Also what draws a chart inside a closed <details>: it starts at zero size and gets its real
     // one when the section opens.
-    new ResizeObserver(() => chart.resize()).observe(canvas);
+    new ResizeObserver(() => {
+      chart.resize();
+    }).observe(canvas);
     block.dataset.state = "rendered";
     return chart;
   } catch (error) {

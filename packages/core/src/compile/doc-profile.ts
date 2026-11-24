@@ -35,11 +35,13 @@ export type DocumentProfile = {
 function normalizeIdFamily(token: string): string | undefined {
   const match = ID_FAMILY_PATTERN.exec(token);
 
-  if (match?.groups === undefined) {
+  const prefix = match?.groups?.prefix;
+  const digits = match?.groups?.digits;
+  if (prefix === undefined || digits === undefined) {
     return undefined;
   }
 
-  return `${match.groups.prefix}-${"N".repeat(match.groups.digits.length)}`;
+  return `${prefix}-${"N".repeat(digits.length)}`;
 }
 
 // Reuse the same whitespace/comma token model as column-based ID discovery so compile profiling

@@ -61,7 +61,7 @@ if (npmExecPath === undefined || npmExecPath === "") {
   );
 }
 
-interface PublishedPackage {
+type PublishedPackage = {
   /** Manifest `name`, and the string each README must name so three copies of one file are visible. */
   readonly name: string;
   /** Repository-relative POSIX subpath, which is what `repository.directory` must carry. */
@@ -72,7 +72,7 @@ interface PublishedPackage {
    * a property of `cli` alone, so a copy of it leaking into `core` fails here.
    */
   readonly allowedTopLevelEntries: readonly string[];
-}
+};
 
 // Adding a genuinely new payload file (a `CHANGELOG.md`, say) means one line here. That is
 // the guard working, not friction: the edit is the moment somebody confirms the new file is meant

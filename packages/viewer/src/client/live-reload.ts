@@ -15,9 +15,9 @@ export function onServerEvent(
   name: string,
   listener: (data: string) => void,
 ): void {
-  stream().addEventListener(name, (event) =>
-    listener((event as MessageEvent<string>).data),
-  );
+  stream().addEventListener(name, (event) => {
+    listener((event as MessageEvent<string>).data);
+  });
 }
 
 const scrollKey = `wastech-mdlint-viewer:scroll:${location.pathname}`;

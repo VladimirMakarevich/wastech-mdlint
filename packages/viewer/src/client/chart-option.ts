@@ -56,11 +56,11 @@ function visit(value: unknown, key: string | undefined): void {
     delete value.title;
     delete value.lang;
   }
-  for (const urlKey of ["link", "sublink"]) {
-    const url = value[urlKey];
-    if (typeof url === "string" && !isWebUrl(url)) {
-      delete value[urlKey];
-    }
+  if (typeof value.link === "string" && !isWebUrl(value.link)) {
+    delete value.link;
+  }
+  if (typeof value.sublink === "string" && !isWebUrl(value.sublink)) {
+    delete value.sublink;
   }
   for (const [childKey, child] of Object.entries(value)) {
     visit(child, childKey);

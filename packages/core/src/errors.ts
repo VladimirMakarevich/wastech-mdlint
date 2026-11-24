@@ -30,11 +30,11 @@ export const TOOL_ERROR_CODES = [
 // Derived from the runtime array so the type and the membership check cannot drift apart.
 export type ToolErrorCode = (typeof TOOL_ERROR_CODES)[number];
 
-export interface StructuredErrorInfo {
+export type StructuredErrorInfo = {
   code: ToolErrorCode;
   message: string;
   hint?: string;
-}
+};
 
 // Membership must be an allowlist against TOOL_ERROR_CODES, not "has a string `.code`": Node fs
 // errors (ENOENT, etc.) also carry a `.code`, and duck-typing them through would leak an unrelated

@@ -79,15 +79,16 @@ export async function highlight(
   if (lang !== undefined && !instance.getLoadedLanguages().includes(lang)) {
     await instance.loadLanguage(lang);
   }
-  const transformers: ShikiTransformer[] = options.lineAnchors
-    ? [
-        {
-          line(node, line) {
-            node.properties.id = `L${line}`;
+  const transformers: ShikiTransformer[] =
+    options.lineAnchors === true
+      ? [
+          {
+            line(node, line) {
+              node.properties.id = `L${line}`;
+            },
           },
-        },
-      ]
-    : [];
+        ]
+      : [];
   const root: Root = instance.codeToHast(code, {
     lang: lang ?? "text",
     themes: THEMES,

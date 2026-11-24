@@ -349,10 +349,7 @@ function documentContext(
  * The diff of one path in the review — a document or the config — or `undefined` when the review
  * holds no such path. The path is only ever compared with the review's own, never read from disk.
  */
-export function diffPayload(
-  review: Review,
-  relPath: string,
-): unknown | undefined {
+export function diffPayload(review: Review, relPath: string): unknown {
   const document = review.documents.find((entry) => entry.path === relPath);
   if (document !== undefined) {
     return {

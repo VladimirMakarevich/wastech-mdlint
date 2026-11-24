@@ -1,23 +1,15 @@
 import GithubSlugger from "github-slugger";
 import type {
-  Code,
   Definition,
-  Emphasis,
-  Heading,
   Html,
   Image,
-  Paragraph,
   ImageReference,
   Link,
   LinkReference,
   ListItem,
   Root,
-  Strong,
   Table,
-  TableCell,
-  TableRow,
   Text,
-  Yaml,
 } from "mdast";
 import { remark } from "remark";
 import remarkFrontmatter from "remark-frontmatter";
@@ -205,7 +197,7 @@ function extractFrontmatter(tree: Root): ParsedFrontmatter | null {
     return null;
   }
 
-  const node = first as Yaml;
+  const node = first;
 
   // LF-normalised so a CRLF checkout (`core.autocrlf` on Windows) exposes the same string as the
   // committed file. Only line numbers are exposed, never offsets, so normalising cannot put
@@ -237,7 +229,7 @@ function extractFirstBlock(tree: Root): ParsedFirstBlock | null {
     }
     if (
       node.type === "html" &&
-      HTML_COMMENTS_ONLY_PATTERN.test((node as Html).value.trim())
+      HTML_COMMENTS_ONLY_PATTERN.test(node.value.trim())
     ) {
       continue;
     }
@@ -263,12 +255,12 @@ function extractEmphasisParagraphs(tree: Root): ParsedEmphasisParagraph[] {
     if (inline.type !== "strong" && inline.type !== "emphasis") {
       continue;
     }
-    const inner = (inline as Strong | Emphasis).children;
+    const inner = inline.children;
     if (inner.length !== 1 || inner[0]!.type !== "text") {
       continue;
     }
     found.push({
-      text: (inner[0] as Text).value,
+      text: inner[0].value,
       kind: inline.type,
       line: node.position?.start.line ?? 0,
     });
@@ -337,7 +329,7 @@ function extractTable(
   node: Table,
   section: string | undefined,
 ): ParsedTable | undefined {
-  const [headerRow, ...bodyRows] = node.children as TableRow[];
+  const [headerRow, ...bodyRows] = node.children;
 
   if (headerRow === undefined) {
     return undefined;
@@ -512,7 +504,7 @@ function extractImports(node: Text): ParsedImport[] {
 
     // The match may start with a boundary char (space/paren); locate the `@`'s offset within
     // node.value so position tracking anchors on the `@` itself, not the leading boundary.
-    const matchIndex = match.index ?? 0;
+    const matchIndex = match.index;
     const atOffset = match[0].lastIndexOf(`@${rawTarget}`);
     const atCharIndex = matchIndex + atOffset;
 
@@ -670,7 +662,7 @@ export function parseDocumentWithTree(params: {
   path: string;
   content: string;
 }): { document: ParsedDocument; tree: Root } {
-  const tree = markdownProcessor.parse(params.content) as Root;
+  const tree = markdownProcessor.parse(params.content);
   const markLength = byteOrderMarkLength(params.content);
   if (markLength > 0) {
     shiftOffsetsPastByteOrderMark(tree, markLength);
@@ -715,7 +707,7 @@ export function parseDocumentWithTree(params: {
   visit(tree, (node, _index, parent) => {
     switch (node.type) {
       case "heading": {
-        const heading = node as Heading;
+        const heading = node;
         const text = collectText(heading);
         const slug = slugger.slug(text);
         currentSection = text;
@@ -742,29 +734,20 @@ export function parseDocumentWithTree(params: {
       case "paragraph":
       case "tableCell": {
         undefinedReferences.push(
-          ...extractUndefinedReferences(
-            node as Paragraph | TableCell,
-            params.content,
-            definitions,
-          ),
+          ...extractUndefinedReferences(node, params.content, definitions),
         );
-        reversedLinks.push(
-          ...extractReversedLinks(
-            node as Paragraph | TableCell,
-            params.content,
-          ),
-        );
+        reversedLinks.push(...extractReversedLinks(node, params.content));
         return;
       }
       case "table": {
-        const table = extractTable(node as Table, currentSection);
+        const table = extractTable(node, currentSection);
         if (table !== undefined) {
           tables.push(table);
         }
         return;
       }
       case "listItem": {
-        const checkItem = extractCheckItem(node as ListItem, currentSection);
+        const checkItem = extractCheckItem(node, currentSection);
         if (checkItem !== undefined) {
           checkItems.push(checkItem);
         }
@@ -772,7 +755,7 @@ export function parseDocumentWithTree(params: {
       }
       case "link":
       case "linkReference": {
-        const linkNode = node as LinkLikeNode;
+        const linkNode = node;
         if (
           linkNode.type === "linkReference" &&
           linkNode.referenceType !== "full"
@@ -809,7 +792,7 @@ export function parseDocumentWithTree(params: {
       }
       case "image":
       case "imageReference": {
-        const imageNode = node as ImageLikeNode;
+        const imageNode = node;
         if (imageNode.type === "imageReference") {
           referencedIdentifiers.add(imageNode.identifier);
         }
@@ -826,17 +809,17 @@ export function parseDocumentWithTree(params: {
         return;
       }
       case "html": {
-        const directive = parseDirective(node as Html);
+        const directive = parseDirective(node);
         if (directive !== undefined) {
           directives.push(directive);
         }
-        const extracted = extractHtmlAnchors(node as Html, openRawText);
+        const extracted = extractHtmlAnchors(node, openRawText);
         htmlAnchors.push(...extracted.anchors);
         openRawText = extracted.openRawText;
         return;
       }
       case "definition": {
-        const definition = node as Definition;
+        const definition = node;
         const start = definition.position?.start.offset;
         const end = definition.position?.end.offset;
         if (start === undefined || end === undefined) {
@@ -856,7 +839,7 @@ export function parseDocumentWithTree(params: {
         return;
       }
       case "code": {
-        const code = node as Code;
+        const code = node;
         const start = code.position?.start.offset;
         if (start === undefined) {
           return;
@@ -877,7 +860,7 @@ export function parseDocumentWithTree(params: {
         return;
       }
       case "text": {
-        const textNode = node as Text;
+        const textNode = node;
         imports.push(...extractImports(textNode));
         const start = textNode.position?.start.offset;
         const end = textNode.position?.end.offset;
@@ -890,10 +873,7 @@ export function parseDocumentWithTree(params: {
           start !== undefined &&
           end !== undefined &&
           !referenceLabelText.has(textNode) &&
-          !(
-            parent?.type === "link" &&
-            isAutolink(parent as Link, params.content)
-          ) &&
+          !(parent?.type === "link" && isAutolink(parent, params.content)) &&
           normalizeLineEndings(params.content.slice(start, end)) ===
             normalizeLineEndings(textNode.value)
         ) {

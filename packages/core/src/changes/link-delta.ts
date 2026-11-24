@@ -59,7 +59,7 @@ function beyond(
     remaining.set(key, (remaining.get(key) ?? 0) + 1);
   }
   return edges.filter((_edge, index) => {
-    const key = keys[index] as string;
+    const key = keys[index]!;
     const left = remaining.get(key) ?? 0;
     remaining.set(key, left - 1);
     return left <= 0;

@@ -55,7 +55,7 @@ async function refreshPanel(documentPath: string): Promise<void> {
   const data = await fetchJson<DocumentDiagnostics>(
     `/api/diagnostics?path=${encodeURIComponent(documentPath)}`,
   );
-  if (data === undefined || data.status !== "ready") {
+  if (data?.status !== "ready") {
     return;
   }
   document.querySelector(".diagnostics")?.remove();
@@ -140,7 +140,7 @@ function panel(
 
 async function refreshTree(): Promise<void> {
   const data = await fetchJson<Summary>("/api/diagnostics");
-  if (data === undefined || data.status !== "ready") {
+  if (data?.status !== "ready") {
     return;
   }
   for (const badge of document.querySelectorAll(".tree-badge")) {

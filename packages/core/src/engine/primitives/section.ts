@@ -62,9 +62,10 @@ export function sectionOrder(
   document: ParsedDocument,
   options: SectionOrderOptions,
 ): PrimitiveFinding[] {
-  let headings = options.section
-    ? headingsInSection(document.headings, options.section)
-    : document.headings;
+  let headings =
+    options.section !== undefined && options.section !== ""
+      ? headingsInSection(document.headings, options.section)
+      : document.headings;
 
   if (options.level !== undefined) {
     headings = headings.filter((heading) => heading.depth === options.level);

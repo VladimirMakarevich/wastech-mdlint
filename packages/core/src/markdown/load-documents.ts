@@ -91,7 +91,7 @@ async function collectFiles(params: {
         continue;
       }
       const resolvedStats = await stat(absolutePath).catch(() => undefined);
-      if (resolvedStats === undefined || !resolvedStats.isFile()) {
+      if (resolvedStats?.isFile() !== true) {
         continue;
       }
     } else if (!entry.isFile()) {
@@ -127,7 +127,7 @@ export async function loadDocuments(
   const rootDisplayPath = path.resolve(options.cwd);
   const rootStats = await stat(rootDisplayPath).catch(() => undefined);
 
-  if (rootStats === undefined || !rootStats.isDirectory()) {
+  if (rootStats?.isDirectory() !== true) {
     return new Map();
   }
 

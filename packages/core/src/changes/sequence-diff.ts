@@ -66,8 +66,7 @@ export function diffSequences<T>(
     }
     const last = runs[runs.length - 1];
     if (
-      last !== undefined &&
-      last.kind === run.kind &&
+      last?.kind === run.kind &&
       last.baseStart + (run.kind === "insert" ? 0 : last.length) ===
         run.baseStart &&
       last.headStart + (run.kind === "delete" ? 0 : last.length) ===
@@ -127,12 +126,8 @@ function diffMiddle<T>(
       // right (a deletion) otherwise. A fixed rule, so equal inputs always give equal scripts.
       const down =
         k === -edits ||
-        (k !== edits &&
-          (frontier[offset + k - 1] as number) <
-            (frontier[offset + k + 1] as number));
-      let x = down
-        ? (frontier[offset + k + 1] as number)
-        : (frontier[offset + k - 1] as number) + 1;
+        (k !== edits && frontier[offset + k - 1]! < frontier[offset + k + 1]!);
+      let x = down ? frontier[offset + k + 1]! : frontier[offset + k - 1]! + 1;
       let y = x - k;
       while (x < n && y < m && equals(base[x] as T, head[y] as T)) {
         x += 1;
@@ -152,9 +147,9 @@ function traceBack(rows: Int32Array[], n: number, m: number): Step[] {
   let x = n;
   let y = m;
   for (let edits = rows.length - 1; edits >= 0; edits -= 1) {
-    const row = rows[edits] as Int32Array;
+    const row = rows[edits]!;
     // `row` holds diagonals -edits-1 .. edits+1 of the frontier before this edit count's pass.
-    const at = (k: number) => row[k + edits + 1] as number;
+    const at = (k: number) => row[k + edits + 1]!;
     const k = x - y;
     const down = k === -edits || (k !== edits && at(k - 1) < at(k + 1));
     const previousK = down ? k + 1 : k - 1;

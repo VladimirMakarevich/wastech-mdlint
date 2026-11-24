@@ -55,7 +55,7 @@ describe("generateConfigSchema", () => {
       properties: {
         rules: {
           items: {
-            oneOf: Array<{
+            oneOf: {
               properties?: {
                 rule?: { enum?: string[] };
                 options?: {
@@ -63,7 +63,7 @@ describe("generateConfigSchema", () => {
                   required?: string[];
                 };
               };
-            }>;
+            }[];
           };
         };
       };
@@ -135,7 +135,7 @@ describe("generateConfigSchema", () => {
       properties: {
         rules: {
           items: {
-            oneOf: Array<{ properties?: { rule?: { const?: string } } }>;
+            oneOf: { properties?: { rule?: { const?: string } } }[];
           };
         };
       };
@@ -158,12 +158,12 @@ describe("generateConfigSchema", () => {
       properties: {
         rules: {
           items: {
-            oneOf: Array<{
+            oneOf: {
               properties?: {
                 rule?: { const?: string };
                 target?: { enum?: string[] };
               };
-            }>;
+            }[];
           };
         };
       };
@@ -209,7 +209,7 @@ describe("generateConfigSchema", () => {
       generateConfigSchema({ customRules: [{ id: "REQ-OWNER" }] }),
     ) as {
       properties: {
-        rules: { items: { oneOf: Array<Record<string, unknown>> } };
+        rules: { items: { oneOf: Record<string, unknown>[] } };
       };
     };
     const branches = schema.properties.rules.items.oneOf;
@@ -243,9 +243,9 @@ describe("generateConfigSchema", () => {
       properties: {
         rules: {
           items: {
-            oneOf: Array<{
+            oneOf: {
               properties?: { rule?: { enum?: string[]; const?: string } };
-            }>;
+            }[];
           };
         };
       };
@@ -269,7 +269,7 @@ describe("generateConfigSchema", () => {
       properties: {
         rules: {
           items: {
-            oneOf: Array<{
+            oneOf: {
               properties?: {
                 rule?: { enum?: string[] };
                 options?: {
@@ -279,7 +279,7 @@ describe("generateConfigSchema", () => {
                   >;
                 };
               };
-            }>;
+            }[];
           };
         };
       };

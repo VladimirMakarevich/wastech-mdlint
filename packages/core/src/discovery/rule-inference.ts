@@ -401,7 +401,7 @@ function composeRationale(params: {
 // Repeated ids (only SEC-001 can repeat) sort by their first scoped file after the id itself, so
 // the final `rules` order is fully deterministic regardless of cluster traversal order.
 function fileScopeSortKey(rule: InferredRule): string {
-  const files = rule.options?.["files"];
+  const files = rule.options?.files;
   return Array.isArray(files) && typeof files[0] === "string" ? files[0] : "";
 }
 

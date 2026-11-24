@@ -53,8 +53,16 @@ export function initDisplaySettings(): void {
     }
   };
 
-  button.addEventListener("click", () => (isOpen() ? close(true) : open()));
-  panel.closeButton.addEventListener("click", () => close(true));
+  button.addEventListener("click", () => {
+    if (isOpen()) {
+      close(true);
+    } else {
+      open();
+    }
+  });
+  panel.closeButton.addEventListener("click", () => {
+    close(true);
+  });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && isOpen()) {
       event.preventDefault();
@@ -169,7 +177,9 @@ function buildPanel(): Panel {
   const form = document.createElement("form");
   form.className = "settings-form";
   // Nothing is submitted: every control applies itself.
-  form.addEventListener("submit", (event) => event.preventDefault());
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+  });
 
   const listeners: ((settings: DisplaySettings) => void)[] = [];
   let current: DisplaySettings = { ...DEFAULT_SETTINGS };
@@ -196,9 +206,9 @@ function buildPanel(): Panel {
     for (const [value, text] of options) {
       control.append(new Option(text, value));
     }
-    control.addEventListener("change", () =>
-      change({ [key]: control.value } as Partial<DisplaySettings>),
-    );
+    control.addEventListener("change", () => {
+      change({ [key]: control.value });
+    });
     renderers.push(() => (control.value = current[key]));
     return field(label, control, "select");
   };
@@ -209,10 +219,12 @@ function buildPanel(): Panel {
     label: string,
     options: readonly [DisplaySettings[K], string][],
   ): HTMLElement => {
-    const control = segmentedControl(label, options, (value) =>
-      change({ [key]: value } as Partial<DisplaySettings>),
-    );
-    renderers.push(() => control.render(current[key]));
+    const control = segmentedControl(label, options, (value) => {
+      change({ [key]: value });
+    });
+    renderers.push(() => {
+      control.render(current[key]);
+    });
     const row = document.createElement("div");
     row.className = "settings-field is-segmented";
     const text = document.createElement("span");
@@ -238,9 +250,9 @@ function buildPanel(): Panel {
     control.autocomplete = "off";
     // Applied as typed, but the typed text is left alone while the field has focus: rewriting it
     // with the cleaned name would move the caret under the reader's fingers.
-    control.addEventListener("input", () =>
-      change({ [key]: control.value } as Partial<DisplaySettings>),
-    );
+    control.addEventListener("input", () => {
+      change({ [key]: control.value });
+    });
     const row = field(label, control, "text");
     renderers.push(() => {
       row.hidden = current[chooser] !== "custom";
@@ -259,9 +271,9 @@ function buildPanel(): Panel {
     control.max = String(max);
     control.step = String(step);
     const output = document.createElement("output");
-    control.addEventListener("input", () =>
-      change({ [key]: Number(control.value) } as Partial<DisplaySettings>),
-    );
+    control.addEventListener("input", () => {
+      change({ [key]: Number(control.value) });
+    });
     renderers.push(() => {
       control.value = String(current[key]);
       output.textContent = `${current[key]}${unit}`;
@@ -288,7 +300,7 @@ function buildPanel(): Panel {
       const value = Number(control.value);
       change({
         [key]: Number.isFinite(value) ? value : DEFAULT_SETTINGS[key],
-      } as Partial<DisplaySettings>);
+      });
     });
     renderers.push(() => (control.value = String(current[key])));
     return field(label, control, "number");
@@ -303,9 +315,9 @@ function buildPanel(): Panel {
     control.className = "switch";
     // An on/off setting that applies at once is a switch, not a box to tick and then submit.
     control.setAttribute("role", "switch");
-    control.addEventListener("change", () =>
-      change({ [key]: control.checked } as Partial<DisplaySettings>),
-    );
+    control.addEventListener("change", () => {
+      change({ [key]: control.checked });
+    });
     renderers.push(() => (control.checked = current[key]));
     const row = document.createElement("label");
     row.className = "settings-switch switch-row";
@@ -336,7 +348,9 @@ function buildPanel(): Panel {
   reset.type = "button";
   reset.className = "settings-reset";
   reset.textContent = "Reset to defaults";
-  reset.addEventListener("click", () => change({ ...DEFAULT_SETTINGS }));
+  reset.addEventListener("click", () => {
+    change({ ...DEFAULT_SETTINGS });
+  });
 
   form.append(
     group("Whole site", [

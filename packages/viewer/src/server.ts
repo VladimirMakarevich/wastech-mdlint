@@ -168,11 +168,7 @@ export async function startViewer(
       );
       return;
     }
-    if (
-      isForeignRequest(
-        request.headers as Parameters<typeof isForeignRequest>[0],
-      )
-    ) {
+    if (isForeignRequest(request.headers)) {
       sendText(response, 403, "Forbidden: cross-site request.");
       return;
     }
@@ -280,10 +276,7 @@ export async function startViewer(
     response: ServerResponse,
     target: string,
   ): Promise<void> {
-    const problem = changeRequestProblem(
-      request.headers as Parameters<typeof changeRequestProblem>[0],
-      ctx.changeToken,
-    );
+    const problem = changeRequestProblem(request.headers, ctx.changeToken);
     if (problem !== undefined) {
       request.resume();
       sendJson(
@@ -421,7 +414,9 @@ export async function startViewer(
   );
   // The first lint runs once the server is answering, so the address is printed without waiting for
   // it; pages opened before it finishes show their findings when the `diagnostics` event arrives.
-  const initialLint = setImmediate(() => ctx.relint());
+  const initialLint = setImmediate(() => {
+    ctx.relint();
+  });
 
   return {
     url: `http://${displayHost(options.host)}:${bound.port}/`,
@@ -433,7 +428,9 @@ export async function startViewer(
       stopWatchingRefs();
       events.close();
       await new Promise<void>((resolve) => {
-        server.close(() => resolve());
+        server.close(() => {
+          resolve();
+        });
         server.closeAllConnections();
       });
     },

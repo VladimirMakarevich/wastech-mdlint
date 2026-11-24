@@ -105,8 +105,9 @@ function attach(
     // Keeps this handle's line and grip shown while the pointer runs ahead of it, and the other
     // handle's hidden.
     handle.classList.add("is-dragging");
-    const move = (moved: PointerEvent): void =>
+    const move = (moved: PointerEvent): void => {
       apply(startWidth + outward * (moved.clientX - startX));
+    };
     const end = (): void => {
       handle.removeEventListener("pointermove", move);
       handle.removeEventListener("pointerup", end);

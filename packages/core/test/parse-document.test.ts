@@ -728,10 +728,10 @@ describe("parseDocument · undefined references", () => {
   // runs for minutes and times the test out, while a linear scan finishes in milliseconds.
   it("keeps exact positions, in linear time, across a paragraph with many references", () => {
     const count = 50_000;
-    const content =
-      Array.from({ length: count }, (_, index) => `x [t][m${index}]`).join(
-        "\n",
-      ) + "\n";
+    const content = `${Array.from(
+      { length: count },
+      (_, index) => `x [t][m${index}]`,
+    ).join("\n")}\n`;
     const paragraph: Paragraph = {
       type: "paragraph",
       children: [],

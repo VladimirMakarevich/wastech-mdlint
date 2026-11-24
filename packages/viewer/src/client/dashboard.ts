@@ -80,8 +80,12 @@ export function initDashboard(): void {
     timer = window.setTimeout(() => void show(address()), DELAY_MS);
   }
 
-  form.addEventListener("input", () => schedule(formAddress));
-  form.addEventListener("change", () => schedule(formAddress));
+  form.addEventListener("input", () => {
+    schedule(formAddress);
+  });
+  form.addEventListener("change", () => {
+    schedule(formAddress);
+  });
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     window.clearTimeout(timer);
@@ -101,7 +105,9 @@ export function initDashboard(): void {
 
   // Findings arrive after a save, and an edit changes sizes; either way the rows on screen are stale.
   // A change that adds or removes documents reloads the whole page instead, through live reload.
-  const refresh = () => schedule(() => location.pathname + location.search);
+  const refresh = () => {
+    schedule(() => location.pathname + location.search);
+  };
   onServerEvent("diagnostics", refresh);
   onServerEvent("change", refresh);
 }

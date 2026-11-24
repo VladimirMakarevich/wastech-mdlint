@@ -93,7 +93,7 @@ export type CompileBudget = {
 };
 
 // Frozen: the MCP compile tool and the static-skill tooling both depend on this exact shape.
-export interface CompileResult {
+export type CompileResult = {
   skillContent: string;
   metadata: {
     documentCount: number;
@@ -101,7 +101,7 @@ export interface CompileResult {
     componentCount: number;
     contentHash: string;
   };
-}
+};
 
 export type SynthesizeInput = {
   skill: { name: string; description: string };

@@ -20,7 +20,7 @@ export function initCodeCopy(): void {
     button.hidden = false;
     let timer: number | undefined;
     button.addEventListener("click", () => {
-      void copyText(code.textContent ?? "").then((copied) => {
+      void copyText(code.textContent).then((copied) => {
         button.textContent = copied ? "Copied" : "Copy failed";
         button.classList.add("is-done");
         window.clearTimeout(timer);

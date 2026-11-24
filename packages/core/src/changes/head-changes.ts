@@ -40,7 +40,7 @@ export function headChanges(diff: TextDiff): HeadChanges {
     let lastHead = hunk.headLines > 0 ? hunk.headStart - 1 : hunk.headStart;
     let index = 0;
     while (index < hunk.lines.length) {
-      const line = hunk.lines[index] as DiffLine;
+      const line = hunk.lines[index]!;
       if (line.kind === "context") {
         lastHead = line.headLine;
         index += 1;
@@ -50,7 +50,7 @@ export function headChanges(diff: TextDiff): HeadChanges {
       const removed: RemovedLine[] = [];
       const added: AddedLine[] = [];
       while (index < hunk.lines.length) {
-        const entry = hunk.lines[index] as DiffLine;
+        const entry = hunk.lines[index]!;
         if (entry.kind === "context") {
           break;
         }
@@ -78,10 +78,7 @@ export function headChanges(diff: TextDiff): HeadChanges {
         }
         if (group === undefined) {
           group = {
-            after:
-              pairedAbove === 0
-                ? lastHead
-                : (editedHeads[pairedAbove - 1] as number),
+            after: pairedAbove === 0 ? lastHead : editedHeads[pairedAbove - 1]!,
             baseLines: [],
             hunk: hunkIndex,
           };

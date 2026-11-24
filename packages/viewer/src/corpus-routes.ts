@@ -91,7 +91,9 @@ export function corpusRoutes(ctx: ViewerContext) {
   ): { folder: string; focus: string | undefined } | undefined {
     const folder = params.get("folder") ?? "";
     // `focus=` with nothing after it, as a hand-edited address may carry, focuses nothing.
-    const focus = params.get("focus") || undefined;
+    const focusParam = params.get("focus");
+    const focus =
+      focusParam === null || focusParam === "" ? undefined : focusParam;
     if (
       (folder !== "" &&
         !graphFolders(corpus.documents.keys()).includes(folder)) ||

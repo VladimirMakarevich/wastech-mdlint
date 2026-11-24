@@ -133,7 +133,7 @@ export function diffText(
   let added = 0;
   let removed = 0;
   for (let index = 0; index < runs.length; index += 1) {
-    const run = runs[index] as DiffRun;
+    const run = runs[index]!;
     if (run.kind === "equal") {
       for (let offset = 0; offset < run.length; offset += 1) {
         all.push({
@@ -150,7 +150,7 @@ export function diffText(
     const addedIndexes: number[] = [];
     let blockEnd = index;
     while (blockEnd < runs.length && runs[blockEnd]?.kind !== "equal") {
-      const blockRun = runs[blockEnd] as DiffRun;
+      const blockRun = runs[blockEnd]!;
       for (let offset = 0; offset < blockRun.length; offset += 1) {
         if (blockRun.kind === "delete") {
           removedIndexes.push(blockRun.baseStart + offset);
@@ -389,15 +389,14 @@ function pairLines(
   );
   for (let removed = removedCount - 1; removed >= 0; removed -= 1) {
     for (let added = addedCount - 1; added >= 0; added -= 1) {
-      const row = best[removed] as number[];
-      const skipRemoved = (best[removed + 1] as number[])[added] as number;
-      const skipAdded = row[added + 1] as number;
+      const row = best[removed]!;
+      const skipRemoved = best[removed + 1]![added]!;
+      const skipAdded = row[added + 1]!;
       const comparison = comparisons[removed]?.[added];
       const take =
         comparison === undefined
           ? -1
-          : comparison.similarity +
-            ((best[removed + 1] as number[])[added + 1] as number);
+          : comparison.similarity + best[removed + 1]![added + 1]!;
       row[added] = Math.max(take, skipRemoved, skipAdded);
     }
   }
@@ -407,17 +406,15 @@ function pairLines(
   let added = 0;
   while (removed < removedCount && added < addedCount) {
     const comparison = comparisons[removed]?.[added];
-    const here = (best[removed] as number[])[added] as number;
+    const here = best[removed]![added]!;
     if (
       comparison !== undefined &&
-      here ===
-        comparison.similarity +
-          ((best[removed + 1] as number[])[added + 1] as number)
+      here === comparison.similarity + best[removed + 1]![added + 1]!
     ) {
       pairs.push([removed, added, comparison]);
       removed += 1;
       added += 1;
-    } else if (here === ((best[removed + 1] as number[])[added] as number)) {
+    } else if (here === best[removed + 1]![added]!) {
       removed += 1;
     } else {
       added += 1;
@@ -445,7 +442,7 @@ function cellTokens(line: string): string[] {
   const tokens: string[] = [];
   let current = "";
   for (let index = 0; index < line.length; index += 1) {
-    const character = line[index] as string;
+    const character = line[index]!;
     if (character === "\\" && line[index + 1] === "|") {
       current += "\\|";
       index += 1;
@@ -492,7 +489,7 @@ function compareTokens(
     for (let offset = 0; offset < run.length; offset += 1) {
       baseChanged[run.baseStart + offset] = false;
       headChanged[run.headStart + offset] = false;
-      shared += 2 * weight(baseTokens[run.baseStart + offset] as string);
+      shared += 2 * weight(baseTokens[run.baseStart + offset]!);
     }
   }
   return {
@@ -556,7 +553,7 @@ function groupHunks(all: DiffLine[], context: number): DiffHunk[] {
 // The last line number on one side before `index`, for a hunk with no line on that side.
 function lineBefore(all: DiffLine[], index: number, side: "base" | "head") {
   for (let at = index - 1; at >= 0; at -= 1) {
-    const line = all[at] as DiffLine;
+    const line = all[at]!;
     if (side === "base" && line.kind !== "added") {
       return line.baseLine;
     }

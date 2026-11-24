@@ -116,7 +116,7 @@ function runCliBin(args: string[]): { status: number | null; stdout: string } {
 }
 
 function firstText(result: { content: unknown }): string {
-  const content = result.content as Array<{ type: string; text?: string }>;
+  const content = result.content as { type: string; text?: string }[];
   return normalize(content[0]?.text ?? "");
 }
 

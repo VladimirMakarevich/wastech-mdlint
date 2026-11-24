@@ -197,9 +197,9 @@ export const size001: RuleDefinition = defineRule({
         // `tokens` alone carries the calibration: `bytes` and `lines` are exact counts a user
         // can reproduce, while a token number is an estimate whose arithmetic was disclosed nowhere
         // a reader of the finding would look.
-        message:
-          `File exceeds ${metric} ${breach.budget} budget: ${actual} ${METRIC_UNIT[metric]} > ${breach.limit}.` +
-          (metric === "tokens" ? ` ${TOKEN_ESTIMATE_NOTE}` : ""),
+        message: `File exceeds ${metric} ${breach.budget} budget: ${actual} ${METRIC_UNIT[metric]} > ${breach.limit}.${
+          metric === "tokens" ? ` ${TOKEN_ESTIMATE_NOTE}` : ""
+        }`,
         line: 0,
         data,
       });

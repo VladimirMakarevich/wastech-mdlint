@@ -35,7 +35,9 @@ export function initGraph(): void {
     // Picking a folder is the whole interaction, so it submits at once; the button is only for a page
     // without this script.
     for (const field of form.querySelectorAll("select, input[type=checkbox]")) {
-      field.addEventListener("change", () => form.requestSubmit());
+      field.addEventListener("change", () => {
+        form.requestSubmit();
+      });
     }
     form.querySelector("button")?.setAttribute("hidden", "");
   }
@@ -102,7 +104,7 @@ async function draw(
   let zoom = layout.zoom ?? 1;
   chart.setOption(graphOption(view, layout, readColors(), () => zoom));
   // A zoom by a factor of one makes ECharts lay its labels out again and changes nothing else.
-  const relayoutLabels = (): void =>
+  const relayoutLabels = (): void => {
     chart.dispatchAction({
       type: "graphRoam",
       seriesIndex: 0,
@@ -110,6 +112,7 @@ async function draw(
       originX: 0,
       originY: 0,
     });
+  };
   chart.on("click", ({ dataType, dataIndex }) => {
     const node = dataType === "node" ? view.nodes[dataIndex] : undefined;
     if (node !== undefined) {

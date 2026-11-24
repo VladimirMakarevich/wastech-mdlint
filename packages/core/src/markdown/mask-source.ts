@@ -1,5 +1,5 @@
 import type { Html, Node, Parent } from "mdast";
-import { SKIP, visit } from "unist-util-visit";
+import { CONTINUE, SKIP, visit } from "unist-util-visit";
 
 // Inline HTML elements whose content an author writes to be shown literally, not read as prose.
 // remark splits `<code>(text)[./a.md]</code>` into an opening `html` node, a `text` node and a
@@ -100,7 +100,7 @@ export function maskSource(
       }
     }
     if (!shouldMask(node)) {
-      return;
+      return CONTINUE;
     }
     if (from !== undefined && to !== undefined) {
       blank(from, to);

@@ -123,7 +123,7 @@ const ERROR_OUTPUT_SHAPE = {
 // metadata", and each tool's error path supplies schema-compatible placeholder success fields via
 // `errorResult(..., successFields)`.
 export function withErrorOutput(
-  success: Readonly<Record<string, z.ZodTypeAny>>,
-): Record<string, z.ZodTypeAny> {
+  success: Readonly<Record<string, z.ZodType>>,
+): Record<string, z.ZodType> {
   return { ...success, ...ERROR_OUTPUT_SHAPE };
 }

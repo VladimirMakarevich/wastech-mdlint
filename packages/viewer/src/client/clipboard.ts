@@ -5,7 +5,8 @@
 // never claims "Copied" when it was not.
 
 export async function copyText(text: string): Promise<boolean> {
-  if (window.isSecureContext && navigator.clipboard !== undefined) {
+  // The asynchronous clipboard exists exactly in a secure context, so that is the one check needed.
+  if (window.isSecureContext) {
     try {
       await navigator.clipboard.writeText(text);
       return true;
@@ -29,6 +30,7 @@ function copyThroughSelection(text: string): boolean {
   area.select();
   let copied = false;
   try {
+    // eslint-disable-next-line @typescript-eslint/no-deprecated -- the one way to copy an insecure context has: navigator.clipboard does not exist there
     copied = document.execCommand("copy");
   } catch {
     copied = false;

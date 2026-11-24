@@ -6,9 +6,7 @@ import { h } from "hastscript";
 import type {
   Definition,
   Heading,
-  Image,
   ImageReference,
-  Link,
   LinkReference,
   Parent,
 } from "mdast";
@@ -244,8 +242,8 @@ async function renderTree(
     };
     parent.children[index] =
       reference.type === "linkReference"
-        ? ({ type: "link", children: reference.children, ...common } as Link)
-        : ({ type: "image", alt: reference.alt, ...common } as Image);
+        ? { type: "link", children: reference.children, ...common }
+        : { type: "image", alt: reference.alt, ...common };
   });
 
   // Targets are rewritten on the Markdown tree, where `url` is still the target exactly as the
@@ -255,7 +253,7 @@ async function renderTree(
     if (node.type !== "link" && node.type !== "image") {
       return;
     }
-    const target = node as Link | Image;
+    const target = node;
     target.data = {
       ...target.data,
       hProperties: { ...target.data?.hProperties, [FROM_MARKDOWN]: "" },
@@ -379,7 +377,7 @@ async function rewriteEmbeddedTargets(
     }
   });
   for (const { node, property } of targets) {
-    const url = node.properties[property] as string;
+    const url = node.properties[property]!;
     const rewritten = rewriteTarget(
       url,
       await resolvers.resolveEmbedded(url, property === "src"),
@@ -478,7 +476,7 @@ async function replaceCodeBlocks(tree: HastRoot): Promise<void> {
       ? className.map(String).find((name) => name.startsWith("language-"))
       : undefined;
     blocks.push({
-      parent: parent as HastRoot | Element,
+      parent,
       index,
       code: textContent(code),
       info: languageClass?.slice("language-".length),

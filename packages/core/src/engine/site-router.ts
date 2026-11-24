@@ -49,7 +49,7 @@ export function resolveRoutedUrl(
   }
 
   const candidates: string[] = [];
-  const firstSegment = routePath.split("/")[0];
+  const [firstSegment = ""] = routePath.split("/");
   const hasExplicitLocale =
     firstSegment.length > 0 &&
     firstSegment === (sourceLocale ?? router.defaultLocale);

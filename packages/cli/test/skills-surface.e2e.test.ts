@@ -87,10 +87,10 @@ async function help(
 // asserted against the live `--help` surface (commander advertises `.choices()` as quoted strings), so
 // dropping `--fail-on off` or `--format dot` on the CLI, or the skill ceasing to document it for that
 // command, fails here even though the option name survives.
-interface Choice {
+type Choice = {
   value: string;
   evidence: RegExp;
-}
+};
 const COMMANDS: {
   command: string;
   usage: string;
