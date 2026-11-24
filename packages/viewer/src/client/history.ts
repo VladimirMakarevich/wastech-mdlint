@@ -1,6 +1,7 @@
-// The commits that last touched a changed document, in the line above its text. Loaded the first
-// time the reader opens it, so no page waits for git to walk history; drawn with text nodes only,
-// since a commit subject and an author's name are whatever someone typed.
+// The commits that last touched a document: in the line above a changed document's text, and on
+// its own above an unchanged one's. Loaded the first time the reader opens it, so no page waits for
+// git to walk history; drawn with text nodes only, since a commit subject and an author's name are
+// whatever someone typed.
 
 type Commit = {
   short: string;

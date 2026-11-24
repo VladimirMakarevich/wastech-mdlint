@@ -37,6 +37,7 @@ import {
   type DocumentMark,
   type ReviewMarksView,
   reviewChip,
+  sectionProgress,
   type SectionMark,
   reviewProblem,
   reviewToggle,
@@ -301,7 +302,9 @@ export function changesPayload(
         anchor: changeCardId(review.path),
         context: delta === undefined ? null : documentContextPayload(delta),
         review:
-          mark === undefined ? null : { status: mark.status, hash: mark.hash },
+          mark === undefined
+            ? null
+            : { status: mark.status, hash: mark.hash, sections: mark.sections },
       };
     }),
     outsideCorpus: set.outsideCorpus,
@@ -477,13 +480,19 @@ export function renderChangeBanner(
       },
       "Changes page",
     ),
-    // The commits that last touched the document, asked of git only when the reader opens it: the
-    // page itself never waits for a walk through history. Hidden until the script that loads it has
-    // run. A deleted document has no page to carry it.
-    h("details.changes-history", { hidden: true, dataPath: review.path }, [
-      h("summary", "History"),
-      h("ol.changes-history-list"),
-    ]),
+    // A deleted document has no page to carry it.
+    historyDetails(review.path),
+  ]);
+}
+
+/**
+ * The commits that last touched a document, asked of git only when the reader opens it: the page
+ * itself never waits for a walk through history. Hidden until the script that loads it has run.
+ */
+export function historyDetails(relPath: string): Element {
+  return h("details.changes-history", { hidden: true, dataPath: relPath }, [
+    h("summary", "History"),
+    h("ol.changes-history-list"),
   ]);
 }
 
@@ -863,6 +872,7 @@ function changeCard(card: {
             )
           : undefined,
         reviewChip(card.mark),
+        sectionProgress(card.mark),
         h("span.change-stats", stats(card.diff)),
         card.toggle,
       ]),

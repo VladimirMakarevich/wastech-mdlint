@@ -1,4 +1,8 @@
-import type { ParsedHeading } from "../markdown/document-types.js";
+import type {
+  ParsedDocument,
+  ParsedHeading,
+} from "../markdown/document-types.js";
+import { documentSections } from "./sections.js";
 import type { DiffLine, TextDiff } from "./text-diff.js";
 
 // A diff restated in the head side's own line numbers: which lines of the current text are new or
@@ -184,4 +188,25 @@ export function changedSections(
     const inside = (line: number) => line >= heading.line && line <= end;
     return changedLines.some(inside) || removalPoints.some(inside);
   });
+}
+
+/**
+ * Whether a change falls in the text before a document's first section — the one unit
+ * `documentSections` cuts that has no outline heading of its own, so `changedSections` cannot name
+ * it. Lines removed above the first line count as its own, and so do lines removed right after its
+ * last one, as `changedSections` gives a removal to the section it stood at the end of.
+ */
+export function introductionChanged(
+  document: ParsedDocument,
+  changes: HeadChanges,
+): boolean {
+  const introduction = documentSections(document)[0];
+  if (introduction === undefined) {
+    return false;
+  }
+  const inside = (line: number) => line <= introduction.end;
+  return (
+    [...changes.lines.keys()].some(inside) ||
+    changes.removals.some((removal) => inside(removal.after))
+  );
 }

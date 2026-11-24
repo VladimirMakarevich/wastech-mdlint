@@ -440,7 +440,14 @@ describe.skipIf(!hasGit)(
           /<a href="#([^"]+)">[^<]*(<span class="outline-change")?/g,
         ),
       ].map((match) => `${match[1]}${match[2] === undefined ? "" : " *"}`);
-      expect(changed).toEqual(["intro *", "steps *", "unchanged"]);
+      // The first entry stands for the text before the first section, there to be marked viewed;
+      // the branch left that text alone, so it carries no change mark.
+      expect(changed).toEqual([
+        "viewer.content",
+        "intro *",
+        "steps *",
+        "unchanged",
+      ]);
     });
 
     it("shows the source diff in place of the text with ?diff=source", async () => {

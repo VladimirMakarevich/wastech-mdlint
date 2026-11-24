@@ -99,6 +99,18 @@ describe.skipIf(!hasGit)("history and blame (requires git on PATH)", () => {
     expect((await get(port, "/doc/docs/guide.md")).body).toContain(
       '<details class="changes-history" hidden data-path="docs/guide.md"><summary>History</summary>',
     );
+    // A document the branch left alone has no banner, and carries the same place on its own.
+    const unchanged = articleOf((await get(port, "/doc/README.md")).body);
+    expect(unchanged).not.toContain("changes-banner");
+    expect(unchanged).toContain(
+      '<div class="document-history"><details class="changes-history" hidden data-path="README.md"><summary>History</summary>',
+    );
+    const commits = JSON.parse(
+      (await get(port, "/api/history?path=README.md")).body,
+    ) as { commits: { subject: string }[] };
+    expect(commits.commits.map((commit) => commit.subject)).toEqual([
+      "Write the guide",
+    ]);
   });
 
   it("draws who last changed each block in the margin only when asked", async () => {

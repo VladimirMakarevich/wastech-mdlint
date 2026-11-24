@@ -248,6 +248,7 @@ describe.skipIf(!hasGit)("review marks (requires git on PATH)", () => {
     ).toEqual({
       status: "unreviewed",
       hash: contentHash(GUIDE),
+      sections: { reviewed: 0, total: 1 },
     });
   });
 
@@ -530,20 +531,27 @@ describe.skipIf(!hasGit)("section marks (requires git on PATH)", () => {
     fixture.git("checkout", "-q", "-b", "feature");
     await fixture.write(
       "docs/guide.md",
-      "# Guide\n\nIntro.\n\n## Install\n\nNew install.\n\n## Use\n\nUse it well.\n",
+      "# Guide\n\nIntro, reworded.\n\n## Install\n\nNew install.\n\n## Use\n\nUse it well.\n",
     );
     const target = await start(fixture.repo, await stateDir(), fixture.env);
     try {
       const page = (await send(target.port, "/doc/docs/guide.md")).body;
       const buttons = [
         ...page.matchAll(
-          /<button class="section-mark" type="button" hidden aria-pressed="false" aria-label="[^"]*" title="Not viewed yet" data-path="docs\/guide\.md" data-section="([a-z]+)" data-hash="([0-9a-f]{64})">/g,
+          /<button class="section-mark" type="button" hidden aria-pressed="false" aria-label="[^"]*" title="Not viewed yet" data-path="docs\/guide\.md" data-section="([a-z]*)" data-hash="([0-9a-f]{64})">/g,
         ),
       ].map((match) => ({ section: match[1]!, hash: match[2]! }));
+      // The text before the first section has no heading, so the outline gives it an entry of its
+      // own, first, marked as changed since the branch reworded it.
       expect(buttons.map((button) => button.section)).toEqual([
+        "",
         "install",
         "use",
       ]);
+      expect(page).toMatch(
+        /<li class="depth-2" data-review="unreviewed"><a href="#viewer\.content">Introduction<span class="outline-change"[^>]*><\/span><\/a><button class="section-mark"[^>]*data-section=""/,
+      );
+      const [introButton, ...headed] = buttons;
 
       const sectionPost = (body: unknown) =>
         send(target.port, "/api/review/section", {
@@ -563,7 +571,7 @@ describe.skipIf(!hasGit)("section marks (requires git on PATH)", () => {
       });
       expect(stale.status).toBe(409);
 
-      for (const button of buttons) {
+      for (const button of headed) {
         const answer = await sectionPost({
           path: "docs/guide.md",
           section: button.section,
@@ -575,18 +583,36 @@ describe.skipIf(!hasGit)("section marks (requires git on PATH)", () => {
           section: { key: button.section, status: "reviewed" },
         });
       }
-      // The text before the first section never changed, but was never marked either.
+      // The text before the first section is a section too, and is not marked yet.
       expect((await statuses(target))["docs/guide.md"]).toBe("changed");
+      // The card says how far the section review has got, and the JSON says the same in numbers.
+      const progressOf = async () =>
+        /<section class="change-card" id="change\.docs%2Fguide\.md"[\s\S]*?<\/header>/
+          .exec((await send(target.port, "/changes")).body)?.[0]
+          .match(/<span class="review-sections"[^>]*>(\d+) of (\d+) sections</)
+          ?.slice(1)
+          .map(Number);
+      expect(await progressOf()).toEqual([2, 3]);
+      expect(
+        (await changes(target)).documents.find(
+          (entry) => entry.path === "docs/guide.md",
+        )?.review,
+      ).toMatchObject({ sections: { reviewed: 2, total: 3 } });
+      expect(introButton!.hash).toBe(
+        contentHash("# Guide\n\nIntro, reworded."),
+      );
       const intro = await sectionPost({
         path: "docs/guide.md",
         section: "",
-        hash: contentHash("# Guide\n\nIntro."),
+        hash: introButton!.hash,
         reviewed: true,
       });
       expect(JSON.parse(intro.body)).toMatchObject({
         documents: [{ path: "docs/guide.md", review: { status: "reviewed" } }],
       });
       expect((await statuses(target))["docs/guide.md"]).toBe("reviewed");
+      // Every section viewed: the status says it, so the count is gone.
+      expect(await progressOf()).toBeUndefined();
       expect((await send(target.port, "/doc/docs/guide.md")).body).toMatch(
         /<li class="depth-2" data-review="reviewed">[\s\S]*?aria-pressed="true"/,
       );

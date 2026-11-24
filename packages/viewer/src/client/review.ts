@@ -95,7 +95,36 @@ async function mark(
   say(toggle, "");
   showStatus(toggle, status);
   showSections(saved.documents[0]?.sections ?? []);
+  showSectionProgress(toggle, saved.documents[0]?.sections ?? []);
   showCount(saved);
+}
+
+/**
+ * The card's "2 of 5 sections", restated from the sections the server answered with: marking a
+ * document as a whole marks or clears its sections with it, so the count the page was served with
+ * no longer holds. Shown under the same rule as the server's: only while some are viewed and some
+ * are not.
+ */
+function showSectionProgress(
+  toggle: HTMLLabelElement,
+  sections: readonly { status: ReviewStatus }[],
+): void {
+  const card = toggle.closest<HTMLElement>(".change-card");
+  if (card === null) {
+    return;
+  }
+  card.querySelector(":scope > header .review-sections")?.remove();
+  const reviewed = sections.filter(
+    (section) => section.status === "reviewed",
+  ).length;
+  if (reviewed === 0 || reviewed === sections.length) {
+    return;
+  }
+  const progress = document.createElement("span");
+  progress.className = "review-sections";
+  progress.title = "Sections viewed from the document's outline";
+  progress.textContent = `${String(reviewed)} of ${String(sections.length)} sections`;
+  card.querySelector(":scope > header .change-stats")?.before(progress);
 }
 
 /**

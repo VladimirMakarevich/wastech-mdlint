@@ -18,8 +18,10 @@ import { h } from "hastscript";
 import {
   changedSections,
   compareStrings,
+  documentSections,
   type GitRepository,
   headChanges,
+  introductionChanged,
   type LintMessage,
   type ParsedDocument,
 } from "@wastech-mdlint/core";
@@ -31,6 +33,7 @@ import {
   diffViewOf,
   type DiffView,
   type DocumentReview,
+  historyDetails,
   renderChangeBanner,
   renderChangesArticle,
   renderDiff,
@@ -316,6 +319,7 @@ export async function startViewer(
   type MarkedDocument = {
     rendered: RenderedDocument;
     changedSections: Set<string>;
+    introductionChanged: boolean;
   };
 
   // A document rendered with its changes marked, kept for as long as the review it was marked from:
@@ -358,6 +362,7 @@ export async function startViewer(
           (heading) => heading.slug,
         ),
       ),
+      introductionChanged: introductionChanged(document, changes),
     }));
     if (annotate === undefined) {
       marked.set(review, { document, result });
@@ -679,6 +684,7 @@ export async function startViewer(
         : renderChangeBanner(branchReview, shown, reviewed);
     const localGraphChanges = review !== undefined && view !== "off";
     let params: Omit<PageParams, "siteName" | "documentPaths" | "showChanges">;
+    let introChanged = false;
     if (review !== undefined && view === "source") {
       // The diff takes the article's place. The outline is left out with the rendered text, since
       // none of its headings is on this page to jump to.
@@ -700,11 +706,9 @@ export async function startViewer(
       review.status !== "A" &&
       review.diff.hunks.length > 0
     ) {
-      const { rendered, changedSections } = await renderMarked(
-        document,
-        review,
-        annotate,
-      );
+      const marked = await renderMarked(document, review, annotate);
+      const { rendered } = marked;
+      introChanged = marked.introductionChanged;
       params = {
         ...common,
         localGraphChanges,
@@ -712,7 +716,7 @@ export async function startViewer(
         changeBanner: banner(view),
         article: [...rawHtml(rendered.html), renderHunkTemplate(review.diff)],
         headings: document.headings,
-        changedSections,
+        changedSections: marked.changedSections,
         frontmatter: document.frontmatter,
         frontmatterChange: rendered.frontmatterChange,
       };
@@ -728,22 +732,28 @@ export async function startViewer(
         frontmatter: document.frontmatter,
       };
     }
+    const sectionMarks =
+      reviewed === undefined || branchReview === undefined
+        ? undefined
+        : { path: branchReview.path, marks: reviewed.sections };
+    const introduction =
+      params.headings === undefined
+        ? undefined
+        : introductionEntry(document, introChanged, sectionMarks !== undefined);
     sendHtml(
       response,
       200,
       page({
         ...params,
-        // The "Viewed" checkbox above a changed document sends its mark with it, and so does each
-        // section's in the outline.
-        ...(reviewed === undefined || branchReview === undefined
+        ...(introduction === undefined ? {} : { introduction }),
+        ...(git === undefined || branchReview !== undefined
           ? {}
           : {
-              changeToken,
-              sectionMarks: {
-                path: branchReview.path,
-                marks: reviewed.sections,
-              },
+              historyLine: h("div.document-history", historyDetails(relPath)),
             }),
+        // The "Viewed" checkbox above a changed document sends its mark with it, and so does each
+        // section's in the outline.
+        ...(sectionMarks === undefined ? {} : { changeToken, sectionMarks }),
       }),
       request.method === "HEAD",
     );
@@ -2072,6 +2082,30 @@ async function listen(
 
 // The address to print. A wildcard bind is reachable at localhost too, and that is the address the
 // Host check accepts by name.
+/**
+ * The outline entry for the text before a document's first section, or `undefined` for none. That
+ * text is a unit of review like any section, so where the page marks sections it needs an entry to be
+ * marked from, and where the branch changed it the entry is where the outline says so. Elsewhere the
+ * outline stays a list of headings: an entry for every title and opening paragraph would add a line
+ * to every page and tell the reader nothing. A document with no section has no outline to add it to.
+ */
+function introductionEntry(
+  document: ParsedDocument,
+  changed: boolean,
+  marked: boolean,
+): { changed: boolean } | undefined {
+  const [introduction, ...sections] = documentSections(document);
+  if (
+    introduction === undefined ||
+    sections.length === 0 ||
+    introduction.text.trim() === "" ||
+    (!changed && !marked)
+  ) {
+    return undefined;
+  }
+  return { changed };
+}
+
 function displayHost(host: string): string {
   if (host === "0.0.0.0" || host === "::") {
     return "localhost";

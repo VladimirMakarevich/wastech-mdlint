@@ -29,6 +29,9 @@ export type DocumentMark = {
   hash: string;
   // The newest version reviewed under its path, when it has changed since.
   since?: string;
+  // How many of its sections, the text before the first one included, the reader has viewed as they
+  // are now: the progress of a document reviewed one section at a time.
+  sections: { reviewed: number; total: number };
 };
 
 /**
@@ -56,14 +59,19 @@ export function markOf(
   marks: ReviewMarks,
 ): DocumentMark {
   const hash = contentHash(entry.headText);
+  const sections = sectionHashes(entry);
+  const renamed = entry.oldPath === undefined ? {} : { oldPath: entry.oldPath };
   return {
     hash,
-    ...marks.status({
-      path: entry.path,
-      ...(entry.oldPath === undefined ? {} : { oldPath: entry.oldPath }),
-      hash,
-      sections: sectionHashes(entry),
-    }),
+    ...marks.status({ path: entry.path, ...renamed, hash, sections }),
+    sections: {
+      reviewed: sections.filter(
+        (section) =>
+          marks.sectionStatus({ path: entry.path, ...renamed, ...section }) ===
+          "reviewed",
+      ).length,
+      total: sections.length,
+    },
   };
 }
 
@@ -306,6 +314,27 @@ const STATUS_TEXT: Record<Exclude<ReviewStatus, "unreviewed">, string> = {
   reviewed: "Reviewed",
   changed: "Changed since review",
 };
+
+/**
+ * How far a document reviewed one section at a time has got, beside its card's status: only while
+ * some of its sections are viewed and some are not. None viewed is the common case and says nothing;
+ * all viewed makes the document reviewed, which its status already says.
+ */
+export function sectionProgress(
+  mark: DocumentMark | undefined,
+): Element | undefined {
+  if (mark === undefined) {
+    return undefined;
+  }
+  const { reviewed, total } = mark.sections;
+  return reviewed === 0 || reviewed === total
+    ? undefined
+    : h(
+        "span.review-sections",
+        { title: "Sections viewed from the document's outline" },
+        `${String(reviewed)} of ${String(total)} sections`,
+      );
+}
 
 /** The status beside a changed document; nothing for one never reviewed, which is most of them. */
 export function reviewChip(

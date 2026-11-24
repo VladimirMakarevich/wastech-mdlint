@@ -4,6 +4,7 @@ import {
   baseLineMap,
   changedSections,
   headChanges,
+  introductionChanged,
 } from "../src/changes/head-changes.js";
 import { diffText } from "../src/changes/text-diff.js";
 import { parseDocument } from "../src/markdown/parse-document.js";
@@ -150,5 +151,44 @@ describe("changedSections", () => {
 
   it("marks nothing when nothing changed", () => {
     expect(slugs(head)).toEqual([]);
+  });
+});
+
+describe("introductionChanged", () => {
+  const head = [
+    "# Title", // 1
+    "", // 2
+    "Opening words.", // 3
+    "", // 4
+    "## One", // 5
+    "", // 6
+    "Body.", // 7
+    "",
+  ].join("\n");
+  const document = parseDocument({ path: "doc.md", content: head });
+  const changed = (base: string) =>
+    introductionChanged(document, changesOf(base, head));
+
+  it("sees an edit to the text before the first section", () => {
+    expect(changed(head.replace("Opening words.", "Opening lines."))).toBe(
+      true,
+    );
+  });
+
+  // The title's own section is the whole document, so `changedSections` marks it for any change;
+  // the introduction is only the text above the first section.
+  it("does not see a change inside a section", () => {
+    expect(changed(head.replace("Body.", "Text."))).toBe(false);
+  });
+
+  it("sees lines removed above the first line and right before the first section", () => {
+    expect(changed(`Gone.\n\n${head}`)).toBe(true);
+    expect(
+      changed(head.replace("Opening words.\n", "Opening words.\n\nGone.\n")),
+    ).toBe(true);
+  });
+
+  it("is false when nothing changed", () => {
+    expect(changed(head)).toBe(false);
   });
 });

@@ -3520,6 +3520,12 @@ a:hover {
   color: var(--warning);
 }
 
+.review-sections {
+  color: var(--fg-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .changes-files li .review-chip {
   margin-left: var(--space-1);
 }
@@ -3641,7 +3647,14 @@ a:hover {
   border-color: var(--warning);
 }
 
-/* The commits that last touched a changed document, under the line above its text. */
+/* The commits that last touched a document: under the line above a changed document's text, and on
+   its own above an unchanged one's. */
+.markdown-body .document-history {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-sans);
+  letter-spacing: normal;
+}
+
 .changes-history {
   flex-basis: 100%;
   font-size: 13px;

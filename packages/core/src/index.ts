@@ -232,6 +232,7 @@ export {
   baseLineMap,
   changedSections,
   headChanges,
+  introductionChanged,
 } from "./changes/head-changes.js";
 export type {
   HeadChanges,

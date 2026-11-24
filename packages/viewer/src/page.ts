@@ -37,6 +37,10 @@ export type PageParams = {
   // Above everything in the article, front matter included: on a changed document, what the branch
   // did to it and how the page shows that.
   changeBanner?: Element;
+  // In its place on a document the branch did not change, in a git work tree: the line that lists the
+  // commits that last touched it, since the history of a page is worth a look whether or not this
+  // branch is what changed it.
+  historyLine?: Element;
   headings?: readonly ParsedHeading[];
   // Slugs of the headings whose section the branch changed, marked in the outline so a reader sees
   // where the changes are before scrolling to them.
@@ -44,6 +48,9 @@ export type PageParams = {
   // On a changed document with review marks on: each section's place in the reader's review, by its
   // heading's slug, so a section can be marked from the outline on its own.
   sectionMarks?: { path: string; marks: ReadonlyMap<string, SectionMark> };
+  // The outline's first entry, for the text before the first section, where the page marks sections
+  // or the branch changed that text: it has no heading of its own to list.
+  introduction?: { changed: boolean };
   backlinks?: readonly string[];
   // How many documents the page's document links to or is linked from. The rail draws them as a
   // small graph, and leaves the graph out when there are none.
@@ -333,7 +340,7 @@ export function renderPage(params: PageParams): string {
               h(
                 `article.markdown-body${params.blameToggle?.on === true ? ".has-blame" : ""}`,
                 [
-                  params.changeBanner,
+                  params.changeBanner ?? params.historyLine,
                   renderFrontmatter(
                     params.frontmatter ?? null,
                     params.frontmatterChange,
@@ -542,35 +549,28 @@ function renderRail(params: PageParams): Element | undefined {
         ? undefined
         : h("nav.outline", { ariaLabel: "On this page" }, [
             h("h2", "On this page"),
-            h(
-              "ul",
-              outline.map((heading) => {
-                const mark = params.sectionMarks?.marks.get(heading.slug);
-                return h(
-                  `li.depth-${heading.depth}`,
-                  { dataReview: mark?.status },
-                  [
-                    h("a", { href: `#${heading.slug}` }, [
-                      heading.text,
-                      params.changedSections?.has(heading.slug) === true
-                        ? h("span.outline-change", {
-                            role: "img",
-                            ariaLabel: "changed in this branch",
-                            title: "Changed in this branch",
-                          })
-                        : undefined,
-                    ]),
-                    mark === undefined || params.sectionMarks === undefined
-                      ? undefined
-                      : sectionMarkButton(
-                          params.sectionMarks.path,
-                          heading.text,
-                          mark,
-                        ),
-                  ],
-                );
-              }),
-            ),
+            h("ul", [
+              params.introduction === undefined
+                ? undefined
+                : outlineEntry(params, {
+                    // Its section key is `""`, as core's `documentSections` names it. It jumps to the
+                    // top of the main column, where the text it stands for begins.
+                    key: "",
+                    depth: 2,
+                    text: "Introduction",
+                    href: `#${CONTENT_ID}`,
+                    changed: params.introduction.changed,
+                  }),
+              ...outline.map((heading) =>
+                outlineEntry(params, {
+                  key: heading.slug,
+                  depth: heading.depth,
+                  text: heading.text,
+                  href: `#${heading.slug}`,
+                  changed: params.changedSections?.has(heading.slug) === true,
+                }),
+              ),
+            ]),
           ]),
       backlinks.length === 0
         ? undefined
@@ -585,6 +585,38 @@ function renderRail(params: PageParams): Element | undefined {
           ]),
     ]),
     columnResizer("rail", "Resize the side column"),
+  ]);
+}
+
+/**
+ * One entry of the outline: a link to its section, the branch's change mark, and the button that
+ * marks the section viewed where the page marks sections.
+ */
+function outlineEntry(
+  params: PageParams,
+  entry: {
+    key: string;
+    depth: number;
+    text: string;
+    href: string;
+    changed: boolean;
+  },
+): Element {
+  const mark = params.sectionMarks?.marks.get(entry.key);
+  return h(`li.depth-${entry.depth}`, { dataReview: mark?.status }, [
+    h("a", { href: entry.href }, [
+      entry.text,
+      entry.changed
+        ? h("span.outline-change", {
+            role: "img",
+            ariaLabel: "changed in this branch",
+            title: "Changed in this branch",
+          })
+        : undefined,
+    ]),
+    mark === undefined || params.sectionMarks === undefined
+      ? undefined
+      : sectionMarkButton(params.sectionMarks.path, entry.text, mark),
   ]);
 }
 
