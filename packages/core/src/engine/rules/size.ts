@@ -32,7 +32,7 @@ const thresholdSchema = z
   .refine(
     (thresholds) =>
       thresholds.warn !== undefined || thresholds.error !== undefined,
-    { message: "threshold requires at least one of: warn, error" },
+    { error: "threshold requires at least one of: warn, error" },
   );
 
 const overrideSchema = z
@@ -70,7 +70,7 @@ const size001OptionsSchema = z
           ),
       ),
     {
-      message:
+      error:
         "SIZE-001 measures nothing unless at least one budget is set: configure bytes, lines, or tokens (at the top level or in an overrides entry)",
     },
   );

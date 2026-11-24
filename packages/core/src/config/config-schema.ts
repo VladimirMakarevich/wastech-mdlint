@@ -140,7 +140,7 @@ export const customRuleEntrySchema = z
 const standardRuleEntrySchema = ruleEntrySchema.refine(
   (entry) => entry.rule !== "custom",
   {
-    message: 'a "custom" rule entry also requires "id" and "options.assert"',
+    error: 'a "custom" rule entry also requires "id" and "options.assert"',
     abort: true,
   },
 );

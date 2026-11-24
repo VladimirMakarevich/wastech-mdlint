@@ -646,7 +646,7 @@ const HAS_LETTER_OR_DIGIT = /[\p{L}\p{N}]/u;
 const linkTextPhraseSchema = z
   .string()
   .refine((value) => HAS_LETTER_OR_DIGIT.test(value), {
-    message: "a link-text phrase must contain a letter or digit",
+    error: "a link-text phrase must contain a letter or digit",
   });
 
 // CTX-004 — link text describes its target. An agent, like a reader scanning a page, decides whether
@@ -729,7 +729,7 @@ export const ctx005: RuleDefinition = defineRule({
 // an entry that config loading then rejects. No `g` flag: a shared `g`-flagged RegExp carries
 // `lastIndex` between `test` calls.
 const codeLanguageSchema = z.string().min(1).regex(/^\S+$/, {
-  message: "a code language must be a single word without whitespace",
+  error: "a code language must be a single word without whitespace",
 });
 
 // CTX-006 — fenced code blocks declare a language. The language tells an agent whether a block is
