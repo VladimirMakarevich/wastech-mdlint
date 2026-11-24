@@ -33,7 +33,7 @@ export const skillModelSchema = z
     id: z.string().min(1),
     kind: z.enum(["static", "generated"]),
     path: z.string().min(1).refine(isRepoRelativePosixPath, {
-      message: "path must be a repository-relative POSIX path",
+      error: "path must be a repository-relative POSIX path",
     }),
     frontmatter: skillFrontmatterSchema,
   })

@@ -46,7 +46,7 @@ export const columnConditionSchema = z
       condition.equals !== undefined ||
       condition.matches !== undefined ||
       condition.notEmpty !== undefined,
-    { message: "condition requires one of: equals, matches, notEmpty" },
+    { error: "condition requires one of: equals, matches, notEmpty" },
   );
 
 export const assertionSchema = z.discriminatedUnion("kind", [

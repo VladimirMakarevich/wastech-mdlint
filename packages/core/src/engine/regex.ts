@@ -17,7 +17,7 @@ function isValidRegex(pattern: string, flags?: string): boolean {
 export const regexStringSchema = z
   .string()
   .refine((value) => isValidRegex(value), {
-    message: "expected a valid regular expression",
+    error: "expected a valid regular expression",
   });
 
 // Optional JS regex flag string (subset of d,g,i,m,s,u,y). Validated so a bad flag surfaces as a
@@ -25,7 +25,7 @@ export const regexStringSchema = z
 export const regexFlagsSchema = z
   .string()
   .refine((value) => isValidRegex(".", value), {
-    message: "expected valid regular-expression flags",
+    error: "expected valid regular-expression flags",
   });
 
 // Cross-field check for an options object carrying both `pattern` and `flags`. Validating each field
