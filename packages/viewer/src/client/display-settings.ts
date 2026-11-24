@@ -1,5 +1,7 @@
 import {
+  ACCENTS,
   DEFAULT_SETTINGS,
+  accentColor,
   NUMBER_RANGES,
   STORAGE_KEY,
   VARIABLE_NAME,
@@ -11,7 +13,7 @@ import {
 import { segmentedControl } from "./segmented.js";
 
 // The header's display settings: a button at the right end of the bar opens a panel that slides in
-// from the right edge, where the reader sets the fonts of the whole site and the article's own fonts,
+// from the right edge, where the reader sets the accent color and fonts of the whole site and the article's own fonts,
 // sizes, spacing, width and margins. Every change applies as it is made and is remembered for this
 // address, like the theme; `theme.ts` puts the stored values back before the first paint, so a page never shows the defaults
 // first and then jumps — not on the next page, not after the viewer restarts.
@@ -233,6 +235,7 @@ function panelSections(controls: PanelControls): HTMLElement[] {
 
   return [
     group("Whole site", [
+      controls.accent("Accent color"),
       controls.select("siteFont", "Font", [
         ["system", "System"],
         ["serif", "Serif"],
@@ -339,6 +342,38 @@ class PanelControls {
     });
     const row = document.createElement("div");
     row.className = "settings-field is-segmented";
+    const text = document.createElement("span");
+    text.className = "settings-label";
+    text.textContent = label;
+    row.append(text, control.element);
+    return row;
+  }
+
+  // The accent as a row of color dots: a color is chosen by seeing it, which a list of names would
+  // not let the reader do. Still a radio group to the keyboard and a screen reader, each dot named
+  // by its caption, since a dot alone says nothing to someone who cannot see it.
+  accent(label: string): HTMLElement {
+    const control = segmentedControl(
+      label,
+      ACCENTS.map(([value, caption]) => [value, caption] as const),
+      (value) => {
+        this.change({ accent: value });
+      },
+      "accent-swatches",
+    );
+    control.element.querySelectorAll("button").forEach((button, at) => {
+      const [value, caption] = ACCENTS[at]!;
+      button.className = "accent-swatch";
+      button.textContent = "";
+      button.title = caption;
+      button.setAttribute("aria-label", caption);
+      button.style.setProperty("--swatch", accentColor(value));
+    });
+    this.renderers.push(() => {
+      control.render(this.current.accent);
+    });
+    const row = document.createElement("div");
+    row.className = "settings-field is-swatches";
     const text = document.createElement("span");
     text.className = "settings-label";
     text.textContent = label;

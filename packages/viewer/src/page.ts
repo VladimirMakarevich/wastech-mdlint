@@ -38,9 +38,10 @@ export type PageParams = {
   // Above everything in the article, front matter included: on a changed document, what the branch
   // did to it and how the page shows that.
   changeBanner?: Element;
-  // In its place on a document the branch did not change, in a git work tree: the line that lists the
-  // commits that last touched it, since the history of a page is worth a look whether or not this
-  // branch is what changed it.
+  // On any document in a git work tree, under the change banner where there is one: the line that
+  // lists the commits that last touched it, since the history of a page is worth a look whether or
+  // not this branch is what changed it. Kept out of the banner, which stays pinned while the text
+  // scrolls and would carry an opened list over the text with it.
   historyLine?: Element;
   headings?: readonly ParsedHeading[];
   // Slugs of the headings whose section the branch changed, marked in the outline so a reader sees
@@ -189,7 +190,8 @@ export function renderPage(params: PageParams): string {
                 `article.markdown-body${params.blameToggle?.on === true ? ".has-blame" : ""}`,
                 [
                   params.findingsPanel,
-                  params.changeBanner ?? params.historyLine,
+                  params.changeBanner,
+                  params.historyLine,
                   renderFrontmatter(
                     params.frontmatter ?? null,
                     params.frontmatterChange,

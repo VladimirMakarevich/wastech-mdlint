@@ -393,7 +393,7 @@ export class DocumentRoutes {
     return {
       ...params,
       ...(introduction === undefined ? {} : { introduction }),
-      ...(this.ctx.git === undefined || branchReview !== undefined
+      ...(this.ctx.git === undefined
         ? {}
         : {
             historyLine: h(

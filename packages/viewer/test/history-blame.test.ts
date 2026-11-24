@@ -95,10 +95,19 @@ describe.skipIf(!hasGit)("history and blame (requires git on PATH)", () => {
     expect((await get(port, "/api/history?path=../secret.md")).status).toBe(
       404,
     );
-    // The banner carries the place to show it, hidden until its script runs.
-    expect((await get(port, "/doc/docs/guide.md")).body).toContain(
-      '<details class="changes-history" hidden data-path="docs/guide.md"><summary>History</summary>',
+    // A changed document carries the place to show it right under its banner, hidden until its
+    // script runs — not inside the banner, which stays pinned while the text scrolls and would carry
+    // an opened list over the text with it.
+    const changed = articleOf((await get(port, "/doc/docs/guide.md")).body);
+    expect(changed).toContain(
+      '</div><div class="document-history"><details class="changes-history" hidden data-path="docs/guide.md"><summary>History</summary>',
     );
+    const banner = changed.slice(
+      changed.indexOf('<div class="changes-banner">'),
+      changed.indexOf('<div class="document-history">'),
+    );
+    expect(banner).toContain("changes-banner-link");
+    expect(banner).not.toContain("changes-history");
     // A document the branch left alone has no banner, and carries the same place on its own.
     const unchanged = articleOf((await get(port, "/doc/README.md")).body);
     expect(unchanged).not.toContain("changes-banner");

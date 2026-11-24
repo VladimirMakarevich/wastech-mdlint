@@ -1,5 +1,5 @@
-// What the reader can change about how text is set: the fonts of the whole site, and the article's
-// own fonts, sizes, spacing, width and margins. Pure — no DOM, no storage — so the rules that turn a stored or typed value
+// What the reader can change about how the viewer looks: the accent color and fonts of the whole
+// site, and the article's own fonts, sizes, spacing, width and margins. Pure — no DOM, no storage — so the rules that turn a stored or typed value
 // into CSS are tested on their own, and the panel in `display-settings.ts` only wires inputs to them.
 //
 // Every setting becomes one `--reader-*` custom property on <html>, and the stylesheet reads each one
@@ -10,8 +10,38 @@
 export type TextFont = "system" | "serif" | "wide" | "mono" | "custom";
 export type CodeFont = "system" | "custom";
 export type Alignment = "start" | "justify";
+export type Accent = "blue" | "indigo" | "purple" | "red" | "teal" | "graphite";
+
+/**
+ * The accent colors the reader can pick, each with its caption and its light and dark value. A closed
+ * list rather than a free color: the accent carries small text — links, rule ids — so each light value
+ * is dark enough for 4.5:1 on white and each dark value light enough for the same on the dark page,
+ * which a picked color would not be. Green and amber are left out because they already mean "added"
+ * and "changed" on every changed document, and a link in either would read as a change mark. The red
+ * is a crimson, apart from the brighter red that marks a removal.
+ */
+export const ACCENTS: readonly (readonly [
+  Accent,
+  string,
+  { light: string; dark: string },
+])[] = [
+  ["blue", "Blue", { light: "#0066cc", dark: "#0a84ff" }],
+  ["indigo", "Indigo", { light: "#4b48c8", dark: "#7d7aff" }],
+  ["purple", "Purple", { light: "#8e3cc8", dark: "#bf5af2" }],
+  ["red", "Red", { light: "#b8204a", dark: "#ff5c7a" }],
+  ["teal", "Teal", { light: "#007a8a", dark: "#40c8e0" }],
+  ["graphite", "Graphite", { light: "#48484a", dark: "#aeaeb2" }],
+];
+
+/** An accent's value as the stylesheet reads it: one token for both themes. */
+export function accentColor(accent: Accent): string {
+  const entry = ACCENTS.find(([value]) => value === accent) ?? ACCENTS[0]!;
+  return `light-dark(${entry[2].light}, ${entry[2].dark})`;
+}
 
 export type DisplaySettings = {
+  // The color of links, focus rings, the chosen tab and the other marks of the interface.
+  accent: Accent;
   // The fonts of the whole site — header, tree, side column, panels, dashboard — and the ones the
   // article uses while its own are left at "same as the site".
   siteFont: TextFont;
@@ -49,6 +79,7 @@ export type DisplaySettings = {
 };
 
 export const DEFAULT_SETTINGS: Readonly<DisplaySettings> = {
+  accent: "blue",
   siteFont: "system",
   customSiteFont: "",
   siteCodeFont: "system",
@@ -103,6 +134,7 @@ const TEXT_FONTS: readonly TextFont[] = [
 ];
 const CODE_FONTS: readonly CodeFont[] = ["system", "custom"];
 const ALIGNMENTS: readonly Alignment[] = ["start", "justify"];
+const ACCENT_VALUES: readonly Accent[] = ACCENTS.map(([value]) => value);
 
 // Font stacks of faces that ship with the common systems, since the viewer fetches nothing from the
 // network: Charter/Sitka/Cambria/Georgia for serif text, Verdana and its look-alikes for a wide sans
@@ -166,6 +198,7 @@ export function parseSettings(value: unknown): DisplaySettings {
       ? (raw as T)
       : undefined;
   };
+  settings.accent = choice("accent", ACCENT_VALUES) ?? settings.accent;
   settings.siteFont = choice("siteFont", TEXT_FONTS) ?? settings.siteFont;
   settings.siteCodeFont =
     choice("siteCodeFont", CODE_FONTS) ?? settings.siteCodeFont;
@@ -245,6 +278,9 @@ export function allVariables(
   settings: DisplaySettings,
 ): Record<string, string> {
   return {
+    // Only ever one of the fixed values in `ACCENTS`, never text from storage, so nothing stored can
+    // carry a second declaration into the property.
+    "--reader-accent": accentColor(settings.accent),
     "--reader-site-font": textFontStack(
       settings.siteFont,
       settings.customSiteFont,

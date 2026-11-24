@@ -54,6 +54,11 @@ export const BASELINES: readonly (readonly [Baseline, string])[] = [
  * views of its changes, and the way to its card on the Changes page. Rendered with the page, from the
  * review the page was marked with, so it is there without script and nothing below it moves once
  * the page has loaded. The switch is a row of links, which work without script too.
+ *
+ * The stylesheet pins the line under the header while the text scrolls, so the views and the
+ * "Viewed" mark stay in reach on a long document. The commits that last touched the document are
+ * therefore not part of it: opened inside a pinned line, their list would cover the text it was
+ * meant to sit above. The page renders them below the line instead, as it does for any document.
  */
 export function renderChangeBanner(
   review: DocumentReview,
@@ -71,7 +76,7 @@ export function renderChangeBanner(
       : reviewToggle(review, reviewed.mark, true),
     baselineSwitch(page, view, baseline, reviewed),
     h(
-      "nav.changes-view.segmented.is-compact",
+      "nav.changes-view.segmented.is-compact.is-even",
       { ariaLabel: "Show the changes" },
       DIFF_VIEWS.map(([value, label]) =>
         h(
@@ -91,8 +96,6 @@ export function renderChangeBanner(
       },
       "Changes page",
     ),
-    // A deleted document has no page to carry it.
-    historyDetails(review.path),
   ]);
 }
 
@@ -132,7 +135,7 @@ function baselineSwitch(
     return undefined;
   }
   return h(
-    "nav.changes-since.segmented.is-compact",
+    "nav.changes-since.segmented.is-compact.is-even",
     { ariaLabel: "Compare with" },
     BASELINES.map(([value, label]) =>
       h(
@@ -150,6 +153,7 @@ function baselineSwitch(
 /**
  * The commits that last touched a document, asked of git only when the reader opens it: the page
  * itself never waits for a walk through history. Hidden until the script that loads it has run.
+ * Placed below a changed document's banner, or alone above an unchanged one's text.
  */
 export function historyDetails(relPath: string): Element {
   return h("details.changes-history", { hidden: true, dataPath: relPath }, [

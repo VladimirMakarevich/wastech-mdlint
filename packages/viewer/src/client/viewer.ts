@@ -1,3 +1,4 @@
+import { initBannerHeight } from "./banner-height.js";
 import { initChangeMarks } from "./change-marks.js";
 import { initChanges } from "./changes.js";
 import { initCharts } from "./charts.js";
@@ -47,6 +48,7 @@ initSearch();
 initDiagnostics(documentPath);
 initChanges();
 initChangeMarks();
+initBannerHeight();
 initReview(documentPath);
 initHistory();
 initDiffExpand();
