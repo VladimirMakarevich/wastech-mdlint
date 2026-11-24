@@ -150,7 +150,7 @@ describe("afterSave", () => {
       ...formDraft,
       edits: [SEVERITY_EDIT, include],
       full: undefined,
-      saving: { text: savedText, edited: true, edits: 1 },
+      saving: { text: savedText, edited: true, edits: [SEVERITY_EDIT] },
     };
     const kept = afterSave(later, saved);
     expect(kept).toEqual({
@@ -173,6 +173,26 @@ describe("afterSave", () => {
       edits: [include],
       mode: "form",
       textEdited: false,
+    });
+  });
+
+  // The defect this guards: the same field changed again during the save rewrote the saved edit in
+  // place, and splitting by count then dropped it as saved, losing the reader's later value.
+  it("keeps every edit when a saved one was changed in place after the save began", () => {
+    const changedAgain = { ...SEVERITY_EDIT, value: "off" };
+    const draft = {
+      ...formDraft,
+      edits: [changedAgain],
+      full: undefined,
+      saving: { text: savedText, edited: true, edits: [SEVERITY_EDIT] },
+    };
+    expect(afterSave(draft, saved)).toEqual({
+      base: "saved",
+      text: formDraft.text,
+      edits: [changedAgain],
+      mode: "form",
+      textEdited: true,
+      full: undefined,
     });
   });
 

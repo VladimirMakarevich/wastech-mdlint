@@ -355,8 +355,14 @@ class ConfigEditor {
   private set(path: Path, value: Json): void {
     this.model = setAt(this.model ?? {}, path, clone(value));
     const last = this.edits.at(-1);
-    // Typing into one field is one change, not one per keystroke.
-    if (last?.op === "set" && samePath(last.path, path)) {
+    // Typing into one field is one change, not one per keystroke — but never into an edit a save on
+    // its way already carries: the change made after it has to stay a change of its own.
+    const saved = this.saving?.edits?.length ?? 0;
+    if (
+      last?.op === "set" &&
+      samePath(last.path, path) &&
+      this.edits.length > saved
+    ) {
       last.value = clone(value);
     } else {
       this.edits.push({ op: "set", path: [...path], value: clone(value) });
@@ -615,7 +621,9 @@ class ConfigEditor {
     this.saving = {
       text,
       edited: false,
-      ...(this.text === this.file.text ? { edits: this.edits.length } : {}),
+      ...(this.text === this.file.text
+        ? { edits: this.edits.map((edit) => clone(edit)) }
+        : {}),
     };
     this.saveDraft();
     let result: {

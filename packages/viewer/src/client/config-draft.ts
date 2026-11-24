@@ -28,9 +28,10 @@ export type Draft = {
   // Set while a save of this change is on its way: the text sent, and whether the reader changed
   // anything since. The server tells every page to reload once the file is written, which can land
   // before the save's own answer; this is how the reloaded page knows the file it reads is the one
-  // this draft saved, and not one another program wrote. `edits` is how many of the form's edits
-  // the saved text already holds; a draft stored before it was kept has none.
-  saving?: { text: string; edited: boolean; edits?: number };
+  // this draft saved, and not one another program wrote. `edits` is a copy of the form's edits
+  // the saved text already holds, taken as the save began; a draft stored before it was kept has
+  // none.
+  saving?: { text: string; edited: boolean; edits?: Edit[] };
 };
 
 /** The config file a draft is checked against: its text and that text's hash. */
@@ -85,7 +86,9 @@ function isSaving(value: unknown): value is Draft["saving"] {
     value !== null &&
     typeof (value as { text: unknown }).text === "string" &&
     typeof (value as { edited: unknown }).edited === "boolean" &&
-    ["number", "undefined"].includes(typeof (value as { edits: unknown }).edits)
+    ((value as { edits: unknown }).edits === undefined ||
+      (Array.isArray((value as { edits: unknown }).edits) &&
+        (value as { edits: unknown[] }).edits.every(isEdit)))
   );
 }
 
@@ -116,16 +119,23 @@ export function afterSave(draft: Draft, saved: FileVersion): Draft | undefined {
   ) {
     return undefined;
   }
+  // Split only where the saved edits still lead the draft's, each as it was saved: one changed in
+  // place since — the editor folds a field typed into twice into one edit — would otherwise be
+  // dropped as already saved while holding the reader's later value.
   const savedEdits = draft.saving.edits;
   if (
     !draft.textEdited &&
     savedEdits !== undefined &&
-    savedEdits <= draft.edits.length
+    savedEdits.length <= draft.edits.length &&
+    savedEdits.every(
+      (savedEdit, index) =>
+        JSON.stringify(savedEdit) === JSON.stringify(draft.edits[index]),
+    )
   ) {
     return {
       base: saved.hash,
       text: saved.text,
-      edits: draft.edits.slice(savedEdits),
+      edits: draft.edits.slice(savedEdits.length),
       mode: draft.mode,
       textEdited: false,
       // The whole changed file is the same text either way: the saved edits are now in `text`.
