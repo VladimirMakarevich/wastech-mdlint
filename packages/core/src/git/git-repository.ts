@@ -121,12 +121,12 @@ export async function openGitRepository(
   }
 
   const atTopLevel: GitInvocation = { cwd: located.topLevel, env: probe.env };
-  const filterOverrides = await filterDriverOverrides(atTopLevel);
+  const overrides = await repositoryConfigOverrides(atTopLevel);
 
   return new GitRepository(
     {
       cwd: located.topLevel,
-      env: gitEnvironment(inherited, filterOverrides),
+      env: gitEnvironment(inherited, overrides),
     },
     located.prefix,
     located.commonDirReal,
@@ -239,37 +239,56 @@ function unlocatedRepository(exitCode: number, stderr: string): GitUnavailable {
 // driver's `clean` command on every work-tree file whose stat changed when it compares the work
 // tree. They are emptied — an empty command is no filter — for every driver any config defines,
 // the user's own included: a legitimate driver such as git-lfs is not told apart from a planted
-// one, so a Markdown file kept in LFS compares as its pointer text. Listing them runs nothing:
-// `git config` only reads files.
-async function filterDriverOverrides(
+// one, so a Markdown file kept in LFS compares as its pointer text.
+//
+// Protocols are the same shape of problem: the fixed settings every call carries refuse the
+// transports git knows by name, but a config can allow one of its own — `protocol.<name>.allow`,
+// for a remote helper reached through a `<name>::` URL — and a per-protocol key outranks the generic
+// `protocol.allow`. So every protocol any config names is refused by name too.
+//
+// Listing them runs nothing: `git config` only reads files. Exported for tests.
+export async function repositoryConfigOverrides(
   atTopLevel: GitInvocation,
 ): Promise<(readonly [string, string])[]> {
-  const filters = await runGit(atTopLevel, [
+  const listed = await runGit(atTopLevel, [
     "config",
     "-z",
     "--get-regexp",
-    "^filter\\.",
+    "^(filter|protocol)\\.",
   ]);
   const driverNames = new Set<string>();
-  // Exit 1 is "no such key": no filter drivers at all.
-  if (filters.exitCode === 0) {
-    for (const entry of filters.stdout.toString("utf8").split("\0")) {
-      // `filter.<name>.<variable>\n<value>`; a driver name may itself contain dots, so the name is
+  const protocolNames = new Set<string>();
+  // Exit 1 is "no such key": no filter drivers and no protocol settings at all.
+  if (listed.exitCode === 0) {
+    for (const entry of listed.stdout.toString("utf8").split("\0")) {
+      // `<section>.<name>.<variable>\n<value>`; a name may itself contain dots, so it is
       // everything between the first and the last dot of the key.
       const key = entry.split("\n", 1)[0] ?? "";
+      const firstDot = key.indexOf(".");
       const lastDot = key.lastIndexOf(".");
-      if (key.startsWith("filter.") && lastDot > "filter.".length) {
-        driverNames.add(key.slice("filter.".length, lastDot));
+      if (lastDot <= firstDot + 1) {
+        continue;
+      }
+      const name = key.slice(firstDot + 1, lastDot);
+      if (key.startsWith("filter.")) {
+        driverNames.add(name);
+      } else if (key.startsWith("protocol.")) {
+        protocolNames.add(name);
       }
     }
   }
-  return [...driverNames].sort(compareStrings).flatMap((name) => [
-    [`filter.${name}.clean`, ""] as const,
-    [`filter.${name}.smudge`, ""] as const,
-    [`filter.${name}.process`, ""] as const,
-    // A required driver with no command is an error rather than a skipped filter.
-    [`filter.${name}.required`, "false"] as const,
-  ]);
+  return [
+    ...[...driverNames].sort(compareStrings).flatMap((name) => [
+      [`filter.${name}.clean`, ""] as const,
+      [`filter.${name}.smudge`, ""] as const,
+      [`filter.${name}.process`, ""] as const,
+      // A required driver with no command is an error rather than a skipped filter.
+      [`filter.${name}.required`, "false"] as const,
+    ]),
+    ...[...protocolNames]
+      .sort(compareStrings)
+      .map((name) => [`protocol.${name}.allow`, "never"] as const),
+  ];
 }
 
 // Diff flags no review call goes without: an external diff program and a textconv driver are both
@@ -444,12 +463,28 @@ export class GitRepository {
    *
    * Git detects renames only between paths it tracks, so a file moved on disk and not yet staged
    * reads as a deletion and an addition.
+   *
+   * `alsoPaths` are files outside the host root to report as well, named relative to the root with
+   * `..` segments — the config file a parent directory holds, which decides what the corpus under
+   * the root is. A path that leaves the work tree has no history to compare and is skipped.
    */
   async changedPaths(
     from: string,
-    options: { worktree: boolean },
+    options: { worktree: boolean; alsoPaths?: readonly string[] },
   ): Promise<GitChange[]> {
-    const pathspec = this.prefix === "" ? [] : ["--", this.prefix];
+    // Each outside path by its top-level name, to be found in git's output and named back the way
+    // the caller did.
+    const outside = new Map<string, string>();
+    for (const relPath of options.alsoPaths ?? []) {
+      const topLevel = this.resolveTopLevel(relPath);
+      if (topLevel !== undefined && this.fromTopLevel(topLevel) === undefined) {
+        outside.set(topLevel, relPath);
+      }
+    }
+    const pathspec =
+      this.prefix === ""
+        ? []
+        : ["--", this.prefix, ...[...outside.keys()].sort(compareStrings)];
     // Two snapshots compared as trees, through the plumbing command: it never looks at the work
     // tree, so it has no stat data to refresh and nothing to write.
     const committedOutput = await this.mustRun([
@@ -487,8 +522,10 @@ export class GitRepository {
       );
     }
 
+    const toRoot = (topLevel: string) =>
+      this.fromTopLevel(topLevel) ?? outside.get(topLevel);
     return changes
-      .map((change) => this.fromTopLevelChange(change))
+      .map((change) => fromTopLevelChange(change, toRoot))
       .filter((change): change is GitChange => change !== undefined)
       .sort((left, right) => compareStrings(left.path, right.path));
   }
@@ -503,8 +540,14 @@ export class GitRepository {
   ): Promise<Map<string, string>> {
     const name = requireObjectName(commit);
     // `cat-file --batch` reads one request per line, so a name holding a line break cannot be asked
-    // for; git itself cannot express it in this protocol either.
-    const requested = paths.filter((relPath) => !/[\n\r]/.test(relPath));
+    // for; git itself cannot express it in this protocol either. A path that leaves the work tree is
+    // in no commit.
+    const requested = paths.flatMap((relPath) => {
+      const topLevel = /[\n\r]/.test(relPath)
+        ? undefined
+        : this.resolveTopLevel(relPath);
+      return topLevel === undefined ? [] : [{ relPath, topLevel }];
+    });
     const texts = new Map<string, string>();
     if (requested.length === 0) {
       return texts;
@@ -512,14 +555,12 @@ export class GitRepository {
     // One process for every file rather than one per file.
     const output = await this.mustRun(
       ["cat-file", "--batch"],
-      requested
-        .map((relPath) => `${name}:${this.toTopLevel(relPath)}\n`)
-        .join(""),
+      requested.map(({ topLevel }) => `${name}:${topLevel}\n`).join(""),
     );
 
     const buffer = output.stdout;
     let offset = 0;
-    for (const relPath of requested) {
+    for (const { relPath } of requested) {
       const lineEnd = buffer.indexOf(0x0a, offset);
       if (lineEnd === -1) {
         break;
@@ -623,6 +664,19 @@ export class GitRepository {
     return this.prefix === "" ? relPath : `${this.prefix}/${relPath}`;
   }
 
+  // `toTopLevel` with `..` segments resolved, for a path that may climb out of the host root —
+  // git's `<commit>:<path>` and its pathspecs do not resolve them — or `undefined` when it climbs out
+  // of the work tree too, or is absolute (a config on another Windows drive has no relative name).
+  private resolveTopLevel(relPath: string): string | undefined {
+    if (path.posix.isAbsolute(relPath) || path.win32.isAbsolute(relPath)) {
+      return undefined;
+    }
+    const resolved = path.posix.normalize(this.toTopLevel(relPath));
+    return resolved === "." || resolved === ".." || resolved.startsWith("../")
+      ? undefined
+      : resolved;
+  }
+
   private fromTopLevel(topRelative: string): string | undefined {
     if (this.prefix === "") {
       return topRelative;
@@ -631,25 +685,28 @@ export class GitRepository {
       ? topRelative.slice(this.prefix.length + 1)
       : undefined;
   }
+}
 
-  // A rename that crosses the host root's edge is an addition or a deletion from inside it.
-  private fromTopLevelChange(change: GitChange): GitChange | undefined {
-    const relPath = this.fromTopLevel(change.path);
-    const oldPath =
-      change.oldPath === undefined
-        ? undefined
-        : this.fromTopLevel(change.oldPath);
-    if (change.status !== "R") {
-      return relPath === undefined ? undefined : { ...change, path: relPath };
-    }
-    if (relPath !== undefined && oldPath !== undefined) {
-      return { status: "R", path: relPath, oldPath };
-    }
-    if (relPath !== undefined) {
-      return { status: "A", path: relPath };
-    }
-    return oldPath === undefined ? undefined : { status: "D", path: oldPath };
+// A change restated from the work tree's top level to the host root by `toRoot`, which names a path
+// the root cannot see `undefined`. A rename that crosses the edge of what it sees is an addition or a
+// deletion from inside it.
+function fromTopLevelChange(
+  change: GitChange,
+  toRoot: (topLevel: string) => string | undefined,
+): GitChange | undefined {
+  const relPath = toRoot(change.path);
+  const oldPath =
+    change.oldPath === undefined ? undefined : toRoot(change.oldPath);
+  if (change.status !== "R") {
+    return relPath === undefined ? undefined : { ...change, path: relPath };
   }
+  if (relPath !== undefined && oldPath !== undefined) {
+    return { status: "R", path: relPath, oldPath };
+  }
+  if (relPath !== undefined) {
+    return { status: "A", path: relPath };
+  }
+  return oldPath === undefined ? undefined : { status: "D", path: oldPath };
 }
 
 /**

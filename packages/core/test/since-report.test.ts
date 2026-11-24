@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { analyzeSince } from "../src/changes/branch-review.js";
@@ -98,6 +100,53 @@ describe.skipIf(!hasGit)("since a ref (requires git on PATH)", () => {
       expect(impact.directlyAffected).toEqual([
         { path: "docs/hub.md", references: 2 },
       ]);
+    },
+    TIMEOUT_MS,
+  );
+
+  it(
+    "lints the base with the base's config when the config sits above the linted directory",
+    async () => {
+      // The branch turns a rule on and touches no document: every finding it brings is new, and
+      // only a base linted with the base's own config — which had no rules — can say so. A root
+      // below the config that compared only its own directory would never see the config change,
+      // would lint the base with the head's config, and would report nothing.
+      const fixture = await makeRepo();
+      await fixture.write(
+        "wastech-mdlint.config.json",
+        `${JSON.stringify({ rules: [] })}\n`,
+      );
+      await fixture.write("docs/a.md", "# A\n\n[missing](nowhere.md)\n");
+      fixture.commit("base");
+      fixture.git("checkout", "-q", "-b", "feature");
+      await fixture.write(
+        "wastech-mdlint.config.json",
+        `${JSON.stringify({ rules: [{ rule: "REF-001" }] })}\n`,
+      );
+
+      const reported = async (cwd: string) => {
+        const result = await analysis(cwd, fixture.env);
+        if ("available" in result) {
+          throw new Error(result.message);
+        }
+        return {
+          config: result.review.config?.path,
+          configChanged: result.review.set.configChanged,
+          messages: sinceLintResult(result).messages.map(
+            (message) => `${message.filePath} ${message.ruleId}`,
+          ),
+        };
+      };
+      expect(await reported(fixture.repo)).toEqual({
+        config: "wastech-mdlint.config.json",
+        configChanged: true,
+        messages: ["docs/a.md REF-001"],
+      });
+      expect(await reported(path.join(fixture.repo, "docs"))).toEqual({
+        config: "../wastech-mdlint.config.json",
+        configChanged: true,
+        messages: ["a.md REF-001"],
+      });
     },
     TIMEOUT_MS,
   );

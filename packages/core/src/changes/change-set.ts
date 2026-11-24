@@ -23,7 +23,10 @@ export type CorpusMembership = {
    * the base, not the base config's.
    */
   scope: ScopeTester;
-  /** The config file's repository-relative path, when the corpus was loaded from one. */
+  /**
+   * The config file's path relative to the root, when the corpus was loaded from one: `../…` when a
+   * parent directory holds it.
+   */
   configPath?: string;
 };
 
@@ -147,8 +150,14 @@ export async function collectChangeSet(
   }
   // A merge-base exists only when HEAD has a commit, so this is defined here.
   const head = (await repository.headCommit()) ?? mergeBase;
+  // The config is asked for by name because it may sit above the root — found in a parent
+  // directory, or given as `../…` — where a comparison limited to the root would never see it
+  // change, and the base would be linted with the head's config. Inside the root it is reported
+  // anyway, and naming it again changes nothing.
   const changes = await repository.changedPaths(mergeBase, {
     worktree: params.worktree,
+    alsoPaths:
+      params.corpus.configPath === undefined ? [] : [params.corpus.configPath],
   });
   return {
     base,

@@ -1,14 +1,23 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 
+import {
+  findExecutable,
+  forgetExecutable,
+  isRootedPathEntry,
+  unquoted,
+} from "../find-executable.js";
+
 // Every `git` process the product starts goes through `runGit`. Git is run on whatever repository a
 // user points a host at — possibly an archive unpacked from somewhere else, `.git/config` included —
 // and that config can name programs git starts on its own during a plain read: an fsmonitor hook on
 // any work-tree comparison, a filter driver's `clean` command on every file whose stat changed, an
-// external diff or a textconv driver on a diff. Nothing here may let one run. The defenses are in
-// three places: the environment built below, the config every call carries (this file plus the
-// filter overrides `openGitRepository` adds once it knows the repository), and the flags each diff
-// call passes (`--no-ext-diff --no-textconv`).
+// external diff or a textconv driver on a diff, and — in a partial clone missing an object — the
+// upload-pack or ssh command of the fetch git makes to get it. Nothing here may let one run, and the
+// repository may not supply `git` itself either. The defenses are in four places: the executable
+// `runGit` starts, found by absolute path; the environment built below; the config every call
+// carries (this file plus the filter and protocol overrides `openGitRepository` adds once it knows
+// the repository); and the flags each diff call passes (`--no-ext-diff --no-textconv`).
 
 /** Raised when git ran and failed in a way none of the expected states explains. */
 export class GitCommandError extends Error {
@@ -78,12 +87,32 @@ const DROPPED_LOCALE_VARIABLES = new Set(["LANG", "LANGUAGE", "LC_ALL"]);
  */
 const BASE_CONFIG: readonly (readonly [string, string])[] = [
   // An fsmonitor hook set in repository config is a program git starts on any work-tree comparison.
-  ["core.fsmonitor", "false"],
+  // Emptied rather than set to `false`: before git 2.36 the key is read as the hook's path, and only
+  // an empty value turns the hook off — `false` there is a command named `false` to run. From 2.36
+  // it is read as a boolean or a path, and an empty value is false.
+  ["core.fsmonitor", ""],
   // With `-z` output git already leaves names unquoted; this keeps any non-`-z` output the same.
   ["core.quotePath", "false"],
   // `log` and `blame` would otherwise start gpg to check each signed commit when a config asks for
   // signatures to be shown, and gpg is a program the repository's config can name.
   ["log.showSignature", "false"],
+  // In a partial clone a read that meets a missing object — `cat-file --batch`, `diff-tree -M`,
+  // `blame`, `log --follow` — fetches it from the promisor remote, and a fetch starts programs the
+  // repository's config names: `remote.<name>.uploadpack` for a local or `file://` remote,
+  // `core.sshCommand` for ssh, a remote helper for `ext::` and its kind. `GIT_NO_LAZY_FETCH` below
+  // stops the fetch itself, but only from git 2.45; on the older gits this module still accepts,
+  // every transport is refused instead, so the fetch fails before any of those programs is looked
+  // up. The generic key sets the default for protocols with no key of their own, and each known
+  // protocol is named as well because a repository's `protocol.<name>.allow` outranks the generic
+  // key whatever scope sets it; `openGitRepository` adds the same override for any other protocol a
+  // config names. `core.sshCommand` and `uploadpack` are left alone: git checks a transport is allowed
+  // before it looks either up, so with every transport refused neither is ever read, and an override
+  // would only be one more value to keep right. A read that needs a missing object therefore fails
+  // or finds nothing rather than fetching.
+  ["protocol.allow", "never"],
+  ...["file", "git", "ssh", "http", "https", "ext"].map(
+    (protocol) => [`protocol.${protocol}.allow`, "never"] as const,
+  ),
 ];
 
 /**
@@ -91,6 +120,7 @@ const BASE_CONFIG: readonly (readonly [string, string])[] = [
  *
  * `PATH` keeps only absolute entries. An empty or `.` entry is resolved against the child's working
  * directory — the repository — so a `git` executable committed there would be the one that runs.
+ * That alone is not enough on Windows, which `runGit` handles by never starting git by bare name.
  */
 export function gitEnvironment(
   inherited: NodeJS.ProcessEnv,
@@ -127,9 +157,12 @@ export function gitEnvironment(
     // Nothing run here may stop to ask for a password, and nothing may page its output.
     GIT_TERMINAL_PROMPT: "0",
     GIT_PAGER: "cat",
-    // A pathspec is always a directory prefix this module built, never a pattern: a folder named
-    // `docs*` must limit a diff to itself, not to every folder it matches.
+    // A pathspec is always a path this module built, never a pattern: a folder named `docs*` must
+    // limit a diff to itself, not to every folder it matches.
     GIT_LITERAL_PATHSPECS: "1",
+    // A missing object in a partial clone is reported missing instead of fetched (git 2.45 and
+    // later; the protocol settings above cover older gits).
+    GIT_NO_LAZY_FETCH: "1",
     LC_ALL: "C",
   };
 }
@@ -137,8 +170,20 @@ export function gitEnvironment(
 function absolutePathEntries(value: string): string {
   return value
     .split(path.delimiter)
-    .filter((entry) => path.isAbsolute(entry.replace(/^"(.*)"$/, "$1")))
+    .filter((entry) => isRootedPathEntry(unquoted(entry)))
     .join(path.delimiter);
+}
+
+/**
+ * The absolute path of the `git` executable `env`'s `PATH` names, or `undefined` when none of its
+ * absolute entries holds one. Git is never started by bare name: on Windows that would search the
+ * repository's own folder before `PATH`, so a committed `git.exe` would run. Exported for tests.
+ */
+export function findGitExecutable(
+  env: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform = process.platform,
+): Promise<string | undefined> {
+  return findExecutable("git", env, platform);
 }
 
 // Generous: a blob read returns every requested file in one stream, and a change list of a large
@@ -151,15 +196,28 @@ const TIMEOUT_MS = 60_000;
  * expected states (no such ref, no common history) are a non-zero exit — and rejects only when git
  * could not be started, timed out, or produced more output than any legitimate call does.
  */
-export function runGit(
+export async function runGit(
   invocation: GitInvocation,
   args: readonly string[],
   input?: string,
 ): Promise<GitOutput> {
+  const executable = await findGitExecutable(invocation.env);
+  if (executable === undefined) {
+    throw new GitNotFoundError();
+  }
+  return spawnGit(executable, invocation, args, input);
+}
+
+function spawnGit(
+  executable: string,
+  invocation: GitInvocation,
+  args: readonly string[],
+  input: string | undefined,
+): Promise<GitOutput> {
   return new Promise((resolve, reject) => {
     // `--no-pager` as well as `GIT_PAGER`: a pager runs only on a terminal, which a child with piped
     // output never is, but the flag makes that independent of how git decides it.
-    const child = spawn("git", ["--no-pager", ...args], {
+    const child = spawn(executable, ["--no-pager", ...args], {
       cwd: invocation.cwd,
       env: invocation.env,
       windowsHide: true,
@@ -192,7 +250,13 @@ export function runGit(
     child.stdin.on("error", () => {});
     child.once("error", (error: NodeJS.ErrnoException) => {
       clearTimeout(timer);
-      reject(error.code === "ENOENT" ? new GitNotFoundError() : error);
+      if (error.code === "ENOENT") {
+        // Uninstalled since it was found: forget it, so the next call looks again.
+        forgetExecutable(executable);
+        reject(new GitNotFoundError());
+      } else {
+        reject(error);
+      }
     });
     child.once("close", (code) => {
       clearTimeout(timer);

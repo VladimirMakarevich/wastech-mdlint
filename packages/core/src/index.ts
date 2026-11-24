@@ -197,6 +197,9 @@ export type {
   OpenGitRepositoryOptions,
 } from "./git/git-repository.js";
 export { GitCommandError } from "./git/git-command.js";
+// How every program the product starts is found, so a host that launches one (the viewer opening a
+// file manager) cannot be made to run a same-named file from the repository it serves.
+export { findExecutable } from "./find-executable.js";
 
 // Changes — what a branch changed in the corpus, and the diff a reviewer reads. The sequence diff
 // under them stays internal: hosts compare texts, not arbitrary sequences.

@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
@@ -107,6 +108,45 @@ describe.skipIf(!hasGit)(
         );
         expect(run(fixture, ["lint", ".", "--since", "main"]).status).toBe(0);
         expect(run(fixture, ["lint", "."]).status).toBe(1);
+      },
+      TIMEOUT_MS,
+    );
+
+    it(
+      "lints the base with the base's config from a directory below the config, as from its own",
+      async () => {
+        // The branch turns a rule on in the config at the top and changes no document, so the one
+        // finding it brings exists only under the head's config. Linting `docs` — named as the
+        // path, or as the cwd — puts the config above the root, where a comparison limited to the
+        // root would not see it change and would lint the base with the head's rules: green, while
+        // `lint . --since` on the same branch is red.
+        const fixture = await makeRepo();
+        await fixture.write(
+          "wastech-mdlint.config.json",
+          `${JSON.stringify({ rules: [] })}\n`,
+        );
+        await fixture.write("docs/a.md", "# A\n\n[missing](nowhere.md)\n");
+        fixture.commit("base");
+        fixture.git("checkout", "-q", "-b", "feature");
+        await fixture.write(
+          "wastech-mdlint.config.json",
+          `${JSON.stringify({ rules: [{ rule: "REF-001" }] })}\n`,
+        );
+
+        const fromTop = run(fixture, ["lint", ".", "--since", "main"]);
+        const fromPath = run(fixture, ["lint", "docs", "--since", "main"]);
+        const fromCwd = run(
+          { repo: path.join(fixture.repo, "docs"), env: fixture.env },
+          ["lint", ".", "--since", "main"],
+        );
+        expect(fromTop.status).toBe(1);
+        expect(fromTop.stdout).toMatch(
+          /^docs\/a\.md\n {2}3:1 {2}error .*REF-001/m,
+        );
+        for (const below of [fromPath, fromCwd]) {
+          expect(below.status).toBe(1);
+          expect(below.stdout).toMatch(/^a\.md\n {2}3:1 {2}error .*REF-001/m);
+        }
       },
       TIMEOUT_MS,
     );

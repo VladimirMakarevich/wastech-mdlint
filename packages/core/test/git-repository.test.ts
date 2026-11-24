@@ -1,12 +1,27 @@
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { chmod, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  copyFile,
+  link,
+  mkdir,
+  readFile,
+  rm,
+  stat,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
 import { compareStrings } from "../src/deterministic-sort.js";
-import { gitEnvironment } from "../src/git/git-command.js";
+import {
+  findGitExecutable,
+  gitEnvironment,
+  runGit,
+} from "../src/git/git-command.js";
 import {
   composeChanges,
   type GitChange,
@@ -15,6 +30,7 @@ import {
   openGitRepository,
   parseNameStatus,
   parseStatusPorcelain,
+  repositoryConfigOverrides,
 } from "../src/git/git-repository.js";
 import {
   git,
@@ -80,6 +96,7 @@ describe("gitEnvironment", () => {
     expect(env.HOME).toBe("/home/user");
     expect(env.LC_ALL).toBe("C");
     expect(env.GIT_OPTIONAL_LOCKS).toBe("0");
+    expect(env.GIT_NO_LAZY_FETCH).toBe("1");
   });
 
   it("carries its settings, and any extra ones, as environment config", () => {
@@ -92,9 +109,21 @@ describe("gitEnvironment", () => {
       ],
     );
     expect(settings).toEqual([
-      ["core.fsmonitor", "false"],
+      // Empty, not `false`: git before 2.36 reads this key as the hook's path, and only an empty
+      // value turns the hook off there.
+      ["core.fsmonitor", ""],
       ["core.quotePath", "false"],
       ["log.showSignature", "false"],
+      // Every transport refused, each known one by name because a repository's per-protocol key
+      // outranks the generic one: a lazy fetch in a partial clone cannot start a program on a git
+      // too old for `GIT_NO_LAZY_FETCH`.
+      ["protocol.allow", "never"],
+      ["protocol.file.allow", "never"],
+      ["protocol.git.allow", "never"],
+      ["protocol.ssh.allow", "never"],
+      ["protocol.http.allow", "never"],
+      ["protocol.https.allow", "never"],
+      ["protocol.ext.allow", "never"],
       ["filter.a=b.clean", ""],
     ]);
   });
@@ -105,6 +134,47 @@ describe("gitEnvironment", () => {
       Path: ["", ".", "relative/bin", absolute].join(path.delimiter),
     });
     expect(env.Path).toBe(absolute);
+  });
+});
+
+describe("findGitExecutable", () => {
+  it("finds git on an absolute PATH entry only, as a file it can start", async () => {
+    const dir = await tempDir();
+    const first = path.join(dir, "first");
+    const second = path.join(dir, "second");
+    await mkdir(first);
+    await mkdir(second);
+    const pathValue = (entries: string[]) => ({
+      PATH: entries.join(path.delimiter),
+    });
+
+    if (process.platform === "win32") {
+      // `.com` before `.exe` within one directory, as libuv orders them; a `git.cmd` cannot be
+      // started without a shell, so it is never the answer.
+      await writeFile(path.join(first, "git.cmd"), "", "utf8");
+      await writeFile(path.join(second, "git.exe"), "", "utf8");
+      await writeFile(path.join(second, "git.com"), "", "utf8");
+      expect(await findGitExecutable(pathValue([first, second]))).toBe(
+        path.join(second, "git.com"),
+      );
+    } else {
+      // Not executable: `execvp` would skip it, so the lookup does too.
+      await writeFile(path.join(first, "git"), "", "utf8");
+      await chmod(path.join(first, "git"), 0o644);
+      await writeFile(path.join(second, "git"), "", "utf8");
+      await chmod(path.join(second, "git"), 0o755);
+      expect(await findGitExecutable(pathValue([first, second]))).toBe(
+        path.join(second, "git"),
+      );
+    }
+
+    // A relative entry is never searched, even when it names a directory holding git. (On Windows a
+    // temporary directory on another drive than the checkout has no relative name to try.)
+    const relative = path.relative(process.cwd(), second);
+    if (!path.isAbsolute(relative)) {
+      expect(await findGitExecutable(pathValue([relative]))).toBeUndefined();
+    }
+    expect(await findGitExecutable({})).toBeUndefined();
   });
 });
 
@@ -552,8 +622,10 @@ describe.skipIf(!hasGit)("openGitRepository (requires git on PATH)", () => {
       );
       await chmod(planted, 0o755);
 
-      // A `.` entry resolves against the child's working directory — the repository. Windows never
-      // searches it for an extensionless name; on POSIX this is the case that would run the file.
+      // A `.` entry resolves against the child's working directory — the repository — so on POSIX a
+      // bare `git` looked up through this `PATH` would be this file. Git is found on absolute entries
+      // only and started by that path. Windows runs no extensionless file; its own lookup, which
+      // tries the working directory whatever `PATH` says, is the next test's.
       const env = {
         ...fixture.env,
         PATH: [".", process.env.PATH ?? ""].join(path.delimiter),
@@ -561,6 +633,217 @@ describe.skipIf(!hasGit)("openGitRepository (requires git on PATH)", () => {
       const repository = await open(fixture.repo, env);
       await repository.headCommit();
       expect(existsSync(marker)).toBe(false);
+    },
+    TIMEOUT_MS,
+  );
+
+  it.skipIf(process.platform !== "win32")(
+    "never runs a git.exe or git.com placed in the repository, on Windows",
+    async () => {
+      const fixture = await makeRepo();
+      await fixture.write("doc.md", "text\n");
+      fixture.commit("base");
+      // Started by bare name, a program is looked up in the child's working directory before `PATH`
+      // unless `NoDefaultCurrentDirectoryInExePath` is set in the *parent's* environment — the
+      // lookup happens in this process — which almost no machine has, though some tool harnesses
+      // set it. It is removed for the test, so the control below shows the lookup an ordinary
+      // machine does, and the variable cannot be what keeps the planted file from running.
+      const variable = Object.keys(process.env).filter(
+        (name) => name.toUpperCase() === "NODEFAULTCURRENTDIRECTORYINEXEPATH",
+      );
+      const saved = variable.map((name) => [name, process.env[name]] as const);
+      for (const name of variable) {
+        Reflect.deleteProperty(process.env, name);
+      }
+      const env = Object.fromEntries(
+        Object.entries(fixture.env).filter(
+          ([name]) => !variable.includes(name),
+        ),
+      );
+
+      try {
+        // The stand-in is node itself: any Windows executable will do, and node is the one a test
+        // run is sure to have. Started as git it prints no git version, so a repository that opens
+        // and answers was opened by the real git. A hard link where the volume allows it, since a
+        // copy of node is large.
+        for (const name of ["git.exe", "git.com"]) {
+          const planted = path.join(fixture.repo, name);
+          await link(process.execPath, planted).catch(() =>
+            copyFile(process.execPath, planted),
+          );
+
+          // Control: the lookup a bare `git` gets runs the planted file, even with `PATH` reduced to
+          // absolute entries.
+          const control = spawnSync("git", ["--version"], {
+            cwd: fixture.repo,
+            env: gitEnvironment(env),
+            encoding: "utf8",
+            windowsHide: true,
+          });
+          expect(control.stdout.trim(), name).toBe(process.version);
+
+          const repository = await open(fixture.repo, env);
+          expect(await repository.headCommit(), name).toMatch(/^[0-9a-f]{40}$/);
+          await rm(planted);
+        }
+      } finally {
+        for (const [name, value] of saved) {
+          process.env[name] = value;
+        }
+      }
+    },
+    TIMEOUT_MS,
+  );
+
+  it(
+    "never fetches a partial clone's missing object, so no program the remote's config names runs",
+    async () => {
+      const source = await makeRepo();
+      await source.write("doc.md", "text\n");
+      source.commit("base");
+      source.git("config", "uploadpack.allowFilter", "true");
+      const slash = (target: string) => target.split(path.sep).join("/");
+      // Without blobs: every file's text is a missing object the clone would fetch on first read.
+      const clone = path.join(source.dir, "clone");
+      git(source.dir, source.env, [
+        "clone",
+        "-q",
+        "--filter=blob:none",
+        "--no-checkout",
+        `file://${slash(source.repo)}`,
+        clone,
+      ]);
+      const sourceUrl = git(clone, source.env, [
+        "config",
+        "remote.origin.url",
+      ]).trim();
+      const cloneGit = (...args: string[]) => git(clone, source.env, args);
+
+      // Two programs a fetch would start: an upload-pack named for a `file://` remote, and the
+      // command an `ext::` remote is, allowed by the repository's own `protocol.ext.allow`.
+      const markers = {
+        uploadPack: path.join(source.dir, "upload-pack ran"),
+        ext: path.join(source.dir, "ext ran"),
+      };
+      const uploadPack = path.join(source.dir, "upload-pack.sh");
+      await writeFile(
+        uploadPack,
+        `#!/bin/sh\ntouch '${slash(markers.uploadPack)}'\nexec git-upload-pack "$@"\n`,
+        "utf8",
+      );
+      cloneGit(
+        "config",
+        "remote.origin.uploadpack",
+        `sh '${slash(uploadPack)}'`,
+      );
+      // `ext::` splits its command at spaces; `% ` is a literal one.
+      const extUrl = `ext::sh -c touch% '${slash(markers.ext).replaceAll(" ", "% ")}'`;
+      cloneGit("config", "protocol.ext.allow", "always");
+      cloneGit("config", "protocol.planted.allow", "always");
+
+      const head = git(clone, source.env, ["rev-parse", "HEAD"]).trim();
+      const readsNothing = async () => {
+        const repository = await open(clone, source.env);
+        // From git 2.45 `GIT_NO_LAZY_FETCH` makes the blob read as absent; before it, the refused
+        // transport makes the read fail. Either way nothing is fetched and nothing is returned.
+        const texts = await repository
+          .readBlobs(head, ["doc.md"])
+          .catch(() => new Map<string, string>());
+        expect(texts.has("doc.md")).toBe(false);
+
+        // The protocol settings alone, as a git older than 2.45 has only those.
+        const probe = { cwd: clone, env: gitEnvironment(source.env) };
+        const overrides = await repositoryConfigOverrides(probe);
+        expect(overrides).toEqual(
+          expect.arrayContaining([
+            ["protocol.ext.allow", "never"],
+            ["protocol.planted.allow", "never"],
+          ]),
+        );
+        const env = gitEnvironment(source.env, overrides);
+        delete env.GIT_NO_LAZY_FETCH;
+        const output = await runGit(
+          { cwd: clone, env },
+          ["cat-file", "--batch"],
+          `${head}:doc.md\n`,
+        );
+        expect(output.stdout.toString("utf8")).not.toContain(" blob ");
+      };
+
+      await readsNothing();
+      cloneGit("config", "remote.origin.url", extUrl);
+      await readsNothing();
+      for (const marker of Object.values(markers)) {
+        expect(existsSync(marker), path.basename(marker)).toBe(false);
+      }
+
+      // Controls, last because a fetch that succeeds fills the blob in: the fixture's unhardened git
+      // does start each program, so their absence above means they were stopped.
+      const unhardenedRead = () =>
+        spawnSync("git", ["cat-file", "--batch"], {
+          cwd: clone,
+          env: source.env,
+          input: `${head}:doc.md\n`,
+          encoding: "utf8",
+          windowsHide: true,
+        });
+      unhardenedRead();
+      expect(existsSync(markers.ext)).toBe(true);
+      cloneGit("config", "remote.origin.url", sourceUrl);
+      unhardenedRead();
+      expect(existsSync(markers.uploadPack)).toBe(true);
+    },
+    TIMEOUT_MS,
+  );
+
+  it(
+    "reports and reads a file above the root when asked for it by name",
+    async () => {
+      const fixture = await makeRepo();
+      await fixture.write("config.json", "{}\n");
+      await fixture.write("README.md", "readme\n");
+      await fixture.write("docs/a.md", "a\n");
+      fixture.commit("base");
+      fixture.git("checkout", "-q", "-b", "feature");
+      await fixture.write("config.json", '{ "rules": [] }\n');
+      await fixture.write("README.md", "readme, edited\n");
+      await fixture.write("docs/a.md", "a, edited\n");
+
+      const repository = await open(
+        path.join(fixture.repo, "docs"),
+        fixture.env,
+      );
+      const mergeBase = await mergeBaseWithMain(repository);
+      // A path out of the work tree has no history and is skipped; one inside the root is reported
+      // once however it is asked for; the root-level README, not asked for, stays out.
+      const asked = ["../config.json", "../../outside.json", "a.md"];
+      const expected = [
+        { status: "M", path: "../config.json" },
+        { status: "M", path: "a.md" },
+      ];
+      expect(
+        await repository.changedPaths(mergeBase, {
+          worktree: true,
+          alsoPaths: asked,
+        }),
+      ).toEqual(expected);
+      expect(
+        await repository.changedPaths(mergeBase, { worktree: true }),
+      ).toEqual([{ status: "M", path: "a.md" }]);
+      expect(await repository.readBlobs(mergeBase, asked)).toEqual(
+        new Map([
+          ["../config.json", "{}\n"],
+          ["a.md", "a\n"],
+        ]),
+      );
+
+      fixture.commit("feature");
+      expect(
+        await repository.changedPaths(mergeBase, {
+          worktree: false,
+          alsoPaths: asked,
+        }),
+      ).toEqual(expected);
     },
     TIMEOUT_MS,
   );
