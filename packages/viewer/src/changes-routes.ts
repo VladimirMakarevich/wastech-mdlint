@@ -43,7 +43,7 @@ export class ChangesRoutes {
   ): Promise<void> {
     const { ctx } = this;
     if (ctx.changes === undefined) {
-      ctx.sendNotFound(request, response, NO_CHANGES);
+      await ctx.sendNotFound(request, response, NO_CHANGES);
       return;
     }
     const worktree = worktreeOf(params);
@@ -53,7 +53,7 @@ export class ChangesRoutes {
     sendHtml(
       response,
       200,
-      ctx.page({
+      await ctx.page({
         title: "Changes",
         section: "changes",
         article: renderChangesArticle(

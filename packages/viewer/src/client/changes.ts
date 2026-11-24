@@ -1,19 +1,26 @@
 import { onServerEvent } from "./live-reload.js";
+import {
+  changeLetter,
+  changesCount,
+  drawnByServer,
+  markElement,
+  reviewDot,
+  type ChangeLetter,
+  type ReviewStatus,
+} from "./tree-marks.js";
 
 // The branch's changes, shown wherever a reader is: a count on the header's Changes section, and a
 // letter beside each changed file in the tree with a switch to show only those. With review marks,
 // the count is what is left to review, a dot marks each changed file not yet reviewed, and a second
-// switch shows only those. Fetched, like the
-// findings, because every page shows them and none but a document's own page should wait for git to
-// answer before it is drawn. A changed document's page, which does wait, is marked on the server:
-// the line above its text, its changed blocks and its outline.
-
-type ReviewStatus = "unreviewed" | "reviewed" | "changed";
+// switch shows only those. The server draws them into every page from the review it keeps, without
+// asking git again, so no page but a document's own waits for git before it is drawn; they are asked
+// for here when an event says they moved, and as the page opens when the server had none to draw or
+// no watcher to say when they move.
 
 type ChangedDocument = {
   path: string;
   oldPath?: string;
-  status: "A" | "M" | "D" | "R";
+  status: ChangeLetter;
   review: { status: ReviewStatus } | null;
 };
 
@@ -21,21 +28,12 @@ type Changes =
   | {
       status: "ready";
       documents: ChangedDocument[];
-      review: { state: "ready"; left: number; total: number } | null;
+      review:
+        | { state: "ready"; left: number; total: number }
+        | { state: "unavailable" }
+        | null;
     }
   | { status: "unavailable"; message: string };
-
-const REVIEW_NAMES: Record<Exclude<ReviewStatus, "reviewed">, string> = {
-  unreviewed: "Not reviewed yet",
-  changed: "Changed since your review",
-};
-
-const STATUS_NAMES: Record<ChangedDocument["status"], string> = {
-  A: "Added in this branch",
-  M: "Modified in this branch",
-  D: "Deleted in this branch",
-  R: "Renamed in this branch",
-};
 
 // Remembered for this address, like the findings switch.
 const FILTER_KEY = "wastech-mdlint-viewer:tree-changed-only";
@@ -53,7 +51,11 @@ export function initChanges(): void {
   const refresh = () => {
     void load(section);
   };
-  refresh();
+  if (drawnByServer("changes")) {
+    filterReady = true;
+  } else {
+    refresh();
+  }
   onServerEvent("change", refresh);
   // A mark saved on any page changes what is left everywhere, and a commit, a checkout or a fetch
   // can change what changed at all.
@@ -81,23 +83,17 @@ async function load(section: HTMLAnchorElement): Promise<void> {
 
 function markSection(section: HTMLAnchorElement, data: Changes): void {
   section.querySelector(".segment-count")?.remove();
-  const count = data.status === "ready" ? data.documents.length : 0;
-  if (count === 0) {
+  if (data.status !== "ready") {
     return;
   }
-  const badge = document.createElement("span");
-  badge.className = "segment-count";
-  const review = data.status === "ready" ? data.review : null;
-  if (review?.state !== "ready") {
-    badge.textContent = String(count);
-    badge.title = `${count} changed ${count === 1 ? "document" : "documents"}`;
-  } else {
-    // What is left, against everything that changed: the queue a reviewer works down.
-    badge.textContent = `${review.left}/${review.total}`;
-    badge.title = `${review.left} of ${review.total} changed ${review.total === 1 ? "document" : "documents"} left to review`;
-    badge.classList.toggle("is-done", review.left === 0);
+  const review = data.review?.state === "ready" ? data.review : null;
+  const count = changesCount(
+    data.documents.length,
+    review === null ? null : { left: review.left, total: review.total },
+  );
+  if (count !== undefined) {
+    section.append(markElement(count));
   }
-  section.append(badge);
 }
 
 function markTree(changed: Map<string, ChangedDocument>): void {
@@ -119,44 +115,35 @@ function markTree(changed: Map<string, ChangedDocument>): void {
       link.getAttribute("href")!.slice("/doc/".length),
     );
     const entry = changed.get(relPath);
-    if (entry === undefined) {
-      continue;
+    if (entry !== undefined) {
+      markFile(link, entry);
     }
-    const mark = document.createElement("span");
-    mark.className = `tree-change tree-change-${entry.status}`;
-    mark.textContent = entry.status;
-    mark.title =
-      entry.oldPath === undefined
-        ? STATUS_NAMES[entry.status]
-        : `${STATUS_NAMES[entry.status]}, from ${entry.oldPath}`;
-    // Before a findings count, so the two read in the same place on every row that has both.
-    const badge = link.querySelector(".tree-badge");
-    if (badge === null) {
-      link.append(mark);
-    } else {
-      badge.before(mark);
-    }
-    const left =
-      entry.review !== null && entry.review.status !== "reviewed"
-        ? entry.review.status
-        : undefined;
-    if (left !== undefined) {
-      const dot = document.createElement("span");
-      dot.className = `tree-review-dot tree-review-${left}`;
-      dot.setAttribute("role", "img");
-      dot.setAttribute("aria-label", REVIEW_NAMES[left]);
-      dot.title = REVIEW_NAMES[left];
-      mark.after(dot);
-    }
-    for (
-      let item = link.closest("li");
-      item !== null;
-      item = item.parentElement?.closest(".sidebar li") ?? null
-    ) {
-      item.dataset.changed = "";
-      if (left !== undefined) {
-        item.dataset.unreviewed = "";
-      }
+  }
+}
+
+// The letter and the dot on one file's row, and the flags its row and every folder above it carry
+// for the switches.
+function markFile(link: HTMLAnchorElement, entry: ChangedDocument): void {
+  const mark = markElement(changeLetter(entry));
+  // Before a findings count, so the two read in the same place on every row that has both.
+  const badge = link.querySelector(".tree-badge");
+  if (badge === null) {
+    link.append(mark);
+  } else {
+    badge.before(mark);
+  }
+  const dot = reviewDot(entry.review?.status ?? null);
+  if (dot !== undefined) {
+    mark.after(markElement(dot));
+  }
+  for (
+    let item = link.closest("li");
+    item !== null;
+    item = item.parentElement?.closest(".sidebar li") ?? null
+  ) {
+    item.dataset.changed = "";
+    if (dot !== undefined) {
+      item.dataset.unreviewed = "";
     }
   }
 }

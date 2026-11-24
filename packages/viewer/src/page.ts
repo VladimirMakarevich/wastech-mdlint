@@ -1,17 +1,18 @@
 import type { Element, ElementContent, Root } from "hast";
 import { toHtml } from "hast-util-to-html";
-import { h, s } from "hastscript";
+import { type Child, h, s } from "hastscript";
 
-import {
-  compareStrings,
-  type FrontmatterValue,
-  type ParsedFrontmatter,
-  type ParsedHeading,
+import type {
+  FrontmatterValue,
+  ParsedFrontmatter,
+  ParsedHeading,
 } from "@wastech-mdlint/core";
 
 import type { BlockChange } from "./change-marks.js";
+import { renderTree } from "./page-tree.js";
 import type { SectionMark } from "./review-state.js";
 import { documentHref } from "./render-document.js";
+import { changesCount, type TreeMarks } from "./tree-marks.js";
 
 // Every page is assembled as a hast tree and serialized once, so text from the repository — file
 // names, headings, front matter values — is escaped by construction. The only markup inserted as a
@@ -79,6 +80,15 @@ export type PageParams = {
   // Whether review marks are on — a git work tree, on a loopback binding — so the tree also has a
   // switch for the changed files not yet reviewed. The same on every page, like `showChanges`.
   showReview?: boolean;
+  // The marks beside the tree's files and on the Changes section, drawn into the page so it is whole
+  // from its first frame.
+  marks?: TreeMarks;
+  // The number of the last server event the page's state includes; its script connects to the event
+  // stream with it and is sent whatever came after.
+  eventSequence?: number;
+  // On a document with findings, once the first lint is in: the panel that lists them, above
+  // everything else in the article.
+  findingsPanel?: Element;
 };
 
 export type Section = "graph" | "dashboard" | "changes" | "config";
@@ -93,6 +103,11 @@ export type Section = "graph" | "dashboard" | "changes" | "config";
  * entry to the first element with it, the viewer's own.
  */
 export const CONTENT_ID = "viewer.content";
+
+// The id of an empty element at the very end of the page, which the page is not drawn before (see
+// `renderHead`). An element of its own rather than the layout around the tree and the article, since
+// a browser stops waiting for an element as soon as it has read its start tag.
+const END_ID = "viewer.end";
 
 // The theme switch's three choices, one segment each. The stylesheet marks the chosen one from the
 // choice `theme.js` applied before the first paint, so the control is right from the first frame
@@ -152,6 +167,7 @@ export function renderPage(params: PageParams): string {
               h(
                 `article.markdown-body${params.blameToggle?.on === true ? ".has-blame" : ""}`,
                 [
+                  params.findingsPanel,
                   params.changeBanner ?? params.historyLine,
                   renderFrontmatter(
                     params.frontmatter ?? null,
@@ -163,6 +179,7 @@ export function renderPage(params: PageParams): string {
             ]),
             renderRail(params),
           ]),
+          h("div", { id: END_ID, hidden: true }),
         ]),
       ]),
     ],
@@ -187,6 +204,12 @@ function renderHead(params: PageParams): Element {
           name: "wastech-change-token",
           content: params.changeToken,
         }),
+    params.eventSequence === undefined
+      ? undefined
+      : h("meta", {
+          name: "wastech-events",
+          content: String(params.eventSequence),
+        }),
     h("title", `${params.title} · ${params.siteName}`),
     h("link", { rel: "icon", href: "/favicon.ico" }),
     // Classic and blocking, ahead of the stylesheet, so a stored theme is applied before the
@@ -194,6 +217,11 @@ function renderHead(params: PageParams): Element {
     h("script", { src: "/assets/theme.js" }),
     h("link", { rel: "stylesheet", href: "/assets/viewer.css" }),
     h("script", { type: "module", src: "/assets/viewer.js" }),
+    // Nothing of the page is drawn until all of it has been read. The blocking script after the tree
+    // stops the parser while it is fetched, and the browser drew what it had by then — the header and
+    // the tree over an empty article — one frame before the rest, so a navigation blinked through an
+    // empty page. Browsers that do not know this link draw as before.
+    h("link", { rel: "expect", href: `#${END_ID}`, blocking: "render" }),
   ]);
 }
 
@@ -266,7 +294,12 @@ function renderSectionNav(params: PageParams): Element {
     ),
     sectionLink(params, "dashboard", "/dashboard", "Dashboard"),
     params.showChanges === true
-      ? sectionLink(params, "changes", "/changes", "Changes")
+      ? sectionLink(params, "changes", "/changes", [
+          "Changes",
+          params.marks?.changes === undefined
+            ? undefined
+            : changesCount(params.marks.changes),
+        ])
       : undefined,
     sectionLink(params, "config", "/config", "Config"),
   ]);
@@ -308,19 +341,29 @@ function renderThemeSwitch(): Element {
 }
 
 function renderSidebar(params: PageParams): Element {
+  const current = params.marks?.current ?? [];
   return h("div.sidebar-frame", [
-    h("nav.sidebar", { ariaLabel: "Documents" }, [
-      // On a phone the tree folds behind this row, so the article starts under the header
-      // rather than below a screenful of file names; the tree-state script closes it there
-      // before the first paint. On a wider screen the row is not drawn and the tree stays
-      // open, and without script it is open everywhere, as a list that cannot be opened
-      // would be no list at all.
-      h("details.sidebar-disclosure", { open: true }, [
-        h("summary.sidebar-summary", "Documents"),
-        ...renderTreeFilters(params),
-        renderTree(params.documentPaths, params.documentPath),
-      ]),
-    ]),
+    h(
+      "nav.sidebar",
+      {
+        ariaLabel: "Documents",
+        // Which marks in the tree are current, so the page script does not ask for them again and
+        // the tree-state script may narrow the tree to them before the first paint.
+        dataMarked: current.length === 0 ? undefined : current.join(" "),
+      },
+      [
+        // On a phone the tree folds behind this row, so the article starts under the header
+        // rather than below a screenful of file names; the tree-state script closes it there
+        // before the first paint. On a wider screen the row is not drawn and the tree stays
+        // open, and without script it is open everywhere, as a list that cannot be opened
+        // would be no list at all.
+        h("details.sidebar-disclosure", { open: true }, [
+          h("summary.sidebar-summary", "Documents"),
+          ...renderTreeFilters(params),
+          renderTree(params.documentPaths, params.documentPath, params.marks),
+        ]),
+      ],
+    ),
     // Classic and blocking, right after the tree, so the folders the reader had open and
     // the tree's scroll position are back before the tree is first painted.
     h("script", { src: "/assets/tree-state.js" }),
@@ -407,7 +450,7 @@ function sectionLink(
   params: PageParams,
   section: Section,
   href: string,
-  text: string,
+  content: Child,
 ): Element {
   return h(
     "a.segment",
@@ -415,100 +458,13 @@ function sectionLink(
       href,
       ariaCurrent: params.section === section ? "page" : undefined,
     },
-    text,
+    content,
   );
 }
 
 /** Article content for an already-sanitized HTML string. */
 export function rawHtml(html: string): ElementContent[] {
   return [{ type: "raw", value: html }];
-}
-
-type DirectoryNode = {
-  name: string;
-  path: string;
-  directories: Map<string, DirectoryNode>;
-  files: string[];
-};
-
-function renderTree(
-  paths: readonly string[],
-  currentPath: string | undefined,
-): Element {
-  const root: DirectoryNode = {
-    name: "",
-    path: "",
-    directories: new Map(),
-    files: [],
-  };
-  for (const relPath of paths) {
-    const segments = relPath.split("/");
-    let directory = root;
-    for (const segment of segments.slice(0, -1)) {
-      const childPath =
-        directory.path === "" ? segment : `${directory.path}/${segment}`;
-      let child = directory.directories.get(segment);
-      if (child === undefined) {
-        child = {
-          name: segment,
-          path: childPath,
-          directories: new Map(),
-          files: [],
-        };
-        directory.directories.set(segment, child);
-      }
-      directory = child;
-    }
-    directory.files.push(relPath);
-  }
-  return renderDirectory(root, currentPath);
-}
-
-// Folders before files, each in code-point order, the way an editor's file tree reads. Only the
-// folders on the way to the current document start open: a few hundred documents fully expanded
-// bury the one being read.
-function renderDirectory(
-  directory: DirectoryNode,
-  currentPath: string | undefined,
-): Element {
-  const directories = [...directory.directories.values()].sort((a, b) =>
-    compareStrings(a.name, b.name),
-  );
-  const files = [...directory.files].sort(compareStrings);
-  return h("ul.tree", [
-    ...directories.map((child) =>
-      h("li", [
-        h(
-          "details",
-          {
-            open: currentPath?.startsWith(`${child.path}/`) === true,
-            // The name the tree-state script keeps an open folder under from page to page.
-            dataFolder: child.path,
-          },
-          [
-            // Names longer than the tree is wide end in an ellipsis; the full path is the tooltip.
-            h("summary", { title: child.path }, [
-              h("span.tree-name", child.name),
-            ]),
-            renderDirectory(child, currentPath),
-          ],
-        ),
-      ]),
-    ),
-    ...files.map((file) =>
-      h("li", [
-        h(
-          "a",
-          {
-            href: documentHref(file),
-            title: file,
-            ariaCurrent: file === currentPath ? "page" : undefined,
-          },
-          [h("span.tree-name", file.split("/").pop() ?? file)],
-        ),
-      ]),
-    ),
-  ]);
 }
 
 function renderRail(params: PageParams): Element | undefined {

@@ -36,7 +36,7 @@ export class ConfigRoutes {
     sendHtml(
       response,
       200,
-      this.ctx.page({
+      await this.ctx.page({
         title: "Linter config",
         section: "config",
         article: await renderConfigArticle(this.ctx.corpus, {

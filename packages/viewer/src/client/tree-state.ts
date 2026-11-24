@@ -41,6 +41,99 @@
     filter.hidden = false;
   }
 
+  // A switch the reader left on narrows the tree here, before the first paint, when the server drew
+  // the marks it narrows to: narrowed only once its module had run, the whole tree showed first, the
+  // switch slid on, and then most rows vanished under the restored scroll position. This repeats
+  // what `applyTreeFilter` in `diagnostics.ts` and `applyFilter` in `changes.ts` do for the same
+  // switches and storage keys, which a classic script cannot import; those modules take over from
+  // here and leave this state as it is, since their data is the same.
+  function storedOn(key: string): boolean {
+    try {
+      return localStorage.getItem(key) === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  // Opens the folders on the way to the rows `attribute` flags, marked as `opener`'s, so turning the
+  // switch off closes them again; says so when no row is flagged.
+  function openTowardFlagged(
+    scroller: HTMLElement,
+    attribute: string,
+    opener: "openedByFilter" | "openedByChangesFilter",
+    empty: HTMLElement | null,
+  ): void {
+    for (const folder of scroller.querySelectorAll<HTMLDetailsElement>(
+      "details",
+    )) {
+      if (
+        folder.parentElement?.hasAttribute(attribute) === true &&
+        !folder.open
+      ) {
+        folder.open = true;
+        folder.dataset[opener] = "";
+      }
+    }
+    if (empty !== null) {
+      empty.hidden = scroller.querySelector(`li[${attribute}]`) !== null;
+    }
+  }
+
+  function switchOf(scroller: HTMLElement, name: string) {
+    return scroller.querySelector<HTMLInputElement>(
+      `.tree-filter-${name} input`,
+    );
+  }
+
+  function narrowToStoredSwitches(scroller: HTMLElement): void {
+    const marked = (scroller.dataset.marked ?? "").split(" ");
+    const findings = switchOf(scroller, "findings");
+    if (
+      marked.includes("findings") &&
+      findings !== null &&
+      storedOn("wastech-mdlint-viewer:tree-findings-only")
+    ) {
+      findings.checked = true;
+      scroller.classList.add("only-findings");
+      openTowardFlagged(
+        scroller,
+        "data-findings",
+        "openedByFilter",
+        scroller.querySelector(".tree-filter-findings-empty"),
+      );
+    }
+    const changed = switchOf(scroller, "changes");
+    if (!marked.includes("changes") || changed === null) {
+      return;
+    }
+    const unreviewed = switchOf(scroller, "unreviewed");
+    changed.checked = storedOn("wastech-mdlint-viewer:tree-changed-only");
+    const leftOnly =
+      unreviewed !== null &&
+      storedOn("wastech-mdlint-viewer:tree-unreviewed-only");
+    if (unreviewed !== null) {
+      unreviewed.checked = leftOnly;
+    }
+    if (!changed.checked && !leftOnly) {
+      return;
+    }
+    scroller.classList.add(leftOnly ? "only-unreviewed" : "only-changed");
+    const empty = scroller.querySelector<HTMLElement>(
+      ".tree-filter-changes-empty",
+    );
+    if (empty !== null) {
+      empty.textContent = leftOnly
+        ? "Nothing left to review."
+        : "No document changed.";
+    }
+    openTowardFlagged(
+      scroller,
+      leftOnly ? "data-unreviewed" : "data-changed",
+      "openedByChangesFilter",
+      empty,
+    );
+  }
+
   // The scroll is kept as the distance into the list rather than into the column, so anything that
   // is above the list on one page and not on the next cannot shift the rows.
   type Saved = { open: string[]; scrolledIntoList: number };
@@ -113,6 +206,11 @@
         folder.open = true;
       }
     }
+  }
+  // After the reader's own folders, so a folder they had open is not taken for one a switch opened,
+  // and before the scroll, which was saved in the tree as narrowed.
+  narrowToStoredSwitches(tree);
+  if (saved !== undefined) {
     tree.scrollTop = listStart() + saved.scrolledIntoList;
   }
 

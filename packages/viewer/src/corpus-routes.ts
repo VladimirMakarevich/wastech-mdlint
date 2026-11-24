@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { ElementContent } from "hast";
+import { toHtml } from "hast-util-to-html";
 import { h } from "hastscript";
 
 import { compareStrings } from "@wastech-mdlint/core";
@@ -22,6 +23,7 @@ import {
   withChanges,
 } from "./graph-view.js";
 import { sendHtml, sendJson } from "./http-send.js";
+import { renderFindingsPanel } from "./findings-panel.js";
 import { findingPrompts } from "./prompts.js";
 import { workTreeChanges } from "./review-queries.js";
 import { pageHeaders } from "./security.js";
@@ -36,11 +38,11 @@ const GRAPH_NOT_FOUND =
 export class CorpusRoutes {
   constructor(private readonly ctx: ViewerContext) {}
 
-  sendSearchPage(
+  async sendSearchPage(
     request: IncomingMessage,
     response: ServerResponse,
     query: string,
-  ): void {
+  ): Promise<void> {
     const hits = this.ctx.search.search(this.ctx.corpus.documents, query);
     const article: ElementContent[] =
       query.trim().length === 0
@@ -67,7 +69,7 @@ export class CorpusRoutes {
     sendHtml(
       response,
       200,
-      this.ctx.page({
+      await this.ctx.page({
         title: query ? `Search: ${query}` : "Search",
         article,
         query,
@@ -130,7 +132,7 @@ export class CorpusRoutes {
   ): Promise<void> {
     const graphRequest = this.parseGraphRequest(params);
     if (graphRequest === undefined) {
-      this.ctx.sendNotFound(request, response, GRAPH_NOT_FOUND);
+      await this.ctx.sendNotFound(request, response, GRAPH_NOT_FOUND);
       return;
     }
     const view = await this.graphWithChanges(
@@ -145,7 +147,7 @@ export class CorpusRoutes {
     sendHtml(
       response,
       200,
-      this.ctx.page({
+      await this.ctx.page({
         title: "Link graph",
         section: "graph",
         article: renderGraphArticle(
@@ -248,7 +250,7 @@ export class CorpusRoutes {
     sendHtml(
       response,
       parsed.ok ? 200 : 400,
-      this.ctx.page({
+      await this.ctx.page({
         title: "Dashboard",
         section: "dashboard",
         article: renderDashboardArticle(
@@ -325,6 +327,30 @@ export class CorpusRoutes {
       findings:
         document === undefined ? [] : this.ctx.diagnostics.findings(document),
     });
+  }
+
+  /**
+   * `/api/diagnostics/panel?path=…`: a document's findings panel as the page draws it, for the page
+   * script to put in place of its own after a lint, so the panel has one renderer. Empty when the
+   * document has no findings; `204` while the first lint is still running, when the page keeps what
+   * it shows.
+   */
+  sendDiagnosticsPanel(
+    response: ServerResponse,
+    params: URLSearchParams,
+  ): void {
+    if (!this.ctx.diagnostics.ready) {
+      response.writeHead(204, pageHeaders()).end();
+      return;
+    }
+    const relPath = params.get("path");
+    const document =
+      relPath === null ? undefined : this.ctx.corpus.documents.get(relPath);
+    const panel =
+      relPath === null || document === undefined
+        ? undefined
+        : renderFindingsPanel(relPath, this.ctx.diagnostics.findings(document));
+    sendHtml(response, 200, panel === undefined ? "" : toHtml(panel));
   }
 
   async sendPrompts(

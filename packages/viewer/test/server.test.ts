@@ -300,16 +300,33 @@ describe("pages", () => {
   // focusable separator it becomes. Each sits in its column's frame, on the edge toward the article.
   it("puts a width handle on the edge of each side column", async () => {
     const { body } = await get("/doc/docs/guide.md");
-    expect(body).toContain(
-      '<div class="sidebar-frame"><nav class="sidebar" aria-label="Documents">',
+    // `data-marked` is there once the first lint is in, which this test does not wait for.
+    expect(body).toMatch(
+      /<div class="sidebar-frame"><nav class="sidebar" aria-label="Documents"( data-marked="[a-z ]*")?>/,
     );
     expect(body).toContain(
       '<div class="column-resizer" data-column="sidebar" role="separator" aria-orientation="vertical" aria-label="Resize the document tree" tabindex="0" hidden></div></div><main',
     );
     expect(body).toContain('<div class="rail-frame"><aside class="rail">');
     expect(body).toMatch(
-      /<\/aside><div class="column-resizer" data-column="rail" role="separator" aria-orientation="vertical" aria-label="Resize the side column" tabindex="0" hidden><\/div><\/div><\/div><\/body>/,
+      /<\/aside><div class="column-resizer" data-column="rail" role="separator" aria-orientation="vertical" aria-label="Resize the side column" tabindex="0" hidden><\/div><\/div><\/div><div id="viewer\.end" hidden><\/div><\/body>/,
     );
+  });
+
+  // The blocking script after the tree stops the parser while it is fetched, and a browser drew the
+  // header and the tree over an empty article for one frame. Every page is held until its last
+  // element is read; that element is an empty one of its own at the very end, since a browser stops
+  // waiting for an element at its start tag, and the layout's start tag comes before the tree.
+  it("is not drawn before all of it has been read", async () => {
+    for (const address of ["/doc/docs/guide.md", "/search?q=x", "/dashboard"]) {
+      const { body } = await get(address);
+      expect(body, address).toContain(
+        '<link rel="expect" href="#viewer.end" blocking="render"></head>',
+      );
+      expect(body, address).toMatch(
+        /<div id="viewer\.end" hidden><\/div><\/body>/,
+      );
+    }
   });
 
   // The tree's open folders and scroll position have to be back before the tree is painted, so the
@@ -329,7 +346,7 @@ describe("pages", () => {
   it("puts a hidden findings-only switch above the tree, in an open disclosure", async () => {
     const { body } = await get("/doc/README.md");
     expect(body).toContain(
-      '<nav class="sidebar" aria-label="Documents"><details class="sidebar-disclosure" open><summary class="sidebar-summary">Documents</summary><label class="tree-filter tree-filter-findings switch-row" hidden><span>Only files with findings</span><input class="switch" type="checkbox" role="switch"></label><p class="tree-filter-empty tree-filter-findings-empty" hidden>No file has findings.</p><ul class="tree">',
+      '<details class="sidebar-disclosure" open><summary class="sidebar-summary">Documents</summary><label class="tree-filter tree-filter-findings switch-row" hidden><span>Only files with findings</span><input class="switch" type="checkbox" role="switch"></label><p class="tree-filter-empty tree-filter-findings-empty" hidden>No file has findings.</p><ul class="tree">',
     );
   });
 
@@ -499,6 +516,52 @@ describe("diagnostics", () => {
         anchor: "fixture-home",
       }),
     ]);
+  });
+
+  // Fetched by the page script, the counts and the panel appeared a moment after every page was
+  // drawn and pushed the article down. Drawn into the page, they are there from its first frame, and
+  // the tree says so, so the script does not ask for them again.
+  it("draws the tree's counts and the findings panel into the page", async () => {
+    await diagnosticsReady();
+    const { body } = await get("/doc/README.md");
+    expect(body).toContain(
+      '<nav class="sidebar" aria-label="Documents" data-marked="findings">',
+    );
+    // What the page includes, so its event stream sends it what came after.
+    expect(body).toMatch(/<meta name="wastech-events" content="\d+">/);
+    expect(body).toContain(
+      '<li data-findings=""><a href="/doc/README.md" title="README.md" aria-current="page"><span class="tree-name">README.md</span><span class="tree-badge tree-badge-error" title="1 error">1</span></a></li>',
+    );
+    // First in the article, above the document's own text.
+    expect(body).toMatch(
+      /<article class="markdown-body"><details class="diagnostics has-errors" open><summary><span class="diagnostics-title">wastech-mdlint: 1 error<\/span><\/summary><ul><li class="diagnostic diagnostic-error"><span class="diagnostic-severity">error<\/span><a class="diagnostic-rule" href="https:[^"]+" target="_blank" rel="noopener noreferrer">REF-001<\/a>/,
+    );
+    expect(body).toContain(
+      '<a class="diagnostic-line" href="#fixture-home">line 5</a><button class="prompt-menu" type="button" hidden title="Copy a prompt that answers this finding" data-path="README.md" data-rule="REF-001" data-finding-line="5">Prompt</button>',
+    );
+    const clean = await get("/doc/docs/guide.md");
+    expect(clean.body).not.toContain('class="diagnostics');
+  });
+
+  // After a lint the page script puts the server's panel in place of its own, so the panel has one
+  // renderer: the answer is the very markup the page was drawn with, and nothing for a clean document.
+  it("answers a document's panel as the page draws it", async () => {
+    await diagnosticsReady();
+    const page = (await get("/doc/README.md")).body;
+    const drawn = /<details class="diagnostics[\s\S]*?<\/details>/.exec(
+      page,
+    )?.[0];
+    const panel = await get("/api/diagnostics/panel?path=README.md");
+    expect(panel.status).toBe(200);
+    expect(panel.headers["content-type"]).toBe("text/html; charset=utf-8");
+    expect(panel.body).toBe(drawn);
+    for (const relPath of ["docs/guide.md", "nope.md"]) {
+      const empty = await get(
+        `/api/diagnostics/panel?path=${encodeURIComponent(relPath)}`,
+      );
+      expect(empty.status, relPath).toBe(200);
+      expect(empty.body, relPath).toBe("");
+    }
   });
 });
 

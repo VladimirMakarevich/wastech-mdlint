@@ -67,6 +67,7 @@ export class ChangeTracker {
     Review,
     Promise<ReviewContext | undefined>
   >();
+  private warming: Promise<void> = Promise.resolve();
 
   private constructor(
     private readonly corpus: Corpus,
@@ -105,6 +106,35 @@ export class ChangeTracker {
   /** The review kept for a mode, without asking git whether it is still current. */
   cached(worktree: boolean): Review | undefined {
     return this.cache.get(worktree)?.result;
+  }
+
+  /**
+   * Compute the work-tree review and what it does to the context in the background, ahead of the
+   * first page that needs them. The context — the base linted beside the head — is what the Changes
+   * page, the dashboard's Branch column and a changed document's small graph wait for, a second or so
+   * on a corpus of six hundred documents. Every page used to ask for the changes as it opened, which
+   * computed it on the way; pages now draw the branch's marks from the review alone, so without this
+   * the first of those pages waited for all of it.
+   */
+  warm(): void {
+    const run = this.review(true)
+      .then((review) =>
+        "available" in review ? undefined : this.context(review),
+      )
+      .then(
+        () => undefined,
+        () => undefined,
+      );
+    this.warming = Promise.all([this.warming, run]).then(() => undefined);
+  }
+
+  /**
+   * Resolves once every warm-up started so far has finished, so the viewer can close without git
+   * still running in the repository: on Windows a directory a process is working in cannot be
+   * removed, and a test's temporary repository could not be cleaned up.
+   */
+  idle(): Promise<void> {
+    return this.warming;
   }
 
   /** Forget every review; the next request computes a fresh one. */

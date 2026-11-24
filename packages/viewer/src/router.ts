@@ -89,17 +89,11 @@ export class ViewerRouter {
   private pageRoutes(): [string, Route][] {
     const { documents, review, config, pages, ctx } = this;
     return [
-      [
-        "/",
-        (_request, response) => {
-          documents.redirectToIndex(response);
-        },
-      ],
+      ["/", (_request, response) => documents.redirectToIndex(response)],
       [
         "/search",
-        (request, response, params) => {
-          pages.sendSearchPage(request, response, params.get("q") ?? "");
-        },
+        (request, response, params) =>
+          pages.sendSearchPage(request, response, params.get("q") ?? ""),
       ],
       [
         "/graph",
@@ -179,6 +173,12 @@ export class ViewerRouter {
         "/api/diagnostics",
         (_request, response, params) => {
           pages.sendDiagnostics(response, params);
+        },
+      ],
+      [
+        "/api/diagnostics/panel",
+        (_request, response, params) => {
+          pages.sendDiagnosticsPanel(response, params);
         },
       ],
       [
@@ -284,7 +284,7 @@ export class ViewerRouter {
         return;
       }
     }
-    this.ctx.sendNotFound(
+    await this.ctx.sendNotFound(
       request,
       response,
       "There is no page at this address.",

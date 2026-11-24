@@ -120,28 +120,28 @@ html {
   scrollbar-gutter: stable;
 }
 
-/* Moving between pages is a full page load, so the header and the tree are rebuilt each time. Taken
-   as named parts of a cross-document view transition, they are carried over as they were instead of
-   being repainted with the rest: the bar and the tree stay still while only the content between them
-   changes. Browsers without cross-document transitions load the page as before. */
+/* Moving between pages is a full page load. As a cross-document view transition, the old page stays
+   on screen until the new one can be drawn, and the new one then replaces it in a single frame.
+   Browsers without cross-document transitions load the page as before.
+
+   Nothing fades. Laid over each other without a fade, the old and the new picture of the bar showed
+   wherever they differed — a longer path, which the bar's translucent material also lets through —
+   as doubled text for the whole transition; crossfading the article laid two texts over each other;
+   and fading the new article in left an empty frame between the two pages, which reads as a blink.
+   The new page is drawn with every mark already in place, so what it shows first is what stays. */
 @media (prefers-reduced-motion: no-preference) {
   @view-transition {
     navigation: auto;
   }
 }
 
-::view-transition-group(topbar),
-::view-transition-old(topbar),
-::view-transition-new(topbar),
-::view-transition-group(sidebar),
-::view-transition-old(sidebar),
-::view-transition-new(sidebar) {
-  animation: none;
+::view-transition-old(*) {
+  display: none;
 }
 
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 120ms;
+::view-transition-group(*),
+::view-transition-new(*) {
+  animation: none;
 }
 
 body {
@@ -481,7 +481,6 @@ a:hover {
    Top bar
    --------------------------------------------------------------------------------------------- */
 .topbar {
-  view-transition-name: topbar;
   position: sticky;
   top: 0;
   z-index: 5;
@@ -700,6 +699,28 @@ a:hover {
 :root[data-script] .settings-toggle[hidden],
 :root[data-script] .copy-path[hidden] {
   display: inline-flex;
+}
+
+/* The same for the controls in the page that take room: a document's history line, the box the
+   local graph is drawn in and its hint, the review checkboxes and buttons, and the prompt buttons.
+   Shown only once their module had run, each pushed what was below or beside it aside after the page
+   was drawn — the history line the whole article, the graph's box the outline by its height. Each
+   module still unhides its own, which then changes nothing; none of them hides one again. A button
+   in a corner that takes no room, such as the code block's Copy, is left to appear with its script. */
+:root[data-script] .changes-history[hidden],
+:root[data-script] .local-graph-canvas[hidden],
+:root[data-script] .local-graph-hint[hidden] {
+  display: block;
+}
+
+:root[data-script] .review-toggle[hidden],
+:root[data-script] .review-reset[hidden],
+:root[data-script] .prompt-menu[hidden] {
+  display: inline-flex;
+}
+
+:root[data-script] .section-mark[hidden] {
+  display: inline-block;
 }
 
 /* The theme as three icon segments. Which one is chosen is read from the choice on <html>, which the
@@ -1108,7 +1129,6 @@ a:hover {
 /* The frame stays put while the tree inside it scrolls, so the width handle on its edge spans the
    full height wherever the tree is scrolled to. */
 .sidebar-frame {
-  view-transition-name: sidebar;
   position: sticky;
   top: var(--topbar-height);
   height: calc(100vh - var(--topbar-height));

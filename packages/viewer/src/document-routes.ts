@@ -241,7 +241,7 @@ export class DocumentRoutes {
     const document =
       relPath === undefined ? undefined : corpus.documents.get(relPath);
     if (relPath === undefined || document === undefined) {
-      this.ctx.sendNotFound(
+      await this.ctx.sendNotFound(
         request,
         response,
         "This path is not a document in the corpus. The viewer shows the Markdown files the wastech-mdlint config includes.",
@@ -269,7 +269,7 @@ export class DocumentRoutes {
     sendHtml(
       response,
       200,
-      this.ctx.page(this.withReviewParts(params, shown, introChanged)),
+      await this.ctx.page(this.withReviewParts(params, shown, introChanged)),
       request.method === "HEAD",
     );
   }
@@ -457,7 +457,7 @@ export class DocumentRoutes {
         ? await corpus.resolveFile(relPath)
         : undefined;
     if (relPath === undefined || absolutePath === undefined) {
-      this.ctx.sendNotFound(
+      await this.ctx.sendNotFound(
         request,
         response,
         "The viewer serves only the repository files a document links to, and no document links here.",
@@ -478,7 +478,7 @@ export class DocumentRoutes {
     sendHtml(
       response,
       200,
-      this.ctx.page({
+      await this.ctx.page({
         title: relPath,
         article: await sourceArticle(relPath, absolutePath),
         displayPath: relPath,
@@ -488,7 +488,7 @@ export class DocumentRoutes {
     );
   }
 
-  redirectToIndex(response: ServerResponse): void {
+  async redirectToIndex(response: ServerResponse): Promise<void> {
     const { corpus } = this.ctx;
     const index = ["README.md", "readme.md", "index.md"].find((name) =>
       corpus.documents.has(name),
@@ -498,7 +498,7 @@ export class DocumentRoutes {
       sendHtml(
         response,
         200,
-        this.ctx.page({
+        await this.ctx.page({
           title: "No documents",
           article: [
             h("h1", "No documents"),

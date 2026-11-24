@@ -1,24 +1,15 @@
 import { onServerEvent } from "./live-reload.js";
-import { initPromptButtons, promptButton } from "./prompts.js";
+import { initPromptButtons } from "./prompts.js";
+import { drawnByServer, findingsBadge, markElement } from "./tree-marks.js";
 
 // wastech-mdlint's findings, shown where they apply: a panel above the document they are about, and
-// a count beside every file in the tree that has any. The server lints in the background after a
-// change and announces a `diagnostics` event when new results are in, so both are fetched here
-// rather than rendered into the page — a page would otherwise show findings for the text before
-// the edit that triggered its reload.
-
-type Finding = {
-  ruleId: string;
-  severity: "error" | "warning";
-  message: string;
-  line: number;
-  anchor?: string;
-  helpUri?: string;
-};
-
-type DocumentDiagnostics =
-  | { status: "pending" }
-  | { status: "ready"; findings: Finding[] };
+// a count beside every file in the tree that has any. The server draws both into the page once its
+// first lint is in, and lints again after every change, announcing a `diagnostics` event when the new
+// results are in; only then are they asked for here and drawn again. A page served before the first
+// lint finished has neither, and asks as it opens.
+//
+// A page reloaded after a save has its findings right: the server lints on the same turn it tells
+// the pages of the change, so the reload is answered after the lint.
 
 type Summary =
   | { status: "pending" }
@@ -32,13 +23,22 @@ const TREE_FILTER_KEY = "wastech-mdlint-viewer:tree-findings-only";
 
 export function initDiagnostics(documentPath: string | undefined): void {
   initTreeFilter();
+  // The panel's buttons as the server drew them.
+  const drawn = document.querySelector(".diagnostics");
+  if (drawn !== null) {
+    initPromptButtons(drawn);
+  }
   const refresh = () => {
     void refreshTree();
     if (documentPath !== undefined) {
       void refreshPanel(documentPath);
     }
   };
-  refresh();
+  if (drawnByServer("findings")) {
+    treeFilterReady = true;
+  } else {
+    refresh();
+  }
   onServerEvent("diagnostics", refresh);
 }
 
@@ -51,91 +51,40 @@ async function fetchJson<T>(url: string): Promise<T | undefined> {
   }
 }
 
+/**
+ * Put the server's panel for the document in place of the one shown, keeping it folded if the
+ * reader folded it. Nothing changes while the server's first lint is still running (`204`), and the
+ * panel goes when the document has no findings left (an empty answer).
+ */
 async function refreshPanel(documentPath: string): Promise<void> {
-  const data = await fetchJson<DocumentDiagnostics>(
-    `/api/diagnostics?path=${encodeURIComponent(documentPath)}`,
-  );
-  if (data?.status !== "ready") {
+  let response: Response;
+  try {
+    response = await fetch(
+      `/api/diagnostics/panel?path=${encodeURIComponent(documentPath)}`,
+    );
+  } catch {
     return;
   }
-  document.querySelector(".diagnostics")?.remove();
-  if (data.findings.length === 0) {
+  if (response.status !== 200) {
     return;
   }
-  const article = document.querySelector(".markdown-body");
-  const element = panel(documentPath, data.findings);
-  article?.prepend(element);
-  initPromptButtons(element);
-}
-
-function panel(
-  documentPath: string,
-  findings: readonly Finding[],
-): HTMLElement {
-  const errors = findings.filter(
-    (finding) => finding.severity === "error",
-  ).length;
-  const warnings = findings.length - errors;
-  const details = document.createElement("details");
-  details.className = errors > 0 ? "diagnostics has-errors" : "diagnostics";
-  details.open = true;
-  const summary = document.createElement("summary");
-  // The count in a span of its own, which takes the row's free width and so puts the prompt button
-  // for all findings at the row's right end, level with the per-finding buttons under it.
-  const title = document.createElement("span");
-  title.className = "diagnostics-title";
-  title.textContent = `wastech-mdlint: ${[
-    errors > 0 ? plural(errors, "error") : "",
-    warnings > 0 ? plural(warnings, "warning") : "",
-  ]
-    .filter(Boolean)
-    .join(", ")}`;
-  summary.append(title);
-  if (findings.length > 1) {
-    summary.append(promptButton(documentPath));
+  const html = await response.text();
+  const next = new DOMParser()
+    .parseFromString(html, "text/html")
+    .querySelector<HTMLDetailsElement>("details.diagnostics");
+  const shown = document.querySelector<HTMLDetailsElement>(".diagnostics");
+  if (next === null) {
+    shown?.remove();
+    return;
   }
-  const list = document.createElement("ul");
-  for (const finding of findings) {
-    const item = document.createElement("li");
-    item.className = `diagnostic diagnostic-${finding.severity}`;
-    const severity = document.createElement("span");
-    severity.className = "diagnostic-severity";
-    severity.textContent = finding.severity;
-    const rule = document.createElement(
-      finding.helpUri === undefined ? "span" : "a",
-    );
-    rule.className = "diagnostic-rule";
-    rule.textContent = finding.ruleId;
-    if (rule instanceof HTMLAnchorElement && finding.helpUri !== undefined) {
-      rule.href = finding.helpUri;
-      rule.target = "_blank";
-      rule.rel = "noopener noreferrer";
-    }
-    const message = document.createElement("span");
-    message.className = "diagnostic-message";
-    message.textContent = finding.message;
-    // Findings carry a source line, not an element; the nearest heading above that line is the
-    // closest place on the rendered page to send the reader. Above the first heading, that is the
-    // top of the main column, whose id (`viewer.content`, from `page.ts`) holds a `.` so no heading
-    // slug can take it.
-    const where = document.createElement("a");
-    where.className = "diagnostic-line";
-    where.href =
-      finding.anchor === undefined ? "#viewer.content" : `#${finding.anchor}`;
-    // Line 0 is how a rule reports a finding about the file as a whole, such as its size.
-    where.textContent =
-      finding.line > 0 ? `line ${finding.line}` : "whole file";
-    item.append(
-      severity,
-      rule,
-      message,
-      where,
-      promptButton(documentPath, finding),
-    );
-    list.append(item);
+  const placed = document.importNode(next, true);
+  if (shown === null) {
+    document.querySelector(".markdown-body")?.prepend(placed);
+  } else {
+    placed.open = shown.open;
+    shown.replaceWith(placed);
   }
-  details.append(summary, list);
-  return details;
+  initPromptButtons(placed);
 }
 
 async function refreshTree(): Promise<void> {
@@ -155,21 +104,13 @@ async function refreshTree(): Promise<void> {
     const relPath = decodeURIComponent(
       link.getAttribute("href")!.slice("/doc/".length),
     );
-    const counts = data.files[relPath];
+    const counts = Object.hasOwn(data.files, relPath)
+      ? data.files[relPath]
+      : undefined;
     if (counts === undefined) {
       continue;
     }
-    const badge = document.createElement("span");
-    badge.className =
-      counts.errors > 0 ? "tree-badge tree-badge-error" : "tree-badge";
-    badge.textContent = String(counts.errors + counts.warnings);
-    badge.title = [
-      counts.errors > 0 ? plural(counts.errors, "error") : "",
-      counts.warnings > 0 ? plural(counts.warnings, "warning") : "",
-    ]
-      .filter(Boolean)
-      .join(", ");
-    link.append(badge);
+    link.append(markElement(findingsBadge(counts)));
     // The file's row and every folder above it, so the filter below can keep the way to it open.
     for (
       let item = link.closest("li");
@@ -257,8 +198,4 @@ function writeStored(value: string): void {
   } catch {
     // The choice holds for this page only.
   }
-}
-
-function plural(count: number, noun: string): string {
-  return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }

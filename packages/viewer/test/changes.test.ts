@@ -165,6 +165,9 @@ describe.skipIf(!hasGit)("the Changes section (requires git on PATH)", () => {
 
   it("adds Changes to the header, between Dashboard and Config, on every page alike", async () => {
     const headers = new Set<string>();
+    // Every page counts the changes from the review the server keeps; asking for it first makes
+    // that review, so every page below draws the same count.
+    await get(port, "/api/changes");
     for (const address of [
       "/graph",
       "/dashboard",
@@ -181,8 +184,8 @@ describe.skipIf(!hasGit)("the Changes section (requires git on PATH)", () => {
       )
         .replace(' aria-current="page"', "")
         .replace(/<a class="segment" href="\/graph[^"]*"/, "");
-      expect(header, address).toContain(
-        '<a class="segment" href="/dashboard">Dashboard</a><a class="segment" href="/changes">Changes</a><a class="segment" href="/config">Config</a>',
+      expect(header, address).toMatch(
+        /<a class="segment" href="\/dashboard">Dashboard<\/a><a class="segment" href="\/changes">Changes<span class="segment-count" title="\d+ of \d+ changed documents left to review">\d+\/\d+<\/span><\/a><a class="segment" href="\/config">Config<\/a>/,
       );
       // A document page also names its file in the bar; the section pages share one header.
       if (!address.startsWith("/doc/")) {
@@ -481,7 +484,8 @@ describe.skipIf(!hasGit)(
     it("leaves an unchanged document's page as it was", async () => {
       const { body } = await get(port, "/doc/README.md");
       expect(body).not.toContain("changes-banner");
-      expect(body).not.toContain("data-change");
+      // In the article: the tree beside it flags the changed files with `data-changed`.
+      expect(articleOf(body)).not.toContain("data-change");
       expect(body).not.toContain("change-hunks");
     });
 
@@ -506,13 +510,29 @@ describe.skipIf(!hasGit)(
       expect(await tracker.review(true)).toBe(await fresh);
     });
 
+    // Pages draw the branch's marks from the review alone, so the context the Changes page and a
+    // changed document's small graph wait for is computed ahead of them; closing the viewer waits for
+    // it, as git still running in the repository would keep its directory busy.
+    it("computes the review and its context ahead of the pages, and says when it is done", async () => {
+      const corpus = await Corpus.load({ cwd: fixture.repo });
+      const tracker = (await ChangeTracker.open(corpus, {
+        env: fixture.env,
+      }))!;
+      expect(tracker.cached(true)).toBeUndefined();
+      tracker.warm();
+      await tracker.idle();
+      const review = tracker.cached(true);
+      expect(review).toBeDefined();
+      expect(await tracker.context(review!)).toBeDefined();
+    });
+
     // Every block of a document the branch added is new; the line above the text says so once.
     it("marks no blocks on a document the branch added", async () => {
       const { body } = await get(port, "/doc/docs/added.md");
       expect(articleOf(body)).toContain(
         '<span class="changes-banner-text">Added in this branch · +3 −0</span>',
       );
-      expect(body).not.toContain("data-change");
+      expect(articleOf(body)).not.toContain("data-change");
     });
   },
 );

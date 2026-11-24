@@ -117,6 +117,9 @@ export async function startViewer(
   // it; pages opened before it finishes show their findings when the `diagnostics` event arrives.
   const initialLint = setImmediate(() => {
     ctx.relint();
+    if (options.watch && changes !== undefined) {
+      changes.warm();
+    }
   });
 
   return {
@@ -128,6 +131,7 @@ export async function startViewer(
       stopWatching();
       stopWatchingRefs();
       ctx.events.close();
+      await changes?.idle();
       await new Promise<void>((resolve) => {
         server.close(() => {
           resolve();
@@ -227,9 +231,9 @@ async function applyChanges(
   }
   // Every open page answers this event — a document page by reloading and waiting for its review,
   // every other page's script by asking for the changes — so the review they will all join is
-  // started before they ask.
+  // started before they ask, and its context after it.
   if (changes !== undefined && events.size > 0) {
-    void changes.review(true).catch(() => undefined);
+    changes.warm();
   }
   events.broadcast("change", {
     paths: change.changed,
@@ -259,6 +263,7 @@ async function refreshAfterGitMove(
   const after = await changes.review(true).catch(() => undefined);
   if (after !== undefined && after !== before) {
     ctx.events.broadcast("git", {});
+    changes.warm();
   }
 }
 

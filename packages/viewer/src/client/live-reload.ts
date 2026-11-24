@@ -5,8 +5,18 @@ type ChangeEvent = { paths: string[]; structural: boolean };
 
 let events: EventSource | undefined;
 
+// The page is served with the number of the last event its state includes, and connects with it, so
+// the server first sends whatever happened between serving the page and this connection. The
+// listeners are all added in the module scripts' first turn, before any of it can arrive.
 function stream(): EventSource {
-  events ??= new EventSource("/events");
+  const seen = document.querySelector<HTMLMetaElement>(
+    'meta[name="wastech-events"]',
+  )?.content;
+  events ??= new EventSource(
+    seen === undefined
+      ? "/events"
+      : `/events?${new URLSearchParams({ seen }).toString()}`,
+  );
   return events;
 }
 
@@ -41,6 +51,11 @@ export function initLiveReload(documentPath: string | undefined): void {
     if (disconnected) {
       reloadKeepingScroll();
     }
+  });
+  // More happened since the page was served than the server keeps to send again, or the server that
+  // served it has restarted: what the page shows cannot be brought up to date piece by piece.
+  onServerEvent("missed", () => {
+    reloadKeepingScroll();
   });
   onServerEvent("change", (data) => {
     const change = JSON.parse(data) as ChangeEvent;
