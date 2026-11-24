@@ -1,3 +1,4 @@
+import { DashboardRequests } from "./dashboard-requests.js";
 import { onServerEvent } from "./live-reload.js";
 import { initPromptButtons } from "./prompts.js";
 
@@ -29,12 +30,10 @@ export function initDashboard(): void {
   // Only the newest request may change the page: an older answer arriving late would show filters
   // the reader has already moved past.
   let controller: AbortController | undefined;
-  // The address last asked for, which is what the reader has chosen even while its answer is on the
-  // way: the page's own address changes only once an answer lands.
-  let latest = location.pathname + location.search;
+  const requests = new DashboardRequests(location.pathname + location.search);
 
   async function show(address: string): Promise<void> {
-    latest = address;
+    requests.asked(address);
     controller?.abort();
     const current = new AbortController();
     controller = current;
@@ -54,15 +53,14 @@ export function initDashboard(): void {
 
   function schedule(address: () => string): void {
     window.clearTimeout(timer);
+    requests.delayed();
     timer = window.setTimeout(() => {
-      timer = undefined;
       void show(address());
     }, DELAY_MS);
   }
 
   function showNow(address: string): void {
     window.clearTimeout(timer);
-    timer = undefined;
     void show(address);
   }
 
@@ -89,12 +87,10 @@ export function initDashboard(): void {
 
   // Findings arrive after a save, and an edit changes sizes; either way the rows on screen are stale.
   // A change that adds or removes documents reloads the whole page instead, through live reload.
-  // It asks again for the reader's latest choice, not the page's address, which still names the one
-  // before it while that answer is on the way; and a choice still waiting out its delay is left to
-  // run, since it fetches fresh rows anyway — replacing it would drop the reader's newer filter.
   const refresh = () => {
-    if (timer === undefined) {
-      schedule(() => latest);
+    const address = requests.refreshAddress();
+    if (address !== undefined) {
+      schedule(() => address);
     }
   };
   onServerEvent("diagnostics", refresh);
