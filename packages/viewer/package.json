@@ -1,6 +1,6 @@
 {
   "name": "@wastech-mdlint/viewer",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Local web viewer for a repository's Markdown: the corpus wastech-mdlint lints, rendered with diagrams, charts, highlighted code, backlinks and a link graph, reloading as files change.",
   "keywords": [
     "markdown",
@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "@types/hast": "^3.0.5",
-    "@wastech-mdlint/core": "0.3.0",
+    "@wastech-mdlint/core": "0.4.0",
     "echarts": "^6.1.0",
     "hast-util-raw": "^9.2.1",
     "hast-util-sanitize": "^5.0.2",
