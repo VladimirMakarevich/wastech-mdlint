@@ -41,18 +41,31 @@ function connect(
   };
 }
 
+// The id of event `number` in this hub's run.
+function at(number: number): string {
+  return `${hub.sequence.split(".")[0]!}.${number}`;
+}
+
 describe("event stream", () => {
-  it("numbers every event and serves the number of the last one", () => {
+  it("numbers every event within its run and serves the id of the last one", () => {
     hub = new EventHub();
-    expect(hub.sequence).toBe(0);
+    expect(hub.sequence).toMatch(/^[0-9a-f]{8}.0$/);
     const page = connect("/events");
     hub.broadcast("change", { paths: ["a.md"], structural: false });
     hub.broadcast("diagnostics", {});
-    expect(hub.sequence).toBe(2);
+    expect(hub.sequence).toBe(at(2));
     expect(page.text()).toContain(
-      'id: 1\nevent: change\ndata: {"paths":["a.md"],"structural":false}\n\n',
+      `id: ${at(1)}
+event: change
+data: {"paths":["a.md"],"structural":false}
+
+`,
     );
-    expect(page.text()).toContain("id: 2\nevent: diagnostics\ndata: {}\n\n");
+    expect(page.text()).toContain(`id: ${at(2)}
+event: diagnostics
+data: {}
+
+`);
   });
 
   it("sends a page what happened since it was served, and nothing it already includes", () => {
@@ -68,7 +81,7 @@ describe("event stream", () => {
     expect(connect(`/events?seen=${hub.sequence}`).events()).toEqual([]);
     // A stream the browser reconnects by itself names the last event it got.
     expect(
-      connect("/events?seen=0", { "last-event-id": "2" }).events(),
+      connect(`/events?seen=${at(0)}`, { "last-event-id": at(2) }).events(),
     ).toEqual(["git"]);
   });
 
@@ -77,21 +90,46 @@ describe("event stream", () => {
     for (let index = 0; index < 100; index += 1) {
       hub.broadcast("diagnostics", {});
     }
-    expect(connect("/events?seen=1").events()).toEqual(["missed"]);
-    // Served by an earlier run of the server, which counted further than this one has.
-    expect(connect("/events?seen=500").events()).toEqual(["missed"]);
+    expect(connect(`/events?seen=${at(1)}`).events()).toEqual(["missed"]);
+    expect(connect(`/events?seen=${at(500)}`).events()).toEqual(["missed"]);
     // Still kept: the last few are sent again as they were.
-    expect(connect("/events?seen=98").events()).toEqual([
+    expect(connect(`/events?seen=${at(98)}`).events()).toEqual([
       "diagnostics",
       "diagnostics",
     ]);
   });
 
-  it("ignores a number that is not one", () => {
+  // A page whose stream was closed while the server restarted holds a position from the earlier run.
+  // The new run counts from zero again, so by number alone that position can look up to date (the
+  // new run has sent exactly as many events) or like an earlier point of the new run, whose events
+  // would be sent as if they followed the old ones. Either way the page would keep showing what the
+  // old server served — its files, its config — until the reader navigated.
+  it("tells a page served by an earlier run to reload, whatever number it holds", () => {
     hub = new EventHub();
     hub.broadcast("diagnostics", {});
-    expect(connect("/events?seen=-1").events()).toEqual([]);
-    expect(connect("/events?seen=abc").events()).toEqual([]);
+    hub.broadcast("change", { paths: ["a.md"], structural: false });
+    const earlier = { one: at(1), two: at(2) };
+    hub.close();
+
+    hub = new EventHub();
+    hub.broadcast("diagnostics", {});
+    hub.broadcast("git", {});
+    hub.broadcast("diagnostics", {});
+    expect(hub.sequence).not.toBe(earlier.two);
+    // As many events as the page saw, and fewer: neither may read as a position in this run.
+    expect(connect(`/events?seen=${earlier.two}`).events()).toEqual(["missed"]);
+    expect(connect(`/events?seen=${earlier.one}`).events()).toEqual(["missed"]);
+    expect(
+      connect("/events", { "last-event-id": earlier.one }).events(),
+    ).toEqual(["missed"]);
+  });
+
+  it("ignores a position that is not one", () => {
+    hub = new EventHub();
+    hub.broadcast("diagnostics", {});
+    for (const seen of ["-1", "abc", "1", `${at(1)}x`, "ABCDEF12.1"]) {
+      expect(connect(`/events?seen=${seen}`).events(), seen).toEqual([]);
+    }
     expect(connect("/events").events()).toEqual([]);
   });
 });

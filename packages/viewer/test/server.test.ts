@@ -575,7 +575,9 @@ describe("diagnostics", () => {
       '<nav class="sidebar" aria-label="Documents" data-marked="findings">',
     );
     // What the page includes, so its event stream sends it what came after.
-    expect(body).toMatch(/<meta name="wastech-events" content="\d+">/);
+    expect(body).toMatch(
+      /<meta name="wastech-events" content="[0-9a-f]{8}\.\d+">/,
+    );
     expect(body).toContain(
       '<li data-findings=""><a href="/doc/README.md" title="README.md" aria-current="page"><span class="tree-name">README.md</span><span class="tree-badge tree-badge-error" title="1 error">1</span></a></li>',
     );

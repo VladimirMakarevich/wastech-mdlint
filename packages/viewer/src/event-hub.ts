@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 import { assetHeaders } from "./security.js";
@@ -12,18 +13,27 @@ const KEPT_EVENTS = 64;
  * that the review moved or that a mark was saved elsewhere. One stream per open page, written to by
  * every part of the server that changes what a page shows.
  *
- * Every event is numbered, and every page is served with the number of the last one sent before it
+ * Every event is numbered, and every page is served with the id of the last one sent before it
  * (`sequence`). The page draws its tree's marks, the Changes count and its findings from the server's
  * state at that moment and asks for nothing more, so an event sent between serving it and its stream
  * connecting would otherwise be lost, and the page would keep showing the state before it. The page
- * connects with its number, and the events it missed are sent to it first; when they are no longer
- * kept — a burst longer than `KEPT_EVENTS`, or a server that restarted meanwhile and counts from
- * zero again — it is told so with `missed`, and reloads.
+ * connects with that id, and the events it missed are sent to it first; when they are no longer
+ * kept — a burst longer than `KEPT_EVENTS`, or a server that restarted meanwhile — it is told so
+ * with `missed`, and reloads.
+ *
+ * An id is this run's tag and the event's number (`3f9c01ab.12`). A number alone cannot tell a
+ * restarted server from the one that served the page: the new one counts from zero again, and once
+ * it has sent as many events as the page saw — its startup findings alone can be one — the page's
+ * number reads as up to date, or as an earlier point of the new run, whose events would then be sent
+ * as if they followed the old ones. A page that closed its stream while hidden has no lost
+ * connection to tell it the server went away, so the tag is what does.
  */
 export class EventHub {
   private readonly clients = new Set<ServerResponse>();
   private readonly keepAlive: NodeJS.Timeout;
   private latest = 0;
+  // Random rather than a start time, so two runs started within one clock tick still differ.
+  private readonly run = randomBytes(4).toString("hex");
   private readonly kept: { id: number; message: string }[] = [];
 
   constructor() {
@@ -42,9 +52,9 @@ export class EventHub {
     return this.clients.size;
   }
 
-  /** The number of the last event sent, which a page is served with. */
-  get sequence(): number {
-    return this.latest;
+  /** The id of the last event sent, which a page is served with. */
+  get sequence(): string {
+    return this.id(this.latest);
   }
 
   open(request: IncomingMessage, response: ServerResponse): void {
@@ -57,8 +67,10 @@ export class EventHub {
     // Reconnect quickly after a restart, so the page notices the new server within a second.
     response.write("retry: 1000\n\n");
     const seen = seenBy(request);
-    if (seen !== undefined && seen !== this.latest) {
-      response.write(this.since(seen));
+    if (seen !== undefined && seen.run !== this.run) {
+      response.write(this.missed());
+    } else if (seen !== undefined && seen.number !== this.latest) {
+      response.write(this.since(seen.number));
     }
     this.clients.add(response);
     request.on("close", () => this.clients.delete(response));
@@ -67,7 +79,7 @@ export class EventHub {
   broadcast(name: string, data: unknown): void {
     this.latest += 1;
     // The id is what a browser sends back as `Last-Event-ID` when it reconnects on its own.
-    const message = `id: ${this.latest}\nevent: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
+    const message = `id: ${this.id(this.latest)}\nevent: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
     this.kept.push({ id: this.latest, message });
     if (this.kept.length > KEPT_EVENTS) {
       this.kept.shift();
@@ -85,12 +97,19 @@ export class EventHub {
     this.clients.clear();
   }
 
-  // The events after `seen`, or `missed` when they are not all kept. A number past the latest one can
-  // only come from a page an earlier run of the server sent.
+  private id(number: number): string {
+    return `${this.run}.${number}`;
+  }
+
+  private missed(): string {
+    return `id: ${this.id(this.latest)}\nevent: missed\ndata: {}\n\n`;
+  }
+
+  // The events of this run after `seen`, or `missed` when they are not all kept.
   private since(seen: number): string {
     const first = this.kept[0]?.id ?? this.latest + 1;
     if (seen > this.latest || seen + 1 < first) {
-      return `id: ${this.latest}\nevent: missed\ndata: {}\n\n`;
+      return this.missed();
     }
     return this.kept
       .filter((event) => event.id > seen)
@@ -99,17 +118,22 @@ export class EventHub {
   }
 }
 
-// The last event a connecting page has seen: the number it was served with on its first connection,
-// or the id of the last event it received when the browser reconnects the stream by itself.
-function seenBy(request: IncomingMessage): number | undefined {
+// The last event a connecting page has seen: the id it was served with, or the id of the last event
+// it received when it reopens its stream or the browser reconnects it by itself. Anything else —
+// malformed, or a bare number no run of this server sends — is no position to resume from.
+function seenBy(
+  request: IncomingMessage,
+): { run: string; number: number } | undefined {
   const header = request.headers["last-event-id"];
   const query = new URL(
     request.url ?? "/",
     "http://localhost",
   ).searchParams.get("seen");
   const value = typeof header === "string" ? header : query;
-  if (value === null || !/^\d{1,15}$/.test(value)) {
+  const match =
+    value === null ? null : /^([0-9a-f]{8})\.(\d{1,15})$/.exec(value);
+  if (match === null) {
     return undefined;
   }
-  return Number(value);
+  return { run: match[1]!, number: Number(match[2]) };
 }

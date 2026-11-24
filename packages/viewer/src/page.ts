@@ -86,7 +86,7 @@ export type PageParams = {
   marks?: TreeMarks;
   // The number of the last server event the page's state includes; its script connects to the event
   // stream with it and is sent whatever came after.
-  eventSequence?: number;
+  eventSequence?: string;
   // On a document with findings, once the first lint is in: the panel that lists them, above
   // everything else in the article.
   findingsPanel?: Element;
@@ -231,7 +231,7 @@ function renderHead(params: PageParams): Element {
       ? undefined
       : h("meta", {
           name: "wastech-events",
-          content: String(params.eventSequence),
+          content: params.eventSequence,
         }),
     h("title", `${params.title} · ${params.siteName}`),
     h("link", { rel: "icon", href: "/favicon.ico" }),

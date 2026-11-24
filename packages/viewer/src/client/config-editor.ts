@@ -6,7 +6,18 @@
 
 import { copyText } from "./clipboard.js";
 import { button, element, paragraph, section } from "./config-dom.js";
-import { clearDraft, readDraft, storeDraft } from "./config-draft.js";
+import {
+  afterSave,
+  clearDraft,
+  type Draft,
+  draftText,
+  planDrafts,
+  readDraft,
+  readSetAside,
+  rebaseDraft,
+  storeDraft,
+  storeSetAside,
+} from "./config-draft.js";
 import { FieldRenderer } from "./config-fields.js";
 import {
   clone,
@@ -71,7 +82,16 @@ class ConfigEditor {
   // can apply edits to text, so until its preview does, the textarea holds the text without them and
   // stays read-only: typing into it starts over from that text and would drop the edits.
   private foldingDraft = false;
+  // The whole changed file as the last preview built it, while no change has been made since: what
+  // the draft keeps so a change with form edits can still be copied once it can no longer be
+  // previewed against the file.
+  private previewedText: string | undefined;
+  // Set while a save is on its way: the text sent, and whether the reader has changed anything since.
+  private saving: { text: string; edited: boolean } | undefined;
+  // A draft made to an earlier version of the file, offered back above the editor.
+  private setAside: Draft | undefined;
 
+  private readonly notice = element("div", "config-notice");
   private readonly formView = element("div", "config-form-view");
   private readonly textView = element("div", "config-text-view");
   private readonly textarea = document.createElement("textarea");
@@ -103,7 +123,9 @@ class ConfigEditor {
   constructor(
     private readonly root: HTMLElement,
     private readonly api: ConfigApi,
-    private readonly file: { path: string; text: string; hash: string },
+    // Replaced by the saved version once a save lands, so a change made while it was on its way is
+    // previewed, saved and kept as a draft against the file now on disk.
+    private file: { path: string; text: string; hash: string },
     private readonly token: string,
   ) {
     this.text = file.text;
@@ -114,7 +136,7 @@ class ConfigEditor {
   }
 
   start(): void {
-    this.restoreDraft();
+    this.restoreDrafts();
     this.root.hidden = false;
     this.textarea.className = "config-textarea";
     this.textarea.spellcheck = false;
@@ -159,7 +181,12 @@ class ConfigEditor {
     this.bar.hidden = true;
     this.bar.append(this.barText, this.actions);
 
+    this.notice.setAttribute("role", "region");
+    this.notice.setAttribute("aria-label", "Earlier unsaved change");
+    this.renderNotice();
+
     this.root.replaceChildren(
+      this.notice,
       toolbar,
       this.formView,
       this.textView,
@@ -353,6 +380,10 @@ class ConfigEditor {
   }
 
   private changed(): void {
+    this.previewedText = undefined;
+    if (this.saving !== undefined) {
+      this.saving.edited = true;
+    }
     this.saveDraft();
     this.schedulePreview(PREVIEW_DELAY_MS);
   }
@@ -412,6 +443,14 @@ class ConfigEditor {
     this.preview = preview;
     if (this.foldingDraft) {
       this.foldDraft();
+    }
+    // Any change since the request aborted it, so this answer is about the change as it stands.
+    if (
+      (preview.status === "ok" || preview.status === "invalid") &&
+      preview.text !== undefined
+    ) {
+      this.previewedText = preview.text;
+      this.saveDraft();
     }
     this.renderPreview();
   }
@@ -478,11 +517,21 @@ class ConfigEditor {
         paragraph(preview.error, "config-invalid"),
       );
       this.showBar(preview.error);
-      this.actions.append(
-        preview.status === "conflict"
-          ? this.discardButton("Reload the page")
-          : this.discardButton(),
-      );
+      if (preview.status === "conflict") {
+        // The file changed on disk under the change. Reloading keeps the draft: the reloaded page
+        // finds it made to an earlier version and offers it back, to apply to the new file or copy.
+        // The change can be copied from here too, as text, whenever there is one.
+        const text = this.currentText();
+        if (text !== undefined) {
+          this.actions.append(this.copyButton(text), this.downloadButton(text));
+        }
+        const reload = button("Reload the page");
+        reload.addEventListener("click", () => {
+          location.reload();
+        });
+        this.actions.append(reload);
+      }
+      this.actions.append(this.discardButton());
       return;
     }
     this.previewBody.replaceChildren(...okPreview(preview, this.file.path));
@@ -510,13 +559,30 @@ class ConfigEditor {
   }
 
   private renderActions(text: string): void {
-    const copy = button("Copy");
+    this.actions.append(this.copyButton(text), this.downloadButton(text));
+    if (this.api.writeBlocked === null) {
+      const save = button("Save", "config-primary");
+      save.addEventListener("click", () => void this.save(text, save));
+      this.actions.append(save);
+    }
+    this.actions.append(this.discardButton());
+    if (this.api.writeBlocked !== null) {
+      this.actions.append(paragraph(this.api.writeBlocked, "config-save-off"));
+    }
+  }
+
+  private copyButton(text: string, label = "Copy"): HTMLButtonElement {
+    const copy = button(label);
     copy.addEventListener("click", () => {
       void copyText(text).then(
         (copied) => (copy.textContent = copied ? "Copied" : "Copy failed"),
       );
     });
-    const download = button("Download");
+    return copy;
+  }
+
+  private downloadButton(text: string, label = "Download"): HTMLButtonElement {
+    const download = button(label);
     download.addEventListener("click", () => {
       const url = URL.createObjectURL(
         new Blob([text], { type: "application/json" }),
@@ -528,16 +594,7 @@ class ConfigEditor {
       link.click();
       URL.revokeObjectURL(url);
     });
-    this.actions.append(copy, download);
-    if (this.api.writeBlocked === null) {
-      const save = button("Save", "config-primary");
-      save.addEventListener("click", () => void this.save(text, save));
-      this.actions.append(save);
-    }
-    this.actions.append(this.discardButton());
-    if (this.api.writeBlocked !== null) {
-      this.actions.append(paragraph(this.api.writeBlocked, "config-save-off"));
-    }
+    return download;
   }
 
   // Starts over from the file on disk: the draft is dropped and the page loaded again.
@@ -552,7 +609,16 @@ class ConfigEditor {
 
   private async save(text: string, control: HTMLButtonElement): Promise<void> {
     control.disabled = true;
-    let result: { status: string; error?: string; errors?: string[] };
+    // Kept in the draft too: the reload the server starts once the file is written can come before
+    // this request's answer, and the reloaded page has only the draft to tell that it was saved.
+    this.saving = { text, edited: false };
+    this.saveDraft();
+    let result: {
+      status: string;
+      hash?: string;
+      error?: string;
+      errors?: string[];
+    };
     try {
       result = (await (
         await this.post("/api/config/save", { base: this.file.hash, text })
@@ -563,16 +629,12 @@ class ConfigEditor {
         error: "The viewer did not answer; nothing is known to be saved.",
       };
     }
-    if (result.status === "saved") {
-      clearDraft();
-      // The server reloads the corpus for the new config and tells every page, this one included,
-      // to reload; until then the reader knows the write happened.
-      const saved = `Saved to ${this.file.path}. The viewer is reloading the corpus with it.`;
-      this.previewBody.replaceChildren(paragraph(saved, "config-saved"));
-      this.actions.replaceChildren();
-      this.showBar(saved);
+    if (result.status === "saved" && result.hash !== undefined) {
+      this.saved({ text, hash: result.hash });
       return;
     }
+    this.saving = undefined;
+    this.saveDraft();
     control.disabled = false;
     this.preview =
       result.status === "invalid"
@@ -584,26 +646,71 @@ class ConfigEditor {
     this.renderPreview();
   }
 
-  // --- Draft ---------------------------------------------------------------------------------
-
-  private saveDraft(): void {
-    storeDraft(
-      this.hasChanges()
-        ? {
-            base: this.file.hash,
-            text: this.text,
-            edits: this.edits,
-            mode: this.mode,
-          }
-        : undefined,
-    );
-  }
-
-  private restoreDraft(): void {
-    const draft = readDraft();
-    if (draft?.base !== this.file.hash) {
+  // The file on disk is now `saved`. A change the reader made while the save was on its way is not
+  // part of it, so it stays — as the draft and in the editor — now made to the saved file; only a
+  // draft that is exactly what was saved is dropped.
+  private saved(saved: { text: string; hash: string }): void {
+    const remaining = afterSave(this.currentDraft(), saved);
+    this.saving = undefined;
+    this.file = { ...this.file, ...saved };
+    if (remaining === undefined) {
+      this.text = saved.text;
+      this.edits = [];
+      this.previewedText = undefined;
+    }
+    this.saveDraft();
+    // The server reloads the corpus for the new config and tells every page, this one included,
+    // to reload; until then the reader knows the write happened.
+    const message = `Saved to ${this.file.path}. The viewer is reloading the corpus with it.`;
+    if (remaining === undefined) {
+      // A change made and undone while saving left a preview on its way; it has nothing to add.
+      window.clearTimeout(this.previewTimer);
+      this.previewController?.abort();
+      this.previewBody.replaceChildren(paragraph(message, "config-saved"));
+      this.actions.replaceChildren();
+      this.showBar(message);
       return;
     }
+    this.status.textContent = `${message} The change you made since is kept.`;
+    this.schedulePreview(0);
+  }
+
+  // --- Draft ---------------------------------------------------------------------------------
+
+  private currentDraft(): Draft {
+    return {
+      base: this.file.hash,
+      text: this.text,
+      edits: this.edits,
+      mode: this.mode,
+      textEdited: this.text !== this.file.text,
+      full: this.edits.length === 0 ? undefined : this.previewedText,
+      saving: this.saving,
+    };
+  }
+
+  // The changed file as text, when it can be had without the server.
+  private currentText(): string | undefined {
+    return draftText(this.currentDraft());
+  }
+
+  private saveDraft(): void {
+    storeDraft(this.hasChanges() ? this.currentDraft() : undefined);
+  }
+
+  // Restores the draft made to this version of the file, and sets aside one made to another.
+  private restoreDrafts(): void {
+    const plan = planDrafts(readDraft(), readSetAside(), this.file);
+    storeDraft(plan.restore);
+    storeSetAside(plan.setAside);
+    this.setAside = plan.setAside;
+    if (plan.restore !== undefined) {
+      this.restoreDraft(plan.restore);
+    }
+  }
+
+  private restoreDraft(draft: Draft): void {
+    this.previewedText = draft.full;
     this.text = draft.text;
     this.edits = draft.edits;
     if (this.text !== this.file.text) {
@@ -621,6 +728,68 @@ class ConfigEditor {
     // Edits are restored into the form, whichever view they were made in: turning them into text is
     // the server's job, and the form can switch to text once the preview has done it.
     this.mode = this.model === null ? "text" : "form";
+  }
+
+  // A draft made to an earlier version of the file is never applied or dropped without the reader:
+  // the notice says the file changed under it and offers it back until they apply or discard it.
+  private renderNotice(): void {
+    const draft = this.setAside;
+    this.notice.hidden = draft === undefined;
+    if (draft === undefined) {
+      this.notice.replaceChildren();
+      return;
+    }
+    const text = draftText(draft);
+    const actions = element("div", "config-actions");
+    const apply = button("Apply it to the current file", "config-primary");
+    apply.addEventListener("click", () => {
+      this.applySetAside(draft);
+    });
+    actions.append(apply);
+    if (text !== undefined) {
+      actions.append(this.copyButton(text), this.downloadButton(text));
+    }
+    const discard = button("Discard it");
+    discard.addEventListener("click", () => {
+      storeSetAside(undefined);
+      this.setAside = undefined;
+      this.renderNotice();
+    });
+    actions.append(discard);
+    const then =
+      text === undefined
+        ? "Apply it to see it against the current file; it can be copied from there."
+        : "Apply it to see it against the current file, or copy it as it was.";
+    this.notice.replaceChildren(
+      paragraph(
+        `You have an unsaved change made to an earlier version of ${this.file.path}, which has changed on disk since, so it was not restored. ${then}`,
+        "config-notice-text",
+      ),
+      actions,
+    );
+  }
+
+  // Becomes the current draft, made to apply to the file now on disk, and the page is loaded again to
+  // restore it as any draft is restored. It would replace a change the reader has made here since,
+  // so that is asked first.
+  private applySetAside(draft: Draft): void {
+    if (
+      this.hasChanges() &&
+      !window.confirm(
+        "Replace the change you have made on this page with the earlier one?",
+      )
+    ) {
+      return;
+    }
+    // Without storage the reload would restore nothing, and the earlier change would be gone with
+    // the set-aside copy; it stays offered, and can still be copied.
+    if (!storeDraft(rebaseDraft(draft, this.file))) {
+      this.status.textContent =
+        "The browser would not keep the change across a reload, so it cannot be applied here.";
+      return;
+    }
+    storeSetAside(undefined);
+    location.reload();
   }
 
   // An entry as written may name a rule by its alias or in another case; the form shows it by id.
