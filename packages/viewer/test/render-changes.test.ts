@@ -202,6 +202,18 @@ describe("putting back removed blocks", () => {
     );
   });
 
+  // A list that starts at 0 carries `start: 0`, which `|| 1` once read as "no start", numbering the
+  // item put back one too high.
+  it("numbers a removed item of a list that starts at 0 as it was", async () => {
+    const { html } = await renderChange(
+      lines("# T", "", "0. zero", "1. one", "2. two"),
+      lines("# T", "", "0. zero", "1. two"),
+    );
+    expect(html).toContain(
+      '<div class="change-removed-body"><ol><li>one</li></ol></div>',
+    );
+  });
+
   it("puts back a whole removed list as one block, not item by item", async () => {
     const { html } = await renderChange(
       lines("# T", "", "Kept.", "", "- a", "- b", "", "End."),

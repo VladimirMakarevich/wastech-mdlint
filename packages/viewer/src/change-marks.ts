@@ -495,7 +495,7 @@ function detach(block: Block): Element {
   const list = block.container;
   const start =
     list.tagName === "ol"
-      ? (Number(list.properties.start ?? 1) || 1) +
+      ? listStart(list) +
         list.children
           .filter(
             (child): child is Element =>
@@ -511,4 +511,11 @@ function detach(block: Block): Element {
     },
     [node],
   );
+}
+
+// Where an ordered list starts counting. `0` is a start like any other, so only a missing or
+// unreadable value falls back to the default of 1.
+function listStart(list: Element): number {
+  const start = Number(list.properties.start ?? 1);
+  return Number.isFinite(start) ? start : 1;
 }
