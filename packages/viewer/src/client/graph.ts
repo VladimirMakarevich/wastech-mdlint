@@ -3,6 +3,7 @@ import {
   forceSeries,
   isOwnLink,
   LABEL_FONT_SIZE,
+  laidOutAtOnce,
   layoutFor,
   type GraphKind,
   type GraphNode,
@@ -135,8 +136,11 @@ class DrawnGraph {
   // first frame and on a zoom, so names that drift onto each other as documents move would stay
   // drawn on top of each other. Each check renders a frame and so raises `finished` again; the
   // deadline is what ends the loop once the layout has had time to settle, and it starts over
-  // whenever the layout is set moving again: by a resize, a theme switch or a dragged document.
-  private settleUntil = performance.now() + LAYOUT_SETTLE_MS;
+  // whenever the layout is set moving again: by a resize, a theme switch or a dragged document. A
+  // graph laid out before it is drawn has nothing left to settle, and a change to it is laid out at
+  // once too, so a check or two after one is all it needs.
+  private readonly settleFor: number;
+  private settleUntil: number;
   private lastCheck = 0;
   private laidOutFor = { width: 0, height: 0 };
   private resizeTimer: number | undefined;
@@ -148,6 +152,10 @@ class DrawnGraph {
     this.kind = init.kind;
     this.layout = init.layout;
     this.zoom = init.layout.zoom ?? 1;
+    this.settleFor = laidOutAtOnce(init.view, init.kind)
+      ? 2 * LABEL_CHECK_INTERVAL_MS
+      : LAYOUT_SETTLE_MS;
+    this.settleUntil = performance.now() + this.settleFor;
   }
 
   start(): void {
@@ -181,7 +189,7 @@ class DrawnGraph {
     // from scratch, scattering every document. The new option leaves the zoom out, so the reader's
     // zoom stays, and restarts the layout cool, from where each document is.
     onThemeChange(() => {
-      this.settleUntil = performance.now() + LAYOUT_SETTLE_MS;
+      this.settleUntil = performance.now() + this.settleFor;
       this.chart.setOption(
         this.option({
           ...this.layout,
@@ -238,7 +246,7 @@ class DrawnGraph {
       minZoom: this.layout.minZoom,
       maxZoom: this.layout.maxZoom,
     };
-    this.settleUntil = performance.now() + LAYOUT_SETTLE_MS;
+    this.settleUntil = performance.now() + this.settleFor;
     this.chart.setOption(this.option(this.layout));
   }
 
@@ -282,7 +290,7 @@ class DrawnGraph {
       this.relayoutLabels();
     });
     this.chart.getZr().on("mouseup", () => {
-      this.settleUntil = performance.now() + LAYOUT_SETTLE_MS;
+      this.settleUntil = performance.now() + this.settleFor;
     });
   }
 }

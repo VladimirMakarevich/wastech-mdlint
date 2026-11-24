@@ -204,10 +204,21 @@ export function isOwnLink(
 export type ForceSeries = {
   top: number;
   bottom: number;
-  force: Layout["force"] & { friction?: number };
+  force: Layout["force"] & { friction?: number; layoutAnimation: boolean };
   data: ForceNode[];
   links: ForceLink[];
 };
+
+// The most documents a local graph is laid out at once rather than step by step. ECharts runs about
+// five hundred steps, each weighing every document against every other: for a few dozen that is a
+// few milliseconds before the first frame, while a hub with hundreds of neighbors would hold the page
+// up for a noticeable moment, and is drawn settling instead.
+const LOCAL_LAID_OUT_AT_ONCE = 120;
+
+/** Whether ECharts lays the graph out before drawing it, rather than drawing it as it settles. */
+export function laidOutAtOnce(view: GraphView, kind: GraphKind): boolean {
+  return kind === "local" && view.nodes.length <= LOCAL_LAID_OUT_AT_ONCE;
+}
 
 /**
  * Everything in the graph series that steers the layout, with nodes and links in the view's order. A
@@ -237,7 +248,14 @@ export function forceSeries(view: GraphView, layout: Layout): ForceSeries {
     // box above the middle and the bottom fifth always empty.
     top: layout.top,
     bottom: 0,
-    force: { ...layout.force, friction: layout.friction },
+    // The local graph is drawn where it comes to rest. Laid out step by step, its neighbors drifted
+    // onto their ring for the first seconds of every document page, still moving after the page had
+    // settled; the page graph is opened on purpose, and settling is part of reading it.
+    force: {
+      ...layout.force,
+      friction: layout.friction,
+      layoutAnimation: !laidOutAtOnce(view, layout.kind),
+    },
     data: view.nodes.map((node) => {
       const symbolSize = size.get(node.path) ?? 0;
       return {

@@ -180,6 +180,31 @@ describe("local graph layout", () => {
     }
   });
 
+  // Laid out step by step, the neighbors drifted onto their ring for the first seconds of every page.
+  // The ring the tests above measure, run to rest, is what the page now draws first; a hub too large
+  // to lay out before its first frame still settles in view, like the page graph.
+  it("is laid out before it is drawn, unless it is very large", () => {
+    const local = forceSeries(view, layoutFor(view, box, "local"));
+    expect(local.force.layoutAnimation).toBe(false);
+    const hub: GraphView = {
+      folder: "",
+      nodes: [
+        node("docs/index.md", 1),
+        ...Array.from({ length: 200 }, (_, index) =>
+          node(`docs/h${String(index).padStart(3, "0")}.md`, 0),
+        ),
+      ],
+      edges: [],
+      focus: { path: "docs/index.md", neighbors: [] },
+    };
+    expect(
+      forceSeries(hub, layoutFor(hub, box, "local")).force.layoutAnimation,
+    ).toBe(true);
+    expect(
+      forceSeries(view, layoutFor(view, box, "page")).force.layoutAnimation,
+    ).toBe(true);
+  });
+
   it("keeps every neighbor inside the box", () => {
     const placed = settle(view, box, "local");
     for (const item of placed) {
