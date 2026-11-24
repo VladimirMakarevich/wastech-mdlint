@@ -73,6 +73,7 @@ export async function startViewer(
   const changes = await ChangeTracker.open(corpus, {
     base: options.base,
     env: options.gitEnv,
+    watched: options.watch,
   });
   if (changes !== undefined) {
     // Computed once now: a `--base` that names nothing is reported where it was typed, and the first
@@ -250,8 +251,13 @@ function watchRefs(ctx: ViewerContext): () => void {
   if (git === undefined || changes === undefined) {
     return () => {};
   }
-  return watchGitRefs(git, () => {
-    void refreshAfterGitMove(ctx, changes);
+  return watchGitRefs(git, {
+    onMove: () => {
+      void refreshAfterGitMove(ctx, changes);
+    },
+    onLost: () => {
+      changes.watchLost();
+    },
   });
 }
 
@@ -259,9 +265,7 @@ async function refreshAfterGitMove(
   ctx: ViewerContext,
   changes: ChangeTracker,
 ): Promise<void> {
-  const before = changes.cached(true);
-  const after = await changes.review(true).catch(() => undefined);
-  if (after !== undefined && after !== before) {
+  if (await changes.gitMoved().catch(() => false)) {
     ctx.events.broadcast("git", {});
     changes.warm();
   }

@@ -39,17 +39,20 @@ export function isRefChange(relPath: string): boolean {
  * `gitDir` holds this work tree's own `HEAD`; `commonDir` the refs every worktree of the clone shares.
  * They are the same directory in the main work tree. Only the top of each is watched, plus `refs/`
  * recursively, so the objects a commit or a fetch writes by the thousand never reach the callback.
+ *
+ * `onLost` is called when one of those watches could not start or has ended, after which a move
+ * there would go unreported: the review is kept without asking git only while this watch holds.
  */
 export function watchGitRefs(
   dirs: { gitDir: string; commonDir: string },
-  onMove: () => void,
+  handlers: { onMove: () => void; onLost: () => void },
   debounceMs = 150,
 ): () => void {
   let timer: NodeJS.Timeout | undefined;
   const watchers: FSWatcher[] = [];
   const schedule = () => {
     clearTimeout(timer);
-    timer = setTimeout(onMove, debounceMs);
+    timer = setTimeout(handlers.onMove, debounceMs);
   };
   const watchDir = (
     dir: string,
@@ -69,13 +72,16 @@ export function watchGitRefs(
         },
       );
       watched.on("error", () => {
-        // A ref folder git removed and recreated (a `pack-refs`) ends its watch; the review is still
-        // checked against git on every request, so a page is at worst stale until the next one.
+        // A ref folder git removed and recreated (a `pack-refs`) ends its watch. The review is then
+        // checked against git on every request again, so a page is at worst stale until the next one.
         watched.close();
+        handlers.onLost();
       });
       watchers.push(watched);
     } catch {
-      // A folder git has not created yet, such as `refs/remotes` before a first fetch: nothing to watch.
+      // A folder that cannot be watched — gone, or not readable — reports nothing, so the review is
+      // checked against git on every request.
+      handlers.onLost();
     }
   };
   const posix = (filename: string) => filename.split(path.sep).join("/");

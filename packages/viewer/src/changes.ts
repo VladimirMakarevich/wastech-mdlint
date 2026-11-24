@@ -50,8 +50,11 @@ type Cached = { key: string; result: Review };
  *
  * A review is stale when the work tree changed — which the corpus watcher reports, and the server
  * passes on through `invalidate` — or when `HEAD` or the base moved without the work tree changing,
- * as a commit, a `reset --soft` or a fetch does. The second is asked of git on every request, in one
- * process: a few milliseconds, against the several processes and the diffs a full review costs.
+ * as a commit, a `reset --soft` or a fetch does. Where the repository is watched, the watcher on
+ * git's `HEAD` and refs reports the second too, through `gitMoved`, and a kept review is answered
+ * without asking git: that one short process was most of the time a document page took to answer,
+ * and every navigation paid it although nothing had moved. Without a watcher nothing would report
+ * it, so git is asked on every request instead.
  *
  * Requests that arrive while a review is being computed wait for that one rather than starting
  * their own: after a save, the reloading document page, the open pages' scripts and every other tab
@@ -68,12 +71,16 @@ export class ChangeTracker {
     Promise<ReviewContext | undefined>
   >();
   private warming: Promise<void> = Promise.resolve();
+  // Whether git's `HEAD` and refs are watched now: from the start, until a watch is lost.
+  private watched: boolean;
 
   private constructor(
     private readonly corpus: Corpus,
     private readonly repository: GitRepository | GitUnavailable,
-    private readonly base: string | undefined,
-  ) {}
+    private readonly options: { base?: string; watched: boolean },
+  ) {
+    this.watched = options.watched;
+  }
 
   /**
    * A tracker for the repository holding the corpus, or `undefined` outside any git work tree or
@@ -83,7 +90,12 @@ export class ChangeTracker {
    */
   static async open(
     corpus: Corpus,
-    options: { base?: string; env?: NodeJS.ProcessEnv },
+    options: {
+      base?: string;
+      env?: NodeJS.ProcessEnv;
+      // Whether the server watches git's `HEAD` and refs and calls `gitMoved` when they move.
+      watched?: boolean;
+    },
   ): Promise<ChangeTracker | undefined> {
     const repository = await openGitRepository(corpus.rootDir, {
       env: options.env,
@@ -95,7 +107,10 @@ export class ChangeTracker {
     ) {
       return undefined;
     }
-    return new ChangeTracker(corpus, repository, options.base);
+    return new ChangeTracker(corpus, repository, {
+      ...(options.base === undefined ? {} : { base: options.base }),
+      watched: options.watched === true,
+    });
   }
 
   /** The repository, when git can read it: where review marks are kept is decided from it. */
@@ -137,6 +152,35 @@ export class ChangeTracker {
     return this.warming;
   }
 
+  /**
+   * Called when the watcher on git's `HEAD` and refs saw something move. Each kept review is checked
+   * against git and dropped when it no longer matches, and the work-tree one is computed again where
+   * it was; true when that one is now a different review, which the open pages are then told. A ref
+   * of some other branch moving changes nothing they show, and answers false.
+   */
+  async gitMoved(): Promise<boolean> {
+    const before = this.cached(true);
+    const repository = this.repository;
+    if (repository.available) {
+      for (const [worktree, kept] of [...this.cache]) {
+        const key = await repository.revisionKey(kept.result.set.base);
+        if (key !== kept.key && this.cache.get(worktree) === kept) {
+          this.cache.delete(worktree);
+        }
+      }
+    }
+    const after = await this.review(true).catch(() => undefined);
+    return after !== undefined && after !== before;
+  }
+
+  /**
+   * A watch on git's `HEAD` or refs ended or never started, so a move there would go unreported:
+   * from now on a kept review is checked against git on every request again.
+   */
+  watchLost(): void {
+    this.watched = false;
+  }
+
   /** Forget every review; the next request computes a fresh one. */
   invalidate(): void {
     this.generation += 1;
@@ -152,7 +196,8 @@ export class ChangeTracker {
     const cached = this.cache.get(worktree);
     if (
       cached !== undefined &&
-      (await repository.revisionKey(cached.result.set.base)) === cached.key
+      (this.watched ||
+        (await repository.revisionKey(cached.result.set.base)) === cached.key)
     ) {
       return cached.result;
     }
@@ -238,7 +283,7 @@ export class ChangeTracker {
       membership: corpus.membership(),
     };
     const review = await reviewBranch(repository, {
-      ...(this.base === undefined ? {} : { base: this.base }),
+      ...(this.options.base === undefined ? {} : { base: this.options.base }),
       worktree,
       corpus: snapshot,
     });

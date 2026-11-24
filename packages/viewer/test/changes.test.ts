@@ -929,6 +929,35 @@ describe.skipIf(!hasGit)(
   },
 );
 
+describe.skipIf(!hasGit)("a watched repository (requires git on PATH)", () => {
+  // Every document page asked git whether `HEAD` or the base had moved — one process each, most of
+  // the time the page took — although almost always nothing had. Where git's `HEAD` and refs are
+  // watched, the kept review answers without asking, the watcher's report drops it once git really
+  // moved, and a watch that is lost puts the check on every request back.
+  it("keeps the review without asking git until the watcher says git moved", async () => {
+    const fixture = await featureBranch();
+    const corpus = await Corpus.load({ cwd: fixture.repo });
+    const tracker = (await ChangeTracker.open(corpus, {
+      env: fixture.env,
+      watched: true,
+    }))!;
+    const first = await tracker.review(true);
+    fixture.git("commit", "-q", "--allow-empty", "-m", "nothing changed");
+    expect(await tracker.review(true)).toBe(first);
+
+    expect(await tracker.gitMoved()).toBe(true);
+    const second = await tracker.review(true);
+    expect(second).not.toBe(first);
+    // Nothing moved since: a report from the watcher, such as another branch's ref, changes nothing.
+    expect(await tracker.gitMoved()).toBe(false);
+    expect(await tracker.review(true)).toBe(second);
+
+    tracker.watchLost();
+    fixture.git("commit", "-q", "--allow-empty", "-m", "unwatched");
+    expect(await tracker.review(true)).not.toBe(second);
+  }, 60_000);
+});
+
 describe.skipIf(!hasGit)("the bin with --base (requires git on PATH)", () => {
   // @boundary-guard installed-bin-spawn
   // A `--base` that names nothing must reach the user as a line on stderr from the process they
