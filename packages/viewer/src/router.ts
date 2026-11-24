@@ -8,6 +8,10 @@ import { CorpusRoutes } from "./corpus-routes.js";
 import { DocumentRoutes } from "./document-routes.js";
 import { readBody, sendJson, sendText } from "./http-send.js";
 import { decodeRequestPath } from "./request-path.js";
+import {
+  sendSpeculationRules,
+  SPECULATION_RULES_PATH,
+} from "./speculation-rules.js";
 import { baselineOf } from "./review-state.js";
 import {
   changeRequestProblem,
@@ -118,6 +122,12 @@ export class ViewerRouter {
         "/events",
         (request, response) => {
           ctx.events.open(request, response);
+        },
+      ],
+      [
+        SPECULATION_RULES_PATH,
+        (request, response) => {
+          sendSpeculationRules(request, response);
         },
       ],
       [

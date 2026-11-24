@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { SPECULATION_RULES_PATH } from "./speculation-rules.js";
 import { pageHeaders } from "./security.js";
 
 // How every route answers. Each carries the same security headers, so no page, payload or refusal is
@@ -14,6 +15,8 @@ export function sendHtml(
   response.writeHead(status, {
     ...pageHeaders(),
     "Content-Type": "text/html; charset=utf-8",
+    // Which links the browser may fetch ahead of a click; the rules say why and which.
+    "Speculation-Rules": `"${SPECULATION_RULES_PATH}"`,
   });
   response.end(headOnly ? undefined : html);
 }

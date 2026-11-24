@@ -287,6 +287,46 @@ describe("pages", () => {
     expect((await get("/assets/nope.js")).status).toBe(404);
   });
 
+  // A link to a document is fetched as the pointer rests on it, so the click is answered from that
+  // copy rather than waiting for the server. The rules are a file the pages name in a header, since
+  // the CSP refuses inline script, and they only fetch: rendering ahead would run a page's scripts
+  // before the reader opened it. A request a browser makes to fetch ahead is answered like a click.
+  it("lets the browser fetch a document's page ahead of the click", async () => {
+    const page = await get("/doc/README.md");
+    expect(page.headers["speculation-rules"]).toBe('"/speculation-rules.json"');
+    const rules = await get("/speculation-rules.json");
+    expect(rules.status).toBe(200);
+    expect(rules.headers["content-type"]).toBe(
+      "application/speculationrules+json",
+    );
+    expect(JSON.parse(rules.body)).toEqual({
+      prefetch: [
+        {
+          where: {
+            and: [
+              { href_matches: "/doc/*" },
+              { not: { selector_matches: 'a[href^="#"]' } },
+              { not: { selector_matches: ".blame-toggle" } },
+            ],
+          },
+          eagerness: "moderate",
+        },
+      ],
+    });
+    const ahead = await get("/doc/docs/guide.md", {
+      headers: {
+        "Sec-Purpose": "prefetch",
+        "Sec-Fetch-Site": "same-origin",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Dest": "document",
+      },
+    });
+    expect(ahead.status).toBe(200);
+    expect(ahead.body).toContain(
+      '<meta name="wastech-doc" content="docs/guide.md">',
+    );
+  });
+
   it("leaves chart blocks in a document for the page script to draw", async () => {
     const { status, body } = await get("/doc/docs/charts.md");
     expect(status).toBe(200);
