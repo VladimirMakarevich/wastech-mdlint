@@ -57,7 +57,7 @@ Two suites read this repository's own Markdown rather than a fixture. They are n
 
 ## Cross-Platform Expectations
 
-- Windows, macOS and Linux support is a product requirement for all three packages, not an optional extra.
+- Windows, macOS and Linux support is a product requirement for all four packages, not an optional extra.
 - Normalize path assertions to repository-relative POSIX paths where user-visible output is part of the contract.
 - Be explicit about newline handling when output is byte-compared.
 - Avoid tests that depend on host-specific directory ordering or path separators.

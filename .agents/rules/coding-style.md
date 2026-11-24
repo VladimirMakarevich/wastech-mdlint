@@ -51,7 +51,7 @@ Use one name per concept across code, tests, config keys, and user-facing output
 
 ## Determinism And Paths
 
-- Runtime behavior must stay correct on Windows, macOS and Linux for all three packages.
+- Runtime behavior must stay correct on Windows, macOS and Linux for all four packages.
 - Public data structures and reports use normalized repository-relative POSIX paths.
 - Sort output collections before rendering or serializing when order is user-visible. Use the shared code-point comparator rather than locale-aware collation: locale collation depends on the host's ICU data and default locale, so it cannot produce the same order on two machines.
 - Avoid hidden time-dependent or filesystem-order-dependent behavior.

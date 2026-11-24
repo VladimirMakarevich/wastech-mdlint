@@ -35,7 +35,7 @@ These hold for every change. Breaking one is a design decision, not an implement
 - **The rule system is registry-driven.** Structured metadata, Zod-validated options, shared assertion primitives, deterministic findings. Declarative custom rules stay data-driven over a closed primitive vocabulary — never runtime user code.
 - **One graph.** `ContextGraph` is shared infrastructure for graph commands, impact and slice logic, MCP tools, and graph-aware rules. A parallel traversal implementation is a bug waiting to diverge.
 - **Deterministic output.** Public and report output uses normalized repository-relative POSIX paths and stable ordering. No timestamps, no filesystem-order dependence, no locale-dependent collation.
-- **Cross-platform.** Runtime surfaces in all three packages must behave correctly on Windows, macOS and Linux. Path normalization, glob handling, newline behavior and child-process handling are correctness concerns, not polish.
+- **Cross-platform.** Runtime surfaces in all four packages must behave correctly on Windows, macOS and Linux. Path normalization, glob handling, newline behavior and child-process handling are correctness concerns, not polish.
 - **Config is data.** JSONC in `wastech-mdlint.config.json` with a local `$schema`. No remote schema URLs, no runtime TypeScript config loading, no `.cjs`/`.mjs` config.
 
 ## Implementation Guidance
