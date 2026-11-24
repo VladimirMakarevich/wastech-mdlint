@@ -6,6 +6,17 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.1]
+
+### Fixed
+
+- The viewer no longer leaves a page stale after a navigation that ends with the page still standing. A change on disk that arrives while a click is taking the reader to another page still does not reload the page they are leaving, but the reload is now kept instead of dropped: if the navigation is stopped with Esc, answered with a file to save, or the page is brought back with the back button, the page reloads then.
+- The viewer's link graph, when a save changes its links, reloads through the same path as every other page: it no longer replaces a navigation the reader started, and it keeps the scroll position.
+
+### Security
+
+- The repository's lockfile moves `hono` to 4.13.16 and `@hono/node-server` to 2.1.6, past their moderate advisories. They arrive through `@modelcontextprotocol/sdk` and are loaded only by its HTTP transport, which the stdio-only MCP server does not use, and a fresh install of the published packages already resolved the fixed versions.
+
 ## [0.4.0]
 
 Breaking for code calling `getContextSlice` with a depth or an ID convention, and for an MCP client generated from the `impact-analysis` `outputSchema`, in which `file` is now optional — see Added and Changed.
@@ -165,7 +176,8 @@ First public release. Published manually and carries no provenance attestation; 
 - Windows, macOS, and Linux are all supported: paths in public output are normalized to repository-relative POSIX form, ordering uses a code-point comparator rather than locale collation, and every product file is written through an atomic temp-and-rename path so a failed write cannot truncate an existing file.
 - All analysis is local. No external HTTP link checking, no link cache, no remote schema resolution, and no install-time file writes.
 
-[unreleased]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.4.0...HEAD
+[unreleased]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.2.1...v0.2.2
