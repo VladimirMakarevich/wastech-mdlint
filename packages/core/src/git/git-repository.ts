@@ -232,6 +232,15 @@ export class GitRepository {
     readonly commonDir: string,
   ) {}
 
+  /**
+   * A path relative to the host root, restated from the work tree's top level. For what a host keeps
+   * about a clone beside `commonDir`: two hosts started in different folders of one clone name the
+   * same file differently among themselves, but the same way from the top level.
+   */
+  topLevelPath(relPath: string): string {
+    return this.toTopLevel(relPath);
+  }
+
   /** The commit `HEAD` names, or `undefined` before the first commit. */
   async headCommit(): Promise<string | undefined> {
     return this.resolveCommit("HEAD");

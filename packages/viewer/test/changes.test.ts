@@ -218,7 +218,7 @@ describe.skipIf(!hasGit)("the Changes section (requires git on PATH)", () => {
       /<nav class="changes-files"[\s\S]*?<\/nav>/.exec(body)?.[0] ?? "";
     const rows = [
       ...list.matchAll(
-        /<li><span class="change-status[^"]*"[^>]*>([AMDR])<\/span> <a href="[^"]*">([^<]+)<\/a> <span class="change-stats">\+(\d+) −(\d+)<\/span>/g,
+        /<li[^>]*><span class="change-status[^"]*"[^>]*>([AMDR])<\/span> <a href="[^"]*">([^<]+)<\/a> <span class="change-stats">\+(\d+) −(\d+)<\/span>/g,
       ),
     ].map((match) => ({
       status: match[1],

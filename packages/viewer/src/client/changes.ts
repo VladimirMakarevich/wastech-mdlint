@@ -1,20 +1,34 @@
 import { onServerEvent } from "./live-reload.js";
 
 // The branch's changes, shown wherever a reader is: a count on the header's Changes section, and a
-// letter beside each changed file in the tree with a switch to show only those. Fetched, like the
+// letter beside each changed file in the tree with a switch to show only those. With review marks,
+// the count is what is left to review, a dot marks each changed file not yet reviewed, and a second
+// switch shows only those. Fetched, like the
 // findings, because every page shows them and none but a document's own page should wait for git to
 // answer before it is drawn. A changed document's page, which does wait, is marked on the server:
 // the line above its text, its changed blocks and its outline.
+
+type ReviewStatus = "unreviewed" | "reviewed" | "changed";
 
 type ChangedDocument = {
   path: string;
   oldPath?: string;
   status: "A" | "M" | "D" | "R";
+  review: { status: ReviewStatus } | null;
 };
 
 type Changes =
-  | { status: "ready"; documents: ChangedDocument[] }
+  | {
+      status: "ready";
+      documents: ChangedDocument[];
+      review: { state: "ready"; left: number; total: number } | null;
+    }
   | { status: "unavailable"; message: string };
+
+const REVIEW_NAMES: Record<Exclude<ReviewStatus, "reviewed">, string> = {
+  unreviewed: "Not reviewed yet",
+  changed: "Changed since your review",
+};
 
 const STATUS_NAMES: Record<ChangedDocument["status"], string> = {
   A: "Added in this branch",
@@ -25,6 +39,7 @@ const STATUS_NAMES: Record<ChangedDocument["status"], string> = {
 
 // Remembered for this address, like the findings switch.
 const FILTER_KEY = "wastech-mdlint-viewer:tree-changed-only";
+const UNREVIEWED_KEY = "wastech-mdlint-viewer:tree-unreviewed-only";
 
 export function initChanges(): void {
   // Drawn by the server only in a git work tree; without it there is nothing to review.
@@ -40,6 +55,8 @@ export function initChanges(): void {
   };
   refresh();
   onServerEvent("change", refresh);
+  // A mark saved on any page changes what is left everywhere.
+  onServerEvent("review", refresh);
 }
 
 async function load(section: HTMLAnchorElement): Promise<void> {
@@ -54,30 +71,44 @@ async function load(section: HTMLAnchorElement): Promise<void> {
     data.status === "ready"
       ? new Map(data.documents.map((entry) => [entry.path, entry]))
       : new Map<string, ChangedDocument>();
-  markSection(section, data.status === "ready" ? data.documents.length : 0);
+  markSection(section, data);
   markTree(changed);
   filterReady = true;
   applyFilter();
 }
 
-function markSection(section: HTMLAnchorElement, count: number): void {
+function markSection(section: HTMLAnchorElement, data: Changes): void {
   section.querySelector(".segment-count")?.remove();
+  const count = data.status === "ready" ? data.documents.length : 0;
   if (count === 0) {
     return;
   }
   const badge = document.createElement("span");
   badge.className = "segment-count";
-  badge.textContent = String(count);
-  badge.title = `${count} changed ${count === 1 ? "document" : "documents"}`;
+  const review = data.status === "ready" ? data.review : null;
+  if (review === null || review.state !== "ready") {
+    badge.textContent = String(count);
+    badge.title = `${count} changed ${count === 1 ? "document" : "documents"}`;
+  } else {
+    // What is left, against everything that changed: the queue a reviewer works down.
+    badge.textContent = `${review.left}/${review.total}`;
+    badge.title = `${review.left} of ${review.total} changed ${review.total === 1 ? "document" : "documents"} left to review`;
+    badge.classList.toggle("is-done", review.left === 0);
+  }
   section.append(badge);
 }
 
 function markTree(changed: Map<string, ChangedDocument>): void {
-  for (const mark of document.querySelectorAll(".tree-change")) {
+  for (const mark of document.querySelectorAll(
+    ".tree-change, .tree-review-dot",
+  )) {
     mark.remove();
   }
-  for (const item of document.querySelectorAll(".sidebar li[data-changed]")) {
+  for (const item of document.querySelectorAll(
+    ".sidebar li[data-changed], .sidebar li[data-unreviewed]",
+  )) {
     item.removeAttribute("data-changed");
+    item.removeAttribute("data-unreviewed");
   }
   for (const link of document.querySelectorAll<HTMLAnchorElement>(
     '.sidebar a[href^="/doc/"]',
@@ -103,12 +134,27 @@ function markTree(changed: Map<string, ChangedDocument>): void {
     } else {
       badge.before(mark);
     }
+    const left =
+      entry.review !== null && entry.review.status !== "reviewed"
+        ? entry.review.status
+        : undefined;
+    if (left !== undefined) {
+      const dot = document.createElement("span");
+      dot.className = `tree-review-dot tree-review-${left}`;
+      dot.setAttribute("role", "img");
+      dot.setAttribute("aria-label", REVIEW_NAMES[left]);
+      dot.title = REVIEW_NAMES[left];
+      mark.after(dot);
+    }
     for (
       let item = link.closest("li");
       item !== null;
       item = item.parentElement?.closest(".sidebar li") ?? null
     ) {
       item.dataset.changed = "";
+      if (left !== undefined) {
+        item.dataset.unreviewed = "";
+      }
     }
   }
 }
@@ -121,24 +167,37 @@ function filterInput(): HTMLInputElement | null {
   return document.querySelector<HTMLInputElement>(".tree-filter-changes input");
 }
 
+// Drawn only where review marks are on.
+function unreviewedInput(): HTMLInputElement | null {
+  return document.querySelector<HTMLInputElement>(
+    ".tree-filter-unreviewed input",
+  );
+}
+
 function initFilter(): void {
-  const label = document.querySelector<HTMLElement>(".tree-filter-changes");
-  const input = filterInput();
-  if (label === null || input === null) {
-    return;
+  const switches: [HTMLInputElement | null, string][] = [
+    [filterInput(), FILTER_KEY],
+    [unreviewedInput(), UNREVIEWED_KEY],
+  ];
+  for (const [input, key] of switches) {
+    const label = input?.closest<HTMLElement>(".tree-filter");
+    if (input === null || label === null || label === undefined) {
+      continue;
+    }
+    label.hidden = false;
+    input.checked = readStored(key) === "1";
+    input.addEventListener("change", () => {
+      writeStored(key, input.checked ? "1" : "0");
+      applyFilter();
+    });
   }
-  label.hidden = false;
-  input.checked = readStored() === "1";
-  input.addEventListener("change", () => {
-    writeStored(input.checked ? "1" : "0");
-    applyFilter();
-  });
 }
 
 /**
- * Show only the changed files, and open the folders on the way to them. A folder this opened is
- * marked as the changes filter's own — apart from the findings filter's — so turning this one off
- * closes exactly what it opened, whatever the other switch is doing.
+ * Show only the changed files — or only those left to review, which are among them — and open the
+ * folders on the way to them. A folder this opened is marked as the changes filters' own — apart
+ * from the findings filter's — so turning them off closes exactly what they opened, whatever the
+ * other switch is doing.
  */
 function applyFilter(): void {
   const sidebar = document.querySelector<HTMLElement>(".sidebar");
@@ -146,13 +205,16 @@ function applyFilter(): void {
   if (sidebar === null || input === null) {
     return;
   }
-  const active = input.checked && filterReady;
-  sidebar.classList.toggle("only-changed", active);
+  const unreviewed = unreviewedInput()?.checked === true && filterReady;
+  const active = (input.checked || unreviewed) && filterReady;
+  const attribute = unreviewed ? "data-unreviewed" : "data-changed";
+  sidebar.classList.toggle("only-changed", active && !unreviewed);
+  sidebar.classList.toggle("only-unreviewed", unreviewed);
   for (const details of sidebar.querySelectorAll<HTMLDetailsElement>(
     "details",
   )) {
     const leadsToChange =
-      details.parentElement?.hasAttribute("data-changed") === true;
+      details.parentElement?.hasAttribute(attribute) === true;
     if (active && leadsToChange && !details.open) {
       details.open = true;
       details.dataset.openedByChangesFilter = "";
@@ -165,23 +227,26 @@ function applyFilter(): void {
     ".tree-filter-changes-empty",
   );
   if (empty !== null) {
+    empty.textContent = unreviewed
+      ? "Nothing left to review."
+      : "No document changed.";
     empty.hidden =
-      !active || sidebar.querySelector("li[data-changed]") !== null;
+      !active || sidebar.querySelector(`li[${attribute}]`) !== null;
   }
 }
 
 // Storage can be unavailable (private windows, blocked site data); the filter then starts off.
-function readStored(): string | null {
+function readStored(key: string): string | null {
   try {
-    return localStorage.getItem(FILTER_KEY);
+    return localStorage.getItem(key);
   } catch {
     return null;
   }
 }
 
-function writeStored(value: string): void {
+function writeStored(key: string, value: string): void {
   try {
-    localStorage.setItem(FILTER_KEY, value);
+    localStorage.setItem(key, value);
   } catch {
     // The choice holds for this page only.
   }

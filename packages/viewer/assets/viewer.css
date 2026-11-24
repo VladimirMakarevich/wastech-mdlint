@@ -203,6 +203,7 @@ a:hover {
 .prompt-menu,
 .code-copy,
 .config-open-button,
+.review-reset,
 .config-editor button:not(.segment),
 .filter-actions button,
 .graph-controls button {
@@ -231,6 +232,7 @@ a:hover {
 .prompt-menu[aria-expanded="true"],
 .code-copy:hover,
 .config-open-button:hover:not(:disabled),
+.review-reset:hover:not(:disabled),
 .config-editor button:not(.segment):hover:not(:disabled),
 .filter-actions button:hover,
 .graph-controls button:hover {
@@ -238,6 +240,7 @@ a:hover {
 }
 
 .config-open-button:disabled,
+.review-reset:disabled,
 .config-editor button:not(.segment):disabled {
   opacity: 0.5;
   cursor: default;
@@ -3414,6 +3417,137 @@ a:hover {
   margin: var(--space-2) var(--space-3);
   color: var(--fg-muted);
   font-size: 13px;
+}
+
+/* ---------------------------------------------------------------------------------------------
+   Review marks: what the reader has reviewed. A reviewed card folds to its header, as a viewed file
+   does in a pull request, so what is left stands out; a document changed after its review is marked
+   in the amber of an edit, since that is what it is to the reader.
+   --------------------------------------------------------------------------------------------- */
+.markdown-body .changes-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-4);
+}
+
+.markdown-body .changes-controls .changes-mode {
+  margin: 0;
+}
+
+.markdown-body .changes-review {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  font-size: 14px;
+}
+
+.changes-review-count {
+  font-weight: 600;
+}
+
+.markdown-body .review-problem,
+.markdown-body .review-message {
+  color: var(--warning);
+  font-size: 13px;
+}
+
+.markdown-body .review-message {
+  flex-basis: 100%;
+  margin: var(--space-1) 0 0;
+}
+
+.change-card > .review-message {
+  margin: var(--space-2) var(--space-3);
+}
+
+.review-chip {
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.review-chip-reviewed {
+  background: color-mix(in srgb, var(--diff-added) 14%, transparent);
+  color: var(--diff-added);
+}
+
+.review-chip-changed {
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  color: var(--warning);
+}
+
+.changes-files li .review-chip {
+  margin-left: var(--space-1);
+}
+
+.changes-files li[data-review="reviewed"] > a {
+  color: var(--fg-muted);
+}
+
+.review-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Both are laid out as flex boxes, which would otherwise show them before the script that makes them
+   work has run. */
+.review-toggle[hidden],
+.review-reset[hidden] {
+  display: none;
+}
+
+.review-toggle input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.change-card[data-review="reviewed"] > .change-note,
+.change-card[data-review="reviewed"] > .change-context {
+  display: none;
+}
+
+.change-card[data-review="reviewed"] .change-path {
+  color: var(--fg-muted);
+}
+
+.segment-count.is-done {
+  background: color-mix(in srgb, var(--diff-added) 16%, transparent);
+  color: var(--diff-added);
+}
+
+/* A changed file not yet reviewed, beside its letter in the tree. */
+.tree-review-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.tree-review-changed {
+  background: var(--warning);
+}
+
+.sidebar.only-unreviewed .tree li:not([data-unreviewed]) {
+  display: none;
+}
+
+@media print {
+  .review-toggle,
+  .review-reset,
+  .changes-since {
+    display: none;
+  }
 }
 
 @media (max-width: 1200px) {

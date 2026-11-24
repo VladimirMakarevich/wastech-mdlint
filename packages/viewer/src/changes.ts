@@ -38,6 +38,14 @@ import {
   renderDocumentContext,
 } from "./context-view.js";
 import { computeReviewContext, type ReviewContext } from "./review-context.js";
+import {
+  type Baseline,
+  type DocumentMark,
+  type ReviewMarksView,
+  reviewChip,
+  reviewProblem,
+  reviewToggle,
+} from "./review-state.js";
 
 // The review of a branch's changes to the corpus: which documents changed against the base branch,
 // most influential first, each with its diff. Everything computed here comes from core — the change
@@ -138,6 +146,11 @@ export class ChangeTracker {
       return undefined;
     }
     return new ChangeTracker(corpus, repository, options.base);
+  }
+
+  /** The repository, when git can read it: where review marks are kept is decided from it. */
+  get git(): GitRepository | undefined {
+    return this.repository.available ? this.repository : undefined;
   }
 
   /** Forget every review; the next request computes a fresh one. */
@@ -329,11 +342,15 @@ async function readConfigText(
 /**
  * `/api/changes`: what the page lists, as data. Diffs are left to `/api/changes/diff`. With the
  * review's context, every document carries its findings, size and links, and the list is in the
- * page's order; without it — it could not be computed — those are `null`.
+ * page's order; without it — it could not be computed — those are `null`. With review marks, every
+ * document carries its status and the hash a mark must name, and `review` counts what is left; both
+ * are `null` where marks are off, and `review` says why when they could not be read. No time from the
+ * marks appears here, so the payload depends only on the files and the marks.
  */
 export function changesPayload(
   result: ReviewResult,
   context?: ReviewContext,
+  marks?: ReviewMarksView,
 ): unknown {
   if ("available" in result) {
     return {
@@ -367,6 +384,8 @@ export function changesPayload(
           },
     documents: ordered(result, context).map((review) => {
       const delta = documentContext(context, review.path);
+      const mark =
+        marks?.ok === true ? marks.documents.get(review.path) : undefined;
       return {
         path: review.path,
         ...(review.oldPath === undefined ? {} : { oldPath: review.oldPath }),
@@ -379,11 +398,26 @@ export function changesPayload(
         // the id a second way.
         anchor: changeCardId(review.path),
         context: delta === undefined ? null : documentContextPayload(delta),
+        review:
+          mark === undefined ? null : { status: mark.status, hash: mark.hash },
       };
     }),
     outsideCorpus: set.outsideCorpus,
     context: context === undefined ? null : contextPayload(context),
+    review: reviewPayload(result, marks),
   };
+}
+
+function reviewPayload(
+  review: Review,
+  marks: ReviewMarksView | undefined,
+): unknown {
+  if (marks === undefined) {
+    return null;
+  }
+  return marks.ok
+    ? { state: "ready", left: marks.left, total: review.documents.length }
+    : { state: "unavailable", message: marks.message };
 }
 
 // The review's documents in the order to read them: with its context, the order that also moves
@@ -479,16 +513,47 @@ const DIFF_VIEWS: readonly (readonly [DiffView, string])[] = [
 export function renderChangeBanner(
   review: DocumentReview,
   view: DiffView,
+  reviewed?: BannerReview,
 ): Element {
   const page = documentHref(review.path);
+  const baseline = reviewed?.baseline ?? "base";
+  const since = baseline === "review" ? reviewed?.since : undefined;
   return h("div.changes-banner", [
     statusBadge(review.status),
     h(
       "span.changes-banner-text",
-      `${STATUS_NAMES[review.status]} in this branch${
-        review.oldPath === undefined ? "" : `, from ${review.oldPath}`
-      } · ${stats(review.diff)}`,
+      since === undefined
+        ? `${STATUS_NAMES[review.status]} in this branch${
+            review.oldPath === undefined ? "" : `, from ${review.oldPath}`
+          } · ${stats(review.diff)}`
+        : since.diff.hunks.length === 0 && !since.diff.newlineAtEndChanged
+          ? "Unchanged since your review"
+          : `Changed since your review · ${stats(since.diff)}`,
     ),
+    reviewChip(reviewed?.mark),
+    reviewed === undefined
+      ? undefined
+      : reviewToggle(review, reviewed.mark, true),
+    // Offered where an earlier version was reviewed, and kept on a reviewed document while it is in
+    // use, so the way back is there. A document never reviewed has nothing to compare with.
+    reviewed !== undefined &&
+    (reviewed.mark.status === "changed" ||
+      (reviewed.mark.status === "reviewed" && baseline === "review"))
+      ? h(
+          "nav.changes-since.segmented.is-compact",
+          { ariaLabel: "Compare with" },
+          BASELINES.map(([value, label]) =>
+            h(
+              "a.segment",
+              {
+                href: documentViewHref(page, view, value),
+                ariaCurrent: value === baseline ? "page" : undefined,
+              },
+              label,
+            ),
+          ),
+        )
+      : undefined,
     h(
       "nav.changes-view.segmented.is-compact",
       { ariaLabel: "Show the changes" },
@@ -496,7 +561,7 @@ export function renderChangeBanner(
         h(
           "a.segment",
           {
-            href: value === "rendered" ? page : `${page}?diff=${value}`,
+            href: documentViewHref(page, value, baseline),
             ariaCurrent: value === view ? "page" : undefined,
           },
           label,
@@ -505,10 +570,53 @@ export function renderChangeBanner(
     ),
     h(
       "a.changes-banner-link",
-      { href: `/changes#${changeCardId(review.path)}` },
+      {
+        href: `${changesHref(true, baseline)}#${changeCardId(review.path)}`,
+      },
       "Changes page",
     ),
   ]);
+}
+
+/** What the line above a changed document says about the reader's review of it. */
+export type BannerReview = {
+  mark: DocumentMark;
+  baseline: Baseline;
+  // The document's review since the reader's last review, when the page compares with that.
+  since?: DocumentReview;
+};
+
+const BASELINES: readonly (readonly [Baseline, string])[] = [
+  ["base", "Base branch"],
+  ["review", "My last review"],
+];
+
+function documentViewHref(
+  page: string,
+  view: DiffView,
+  baseline: Baseline,
+): string {
+  const params = new URLSearchParams();
+  if (view !== "rendered") {
+    params.set("diff", view);
+  }
+  if (baseline === "review") {
+    params.set("since", "review");
+  }
+  const query = params.toString();
+  return query === "" ? page : `${page}?${query}`;
+}
+
+function changesHref(worktree: boolean, baseline: Baseline): string {
+  const params = new URLSearchParams();
+  if (!worktree) {
+    params.set("worktree", "0");
+  }
+  if (baseline === "review") {
+    params.set("since", "review");
+  }
+  const query = params.toString();
+  return query === "" ? "/changes" : `/changes?${query}`;
 }
 
 /**
@@ -543,23 +651,46 @@ export function renderChangesArticle(
   result: ReviewResult,
   worktree: boolean,
   context?: ReviewContext,
+  reviewed?: ReviewView,
 ): ElementContent[] {
+  const baseline = reviewed?.baseline ?? "base";
   const article: ElementContent[] = [
     h("h1", "Changes"),
-    h("nav.changes-mode.segmented", { ariaLabel: "What to compare" }, [
-      h(
-        "a.segment",
-        { href: "/changes", ariaCurrent: worktree ? "page" : undefined },
-        "Work tree",
-      ),
-      h(
-        "a.segment",
-        {
-          href: "/changes?worktree=0",
-          ariaCurrent: worktree ? undefined : "page",
-        },
-        "Commits only",
-      ),
+    h("div.changes-controls", [
+      h("nav.changes-mode.segmented", { ariaLabel: "What to compare" }, [
+        h(
+          "a.segment",
+          {
+            href: changesHref(true, baseline),
+            ariaCurrent: worktree ? "page" : undefined,
+          },
+          "Work tree",
+        ),
+        h(
+          "a.segment",
+          {
+            href: changesHref(false, baseline),
+            ariaCurrent: worktree ? undefined : "page",
+          },
+          "Commits only",
+        ),
+      ]),
+      reviewed === undefined
+        ? undefined
+        : h(
+            "nav.changes-since.segmented",
+            { ariaLabel: "Compare with" },
+            BASELINES.map(([value, label]) =>
+              h(
+                "a.segment",
+                {
+                  href: changesHref(worktree, value),
+                  ariaCurrent: value === baseline ? "page" : undefined,
+                },
+                label,
+              ),
+            ),
+          ),
     ]),
   ];
   if ("available" in result) {
@@ -593,7 +724,29 @@ export function renderChangesArticle(
     ]),
     ...(context === undefined ? [] : renderContextSummary(context)),
   );
+  if (reviewed !== undefined && result.documents.length > 0) {
+    article.push(
+      reviewed.marks.ok
+        ? h("p.changes-review", [
+            h(
+              "span.changes-review-count",
+              `${String(result.documents.length - reviewed.marks.left)} of ${plural(result.documents.length, "document")} reviewed`,
+            ),
+            // Starting over needs the script that sends the request, so it is hidden until then.
+            h(
+              "button.review-reset",
+              { type: "button", hidden: true },
+              "Reset review",
+            ),
+          ])
+        : reviewProblem(reviewed.marks.message),
+    );
+  }
   const documents = ordered(result, context);
+  const markOf = (relPath: string): DocumentMark | undefined =>
+    reviewed?.marks.ok === true
+      ? reviewed.marks.documents.get(relPath)
+      : undefined;
 
   if (set.outsideCorpus.length > 0) {
     article.push(
@@ -627,12 +780,17 @@ export function renderChangesArticle(
             const delta = documentContext(context, review.path);
             const findings =
               delta === undefined ? undefined : findingsText(delta.findings);
-            return h("li", [
+            const mark = markOf(review.path);
+            return h("li", { dataReview: mark?.status }, [
               statusBadge(review.status),
               " ",
               h("a", { href: `#${changeCardId(review.path)}` }, review.path),
               " ",
-              h("span.change-stats", stats(review.diff)),
+              h(
+                "span.change-stats",
+                stats(shownDiff(review, mark, reviewed).diff),
+              ),
+              reviewChip(mark),
               review.eager
                 ? h(
                     "span.change-eager",
@@ -676,20 +834,75 @@ export function renderChangesArticle(
   }
   for (const review of documents) {
     const delta = documentContext(context, review.path);
+    const mark = markOf(review.path);
+    const shown = shownDiff(review, mark, reviewed);
     article.push(
       changeCard({
         id: changeCardId(review.path),
         status: review.status,
         path: review.path,
-        href: review.status === "D" ? undefined : documentHref(review.path),
+        href:
+          review.status === "D"
+            ? undefined
+            : documentViewHref(documentHref(review.path), "rendered", baseline),
         oldPath: review.oldPath,
         eager: review.eager,
-        diff: review.diff,
+        note: shown.note,
+        diff: shown.diff,
         context: delta === undefined ? undefined : renderDocumentContext(delta),
+        ...(mark === undefined
+          ? {}
+          : { mark, toggle: reviewToggle(review, mark, worktree) }),
       }),
     );
   }
   return article;
+}
+
+/** How the Changes page shows the reader's review: the marks, and what it compares with. */
+export type ReviewView = {
+  marks: ReviewMarksView;
+  baseline: Baseline;
+  // Each changed document's review since the reader's last review of it, when the page compares
+  // with that and the reviewed text is still kept.
+  since: ReadonlyMap<string, DocumentReview>;
+};
+
+const NO_DIFF: TextDiff = {
+  hunks: [],
+  added: 0,
+  removed: 0,
+  newlineAtEndChanged: false,
+};
+
+/**
+ * The diff a card shows and what it is against. Comparing with the reader's last review, a document
+ * changed since then shows the diff from the version they reviewed; one they reviewed as it is has
+ * nothing to show; one never reviewed, or whose reviewed text is no longer kept, falls back to the
+ * base branch, and the card says so rather than passing one comparison off as the other.
+ */
+function shownDiff(
+  review: DocumentReview,
+  mark: DocumentMark | undefined,
+  reviewed: ReviewView | undefined,
+): { diff: TextDiff; note?: string } {
+  if (reviewed?.baseline !== "review" || mark === undefined) {
+    return { diff: review.diff };
+  }
+  if (mark.status === "reviewed") {
+    return { diff: NO_DIFF, note: "Unchanged since your review." };
+  }
+  const since = reviewed.since.get(review.path);
+  if (mark.status === "changed" && since !== undefined) {
+    return { diff: since.diff, note: "Changes since your last review." };
+  }
+  return {
+    diff: review.diff,
+    note:
+      mark.status === "changed"
+        ? "The version you reviewed is no longer kept, so this compares with the base branch."
+        : "Not reviewed yet, so this compares with the base branch.",
+  };
 }
 
 function changeCard(card: {
@@ -702,41 +915,53 @@ function changeCard(card: {
   note?: string;
   diff: TextDiff;
   context?: Element;
+  mark?: DocumentMark;
+  toggle?: Element;
 }): Element {
   const lineCount = card.diff.hunks.reduce(
     (sum, hunk) => sum + hunk.lines.length,
     0,
   );
-  return h("section.change-card", { id: card.id }, [
-    h("header.change-card-header", [
-      statusBadge(card.status),
-      card.href === undefined
-        ? h("span.change-path", card.path)
-        : h("a.change-path", { href: card.href }, card.path),
-      card.oldPath === undefined
-        ? undefined
-        : h("span.change-from", `from ${card.oldPath}`),
-      card.eager === true
-        ? h(
-            "span.change-eager",
-            { title: "Loaded into every agent session" },
-            "every session",
-          )
-        : undefined,
-      h("span.change-stats", stats(card.diff)),
-    ]),
-    card.note === undefined ? undefined : h("p.change-note", card.note),
-    card.context,
-    h("details.change-diff", { open: lineCount <= FOLDED_DIFF_LINES }, [
-      h(
-        "summary",
-        lineCount <= FOLDED_DIFF_LINES
-          ? "Diff"
-          : `Show the diff (${plural(lineCount, "line")})`,
-      ),
-      renderDiff(card.diff),
-    ]),
-  ]);
+  // A reviewed card folds to its header and the diff's summary line, as a viewed file does in a
+  // pull request, so what is left stands out; its diff opens with one click.
+  const folded =
+    card.mark?.status === "reviewed" || lineCount > FOLDED_DIFF_LINES;
+  return h(
+    "section.change-card",
+    { id: card.id, dataReview: card.mark?.status },
+    [
+      h("header.change-card-header", [
+        statusBadge(card.status),
+        card.href === undefined
+          ? h("span.change-path", card.path)
+          : h("a.change-path", { href: card.href }, card.path),
+        card.oldPath === undefined
+          ? undefined
+          : h("span.change-from", `from ${card.oldPath}`),
+        card.eager === true
+          ? h(
+              "span.change-eager",
+              { title: "Loaded into every agent session" },
+              "every session",
+            )
+          : undefined,
+        reviewChip(card.mark),
+        h("span.change-stats", stats(card.diff)),
+        card.toggle,
+      ]),
+      card.note === undefined ? undefined : h("p.change-note", card.note),
+      card.context,
+      h("details.change-diff", { open: !folded }, [
+        h(
+          "summary",
+          lineCount <= FOLDED_DIFF_LINES
+            ? "Diff"
+            : `Show the diff (${plural(lineCount, "line")})`,
+        ),
+        renderDiff(card.diff),
+      ]),
+    ],
+  );
 }
 
 function statusBadge(status: GitChange["status"]): Element {

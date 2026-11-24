@@ -20,6 +20,9 @@ Options:
       --no-watch     Do not reload pages when files change
       --allow-config-writes
                      Let the config page save changes to the config file
+      --state-dir <dir>
+                     Where to keep review marks (default: the user's state
+                     directory, under wastech-mdlint/viewer)
   -h, --help         Show this help
 `;
 
@@ -36,6 +39,7 @@ export type CliArgs =
       portExplicit: boolean;
       watch: boolean;
       allowConfigWrites: boolean;
+      stateDir?: string;
     };
 
 /** Parse the command line into what to do. Pure, so every outcome is testable without a server. */
@@ -87,6 +91,9 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     portExplicit: values.port !== undefined,
     watch: values["no-watch"] !== true,
     allowConfigWrites,
+    ...(values["state-dir"] === undefined
+      ? {}
+      : { stateDir: values["state-dir"] }),
   };
 }
 
@@ -102,6 +109,7 @@ function parse(argv: readonly string[]) {
       base: { type: "string" },
       "no-watch": { type: "boolean" },
       "allow-config-writes": { type: "boolean" },
+      "state-dir": { type: "string" },
       help: { type: "boolean", short: "h" },
     },
   });

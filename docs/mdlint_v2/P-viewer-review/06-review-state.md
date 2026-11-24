@@ -1,57 +1,60 @@
 # 06 · Review state: reviewed marks, queue, "since my last review"
 
-> Part of the [viewer review plan](index.md).
+> Part of the [viewer review plan](index.md). Status **Implemented**, pending the rules discussion below.
 
 ## Goal
 
 A person marks what they have reviewed. The viewer keeps that per content — across branches, rebases and restarts — shows what is still left and what changed after it was reviewed, and can show the diff since the last review instead of since the base branch.
 
-## Steps
+## Decisions taken before building
 
-1. **Model.** Per repository, a mark per document path: the hash of the text that was reviewed and a reference to its snapshot. The hash is SHA-256 of phase 02's normalized text, not git's blob id: uncommitted text has no blob, and with `core.autocrlf` the blob and the work-tree file differ. A changed document's status is computed, never stored:
-   - **unreviewed** — no mark;
-   - **reviewed** — the mark's hash equals the current hash;
-   - **changed since review** — a mark exists and the hash differs.
+Agreed with the user:
 
-   "Skipped" is not a separate record: it is a document in the change set whose current text carries no mark. Marks are also looked up by hash, so a document renamed without edits stays reviewed, and switching to a branch where a file has the same text finds it reviewed. A deleted document is reviewed once its deletion is marked.
+- **Store.** One folder per clone in the user's state directory — `%LOCALAPPDATA%\wastech-mdlint\viewer\`, `~/Library/Application Support/wastech-mdlint/viewer/`, `$XDG_STATE_HOME/wastech-mdlint/viewer/` (a relative value ignored) or `~/.local/state/wastech-mdlint/viewer/`; `--state-dir` overrides it. The folder is `<clone name>-<16 hex of sha256(realpath of the git common dir)>`, created owner-only (`0700`) with the first mark. Inside: `review.json` (format 1, the common dir for a person reading it, per path the hashes of its reviewed texts newest first), `texts/<sha256>.md` and, only while writing, `review.lock`.
+- **History per path**, ten versions, so a branch whose text was reviewed before finds it reviewed although another version was reviewed in between. No timestamps are stored.
+- **No flag on loopback; off entirely with another `--host`** — no box, no status, the request refused (403) — since a mark records this user's review on this machine.
+- **Concurrency.** Writes in one process are queued; across processes a lock file created with `wx` is held for the read-modify-write; a lock older than 10 s is taken over, a fresh one waited for up to 3 s, then 503.
+- **Failure.** A failed write answers 500 and removes the text it had just added; an index that does not parse or carries a newer format is refused (409) and left as it is. GET creates nothing.
+- **`n` and `p` follow the Changes page's order**, not a topological sort: `topologicalSort` emits a node after the nodes linking to it — the opposite of what the plan asked — and leaves cycle members out, and a second order would make "next" jump around the page.
+- **No store without git**, since there is no Changes section to mark from. **"Opened" in `localStorage`** was not built.
 
-2. **Snapshots.** The diff since the last review needs the reviewed text. Committed text could be fetched from git, but uncommitted text never was stored anywhere, so the store keeps each reviewed text content-addressed under its hash — Markdown is small — and drops snapshots no mark refers to on each write.
+## What was built
 
-3. **Location.** The user's state directory, never the work tree and never `.git`: `%LOCALAPPDATA%\wastech-mdlint\viewer\` on Windows, `~/Library/Application Support/wastech-mdlint/viewer/` on macOS, `$XDG_STATE_HOME/wastech-mdlint/viewer/` or `~/.local/state/wastech-mdlint/viewer/` on Linux; `--state-dir <dir>` overrides it, for tests and portable setups. Inside, one directory per repository, named by a hash of the realpath of the git common directory — every worktree of one clone shares a history, a fresh clone starts empty — with that path written inside for a person looking at the folder. Without git, the realpath of the viewer root is the key.
+1. **Core.** `GitRepository.topLevelPath(relPath)`, so marks are keyed from the work tree's top level and two viewers started in different folders of one clone share them.
+2. **Store.** `packages/viewer/src/review-store.ts`: `contentHash` (SHA-256 of `normalizeText`), `ReviewMarks.status` (reviewed when the hash is marked under the path, the rename's old path or any path — the empty text of a deletion only under its own path; changed since review with the newest version as `since`; unreviewed), `ReviewStore` (`read`, `snapshot`, `update` with `mark`, `unmark` — removing the text under every path — and `reset` — forgetting every version of the listed paths), `cloneFolder`. `state-dir.ts` picks the default folder per platform.
+3. **Glue.** `review-state.ts`: statuses for a review (`markReview`, `markOf`), `SinceReview` (a document's review restated against a reviewed text, cached per review and version, so the rendered marks, the Source view and the cards reuse phase 04's code), request parsing, the chip and the hidden "Viewed" checkbox.
+4. **Endpoints.** `POST /api/review/mark` `{ path, hash, reviewed, worktree }` and `POST /api/review/reset` `{ worktree, documents: [{ path, hash }] }`, both in `CHANGE_ROUTES`. The text marked is the review's own for that comparison, never the request's, and only when its hash is the one sent; otherwise 409. A saved mark is broadcast as a `review` event. `/api/changes` gives each document `review: { status, hash }` and a top-level `review` (`left`, `total`, or why marks cannot be read); `/api/changes/diff?…&since=review` the diff since the review.
+5. **Pages.** The token is on the Changes page and a changed document's page when marks are on. Changes: "Compare with: Base branch / My last review" (`?since=review`, kept by every link), "N of M documents reviewed" with **Reset review**, a chip and `data-review` on every row and card, a "Viewed" box per card, a reviewed card folded to its header. Banner: chip, box, and the compare switch where an earlier version was reviewed; with `since=review` all three views show the changes since the review, or "Unchanged since your review".
+6. **Script.** `client/review.ts` sends a mark and shows only what the server answered, keeps the count, folds the card, says why a mark failed; `v`, `n`, `p`. `client/changes.ts`: the header count becomes `left/total`, a dot beside each file left (amber when changed since review), and an "Only files left to review" switch drawn when marks are on.
 
-4. **Writes.** Through core's `writeFileAtomic`, with read-modify-write serialized inside the process and the file re-read before each change, so two viewers on one clone merge their marks rather than the last one overwriting the other's. A failed write is reported to the page and the mark is not shown as set.
+## Where it differs from the plan
 
-5. **Endpoint.** `POST /api/review/mark` with `{ path, hash, reviewed }`:
-   - `hash` is the one the page showed; if the file's current hash differs, the request is refused with 409, so a person can only mark the version they actually saw — the rule the config save follows for the version the page edited;
-   - guarded like the config requests by `changeRequestProblem`: this server's `Origin`, same-origin fetch metadata, `application/json`, the per-process token and the 256 KiB body limit. The token is carried by the Changes and document pages as well as the config page;
-   - refused when `--host` is not a loopback address, since it records one person's review on this machine; on loopback it needs no flag, because it writes nothing in the repository.
-
-   GET never writes. "Opened" — a weaker hint than reviewed — stays in the browser's `localStorage` as a best-effort convenience that may reset on another port, and is not part of the server state.
-
-6. **Interface.**
-   - Changes cards: a "Viewed" checkbox that collapses the card once checked, a status chip, and a header count such as "Changes · 5 left of 12".
-   - Keys: `v` marks or unmarks the focused card or the open document; `n` and `p` go to the next and previous unreviewed document in reading order — referenced documents before the ones that reference them, by core's `topologicalSort` over the subgraph of changed documents, with cycles broken by path so the order is deterministic.
-   - Tree: a dot on changed documents not yet reviewed; the "Changed only" switch gains "Unreviewed only".
-   - Document banner: the status and the same checkbox.
-
-7. **Second baseline.** The Changes page and the banner offer "Compare with: base branch / my last review". For a document with a mark the diff runs from its snapshot to the current text; one without a mark falls back to the base branch. Phase 02's diff takes two texts, so nothing here is git-specific.
-
-8. **Clearing.** "Reset review for this change set" unmarks the documents currently listed; removing the repository's folder in the state directory clears everything, and the README says where it is.
+- **The config card has no "Viewed" box**: marks are for documents, and the queue counts documents.
+- **Requests carry `worktree`**, because Commits only shows a different text than the work tree; **reset is its own route** and names the documents the page listed, each checked like a mark.
+- **A reviewed document compared with its last review** shows that nothing changed, rather than falling back to the base branch; a card or page that falls back says so.
+- **Card sizes and findings stay against the base branch** with My last review; the README says so.
+- **The interface test of a reading order with a cycle was dropped** with the topological order. The keys and the checkbox were checked by hand in the browser; the HTML they act on is pinned by the HTTP tests.
 
 ## Tests
 
-- Store: CRLF and LF text hash the same; concurrent writes from two store instances merge; unreferenced snapshots removed; a rename with identical text stays reviewed; a mark made on one branch holds on another with the same text.
-- Write failure, tagged `@boundary-guard write-failure`: with the state directory made unwritable, a mark leaves no temporary file and no half-written state, the request reports the failure, and the page does not show the mark as set.
-- Endpoint: a foreign `Origin`, a missing token, a wrong content type and a non-loopback `--host` are refused; a stale hash gets 409; a plain GET changes nothing in the store.
-- Interface: the reading order with a cycle; the diff since the last review uses the snapshot.
+- `review-store.test.ts`: CRLF, LF and BOM hash the same; default folder per platform, relative XDG ignored; folder names; reading creates nothing; reviewed, changed and unreviewed; rename and any-path lookup; a deletion counted for its own path; earlier versions kept, ten at most; sorted, top-level keys; unmark under every path and unreferenced texts dropped; reset; concurrent marks from two stores merge; a stale lock taken over; a held lock answered as busy; an unreadable or newer index refused and untouched; `@boundary-guard write-failure` on POSIX (a read-only folder: failure reported, earlier marks whole, no temp file or lock).
+- `review.test.ts` (git fixture): boxes and token where marks are on and none on an unchanged page; GETs leave the state directory empty; the count before marking; a mark, then the page's rows read back from `data-review` against `/api/changes` (`@boundary-guard host-parity`), the folded card, unmark; a stale hash and a path outside the review get 409, a malformed body 400; foreign `Origin`, missing token, `text/plain`, cross-site fetch metadata refused, GET 405; marks survive a restart and the diff, page and cards since the review; a mark holds on another branch and after a move; reset; `@boundary-guard write-failure` everywhere (a file in the state directory's place: 500, nothing written, nothing shown as marked); no marks outside a work tree. `--state-dir` parsing.
+- Core: `topLevelPath` and one `commonDir` for two roots of one clone. `changes.test.ts`: the parity list reads rows that now carry `data-review`. The guard inventory lists both new files.
 
-## Docs
+## Still open
 
-`packages/viewer/README.md`: What it shows (Viewed, the statuses, the keys, the two baselines), Run it (`--state-dir`), Security (the viewer now writes outside the repository — what, where, under which guards — and still writes nothing inside it without `--allow-config-writes`), Known limits. Draft the changes to `.agents/rules/security.md` (Viewer Safety: the mark request joins the list of requests with a body; the state directory) and `.agents/rules/testing.md` (the new guard in the write-failure row) and discuss them with the user before merging.
+Before this merges, agree with the user on the drafted changes to `.agents/rules/`, together with phases 03–05:
+
+- `security.md`, Viewer Safety — the read-only bullet gains the review mark (refused with a non-loopback `--host`, which could otherwise record a review as this user); the token is carried by the config, Changes and changed documents' pages; a new bullet: marks are the viewer's one write outside the repository — per clone, keyed by a hash of the git common directory's realpath, an index of paths and content hashes plus the reviewed texts, owner-only, in the user's state directory or `--state-dir`; a mark names the text the page showed (409 otherwise), is written atomically under a lock every viewer of the clone shares, a failed write is reported with the previous state whole, and `GET` creates nothing there.
+- `testing.md` — the guard table lists `packages/viewer/test/review.test.ts` under `host-parity` and `write-failure`, and `packages/viewer/test/review-store.test.ts` under `write-failure`.
+- `architecture.md`, optional — the viewer's review marks and their store are its own, statuses computed from core's `normalizeText`, the diff since a review from core's `diffText`.
+
+`CLAUDE.md` eager context is at 9994 of 10 000 tokens (LLM-001), so any of these drafts needs a rules file compressed or split first, which is the user's decision.
 
 ## Done when
 
-- [ ] Marks follow content across branches, rebases, renames and restarts, stored outside the work tree.
-- [ ] The tree, the header and each card show what is left and what changed since review; `v`, `n` and `p` work.
-- [ ] The diff since the last review is one click away.
-- [ ] The mark endpoint is guarded like the config save, and its write path has a write-failure guard.
+- [x] Marks follow content across branches, rebases, renames and restarts, stored outside the work tree.
+- [x] The tree, the header and each card show what is left and what changed since review; `v`, `n` and `p` work.
+- [x] The diff since the last review is one click away.
+- [x] The mark endpoint is guarded like the config save, and its write path has a write-failure guard.
+- [ ] The rules changes are agreed with the user.

@@ -8,6 +8,7 @@ import {
 } from "node:http";
 import { createRequire } from "node:module";
 import type { AddressInfo } from "node:net";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -33,6 +34,7 @@ import {
   renderChangesArticle,
   renderDiff,
   renderHunkTemplate,
+  type BannerReview,
   type Review,
   type ReviewResult,
 } from "./changes.js";
@@ -84,6 +86,17 @@ import {
 } from "./render-document.js";
 import { decodeRequestPath } from "./request-path.js";
 import type { ReviewContext } from "./review-context.js";
+import {
+  baselineOf,
+  type Baseline,
+  markOf,
+  markReview,
+  parseMarkRequest,
+  parseResetRequest,
+  type ReviewMarksView,
+  SinceReview,
+} from "./review-state.js";
+import { contentHash, type MarkChange, ReviewStore } from "./review-store.js";
 import { DocumentSearch } from "./search.js";
 import {
   assetHeaders,
@@ -91,9 +104,11 @@ import {
   exposesAbsolutePaths,
   isAllowedHostHeader,
   isForeignRequest,
+  isLoopbackHost,
   pageHeaders,
   rawFileHeaders,
 } from "./security.js";
+import { defaultStateDir } from "./state-dir.js";
 import { watchRepository } from "./watch.js";
 
 export type ViewerOptions = {
@@ -115,6 +130,9 @@ export type ViewerOptions = {
   // The environment git runs with — the process's own unless a test isolates it from the machine's
   // git configuration.
   gitEnv?: NodeJS.ProcessEnv;
+  // Where review marks are kept: the platform's state directory unless `--state-dir` names another.
+  // Tests that mark name a temporary one, so a test run never writes to the machine's own marks.
+  stateDir?: string;
 };
 
 export type RunningViewer = {
@@ -142,17 +160,23 @@ function worktreeOf(params: URLSearchParams): boolean {
   return params.get("worktree") !== "0";
 }
 
-// A config change is a few kilobytes of JSON; anything far beyond that is not one, and reading it
-// into memory would cost the server for nothing.
+// A config change or a review mark is at most a few kilobytes of JSON; anything far beyond that is
+// not one, and reading it into memory would cost the server for nothing.
 const MAX_CHANGE_BODY_BYTES = 256 * 1024;
 
-// The only requests with a body the server acts on. Each computes from the config, writes it or opens
-// it in another program, so each passes the checks in `changeRequestProblem` before its body is read.
+// The only requests with a body the server acts on. Each computes from the config, writes it, opens
+// it in another program or records a review mark, so each passes the checks in
+// `changeRequestProblem` before its body is read.
 const CHANGE_ROUTES = new Set([
   "/api/config/preview",
   "/api/config/save",
   "/api/config/open",
+  "/api/review/mark",
+  "/api/review/reset",
 ]);
+
+const REVIEW_OFF =
+  "Review marks are off: they need a git work tree, and a viewer bound to a loopback address, since a mark records this user's review on this machine.";
 
 // A source file larger than this is a generated or vendored file, not something a document links to
 // for a reader; highlighting it would stall the page for nothing.
@@ -223,6 +247,25 @@ export async function startViewer(
       notices.push(`changes: ${first.message} ${first.hint}`);
     }
   }
+  // Review marks, for a reader on this machine only: from another one, anyone who reached the port
+  // could record a review in this user's name and read which documents they have reviewed. Nothing
+  // is created here; the clone's folder appears with the first mark.
+  const git = changes?.git;
+  const reviewStore =
+    git !== undefined && isLoopbackHost(options.host)
+      ? new ReviewStore({
+          // A relative `--state-dir` is taken from where the viewer was started, as a shell user
+          // expects, and fixed now, so it means the same folder for as long as the viewer runs.
+          stateDir:
+            options.stateDir === undefined
+              ? defaultStateDir(process.platform, process.env, os.homedir())
+              : path.resolve(options.stateDir),
+          commonDir: git.commonDir,
+          keyOf: (relPath) => git.topLevelPath(relPath),
+        })
+      : undefined;
+  const sinceReviews =
+    reviewStore === undefined ? undefined : new SinceReview(reviewStore);
   const bound = { host: options.host, port: options.port };
   const eventClients = new Set<ServerResponse>();
   const search = new DocumentSearch();
@@ -346,6 +389,7 @@ export async function startViewer(
       siteName,
       documentPaths: [...corpus.documents.keys()],
       showChanges: changes !== undefined,
+      showReview: reviewStore !== undefined,
     });
   }
 
@@ -390,7 +434,7 @@ export async function startViewer(
       sendText(
         response,
         405,
-        "Method not allowed: only the config page's preview and save take a body.",
+        "Method not allowed: only the config page's and the review marks' requests take a body.",
       );
       return;
     }
@@ -451,7 +495,14 @@ export async function startViewer(
         sendJson(response, { error: NO_CHANGES }, 404);
       } else {
         const review = await changes.review(worktreeOf(params));
-        sendJson(response, changesPayload(review, await contextOf(review)));
+        sendJson(
+          response,
+          changesPayload(
+            review,
+            await contextOf(review),
+            await marksOf(review),
+          ),
+        );
       }
     } else if (target === "/api/changes/diff") {
       await sendChangeDiff(response, params);
@@ -514,6 +565,7 @@ export async function startViewer(
         response,
         decodeRequestPath(target.slice("/doc/".length)),
         diffViewOf(params),
+        baselineOf(params),
       );
     } else if (target.startsWith("/file/")) {
       await sendLinkedFile(
@@ -558,6 +610,7 @@ export async function startViewer(
     response: ServerResponse,
     relPath: string | undefined,
     view: DiffView,
+    baseline: Baseline,
   ): Promise<void> {
     const document =
       relPath === undefined ? undefined : corpus.documents.get(relPath);
@@ -576,7 +629,15 @@ export async function startViewer(
       backlinks: corpus.backlinks(relPath),
       neighborCount: documentNeighbors(corpus.graph, relPath).length,
     };
-    const review = await reviewOf(document);
+    const branchReview = await reviewOf(document);
+    const reviewed = await bannerReviewOf(branchReview, baseline);
+    // What the page marks: the branch's changes, or the changes since the reader's last review when
+    // the page compares with that and the reviewed text is still kept.
+    const review = reviewed?.since ?? branchReview;
+    const banner = (shown: DiffView) =>
+      branchReview === undefined
+        ? undefined
+        : renderChangeBanner(branchReview, shown, reviewed);
     const localGraphChanges = review !== undefined && view !== "off";
     let params: Omit<PageParams, "siteName" | "documentPaths" | "showChanges">;
     if (review !== undefined && view === "source") {
@@ -587,7 +648,7 @@ export async function startViewer(
         ...common,
         localGraphChanges,
         title,
-        changeBanner: renderChangeBanner(review, view),
+        changeBanner: banner(view),
         article: [h("div.change-source", renderDiff(review.diff))],
       };
     } else if (
@@ -606,7 +667,7 @@ export async function startViewer(
         ...common,
         localGraphChanges,
         title: rendered.title,
-        changeBanner: renderChangeBanner(review, view),
+        changeBanner: banner(view),
         article: [...rawHtml(rendered.html), renderHunkTemplate(review.diff)],
         headings: document.headings,
         changedSections,
@@ -619,14 +680,49 @@ export async function startViewer(
         ...common,
         localGraphChanges,
         title,
-        changeBanner:
-          review === undefined ? undefined : renderChangeBanner(review, view),
+        changeBanner: banner(view),
         article: rawHtml(html),
         headings: document.headings,
         frontmatter: document.frontmatter,
       };
     }
-    sendHtml(response, 200, page(params), request.method === "HEAD");
+    sendHtml(
+      response,
+      200,
+      page({
+        ...params,
+        // The "Viewed" checkbox above a changed document sends its mark with it.
+        ...(reviewed === undefined ? {} : { changeToken }),
+      }),
+      request.method === "HEAD",
+    );
+  }
+
+  /**
+   * What the line above a changed document says about the reader's review of it, and the review
+   * since their last one when the page compares with that; `undefined` where marks are off or
+   * cannot be read, which the Changes page explains.
+   */
+  async function bannerReviewOf(
+    review: DocumentReview | undefined,
+    baseline: Baseline,
+  ): Promise<BannerReview | undefined> {
+    if (review === undefined || reviewStore === undefined) {
+      return undefined;
+    }
+    const read = await reviewStore.read();
+    if (!read.ok) {
+      return undefined;
+    }
+    const mark = markOf(review, read.marks);
+    // A document reviewed as it is compares with its own text, which is kept under its hash
+    // whichever path it was marked under: the page then shows that nothing changed since.
+    const version = mark.status === "reviewed" ? mark.hash : mark.since;
+    const since =
+      baseline === "review" && version !== undefined
+        ? await sinceReviews?.of(review, version)
+        : undefined;
+    return { mark, baseline, ...(since === undefined ? {} : { since }) };
   }
 
   async function sendLinkedFile(
@@ -870,6 +966,8 @@ export async function startViewer(
     }
     const worktree = worktreeOf(params);
     const review = await changes.review(worktree);
+    const marks = await marksOf(review);
+    const baseline = baselineOf(params);
     sendHtml(
       response,
       200,
@@ -880,7 +978,19 @@ export async function startViewer(
           review,
           worktree,
           await contextOf(review),
+          marks === undefined || "available" in review
+            ? undefined
+            : {
+                marks,
+                baseline,
+                since:
+                  baseline === "review"
+                    ? await sinceOf(review, marks)
+                    : new Map(),
+              },
         ),
+        // The "Viewed" checkboxes send their mark with it.
+        changeToken: marks === undefined ? undefined : changeToken,
       }),
       request.method === "HEAD",
     );
@@ -921,7 +1031,34 @@ export async function startViewer(
       return;
     }
     // Only ever compared against the review's own paths, like the graph's parameters.
-    const answer = diffPayload(review, params.get("path") ?? "");
+    const relPath = params.get("path") ?? "";
+    if (baselineOf(params) === "review") {
+      const entry = review.documents.find(
+        (document) => document.path === relPath,
+      );
+      const marks = await marksOf(review);
+      const since =
+        entry === undefined
+          ? undefined
+          : (await sinceOf(review, marks)).get(relPath);
+      if (since === undefined) {
+        sendJson(
+          response,
+          {
+            error:
+              "This path has no reviewed version to compare with: it is not among the changed documents, was never reviewed, is reviewed as it is, or its reviewed text is no longer kept.",
+          },
+          404,
+        );
+        return;
+      }
+      sendJson(
+        response,
+        diffPayload({ ...review, documents: [since] }, relPath),
+      );
+      return;
+    }
+    const answer = diffPayload(review, relPath);
     if (answer === undefined) {
       sendJson(
         response,
@@ -1052,7 +1189,8 @@ export async function startViewer(
         response,
         {
           status: "refused",
-          error: "The request body is too large to be a config change.",
+          error:
+            "The request body is too large to be a config change or a review mark.",
         },
         413,
       );
@@ -1073,6 +1211,10 @@ export async function startViewer(
       await openConfig(response, json);
       return;
     }
+    if (target === "/api/review/mark" || target === "/api/review/reset") {
+      await changeMarks(response, target, json);
+      return;
+    }
     const parsed = parseChangeRequest(json);
     if (!parsed.ok) {
       sendJson(response, { status: "refused", error: parsed.message }, 400);
@@ -1085,6 +1227,151 @@ export async function startViewer(
       return;
     }
     await previewChange(response, parsed.request);
+  }
+
+  // Records that the reader reviewed a document, or takes that back, or forgets the marks of every
+  // document a page listed. The text marked is always the one this server's review holds for the
+  // page's comparison, never one the request supplies, and only when its hash is the one the page
+  // showed: a reader can mark exactly the version they saw, as a config save applies only to the
+  // version the page edited.
+  async function changeMarks(
+    response: ServerResponse,
+    target: string,
+    body: unknown,
+  ): Promise<void> {
+    if (reviewStore === undefined || changes === undefined) {
+      sendJson(response, { status: "refused", error: REVIEW_OFF }, 403);
+      return;
+    }
+    const parsed =
+      target === "/api/review/mark"
+        ? parseMarkRequest(body)
+        : parseResetRequest(body);
+    if (!parsed.ok) {
+      sendJson(response, { status: "refused", error: parsed.message }, 400);
+      return;
+    }
+    const review = await changes.review(parsed.request.worktree);
+    if ("available" in review) {
+      sendJson(response, { status: "refused", error: review.message }, 409);
+      return;
+    }
+    const listed =
+      "documents" in parsed.request
+        ? parsed.request.documents
+        : [{ path: parsed.request.path, hash: parsed.request.hash }];
+    const entries: DocumentReview[] = [];
+    for (const { path: relPath, hash } of listed) {
+      // Only ever compared against the review's own paths.
+      const entry = review.documents.find(
+        (document) => document.path === relPath,
+      );
+      if (entry === undefined || contentHash(entry.headText) !== hash) {
+        sendJson(
+          response,
+          {
+            status: "conflict",
+            error:
+              entry === undefined
+                ? "This document is no longer among the changes. Reload the page to see what changed now."
+                : "The document changed since this page showed it. Reload the page to review the version there now.",
+          },
+          409,
+        );
+        return;
+      }
+      entries.push(entry);
+    }
+    let change: MarkChange;
+    if ("documents" in parsed.request) {
+      change = {
+        kind: "reset",
+        documents: entries.map((entry) => ({
+          path: entry.path,
+          ...(entry.oldPath === undefined ? {} : { oldPath: entry.oldPath }),
+          hash: contentHash(entry.headText),
+        })),
+      };
+    } else {
+      const entry = entries[0]!;
+      change = parsed.request.reviewed
+        ? {
+            kind: "mark",
+            path: entry.path,
+            hash: parsed.request.hash,
+            text: entry.headText,
+          }
+        : {
+            kind: "unmark",
+            path: entry.path,
+            ...(entry.oldPath === undefined ? {} : { oldPath: entry.oldPath }),
+            hash: parsed.request.hash,
+          };
+    }
+    const outcome = await reviewStore.update(change);
+    if (!outcome.ok) {
+      sendJson(
+        response,
+        { status: outcome.status, error: outcome.message },
+        outcome.status === "failed"
+          ? 500
+          : outcome.status === "busy"
+            ? 503
+            : 409,
+      );
+      return;
+    }
+    // Every open page counts what is left, so each is told; nothing on disk the watcher sees changed.
+    broadcast("review", {});
+    const marks = markReview(review, { ok: true, marks: outcome.marks });
+    sendJson(response, {
+      status: "saved",
+      documents: entries.map((entry) => {
+        const mark = markOf(entry, outcome.marks);
+        return {
+          path: entry.path,
+          review: { status: mark.status, hash: mark.hash },
+        };
+      }),
+      left: marks.ok ? marks.left : review.documents.length,
+      total: review.documents.length,
+    });
+  }
+
+  /** The marks of a review's documents, or `undefined` where review marks are off. */
+  async function marksOf(
+    review: ReviewResult,
+  ): Promise<ReviewMarksView | undefined> {
+    if (reviewStore === undefined || "available" in review) {
+      return undefined;
+    }
+    return markReview(review, await reviewStore.read());
+  }
+
+  /**
+   * Each changed document's review since the reader's last review of it, for a page that compares
+   * with that: only documents changed since they were reviewed, and only those whose reviewed text
+   * is still kept.
+   */
+  async function sinceOf(
+    review: Review,
+    marks: ReviewMarksView | undefined,
+  ): Promise<Map<string, DocumentReview>> {
+    const since = new Map<string, DocumentReview>();
+    if (sinceReviews === undefined || marks?.ok !== true) {
+      return since;
+    }
+    for (const entry of review.documents) {
+      const version = marks.documents.get(entry.path)?.since;
+      const rebased =
+        version === undefined
+          ? undefined
+          : await sinceReviews.of(entry, version);
+      if (rebased !== undefined) {
+        since.set(entry.path, rebased);
+      }
+    }
+    return since;
   }
 
   // Shows the config file in the file manager or opens it in its default application, on the

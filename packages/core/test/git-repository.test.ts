@@ -387,6 +387,13 @@ describe.skipIf(!hasGit)("openGitRepository (requires git on PATH)", () => {
         "sub/new.md",
       ]);
       expect([...texts]).toEqual([["guide.md", "guide\n"]]);
+      expect(repository.topLevelPath("sub/new.md")).toBe(
+        "packages/docs/sub/new.md",
+      );
+      const atTop = await open(fixture.repo, fixture.env);
+      expect(atTop.topLevelPath("root.md")).toBe("root.md");
+      // One clone, one identity, whichever folder of it the host was started in.
+      expect(repository.commonDir).toBe(atTop.commonDir);
     },
     TIMEOUT_MS,
   );

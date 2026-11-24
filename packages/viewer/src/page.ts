@@ -50,8 +50,9 @@ export type PageParams = {
   frontmatterChange?: BlockChange;
   // Pre-fills the header's search box on a results page.
   query?: string;
-  // Set on the config page only: the token its script sends with a change, so the server can tell a
-  // request from its own page from one another page made the browser send.
+  // Set on the pages that send a change — the config page, and where review marks are on, the Changes
+  // page and a changed document's page: the token their scripts send with it, so the server can tell
+  // a request from its own page from one another page made the browser send.
   changeToken?: string;
   // Which of the header's sections the page is, marked on its link. The only thing about the header
   // that differs between those pages: everything else is byte-identical, so switching between them
@@ -61,6 +62,9 @@ export type PageParams = {
   // then has a Changes section and the tree a switch for changed files. The same on every page, so
   // the header still stays put between them.
   showChanges?: boolean;
+  // Whether review marks are on — a git work tree, on a loopback binding — so the tree also has a
+  // switch for the changed files not yet reviewed. The same on every page, like `showChanges`.
+  showReview?: boolean;
 };
 
 export type Section = "graph" | "dashboard" | "changes" | "config";
@@ -270,6 +274,19 @@ export function renderPage(params: PageParams): string {
                         { hidden: true },
                         [
                           h("span", "Only changed files"),
+                          h("input.switch", {
+                            type: "checkbox",
+                            role: "switch",
+                          }),
+                        ],
+                      )
+                    : undefined,
+                  params.showReview === true
+                    ? h(
+                        "label.tree-filter.tree-filter-unreviewed.switch-row",
+                        { hidden: true },
+                        [
+                          h("span", "Only files left to review"),
                           h("input.switch", {
                             type: "checkbox",
                             role: "switch",
