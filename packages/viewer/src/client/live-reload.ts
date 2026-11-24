@@ -97,6 +97,12 @@ function restoreScroll(): void {
 }
 
 function reloadKeepingScroll(): void {
+  // A page already leaving for another — a click taken, the next page on its way — is not reloaded:
+  // the reload would replace that navigation, and the reader would land back on the page they left.
+  // The page they are going to is served fresh anyway.
+  if (document.documentElement.dataset.navigating !== undefined) {
+    return;
+  }
   try {
     sessionStorage.setItem(scrollKey, String(window.scrollY));
   } catch {

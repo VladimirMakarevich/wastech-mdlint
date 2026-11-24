@@ -393,6 +393,25 @@ a:hover {
   cursor: default;
 }
 
+/* Between a click that leaves the page and the next page appearing, the header's section is the one
+   the next page belongs to: the segment it leads to is chosen and the page's own is not, as the next
+   page will draw them, so the click shows at once that it was taken. */
+.section-nav .segment[data-pending] {
+  background: var(--segment-thumb);
+  box-shadow: var(--shadow-sm);
+}
+
+.section-nav[data-pending] .segment[aria-current="page"]:not([data-pending]) {
+  background: none;
+  box-shadow: none;
+}
+
+/* Drawn in full at once: the page is left a frame after the click, and the frame it leaves on screen
+   until the next page appears would otherwise hold the choice halfway through its transition. */
+:root[data-navigating] :is(.segment, .tree a) {
+  transition: none;
+}
+
 .segment svg {
   flex: none;
 }
@@ -492,6 +511,44 @@ a:hover {
   border-bottom: 1px solid var(--border-subtle);
   background: var(--material);
   backdrop-filter: var(--material-filter);
+}
+
+/* While the next page takes longer than a moment, a thin bar along the header's lower edge grows
+   toward its end, and the pointer says the page is busy. Never shown for the moment a document takes
+   to open: a bar that came and went in a tenth of a second would be a blink of its own. It belongs
+   to the page being left, so the next page arrives without it. */
+.topbar::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: var(--accent);
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left;
+  pointer-events: none;
+}
+
+:root[data-navigating="slow"] .topbar::after {
+  opacity: 1;
+  animation: navigation-progress 3s var(--ease-out) forwards;
+}
+
+/* It never reaches the end, which only the next page arriving can mean. */
+@keyframes navigation-progress {
+  from {
+    transform: scaleX(0.08);
+  }
+
+  to {
+    transform: scaleX(0.9);
+  }
+}
+
+:root[data-navigating="slow"] :is(body, a, button, summary, .segment) {
+  cursor: progress;
 }
 
 .site-name {
@@ -1377,10 +1434,19 @@ a:hover {
   outline-offset: -2px;
 }
 
-.tree a[aria-current="page"] {
+.tree a[aria-current="page"],
+.tree a[data-pending] {
   background: var(--accent-bg);
   color: var(--accent);
   font-weight: 600;
+}
+
+/* The file the next page opens is marked as soon as it is clicked; the page's own is not, while the
+   wait lasts. */
+.sidebar[data-pending] .tree a[aria-current="page"]:not([data-pending]) {
+  background: none;
+  color: var(--fg-muted);
+  font-weight: inherit;
 }
 
 /* "Only files with findings": a switch row over the tree; with it on, every row without a finding
@@ -3904,6 +3970,12 @@ a:hover {
   .switch,
   .switch::before {
     transition: none;
+  }
+
+  /* A still line across the header says the same as the growing one. */
+  :root[data-navigating="slow"] .topbar::after {
+    animation: none;
+    transform: none;
   }
 }
 
