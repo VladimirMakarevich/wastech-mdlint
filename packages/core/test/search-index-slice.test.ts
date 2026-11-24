@@ -240,7 +240,10 @@ describe("getContextSlice · multi-start union and depth bound", () => {
   it("merges reachable sets from both starts and lets the minimal depth win on overlap", () => {
     const { documents, graph } = multiStartFixture();
 
-    const result = getContextSlice(graph, documents, "REQ-1", 2, idRef);
+    const result = getContextSlice(graph, documents, "REQ-1", {
+      depth: 2,
+      idRef,
+    });
 
     expect(result.matchKind).toBe("id");
     expect(result.starts).toEqual(["x.md", "y.md"]);
@@ -257,7 +260,10 @@ describe("getContextSlice · multi-start union and depth bound", () => {
   it("bounds the merged traversal by an explicit depth", () => {
     const { documents, graph } = multiStartFixture();
 
-    const result = getContextSlice(graph, documents, "REQ-1", 1, idRef);
+    const result = getContextSlice(graph, documents, "REQ-1", {
+      depth: 1,
+      idRef,
+    });
 
     expect(result.visited).toEqual([
       { path: "mid.md", depth: 1, via: "y.md" },
@@ -271,20 +277,14 @@ describe("getContextSlice · multi-start union and depth bound", () => {
   it("defaults depth to 2 when omitted", () => {
     const { documents, graph } = multiStartFixture();
 
-    const withDefault = getContextSlice(
-      graph,
-      documents,
-      "REQ-1",
-      undefined,
+    const withDefault = getContextSlice(graph, documents, "REQ-1", {
+      depth: undefined,
       idRef,
-    );
-    const withExplicitTwo = getContextSlice(
-      graph,
-      documents,
-      "REQ-1",
-      2,
+    });
+    const withExplicitTwo = getContextSlice(graph, documents, "REQ-1", {
+      depth: 2,
       idRef,
-    );
+    });
 
     expect(withDefault).toEqual(withExplicitTwo);
   });

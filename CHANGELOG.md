@@ -6,6 +6,10 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Breaking for code calling `@wastech-mdlint/core` directly: `getContextSlice(graph, documents, query, options)` takes the depth and the ID convention as one options object, `{ depth?, idRef? }`, instead of two trailing positional arguments, and the type is exported as `ContextSliceOptions`. `getContextSlice(graph, documents, "REQ-1", 3, idRef)` becomes `getContextSlice(graph, documents, "REQ-1", { depth: 3, idRef })`. The depth still defaults to `2`. The CLI `slice` command and the MCP `context-slice` tool are unchanged.
+
 ## [0.3.0]
 
 Breaking for a config with a `custom` rule whose ID starts with `FM-` or spells a built-in rule's alias in uppercase, for one relying on `TBL-002` to report a row shorter than its header, for a file whose first line is a `---` horizontal rule, and for an inline directive naming an unknown rule category such as `REF_001`, which is now reported as an error — see Added and Fixed.

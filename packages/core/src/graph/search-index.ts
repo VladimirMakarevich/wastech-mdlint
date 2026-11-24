@@ -173,6 +173,18 @@ function mergeVisited(perStart: QueryVisit[][]): QueryVisit[] {
 }
 
 /**
+ * How far a slice reaches and which ID convention resolves its query. Named rather than positional:
+ * both are optional, and a caller passing only the ID convention would otherwise have to spell out
+ * the depth's default by hand.
+ */
+export type ContextSliceOptions = {
+  // Hops from each resolved start; 2 when omitted, an explicit `undefined` included.
+  depth?: number | undefined;
+  // The ID convention `settings.idRef` configures; ID queries resolve only with it.
+  idRef?: IdRef | undefined;
+};
+
+/**
  * Resolve `query` via `buildSearchIndex`/`resolveQuery`, then run the shared forward `query()` from
  * every resolved start and merge the results — "closest start wins" for any node reachable from
  * more than one start. Exact resolution only (see `SLICE_RESOLUTION_DESCRIPTION`); a query that
@@ -182,9 +194,9 @@ export function getContextSlice(
   graph: ContextGraph,
   documents: Map<string, ParsedDocument>,
   query: string,
-  depth = 2,
-  idRef?: IdRef,
+  options: ContextSliceOptions = {},
 ): ContextSliceResult {
+  const { depth = 2, idRef } = options;
   const resolved = resolveQuery(buildSearchIndex(documents, idRef), query);
   if (resolved === null) {
     return { query, matchKind: null, starts: [], files: [], visited: [] };

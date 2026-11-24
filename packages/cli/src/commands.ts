@@ -346,13 +346,10 @@ async function handleSlice(
 
   // An unresolved query is a legitimate answer, not a usage error — `getContextSlice`
   // already returns an empty result rather than throwing, so this command always exits 0.
-  const result = getContextSlice(
-    graph,
-    documents,
-    command.query,
-    command.depth,
-    loaded.settings.idRef,
-  );
+  const result = getContextSlice(graph, documents, command.query, {
+    depth: command.depth,
+    idRef: loaded.settings.idRef,
+  });
 
   const output =
     command.format === "json"

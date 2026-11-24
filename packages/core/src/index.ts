@@ -157,6 +157,7 @@ export {
 } from "./graph/search-index.js";
 export type {
   ContextSearchIndex,
+  ContextSliceOptions,
   ContextSliceResult,
   SliceMatchKind,
 } from "./graph/search-index.js";

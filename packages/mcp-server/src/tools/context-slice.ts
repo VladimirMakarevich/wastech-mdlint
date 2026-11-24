@@ -61,15 +61,12 @@ export async function handleContextSlice(
   try {
     const { graph, documents, settings } = await resolveToolContext(input);
 
-    // `input.depth` is passed straight through even when `undefined`: `getContextSlice`'s own default
-    // parameter (`depth = 2`) applies to an explicit `undefined` argument, so no `?? 2` is needed.
-    const result = getContextSlice(
-      graph,
-      documents,
-      input.query,
-      input.depth,
-      settings.idRef,
-    );
+    // `input.depth` is passed straight through even when `undefined`: `getContextSlice` defaults an
+    // explicit `undefined` depth to 2 as it does an absent one, so no `?? 2` is needed.
+    const result = getContextSlice(graph, documents, input.query, {
+      depth: input.depth,
+      idRef: settings.idRef,
+    });
 
     // An unresolved query is not an error: it returns `matchKind: null` with empty arrays. This is
     // the honest-empty-result contract — do not throw.
