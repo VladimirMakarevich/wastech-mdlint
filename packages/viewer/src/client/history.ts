@@ -3,7 +3,7 @@
 // git to walk history; drawn with text nodes only, since a commit subject and an author's name are
 // whatever someone typed.
 
-type Commit = {
+export type Commit = {
   short: string;
   date: string;
   subject: string;
@@ -21,34 +21,63 @@ export function initHistory(): void {
         return;
       }
       loaded = true;
-      void load(details);
+      // A history that could not be read is asked for again the next time the reader opens it: a
+      // network hiccup or a viewer restarting is not an answer to keep.
+      void load(details).then((answered) => {
+        loaded = answered;
+      });
     });
   }
 }
 
-async function load(details: HTMLDetailsElement): Promise<void> {
+/**
+ * What `/api/history` answered: the commits, or the note shown in their place and whether it is an
+ * answer (no commit yet) rather than a failure to ask about again. A refusal — git gone, the document
+ * no longer in the corpus — says why, rather than reading as a document no commit has touched.
+ */
+export function readHistory(
+  ok: boolean,
+  answer: { commits?: Commit[]; error?: string },
+): { commits: Commit[] } | { note: string; answered: boolean } {
+  if (!ok || answer.commits === undefined) {
+    return {
+      note: answer.error ?? "The history could not be loaded.",
+      answered: false,
+    };
+  }
+  return answer.commits.length === 0
+    ? { note: "No commit touches this document yet.", answered: true }
+    : { commits: answer.commits };
+}
+
+// Whether the server answered with the history, so it need not be asked again.
+async function load(details: HTMLDetailsElement): Promise<boolean> {
   const list = details.querySelector<HTMLOListElement>(".changes-history-list");
   if (list === null) {
-    return;
+    return true;
   }
   const status = document.createElement("li");
   status.className = "changes-history-note";
   status.textContent = "Loading…";
   list.replaceChildren(status);
-  let commits: Commit[];
+  let answer: { commits?: Commit[]; error?: string };
+  let ok: boolean;
   try {
     const response = await fetch(
       `/api/history?${new URLSearchParams({ path: details.dataset.path ?? "" }).toString()}`,
     );
-    commits = ((await response.json()) as { commits?: Commit[] }).commits ?? [];
+    ok = response.ok;
+    answer = (await response.json()) as typeof answer;
   } catch {
     status.textContent = "The history could not be loaded.";
-    return;
+    return false;
   }
-  if (commits.length === 0) {
-    status.textContent = "No commit touches this document yet.";
-    return;
+  const read = readHistory(ok, answer);
+  if ("note" in read) {
+    status.textContent = read.note;
+    return read.answered;
   }
+  const { commits } = read;
   list.replaceChildren(
     ...commits.map((commit) => {
       const item = document.createElement("li");
@@ -71,4 +100,5 @@ async function load(details: HTMLDetailsElement): Promise<void> {
       return item;
     }),
   );
+  return true;
 }
