@@ -21,7 +21,7 @@ Three rules follow from that, and they are not negotiable:
 - `@wastech-mdlint/core` — the engine.
 - `@wastech-mdlint/cli` — the commander-based CLI host. Bin: `wastech-mdlint`.
 - `@wastech-mdlint/mcp-server` — the stdio MCP host. Bin: `wastech-mdlint-mcp`.
-- `@wastech-mdlint/viewer` — the local web viewer host (experimental, `private`). Bin: `wastech-mdlint-viewer`.
+- `@wastech-mdlint/viewer` — the local web viewer host (experimental, `private`). Bin: `wastech-mdlint-viewer`. Before changing it, read [`.agents/rules/viewer.md`](.agents/rules/viewer.md): what each of its pages takes from core, and its security boundary as the one host with a network listener and a write outside the repository.
 
 Treat the filesystem as truth for where code lives.
 

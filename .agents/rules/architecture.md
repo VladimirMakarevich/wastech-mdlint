@@ -4,12 +4,12 @@ These invariants govern implementation work. They are stated here in full; the c
 
 ## Core Ownership
 
-- Core owns the parsing pipeline, config loading, lint orchestration, graph construction, compile logic, and result formatting.
+- Core owns the parsing pipeline, config loading, lint orchestration, graph construction, compile logic, result formatting, read-only git access, and the review of a branch against its base (`reviewBranch`, `branchContext`, `analyzeSince`, `sinceLintResult`, `sinceImpact`) that the viewer's Changes pages, `lint --since`, `impact --since` and the MCP `since` all read.
 - CLI, MCP and the viewer are thin host adapters over core. They must not fork or duplicate the core pipeline.
 - Host-specific behavior belongs at the boundary:
   - CLI: argument parsing, command dispatch, exit codes, file output.
   - MCP: tool registration, input validation, structured output, error wrapping.
-  - Viewer: HTTP serving, HTML rendering of the tree core parsed (`parseDocumentWithTree`), highlighting, live reload. It takes its corpus from `loadContext`, its findings from `lintContext` over that same corpus, its link targets from `resolveTargetCandidates`, which linked files it serves and which changed paths need a reload from `createScopeTester`, and its heading ids from core's slugs, so a page and the lint findings about it never disagree. Its link graph is that corpus's `ContextGraph` and a document's neighbors come from core's `query`; the viewer only narrows the graph to a folder and merges a pair's parallel edges into one line for drawing. Its dashboard takes sizes from `measureDocument`, link flags from that graph (`cycles`, `getComponents`) and findings from the same lint run, and only filters, sorts and lays them out. Its config page reads, checks and changes the config only through `parseConfiguration`, the generated schema and `editConfigText`, so what it previews or saves is a config `loadConfiguration` accepts, comments intact.
+  - Viewer: HTTP serving, HTML rendering, highlighting, live reload, and its review marks and their store. Which core function each of its pages takes its answer from is in [`viewer.md`](viewer.md).
 - Shared computational behavior belongs in core, not in host packages.
 
 The reason is not tidiness. Two hosts that each compute an answer will eventually compute two different answers, and because each package's own tests pass, nothing reports the divergence — which is why a cross-host parity guard exists in the test suite as well.
