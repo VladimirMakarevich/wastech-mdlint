@@ -1,28 +1,13 @@
-import { mkdir, readFile, stat } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 
-import { type ParseError, parse as parseJsonc } from "jsonc-parser";
-
 import {
-  buildAgentRuleMarkdown,
-  buildCiWorkflowYaml,
-  canonicalizeRuleId,
   compareStrings,
   CONFIG_FILE_NAME,
-  containsJsoncComments,
-  DEFAULT_EXCLUDE_GLOBS,
   detectPackageManager,
-  DEFAULT_INCLUDE_GLOBS,
   findConfig,
   generateInitConfig,
-  identifyExistingRule,
   inferRuleSet,
-  loadConfiguration,
-  MARKDOWN_GLOB_SUFFIX,
-  matchesConfigGlob,
   normalizeRelativePath,
-  PACKAGE_SCHEMA_SEGMENTS,
   resolvePackageSchemaRef,
   ruleRegistry,
   scanRepository,
@@ -35,1496 +20,137 @@ import {
   type InferenceScope,
   type InferredRule,
   type InitConfigAction,
-  type LoadedConfiguration,
-  type ProjectSchemaReason,
   type RuleCategory,
-  type RuleConfigEntry,
   type ScanPruning,
 } from "@wastech-mdlint/core";
 
-// `init`: the thin host boundary over core's repo scan + rule inference. This module
-// owns orchestration and pure preview-building; it never touches process.stdin/stdout (that split
-// lives in init-prompter.ts). Writing follows the same core-generates / host-writes split: core
-// produces the bytes (generateInitConfig), this host performs the actual filesystem writes.
+import {
+  buildConfigPreview,
+  DRAFT_SUMMARY_HEADER,
+  formatDraftSummary,
+  freshInferenceScope,
+  groupInferredRulesByCategory,
+  resolveIncludeToWrite,
+  type ConfirmedInitSelections,
+  type DraftSchemaPlan,
+} from "./init-draft.js";
+import {
+  diffAgainstExistingRuleIds,
+  mergeInferenceScope,
+  readMergeBaseline,
+  type MergeBaseline,
+} from "./init-existing-config.js";
+import {
+  findInstalledSchemaDir,
+  findRepositoryRoot,
+  offerOptInFiles,
+  optInOutcome,
+} from "./init-opt-in.js";
+import {
+  planProjectSchemaWrite,
+  type SchemaWriteOutcome,
+} from "./init-schema-write.js";
+import {
+  formatNotWrittenSummary,
+  formatSkipSummary,
+  formatWriteFailureSummary,
+  formatWriteSummary,
+} from "./init-summary.js";
+import {
+  DEFAULT_EXISTING_CONFIG_ACTION,
+  type ExistingConfigAction,
+  type InitCommandOptions,
+  type InitPrompter,
+  type RunInitCommandResult,
+} from "./init-types.js";
 
-export type ExistingConfigAction = "overwrite" | "merge" | "skip";
+// `init`: the thin host boundary over core's repo scan + rule inference. This module owns
+// orchestration; the pure preview-building, the existing-config reads, the opt-in files and the
+// summaries live in the sibling `init-*` modules it re-exports from. It never touches
+// process.stdin/stdout (that split lives in init-prompter.ts). Writing follows the same
+// core-generates / host-writes split: core produces the bytes (generateInitConfig), this host
+// performs the actual filesystem writes.
 
-// The least-destructive choice — `init` never clobbers a file implicitly. Both `--yes`'s own
-// fallback below and the interactive prompt's default (init-prompter.ts) resolve to this single
-// constant, so pressing Enter through the interactive flow can never silently diverge from what
-// non-interactive `--yes` does.
-export const DEFAULT_EXISTING_CONFIG_ACTION: ExistingConfigAction = "skip";
-
-// One method per real decision point (mirrors CliIo's stdout/stderr/cwd seam), so a fake prompter
-// can drive every branch of runInitCommand in tests without a TTY.
-export type InitPrompter = {
-  // `configPath` is already a repository-relative POSIX path (normalized by the caller) — public
-  // output never surfaces an absolute, platform-native filesystem path.
-  resolveExistingConfigAction(
-    configPath: string,
-  ): Promise<ExistingConfigAction>;
-  choosePackageManager(): Promise<DetectedPackageManager>;
-  selectClusters(clusters: DocCluster[]): Promise<DocCluster[]>;
-  selectCategories(categories: RuleCategory[]): Promise<RuleCategory[]>;
-  // Must display `summary` to the user before asking for confirmation — it is the only place the
-  // draft is shown on an interactive run. `runInitCommand` trusts that display already happened
-  // and does not re-emit `summary` itself once this resolves, so a caller must not skip it.
-  confirmDraft(summary: string): Promise<boolean>;
-  // The opt-in CI-workflow offer: "ask first, don't write silently", so its prompt defaults to
-  // no. Only consulted on an interactive run when no workflow file already exists.
-  confirmCiWorkflow(): Promise<boolean>;
-  // The opt-in agent-rule offer, under the same discipline and with the same default: only
-  // consulted on an interactive run when no agent rule file already exists.
-  confirmAgentRule(): Promise<boolean>;
-};
-
-export type InitCommandOptions = {
-  cwd: string;
-  yes: boolean;
-  onExisting?: ExistingConfigAction;
-  isTty: boolean;
-  // Pre-answers the CI-workflow prompt under `--yes` only (mirrors `--on-existing`): interactive
-  // runs always prompt regardless of this flag.
-  withCiWorkflow?: boolean;
-  // Pre-answers the agent-rule prompt under `--yes` only, exactly as `withCiWorkflow` does.
-  withAgentRule?: boolean;
-  // The running CLI's own version. The agent rule pins its on-demand runner and its companion skill
-  // to it; read once by the host rather than here, since the host already owns reading its package
-  // metadata for `--version`.
-  cliVersion: string;
-  // True only when the CLI's `[path]` argument was actually typed by the user (program.ts is the
-  // one layer that can tell "typed, and happens to equal cwd" apart from "omitted"). A required
-  // field, not optional, so every call site is forced to decide it explicitly: an
-  // explicit target directory must not be silently re-rooted onto a config found at a strict
-  // ancestor — see the re-rooting comment in `runInitCommand` below.
-  pathWasExplicit: boolean;
-};
-
-// The confirmed draft handed to formatDraftSummary. `"none"` distinguishes "no config existed" from
-// an existing config the user chose to leave alone via `"skip"` (which returns before this is built).
-export type ConfirmedInitSelections = {
-  existingConfigAction: ExistingConfigAction | "none";
-  packageManager: DetectedPackageManager;
-  clusters: DocCluster[];
-  rules: InferredRule[];
-  newRuleIds: string[];
-  // Only meaningful when `existingConfigAction === "merge"`: true when the existing config could
-  // not be read/parsed, so `newRuleIds` is the *full* inferred set rather than a real diff against
-  // known existing ids — the summary must say so rather than presenting the count as authoritative.
-  existingConfigUnreadable: boolean;
-  // Whether the scan found any cluster to offer at all. `clusters: []` is ambiguous on its own, and
-  // the two readings need opposite `include` values: nothing detected means "fall back
-  // to the tool default", while every offered cluster deselected means "lint none of these". A
-  // required field so each call site has to state which case it is in.
-  clustersWereOffered: boolean;
-  // Only meaningful for `"merge"`: the existing config carries JSONC comments the rebuild will drop.
-  existingConfigHasComments: boolean;
-  // What the scan refused to walk, straight from `scanRepository`. Required for the same reason
-  // `clustersWereOffered` is: the draft has to disclose it, and an optional field would let a
-  // new call site drop the disclosure silently — which is the exact defect this closes.
-  pruning: ScanPruning;
-  // Which `$schema` the write will point at, and whether reaching it means creating a second file.
-  // Required for the same reason `pruning` is: warn-before-confirming covers what a run *creates*,
-  // not only what it replaces, and the schema file used to appear in the after-the-fact write
-  // summary alone.
-  schema: DraftSchemaPlan;
-};
+export {
+  buildConfigPreview,
+  formatDraftSummary,
+  formatScanExclusions,
+  groupInferredRulesByCategory,
+  resolveIncludeToWrite,
+  type ConfigPreview,
+  type ConfirmedInitSelections,
+  type DraftSchemaPlan,
+} from "./init-draft.js";
+export {
+  diffAgainstExistingRuleIds,
+  extractExistingRuleIds,
+  readExistingConfigDocument,
+  type ParsedExistingConfig,
+} from "./init-existing-config.js";
+export type { AgentRuleOutcome, CiWorkflowOutcome } from "./init-opt-in.js";
+export {
+  resolveSchemaWriteOutcome,
+  type SchemaWriteOutcome,
+} from "./init-schema-write.js";
+export {
+  formatNotWrittenSummary,
+  formatSkipSummary,
+  formatWriteFailureSummary,
+  formatWriteSummary,
+} from "./init-summary.js";
+export {
+  DEFAULT_EXISTING_CONFIG_ACTION,
+  type ExistingConfigAction,
+  type InitCommandOptions,
+  type InitOutcome,
+  type InitPrompter,
+  type RunInitCommandResult,
+} from "./init-types.js";
 
 /**
- * What the draft says about `$schema` before the user confirms. `ref` is the value the config will
- * carry; `projectSchema` is present only when `init` must also generate a schema file beside the
- * config for that ref to resolve — the ordinary `npx` case, where nothing is installed to point at,
- * or a config whose custom rules the built-in schema cannot describe.
- *
- * Both fields come straight from `generateInitConfig`, so the draft and the write summary cannot
- * disagree about which file the config points at or about why it is there.
+ * Which existing config governs this run, and from where. Every later step reads it, so it is
+ * resolved once and handed along rather than recomputed per step.
  */
-export type DraftSchemaPlan = {
-  ref: string;
-  projectSchema?: { fileName: string; reason: ProjectSchemaReason };
-};
-
-export type ConfigPreview = {
-  include: string[];
-  rules: RuleConfigEntry[];
-};
-
-/**
- * Every way `runInitCommand` can end, named — because four of the seven write nothing and the host has
- * to sort them into two exit codes that mean opposite things. A boolean could not:
- * the previous `writeFailed` flag collapsed "the user asked for no write" and "the file we were told
- * to merge into is invalid" into one `false`, so a CI merge step that refused to write reported
- * success. Which bucket a new outcome belongs in is a decision, so it is spelled out here and
- * switched exhaustively at the boundary rather than inferred from a flag.
- *
- * Deliberate no-write (exit `0`): `skipped`, `declined`. Operational failure (exit `2`):
- * `invalid-existing-config`, `write-failed`, `ci-workflow-write-failed`, `agent-rule-write-failed`.
- *
- * `skipped` means the *config* was deliberately left alone, not that nothing was written: the CI
- * workflow and agent rule are still offered after a skip, because a repository that already has a
- * config is exactly the one that wants to add them without touching it. So the two opt-in failure
- * outcomes can follow either a config write or a skip — a requested file that could not be written
- * is a failed write either way, and exiting `0` for it would let a CI step report success after
- * writing nothing it was asked to write.
- */
-export type InitOutcome =
-  | "written"
-  | "skipped"
-  | "declined"
-  | "invalid-existing-config"
-  | "write-failed"
-  | "ci-workflow-write-failed"
-  | "agent-rule-write-failed";
-
-export type RunInitCommandResult = {
-  output: string;
-  outcome: InitOutcome;
-};
-
-const DRAFT_SUMMARY_HEADER = "wastech-mdlint init — draft configuration";
-
-// One wording for comment loss, shared by the draft preview and the write summary so the warning the
-// user agreed to and the one they are told about afterwards can never drift apart. Tense-neutral for
-// that reason: the draft appends its own "back it up first" hint, which only makes sense beforehand.
-const COMMENT_LOSS_NOTE =
-  "merge rebuilds the config from its parsed values, so the JSONC comments in the existing file " +
-  "are not preserved.";
-
-// The two rules the README leads with are the two `init` can never propose, and measuring the whole
-// corpus rather than a sample does not change that: both require a budget, and a budget is a choice
-// rather than a measurement — knowing how large every document is says nothing about how large one
-// ought to be. That is a scope choice, and an unstated one is what turns into a finding a second
-// time, so the draft says it out loud rather than leaving the user to notice the absence. Same
-// disclosure discipline as the scan-exclusion block above it.
-const NOT_INFERRED_NOTE = [
-  "Not proposed by init:",
-  "  SIZE-001 (byte / line / token budgets) and LLM-001 (eager-import token budget) are never " +
-    "inferred — both need a budget only you can choose, and measuring your corpus cannot supply " +
-    "one. Add them by hand: see docs/guide/rules/SIZE-001.md and " +
-    "docs/guide/rules/LLM-001.md.",
-];
-
-/**
- * Groups inferred rules by category, preserving `inferRuleSet`'s own deterministic id order within
- * each group (a computed sequence, not an incidental one — re-sorting here would just be redundant).
- */
-export function groupInferredRulesByCategory(
-  rules: InferredRule[],
-): Partial<Record<RuleCategory, InferredRule[]>> {
-  const grouped: Partial<Record<RuleCategory, InferredRule[]>> = {};
-
-  for (const rule of rules) {
-    const existing = grouped[rule.category];
-    if (existing === undefined) {
-      grouped[rule.category] = [rule];
-    } else {
-      existing.push(rule);
-    }
-  }
-
-  return grouped;
-}
-
-/**
- * Canonical-id set difference: which inferred rules are not already present in an existing
- * config's `rules[]`. Preview-only — the actual additive/existing-wins merge write happens later.
- */
-export function diffAgainstExistingRuleIds(
-  existingIds: string[],
-  rules: InferredRule[],
-): { newRules: InferredRule[] } {
-  const canonicalExisting = new Set(
-    existingIds.map((id) => canonicalizeRuleId(id)),
-  );
-  const newRules = rules.filter(
-    (rule) => !canonicalExisting.has(canonicalizeRuleId(rule.rule)),
-  );
-  return { newRules };
-}
-
-export type ParsedExistingConfig = {
-  // The parsed JSONC root object, or undefined when the file could not be read or did not parse to
-  // an object. `parsed` mirrors that: false ⇒ `raw` is undefined.
-  raw: Record<string, unknown> | undefined;
-  parsed: boolean;
-  // Whether the file on disk carries JSONC comments. A `merge` rebuilds the config from `raw`, so
-  // those comments do not survive it — this is what lets the summaries say so instead of
-  // presenting an additive merge as entirely non-destructive. False for an unreadable file: there is
-  // nothing known to lose, and that case already aborts the merge.
-  hasComments: boolean;
-};
-
-/**
- * Shared JSONC read of an existing config's root object. Deliberately not a full `lintConfigSchema`
- * validation (that belongs to `loadConfiguration`) — a committed config that doesn't fully validate
- * must still be diffable for the merge preview, and a malformed file must degrade to `parsed: false`
- * (so callers can warn/abort) rather than crash `init`.
- */
-async function parseExistingConfigFile(
-  cwd: string,
-  configPath: string,
-): Promise<ParsedExistingConfig> {
-  const absoluteConfigPath = path.isAbsolute(configPath)
-    ? configPath
-    : path.resolve(cwd, configPath);
-
-  try {
-    const text = await readFile(absoluteConfigPath, "utf8");
-    const errors: ParseError[] = [];
-    const raw: unknown = parseJsonc(text, errors, {
-      allowTrailingComma: true,
-      disallowComments: false,
-    });
-
-    if (errors.length > 0 || raw === null || typeof raw !== "object") {
-      return { raw: undefined, parsed: false, hasComments: false };
-    }
-    return {
-      raw: raw as Record<string, unknown>,
-      parsed: true,
-      hasComments: containsJsoncComments(text),
-    };
-  } catch {
-    return { raw: undefined, parsed: false, hasComments: false };
-  }
-}
-
-/**
- * Derives the canonicalized `rules[].rule` ids from an already-parsed config root, and whether the
- * config can be merged additively (`mergeable`). A present-but-non-array `rules` key cannot be
- * merged, so it degrades the same way an unparsable file does. Pure over one parsed snapshot, so the
- * diff preview and the write path can share a single read without re-parsing.
- */
-export function extractExistingRuleIds(
-  raw: Record<string, unknown> | undefined,
-): {
-  ruleIds: string[];
-  mergeable: boolean;
-} {
-  if (raw === undefined) {
-    return { ruleIds: [], mergeable: false };
-  }
-
-  const rulesField = raw.rules;
-  if (rulesField === undefined) {
-    // Successfully parsed, and the key is genuinely absent — zero existing ids is a known fact
-    // here, not a degraded guess.
-    return { ruleIds: [], mergeable: true };
-  }
-  if (!Array.isArray(rulesField)) {
-    return { ruleIds: [], mergeable: false };
-  }
-
-  const ids: string[] = [];
-  for (const entry of rulesField) {
-    // `identifyExistingRule` (core) keys a built-in by its canonical `rule` and a custom rule by its
-    // canonical `id` — never the literal `"custom"`. Any entry it can't identify (a bare string, a
-    // non-string `rule`, or a `rule: "custom"` with a missing/non-string/non-schemaable `id`) makes
-    // the whole config non-mergeable: appending inferred rules over an unidentifiable existing entry
-    // could silently duplicate or shadow it, so the caller routes this to the not-written abort.
-    const identity = identifyExistingRule(entry);
-    if (identity.kind === "invalid") {
-      return { ruleIds: [], mergeable: false };
-    }
-    ids.push(
-      identity.kind === "custom" ? identity.rule.id : identity.canonicalId,
-    );
-  }
-  return { ruleIds: ids, mergeable: true };
-}
-
-/**
- * The existing config's parsed root object for the merge *write* path (feeds `generateInitConfig`'s
- * `ExistingConfigDocument`). Only consulted once the diff has already confirmed the file is readable
- * and additively mergeable, so an undefined `raw` here is a guarded, unreachable case rather than a
- * silent fallback.
- */
-export async function readExistingConfigDocument(
-  cwd: string,
-  configPath: string,
-): Promise<ParsedExistingConfig> {
-  return parseExistingConfigFile(cwd, configPath);
-}
-
-/**
- * The `include` value a fresh write will use — the one place this three-valued rule is decided.
- *
- * Three values, because an empty selection and an empty scan need opposite files: a literal `[]` is
- * written only when clusters were offered and turned down (lints nothing, as asked), while a scan
- * that found none omits the key so the tool's own dot-matching default `include` applies. Inverting a
- * deliberate "none of these" into that default is the bug this shape exists to prevent. (The default
- * glob is not spelled here for the reason the comment on `formatScanExclusions` gives: it contains a
- * sequence that would close this block comment early.)
- *
- * It is one function because two callers need the same answer in different forms: the writer needs the
- * value, and the draft's scan-exclusion disclosure needs to know whether the key will be written at
- * all (`resolveIncludeToWrite(...) !== undefined`) — the case where the skipped hidden files end up
- * linted by the default rather than excluded. Derived twice, they could disagree, and the disclosure
- * would then claim the opposite of what was written.
- */
-export function resolveIncludeToWrite(
-  previewInclude: readonly string[],
-  clustersWereOffered: boolean,
-): string[] | undefined {
-  if (previewInclude.length > 0) {
-    return [...previewInclude];
-  }
-  return clustersWereOffered ? [] : undefined;
-}
-
-/**
- * The corpus a fresh write's config will lint, so inference can measure exactly it.
- *
- * Every value here has to be the one `generateInitConfig`'s fresh branch emits, not an approximation
- * of it: the counts inference writes into the rationale comments are a promise that running `lint`
- * against the file reproduces them, and a scope assembled from different defaults would break that
- * promise silently — the config would still be valid and the numbers beside each rule simply wrong.
- * That is why `include` comes from the same three-valued helper the writer uses rather than from the
- * cluster list directly, and why `respectGitignore` is pinned `true` here as it is there.
- */
-function freshInferenceScope(
-  clusters: DocCluster[],
-  clustersWereOffered: boolean,
-): InferenceScope {
-  const include = resolveIncludeToWrite(
-    buildConfigPreview(clusters, []).include,
-    clustersWereOffered,
-  );
-  return {
-    ...(include === undefined ? {} : { include }),
-    exclude: [...DEFAULT_EXCLUDE_GLOBS],
-    respectGitignore: true,
-  };
-}
-
-/**
- * Shapes the confirmed clusters/rules into the `{ include, rules }` slice of `LintConfig` the
- * writer later serializes. Structural-only — no `$schema` and no rationale comments here — and
- * validated against `lintConfigSchema` only in tests (a forward-compat smoke check, not a runtime
- * dependency on the schema). A proposal's `severity` *is* carried, because it decides whether the
- * entry runs; a preview that dropped it would show the user a rule the write then disables.
- */
-export function buildConfigPreview(
-  clusters: DocCluster[],
-  rules: InferredRule[],
-): ConfigPreview {
-  const include = [
-    ...new Set(clusters.map((cluster) => cluster.includeGlob)),
-  ].sort(compareStrings);
-
-  const ruleEntries: RuleConfigEntry[] = rules.map((rule) => ({
-    rule: rule.rule,
-    ...(rule.severity === undefined ? {} : { severity: rule.severity }),
-    ...(rule.options === undefined ? {} : { options: rule.options }),
-  }));
-
-  return { include, rules: ruleEntries };
-}
-
-function formatExistingConfigLine(
-  selections: ConfirmedInitSelections,
-  configPath: string | undefined,
-): string {
-  if (selections.existingConfigAction === "none" || configPath === undefined) {
-    return "Existing config: none found.";
-  }
-
-  switch (selections.existingConfigAction) {
-    case "overwrite":
-      return `Existing config found at ${configPath}: will be overwritten with the confirmed draft below.`;
-    case "merge": {
-      const base =
-        `Existing config found at ${configPath}: existing rules[] entries are left untouched ` +
-        `(severity/options preserved); ${selections.newRuleIds.length} new rule(s) would be appended.`;
-      if (selections.existingConfigUnreadable) {
-        return (
-          `${base} WARNING: the existing config could not be read, parsed, or validated, so this is ` +
-          "the full inferred set, not a verified diff — check for duplicates before merging."
-        );
-      }
-      // Surfaced here, before `confirmDraft`, and not only in the write summary: comment loss is the
-      // one part of an "additive, existing-wins" merge that is genuinely destructive, so the user has
-      // to see it while they can still decline.
-      return selections.existingConfigHasComments
-        ? `${base} WARNING: ${COMMENT_LOSS_NOTE} Back it up first if you need them.`
-        : base;
-    }
-    case "skip":
-      // Unreachable via runInitCommand (skip returns before a ConfirmedInitSelections is built),
-      // but kept for exhaustiveness since the type still permits it.
-      return `Existing config found at ${configPath}: left untouched (skip).`;
-    default: {
-      const exhaustiveCheck: never = selections.existingConfigAction;
-      return exhaustiveCheck;
-    }
-  }
-}
-
-// How many entries one exclusion line names before it collapses into a `+N more` tail. A monorepo can
-// prune dozens of `node_modules` copies, and a wall of paths is what makes a disclosure ignorable —
-// a disclosure nobody reads. The input is sorted, so which entries survive the cap is stable.
-const EXCLUSION_LIST_CAP = 5;
-
-// One named thing on an exclusion line, with however many of it there are: Markdown files under a
-// hidden directory, or pruned directories sharing a basename.
-type CountedEntry = { name: string; count: number };
-
-function sumCounts(entries: readonly CountedEntry[]): number {
-  return entries.reduce((total, entry) => total + entry.count, 0);
-}
-
-// Renders `name (count)` pairs, and the elided tail carries the total it drops.
-//
-// Both halves exist so the line's leading total is arithmetic the reader can perform against the list
-// beside it. Printing a count of directories next to a deduplicated list of names is what made
-// `3 directories skipped by name — .git, node_modules` unreconcilable: two correct numbers, no stated
-// relationship, and a reader left to guess whether the disclosure or their own arithmetic is wrong.
-// The tail is the same failure at the cap — `+6 more` names says nothing about how many of the total
-// those six account for.
-function formatCountedList(entries: readonly CountedEntry[]): string {
-  const render = (entry: CountedEntry): string =>
-    `${entry.name} (${entry.count})`;
-
-  if (entries.length <= EXCLUSION_LIST_CAP) {
-    return entries.map(render).join(", ");
-  }
-
-  const shown = entries.slice(0, EXCLUSION_LIST_CAP).map(render).join(", ");
-  const elided = entries.slice(EXCLUSION_LIST_CAP);
-  return `${shown}, +${elided.length} more (${sumCounts(elided)})`;
-}
-
-function pluralize(count: number, singular: string, plural: string): string {
-  return `${count} ${count === 1 ? singular : plural}`;
-}
-
-// Deduped, sorted basenames of a pruned set with their occurrence counts — `mobile/node_modules` and
-// `node_modules` are one name to report, and the count is what keeps the line's own total derivable.
-function prunedNameCounts(
-  directories: readonly { path: string }[],
-): CountedEntry[] {
-  const counts = new Map<string, number>();
-  for (const entry of directories) {
-    const name = path.posix.basename(entry.path);
-    counts.set(name, (counts.get(name) ?? 0) + 1);
-  }
-  return [...counts]
-    .map(([name, count]) => ({ name, count }))
-    .sort((left, right) => compareStrings(left.name, right.name));
-}
-
-// Splits one pruned hidden directory's Markdown files by whether the drafted config will lint them.
-//
-// A hidden directory is skipped by the *scan*, which is a separate question from whether the config
-// the scan led to selects its files — and the two answers routinely differ. Config globs are matched
-// with dot-segments enabled, so a cluster proposed for an ancestor directory (`backend`) covers a
-// dot-directory nested under it (`backend/.rules`) without ever naming it. A directory can therefore
-// land on both sides at once, when the include reaches part of its tree and not the rest.
-//
-// Judged per file rather than per directory for that reason, and against the same patterns the write
-// will emit, so the block cannot claim a file is out of the corpus that the config beside it pulls in.
-function partitionHiddenFiles(
-  files: readonly string[],
-  include: readonly string[],
-  exclude: readonly string[],
-): { linted: string[]; notLinted: string[] } {
-  const linted: string[] = [];
-  const notLinted: string[] = [];
-
-  for (const file of files) {
-    const selected =
-      matchesConfigGlob(file, [...include]) &&
-      !matchesConfigGlob(file, [...exclude]);
-    (selected ? linted : notLinted).push(file);
-  }
-
-  return { linted, notLinted };
-}
-
-/**
- * The scan-exclusion disclosure: what the scan refused to walk, why, and — for the one class where
- * the two can differ — whether the drafted config lints those files anyway. Pure and exported so the
- * wording is asserted directly, mirroring `formatDraftSummary`/`formatWriteSummary`.
- *
- * **One line per reason, never one total.** The classes are not one class: a pruned `node_modules` is
- * unsurprising, and a `.claude/skills/` dropped because its parent starts with a dot is the finding.
- * A single aggregate count is precisely what invites a user to skim past it.
- *
- * **Every count is derivable from the list printed beside it.** Each line states a total and then
- * names its parts with their own counts, so a reader can add them up rather than take the total on
- * faith; an elided tail carries the total it drops for the same reason.
- *
- * Only the hidden class names files, and the asymmetry is deliberate — it is the one class whose
- * contents are plausibly documentation the user wants linted, and it is also the only one cheap to
- * enumerate (`scanRepository` lists it while pruning; listing a dependency tree would mean walking the
- * tree that pruning exists to avoid). The other two say "contents not counted" out loud rather than
- * implying a zero.
- *
- * Returns `[]` when there is nothing to disclose, so the caller can omit the block entirely.
- *
- * `includeToWrite` is the exact value the write will put in the `include` key — the patterns, not a
- * flag — because the hidden class needs both of the questions it answers. *Which* patterns decides
- * per file whether a skipped file is nonetheless in the corpus, which is the difference between a
- * true sentence and a misleading one when a cluster glob covers a dot-directory nested under it.
- * *Whether* the key is written at all (`undefined`) decides the actionable half: with an include, a
- * file outside it needs a pattern added; with the key omitted — the scan found no cluster, which is
- * exactly the shape of a repo whose only Markdown *is* in dot-directories — the dot-matching default
- * is in force instead, and saying otherwise would contradict the `Include (…)` line above.
- *
- * (No default glob is spelled out in this block comment on purpose: a depth-agnostic prefix contains
- * `*` `*` `/`, which would close the comment early — the same reason `config/corpus-scope.ts` uses
- * `//` throughout.)
- */
-export function formatScanExclusions(
-  pruning: ScanPruning,
-  includeToWrite: readonly string[] | undefined,
-): string[] {
-  // The scope the drafted config will actually lint by. `exclude` and `respectGitignore` are pinned
-  // by the fresh write, and this is the same `exclude` it emits — the hidden files were already
-  // walked under the scan's own noise and gitignore pruning, so applying it here is what keeps the
-  // two definitions from drifting apart rather than a second filter.
-  const include = includeToWrite ?? DEFAULT_INCLUDE_GLOBS;
-
-  // Sorted here rather than trusted from the caller: `ScanPruning` is public core API and this
-  // formatter is exported, so an unsorted record would otherwise render in input order and shift
-  // which entries the cap keeps. Sorting belongs at the rendering site, not at the caller.
-  const hidden = pruning.directories
-    .filter((entry) => entry.reason === "hidden")
-    .sort((left, right) => compareStrings(left.path, right.path));
-  const noise = pruning.directories.filter((entry) => entry.reason === "noise");
-  const gitignored = pruning.directories.filter(
-    (entry) => entry.reason === "gitignored",
-  );
-
-  const notLinted: CountedEntry[] = [];
-  const lintedAnyway: CountedEntry[] = [];
-  for (const entry of hidden) {
-    const split = partitionHiddenFiles(
-      entry.markdownFiles ?? [],
-      include,
-      DEFAULT_EXCLUDE_GLOBS,
-    );
-    // A directory holding no Markdown at all contributes to neither, and is therefore never
-    // disclosed: reporting an empty `.husky` would train the reader to skim the line that matters.
-    if (split.notLinted.length > 0) {
-      notLinted.push({ name: entry.path, count: split.notLinted.length });
-    }
-    if (split.linted.length > 0) {
-      lintedAnyway.push({ name: entry.path, count: split.linted.length });
-    }
-  }
-
-  const lines: string[] = [];
-
-  const describeHidden = (entries: readonly CountedEntry[]): string =>
-    `${pluralize(sumCounts(entries), "Markdown file", "Markdown files")} in ` +
-    `${pluralize(entries.length, "directory", "directories")} whose name starts with a dot — ` +
-    `${formatCountedList(entries)}.`;
-
-  if (notLinted.length > 0) {
-    // The suggested pattern splices MARKDOWN_GLOB_SUFFIX rather than a literal `.md` tail, because
-    // the count beside it was produced with MARKDOWN_EXTENSIONS: a hardcoded tail would advertise a
-    // pattern that lints fewer files than the number in the same sentence. The directory it names is
-    // taken from this group, so the advice can never point at one an include already covers — which
-    // is the whole reason the two groups are separate lines.
-    const advice =
-      includeToWrite === undefined
-        ? `The scan never proposes a dot-directory as a doc cluster, and no include will be ` +
-          `written either, so the dot-matching default is in force — it selects .md only, so these ` +
-          `are not linted.`
-        : `The scan never proposes a dot-directory as a doc cluster, and no include pattern above ` +
-          `matches these; add a pattern such as "${notLinted[0]!.name}/**/${MARKDOWN_GLOB_SUFFIX}" ` +
-          `to lint them.`;
-    lines.push(
-      `  hidden directories, not linted: ${describeHidden(notLinted)} ${advice}`,
-    );
-  }
-
-  if (lintedAnyway.length > 0) {
-    // Reported rather than dropped, because the surprise runs in this direction too: a finding in a
-    // file the same screen has just listed under "Excluded from the scan" reads as a bug in the tool.
-    // No advice here — there is nothing to add.
-    const note =
-      includeToWrite === undefined
-        ? `The scan never proposes a dot-directory as a doc cluster, but no include will be ` +
-          `written either, so the dot-matching default stays in force and these are linted.`
-        : `The scan never proposed these as doc clusters, but an include pattern above matches ` +
-          `them anyway, so they are in the corpus.`;
-    lines.push(
-      `  hidden directories, linted anyway: ${describeHidden(lintedAnyway)} ${note}`,
-    );
-  }
-
-  if (noise.length > 0) {
-    lines.push(
-      `  build and dependency directories: ${pluralize(noise.length, "directory", "directories")} ` +
-        `skipped by name, contents not counted — ${formatCountedList(prunedNameCounts(noise))}.`,
-    );
-  }
-
-  if (gitignored.length > 0) {
-    lines.push(
-      `  gitignored directories: ${pluralize(gitignored.length, "directory", "directories")} ` +
-        `skipped, contents not counted — ${formatCountedList(prunedNameCounts(gitignored))}.`,
-    );
-  }
-
-  return lines.length === 0 ? [] : ["Excluded from the scan:", ...lines];
-}
-
-/**
- * Deterministic, human-readable preview of the confirmed draft: existing-config disposition,
- * package manager, include globs (from `buildConfigPreview`, so the printed list matches exactly
- * what the writer will serialize), the scan-exclusion disclosure, the `$schema` the write will point
- * at and any schema file it has to create for that, rules grouped by category with their per-rule
- * rationale, and the two rules inference will never reach (`NOT_INFERRED_NOTE`).
- *
- * `merge` is additive and existing-wins: it only ever appends new `rules[]`
- * entries and must never touch `include`/`exclude`/`settings`. So a merge preview omits the
- * `Include (...)` section entirely — showing clusters there would imply `include` is changing,
- * which the merge path is not allowed to write.
- */
-export function formatDraftSummary(
-  selections: ConfirmedInitSelections,
-  configPath: string | undefined,
-): string {
-  const lines: string[] = [DRAFT_SUMMARY_HEADER, ""];
-
-  lines.push(formatExistingConfigLine(selections, configPath));
-  lines.push(
-    `Package manager: ${selections.packageManager ?? "not detected"}.`,
-  );
-  lines.push("");
-
-  if (selections.existingConfigAction === "merge") {
-    lines.push(
-      "Include / exclude / settings: left unchanged (merge only appends new rules[] entries).",
-    );
-  } else {
-    const preview = buildConfigPreview(selections.clusters, selections.rules);
-    lines.push(`Include (${preview.include.length}):`);
-    if (preview.include.length === 0) {
-      // The two empty cases produce different files, so they must not share a message: deselecting
-      // every offered cluster writes a literal `"include": []` (lints nothing), while finding none
-      // omits the key and leaves the tool's `**/*.md` default in force.
-      lines.push(
-        selections.clustersWereOffered
-          ? '  (none selected — an empty "include" will be written, so no files will be linted)'
-          : "  (none — no Markdown clusters detected; include will be omitted, so the default **/*.md applies)",
-      );
-    } else {
-      for (const glob of preview.include) {
-        lines.push(`  - ${glob}`);
-      }
-    }
-
-    // Only on a fresh write, and only after the Include block it qualifies: `merge` has just said
-    // scope is left unchanged, so disclosing what the scan skipped there would imply a decision the
-    // merge path is not making. Under `--yes` this reaches stdout via `composeOutput`; interactively
-    // `confirmDraft` shows it while the user can still decline, which is where the warn-before-
-    // confirming discipline wants it.
-    // Asks the writer's own decision function rather than re-deriving it, and hands over the value
-    // itself: the disclosure judges each skipped file against the patterns the config will carry, so
-    // a second derivation here could describe a boundary the written file does not have. The omitted
-    // case (nothing selected *and* nothing offered) is carried by `undefined` rather than flattened,
-    // because that is the one case where the hidden files end up linted by the default.
-    const exclusions = formatScanExclusions(
-      selections.pruning,
-      resolveIncludeToWrite(preview.include, selections.clustersWereOffered),
-    );
-    if (exclusions.length > 0) {
-      lines.push("", ...exclusions);
-    }
-  }
-
-  // The same `Schema:` line the write summary carries, shown here as well rather than only there:
-  // the `npx` path generates a schema.json beside the config, and a file the run *creates* in the
-  // user's repository has to be on screen while declining is still possible — the write summary
-  // alone puts it after the fact. Unconditional (including on `merge`, which always rewires
-  // `$schema`) so the two summaries can never describe different files.
-  lines.push("", `Schema: ${selections.schema.ref}`);
-  const { projectSchema } = selections.schema;
-  if (projectSchema !== undefined) {
-    lines.push(
-      `  init will also write ${projectSchema.fileName} beside the config ` +
-        `(${describeProjectSchemaReason(projectSchema.reason)}), so that $schema resolves. ` +
-        `A ${projectSchema.fileName} already at that path is reported and kept rather than ` +
-        "replaced, unless it is init's own and you passed --on-existing overwrite.",
-    );
-  }
-  lines.push("");
-
-  const grouped = groupInferredRulesByCategory(selections.rules);
-  const categories = (Object.keys(grouped) as RuleCategory[]).sort(
-    compareStrings,
-  );
-
-  lines.push(`Rules (${selections.rules.length}):`);
-  if (categories.length === 0) {
-    lines.push("  (none inferred)");
-  } else {
-    for (const category of categories) {
-      lines.push(`  ${category}:`);
-      for (const rule of grouped[category] ?? []) {
-        lines.push(`    - ${rule.rule}: ${rule.rationale}`);
-      }
-    }
-  }
-
-  // Unconditional, including on `merge`: it states what `init` proposes, which is true whatever the
-  // existing config already lists, so no branch needs to opt out of it.
-  lines.push("", ...NOT_INFERRED_NOTE);
-
-  return `${lines.join("\n")}\n`;
-}
-
-// The workflow file location, as path segments joined via path.join for a Windows-correct write. Its
-// user-visible form is derived as a project-relative POSIX path at the write site (toRepoRelative).
-const CI_WORKFLOW_PATH_SEGMENTS = [
-  ".github",
-  "workflows",
-  "wastech-mdlint.yml",
-] as const;
-
-// Fallback project-root markers, used only when there is no `.git` above the write dir. A valid
-// non-git project still has `package.json`/`node_modules` at its root.
-const PROJECT_ROOT_MARKERS = ["package.json", "node_modules"] as const;
-
-// Walk up from `startDir` to the first ancestor for which `matches` holds; undefined at the FS root
-// or once the walk reaches `boundary` (checked, but never crossed — see findRepositoryRoot/
-// findInstalledSchemaDir for why the caller always passes the user's home directory here).
-async function findAncestor(
-  startDir: string,
-  matches: (directory: string) => Promise<boolean>,
-  boundary: string,
-): Promise<string | undefined> {
-  let directory = path.resolve(startDir);
-  const resolvedBoundary = path.resolve(boundary);
-
-  for (;;) {
-    if (directory === resolvedBoundary) {
-      return undefined;
-    }
-    if (await matches(directory)) {
-      return directory;
-    }
-    const parent = path.dirname(directory);
-    if (parent === directory) {
-      return undefined;
-    }
-    directory = parent;
-  }
-}
-
-/**
- * Resolve the root that anchors the CI workflow and user-visible relative paths. The repository root
- * (`.git`) wins whenever one exists — GitHub loads workflows only from the *repo* root, so a nested
- * workspace-package run (`packages/foo`) must anchor at the repo root, never at `packages/foo`. Only
- * when there is no git root above the write dir does it fall back to the nearest `package.json`/
- * `node_modules` (a valid non-git project). Undefined outside any recognizable project.
- *
- * The walk stops at (and never accepts) the user's home directory: `init` bootstraps a *new* project,
- * so its target commonly has no `.git`/`package.json` of its own yet, and a great many developer
- * machines have an unrelated `.git` at `$HOME` (a dotfiles repo). Without this bound, running `init`
- * anywhere under such a home directory would silently anchor the CI-workflow write — a real file on
- * disk — at `$HOME` instead of the target project. Capping at `$HOME` trades away the rare legitimate
- * case of a project rooted exactly at `$HOME` for never writing outside the user's intended target.
- */
-async function findRepositoryRoot(
-  startDir: string,
-): Promise<string | undefined> {
-  const homeDir = os.homedir();
-  const gitRoot = await findAncestor(
-    startDir,
-    (directory) => fileExists(path.join(directory, ".git")),
-    homeDir,
-  );
-  if (gitRoot !== undefined) {
-    return gitRoot;
-  }
-  return findAncestor(
-    startDir,
-    async (directory) => {
-      for (const marker of PROJECT_ROOT_MARKERS) {
-        if (await fileExists(path.join(directory, marker))) {
-          return true;
-        }
-      }
-      return false;
-    },
-    homeDir,
-  );
-}
-
-/**
- * Walk up from `startDir` for the directory whose `node_modules/@wastech-mdlint/cli/schema.json`
- * actually exists on disk — the real installed schema, wherever the package manager hoisted it.
- * Returns that directory, or undefined when the package is not installed (the ordinary `npx` case,
- * and a common one in tests / before `npm install`) or the walk reaches the user's home directory
- * (same unrelated-ancestor concern as `findRepositoryRoot`). `undefined` means "no package schema
- * ref": the caller generates a project-local `./schema.json` rather than anchoring on a project
- * root whose `node_modules/@wastech-mdlint/cli/schema.json` does not exist.
- */
-async function findInstalledSchemaDir(
-  startDir: string,
-): Promise<string | undefined> {
-  return findAncestor(
-    startDir,
-    (directory) => fileExists(path.join(directory, ...PACKAGE_SCHEMA_SEGMENTS)),
-    os.homedir(),
-  );
-}
-
-/**
- * Asks one opt-in question. These prompts run after the config/schema are already on disk (or after
- * a skip, when the CI workflow may already have been written before the agent-rule prompt), so a
- * Ctrl+C here must not unwind the whole command — that would exit without the summary and make an
- * already-mutated repo look untouched. Cancellation is therefore read as "no" and the summary
- * still prints. Matched on `.name` (not `instanceof`), the version-stable @inquirer convention used
- * in program.ts.
- */
-async function askOptIn(ask: () => Promise<boolean>): Promise<boolean> {
-  try {
-    return await ask();
-  } catch (error) {
-    if (error instanceof Error && error.name === "ExitPromptError") {
-      return false;
-    }
-    throw error;
-  }
-}
-
-/**
- * Writes one opt-in file whose parent directory routinely does not exist yet (`.github/workflows`,
- * `.agents/rules`). The atomic helper deliberately leaves directory creation to its caller, so a
- * failure to create it is reported the same way a failed write is — just without an errno to
- * attribute it to, since the directory, not the file, is what could not be made.
- */
-async function writeOptInFile(
-  absolutePath: string,
-  content: string,
-): Promise<{ ok: true } | { ok: false; code?: string }> {
-  try {
-    await mkdir(path.dirname(absolutePath), { recursive: true });
-  } catch {
-    return { ok: false };
-  }
-  const written = await writeFilesAtomic([{ path: absolutePath, content }]);
-  return written.ok ? { ok: true } : { ok: false, code: written.code };
-}
-
-/**
- * Outcome of the opt-in CI-workflow write. `path` is a repository-relative POSIX path. `"failed"`
- * exists because this write happens *after* the config and schema are already committed: dropping the
- * whole summary on its failure would leave an already-mutated repo looking untouched, so the failure
- * becomes a summary line (plus a non-zero exit) instead of a thrown error.
- *
- * `"kept"` and `"unsafe-config-path"` are the two cases where the offer is withheld by the tool
- * rather than declined by the user: both used to return `undefined`, which the summary
- * renders as no line at all, so a run that quietly skipped the workflow looked identical to one that
- * was never eligible for it. Neither is a failure — nothing was attempted and nothing is broken — so
- * they report without affecting the exit code. A user saying "no" stays `undefined`: they already
- * know what they chose.
- */
-export type CiWorkflowOutcome =
-  | { kind: "written"; path: string }
-  | { kind: "failed"; path: string; code?: string }
-  | { kind: "kept"; path: string }
-  | { kind: "unsafe-config-path"; path: string };
-
-/**
- * Offer — and, if accepted, write — the opt-in CI workflow. Reached through `offerOptInFiles` after
- * either a confirmed config write or a `skip` of an existing config: the workflow depends only on
- * where the config lives, not on whether this run wrote it, so skipping the config must not also
- * silently skip the workflow `--with-ci-workflow` asked for. Never overwrites an existing workflow. Anchors at the project root (where GitHub
- * loads workflows) and points the workflow at `configAbsPath` relative to that root. Returns the
- * write outcome, or undefined when the offer was declined/withheld and nothing was attempted.
- */
-async function offerCiWorkflow(params: {
-  repoRoot: string;
-  configAbsPath: string;
-  yes: boolean;
-  withCiWorkflow: boolean | undefined;
-  prompter: InitPrompter;
-}): Promise<CiWorkflowOutcome | undefined> {
-  const { repoRoot, configAbsPath, yes, withCiWorkflow, prompter } = params;
-
-  // Under `--yes` the flag fully decides (mirroring `--on-existing`), so do no filesystem work when
-  // it is off; an interactive run always prompts.
-  if (yes && withCiWorkflow !== true) {
-    return undefined;
-  }
-
-  // Omit the `--config` argument when the config sits at the project root — the CLI's walk-up finds
-  // it there; otherwise pass its project-root-relative POSIX path.
-  const configFromRoot = normalizeRelativePath(
-    path.relative(repoRoot, configAbsPath),
-  );
-  // Resolved before the guards below so both of them can name the workflow they declined to write.
-  const ciWorkflowPath = path.join(repoRoot, ...CI_WORKFLOW_PATH_SEGMENTS);
-  const relativeWorkflowPath = normalizeRelativePath(
-    path.relative(repoRoot, ciWorkflowPath),
-  );
-
-  // A line terminator in the path can't be represented safely in the workflow's shell command, and
-  // stripping it would mis-target the config — so decline this opt-in feature rather than emit a
-  // broken/mis-pointing workflow (an extreme but legal path edge; the config itself is unaffected).
-  if (/[\r\n]/.test(configFromRoot)) {
-    return { kind: "unsafe-config-path", path: relativeWorkflowPath };
-  }
-
-  if (await fileExists(ciWorkflowPath)) {
-    return { kind: "kept", path: relativeWorkflowPath };
-  }
-
-  const wantsCi = yes || (await askOptIn(() => prompter.confirmCiWorkflow()));
-  if (!wantsCi) {
-    return undefined;
-  }
-
-  const configArg =
-    configFromRoot === CONFIG_FILE_NAME ? undefined : configFromRoot;
-  const written = await writeOptInFile(
-    ciWorkflowPath,
-    buildCiWorkflowYaml(configArg),
-  );
-  return written.ok
-    ? { kind: "written", path: relativeWorkflowPath }
-    : { kind: "failed", path: relativeWorkflowPath, code: written.code };
-}
-
-// Where the agent rule lands, as path segments joined via path.join for a Windows-correct write.
-// `.agents/rules/` is the host-neutral home for agent-operation guidance — it belongs to no single
-// agent product — and the file is named after this tool rather than after its topic, so it cannot
-// collide with a `markdown.md` or `docs.md` rule the repository already keeps for its own reasons.
-const AGENT_RULE_PATH_SEGMENTS = [
-  ".agents",
-  "rules",
-  "wastech-mdlint.md",
-] as const;
-
-/**
- * Outcome of the opt-in agent-rule write. The four kinds mean what they mean for the CI workflow
- * (`CiWorkflowOutcome`), for the same reasons: `"failed"` is reported rather than thrown because the
- * config is already on disk, `"kept"` and `"unsafe-config-path"` are withheld offers that must still
- * be stated, and a user's "no" stays `undefined`. `path` is a repository-relative POSIX path.
- */
-export type AgentRuleOutcome =
-  | { kind: "written"; path: string }
-  | { kind: "failed"; path: string; code?: string }
-  | { kind: "kept"; path: string }
-  | { kind: "unsafe-config-path"; path: string };
-
-/**
- * Offer — and, if accepted, write — the opt-in agent rule. Reached through `offerOptInFiles`, after a
- * config write or a `skip` alike, for the same reason as the CI-workflow offer. Anchored at the
- * repository root for the reason the workflow is: agent context is read from the repository root,
- * not from wherever a nested config happens to sit, and the page itself names that config's
- * directory so its commands still find it. Never overwrites an existing rule — the page is meant to
- * be edited, and a re-run of `init` must not undo those edits.
- */
-async function offerAgentRule(params: {
-  repoRoot: string;
-  configAbsPath: string;
-  yes: boolean;
-  withAgentRule: boolean | undefined;
-  prompter: InitPrompter;
-  cliInstalled: boolean;
-  packageManager: DetectedPackageManager;
-  cliVersion: string;
-}): Promise<AgentRuleOutcome | undefined> {
-  const { repoRoot, configAbsPath, yes, withAgentRule, prompter } = params;
-
-  if (yes && withAgentRule !== true) {
-    return undefined;
-  }
-
-  const configFromRoot = normalizeRelativePath(
-    path.relative(repoRoot, configAbsPath),
-  );
-  const agentRulePath = path.join(repoRoot, ...AGENT_RULE_PATH_SEGMENTS);
-  const relativeAgentRulePath = normalizeRelativePath(
-    path.relative(repoRoot, agentRulePath),
-  );
-
-  // The page names the config's directory inside an inline code span, and no code span can carry a
-  // line terminator — so decline rather than write a page pointing agents at a directory that does
-  // not exist.
-  if (/[\r\n]/.test(configFromRoot)) {
-    return { kind: "unsafe-config-path", path: relativeAgentRulePath };
-  }
-
-  if (await fileExists(agentRulePath)) {
-    return { kind: "kept", path: relativeAgentRulePath };
-  }
-
-  const wantsRule = yes || (await askOptIn(() => prompter.confirmAgentRule()));
-  if (!wantsRule) {
-    return undefined;
-  }
-
-  const written = await writeOptInFile(
-    agentRulePath,
-    buildAgentRuleMarkdown({
-      configPath: configFromRoot,
-      cliInstalled: params.cliInstalled,
-      packageManager: params.packageManager,
-      cliVersion: params.cliVersion,
-    }),
-  );
-  return written.ok
-    ? { kind: "written", path: relativeAgentRulePath }
-    : { kind: "failed", path: relativeAgentRulePath, code: written.code };
-}
-
-/**
- * Offers both opt-in files in their fixed order — the workflow, then the agent rule. The config-write
- * branch and the `skip` branch of `runInitCommand` both go through here rather than each calling the
- * two offers, because two copies of this sequence would drift: one branch would gain a new opt-in
- * file, an ordering change or a guard that the other silently lacks.
- */
-async function offerOptInFiles(params: {
-  repoRoot: string;
-  configAbsPath: string;
+type InitRun = {
   options: InitCommandOptions;
   prompter: InitPrompter;
-  cliInstalled: boolean;
+  // The directory the whole flow scans, infers and writes from — the target, or the directory of a
+  // config found at its ancestor.
+  cwd: string;
+  existingConfigPath: string | undefined;
+  relativeConfigPath: string | undefined;
+  existingConfigAction: ExistingConfigAction | "none";
+};
+
+/** What the scan offered and which of it the user kept. */
+type ConfirmedScan = {
+  confirmedClusters: DocCluster[];
+  clustersWereOffered: boolean;
   packageManager: DetectedPackageManager;
-}): Promise<{
-  ciWorkflow: CiWorkflowOutcome | undefined;
-  agentRule: AgentRuleOutcome | undefined;
-}> {
-  const { repoRoot, configAbsPath, options, prompter } = params;
-  const ciWorkflow = await offerCiWorkflow({
-    repoRoot,
-    configAbsPath,
-    yes: options.yes,
-    withCiWorkflow: options.withCiWorkflow,
-    prompter,
-  });
-  // Offered even when the workflow write just failed: the two files are independent, and a failure
-  // in one is no reason to withhold the other the user may have asked for.
-  const agentRule = await offerAgentRule({
-    repoRoot,
-    configAbsPath,
-    yes: options.yes,
-    withAgentRule: options.withAgentRule,
-    prompter,
-    cliInstalled: params.cliInstalled,
-    packageManager: params.packageManager,
-    cliVersion: options.cliVersion,
-  });
-  return { ciWorkflow, agentRule };
-}
+  pruning: ScanPruning;
+};
 
-/**
- * The run's outcome once the opt-in files have been offered. A requested opt-in file that failed to
- * land turns an otherwise-successful run into a failed write whichever branch it followed — the
- * summary names which file it was, and names both when both failed, which is why naming the
- * workflow first here loses nothing. `onSuccess` is what the run was before the offers: `"written"`
- * after a config write, `"skipped"` after leaving an existing config untouched.
- */
-function optInOutcome(
-  ciWorkflow: CiWorkflowOutcome | undefined,
-  agentRule: AgentRuleOutcome | undefined,
-  onSuccess: "written" | "skipped",
-): InitOutcome {
-  if (ciWorkflow?.kind === "failed") {
-    return "ci-workflow-write-failed";
-  }
-  if (agentRule?.kind === "failed") {
-    return "agent-rule-write-failed";
-  }
-  return onSuccess;
-}
-
-/**
- * Outcome of the project-local `schema.json` write, decided by `resolveSchemaWriteOutcome` before
- * any filesystem write happens. `path` is a repository-relative POSIX path; `reason` is carried
- * straight through from `generateInitConfig` so the summary never guesses why the file exists.
- */
-export type SchemaWriteOutcome = {
-  kind: "written" | "unchanged" | "kept" | "overwritten" | "unreadable";
-  path: string;
-  reason: ProjectSchemaReason;
+/** The draft as confirmed, carrying the generated bytes the write step commits unchanged. */
+type InitDraft = {
+  action: InitConfigAction;
+  existingConfigHasComments: boolean;
+  schemaAnchor: string | undefined;
+  packageManager: DetectedPackageManager;
+  result: GeneratedInitConfig;
+  summary: string;
 };
 
 /**
- * Guards the project-local `schema.json` write with the same `--on-existing` signal that already
- * governs the config write. This write once had no guard at all, unlike the sibling CI-workflow
- * write. Byte-compares an existing file against the freshly generated text first:
- * identical bytes mean there is nothing to preserve, so a repeat `init` run reports "unchanged"
- * (no write) instead of the "kept" warning — that warning is reserved for a real divergence worth
- * flagging. Only once the bytes actually differ does `"overwrite"` bypass the guard; `"merge"` and
- * `"none"` both leave a differing file untouched. Pure so the decision itself — not just its
- * string rendering — is directly testable.
- *
- * `existingSchemaUnreadable` takes precedence over every other check and is a required field:
- * the read that produces `existingSchemaText` degrades *any* failure to `undefined`, which used to be
- * harmless because the write would then fail identically. Atomic writes changed that — `rename` needs
- * write permission on the *directory*, not on the target — so without this signal a present-but-
- * unreadable `schema.json` would be silently replaced, exactly the implicit file-clobbering the
- * guard exists to prevent.
- *
- * `reason` narrows the one destructive outcome. `--on-existing overwrite` is a disposition for the
- * *config* — the user never named `schema.json` — so it may only reach a pre-existing schema whose
- * contents this config actually determines, i.e. `"custom-rules"`. Under `"no-installed-package"`
- * the file is generated purely as a resolvable target for `$schema`, and `schema.json` is a common
- * name for something else entirely (an OpenAPI document, a product schema), so a differing file
- * there degrades to `"kept"`: nothing the user asked for depends on replacing it.
+ * Resolves the existing-config disposition. When no `[path]` was explicitly typed, a config found at
+ * a strict ancestor of `options.cwd` governs the whole run (scan/inference/write all re-root to that
+ * ancestor's directory). When `options.pathWasExplicit` is true, only a config found exactly at
+ * `options.cwd` counts as existing — an ancestor's config is left untouched and reported as "none
+ * found" for this target directory.
  */
-export function resolveSchemaWriteOutcome(params: {
-  existingConfigAction: ExistingConfigAction | "none";
-  existingSchemaText: string | undefined;
-  existingSchemaUnreadable: boolean;
-  generatedSchemaText: string;
-  reason: ProjectSchemaReason;
-}): { shouldWrite: boolean; kind: SchemaWriteOutcome["kind"] } {
-  const {
-    existingConfigAction,
-    existingSchemaText,
-    existingSchemaUnreadable,
-    generatedSchemaText,
-    reason,
-  } = params;
-  if (existingSchemaUnreadable) {
-    return { shouldWrite: false, kind: "unreadable" };
-  }
-  if (existingSchemaText === undefined) {
-    return { shouldWrite: true, kind: "written" };
-  }
-  if (existingSchemaText === generatedSchemaText) {
-    return { shouldWrite: false, kind: "unchanged" };
-  }
-  if (existingConfigAction === "overwrite" && reason === "custom-rules") {
-    return { shouldWrite: true, kind: "overwritten" };
-  }
-  return { shouldWrite: false, kind: "kept" };
-}
-
-// The parenthetical every schema line carries. It replaces the previous hardcoded "custom rules
-// present", which stopped being true once the `npx` fallback started generating the same file for a
-// config with no custom rules at all.
-function describeProjectSchemaReason(reason: ProjectSchemaReason): string {
-  return reason === "custom-rules"
-    ? "custom rules present"
-    : "no installed package schema to point at";
-}
-
-// What to do about an existing `schema.json` init refused to replace. The advice cannot be one
-// sentence for both reasons, because the two describe different files. Under `custom-rules` the file
-// init would generate is the one this config needs, so the fix is to get out of its way. Under
-// `no-installed-package` init only wanted the *name*: the file already there is almost certainly an
-// unrelated schema, and the config's `$schema` is now pointed at it — which is the honest thing to
-// say, rather than inviting a regeneration over a document init has no claim on.
-function describeKeptSchemaAdvice(reason: ProjectSchemaReason): string {
-  return reason === "custom-rules"
-    ? "The config's $schema still points at it, so it may not validate the current rules until " +
-        "they match. Remove or rename it and re-run init with --on-existing merge to regenerate it."
-    : "The config's $schema points at it even though init did not generate it, so this config is " +
-        "validated against whatever that file describes. Repoint $schema by hand, or move that " +
-        "file aside and re-run init to generate one.";
-}
-
-function formatSchemaWriteLine(schema: SchemaWriteOutcome): string {
-  const why = describeProjectSchemaReason(schema.reason);
-
-  switch (schema.kind) {
-    case "written":
-      return `Wrote project-local schema ${schema.path} (${why}).`;
-    case "unchanged":
-      return `Project-local schema ${schema.path} is already up to date (${why}).`;
-    case "kept":
-      return (
-        `Kept existing schema.json at ${schema.path} (${why}) — its contents ` +
-        `differ from what init would generate, so it was left in place. ${describeKeptSchemaAdvice(
-          schema.reason,
-        )}`
-      );
-    case "overwritten":
-      return `Overwrote schema.json at ${schema.path} (${why}), per --on-existing overwrite.`;
-    case "unreadable":
-      return (
-        `Kept existing schema.json at ${schema.path} (${why}) — it exists but could ` +
-        `not be read, so init cannot tell whether it matches and will not replace a file it is ` +
-        `unable to inspect (check its permissions). ${describeKeptSchemaAdvice(
-          schema.reason,
-        )}`
-      );
-    default: {
-      const exhaustiveCheck: never = schema.kind;
-      return exhaustiveCheck;
-    }
-  }
-}
-
-/**
- * What this run did to the config before the opt-in files were offered. The opt-in lines tell the
- * user what state the config is in alongside the file that did or did not land, and after a `skip`
- * the write-path wording ("the config above was still written") would be false. A parameter rather
- * than a second pair of formatters, so the two wordings stay side by side and the write-path bytes
- * the e2e suite pins cannot drift while the skip wording is edited.
- */
-type OptInConfigState = "written" | "untouched";
-
-function formatCiWorkflowLine(
-  ciWorkflow: CiWorkflowOutcome,
-  configState: OptInConfigState,
-): string {
-  switch (ciWorkflow.kind) {
-    case "written":
-      return `Wrote CI workflow ${ciWorkflow.path}.`;
-    case "failed": {
-      const reason =
-        ciWorkflow.code === undefined ? "" : ` (${ciWorkflow.code})`;
-      const configNote =
-        configState === "written"
-          ? "the config above was still written"
-          : "the existing config was left untouched";
-      return (
-        `Could not write the CI workflow ${ciWorkflow.path}${reason} — ${configNote}, and no ` +
-        "partial workflow file was left behind. Re-run init to retry it, or add the workflow by " +
-        "hand."
-      );
-    }
-    case "kept":
-      return `Kept the existing CI workflow ${ciWorkflow.path} — init never overwrites it. Check that ${
-        configState === "written"
-          ? "it still points at the config written above."
-          : "it still points at the existing config."
-      }`;
-    case "unsafe-config-path":
-      return (
-        `Skipped the CI workflow ${ciWorkflow.path} — the config path contains a line terminator, ` +
-        `which cannot be embedded safely in the workflow's shell command. ${
-          configState === "written"
-            ? "The config above was still written"
-            : "The existing config was left untouched"
-        }; add the workflow by hand, or rename the directory.`
-      );
-    default: {
-      const exhaustiveCheck: never = ciWorkflow;
-      return exhaustiveCheck;
-    }
-  }
-}
-
-// Each line says what the file is, where it went and why — the page is written into the user's
-// repository on their behalf, and the one thing nobody can infer from its path alone is that nothing
-// reads it yet. `init` deliberately does not edit `AGENTS.md` or `CLAUDE.md` to wire it in: those are
-// the user's own files, and whether the page is loaded every session or read on demand is a budget
-// decision only they can make.
-function formatAgentRuleLine(
-  agentRule: AgentRuleOutcome,
-  configState: OptInConfigState,
-): string {
-  const configNote =
-    configState === "written"
-      ? "the config above was still written"
-      : "the existing config was left untouched";
-  switch (agentRule.kind) {
-    case "written":
-      return (
-        `Wrote agent rule ${agentRule.path} — how coding agents should lint this repository's ` +
-        "Markdown and answer a size budget: compress a document while no meaning is lost, then " +
-        "split it, never cut its content. " +
-        "Nothing loads it yet: reference it from AGENTS.md or CLAUDE.md — an @ import loads it " +
-        "into every session and counts toward LLM-001, an ordinary link lets an agent read it " +
-        "on demand."
-      );
-    case "failed": {
-      const reason = agentRule.code === undefined ? "" : ` (${agentRule.code})`;
-      return (
-        `Could not write the agent rule ${agentRule.path}${reason} — ${configNote}, and no ` +
-        "partial file was left behind. Re-run init to retry it."
-      );
-    }
-    case "kept":
-      return (
-        `Kept the existing agent rule ${agentRule.path} — init never overwrites it, so edits made ` +
-        "to it survive. Delete it and re-run init to regenerate it."
-      );
-    case "unsafe-config-path":
-      return (
-        `Skipped the agent rule ${agentRule.path} — the config path contains a line terminator, ` +
-        `which the page cannot name. ${
-          configState === "written"
-            ? "The config above was still written"
-            : "The existing config was left untouched"
-        }; rename the directory and re-run init to add it.`
-      );
-    default: {
-      const exhaustiveCheck: never = agentRule;
-      return exhaustiveCheck;
-    }
-  }
-}
-
-/**
- * Deterministic write-outcome summary: how the config was written (fresh/merge), rule counts, which
- * `$schema` it points at, and where the config / project schema / CI workflow / agent rule landed. Every path is
- * a repository-relative POSIX path (so a subdirectory run reports `docs/wastech-mdlint.config.json`,
- * not a bare filename). Pure and exported so it can be asserted directly, mirroring `formatDraftSummary`.
- */
-export function formatWriteSummary(params: {
-  action: InitConfigAction;
-  result: GeneratedInitConfig;
-  configPath: string;
-  // Whether the write just dropped JSONC comments the previous file carried. Required,
-  // not optional, so a new call site cannot silently omit the one destructive part of a merge.
-  commentsDropped: boolean;
-  schema?: SchemaWriteOutcome;
-  ciWorkflow?: CiWorkflowOutcome;
-  agentRule?: AgentRuleOutcome;
-}): string {
-  const {
-    action,
-    result,
-    configPath,
-    commentsDropped,
-    schema,
-    ciWorkflow,
-    agentRule,
-  } = params;
-  const lines: string[] = [];
-
-  if (action === "merge") {
-    lines.push(
-      `Merged ${configPath}: ${result.addedRuleCount} new rule(s) appended (${result.totalRuleCount} total).`,
-    );
-  } else {
-    lines.push(`Wrote ${configPath} with ${result.totalRuleCount} rule(s).`);
-  }
-
-  if (commentsDropped) {
-    lines.push(`Note: ${COMMENT_LOSS_NOTE}`);
-  }
-  // A config that lints nothing is a legitimate outcome of deselecting every cluster, but a silent
-  // one would look exactly like a broken install the first time `lint` reports zero files.
-  if (result.wroteEmptyInclude) {
-    lines.push(
-      'Note: "include" was written as an empty list, because no doc cluster was selected — ' +
-        "no files will be linted until you add a pattern to it.",
-    );
-  }
-
-  lines.push(`Schema: ${result.schemaRef}`);
-  if (schema !== undefined) {
-    lines.push(formatSchemaWriteLine(schema));
-  }
-  if (ciWorkflow !== undefined) {
-    lines.push(formatCiWorkflowLine(ciWorkflow, "written"));
-  }
-  if (agentRule !== undefined) {
-    lines.push(formatAgentRuleLine(agentRule, "written"));
-  }
-
-  return `${lines.join("\n")}\n`;
-}
-
-/**
- * The summary for a `skip` of an existing config: the skip line, then one line per opt-in file that
- * was written, kept, withheld or failed. With no opt-in outcome it is exactly the single skip line
- * a plain `--yes --on-existing skip` has always printed. That line is the whole of a plain skip's
- * output, so anything that recognises a skip by comparing against it — a CI script, an agent driving
- * `init` — would misread an unchanged run if the opt-in offers added a byte to it. Pure and exported so it can be asserted directly, mirroring `formatWriteSummary`.
- */
-export function formatSkipSummary(params: {
-  ciWorkflow?: CiWorkflowOutcome;
-  agentRule?: AgentRuleOutcome;
-}): string {
-  const lines = ["skipped — existing config left untouched."];
-  if (params.ciWorkflow !== undefined) {
-    lines.push(formatCiWorkflowLine(params.ciWorkflow, "untouched"));
-  }
-  if (params.agentRule !== undefined) {
-    lines.push(formatAgentRuleLine(params.agentRule, "untouched"));
-  }
-  return `${lines.join("\n")}\n`;
-}
-
-/**
- * The partial-write summary: a write that failed must still tell the user what
- * landed and what did not, on stdout, instead of leaving them to guess from a bare stderr errno.
- * `written`/`notWritten`/`failedPath` are repository-relative POSIX paths; the two lists are sorted
- * here (their order is incidental once the commit sequence has already happened) so the output is
- * deterministic.
- *
- * Only the errno `code` is rendered, never the raw fs message: Node's `rename` error embeds two
- * absolute, platform-native paths plus the random temp file name.
- */
-export function formatWriteFailureSummary(params: {
-  written: string[];
-  notWritten: string[];
-  failedPath: string;
-  code?: string;
-}): string {
-  const reason = params.code === undefined ? "" : ` (${params.code})`;
-  const lines: string[] = [
-    `Write failed: could not replace ${params.failedPath}${reason}.`,
-  ];
-
-  const written = [...params.written].sort(compareStrings);
-  lines.push(
-    written.length === 0
-      ? "Written: nothing."
-      : `Written: ${written.join(", ")}.`,
-  );
-
-  // Always non-empty in practice (it holds at least the file that failed), but guarded so this pure
-  // formatter never renders a dangling "Not written: ." line.
-  const notWritten = [...params.notWritten].sort(compareStrings);
-  if (notWritten.length > 0) {
-    lines.push(
-      `Not written: ${notWritten.join(", ")}. Every file listed as not written is ` +
-        "byte-unchanged on disk: init stages each file next to its target and renames it into " +
-        "place, so a failed write never truncates or partially replaces an existing file.",
-    );
-  }
-
-  lines.push("Fix the cause and re-run init.");
-  return `${lines.join("\n")}\n`;
-}
-
-/**
- * The "nothing written" outcome for the one abort case: a `merge` whose existing config could not be
- * read/parsed/validated. The deliverable requires never modifying or dropping an existing entry and
- * writing only a valid config — both unprovable when the existing config can't be parsed or would be
- * rejected by the loader — so the safe answer is to write nothing.
- * `configPath` is a normalized POSIX path, relative to the same directory the draft summary's
- * existing-config line already used (the original target directory, not necessarily the repo root).
- */
-export function formatNotWrittenSummary(
-  configPath: string | undefined,
-): string {
-  const location = configPath ?? CONFIG_FILE_NAME;
-  return (
-    `Not written: the existing config at ${location} could not be read, parsed, or validated, so a ` +
-    "merge cannot guarantee a valid config with its existing entries preserved. Fix or remove it, " +
-    "then re-run init.\n"
-  );
-}
-
-/**
- * Orchestrates the init flow end to end: resolve existing-config disposition, scan, confirm
- * clusters/package-manager, re-run inference against the confirmed cluster subset (so global gates
- * and the cycle heuristic reflect what the user actually kept), confirm categories, diff against an
- * existing config when merging, and confirm the draft. On confirmation, writes the config (and an
- * optional project-local schema), then offers the CI workflow and agent rule; a `merge` whose
- * existing config is unreadable aborts the write entirely rather than risk dropping an entry it
- * cannot even parse. A `skip` of an existing config ends the config flow before any scan, but still
- * offers the CI workflow and agent rule against the existing config.
- *
- * When no `[path]` was explicitly typed, a config found at a strict ancestor of `options.cwd`
- * governs the whole run (scan/inference/write all re-root to that ancestor's directory). When
- * `options.pathWasExplicit` is true, only a config found exactly at `options.cwd` counts as
- * existing — an ancestor's config is left untouched and reported as "none found" for this target
- * directory.
- */
-export async function runInitCommand(
+async function resolveExistingConfig(
   options: InitCommandOptions,
   prompter: InitPrompter,
-): Promise<RunInitCommandResult> {
+): Promise<InitRun> {
   const discoveredConfigPath = await findConfig(options.cwd);
   const targetDir = path.resolve(options.cwd);
 
@@ -1558,57 +184,76 @@ export async function runInitCommand(
       : normalizeRelativePath(path.relative(targetDir, existingConfigPath));
 
   let existingConfigAction: ExistingConfigAction | "none" = "none";
-
   if (existingConfigPath !== undefined && relativeConfigPath !== undefined) {
     existingConfigAction = options.yes
       ? (options.onExisting ?? DEFAULT_EXISTING_CONFIG_ACTION)
       : await prompter.resolveExistingConfigAction(relativeConfigPath);
-
-    if (existingConfigAction === "skip") {
-      // `skip` leaves the config and its schema byte-unchanged and never scans or drafts — but it
-      // skips only the config. The CI workflow and agent rule depend on nothing but where the config
-      // lives, and a repository that already has one is exactly the one that wants to add them
-      // without overwriting or merging it; ending the run here once ignored `--with-ci-workflow`
-      // and `--with-agent-rule` without a word and still exited 0.
-      const repoRoot = (await findRepositoryRoot(cwd)) ?? cwd;
-      // The package manager comes from lockfile detection alone. The write path asks the user when
-      // nothing is detected, but here its only effect is the agent rule's runner line, whose
-      // undetected fallback is the npm form — a package-manager question would be out of place in a
-      // run whose whole point is to leave the config alone.
-      const packageManager = await detectPackageManager(cwd);
-      const { ciWorkflow, agentRule } = await offerOptInFiles({
-        repoRoot,
-        // `findConfig` only ever matches `CONFIG_FILE_NAME`, so this is the same path the write path
-        // would have written; the offers read only its location, never its contents, which is why an
-        // unloadable existing config does not stop them.
-        configAbsPath: existingConfigPath,
-        options,
-        prompter,
-        // The same on-disk evidence the write path anchors `$schema` on: an installed package
-        // schema is an installed CLI, and without one the agent rule's commands have no local
-        // binary to resolve.
-        cliInstalled: (await findInstalledSchemaDir(cwd)) !== undefined,
-        packageManager,
-      });
-      return {
-        output: `${DRAFT_SUMMARY_HEADER}\n\n${formatSkipSummary({ ciWorkflow, agentRule })}`,
-        outcome: optInOutcome(ciWorkflow, agentRule, "skipped"),
-      };
-    }
   }
 
-  const scanResult = await scanRepository({ cwd });
+  return {
+    options,
+    prompter,
+    cwd,
+    existingConfigPath,
+    relativeConfigPath,
+    existingConfigAction,
+  };
+}
+
+/**
+ * `skip` leaves the config and its schema byte-unchanged and never scans or drafts — but it skips
+ * only the config. The CI workflow and agent rule depend on nothing but where the config lives, and
+ * a repository that already has one is exactly the one that wants to add them without overwriting
+ * or merging it; ending the run at the skip once ignored `--with-ci-workflow` and
+ * `--with-agent-rule` without a word and still exited 0.
+ */
+async function runSkip(
+  run: InitRun,
+  existingConfigPath: string,
+): Promise<RunInitCommandResult> {
+  const { cwd } = run;
+  const repoRoot = (await findRepositoryRoot(cwd)) ?? cwd;
+  // The package manager comes from lockfile detection alone. The write path asks the user when
+  // nothing is detected, but here its only effect is the agent rule's runner line, whose
+  // undetected fallback is the npm form — a package-manager question would be out of place in a
+  // run whose whole point is to leave the config alone.
+  const packageManager = await detectPackageManager(cwd);
+  const { ciWorkflow, agentRule } = await offerOptInFiles({
+    repoRoot,
+    // `findConfig` only ever matches `CONFIG_FILE_NAME`, so this is the same path the write path
+    // would have written; the offers read only its location, never its contents, which is why an
+    // unloadable existing config does not stop them.
+    configAbsPath: existingConfigPath,
+    options: run.options,
+    prompter: run.prompter,
+    // The same on-disk evidence the write path anchors `$schema` on: an installed package
+    // schema is an installed CLI, and without one the agent rule's commands have no local
+    // binary to resolve.
+    cliInstalled: (await findInstalledSchemaDir(cwd)) !== undefined,
+    packageManager,
+  });
+  return {
+    output: `${DRAFT_SUMMARY_HEADER}\n\n${formatSkipSummary({ ciWorkflow, agentRule })}`,
+    outcome: optInOutcome(ciWorkflow, agentRule, "skipped"),
+  };
+}
+
+/** Scans the repository, then asks which clusters to keep and — when undetected — the package manager. */
+async function scanAndConfirm(run: InitRun): Promise<ConfirmedScan> {
+  const { options, prompter } = run;
+  const scanResult = await scanRepository({ cwd: run.cwd });
 
   // Separates "the user turned every cluster down" from "the scan found nothing to turn down" — the
   // two need opposite `include` values further down, and `confirmedClusters` alone
   // cannot tell them apart once both have collapsed to an empty array.
   const clustersWereOffered = scanResult.clusters.length > 0;
 
-  const confirmedClusters = options.yes
-    ? scanResult.clusters
-    : clustersWereOffered
-      ? await prompter.selectClusters(scanResult.clusters)
-      : [];
+  let confirmedClusters: DocCluster[] = [];
+  if (options.yes) {
+    confirmedClusters = scanResult.clusters;
+  } else if (clustersWereOffered) {
+    confirmedClusters = await prompter.selectClusters(scanResult.clusters);
+  }
 
   // Only prompted when detection found no lockfile and we're not skipping prompts: guessing with
   // no evidence is a UX call for `init`, not something core should decide. Informational in the
@@ -1618,69 +263,46 @@ export async function runInitCommand(
       ? await prompter.choosePackageManager()
       : scanResult.packageManager;
 
-  let existingConfigUnreadable = false;
-  // The single parsed snapshot of the existing config, read once and reused by the inference scope
-  // below, the rule diff, and the merge write — re-reading after confirmation could race with a
-  // concurrent edit and (on a second-read failure) silently drop the very entries a merge must
-  // preserve.
-  let existingDocument: ParsedExistingConfig | undefined;
-  let existingRuleIds: string[] = [];
-  let existingConfiguration: LoadedConfiguration | undefined;
+  return {
+    confirmedClusters,
+    clustersWereOffered,
+    packageManager,
+    pruning: scanResult.pruned,
+  };
+}
 
-  // Read before inference rather than after it, because a merge's inference scope *is* this file's
-  // `include`/`exclude`/`settings`. Inferring first and filtering afterwards was what let a merge
-  // append a rule whose only evidence sat in files the preserved `include` never selects, and then
-  // write the measurement that justified it into the config as a permanent comment.
-  if (existingConfigPath !== undefined && existingConfigAction === "merge") {
-    existingDocument = await readExistingConfigDocument(
-      cwd,
-      existingConfigPath,
-    );
-    const { ruleIds, mergeable } = extractExistingRuleIds(existingDocument.raw);
-    existingRuleIds = ruleIds;
-    // Additive merge preserves the existing content verbatim, so the written config is only valid if
-    // the existing one already loads (append-only adds registry-valid inferred rules). Validate it
-    // through the real loader — an unknown top-level key, unknown rule id, or invalid preserved
-    // options must abort the merge, never be reported as a successful write of a config that
-    // `loadConfiguration` would then reject.
-    existingConfiguration = await loadExistingConfiguration(
-      cwd,
-      existingConfigPath,
-    );
-    existingConfigUnreadable =
-      !existingDocument.parsed ||
-      !mergeable ||
-      existingConfiguration === undefined;
-  }
+/**
+ * Inference measures the corpus the config being written will lint, so this has to describe that
+ * config and not the repository. A merge keeps every existing scope key untouched, so its own
+ * values are the scope; anything else writes the cluster globs the user just confirmed. An
+ * unreadable merge falls through to the fresh scope on purpose: that run aborts without writing,
+ * and the draft it still prints should describe clusters rather than a file it could not parse.
+ */
+function inferenceScopeFor(
+  baseline: MergeBaseline,
+  scan: ConfirmedScan,
+): InferenceScope {
+  return baseline.existingConfiguration !== undefined &&
+    !baseline.existingConfigUnreadable
+    ? mergeInferenceScope(baseline.existingConfiguration)
+    : freshInferenceScope(scan.confirmedClusters, scan.clustersWereOffered);
+}
 
-  // Inference measures the corpus the config being written will lint, so this has to describe that
-  // config and not the repository. A merge keeps every existing scope key untouched, so its own
-  // values are the scope; anything else writes the cluster globs the user just confirmed. An
-  // unreadable merge falls through to the fresh scope on purpose: that run aborts without writing,
-  // and the draft it still prints should describe clusters rather than a file it could not parse.
-  const scope: InferenceScope =
-    existingConfiguration !== undefined && !existingConfigUnreadable
-      ? {
-          ...(existingConfiguration.config.include === undefined
-            ? {}
-            : { include: existingConfiguration.config.include }),
-          ...(existingConfiguration.config.exclude === undefined
-            ? {}
-            : { exclude: existingConfiguration.config.exclude }),
-          ...(existingConfiguration.config.respectGitignore === undefined
-            ? {}
-            : {
-                respectGitignore: existingConfiguration.config.respectGitignore,
-              }),
-          settings: existingConfiguration.settings,
-        }
-      : freshInferenceScope(confirmedClusters, clustersWereOffered);
-
+/**
+ * Re-runs inference against the confirmed cluster subset (so global gates and the cycle heuristic
+ * reflect what the user actually kept), asks which categories to keep, and — on a merge — drops the
+ * rules the existing config already lists.
+ */
+async function selectRules(
+  run: InitRun,
+  scan: ConfirmedScan,
+  baseline: MergeBaseline,
+): Promise<InferredRule[]> {
   const inference = await inferRuleSet({
-    cwd,
-    clusters: confirmedClusters,
+    cwd: run.cwd,
+    clusters: scan.confirmedClusters,
     registry: ruleRegistry,
-    scope,
+    scope: inferenceScopeFor(baseline, scan),
   });
 
   const groupedByCategory = groupInferredRulesByCategory(inference.rules);
@@ -1692,38 +314,68 @@ export async function runInitCommand(
     Object.keys(groupedByCategory) as RuleCategory[]
   ).sort(compareStrings);
 
-  const selectedCategories = options.yes
-    ? categoriesWithRules
-    : categoriesWithRules.length > 0
-      ? await prompter.selectCategories(categoriesWithRules)
-      : [];
+  let selectedCategories: RuleCategory[] = [];
+  if (run.options.yes) {
+    selectedCategories = categoriesWithRules;
+  } else if (categoriesWithRules.length > 0) {
+    selectedCategories =
+      await run.prompter.selectCategories(categoriesWithRules);
+  }
 
   const selectedCategorySet = new Set(selectedCategories);
-  let selectedRules = inference.rules.filter((rule) =>
+  const selectedRules = inference.rules.filter((rule) =>
     selectedCategorySet.has(rule.category),
   );
 
-  if (existingConfigAction === "merge" && existingDocument !== undefined) {
-    selectedRules = diffAgainstExistingRuleIds(
-      existingRuleIds,
-      selectedRules,
-    ).newRules;
+  if (
+    run.existingConfigAction === "merge" &&
+    baseline.existingDocument !== undefined
+  ) {
+    return diffAgainstExistingRuleIds(baseline.existingRuleIds, selectedRules)
+      .newRules;
   }
+  return selectedRules;
+}
 
+// Copies only the two fields the draft names, so the draft and the write summary — both fed from the
+// same `generateInitConfig` result — cannot disagree about which schema file the config points at.
+function draftSchemaPlan(result: GeneratedInitConfig): DraftSchemaPlan {
+  return {
+    ref: result.schemaRef,
+    ...(result.projectSchema === undefined
+      ? {}
+      : {
+          projectSchema: {
+            fileName: result.projectSchema.fileName,
+            reason: result.projectSchema.reason,
+          },
+        }),
+  };
+}
+
+/** Generates the config the run would write and renders the draft the user confirms. */
+async function buildDraft(
+  run: InitRun,
+  scan: ConfirmedScan,
+  baseline: MergeBaseline,
+  selectedRules: InferredRule[],
+): Promise<InitDraft> {
+  const { cwd, existingConfigAction } = run;
   // Only a merge rebuilds an existing file, so only a merge can lose its comments; an `overwrite`
   // discards the whole file by explicit request and needs no separate warning.
   const existingConfigHasComments =
-    existingConfigAction === "merge" && existingDocument?.hasComments === true;
+    existingConfigAction === "merge" &&
+    baseline.existingDocument?.hasComments === true;
 
   const action: InitConfigAction =
     existingConfigAction === "merge" ? "merge" : "fresh";
 
-  // Reuse the snapshot read above. On a merge that survives the unreadable-config abort below,
-  // `existingDocument.raw` is defined (parsed + additively mergeable) — no second read, no window
-  // for a fresh-overwrite that drops the existing keys.
+  // Reuse the snapshot the merge baseline read. On a merge that survives the unreadable-config
+  // abort, `existingDocument.raw` is defined (parsed + additively mergeable) — no second read, no
+  // window for a fresh-overwrite that drops the existing keys.
   const existing: ExistingConfigDocument | undefined =
-    action === "merge" && existingDocument?.raw !== undefined
-      ? { raw: existingDocument.raw }
+    action === "merge" && baseline.existingDocument?.raw !== undefined
+      ? { raw: baseline.existingDocument.raw }
       : undefined;
 
   // The package `$schema` ref is computed relative to the config's own directory (not a fixed
@@ -1733,14 +385,17 @@ export async function runInitCommand(
   // `./node_modules/@wastech-mdlint/cli/schema.json` for a file that does not exist.
   // `undefined` tells `generateInitConfig` to generate and point at a project-local `./schema.json`.
   const schemaAnchor = await findInstalledSchemaDir(cwd);
-  const preview = buildConfigPreview(confirmedClusters, selectedRules);
+  const preview = buildConfigPreview(scan.confirmedClusters, selectedRules);
   // `include` is only meaningful for a fresh write; generateInitConfig ignores it under "merge".
   // Three-valued; the rule and its reasons live in `resolveIncludeToWrite`.
-  const include = resolveIncludeToWrite(preview.include, clustersWereOffered);
+  const include = resolveIncludeToWrite(
+    preview.include,
+    scan.clustersWereOffered,
+  );
   // Generated *before* the draft, not at write time, because the draft has to name the schema file
   // this run would create — and generation is pure, so the only observable difference is that the
   // one anchor lookup above now also happens on a run the user goes on to decline. The same `result`
-  // is what gets written below, so no second generation can disagree with what was confirmed.
+  // is what gets written later, so no second generation can disagree with what was confirmed.
   const result = generateInitConfig({
     action,
     existing,
@@ -1754,42 +409,75 @@ export async function runInitCommand(
 
   const selections: ConfirmedInitSelections = {
     existingConfigAction,
-    packageManager,
-    clusters: confirmedClusters,
+    packageManager: scan.packageManager,
+    clusters: scan.confirmedClusters,
     rules: selectedRules,
     newRuleIds: selectedRules.map((rule) => rule.rule),
-    existingConfigUnreadable,
-    clustersWereOffered,
+    existingConfigUnreadable: baseline.existingConfigUnreadable,
+    clustersWereOffered: scan.clustersWereOffered,
     existingConfigHasComments,
-    pruning: scanResult.pruned,
-    schema: {
-      ref: result.schemaRef,
-      ...(result.projectSchema === undefined
-        ? {}
-        : {
-            projectSchema: {
-              fileName: result.projectSchema.fileName,
-              reason: result.projectSchema.reason,
-            },
-          }),
-    },
+    pruning: scan.pruning,
+    schema: draftSchemaPlan(result),
   };
 
-  const summary = formatDraftSummary(selections, relativeConfigPath);
+  return {
+    action,
+    existingConfigHasComments,
+    schemaAnchor,
+    packageManager: scan.packageManager,
+    result,
+    summary: formatDraftSummary(selections, run.relativeConfigPath),
+  };
+}
 
-  // `--yes` never prompts, so `summary` has not been shown to anyone yet and must be prepended to
-  // whatever the write step produces. Interactively, `confirmDraft` owns displaying `summary` (see
-  // its contract above), so the write step's output is returned on its own to avoid a double print.
-  const confirmed = options.yes ? true : await prompter.confirmDraft(summary);
-  if (!confirmed) {
-    return {
-      output: "Aborted: configuration not confirmed.\n",
-      outcome: "declined",
-    };
+/**
+ * Stages the write batch, committed schema-first, config-last. The order is load-bearing: the config
+ * is what points at the schema, so if the schema rename fails the old config — and its old,
+ * still-accurate `$schema` — survives untouched. The previous config-first order produced the
+ * opposite: a rewritten config pointing at a stale schema. `writeFilesAtomic` stages every temp
+ * before renaming any of them, so the common failure (no space, no permission on the directory)
+ * leaves the repository entirely untouched.
+ */
+async function stageWrites(
+  run: InitRun,
+  result: GeneratedInitConfig,
+  configPath: string,
+  toRepoRelative: (absolutePath: string) => string,
+): Promise<{
+  writes: AtomicFileWrite[];
+  schemaOutcome: SchemaWriteOutcome | undefined;
+}> {
+  const writes: AtomicFileWrite[] = [];
+  let schemaOutcome: SchemaWriteOutcome | undefined;
+  if (result.projectSchema !== undefined) {
+    const planned = await planProjectSchemaWrite({
+      cwd: run.cwd,
+      projectSchema: result.projectSchema,
+      existingConfigAction: run.existingConfigAction,
+      toRepoRelative,
+    });
+    if (planned.write !== undefined) {
+      writes.push(planned.write);
+    }
+    schemaOutcome = planned.outcome;
   }
+  writes.push({ path: configPath, content: result.configText });
+  return { writes, schemaOutcome };
+}
 
+/**
+ * Writes the confirmed draft, then offers the CI workflow and agent rule. A `merge` whose existing
+ * config is unreadable aborts the write entirely rather than risk dropping an entry it cannot even
+ * parse.
+ */
+async function writeConfirmedDraft(
+  run: InitRun,
+  draft: InitDraft,
+  existingConfigUnreadable: boolean,
+): Promise<RunInitCommandResult> {
+  const { cwd, options } = run;
   const composeOutput = (suffix: string): string =>
-    options.yes ? `${summary}\n${suffix}` : suffix;
+    options.yes ? `${draft.summary}\n${suffix}` : suffix;
 
   // The repository root anchors every user-visible path so a subdirectory run reports where files
   // actually landed (e.g. `docs/wastech-mdlint.config.json`). findRepositoryRoot prefers the `.git`
@@ -1804,65 +492,27 @@ export async function runInitCommand(
   // A merge that cannot read/parse the existing config aborts: the deliverable's "never modify or
   // drop an existing entry" is unprovable when the entries can't be parsed, so writing nothing is
   // the only safe outcome (no config, no schema, no CI workflow touch the disk here).
-  if (existingConfigAction === "merge" && existingConfigUnreadable) {
+  if (run.existingConfigAction === "merge" && existingConfigUnreadable) {
     // `relativeConfigPath` (not `toRepoRelative(existingConfigPath)`) so this message names the same
     // path the draft summary above already showed — target-directory-relative, can read `../…` — and
     // never mismatches it for the same file, which it did while the two used different bases.
     return {
-      output: composeOutput(formatNotWrittenSummary(relativeConfigPath)),
+      output: composeOutput(formatNotWrittenSummary(run.relativeConfigPath)),
       // An operational failure, not a deliberate no-write: the user confirmed the draft and asked for
       // a merge, and it is the *state of their file* that made it impossible. Exiting 0 here made a
       // CI merge step that produced nothing report success — `--on-existing skip`
-      // above is the outcome that legitimately writes nothing.
+      // is the outcome that legitimately writes nothing.
       outcome: "invalid-existing-config",
     };
   }
 
   const configPath = path.join(cwd, CONFIG_FILE_NAME);
-
-  // Staged as one batch and committed schema-first, config-last. The order is
-  // load-bearing: the config is what points at the schema, so if the schema rename fails the old
-  // config — and its old, still-accurate `$schema` — survives untouched. The previous config-first
-  // order produced the opposite: a rewritten config pointing at a stale schema.
-  // `writeFilesAtomic` stages every temp before renaming any of them, so the common failure (no space,
-  // no permission on the directory) leaves the repository entirely untouched.
-  const writes: AtomicFileWrite[] = [];
-  let schemaOutcome: SchemaWriteOutcome | undefined;
-  if (result.projectSchema !== undefined) {
-    const schemaPath = path.join(cwd, result.projectSchema.fileName);
-    const schemaRelativePath = toRepoRelative(schemaPath);
-    // A full read (not just fileExists) so an identical repeat run can report "unchanged" rather
-    // than the "kept" warning — any read failure (missing file, permission error) degrades to
-    // undefined, the same "treat it as absent" behavior fileExists uses elsewhere in this file.
-    const existingSchemaText = await readFile(schemaPath, "utf8").catch(
-      () => undefined,
-    );
-    const decision = resolveSchemaWriteOutcome({
-      existingConfigAction,
-      existingSchemaText,
-      // Separates "absent" from "present but unreadable", which the read above collapses into one
-      // `undefined`. Under the old truncate-and-write that conflation was harmless (an unreadable
-      // file usually failed the write too); a temp+rename commit only needs write permission on the
-      // directory, so without this the guard would happily replace a file it could not even read.
-      existingSchemaUnreadable:
-        existingSchemaText === undefined && (await fileExists(schemaPath)),
-      generatedSchemaText: result.projectSchema.text,
-      // Gates the one destructive outcome: only a schema whose *contents* this config determines
-      // (custom rules) may be replaced under `--on-existing overwrite`. The `npx` fallback merely
-      // needs some resolvable target, so it must never clobber a `schema.json` that was already
-      // there for unrelated reasons.
-      reason: result.projectSchema.reason,
-    });
-    if (decision.shouldWrite) {
-      writes.push({ path: schemaPath, content: result.projectSchema.text });
-    }
-    schemaOutcome = {
-      kind: decision.kind,
-      path: schemaRelativePath,
-      reason: result.projectSchema.reason,
-    };
-  }
-  writes.push({ path: configPath, content: result.configText });
+  const { writes, schemaOutcome } = await stageWrites(
+    run,
+    draft.result,
+    configPath,
+    toRepoRelative,
+  );
 
   const writeResult = await writeFilesAtomic(writes);
   if (!writeResult.ok) {
@@ -1887,20 +537,20 @@ export async function runInitCommand(
     repoRoot,
     configAbsPath: configPath,
     options,
-    prompter,
-    // The same on-disk evidence `$schema` was anchored on above: an installed package schema is an
-    // installed CLI, and without one the page's commands have no local binary to resolve.
-    cliInstalled: schemaAnchor !== undefined,
-    packageManager,
+    prompter: run.prompter,
+    // The same on-disk evidence `$schema` was anchored on in the draft: an installed package schema
+    // is an installed CLI, and without one the page's commands have no local binary to resolve.
+    cliInstalled: draft.schemaAnchor !== undefined,
+    packageManager: draft.packageManager,
   });
 
   return {
     output: composeOutput(
       formatWriteSummary({
-        action,
-        result,
+        action: draft.action,
+        result: draft.result,
         configPath: toRepoRelative(configPath),
-        commentsDropped: existingConfigHasComments,
+        commentsDropped: draft.existingConfigHasComments,
         schema: schemaOutcome,
         ciWorkflow,
         agentRule,
@@ -1912,30 +562,48 @@ export async function runInitCommand(
   };
 }
 
-async function fileExists(absolutePath: string): Promise<boolean> {
-  try {
-    await stat(absolutePath);
-    return true;
-  } catch {
-    return false;
+/**
+ * Orchestrates the init flow end to end: resolve the existing-config disposition, scan, confirm
+ * clusters/package-manager, read the merge baseline, infer and confirm categories, diff against an
+ * existing config when merging, and confirm the draft. On confirmation, writes the config (and an
+ * optional project-local schema), then offers the CI workflow and agent rule. A `skip` of an
+ * existing config ends the config flow before any scan, but still offers the CI workflow and agent
+ * rule against the existing config.
+ */
+export async function runInitCommand(
+  options: InitCommandOptions,
+  prompter: InitPrompter,
+): Promise<RunInitCommandResult> {
+  const run = await resolveExistingConfig(options, prompter);
+  if (
+    run.existingConfigPath !== undefined &&
+    run.existingConfigAction === "skip"
+  ) {
+    return runSkip(run, run.existingConfigPath);
   }
-}
 
-// The existing config as the lint pipeline itself resolves it (root schema + rule resolution),
-// or `undefined` when it does not load at all. A `merge` gates on this so it never rewrites a config
-// that preserves an already-invalid key/rule/options and then reports success (acceptance: init
-// writes a valid config). Any thrown ConfigError (or other read failure) counts as "does not load".
-//
-// It returns the loaded configuration rather than a boolean because the merge scope is read off it:
-// deriving `include`/`exclude`/`settings` from the raw parsed object instead would be a second
-// implementation of defaulting rules that the loader already owns, free to disagree with the run.
-async function loadExistingConfiguration(
-  cwd: string,
-  configPath: string,
-): Promise<LoadedConfiguration | undefined> {
-  try {
-    return await loadConfiguration({ cwd, explicitConfigPath: configPath });
-  } catch {
-    return undefined;
+  const scan = await scanAndConfirm(run);
+  const baseline = await readMergeBaseline(
+    run.cwd,
+    run.existingConfigPath,
+    run.existingConfigAction,
+  );
+  const selectedRules = await selectRules(run, scan, baseline);
+  const draft = await buildDraft(run, scan, baseline, selectedRules);
+
+  // `--yes` never prompts, so the summary has not been shown to anyone yet and must be prepended to
+  // whatever the write step produces. Interactively, `confirmDraft` owns displaying it (the
+  // `InitPrompter.confirmDraft` contract), so the write step's output is returned on its own to
+  // avoid a double print.
+  const confirmed = options.yes
+    ? true
+    : await prompter.confirmDraft(draft.summary);
+  if (!confirmed) {
+    return {
+      output: "Aborted: configuration not confirmed.\n",
+      outcome: "declined",
+    };
   }
+
+  return writeConfirmedDraft(run, draft, baseline.existingConfigUnreadable);
 }
