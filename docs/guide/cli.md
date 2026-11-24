@@ -23,7 +23,7 @@ Every command uses the same taxonomy:
 | --- | --- |
 | `0` | Success / clean (no findings at the `--fail-on` threshold). |
 | `1` | Findings at or above the `--fail-on` severity (lint-style commands). Reserved exclusively for findings. |
-| `2` | Operational/usage error — unknown subcommand, bad flag, invalid choice, a `[path]`/`--cwd` that does not exist or is not a directory, missing config section, target outside the corpus, unreadable config, or a file it could not write; and for `--since`, `git` missing or older than 2.31, a `<ref>` that names no commit, a shallow clone without the history back to the merge-base, `--since` together with `--fix`, or `impact` given both or neither of `<file>` and `--since`. |
+| `2` | Operational/usage error — unknown subcommand, bad flag, invalid choice, a `[path]`/`--cwd` that does not exist or is not a directory, missing config section, target outside the corpus, unreadable config, or a file it could not write; and for `--since`, anything that stops the comparison — among them a directory outside a git work tree, `git` missing or older than 2.31, a `<ref>` that names no commit or shares no history with `HEAD`, a shallow clone without the history back to the merge-base, `--since` together with `--fix`, and `impact` given both or neither of `<file>` and `--since`. |
 
 `--help` and `--version` always exit `0`.
 

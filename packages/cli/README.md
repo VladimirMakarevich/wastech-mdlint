@@ -38,7 +38,7 @@ wastech-mdlint impact --since main     # what the branch's changes reach
 | --- | --- |
 | `0` | Clean — no findings at the `--fail-on` threshold |
 | `1` | Findings at that threshold |
-| `2` | Operational error — a nonexistent path, an unknown subcommand, an unreadable config, an unwritable file; and for `--since`, `git` missing or older than 2.31, a `<ref>` that names no commit, a shallow clone without the history back to the merge-base, `--since` together with `--fix`, or `impact` given both or neither of `<file>` and `--since` |
+| `2` | Operational error — a nonexistent path, an unknown subcommand, an unreadable config, an unwritable file; and for `--since`, anything that stops the comparison — among them a directory outside a git work tree, `git` missing or older than 2.31, a `<ref>` that names no commit or shares no history with `HEAD`, a shallow clone without the history back to the merge-base, `--since` together with `--fix`, and `impact` given both or neither of `<file>` and `--since` |
 
 `1` is reserved exclusively for findings, so a CI step can tell a failing document from a broken step.
 
