@@ -16,6 +16,12 @@ import { assetHeaders } from "./security.js";
  *
  * Left out: links within the page (`#…`), and the header's Blame switch, which makes git blame
  * every line — work for a click that may never come.
+ *
+ * The header's sections are fetched the same way: the Changes page and the dashboard are the
+ * longest waits in the viewer, a fifth of a second of the server's and more, and a reader rests on
+ * a section a moment before choosing it. Only the header's links to them, not every link to the
+ * dashboard: the dashboard's own column headers link to it re-sorted, and pointing across them
+ * would have the server build the whole table again and again for nothing.
  */
 const SPECULATION_RULES = JSON.stringify({
   prefetch: [
@@ -27,6 +33,10 @@ const SPECULATION_RULES = JSON.stringify({
           { not: { selector_matches: ".blame-toggle" } },
         ],
       },
+      eagerness: "moderate",
+    },
+    {
+      where: { selector_matches: ".section-nav a" },
       eagerness: "moderate",
     },
   ],

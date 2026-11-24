@@ -311,6 +311,10 @@ describe("pages", () => {
           },
           eagerness: "moderate",
         },
+        {
+          where: { selector_matches: ".section-nav a" },
+          eagerness: "moderate",
+        },
       ],
     });
     const ahead = await get("/doc/docs/guide.md", {
