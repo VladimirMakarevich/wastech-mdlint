@@ -117,6 +117,30 @@ class FakeEventSource {
   }
 }
 
+// Only what the owed reload uses: an observer is told of a change to the attribute it watches, and
+// a test says when that change happens.
+class FakeMutationObserver {
+  static observing: FakeMutationObserver[] = [];
+
+  constructor(private readonly callback: () => void) {}
+
+  observe(): void {
+    FakeMutationObserver.observing.push(this);
+  }
+
+  disconnect(): void {
+    FakeMutationObserver.observing = FakeMutationObserver.observing.filter(
+      (observer) => observer !== this,
+    );
+  }
+
+  static notify(): void {
+    for (const observer of [...FakeMutationObserver.observing]) {
+      observer.callback();
+    }
+  }
+}
+
 function fakePage(visibility: "visible" | "hidden") {
   const documentListeners = new Map<string, (() => void)[]>();
   const windowListeners = new Map<string, (() => void)[]>();
@@ -130,8 +154,10 @@ function fakePage(visibility: "visible" | "hidden") {
     querySelector: (selector: string) =>
       selector === 'meta[name="wastech-events"]' ? { content: id(3) } : null,
     addEventListener: add(documentListeners),
-    documentElement: { dataset: {} },
+    documentElement: { dataset: {} as Record<string, string> },
   };
+  FakeMutationObserver.observing = [];
+  vi.stubGlobal("MutationObserver", FakeMutationObserver);
   const reload = vi.fn();
   const storage = new Map<string, string>();
   vi.stubGlobal("document", page);
@@ -165,6 +191,15 @@ function fakePage(visibility: "visible" | "hidden") {
       for (const listener of windowListeners.get(name) ?? []) {
         listener();
       }
+    },
+    // The navigation feedback's marker, set and cleared as that module does.
+    leave(): void {
+      page.documentElement.dataset.navigating = "pending";
+      FakeMutationObserver.notify();
+    },
+    stay(): void {
+      delete page.documentElement.dataset.navigating;
+      FakeMutationObserver.notify();
     },
   };
 }
@@ -269,5 +304,71 @@ describe("live reload's event stream", () => {
     // Shown again by both events, the page still holds one stream.
     page.show();
     expect(FakeEventSource.opened).toHaveLength(2);
+  });
+});
+
+describe("a reload while the page is leaving", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const changed = JSON.stringify({ paths: ["a.md"], structural: false });
+
+  // Reloading then would replace the navigation the reader started and land them back on this page.
+  it("does not replace a navigation that leaves the page", async () => {
+    const page = fakePage("visible");
+    const liveReload = await loadLiveReload();
+    liveReload.initLiveReload("a.md");
+    page.leave();
+    FakeEventSource.opened.at(-1)!.emit("change", changed, id(4));
+    expect(page.reload).not.toHaveBeenCalled();
+  });
+
+  // A navigation stopped with Esc, or answered with a file to save, leaves the page standing; a
+  // reload dropped rather than owed left it showing stale content until the next change arrived.
+  it("reloads once a navigation ends with the page still standing", async () => {
+    const page = fakePage("visible");
+    const liveReload = await loadLiveReload();
+    liveReload.initLiveReload("a.md");
+    page.leave();
+    const stream = FakeEventSource.opened.at(-1)!;
+    stream.emit("change", changed, id(4));
+    stream.emit("missed", "{}", id(5));
+    // One departure following another clears the marker and sets it again before the observer runs.
+    page.leave();
+    expect(page.reload).not.toHaveBeenCalled();
+    page.stay();
+    // Owed twice, paid once, and not again on a later change of the marker.
+    expect(page.reload).toHaveBeenCalledTimes(1);
+    page.leave();
+    page.stay();
+    expect(page.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("owes nothing when no reload was asked for", async () => {
+    const page = fakePage("visible");
+    const liveReload = await loadLiveReload();
+    liveReload.initLiveReload("a.md");
+    page.leave();
+    page.stay();
+    expect(page.reload).not.toHaveBeenCalled();
+  });
+
+  // The graph page reloaded on its own when its links changed, around the guard and its saved scroll.
+  // A page module listening for server events reloads only through `reloadKeepingScroll`.
+  it("is the only way a page reloads on a server event", async () => {
+    const dir = new URL("../src/client/", import.meta.url);
+    const listening: string[] = [];
+    for (const file of await readdir(dir)) {
+      if (!file.endsWith(".ts") || file === "live-reload.ts") {
+        continue;
+      }
+      const source = await readFile(new URL(file, dir), "utf8");
+      if (/\bonServerEvent\b/.test(source)) {
+        listening.push(file);
+        expect(source, file).not.toMatch(/location\.reload\(/);
+      }
+    }
+    expect(listening).toContain("graph.ts");
   });
 });

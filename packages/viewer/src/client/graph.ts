@@ -10,7 +10,7 @@ import {
   type GraphView,
   type Layout,
 } from "./graph-layout.js";
-import { onServerEvent } from "./live-reload.js";
+import { onServerEvent, reloadKeepingScroll } from "./live-reload.js";
 import { onThemeChange } from "./theme-toggle.js";
 
 // The link graph, drawn in two places from the same code: the graph page, where the server renders
@@ -103,11 +103,12 @@ async function draw(
   new DrawnGraph({ canvas, chart, view, kind, layout }).start();
   // Saving a document can add or drop links without changing which documents exist, and that reloads
   // no page. The view is fetched again and the page reloaded only when it differs, because a reload
-  // restarts the layout, and most saves change no link.
+  // restarts the layout, and most saves change no link. The reload goes through the same path as
+  // every other one, so it neither replaces a navigation the reader started nor loses the scroll.
   onServerEvent("change", () => {
     void fetchText(url).then((next) => {
       if (next !== undefined && next !== text) {
-        location.reload();
+        reloadKeepingScroll();
       }
     });
   });

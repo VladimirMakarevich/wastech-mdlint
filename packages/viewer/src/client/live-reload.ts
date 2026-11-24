@@ -151,17 +151,53 @@ function restoreScroll(): void {
   }
 }
 
-function reloadKeepingScroll(): void {
-  // A page already leaving for another — a click taken, the next page on its way — is not reloaded:
-  // the reload would replace that navigation, and the reader would land back on the page they left.
-  // The page they are going to is served fresh anyway.
+// Watching for the page to stop saying it is leaving, while a reload waits on it.
+let owedReload: MutationObserver | undefined;
+
+/**
+ * Reload the page, keeping its scroll position, unless it is already leaving for another.
+ *
+ * Every reload that something on disk changing causes goes through here, so none of them can replace
+ * a navigation the reader started. A reload the reader asked for themselves, after a save, does not.
+ */
+export function reloadKeepingScroll(): void {
+  // A page already leaving for another — a click taken, the next page on its way — is not reloaded
+  // now: the reload would replace that navigation, and the reader would land back on the page they
+  // left. The page they are going to is served fresh anyway, so usually the reload is simply never
+  // needed. But a navigation can also end with the page still standing — stopped with Esc, answered
+  // with a file to save, or brought back from the back-forward cache — and then the marker is
+  // removed and this page is still showing what was stale. Dropping the reload outright left such a
+  // page stale until the next change happened to arrive, so it is owed instead, and paid once the
+  // marker is gone.
   if (document.documentElement.dataset.navigating !== undefined) {
+    oweReload();
     return;
   }
+  owedReload?.disconnect();
+  owedReload = undefined;
   try {
     sessionStorage.setItem(scrollKey, String(window.scrollY));
   } catch {
     // Reload anyway; the page opens at the top.
   }
   location.reload();
+}
+
+// The marker belongs to the navigation feedback, which may clear and set it again in one turn when
+// one departure follows another; an observer runs after that turn and reads the marker as it then
+// is, so a reload is paid only when the page has really stopped leaving. Owing it twice is owing it
+// once.
+function oweReload(): void {
+  if (owedReload !== undefined) {
+    return;
+  }
+  owedReload = new MutationObserver(() => {
+    if (document.documentElement.dataset.navigating === undefined) {
+      reloadKeepingScroll();
+    }
+  });
+  owedReload.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-navigating"],
+  });
 }
