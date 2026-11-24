@@ -20,10 +20,12 @@ import { parseCliArgs } from "../src/cli-args.js";
 import { CONFIG_DATA_ID as CLIENT_CONFIG_DATA_ID } from "../src/client/config-editor.js";
 import {
   CONFIG_DATA_ID,
+  CONFIG_READ_ONLY,
   hashText,
   saveCandidate,
 } from "../src/config-editor.js";
 import { openCommand, type LaunchCommand } from "../src/open-file.js";
+import { CHANGES_OFF_REMOTELY } from "../src/security.js";
 import { startViewer, type RunningViewer } from "../src/server.js";
 
 assertBuilt(
@@ -871,6 +873,130 @@ function nextStructuralChange(port: number): {
   );
   return { ready, event };
 }
+
+// With `--host`, whoever reaches the port loads the same pages as the user. A token carried in the
+// config page then proved nothing, and a preview linted the checkout under a config the request
+// supplied: `include` widened past `.gitignore` and a custom rule whose finding quotes what it
+// matched read `.env` back in the preview's findings. So off loopback the server takes no request
+// with a body at all, checked before the token, and no page carries one.
+describe("a viewer other machines can reach", () => {
+  const SECRET = "API_KEY=do-not-serve";
+  let remote: { dir: string; viewer: RunningViewer; port: number };
+  const launched: LaunchCommand[] = [];
+
+  beforeAll(async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "wastech-viewer-remote-"));
+    await cp(fixtureRoot, dir, { recursive: true });
+    await writeFile(
+      path.join(dir, "wastech-mdlint.config.json"),
+      COMMENTED_CONFIG,
+    );
+    await writeFile(path.join(dir, ".gitignore"), ".env\n");
+    await writeFile(path.join(dir, ".env"), `${SECRET}\n`);
+    const viewer = await startViewer({
+      cwd: dir,
+      // The wildcard address is what a user passes to reach the viewer from another machine. The
+      // requests below still arrive over loopback, as an IP literal the `Host` check accepts.
+      host: "0.0.0.0",
+      port: 0,
+      portExplicit: true,
+      watch: false,
+      // Refused by the command line with a network address; set here anyway, so the test shows that
+      // the binding alone keeps a save out, whatever the server was started with.
+      allowConfigWrites: true,
+      launch: (command) => {
+        launched.push(command);
+        return Promise.resolve();
+      },
+    });
+    remote = { dir, viewer, port: Number(new URL(viewer.url).port) };
+  }, 30_000);
+
+  afterAll(async () => {
+    await remote?.viewer.close();
+    if (remote !== undefined) {
+      await rm(remote.dir, { recursive: true, force: true });
+    }
+  });
+
+  function post(route: string, body: unknown): Promise<Response> {
+    return send(remote.port, route, {
+      method: "POST",
+      headers: {
+        Origin: `http://127.0.0.1:${remote.port}`,
+        "Content-Type": "application/json",
+        // Any token at all: there is none to match, and the binding is judged before it.
+        "X-Wastech-Viewer-Token": "0".repeat(64),
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("refuses a preview, so no config sent from outside lints the checkout", async () => {
+    const before = await readFile(
+      path.join(remote.dir, "wastech-mdlint.config.json"),
+      "utf8",
+    );
+    const response = await post("/api/config/preview", {
+      base: hashText(before),
+      text: JSON.stringify({
+        include: ["**/*"],
+        respectGitignore: false,
+        rules: [
+          {
+            rule: "custom",
+            id: "x",
+            assert: { kind: "contentNotMatch", pattern: "[\\s\\S]{1,2000}" },
+          },
+        ],
+      }),
+    });
+    expect(response.status).toBe(403);
+    expect(JSON.parse(response.body)).toEqual({
+      status: "refused",
+      error: CHANGES_OFF_REMOTELY,
+    });
+    expect(response.body).not.toContain(SECRET);
+  });
+
+  it("refuses a save, an open and a review mark the same way", async () => {
+    const configPath = path.join(remote.dir, "wastech-mdlint.config.json");
+    const before = await readFile(configPath, "utf8");
+    for (const [route, body] of [
+      ["/api/config/save", { base: hashText(before), text: "{}\n" }],
+      ["/api/config/open", { action: "open" }],
+      ["/api/review/mark", { path: "README.md" }],
+    ] as const) {
+      const response = await post(route, body);
+      expect(response.status, route).toBe(403);
+      expect(JSON.parse(response.body), route).toEqual({
+        status: "refused",
+        error: CHANGES_OFF_REMOTELY,
+      });
+    }
+    expect(await readFile(configPath, "utf8")).toBe(before);
+    expect(launched).toEqual([]);
+  });
+
+  it("serves the config page read-only, with no token and no editor", async () => {
+    const { status, body } = await send(remote.port, "/config");
+    expect(status).toBe(200);
+    expect(body).not.toContain("wastech-change-token");
+    expect(body).toContain(CONFIG_READ_ONLY);
+    expect(body).not.toContain('class="config-editor"');
+    expect(body).not.toContain(`id="${CONFIG_DATA_ID}"`);
+    expect(body).not.toContain('class="config-open"');
+    // What the page is for when it cannot edit: the file and the rules it runs.
+    expect(body).toContain(
+      '<section class="config-current" aria-label="Current file">',
+    );
+    for (const page of ["/doc/README.md", "/dashboard", "/graph"]) {
+      expect((await send(remote.port, page)).body, page).not.toContain(
+        "wastech-change-token",
+      );
+    }
+  });
+});
 
 describe("--allow-config-writes", () => {
   it("is off by default and on when asked for", () => {

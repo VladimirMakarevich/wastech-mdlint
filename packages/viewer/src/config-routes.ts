@@ -44,6 +44,9 @@ export class ConfigRoutes {
           showAbsolutePath: this.ctx.showAbsolutePaths,
           canOpen: this.ctx.openRefused === undefined,
           editor: await configApi(this.ctx.corpus, this.ctx.allowConfigWrites),
+          // Without a token the server refuses every preview, save and open, so the page offers
+          // none: the editor's script starts only where the page carries one.
+          readOnly: this.ctx.changeToken === undefined,
         }),
         changeToken: this.ctx.changeToken,
         scriptFirst: true,

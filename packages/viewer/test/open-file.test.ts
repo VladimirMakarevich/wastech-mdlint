@@ -1,3 +1,9 @@
+import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { chmod, copyFile, mkdtemp, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { launchDetached, openCommand, openRefusal } from "../src/open-file.js";
@@ -13,12 +19,12 @@ describe("openCommand", () => {
   // glued to the quoted path selects the file in its folder, and a quoted path alone opens it.
   it("uses Explorer on Windows, quoted by hand for its verbatim command line", () => {
     expect(openCommand("win32", "reveal", windowsPath)).toEqual({
-      command: "explorer.exe",
+      command: "explorer",
       args: [`/select,"${windowsPath}"`],
       windowsVerbatimArguments: true,
     });
     expect(openCommand("win32", "open", windowsPath)).toEqual({
-      command: "explorer.exe",
+      command: "explorer",
       args: [`"${windowsPath}"`],
       windowsVerbatimArguments: true,
     });
@@ -85,5 +91,67 @@ describe("launchDetached", () => {
         args: [],
       }),
     ).rejects.toThrow();
+  });
+
+  // The viewer usually runs in the repository it serves. Started by bare name, a program is looked
+  // up there before `PATH` on Windows (and through a `.` entry of `PATH` elsewhere), so an
+  // `explorer.exe` committed to a cloned repository would be what "Show in folder" runs. The probe
+  // is a program of that kind placed in the working directory: the control proves a bare-name start
+  // would really run it, and `launchDetached` must not.
+  it("never runs a program placed in the working directory", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "wastech-viewer-open-"));
+    const name = "wastech-viewer-probe";
+    const marker = path.join(dir, "ran");
+    const previousDir = process.cwd();
+    const previousPath = process.env.PATH;
+    // Windows reads this from the *parent's* environment when it looks a program up; almost no
+    // machine sets it, though some tool harnesses do. It is removed so the control shows the lookup
+    // an ordinary machine does, and so it cannot be what keeps the probe from running.
+    const variable = Object.keys(process.env).filter(
+      (key) => key.toUpperCase() === "NODEFAULTCURRENTDIRECTORYINEXEPATH",
+    );
+    const saved = variable.map((key) => [key, process.env[key]] as const);
+    try {
+      if (process.platform === "win32") {
+        // Node stands in for the program: any Windows executable will do.
+        await copyFile(process.execPath, path.join(dir, `${name}.exe`));
+      } else {
+        await writeFile(
+          path.join(dir, name),
+          `#!/bin/sh\ntouch '${marker}'\n`,
+          "utf8",
+        );
+        await chmod(path.join(dir, name), 0o755);
+        process.env.PATH = [".", previousPath ?? ""].join(path.delimiter);
+      }
+      for (const key of variable) {
+        Reflect.deleteProperty(process.env, key);
+      }
+      process.chdir(dir);
+
+      const script = `require("fs").writeFileSync(${JSON.stringify(marker)}, "")`;
+      const args = process.platform === "win32" ? ["-e", script] : [];
+      const control = spawnSync(name, args, { windowsHide: true });
+      expect(control.error).toBeUndefined();
+      expect(existsSync(marker)).toBe(true);
+      await rm(marker);
+
+      await expect(launchDetached({ command: name, args })).rejects.toThrow(
+        "not found on PATH",
+      );
+      expect(existsSync(marker)).toBe(false);
+    } finally {
+      process.chdir(previousDir);
+      // Assigning `undefined` would store the string "undefined", so an unset `PATH` stays unset.
+      if (previousPath === undefined) {
+        Reflect.deleteProperty(process.env, "PATH");
+      } else {
+        process.env.PATH = previousPath;
+      }
+      for (const [key, value] of saved) {
+        process.env[key] = value;
+      }
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

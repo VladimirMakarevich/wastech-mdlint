@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 
+import { findExecutable } from "@wastech-mdlint/core";
+
 import { isLoopbackHost } from "./security.js";
 
 // Opening the config file from its page: showing it in the system's file manager, or handing it to
@@ -54,7 +56,7 @@ export function openCommand(
       return undefined;
     }
     return {
-      command: "explorer.exe",
+      command: "explorer",
       args: [
         action === "reveal" ? `/select,"${absolutePath}"` : `"${absolutePath}"`,
       ],
@@ -84,17 +86,30 @@ export type Launcher = (command: LaunchCommand) => Promise<void>;
  * failure to start (no such program) is reported. What the program does after that is not: Explorer
  * exits with status 1 even when it succeeds, so an exit status says nothing either way.
  */
-export const launchDetached: Launcher = (command) =>
-  new Promise((resolve, reject) => {
-    const child = spawn(command.command, command.args, {
+export const launchDetached: Launcher = async (command) => {
+  // Never by bare name: on Windows that searches the viewer's working directory — usually the
+  // repository it serves — before `PATH`, so an `explorer.exe` committed to it would be what a click
+  // on "Show in folder" runs. An absolute `command` is the caller's own choice and is used as given.
+  const executable = path.isAbsolute(command.command)
+    ? command.command
+    : await findExecutable(command.command, process.env);
+  if (executable === undefined) {
+    throw new Error("the program was not found on PATH");
+  }
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(executable, command.args, {
       detached: true,
       stdio: "ignore",
       shell: false,
       windowsVerbatimArguments: command.windowsVerbatimArguments,
     });
-    child.once("error", reject);
+    // Node's own message names the absolute path it tried, which a page must not show.
+    child.once("error", (error: NodeJS.ErrnoException) => {
+      reject(new Error(error.code ?? "it could not be started"));
+    });
     child.once("spawn", () => {
       child.unref();
       resolve();
     });
   });
+};

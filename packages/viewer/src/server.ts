@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
@@ -17,7 +16,11 @@ import { SinceReview } from "./review-state.js";
 import { ReviewStore } from "./review-store.js";
 import { type BoundAddress, ViewerRouter } from "./router.js";
 import { DocumentSearch } from "./search.js";
-import { exposesAbsolutePaths, isLoopbackHost } from "./security.js";
+import {
+  changeTokenFor,
+  exposesAbsolutePaths,
+  isLoopbackHost,
+} from "./security.js";
 import { defaultStateDir } from "./state-dir.js";
 import { type ViewerContext, viewerContext } from "./viewer-context.js";
 import { watchGitRefs, watchRepository } from "./watch.js";
@@ -167,7 +170,7 @@ function createContext(
     watch: options.watch,
     launch: options.launch ?? launchDetached,
     openRefused: openRefusal(options.host),
-    changeToken: randomBytes(32).toString("hex"),
+    changeToken: changeTokenFor(options.host),
   });
 }
 

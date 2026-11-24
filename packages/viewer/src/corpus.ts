@@ -337,9 +337,13 @@ export class Corpus {
     return [...sources].sort(compareStrings);
   }
 
-  /** The absolute path of a repository file the viewer may read; see `resolveRepositoryFile`. */
+  /**
+   * The absolute path of the linked file at `relPath` if the viewer may hand it out now — judged
+   * again as it is served rather than trusted from when the link was collected, since a symlink can
+   * be pointed elsewhere in between and what it points at is what would be sent.
+   */
   resolveFile(relPath: string): Promise<string | undefined> {
-    return resolveRepositoryFile(this.root, relPath);
+    return resolveServableFile(this.root, this.state, relPath);
   }
 
   /**
@@ -670,23 +674,88 @@ async function collectLinks(
   return links;
 }
 
-/**
- * Whether the viewer may hand out the repository file at `relPath` as a linked file: it is there, it
- * is not Markdown — a Markdown file outside the corpus is one the config keeps out of the viewer
- * exactly as it keeps it out of a lint run — and no `exclude` pattern or `.gitignore` covers it.
- */
+/** Whether the viewer may hand out the repository file at `relPath` as a linked file. */
 async function servableFile(
   root: RepositoryRoot,
+  membership: Membership,
+  relPath: string,
+): Promise<boolean> {
+  return (await resolveServableFile(root, membership, relPath)) !== undefined;
+}
+
+/**
+ * The absolute path of the repository file at `relPath` if the viewer may hand it out as a linked
+ * file: it is there, and neither the path the link names nor the file it really reaches is Markdown —
+ * a Markdown file outside the corpus is one the config keeps out of the viewer exactly as it keeps it
+ * out of a lint run — or covered by an `exclude` pattern or a `.gitignore`.
+ *
+ * The patterns are tested against the real file as well as the written path because a written path
+ * can miss them and still reach the file. A symlink `docs/env.txt` to `../.env` passes every pattern
+ * under its own name and reads the ignored `.env`. And patterns compare letter case exactly while
+ * case-insensitive file systems — the usual Windows and macOS ones, a Windows drive mounted in WSL —
+ * do not, so `.GIT/config` slips past the default `.git` exclude and opens `.git/config`; a Windows 8.3
+ * short name (`SECRET~1.TXT`) is another spelling of the same kind.
+ *
+ * `fs.promises.realpath` follows every link and, on Windows and macOS, also returns each name as it is
+ * stored (the callback `fs.realpath` keeps the spelling it was given). A path that then turns out to
+ * differ from the real one only in letter case is refused outright, so a link means the same file —
+ * or none — on every operating system, as on a case-sensitive one. Linux's realpath keeps the
+ * spelling it was given even on a case-insensitive mount, so last, each name of the real path must be
+ * listed in its folder exactly as spelled: a file reached under any other spelling is refused there
+ * too.
+ */
+async function resolveServableFile(
+  root: RepositoryRoot,
+  membership: Membership,
+  relPath: string,
+): Promise<string | undefined> {
+  if (!(await mayHandOut(membership, relPath))) {
+    return undefined;
+  }
+  const real = await resolveRepositoryFile(root, relPath);
+  if (real === undefined) {
+    return undefined;
+  }
+  if (real.relPath !== relPath) {
+    // `toLowerCase` takes no locale, so it folds case the same way on every machine.
+    if (real.relPath.toLowerCase() === relPath.toLowerCase()) {
+      return undefined;
+    }
+    if (!(await mayHandOut(membership, real.relPath))) {
+      return undefined;
+    }
+  }
+  return (await listedAsSpelled(root.rootRealPath, real.relPath))
+    ? real.absolutePath
+    : undefined;
+}
+
+// Whether every name in `relPath` appears, exactly as spelled, in the listing of the folder above it.
+// Last of the checks, as the only one that lists folders.
+async function listedAsSpelled(
+  rootRealPath: string,
+  relPath: string,
+): Promise<boolean> {
+  let folder = rootRealPath;
+  for (const name of relPath.split("/")) {
+    const names = await readdir(folder).catch(() => undefined);
+    if (names?.includes(name) !== true) {
+      return false;
+    }
+    folder = path.join(folder, name);
+  }
+  return true;
+}
+
+// The checks a path passes on its name alone, before anything on disk is asked about it.
+async function mayHandOut(
   membership: Membership,
   relPath: string,
 ): Promise<boolean> {
   if (isMarkdownFile(relPath) || membership.scope.includes(relPath)) {
     return false;
   }
-  if (await membership.servable.excludes(relPath, false)) {
-    return false;
-  }
-  return (await resolveRepositoryFile(root, relPath)) !== undefined;
+  return !(await membership.servable.excludes(relPath, false));
 }
 
 // Core's candidate list for a written target, minus anything that climbs out of the repository: such
@@ -740,14 +809,16 @@ function foldersOf(paths: Iterable<string>): Set<string> {
 }
 
 /**
- * The absolute path of a repository file, or `undefined` if it is missing, not a regular file, or —
- * through a symlink — outside the repository. Core's loader applies the same symlink rule to the
- * documents it reads; this applies it to every file the viewer reads after startup.
+ * Where a repository file really is — its absolute path and its repository-relative POSIX path, both
+ * through every symlink and in the letter case stored on disk — or `undefined` if it is missing, not
+ * a regular file, or, through a symlink, outside the repository. Core's loader applies the same
+ * symlink rule to the documents it reads; this applies it to every file the viewer reads after
+ * startup.
  */
 async function resolveRepositoryFile(
   root: RepositoryRoot,
   relPath: string,
-): Promise<string | undefined> {
+): Promise<{ absolutePath: string; relPath: string } | undefined> {
   let real: string;
   try {
     real = await realpath(path.join(root.rootDir, ...relPath.split("/")));
@@ -764,18 +835,20 @@ async function resolveRepositoryFile(
     return undefined;
   }
   const stats = await stat(real).catch(() => undefined);
-  return stats?.isFile() === true ? real : undefined;
+  return stats?.isFile() === true
+    ? { absolutePath: real, relPath: relativeToRoot.split(path.sep).join("/") }
+    : undefined;
 }
 
 async function readRepositoryFile(
   root: RepositoryRoot,
   relPath: string,
 ): Promise<string | undefined> {
-  const absolutePath = await resolveRepositoryFile(root, relPath);
-  if (absolutePath === undefined) {
+  const real = await resolveRepositoryFile(root, relPath);
+  if (real === undefined) {
     return undefined;
   }
-  return readFile(absolutePath, "utf8").catch(() => undefined);
+  return readFile(real.absolutePath, "utf8").catch(() => undefined);
 }
 
 // A change to the config or to any `.gitignore` can move files in or out of the corpus.

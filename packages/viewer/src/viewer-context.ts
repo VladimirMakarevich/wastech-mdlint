@@ -74,8 +74,9 @@ export type ViewerContext = {
   // Why opening the config is refused on this binding, or undefined where it is allowed.
   openRefused: string | undefined;
   // Random per process and written only into the pages that send a change, so a change request that
-  // carries it came from a page this server rendered.
-  changeToken: string;
+  // carries it came from a page this server rendered. Undefined on a binding other machines reach
+  // (`changeTokenFor`), where every request with a body is refused and no page carries one.
+  changeToken: string | undefined;
   page(params: PageBody): Promise<string>;
   sendNotFound(
     request: IncomingMessage,

@@ -14,6 +14,7 @@ import {
 } from "./speculation-rules.js";
 import { baselineOf } from "./review-state.js";
 import {
+  CHANGES_OFF_REMOTELY,
   changeRequestProblem,
   isAllowedHostHeader,
   isForeignRequest,
@@ -332,7 +333,17 @@ export class ViewerRouter {
     request: IncomingMessage,
     response: ServerResponse,
   ): Promise<{ value: unknown } | undefined> {
-    const problem = changeRequestProblem(request.headers, this.ctx.changeToken);
+    const token = this.ctx.changeToken;
+    if (token === undefined) {
+      request.resume();
+      sendJson(
+        response,
+        { status: "refused", error: CHANGES_OFF_REMOTELY },
+        403,
+      );
+      return undefined;
+    }
+    const problem = changeRequestProblem(request.headers, token);
     if (problem !== undefined) {
       request.resume();
       sendJson(

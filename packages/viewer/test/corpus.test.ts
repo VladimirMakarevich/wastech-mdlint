@@ -1,4 +1,13 @@
-import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  rename,
+  rm,
+  stat,
+  symlink,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -101,7 +110,157 @@ describe("linked files", () => {
       kind: "missing",
     });
   });
+
+  // `exclude` and `.gitignore` are patterns over a path, and a link names one path while a symlink
+  // makes it read another. Judged by the name alone, `docs/env.txt` linking to `../.env` passed every
+  // pattern and served the ignored `.env`. The patterns are tested against the file really reached.
+  it("refuses a symlinked file that reaches an ignored one", async (context) => {
+    const { root } = await load({
+      ".gitignore": ".env\n",
+      ".env": "SECRET=1\n",
+      "images/pic.png": "png",
+      "README.md": "# Home\n",
+    });
+    const linked =
+      (await fileLink("../.env", path.join(root, "docs", "env.txt"))) &&
+      (await fileLink("../images/pic.png", path.join(root, "docs", "pic.png")));
+    // Windows refuses a file symlink to an account without the privilege to create one; the
+    // directory-link test below runs there through a junction instead.
+    if (!linked) {
+      context.skip();
+    }
+    await write(
+      root,
+      "README.md",
+      "# Home\n\n[env](docs/env.txt) [pic](docs/pic.png)\n",
+    );
+    const corpus = await Corpus.load({ cwd: root });
+    expect(corpus.isLinkedFile("docs/env.txt")).toBe(false);
+    expect(await corpus.resolveFile("docs/env.txt")).toBeUndefined();
+    // A symlink to a file the viewer would serve anyway is still served.
+    expect(corpus.isLinkedFile("docs/pic.png")).toBe(true);
+  });
+
+  // The same through a linked folder, which every system can create — a junction where Windows
+  // refuses a directory symlink. Re-pointing the link after the page was built must not serve what it
+  // now reaches either: the check is made again as the file is served.
+  it("refuses a file reached through a linked folder that an exclude or .gitignore covers", async () => {
+    const { root } = await load({
+      "wastech-mdlint.config.json": JSON.stringify({
+        include: ["**/*.md"],
+        exclude: ["private/**"],
+      }),
+      ".gitignore": "secrets/\n",
+      "private/key.txt": "key",
+      "images/pic.png": "png",
+      "secrets/pic.png": "not an image",
+      "README.md": "# Home\n",
+    });
+    await folderLink(
+      path.join(root, "private"),
+      path.join(root, "docs", "vault"),
+    );
+    await folderLink(
+      path.join(root, "images"),
+      path.join(root, "docs", "media"),
+    );
+    await write(
+      root,
+      "README.md",
+      "# Home\n\n[key](docs/vault/key.txt) [pic](docs/media/pic.png)\n",
+    );
+    const corpus = await Corpus.load({ cwd: root });
+    expect(corpus.isLinkedFile("docs/vault/key.txt")).toBe(false);
+    expect(corpus.isLinkedFile("docs/media/pic.png")).toBe(true);
+    expect(await corpus.resolveFile("docs/media/pic.png")).toBeDefined();
+
+    await unlink(path.join(root, "docs", "media"));
+    await folderLink(
+      path.join(root, "secrets"),
+      path.join(root, "docs", "media"),
+    );
+    expect(await corpus.resolveFile("docs/media/pic.png")).toBeUndefined();
+  });
+
+  // Patterns compare letter case exactly; the usual Windows and macOS file systems do not. There
+  // `.GIT/config` passed the default `.git` exclude and opened `.git/config`, and `.ENV` passed a
+  // `.gitignore` naming `.env`. A path that reaches a file only under another case is refused, so a
+  // link means what it means on a case-sensitive system, where none of these exist at all.
+  it("refuses a path that reaches a file only under another letter case", async () => {
+    const { root } = await load({
+      "wastech-mdlint.config.json": JSON.stringify({
+        include: ["**/*.md"],
+        exclude: ["private/**"],
+      }),
+      ".git/config": "[core]\n",
+      ".gitignore": ".env\n",
+      ".env": "SECRET=1\n",
+      "private/key.txt": "key",
+      "images/pic.png": "png",
+      "README.md":
+        "# Home\n\n[cfg](.GIT/config) [env](.ENV) [key](PRIVATE/key.txt) [pic](IMAGES/pic.png)\n",
+    });
+    // Asked of the file system the test runs on, not inferred from the platform's name: a Linux
+    // checkout can sit on a case-insensitive volume, and a macOS one on a case-sensitive one.
+    if (await caseInsensitive(root)) {
+      // The premise: here each spelling does open the real file.
+      expect((await stat(path.join(root, ".GIT", "config"))).isFile()).toBe(
+        true,
+      );
+    }
+    const corpus = await Corpus.load({ cwd: root });
+    for (const relPath of [
+      ".GIT/config",
+      ".ENV",
+      "PRIVATE/key.txt",
+      "IMAGES/pic.png",
+    ]) {
+      expect(corpus.isLinkedFile(relPath), relPath).toBe(false);
+      expect(await corpus.resolveFile(relPath), relPath).toBeUndefined();
+    }
+  });
 });
+
+// A file symlink at `linkPath`, or `false` where the system refuses to create one.
+async function fileLink(target: string, linkPath: string): Promise<boolean> {
+  await mkdir(path.dirname(linkPath), { recursive: true });
+  try {
+    await symlink(target, linkPath, "file");
+    return true;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "EPERM" || code === "EACCES" || code === "ENOSYS") {
+      return false;
+    }
+    throw error;
+  }
+}
+
+// A link to a folder: a directory symlink, or a junction where Windows refuses the symlink to an
+// account without the privilege. A junction needs an absolute target, so both take one.
+async function folderLink(target: string, linkPath: string): Promise<void> {
+  await mkdir(path.dirname(linkPath), { recursive: true });
+  try {
+    await symlink(target, linkPath, "dir");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EPERM") {
+      throw error;
+    }
+    await symlink(target, linkPath, "junction");
+  }
+}
+
+async function caseInsensitive(dir: string): Promise<boolean> {
+  await writeFile(path.join(dir, "case-probe"), "", "utf8");
+  try {
+    return (
+      (await stat(path.join(dir, "CASE-PROBE")).catch(() => undefined)) !==
+      undefined
+    );
+  } finally {
+    await rm(path.join(dir, "case-probe"));
+  }
+}
 
 describe("applyChanges", () => {
   // The viewer's own Save writes this file, and with watching on it is the only thing that reloads

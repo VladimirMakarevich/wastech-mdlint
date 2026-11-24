@@ -452,6 +452,10 @@ function scriptJson(value: unknown): string {
   return JSON.stringify(value).replaceAll("<", "\\u003c");
 }
 
+/** What a read-only config page says in place of the editor. */
+export const CONFIG_READ_ONLY =
+  "This page is read-only: the viewer is reachable from other machines (--host), so it previews, saves and opens nothing. Copy the file below to change it elsewhere, or start the viewer on a loopback address to edit it here.";
+
 /**
  * The page without its script: the file as it is, highlighted, and the registry's rules with the
  * ones the config runs marked. Editing needs the script, which builds its form from the schema.
@@ -467,10 +471,16 @@ export async function renderConfigArticle(
     canOpen: boolean;
     // What the page's script builds the editor from, carried in the page (`CONFIG_DATA_ID`).
     editor: ConfigApi;
+    // Whether the server takes no change from this page at all — on a binding other machines reach,
+    // where it neither previews nor saves. The page then shows the file and the rules and says why
+    // there is no editor, rather than offering one whose every request would be refused.
+    readOnly: boolean;
   },
 ): Promise<ElementContent[]> {
   const file = await readConfigFile(corpus);
-  const blocked = await writeBlockedReason(corpus, options.allowWrites);
+  const blocked = options.readOnly
+    ? CONFIG_READ_ONLY
+    : await writeBlockedReason(corpus, options.allowWrites);
   const nodes: (ElementContent | undefined)[] = [
     h("h1", "Linter config"),
     file === undefined
@@ -510,7 +520,7 @@ export async function renderConfigArticle(
           "p.config-save-state",
           blocked ?? "Saving is on: a saved change is written to this file.",
         ),
-    file === undefined
+    file === undefined || options.readOnly
       ? undefined
       : h("div.config-editor", { hidden: true }, [
           h("p", "The editor is drawn by the page's script."),

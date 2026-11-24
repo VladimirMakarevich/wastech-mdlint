@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { isIP } from "node:net";
 
 // A local server that reads the repository is a target for any web page the user has open: the page
@@ -150,6 +150,26 @@ export function rawFileHeaders(): Record<string, string> {
 export function assetHeaders(): Record<string, string> {
   return { ...COMMON_HEADERS, "Cache-Control": "no-cache" };
 }
+
+/**
+ * The per-process change token for a viewer bound to `host`, or `undefined` where the viewer takes no
+ * request with a body at all.
+ *
+ * Every such request makes the server act for whoever sent it: a preview lints the repository under a
+ * config the request supplies — a scope widened past `.gitignore`, a custom rule whose finding quotes
+ * the text it matched, which together read any file in the checkout — a save rewrites the config, an
+ * open starts a program, a mark records a review in this user's name. On a loopback binding the
+ * sender is on this machine. With `--host` it is anyone who reaches the port, and a token carried in a
+ * page every one of them can load proves nothing about who they are. So off loopback there is no
+ * token for a page to carry, and the router refuses those requests before reading their bodies.
+ */
+export function changeTokenFor(host: string): string | undefined {
+  return isLoopbackHost(host) ? randomBytes(32).toString("hex") : undefined;
+}
+
+/** Why a request with a body is refused on a binding other machines reach (`changeTokenFor`). */
+export const CHANGES_OFF_REMOTELY =
+  "Forbidden: the viewer is reachable from other machines (--host), so it previews, saves, opens and marks nothing. Start it on a loopback address to make changes.";
 
 // The header the config page's script sends its per-process token in. A custom header is also what
 // makes a cross-origin `fetch` carrying it a preflighted request, which this server never approves.
