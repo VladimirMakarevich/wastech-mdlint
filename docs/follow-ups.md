@@ -1,13 +1,8 @@
 # Review follow-ups (feat/viewer, pre-0.4.0)
 
-Findings from the final pre-release review of `feat/viewer` against `main` that were not fixed in that pass. The ten most severe were fixed; everything below is still open. Line numbers are as of the review and may have drifted, so each item also names the function. This is a working list, not permanent documentation: delete it once every item is fixed, moved to an issue, or dismissed. Items are ordered by when they should land: before the first publication of 0.4.0 (the first release of the viewer, and the npm page that shows each package README), or after it.
+Findings from the final pre-release review of `feat/viewer` against `main` that were not fixed in that pass. The ten most severe were fixed; everything below is still open. Line numbers are as of the review and may have drifted, so each item also names the function. This is a working list, not permanent documentation: delete it once every item is fixed, moved to an issue, or dismissed. Everything that had to land before the first publication of 0.4.0 has landed; what is left waits on a decision or is for after the release.
 
 Severity: **bug** — wrong behavior a user can hit; **gap** — missing guard or test; **docs** — documentation out of step with the product; **nit** — minor.
-
-## Before the 0.4.0 release
-
-What a user can hit as lost data, a frozen process or a broken promise of the documentation, plus what is cheap and visible in everyday use.
-
 
 ## Waiting on a decision
 
