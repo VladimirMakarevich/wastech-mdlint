@@ -40,7 +40,17 @@ export type GitUnavailable = {
 };
 
 /** The branch or commit a change is compared with, and the commit it names. */
-export type GitBase = { ref: string; commit: string };
+export type GitBase = {
+  ref: string;
+  commit: string;
+  /**
+   * The full name `commit` was resolved from, when it differs from `ref`: an auto-detected base is
+   * shown by its short name (`main`, `origin/main`) but found as `refs/heads/main` or
+   * `refs/remotes/origin/main`. Resolving the short name again would pick a tag named `main`, or a
+   * local branch named `origin/main`, over the ref the base came from.
+   */
+  fullRef?: string;
+};
 
 /**
  * One changed path. `R` keeps the old path; a copy, a type change and an unmerged path read as an
@@ -120,14 +130,9 @@ export async function openGitRepository(
     return located;
   }
 
-  const atTopLevel: GitInvocation = { cwd: located.topLevel, env: probe.env };
-  const overrides = await repositoryConfigOverrides(atTopLevel);
-
   return new GitRepository(
-    {
-      cwd: located.topLevel,
-      env: gitEnvironment(inherited, overrides),
-    },
+    { cwd: located.topLevel, env: probe.env },
+    inherited,
     located.prefix,
     located.commonDirReal,
     located.gitDirReal,
@@ -303,7 +308,13 @@ export class GitRepository {
   readonly available = true;
 
   constructor(
-    private readonly invocation: GitInvocation,
+    // The top level with only the fixed settings every call carries: what the repository's own
+    // config is read with before each command, never what a command that could start a program runs
+    // with.
+    private readonly atTopLevel: GitInvocation,
+    // The caller's environment as given, kept so each command's environment is built afresh around
+    // the overrides that call's config scan found.
+    private readonly inherited: NodeJS.ProcessEnv,
     // The host root's path from the work tree's top level, without a trailing slash; `""` at the
     // top. Private, so every path crosses between the two coordinate systems inside this class.
     private readonly prefix: string,
@@ -338,20 +349,23 @@ export class GitRepository {
 
   /**
    * The commits `HEAD` and `base.ref` name now, as one string — `undefined` when either names none.
-   * One process, so a long-lived host can ask on every request whether a commit, a checkout or a
+   * One command, so a long-lived host can ask on every request whether a commit, a checkout or a
    * fetch has made what it computed from the two stale.
    */
   async revisionKey(base: GitBase): Promise<string | undefined> {
     // Refused here rather than with `--end-of-options`: outside `--verify` mode `rev-parse` echoes
     // that marker back as one more line of output instead of consuming it. Both arguments then end in
     // `^{commit}`, and neither can start with `-`.
-    if (base.ref.length === 0 || base.ref.startsWith("-")) {
+    // The name the base was resolved from, so the key compares the same ref `resolveBase` found
+    // rather than whatever its short name resolves to.
+    const ref = base.fullRef ?? base.ref;
+    if (ref.length === 0 || ref.startsWith("-")) {
       return undefined;
     }
-    const output = await runGit(this.invocation, [
+    const output = await this.run([
       "rev-parse",
       "HEAD^{commit}",
-      `${base.ref}^{commit}`,
+      `${ref}^{commit}`,
     ]);
     const commits = output.stdout.toString("utf8").trim().split("\n");
     return output.exitCode === 0 &&
@@ -387,7 +401,7 @@ export class GitRepository {
     }
 
     const candidates: { ref: string; fullRef: string }[] = [];
-    const remoteHead = await runGit(this.invocation, [
+    const remoteHead = await this.run([
       "symbolic-ref",
       "--quiet",
       "refs/remotes/origin/HEAD",
@@ -406,7 +420,7 @@ export class GitRepository {
     for (const candidate of candidates) {
       const commit = await this.resolveCommit(candidate.fullRef);
       if (commit !== undefined) {
-        return { ref: candidate.ref, commit };
+        return { ref: candidate.ref, commit, fullRef: candidate.fullRef };
       }
     }
     return unavailable(
@@ -421,7 +435,7 @@ export class GitRepository {
    * on the base branch after the fork never read as changes made here.
    */
   async mergeBase(base: GitBase): Promise<string | GitUnavailable> {
-    const output = await runGit(this.invocation, [
+    const output = await this.run([
       "merge-base",
       requireObjectName(base.commit),
       "HEAD",
@@ -431,10 +445,7 @@ export class GitRepository {
       return commit;
     }
     // Asked now rather than at open: a clone deepened while a host runs is no longer shallow.
-    const shallow = await runGit(this.invocation, [
-      "rev-parse",
-      "--is-shallow-repository",
-    ]);
+    const shallow = await this.run(["rev-parse", "--is-shallow-repository"]);
     if (shallow.stdout.toString("utf8").trim() === "true") {
       return unavailable(
         "shallow-history",
@@ -588,7 +599,7 @@ export class GitRepository {
    * track or a repository with no commit yet.
    */
   async fileHistory(relPath: string, limit: number): Promise<FileCommit[]> {
-    const output = await runGit(this.invocation, [
+    const output = await this.run([
       "log",
       "--follow",
       "-z",
@@ -625,7 +636,7 @@ export class GitRepository {
    * not tracked, or no commit yet — so a host can simply show nothing.
    */
   async blame(relPath: string): Promise<(BlameLine | undefined)[]> {
-    const output = await runGit(this.invocation, [
+    const output = await this.run([
       "blame",
       "--porcelain",
       "--no-textconv",
@@ -639,7 +650,7 @@ export class GitRepository {
   }
 
   private async resolveCommit(ref: string): Promise<string | undefined> {
-    const output = await runGit(this.invocation, [
+    const output = await this.run([
       "rev-parse",
       "--verify",
       "--quiet",
@@ -652,8 +663,27 @@ export class GitRepository {
       : undefined;
   }
 
+  // Every command this class starts goes through here, and the repository's filter drivers and
+  // protocol settings are listed again for each one rather than once at open. A long-lived host —
+  // the viewer runs for hours — outlives the config it opened with: a checkout activates an
+  // `[includeIf "onbranch:…"]`, a pull rewrites a tracked file an `[include] path` names, a hand
+  // edit lands in `.git/config`. A driver listed only at open would then be unknown, so not emptied,
+  // and `status` would run its `clean` command. The scan is one `git config` read, which runs
+  // nothing; what is left is the moment between the scan and the command it guards.
+  private async run(args: readonly string[], input?: string) {
+    const overrides = await repositoryConfigOverrides(this.atTopLevel);
+    return runGit(
+      {
+        cwd: this.atTopLevel.cwd,
+        env: gitEnvironment(this.inherited, overrides),
+      },
+      args,
+      input,
+    );
+  }
+
   private async mustRun(args: string[], input?: string) {
-    const output = await runGit(this.invocation, args, input);
+    const output = await this.run(args, input);
     if (output.exitCode !== 0) {
       throw new GitCommandError(args[0] ?? "", output.exitCode, output.stderr);
     }

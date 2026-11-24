@@ -139,7 +139,7 @@ describe.skipIf(!hasGit)("collectChangeSet (requires git on PATH)", () => {
     });
     const mainCommit = fixture.git("rev-parse", "main").trim();
     expect(changeSet).toEqual({
-      base: { ref: "main", commit: mainCommit },
+      base: { ref: "main", commit: mainCommit, fullRef: "refs/heads/main" },
       mergeBase: mainCommit,
       head: fixture.git("rev-parse", "HEAD").trim(),
       worktree: true,

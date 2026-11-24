@@ -608,6 +608,45 @@ describe.skipIf(!hasGit)("openGitRepository (requires git on PATH)", () => {
   );
 
   it(
+    "empties a filter driver the config gains after the repository was opened",
+    async () => {
+      const fixture = await makeRepo();
+      await fixture.write("doc.md", "text\n");
+      await fixture.write(".gitattributes", "doc.md filter=late\n");
+      fixture.commit("base");
+      fixture.git("checkout", "-q", "-b", "feature");
+
+      // Opened while no driver exists, as a viewer opens before a checkout or a pull brings one in.
+      const repository = await open(fixture.repo, fixture.env);
+
+      const slash = (target: string) => target.split(path.sep).join("/");
+      const marker = path.join(fixture.dir, "late-filter-ran");
+      const filter = path.join(fixture.dir, "late-filter.sh");
+      await writeFile(
+        filter,
+        `#!/bin/sh\ntouch '${slash(marker)}'\ncat\n`,
+        "utf8",
+      );
+      await chmod(filter, 0o755);
+      fixture.git("config", "filter.late.clean", `sh '${slash(filter)}'`);
+
+      // Control: the fixture's own git runs the driver on a changed stat.
+      await fixture.write("doc.md", "text, edited\n");
+      git(fixture.repo, fixture.env, ["diff", "--name-status", "main"]);
+      expect(existsSync(marker)).toBe(true);
+      await rm(marker, { force: true });
+
+      await fixture.write("doc.md", "text, edited again\n");
+      const mergeBase = await mergeBaseWithMain(repository);
+      expect(
+        await repository.changedPaths(mergeBase, { worktree: true }),
+      ).toEqual([{ status: "M", path: "doc.md" }]);
+      expect(existsSync(marker)).toBe(false);
+    },
+    TIMEOUT_MS,
+  );
+
+  it(
     "never runs a git executable placed in the repository",
     async () => {
       const fixture = await makeRepo();
@@ -955,6 +994,7 @@ describe.skipIf(!hasGit)("resolving the base (requires git on PATH)", () => {
       expect(await repository.resolveBase()).toEqual({
         ref: "main",
         commit: head,
+        fullRef: "refs/heads/main",
       });
 
       fixture.git("update-ref", "refs/remotes/origin/develop", "HEAD");
@@ -966,6 +1006,7 @@ describe.skipIf(!hasGit)("resolving the base (requires git on PATH)", () => {
       expect(await repository.resolveBase()).toEqual({
         ref: "origin/develop",
         commit: head,
+        fullRef: "refs/remotes/origin/develop",
       });
 
       fixture.git("symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
@@ -973,6 +1014,7 @@ describe.skipIf(!hasGit)("resolving the base (requires git on PATH)", () => {
       expect(await repository.resolveBase()).toEqual({
         ref: "master",
         commit: head,
+        fullRef: "refs/heads/master",
       });
 
       fixture.git("branch", "-q", "-m", "master", "trunk");

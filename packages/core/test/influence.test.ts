@@ -115,4 +115,30 @@ describe.skipIf(!hasGit)("revisionKey (requires git on PATH)", () => {
       await repository.revisionKey({ ref: "--all", commit: base.commit }),
     ).toBeUndefined();
   }, 60_000);
+
+  it("keys an auto-detected base by the branch it was found as, not a tag of the same name", async () => {
+    const fixture = await makeRepo();
+    await fixture.write("a.md", "a\n");
+    fixture.commit("base");
+    const mainCommit = fixture.git("rev-parse", "HEAD").trim();
+    fixture.git("checkout", "-q", "-b", "feature");
+    await fixture.write("a.md", "a, edited\n");
+    fixture.commit("feature");
+    // A tag named like the base branch but pointing elsewhere: `main` alone now resolves to it.
+    fixture.git("tag", "main", "HEAD");
+    const repository = await openGitRepository(fixture.repo, {
+      env: fixture.env,
+    });
+    if (!repository.available) {
+      throw new Error(`expected a repository, got ${repository.reason}`);
+    }
+    const base = await repository.resolveBase();
+    if ("available" in base) {
+      throw new Error(`expected a base, got ${base.reason}`);
+    }
+    expect(base).toMatchObject({ ref: "main", commit: mainCommit });
+
+    const head = fixture.git("rev-parse", "HEAD").trim();
+    expect(await repository.revisionKey(base)).toBe(`${head}:${mainCommit}`);
+  }, 60_000);
 });
