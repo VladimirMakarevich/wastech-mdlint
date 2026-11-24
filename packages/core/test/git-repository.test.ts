@@ -19,6 +19,7 @@ import { describe, expect, it } from "vitest";
 import { compareStrings } from "../src/deterministic-sort.js";
 import {
   findGitExecutable,
+  GitCommandError,
   gitEnvironment,
   runGit,
 } from "../src/git/git-command.js";
@@ -801,11 +802,20 @@ describe.skipIf(!hasGit)("openGitRepository (requires git on PATH)", () => {
         );
         const env = gitEnvironment(source.env, overrides);
         delete env.GIT_NO_LAZY_FETCH;
+        // With every transport refused, the lazy fetch fails at once, and git either reports the
+        // object missing or — when it is still writing to the fetch process that already quit —
+        // dies of the broken pipe, which `runGit` reports as a command that did not finish. Both
+        // are the outcome this proves: no object came back. Only a read that returned the blob
+        // would mean a fetch ran.
         const output = await runGit(
           { cwd: clone, env },
           ["cat-file", "--batch"],
           `${head}:doc.md\n`,
-        );
+        ).catch((error: unknown) => {
+          expect(error).toBeInstanceOf(GitCommandError);
+          expect((error as GitCommandError).exitCode).toBeNull();
+          return { stdout: Buffer.alloc(0) };
+        });
         expect(output.stdout.toString("utf8")).not.toContain(" blob ");
       };
 
