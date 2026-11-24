@@ -305,7 +305,7 @@ function sizeBudgetSteps(
       ? ""
       : ` — today that is the entry with pattern ${codeSpan(budget.override.pattern)}`;
   lines.push(
-    `Add an entry to SIZE-001's \`options.overrides\` with \`"pattern": "${input.filePath}"\`, the exact path, and place it before every other entry in that list whose pattern also matches ${file}${broader}: SIZE-001 uses the first override that matches and ignores the rest. A metric the new entry leaves out falls back to the top-level option, not to a broader override, so repeat in it every threshold listed above, and raise only the ones the file exceeds:`,
+    `Add an entry to SIZE-001's \`options.overrides\` with \`"pattern": "${exactPattern(input.filePath)}"\`, the exact path, and place it before every other entry in that list whose pattern also matches ${file}${broader}: SIZE-001 uses the first override that matches and ignores the rest. A metric the new entry leaves out falls back to the top-level option, not to a broader override, so repeat in it every threshold listed above, and raise only the ones the file exceeds:`,
     "",
     ...findings.flatMap((finding) => raiseSteps(sizeData(finding)!)),
   );
@@ -380,9 +380,19 @@ function contextBudgetSteps(
 ): string[] {
   const file = codeSpan(input.filePath);
   const context = contextData(findings[0]!)!;
+  const pattern = exactPattern(input.filePath);
   return [
-    `LLM-001 holds every entrypoint an entry matches to that entry's one \`maxTokensPerEntrypoint\` (${context.maxTokens} today), so raising it there would raise it for every other entrypoint too. Instead, add a second \`LLM-001\` entry with \`"entrypoints": ["${input.filePath}"]\` and a \`maxTokensPerEntrypoint\` above ${context.totalTokens} — for example ${roomAbove(context.totalTokens, 1.1)}, some room above today's total — and make the existing entry stop matching ${file}: remove it from that entry's \`entrypoints\`, or add \`"!${input.filePath}"\` there when a glob matches it.`,
+    `LLM-001 holds every entrypoint an entry matches to that entry's one \`maxTokensPerEntrypoint\` (${context.maxTokens} today), so raising it there would raise it for every other entrypoint too. Instead, add a second \`LLM-001\` entry with \`"entrypoints": ["${pattern}"]\` and a \`maxTokensPerEntrypoint\` above ${context.totalTokens} — for example ${roomAbove(context.totalTokens, 1.1)}, some room above today's total — and make the existing entry stop matching ${file}: remove it from that entry's \`entrypoints\`, or add \`"!${pattern}"\` there when a glob matches it.`,
   ];
+}
+
+// The config pattern that matches `filePath` and nothing else. Config globs without a `/` are
+// depth-agnostic — `README.md` is read as `**/README.md` — so a root file's bare name would hand
+// the raised budget to every same-named file in the repository, and its `!` form would pull every
+// nested one out of the existing entry too. A leading `./` anchors it to the root, the same form
+// `init` writes for its root-only patterns; a path that already has a `/` is anchored as it stands.
+function exactPattern(filePath: string): string {
+  return filePath.includes("/") ? filePath : `./${filePath}`;
 }
 
 // A round number comfortably above `value`: `value` times `factor`, rounded up at its second

@@ -6,6 +6,7 @@ import {
   SPLIT_FORMS,
   splitSteps,
 } from "../src/discovery/agent-rule.js";
+import { matchesConfigGlob } from "../src/discovery/globs.js";
 import {
   buildFindingPrompt,
   findingPromptStrategies,
@@ -257,10 +258,43 @@ describe("buildFindingPrompt", () => {
       ruleEntries: [],
     });
     expect(text).toContain(
-      'add a second `LLM-001` entry with `"entrypoints": ["CLAUDE.md"]`',
+      'add a second `LLM-001` entry with `"entrypoints": ["./CLAUDE.md"]`',
     );
     expect(text).toContain("above 10450 — for example 12000");
-    expect(text).toContain('add `"!CLAUDE.md"` there when a glob matches it');
+    expect(text).toContain('add `"!./CLAUDE.md"` there when a glob matches it');
+  });
+
+  // A config pattern without a `/` matches that name at any depth, so a root file's bare name would
+  // give the raised budget to every nested file of the same name. The check runs each pattern the
+  // prompt hands out through the config matcher itself, so it proves what the agent's edit would
+  // select rather than what the prompt's text looks like.
+  it("anchors a root file's pattern so it selects that file and no nested namesake", () => {
+    const patternsIn = (text: string): string[] =>
+      [...text.matchAll(/"(?:pattern": "|entrypoints": \[")([^"]+)"/g)].map(
+        (match) => match[1]!,
+      );
+    const size = prompt({
+      filePath: "README.md",
+      strategy: "budget",
+      ruleEntries: [
+        { ruleId: "SIZE-001", options: { tokens: { warn: 11000 } } },
+      ],
+    });
+    const context = prompt({
+      filePath: "CLAUDE.md",
+      findings: [CONTEXT_OVER],
+      strategy: "budget",
+      ruleEntries: [],
+    });
+    const cases = [
+      { patterns: patternsIn(size), root: "README.md" },
+      { patterns: patternsIn(context), root: "CLAUDE.md" },
+    ];
+    for (const { patterns, root } of cases) {
+      expect(patterns).toHaveLength(1);
+      expect(matchesConfigGlob(root, patterns)).toBe(true);
+      expect(matchesConfigGlob(`packages/core/${root}`, patterns)).toBe(false);
+    }
   });
 
   it("asks for a fix, never a silence, with what each rule checks", () => {
