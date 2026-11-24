@@ -67,6 +67,26 @@ describe("CandidateLinter", () => {
     }
   });
 
+  // The defect this guards: every preview the page had already dropped still ran, in order, so the
+  // newest one waited behind all of them — up to the time limit each while a pattern ran away.
+  it("skips a job whose request was abandoned before its turn", async () => {
+    const linter = new CandidateLinter(5_000);
+    try {
+      const dropped = new AbortController();
+      const runaway = linter.lint(job("(a+)+$"));
+      const skipped = linter.lint(job("(a+)+$"), dropped.signal);
+      dropped.abort();
+      const started = Date.now();
+      expect(await runaway).toMatchObject({ ok: false, reason: "timeout" });
+      expect(await skipped).toMatchObject({ ok: false, reason: "abandoned" });
+      // The skipped job answered as soon as its turn came, without a second time limit.
+      expect(Date.now() - started).toBeLessThan(9_000);
+      expect(await linter.lint(job("a{40}"))).toMatchObject({ ok: true });
+    } finally {
+      await linter.close();
+    }
+  }, 30_000);
+
   it("stops a pattern that backtracks without end, keeping the server's thread free, and lints the next one", async () => {
     const linter = new CandidateLinter(5_000);
     try {

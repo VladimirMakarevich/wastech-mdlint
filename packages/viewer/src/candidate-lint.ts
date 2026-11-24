@@ -25,7 +25,7 @@ export type CandidateLintJob = {
 
 export type CandidateLintAnswer =
   | { ok: true; messages: LintMessage[]; documentCount: number }
-  | { ok: false; reason: "timeout" | "failed"; message: string };
+  | { ok: false; reason: "timeout" | "failed" | "abandoned"; message: string };
 
 // Long enough for a rules-only change over a few thousand documents, or a new scope's discovery and
 // parse, and short enough that a reader whose half-typed pattern runs away is told so promptly.
@@ -50,12 +50,27 @@ export class CandidateLinter {
     private readonly workerUrl: URL = WORKER_URL,
   ) {}
 
+  /**
+   * Lints `job` once the jobs before it are done. A job whose `signal` has aborted by then — the
+   * page asked for a newer preview and dropped this request — is not run: the editor aborts the
+   * older preview on every change, and running each in turn would put the newest one behind them
+   * all, up to the time limit apiece when the reader is typing into a pattern that runs away.
+   */
   lint(
     job: Omit<CandidateLintJob, "documents"> & {
       documents: ReadonlyMap<string, ParsedDocument>;
     },
+    signal?: AbortSignal,
   ): Promise<CandidateLintAnswer> {
-    const run = this.queue.then(() => this.run(job));
+    const run = this.queue.then(() =>
+      signal?.aborted === true
+        ? {
+            ok: false as const,
+            reason: "abandoned" as const,
+            message: "The preview was no longer wanted.",
+          }
+        : this.run(job),
+    );
     this.queue = run.catch(() => undefined);
     return run;
   }
@@ -83,14 +98,14 @@ export class CandidateLinter {
       this.sent = undefined;
     }
     const worker = this.worker;
+    const documentsSent = this.sent === job.documents;
     const message: CandidateLintJob = {
       rootDir: job.rootDir,
       configPath: job.configPath,
       text: job.text,
       sameScope: job.sameScope,
-      ...(this.sent === job.documents ? {} : { documents: job.documents }),
+      ...(documentsSent ? {} : { documents: job.documents }),
     };
-    this.sent = job.documents;
 
     return new Promise<CandidateLintAnswer>((resolve) => {
       const settle = (answer: CandidateLintAnswer, stop: boolean) => {
@@ -134,7 +149,19 @@ export class CandidateLinter {
       worker.on("message", onMessage);
       worker.on("error", onError);
       worker.on("exit", onExit);
-      worker.postMessage(message);
+      try {
+        worker.postMessage(message);
+      } catch (error) {
+        // Nothing reached the worker, so what it holds is unknown: it is stopped like a failed one,
+        // rather than left with a timer that would later stop it under another job.
+        settle(
+          { ok: false, reason: "failed", message: (error as Error).message },
+          true,
+        );
+        return;
+      }
+      // Only once the worker has them: a later job then sends nothing it already holds.
+      this.sent = job.documents;
     });
   }
 }

@@ -206,13 +206,26 @@ export class ConfigRoutes {
       return;
     }
     const { corpus } = this.ctx;
-    const linted = await this.candidates.lint({
-      rootDir: corpus.rootDir,
-      configPath: file.absolutePath,
-      text: candidate.text,
-      sameScope: corpus.sharesScope(validated.loaded),
-      documents: corpus.documents,
+    // A response closed before it was answered is a request the page gave up on.
+    const abandoned = new AbortController();
+    response.once("close", () => {
+      if (!response.writableFinished) {
+        abandoned.abort();
+      }
     });
+    const linted = await this.candidates.lint(
+      {
+        rootDir: corpus.rootDir,
+        configPath: file.absolutePath,
+        text: candidate.text,
+        sameScope: corpus.sharesScope(validated.loaded),
+        documents: corpus.documents,
+      },
+      abandoned.signal,
+    );
+    if (!linted.ok && linted.reason === "abandoned") {
+      return;
+    }
     if (!linted.ok) {
       sendJson(response, { status: "failed", error: linted.message }, 503);
       return;
