@@ -27,14 +27,14 @@ const SIZE_OFFSET = 124;
 const TYPE_FLAG_OFFSET = 156;
 const PREFIX_OFFSET = 345;
 
-interface HeaderFields {
+type HeaderFields = {
   readonly name: string;
   readonly prefix?: string;
   /** Written verbatim into the size field, so a case can put something unparseable there. */
   readonly sizeField?: string;
   /** `"0"` regular file, `"5"` directory, `"x"` pax extended header. */
   readonly typeFlag?: string;
-}
+};
 
 /**
  * One 512-byte header block.

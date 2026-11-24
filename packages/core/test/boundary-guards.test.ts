@@ -48,6 +48,8 @@ const BOUNDARY_GUARDS: Record<string, string[]> = {
     "packages/mcp-server/test/host-parity.test.ts",
     "packages/mcp-server/test/lint-files.test.ts",
     "packages/mcp-server/test/lint.test.ts",
+    "packages/viewer/test/changes.test.ts",
+    "packages/viewer/test/review.test.ts",
   ],
   // Spawn the built entrypoint through an npm-style link. Only a real process can populate
   // `process.argv[1]`, which is what the entrypoint guard compares against `import.meta.url` — and
@@ -57,6 +59,7 @@ const BOUNDARY_GUARDS: Record<string, string[]> = {
     "packages/cli/test/bin.e2e.test.ts",
     "packages/mcp-server/test/bin-entrypoint.test.ts",
     "packages/mcp-server/test/stdio-integration.test.ts",
+    "packages/viewer/test/changes.test.ts",
   ],
   // The shared `files`/`exclude` option shape stays covered as rules are added: an inventory drift
   // guard plus a runtime assert-kind coverage check — plus the top-level scope's own
@@ -70,10 +73,15 @@ const BOUNDARY_GUARDS: Record<string, string[]> = {
     "packages/core/test/rules-custom.test.ts",
   ],
   // A write that fails partway must leave no temp file and no half-written target, and the command
-  // must report it and exit non-zero rather than claiming success.
+  // must report it and exit non-zero rather than claiming success. The viewer's config save and its
+  // review marks are the writes a network request can cause, so their failure paths are held to the
+  // same.
   "write-failure": [
     "packages/cli/test/init.e2e.test.ts",
     "packages/core/test/atomic-write.test.ts",
+    "packages/viewer/test/config-editor.test.ts",
+    "packages/viewer/test/review-store.test.ts",
+    "packages/viewer/test/review.test.ts",
   ],
   // Output must not depend on evaluation order or on state carried between calls (a `g`-flagged
   // RegExp's `lastIndex` being the concrete case that shipped).

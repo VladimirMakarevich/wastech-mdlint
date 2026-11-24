@@ -50,6 +50,26 @@ const documents = await loadDocuments(["**/*.md"], {
 const graph = buildContextGraph(documents); // { nodes, edges, cycles }
 ```
 
+A long-running host — an editor integration, a local server — can load the corpus once and lint it again after every change, without discovering and parsing every file each time:
+
+```ts
+import { lintContext, loadContext } from "@wastech-mdlint/core";
+
+const context = await loadContext({
+  cwd,
+  config: loaded.config,
+  settings: loaded.settings,
+});
+const findings = lintContext({
+  cwd,
+  context,
+  rules: loaded.rules,
+  settings: loaded.settings,
+});
+```
+
+`lintContext` gives exactly what `lintFiles` gives for the same tree. After an edit, re-parse the changed file with `parseDocument`, rebuild the graph with `buildContextGraph`, and pass the updated context. To render a document, `parseDocumentWithTree` returns the mdast tree of the same parse alongside the `ParsedDocument`, so a page's heading ids and link targets are the ones the rules checked.
+
 Every path in a public result is a repository-relative POSIX path, and every collection is sorted, on all three platforms — output is safe to commit or diff.
 
 ## Documentation

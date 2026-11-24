@@ -122,6 +122,77 @@ export function classifyImpact(
 }
 
 /**
+ * The blast radius of changing several files at once — a branch's changed documents — as one record:
+ * every other document that reaches any of them, at its shortest distance. Built from one `impact`
+ * walk per file over the same graph, so a document reached from two changed files is the same answer
+ * either walk gives, merged; ties in distance keep the predecessor the first file in path order
+ * found, so the record does not depend on which walk ran first. Files not in the graph — a deleted
+ * document — are left out of `files`, since nothing can reach what is no longer there.
+ */
+export type ChangeImpact = Omit<ImpactClassification, "file"> & {
+  files: string[];
+};
+
+export function classifyChangeImpact(
+  graph: ContextGraph,
+  files: readonly string[],
+): ChangeImpact {
+  const nodes = new Set(graph.nodes.map((node) => node.path));
+  const starts = [...new Set(files.map((file) => normalizeRelativePath(file)))]
+    .filter((file) => nodes.has(file))
+    .sort(byPath);
+  const changed = new Set(starts);
+  const nearest = new Map<string, QueryVisit>();
+  for (const start of starts) {
+    for (const visit of impact(graph, start).visited) {
+      if (changed.has(visit.path)) {
+        continue;
+      }
+      const known = nearest.get(visit.path);
+      if (known === undefined || visit.depth < known.depth) {
+        nearest.set(visit.path, visit);
+      }
+    }
+  }
+  const visits = [...nearest.values()];
+
+  const directlyAffected: DirectlyAffected[] = visits
+    .filter((visit) => visit.depth === 1)
+    .map((visit) => ({
+      path: visit.path,
+      references: graph.edges.filter(
+        (edge) => edge.from === visit.path && changed.has(edge.to),
+      ).length,
+    }))
+    .sort((left, right) => byPath(left.path, right.path));
+  const transitivelyAffected: TransitivelyAffected[] = visits
+    .filter((visit) => visit.depth >= 2)
+    .map((visit) => ({
+      path: visit.path,
+      depth: visit.depth,
+      via: visit.via ?? "",
+    }))
+    .sort((left, right) => byPath(left.path, right.path));
+
+  const affectedPaths = new Set([...starts, ...nearest.keys()]);
+  const { order, excluded } = topologicalSort({
+    nodes: graph.nodes.filter((node) => affectedPaths.has(node.path)),
+    edges: graph.edges.filter(
+      (edge) => affectedPaths.has(edge.from) && affectedPaths.has(edge.to),
+    ),
+    cycles: [],
+  });
+
+  return {
+    files: starts,
+    directlyAffected,
+    transitivelyAffected,
+    readingOrder: order,
+    excluded,
+  };
+}
+
+/**
  * Re-express every path in `impactResult` relative to `cwd`. `cwd` is repo-relative (a host with an
  * absolute invocation directory converts it to repo-relative before calling), so the repo root is
  * `""` and maps to an identity relativization — core stays platform-agnostic and never needs a

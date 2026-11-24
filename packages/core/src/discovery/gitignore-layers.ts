@@ -3,7 +3,8 @@ import path from "node:path";
 
 import ignore, { type Ignore } from "ignore";
 
-// Shared `.gitignore` matching for every directory walk in core. It lives here rather than inside
+// Shared `.gitignore` matching for every directory walk in core, and for the scope tester that
+// judges one path the way the corpus walk would. It lives here rather than inside
 // `markdown/load-documents.ts` (its original home) because the pre-config repo scan must skip
 // exactly the trees the lint corpus will skip: two independent matchers would let
 // `init` propose an `include` for a directory the very config it writes then ignores.
@@ -13,8 +14,8 @@ import ignore, { type Ignore } from "ignore";
  * matcher so within-file negation (`!keep.md`) resolves correctly, and so layer precedence is
  * something `isGitIgnored` can decide rather than something the pattern order has already collapsed.
  *
- * **The order of a layer array is part of this type's contract: outermost first.** Both walks build
- * it that way, appending each directory's own layer as they descend, and `isGitIgnored` reads it in
+ * **The order of a layer array is part of this type's contract: outermost first.** Both walks and the
+ * scope tester build it that way, appending each directory's own layer as they descend, and `isGitIgnored` reads it in
  * reverse — the reversal *is* git's precedence rule, so a caller that hands over a differently
  * ordered array gets a differently ordered precedence.
  */
@@ -25,8 +26,9 @@ import ignore, { type Ignore } from "ignore";
  * ordered shallowest-first, because precedence is resolved by walking it from the end. And a layer's
  * `ig` must not be mutated — via `ig.add(...)` or otherwise — after the layer is first queried:
  * ancestor-neutralized copies of it are memoized under its object identity, so later additions would
- * be invisible to every cached answer. Both current producers build a fresh `Ignore` per directory
- * per walk, which satisfies this by construction.
+ * be invisible to every cached answer. Every current producer builds one `Ignore` per directory and
+ * never adds to it — the walks per walk, the scope tester once for its lifetime — which satisfies
+ * this by construction.
  */
 export type IgnoreLayer = { baseRel: string; ig: Ignore };
 
@@ -141,7 +143,7 @@ function resolveOwnVerdict(
   layers: IgnoreLayer[],
 ): Verdict {
   for (let index = layers.length - 1; index >= 0; index -= 1) {
-    const verdict = layerVerdict(layers[index], relPath, isDirectory);
+    const verdict = layerVerdict(layers[index]!, relPath, isDirectory);
     if (verdict !== "no-opinion") {
       return verdict;
     }

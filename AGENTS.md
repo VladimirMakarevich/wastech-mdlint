@@ -21,6 +21,7 @@ Three rules follow from that, and they are not negotiable:
 - `@wastech-mdlint/core` — the engine.
 - `@wastech-mdlint/cli` — the commander-based CLI host. Bin: `wastech-mdlint`.
 - `@wastech-mdlint/mcp-server` — the stdio MCP host. Bin: `wastech-mdlint-mcp`.
+- `@wastech-mdlint/viewer` — the local web viewer host (experimental, published with the other three). Bin: `wastech-mdlint-viewer`. Before changing it, read [`.agents/rules/viewer.md`](.agents/rules/viewer.md): what each of its pages takes from core, and its security boundary as the one host with a network listener and a write outside the repository.
 
 Treat the filesystem as truth for where code lives.
 
@@ -29,12 +30,12 @@ Treat the filesystem as truth for where code lives.
 These hold for every change. Breaking one is a design decision, not an implementation detail, and needs to be raised explicitly rather than done quietly.
 
 - **Core owns the pipeline.** `@wastech-mdlint/core` is the single owner of parsing, config loading, lint orchestration, graph construction, compile logic, and result formatting.
-- **Hosts are thin.** `cli` and `mcp-server` are adapters over core. They never re-implement the pipeline. Host-specific behavior — argument parsing, exit codes, tool registration, error wrapping, structured output — belongs at the boundary; shared computation belongs in core. Two hosts computing the same answer separately is how they start giving different answers.
+- **Hosts are thin.** `cli`, `mcp-server` and `viewer` are adapters over core. They never re-implement the pipeline. Host-specific behavior — argument parsing, exit codes, tool registration, error wrapping, structured output — belongs at the boundary; shared computation belongs in core. Two hosts computing the same answer separately is how they start giving different answers.
 - **One parse pass.** `ParsedDocument` is produced once per document and feeds rules, graph, compile, and inline suppression. Nothing re-parses Markdown ad hoc.
 - **The rule system is registry-driven.** Structured metadata, Zod-validated options, shared assertion primitives, deterministic findings. Declarative custom rules stay data-driven over a closed primitive vocabulary — never runtime user code.
 - **One graph.** `ContextGraph` is shared infrastructure for graph commands, impact and slice logic, MCP tools, and graph-aware rules. A parallel traversal implementation is a bug waiting to diverge.
 - **Deterministic output.** Public and report output uses normalized repository-relative POSIX paths and stable ordering. No timestamps, no filesystem-order dependence, no locale-dependent collation.
-- **Cross-platform.** Runtime surfaces in all three packages must behave correctly on Windows, macOS and Linux. Path normalization, glob handling, newline behavior and child-process handling are correctness concerns, not polish.
+- **Cross-platform.** Runtime surfaces in all four packages must behave correctly on Windows, macOS and Linux. Path normalization, glob handling, newline behavior and child-process handling are correctness concerns, not polish.
 - **Config is data.** JSONC in `wastech-mdlint.config.json` with a local `$schema`. No remote schema URLs, no runtime TypeScript config loading, no `.cjs`/`.mjs` config.
 
 ## Implementation Guidance

@@ -126,6 +126,42 @@ function traverse(
   return { importedPaths, missing, cycles };
 }
 
+// An entrypoint's own text and everything it eagerly imports, in estimated tokens: the total the
+// budget is checked against.
+function totalTokens(
+  entrypointDoc: ParsedDocument,
+  importedPaths: ReadonlySet<string>,
+  documents: Map<string, ParsedDocument>,
+): number {
+  let total = estimateTokens(entrypointDoc.content);
+  for (const importedPath of importedPaths) {
+    total += estimateTokens(documents.get(importedPath)?.content ?? "");
+  }
+  return total;
+}
+
+/**
+ * What an entrypoint loads into every agent session, in estimated tokens, and how many files that
+ * takes — through the same traversal and the same sum the rule checks its budget with, so a host
+ * that shows the number never shows one the rule would not report. `undefined` for a path that is
+ * not a document.
+ */
+export function eagerContextTokens(
+  entrypoint: string,
+  documents: Map<string, ParsedDocument>,
+  siteRouter: SiteRouterSettings | undefined,
+): { tokens: number; importedFiles: number } | undefined {
+  const entrypointDoc = documents.get(entrypoint);
+  if (entrypointDoc === undefined) {
+    return undefined;
+  }
+  const { importedPaths } = traverse(entrypoint, documents, siteRouter);
+  return {
+    tokens: totalTokens(entrypointDoc, importedPaths, documents),
+    importedFiles: importedPaths.size,
+  };
+}
+
 // Collected instead of reported inline so the rule can suppress cross-entrypoint duplicates:
 // entrypoints with overlapping import closures re-derive the same missing-import/cycle
 // diagnostic once per traversal. `filePath` is required — LLM-001 is a project rule, so every
@@ -164,31 +200,25 @@ function comparePendingFindings(
 // the reporting boundary where dedup happens.
 function collectEntrypointFindings(
   entrypoint: string,
-  entrypointDoc: ParsedDocument,
   documents: Map<string, ParsedDocument>,
   maxTokens: number,
   siteRouter: SiteRouterSettings | undefined,
 ): PendingFinding[] {
+  const entrypointDoc = documents.get(entrypoint)!;
   const findings: PendingFinding[] = [];
   const traversal = traverse(entrypoint, documents, siteRouter);
+  const total = totalTokens(entrypointDoc, traversal.importedPaths, documents);
 
-  let totalTokens = estimateTokens(entrypointDoc.content);
-  for (const importedPath of traversal.importedPaths) {
-    totalTokens += estimateTokens(documents.get(importedPath)?.content ?? "");
-  }
-
-  if (totalTokens > maxTokens) {
-    const percentOver = (((totalTokens - maxTokens) / maxTokens) * 100).toFixed(
-      1,
-    );
+  if (total > maxTokens) {
+    const percentOver = (((total - maxTokens) / maxTokens) * 100).toFixed(1);
     findings.push({
       // Only the budget finding quotes a token number, so only it carries the calibration;
       // the missing-import and cycle findings below would gain a non-sequitur from it.
-      message: `Entrypoint ${entrypoint} is over context budget: ${totalTokens} estimated tokens exceeds ${maxTokens} (${percentOver}% over). ${TOKEN_ESTIMATE_NOTE}`,
+      message: `Entrypoint ${entrypoint} is over context budget: ${total} estimated tokens exceeds ${maxTokens} (${percentOver}% over). ${TOKEN_ESTIMATE_NOTE}`,
       line: 0,
       filePath: entrypoint,
       data: {
-        totalTokens,
+        totalTokens: total,
         maxTokens,
         importedFiles: traversal.importedPaths.size,
       },
@@ -249,7 +279,6 @@ export const llm001: RuleDefinition = defineRule({
     for (const entrypoint of entrypoints) {
       for (const finding of collectEntrypointFindings(
         entrypoint,
-        documents.get(entrypoint)!,
         documents,
         options.maxTokensPerEntrypoint,
         context.settings.siteRouter,

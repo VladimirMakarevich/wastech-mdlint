@@ -35,45 +35,47 @@ export type DocumentProfile = {
 function normalizeIdFamily(token: string): string | undefined {
   const match = ID_FAMILY_PATTERN.exec(token);
 
-  if (match?.groups === undefined) {
+  const prefix = match?.groups?.prefix;
+  const digits = match?.groups?.digits;
+  if (prefix === undefined || digits === undefined) {
     return undefined;
   }
 
-  return `${match.groups.prefix}-${"N".repeat(match.groups.digits.length)}`;
+  return `${prefix}-${"N".repeat(digits.length)}`;
 }
 
-// Reuse the same whitespace/comma token model as column-based ID discovery so compile profiling
-// does not infer a different "cell token" shape than the REF/GRP rules.
-function detectIdPattern(document: ParsedDocument): string | undefined {
-  let normalizedFamily: string | undefined;
-
+// Every non-empty token of every table cell, in table, row and header order. Reuse the same
+// whitespace/comma token model as column-based ID discovery so compile profiling does not infer a
+// different "cell token" shape than the REF/GRP rules.
+function* tableCellTokens(document: ParsedDocument): Generator<string> {
   for (const table of document.tables) {
     for (const row of table.rows) {
       for (const header of table.headers) {
-        const tokens = (row.cells[header] ?? "")
+        yield* (row.cells[header] ?? "")
           .split(COLUMN_TOKEN_SPLIT_PATTERN)
           .filter((token) => token.length > 0);
-
-        for (const token of tokens) {
-          const candidate = normalizeIdFamily(token);
-
-          if (candidate === undefined) {
-            continue;
-          }
-
-          // The contract only exposes one top-level family, so mixed prefixes or digit widths must
-          // stay undefined instead of letting scan order pick an arbitrary winner.
-          if (
-            normalizedFamily !== undefined &&
-            normalizedFamily !== candidate
-          ) {
-            return undefined;
-          }
-
-          normalizedFamily = candidate;
-        }
       }
     }
+  }
+}
+
+function detectIdPattern(document: ParsedDocument): string | undefined {
+  let normalizedFamily: string | undefined;
+
+  for (const token of tableCellTokens(document)) {
+    const candidate = normalizeIdFamily(token);
+
+    if (candidate === undefined) {
+      continue;
+    }
+
+    // The contract only exposes one top-level family, so mixed prefixes or digit widths must
+    // stay undefined instead of letting scan order pick an arbitrary winner.
+    if (normalizedFamily !== undefined && normalizedFamily !== candidate) {
+      return undefined;
+    }
+
+    normalizedFamily = candidate;
   }
 
   return normalizedFamily;

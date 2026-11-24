@@ -24,7 +24,10 @@ export type {
   ParsedTableRow,
   ParsedUndefinedReference,
 } from "./markdown/document-types.js";
-export { parseDocument } from "./markdown/parse-document.js";
+export {
+  parseDocument,
+  parseDocumentWithTree,
+} from "./markdown/parse-document.js";
 export { loadDocuments } from "./markdown/load-documents.js";
 export type { LoadDocumentsOptions } from "./markdown/load-documents.js";
 export { canonicalizeRuleId } from "./rule-id.js";
@@ -53,7 +56,10 @@ export {
 // Exported for the hosts, not only for core's own walks: `init`'s scan-exclusion disclosure suggests
 // an `include` pattern for a pruned directory, and it must splice the same tail every other proposal
 // does or it would advertise a narrower set than the scan counted.
-export { MARKDOWN_GLOB_SUFFIX } from "./discovery/markdown-extensions.js";
+export {
+  isMarkdownFile,
+  MARKDOWN_GLOB_SUFFIX,
+} from "./discovery/markdown-extensions.js";
 export { detectPackageManager } from "./discovery/package-manager.js";
 export type { DetectedPackageManager } from "./discovery/package-manager.js";
 export { detectWorkspacePackages } from "./discovery/workspace-packages.js";
@@ -80,7 +86,7 @@ export type {
 } from "./discovery/rule-inference.js";
 
 // Agent rule
-export { buildAgentRuleMarkdown } from "./discovery/agent-rule.js";
+export { buildAgentRuleMarkdown, cliRunner } from "./discovery/agent-rule.js";
 export type { AgentRuleParams } from "./discovery/agent-rule.js";
 
 // Config writer
@@ -151,22 +157,142 @@ export {
 } from "./graph/search-index.js";
 export type {
   ContextSearchIndex,
+  ContextSliceOptions,
   ContextSliceResult,
   SliceMatchKind,
 } from "./graph/search-index.js";
 export {
+  classifyChangeImpact,
   classifyImpact,
   getImpactSet,
   ImpactAnalysisError,
   relativizeImpact,
 } from "./graph/impact-analysis.js";
 export type {
+  ChangeImpact,
   DirectlyAffected,
   ImpactClassification,
   TransitivelyAffected,
 } from "./graph/impact-analysis.js";
 export { loadContext } from "./graph/load-context.js";
 export type { GraphContext } from "./graph/load-context.js";
+
+// Git — read-only access to the repository a host was pointed at, for comparing the corpus with a
+// base branch. In core rather than in a host because what it feeds (which documents changed, and
+// how) is shared computation: two hosts asking git separately would disagree on the base, the
+// prefix or the rename rules. The process runner and its environment stay internal, so no caller
+// can start git without the settings that keep repository config from running programs.
+export {
+  GitRepository,
+  MINIMUM_GIT_VERSION,
+  openGitRepository,
+} from "./git/git-repository.js";
+export type {
+  BlameLine,
+  FileCommit,
+  GitBase,
+  GitChange,
+  GitUnavailable,
+  GitUnavailableReason,
+  OpenGitRepositoryOptions,
+} from "./git/git-repository.js";
+export { GitCommandError } from "./git/git-command.js";
+// How every program the product starts is found, so a host that launches one (the viewer opening a
+// file manager) cannot be made to run a same-named file from the repository it serves.
+export { findExecutable } from "./find-executable.js";
+
+// Changes — what a branch changed in the corpus, and the diff a reviewer reads. The sequence diff
+// under them stays internal: hosts compare texts, not arbitrary sequences.
+export { classifyChanges, collectChangeSet } from "./changes/change-set.js";
+export {
+  eagerContextBudgets,
+  eagerContextPaths,
+  rankByInfluence,
+} from "./changes/influence.js";
+export type { EagerContextBudget, RankedChange } from "./changes/influence.js";
+export type {
+  ChangeSet,
+  ClassifiedChanges,
+  CorpusMembership,
+} from "./changes/change-set.js";
+export {
+  contextGaps,
+  diffText,
+  lineCorrespondence,
+  lineRangeKept,
+  normalizeText,
+  tableRowLines,
+} from "./changes/text-diff.js";
+export type {
+  DiffGap,
+  DiffHunk,
+  DiffLine,
+  DiffSegment,
+  LineRun,
+  TextDiff,
+  TextDiffOptions,
+} from "./changes/text-diff.js";
+export {
+  baseLineMap,
+  changedSections,
+  headChanges,
+  introductionChanged,
+} from "./changes/head-changes.js";
+export type {
+  HeadChanges,
+  HeadLineChange,
+  HeadRemoval,
+} from "./changes/head-changes.js";
+export { compareFindings } from "./changes/findings-delta.js";
+export type {
+  FindingLocator,
+  FindingsDelta,
+} from "./changes/findings-delta.js";
+export { replaceDocuments } from "./changes/snapshot.js";
+export type { DocumentSwap } from "./changes/snapshot.js";
+export { compareEdges, linksIntoChangedLines } from "./changes/link-delta.js";
+export type { CodeLineLink, EdgesDelta } from "./changes/link-delta.js";
+export {
+  computeContextDelta,
+  lineLinkTargets,
+  swapsTowardBase,
+  swapsTowardHead,
+} from "./changes/context-delta.js";
+export type {
+  AffectedDocuments,
+  ChangedDocument,
+  ContextDelta,
+  ContextSide,
+  DocumentContextDelta,
+  EagerContextChange,
+} from "./changes/context-delta.js";
+export {
+  analyzeSince,
+  branchContext,
+  reviewBranch,
+} from "./changes/branch-review.js";
+export type {
+  BranchContext,
+  BranchReview,
+  CorpusSnapshot,
+  ReviewedConfig,
+  ReviewedDocument,
+  SinceAnalysis,
+} from "./changes/branch-review.js";
+export {
+  renderSinceHeader,
+  sinceImpact,
+  sinceLintResult,
+} from "./changes/since-report.js";
+export type {
+  SinceImpact,
+  SinceLintResult,
+  SinceSummary,
+} from "./changes/since-report.js";
+export { documentSections } from "./changes/sections.js";
+export type { DocumentSection } from "./changes/sections.js";
+export { parseLineFragment } from "./engine/anchor-resolve.js";
+export { eagerContextTokens } from "./engine/rules/llm.js";
 export {
   renderContextGraphDot,
   renderContextGraphMermaid,
@@ -245,13 +371,18 @@ export type {
 } from "./engine/types.js";
 export { runRules } from "./engine/run-rules.js";
 export type { RunRulesContext } from "./engine/run-rules.js";
-export { lintFiles } from "./engine/lint-files.js";
-export type { LintFilesInput, LintResult } from "./engine/lint-files.js";
-// The ad-hoc entry point over the shared step order, and the only half of that split a host
-// needs: `lintContent` is the MCP `lint` tool's whole body. `lintCorpus` itself stays **unexported**
-// on purpose — its two callers are `lintFiles` and `lintContent`, both inside core, and it takes an
-// already-parsed corpus plus already-resolved rules, which a host has no way to hold without
-// re-assembling the discovery half the split exists to keep in one place.
+export { lintContext, lintFiles } from "./engine/lint-files.js";
+export type {
+  LintContextInput,
+  LintFilesInput,
+  LintResult,
+} from "./engine/lint-files.js";
+// The ad-hoc entry point over the shared step order: `lintContent` is the MCP `lint` tool's whole
+// body. `lintCorpus` itself stays **unexported** on purpose — its callers are `lintFiles`,
+// `lintContext` and `lintContent`, all inside core, and it takes an already-parsed corpus plus
+// already-resolved rules. A host can hold a parsed corpus only as `loadContext` returned it and
+// rules only as `loadConfiguration` returned them, which is exactly what `lintContext` accepts, so
+// discovery and severity resolution stay in one place.
 export { lintContent } from "./engine/lint-content.js";
 export type { LintContentInput } from "./engine/lint-content.js";
 export {
@@ -269,6 +400,20 @@ export {
   formatLintResultText,
 } from "./engine/format-lint-result.js";
 export { estimateTokens } from "./engine/tokens.js";
+export { measureDocument } from "./engine/document-metrics.js";
+export {
+  buildFindingPrompt,
+  findingPromptStrategies,
+  isBudgetFinding,
+  PROMPT_STRATEGY_LABELS,
+} from "./engine/fix-prompt.js";
+export type {
+  FindingPromptInput,
+  PromptFinding,
+  PromptRuleEntry,
+  PromptStrategy,
+} from "./engine/fix-prompt.js";
+export type { DocumentMetrics } from "./engine/document-metrics.js";
 export { applyEdits, applyFixes, FixWriteError } from "./engine/fix.js";
 export type { ApplyFixesResult } from "./engine/fix.js";
 export { extractColumnIds, extractDefinedIds } from "./engine/defined-ids.js";
@@ -281,6 +426,11 @@ export {
 export { findLineNumber } from "./engine/text-position.js";
 export { extractSectionBody } from "./engine/section-body.js";
 export { resolveRoutedUrl } from "./engine/site-router.js";
+export {
+  candidateEscapesRoot,
+  filePart,
+  resolveTargetCandidates,
+} from "./engine/path-resolve.js";
 
 // Primitives
 export {
@@ -354,7 +504,9 @@ export { ConfigError } from "./config/config-error.js";
 export { TOOL_ERROR_CODES, isStructuredError } from "./errors.js";
 export type { StructuredErrorInfo, ToolErrorCode } from "./errors.js";
 export { CONFIG_FILE_NAME, findConfig } from "./config/find-config.js";
-export { loadConfiguration } from "./config/load-config.js";
+export { loadConfiguration, parseConfiguration } from "./config/load-config.js";
+export { editConfigText } from "./config/edit-config.js";
+export type { ConfigEdit, ConfigEditPath } from "./config/edit-config.js";
 export type {
   ConfiguredRule,
   LoadedConfiguration,
@@ -370,3 +522,5 @@ export {
   DEFAULT_EXCLUDE_GLOBS,
   DEFAULT_INCLUDE_GLOBS,
 } from "./config/corpus-scope.js";
+export { createScopeTester } from "./config/scope-tester.js";
+export type { ScopeTester } from "./config/scope-tester.js";

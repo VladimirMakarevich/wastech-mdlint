@@ -12,12 +12,12 @@ declare module "picomatch" {
 
   // Only the result-object form (`matcher(input, true)`) is declared: the ordered-list matcher needs
   // `output`, the input as picomatch normalized it, to key its sets, and a plain boolean drops it.
-  interface Matcher {
+  type Matcher = {
     (input: string, returnObject: true): { isMatch: boolean; output: string };
     state: PicomatchState;
-  }
+  };
 
-  interface Picomatch {
+  type Picomatch = {
     // Only the `returnState` form is declared, because whether a pattern subtracts is read from the
     // parser state it attaches to the matcher — `negated` alone misses a leading `!(…)` extglob.
     (glob: string, options: PicomatchOptions, returnState: true): Matcher;
@@ -25,7 +25,7 @@ declare module "picomatch" {
     // answered by the actual parser rather than a hand-rolled character check that could drift
     // from it. Only `isGlob` is declared — `base`/`glob`/the boolean sub-flags are unused here.
     scan(input: string, options?: PicomatchOptions): { isGlob: boolean };
-  }
+  };
 
   const picomatch: Picomatch;
 

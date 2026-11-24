@@ -488,13 +488,15 @@ async function collectSourceFiles(directory: string): Promise<string[]> {
 }
 
 describe("gitignore matching has exactly one implementation", () => {
-  // The structural half of the same criterion, asserted rather than assumed (phase task deliverable
-  // 2): a second matcher in either walk would let `init` propose an `include` for a tree the config
-  // it writes then refuses to lint. Substring checks so reformatting the multi-line import — which
-  // Prettier does on its own — cannot fail this.
+  // The structural half of the same criterion, asserted rather than assumed: a second matcher in
+  // either walk would let `init` propose an `include` for a tree the config it writes then refuses to
+  // lint, and one in the scope tester would let a host judge a single path differently from the walk
+  // that built its corpus. Substring checks so reformatting the multi-line import — which Prettier
+  // does on its own — cannot fail this.
   const callSites = [
     "packages/core/src/markdown/load-documents.ts",
     "packages/core/src/discovery/repo-scan.ts",
+    "packages/core/src/config/scope-tester.ts",
   ];
 
   for (const callSite of callSites) {
@@ -510,8 +512,8 @@ describe("gitignore matching has exactly one implementation", () => {
   it("has no third call site anywhere in the workspace's product code", async () => {
     // Pins the *set*, not just its members: the loop above only checks what it lists, so a third
     // consumer could otherwise appear untested. Scanning every workspace package's `src` — derived
-    // from the workspace, not listed here — is what makes "exactly two call sites"
-    // (gitignore-layers.ts's own stated premise) a claim that stays checked as packages are added.
+    // from the workspace, not listed here — is what makes "exactly these call sites" a claim that
+    // stays checked as packages are added.
     const consumers: string[] = [];
 
     for (const srcDir of await workspaceSourceDirs()) {
@@ -524,7 +526,7 @@ describe("gitignore matching has exactly one implementation", () => {
     }
 
     expect(consumers.sort(compareStrings)).toEqual(
-      // The matcher's own module declares it; the two walks call it.
+      // The matcher's own module declares it; the two walks and the one-path scope tester call it.
       [...callSites, "packages/core/src/discovery/gitignore-layers.ts"].sort(
         compareStrings,
       ),

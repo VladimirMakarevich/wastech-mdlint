@@ -50,11 +50,11 @@ const cliSrcIndex = path.join(repoRoot, "packages/cli/src/index.ts");
 
 assertBuilt(cliDistIndex, cliSrcIndex);
 
-interface Spawned {
+type Spawned = {
   status: number | null;
   stdout: string;
   stderr: string;
-}
+};
 
 // Every spawn in this file targets either node itself directly via an absolute path, or (for the
 // npx smoke check below) the real `npx` binary resolved through PATH — neither needs a shell on

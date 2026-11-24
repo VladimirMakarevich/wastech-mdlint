@@ -1,0 +1,59 @@
+{
+  "name": "@wastech-mdlint/viewer",
+  "version": "0.4.0",
+  "description": "Local web viewer for a repository's Markdown: the corpus wastech-mdlint lints, rendered with diagrams, charts, highlighted code, backlinks and a link graph, reloading as files change.",
+  "keywords": [
+    "markdown",
+    "viewer",
+    "preview",
+    "documentation",
+    "docs",
+    "mermaid",
+    "live-reload",
+    "echarts",
+    "graph"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VladimirMakarevich/wastech-mdlint.git",
+    "directory": "packages/viewer"
+  },
+  "type": "module",
+  "bin": {
+    "wastech-mdlint-viewer": "./dist/index.js"
+  },
+  "engines": {
+    "node": ">=24.17.0"
+  },
+  "files": [
+    "dist",
+    "assets",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@types/hast": "^3.0.5",
+    "@wastech-mdlint/core": "0.4.0",
+    "echarts": "^6.1.0",
+    "hast-util-raw": "^9.2.1",
+    "hast-util-sanitize": "^5.0.2",
+    "hast-util-to-html": "^9.0.7",
+    "hastscript": "^9.0.3",
+    "mdast-util-to-hast": "^13.2.2",
+    "mermaid": "^12.3.0",
+    "micromark-util-sanitize-uri": "^2.0.1",
+    "minisearch": "^7.2.0",
+    "shiki": "^4.6.0",
+    "unist-util-visit": "^5.2.0",
+    "vfile": "^6.0.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

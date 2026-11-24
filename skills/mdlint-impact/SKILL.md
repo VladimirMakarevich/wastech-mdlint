@@ -2,7 +2,7 @@
 name: "mdlint-impact"
 description: "Compute the blast radius of changing a Markdown file with wastech-mdlint: resolve the target, run the CLI impact command (or the MCP impact-analysis tool when available), then report which files are affected directly and transitively, in what reading order, and what a cycle excluded. Use when the user wants to scope the impact of a change before editing, or asks what depends on a document."
 license: "MIT"
-compatibility: "Requires @wastech-mdlint/cli 0.3.0. One tag publishes the CLI and tags the skills together, so a skill and the CLI it drives always carry the same version; do not mix versions."
+compatibility: "Requires @wastech-mdlint/cli 0.4.0. One tag publishes the CLI and tags the skills together, so a skill and the CLI it drives always carry the same version; do not mix versions."
 metadata:
   homepage: "https://github.com/VladimirMakarevich/wastech-mdlint"
   source: "https://github.com/VladimirMakarevich/wastech-mdlint"
@@ -10,7 +10,7 @@ metadata:
 
 # Scope the impact of a Markdown change
 
-This skill reports the **blast radius** of changing one Markdown file: which other documents reference it directly, which are affected transitively, the order to read the affected set in, and which nodes a cycle dropped from that order. It is a thin policy layer over wastech-mdlint's impact engine — it does **not** re-traverse the graph itself. The engine is reachable two ways, and this skill prefers the MCP tool when the host exposes it and falls back to the CLI otherwise; both run the same core classification, so the results are equivalent apart from the field-shape differences documented in step 3.
+This skill reports the **blast radius** of changing one Markdown file — or every document a branch changed: which other documents reference it directly, which are affected transitively, the order to read the affected set in, and which nodes a cycle dropped from that order. It is a thin policy layer over wastech-mdlint's impact engine — it does **not** re-traverse the graph itself. The engine is reachable two ways, and this skill prefers the MCP tool when the host exposes it and falls back to the CLI otherwise; both run the same core classification, so the results are equivalent apart from the field-shape differences documented in step 3.
 
 Run the steps in order.
 
@@ -38,7 +38,9 @@ Frame this as a recommendation. Never tell the user impact _requires_ these rule
 
 ## 2. Resolve the target
 
-The impact engine takes a **repository-relative POSIX file path**, not an ID. Passing a target that is not a file in the corpus fails with `TARGET_NOT_FOUND` (CLI exit code 2).
+**If the user asks about their whole change** — everything a branch or the uncommitted work touched, before a pull request or in CI — there is no target to resolve: skip to step 3 and use its `since` form with the branch the change will merge into (`main`, say). The subject is then every corpus document the work tree changed since the merge-base with that ref, uncommitted and untracked files included, as a pull request is compared. It needs a git work tree with history back to the merge-base; outside one, with a ref that names nothing, or in a shallow clone, the CLI exits `2` and the MCP tool answers `INVALID_INPUT`, each with git's remedy — report that rather than an empty blast radius.
+
+For one document, the impact engine takes a **repository-relative POSIX file path**, not an ID. Passing a target that is not a file in the corpus fails with `TARGET_NOT_FOUND` (CLI exit code 2).
 
 - **If the user gives a file path**, normalize it to repository-relative POSIX (`/` separators) and use it directly.
 - **If the user gives an ID, anchor, or heading** (e.g. `REQ-014`, a slug, a section title), resolve it to its containing file first, using the same MCP-preferred / CLI-fallback choice as step 3:
@@ -56,14 +58,16 @@ The impact engine takes a **repository-relative POSIX file path**, not an ID. Pa
 
 Prefer the MCP tool when the host exposes it (honest host semantics); otherwise use the CLI.
 
-- **Preferred — MCP `impact-analysis` tool.** Input `{ file, configPath?, cwd? }`. Returns structured output shaped `{ file, directlyAffected, transitivelyAffected, readingOrder, excluded }`.
-- **Fallback — CLI.** `npx wastech-mdlint impact <file> --format json`.
+- **Preferred — MCP `impact-analysis` tool.** Input `{ file?, since?, configPath?, cwd? }`, with exactly one of `file` and `since`. Returns structured output shaped `{ file?, files?, since?, directlyAffected, transitivelyAffected, readingOrder, excluded }`.
+- **Fallback — CLI.** `npx wastech-mdlint impact <file> --format json`, or `npx wastech-mdlint impact --since <ref> --format json` for the whole change; giving both a file and `--since`, or neither, exits `2`.
 
 **The two surfaces return the same record, with one field the CLI adds — read the fields that actually exist:**
 
 | Field | CLI JSON | MCP output |
 | --- | --- | --- |
-| `file` | the changed file (string) | same |
+| `file` | the changed file (string); absent with `since` | same |
+| `files` | with `since` only: the changed documents still in the corpus (`string[]`) — a deleted one is left out, and the documents that linked to it show up as broken links in `lint --since` | same |
+| `since` | with `since` only: `{ ref, base, mergeBase, head, changed, removed }` — the comparison, `changed` the changed documents | same |
 | `directlyAffected` | `{ path, references }[]` | same |
 | `transitivelyAffected` | `{ path, depth, via }[]` | same |
 | `readingOrder` | `string[]` | same |
@@ -76,6 +80,7 @@ So: the only difference is that the CLI adds a `lint` field the MCP tool does no
 
 Report the blast radius from the fields above. All paths are repository-relative POSIX and the array fields are deterministically ordered, so present them as returned.
 
+- **What changed** — with `since` only: name the comparison (`since.ref` and the short `since.mergeBase`) and list `files`, the subject of everything below. A document reached from several changed ones is listed once, at its shortest distance.
 - **Directly affected** — from `directlyAffected`, each `{ path, references }`. These are the documents that reference the changed file directly; surface the `references` count so the user sees how tightly coupled each one is.
 - **Transitively affected** — from `transitivelyAffected`, each `{ path, depth, via }`. Group or sort your presentation by `depth` and name the `via` predecessor so the user can see the dependency chain that pulls each document in.
 - **Reading order** — from `readingOrder` (a `string[]`). This is a **topological** order over the affected subgraph, not alphabetical: predecessors come before successors, where the graph edges run `referrer → referenced`. For impact that means the **referrers / dependents appear before the file they depend on** — the changed file, being the thing everything else references, typically comes **last**. Present it in the order given — **do not re-sort it**, and do not describe it as "dependencies first."

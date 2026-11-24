@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -8,6 +9,8 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { buildAgentRuleMarkdown } from "@wastech-mdlint/core";
 
+import { assertBuilt } from "../../core/test/support/assert-built.js";
+import { hasGit, makeRepo } from "../../core/test/support/git-fixture.js";
 import { EXIT_CODE_SUCCESS } from "../src/commands.js";
 import { runCli } from "../src/program.js";
 
@@ -84,10 +87,10 @@ async function help(
 // asserted against the live `--help` surface (commander advertises `.choices()` as quoted strings), so
 // dropping `--fail-on off` or `--format dot` on the CLI, or the skill ceasing to document it for that
 // command, fails here even though the option name survives.
-interface Choice {
+type Choice = {
   value: string;
   evidence: RegExp;
-}
+};
 const COMMANDS: {
   command: string;
   usage: string;
@@ -113,7 +116,7 @@ const COMMANDS: {
   {
     command: "lint",
     usage: "wastech-mdlint lint",
-    flags: ["--fix", "--fail-on", "--format", "--config"],
+    flags: ["--fix", "--fail-on", "--format", "--config", "--since"],
     // The fix skill runs `lint … --format json --fail-on off` and contrasts the `--fail-on error` default.
     choices: [
       { value: "json", evidence: /wastech-mdlint lint[^\n`]*--format json/ },
@@ -124,7 +127,7 @@ const COMMANDS: {
   {
     command: "impact",
     usage: "wastech-mdlint impact",
-    flags: ["--format"],
+    flags: ["--format", "--since"],
     choices: [
       { value: "json", evidence: /wastech-mdlint impact[^\n`]*--format json/ },
     ],
@@ -450,6 +453,102 @@ describe("skills reference the real CLI JSON contract", () => {
     expectContract(docsSkill, directly[0]!, ["references"]);
   });
 });
+
+// The skills read the `since` object and the impact record's `files`, which exist only when a git
+// comparison ran, so the in-process fixture above never produces them. These spawn the built bin with
+// the fixture's isolated git environment: in-process, git would read this machine's own git config,
+// and an `autocrlf` or an alias there could change what the branch appears to add.
+const BIN = fileURLToPath(new URL("../dist/index.js", import.meta.url));
+assertBuilt(BIN, fileURLToPath(new URL("../src/index.ts", import.meta.url)));
+
+describe.skipIf(!hasGit)(
+  "skills reference the real --since JSON contract (requires git on PATH)",
+  () => {
+    async function branchJson(
+      args: string[],
+    ): Promise<Record<string, unknown>> {
+      const fixture = await makeRepo();
+      await fixture.write(
+        "wastech-mdlint.config.json",
+        `${JSON.stringify({ rules: [{ rule: "REF-001" }] })}\n`,
+      );
+      await fixture.write("a.md", "# A\n\n[to b](b.md)\n");
+      await fixture.write("b.md", "# B\n\n[gone](gone.md)\n");
+      fixture.commit("base");
+      fixture.git("checkout", "-q", "-b", "feature");
+      await fixture.write("b.md", "# B\n\n[to a](a.md) [typo](c.md)\n");
+      const result = spawnSync(process.execPath, [BIN, ...args], {
+        cwd: fixture.repo,
+        env: fixture.env,
+        encoding: "utf8",
+        windowsHide: true,
+      });
+      expect(result.status, `${args.join(" ")} failed: ${result.stderr}`).toBe(
+        EXIT_CODE_SUCCESS,
+      );
+      return JSON.parse(result.stdout) as Record<string, unknown>;
+    }
+
+    it("lint --since emits the since object the docs skill reads", async () => {
+      const payload = await branchJson([
+        "lint",
+        "--since",
+        "main",
+        "--format",
+        "json",
+        "--fail-on",
+        "off",
+      ]);
+      expectSinceContract(docsSkill, payload, ["messages", "since"]);
+      expectSinceContract(docsSkill, payload.since as Record<string, unknown>, [
+        "removed",
+      ]);
+      // The fixture's branch both adds a broken link and removes one, so neither list is vacuous.
+      expect(payload.messages).toHaveLength(1);
+      expect((payload.since as { removed: unknown[] }).removed).toHaveLength(1);
+    }, 60_000);
+
+    it("impact --since emits the files and since fields the impact skill's table enumerates", async () => {
+      const payload = await branchJson([
+        "impact",
+        "--since",
+        "main",
+        "--format",
+        "json",
+      ]);
+      expectSinceContract(impactSkill, payload, [
+        "files",
+        "since",
+        "directlyAffected",
+        "transitivelyAffected",
+        "readingOrder",
+        "excluded",
+      ]);
+      expect(payload).not.toHaveProperty("file");
+      expect(payload.files).toEqual(["b.md"]);
+      expectSinceContract(
+        impactSkill,
+        payload.since as Record<string, unknown>,
+        ["ref", "base", "mergeBase", "head", "changed", "removed"],
+      );
+    }, 60_000);
+  },
+);
+
+function expectSinceContract(
+  skill: string,
+  payload: Record<string, unknown>,
+  fields: string[],
+): void {
+  for (const field of fields) {
+    expect(skill, `skill no longer documents field '${field}'`).toContain(
+      field,
+    );
+    expect(payload, `CLI payload missing field '${field}'`).toHaveProperty(
+      field,
+    );
+  }
+}
 
 // The agent rule `init` writes is a skill in all but name: a page of instructions an agent follows
 // verbatim, naming CLI commands and flags. It is generated rather than committed, so nothing above

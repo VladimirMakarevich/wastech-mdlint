@@ -61,8 +61,8 @@ if (npmExecPath === undefined || npmExecPath === "") {
   );
 }
 
-interface PublishedPackage {
-  /** Manifest `name`, and the string each README must name so three copies of one file are visible. */
+type PublishedPackage = {
+  /** Manifest `name`, and the string each README must name so several copies of one file are visible. */
   readonly name: string;
   /** Repository-relative POSIX subpath, which is what `repository.directory` must carry. */
   readonly directory: string;
@@ -72,7 +72,7 @@ interface PublishedPackage {
    * a property of `cli` alone, so a copy of it leaking into `core` fails here.
    */
   readonly allowedTopLevelEntries: readonly string[];
-}
+};
 
 // Adding a genuinely new payload file (a `CHANGELOG.md`, say) means one line here. That is
 // the guard working, not friction: the edit is the moment somebody confirms the new file is meant
@@ -94,6 +94,13 @@ const PUBLISHED_PACKAGES: readonly PublishedPackage[] = [
     name: "@wastech-mdlint/mcp-server",
     directory: "packages/mcp-server",
     allowedTopLevelEntries: ALWAYS_ALLOWED,
+  },
+  {
+    // `assets` holds the stylesheet and icon the server reads beside `dist` at run time, by a path
+    // relative to its own module, so an install without it serves pages with no styling.
+    name: "@wastech-mdlint/viewer",
+    directory: "packages/viewer",
+    allowedTopLevelEntries: [...ALWAYS_ALLOWED, "assets"],
   },
 ];
 
@@ -151,7 +158,7 @@ const payloads = new Map<string, Map<string, Buffer>>();
 beforeAll(async () => {
   packDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-pack-"));
 
-  // `--workspaces` packs the three publishable packages; the root is `private: true` and is not
+  // `--workspaces` packs the four publishable packages; the root is `private: true` and is not
   // packed. That pack path runs no lifecycle script, so nothing here rebuilds — which is why the
   // `assertBuilt()` calls above are a precondition rather than a convenience.
   const packed = spawnSync(
@@ -178,7 +185,7 @@ beforeAll(async () => {
     }
     payloads.set(name, readTarball(path.join(packDir, tarball)));
   }
-  // npm startup plus three packs is slow enough to trip the default timeout on Windows CI.
+  // npm startup plus four packs is slow enough to trip the default timeout on Windows CI.
 }, 120_000);
 
 afterAll(async () => {
@@ -212,7 +219,7 @@ describe.each(PUBLISHED_PACKAGES)(
     it("ships a README written for this package", () => {
       const readme = text("README.md");
       expect(readme.trim()).not.toBe("");
-      // Cheap guard against three copies of one file, or of the root README.
+      // Cheap guard against several copies of one file, or of the root README.
       expect(readme).toContain(name);
     });
 
@@ -318,7 +325,7 @@ describe.each(PUBLISHED_PACKAGES)(
 
 describe("release:check", () => {
   // The script is the only local command a maintainer runs before tagging, and it used to pack the
-  // *root* — which is `private: true` with no `files`, so it exercised none of the three
+  // *root* — which is `private: true` with no `files`, so it exercised none of the
   // allowlists while being described as validating exactly those. Nothing could have
   // caught that: the payload assertions above pack the workspaces themselves, so they stay green no
   // matter what the script does. Reading the script text is the only way this property is visible.

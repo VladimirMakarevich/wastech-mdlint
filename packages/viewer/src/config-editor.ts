@@ -1,0 +1,597 @@
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
+import type { Element, ElementContent } from "hast";
+import { h } from "hastscript";
+
+import {
+  compareFindings,
+  compareStrings,
+  ConfigError,
+  editConfigText,
+  generateConfigSchema,
+  parseConfiguration,
+  ruleRegistry,
+  writeFileAtomic,
+  type ConfigEdit,
+  type LintConfig,
+  type LintMessage,
+  type LoadedConfiguration,
+} from "@wastech-mdlint/core";
+
+import type { Corpus } from "./corpus.js";
+import { highlight, withCopyButton } from "./highlight.js";
+import { copyPathButton } from "./page.js";
+
+// The config page: the config as it is on disk, the rules the registry offers, a preview of what a
+// changed config would report, and — only when the viewer was started to allow it — saving the
+// change. Reading, validating and editing the config are core's (`parseConfiguration`,
+// `editConfigText`, the generated schema); this module decides which file that is, compares a
+// candidate's findings with today's, and guards the one write the viewer can make.
+
+export type ConfigFile = {
+  absolutePath: string;
+  // Relative to the repository, POSIX; the absolute path never reaches a page.
+  displayPath: string;
+  text: string;
+  // Of `text`, so a change is applied only to the version of the file the reader was looking at.
+  hash: string;
+};
+
+// What a request to change the config carries: the file version it was made against, and either
+// edits to that version, a whole new text, or new text plus edits on top of it — the page's text
+// mode and its form can be used one after the other.
+export type ChangeRequest = {
+  base: string;
+  text?: string;
+  edits?: ConfigEdit[];
+};
+
+export type PreviewFinding = Pick<
+  LintMessage,
+  "filePath" | "line" | "ruleId" | "severity" | "message"
+>;
+
+export type PreviewCounts = { errors: number; warnings: number };
+
+export type Preview =
+  | { status: "invalid"; errors: string[]; text?: string }
+  | {
+      status: "ok";
+      text: string;
+      hash: string;
+      // The candidate as core parsed it, for the page's form to show after a change made as text.
+      config: LintConfig;
+      ruleIds: (string | null)[];
+      documents: { before: number; after: number };
+      findings: { before: PreviewCounts; after: PreviewCounts };
+      byRule: { ruleId: string; before: number; after: number }[];
+      added: PreviewFinding[];
+      removed: PreviewFinding[];
+      addedCount: number;
+      removedCount: number;
+    };
+
+// Enough to read through and act on; the counts above always cover all of them.
+const LISTED_FINDINGS = 200;
+
+// The package's schema, not a project-local one: it carries the same branch for every built-in rule
+// and the generic custom-rule branch the form builds a custom rule from. Built once — it only
+// changes with the installed package.
+const CONFIG_SCHEMA = JSON.parse(generateConfigSchema()) as unknown;
+
+export function hashText(text: string): string {
+  return createHash("sha256").update(text, "utf8").digest("hex");
+}
+
+/** The config file the corpus was loaded from, read fresh from disk, or `undefined` when there is none. */
+export async function readConfigFile(
+  corpus: Corpus,
+): Promise<ConfigFile | undefined> {
+  const absolutePath = corpus.configuration.configPath;
+  if (absolutePath === undefined) {
+    return undefined;
+  }
+  const text = await readFile(absolutePath, "utf8").catch(() => undefined);
+  if (text === undefined) {
+    return undefined;
+  }
+  return {
+    absolutePath,
+    displayPath: path
+      .relative(corpus.rootDir, absolutePath)
+      .split(path.sep)
+      .join("/"),
+    text,
+    hash: hashText(text),
+  };
+}
+
+/**
+ * Why saving is off, or `undefined` when it is on. Three conditions, each its own reason: the viewer
+ * was not started with the flag that allows writing; there is no config file (creating one is
+ * `init`'s job, which also wires the schema); or the file is outside the repository, the only tree
+ * the viewer is allowed to change.
+ */
+export async function writeBlockedReason(
+  corpus: Corpus,
+  allowWrites: boolean,
+): Promise<string | undefined> {
+  if (!allowWrites) {
+    return "Saving is off. Start the viewer with --allow-config-writes to save from this page; until then, copy or download the changed file.";
+  }
+  const file = await readConfigFile(corpus);
+  if (file === undefined) {
+    return "There is no config file to save to. Create one with wastech-mdlint init, then reload this page.";
+  }
+  if (!(await corpus.contains(file.absolutePath))) {
+    return "The config file is outside the repository, and the viewer writes only inside it.";
+  }
+  return undefined;
+}
+
+export type ParsedChangeRequest =
+  | { ok: true; request: ChangeRequest }
+  | { ok: false; message: string };
+
+const EDIT_OPS = new Set(["set", "remove", "insert"]);
+
+/** Check the shape of a change request body; what the edits mean is for core to judge. */
+export function parseChangeRequest(body: unknown): ParsedChangeRequest {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return { ok: false, message: "The request body must be a JSON object." };
+  }
+  const { base, text, edits, ...rest } = body as Record<string, unknown>;
+  const unknownKey = Object.keys(rest)[0];
+  if (unknownKey !== undefined) {
+    return { ok: false, message: `Unknown field "${unknownKey}".` };
+  }
+  if (typeof base !== "string" || !/^[0-9a-f]{64}$/.test(base)) {
+    return {
+      ok: false,
+      message:
+        '"base" must name the version of the file the change was made to.',
+    };
+  }
+  if (text !== undefined && typeof text !== "string") {
+    return { ok: false, message: '"text" must be a string.' };
+  }
+  const problem = edits === undefined ? undefined : editsProblem(edits);
+  if (problem !== undefined) {
+    return { ok: false, message: problem };
+  }
+  return {
+    ok: true,
+    request: {
+      base,
+      text,
+      edits: edits as ConfigEdit[] | undefined,
+    },
+  };
+}
+
+// Why a request's `edits` is not a list of well-formed edits, or `undefined` when it is.
+function editsProblem(edits: unknown): string | undefined {
+  if (!Array.isArray(edits)) {
+    return '"edits" must be a list.';
+  }
+  for (const [index, edit] of edits.entries()) {
+    const { op, path: editPath } = (edit ?? {}) as Record<string, unknown>;
+    if (
+      typeof op !== "string" ||
+      !EDIT_OPS.has(op) ||
+      !Array.isArray(editPath) ||
+      !editPath.every(
+        (segment) => typeof segment === "string" || typeof segment === "number",
+      )
+    ) {
+      return `Edit ${index + 1} must have an "op" of set, remove or insert and a "path" of names and indexes.`;
+    }
+  }
+  return undefined;
+}
+
+/** The candidate text a request describes, or core's reason it cannot be built. */
+export function candidateText(
+  file: ConfigFile,
+  request: ChangeRequest,
+): { ok: true; text: string } | { ok: false; errors: string[] } {
+  const text = request.text ?? file.text;
+  // Text with no edits on top is taken as written, even when it does not parse: the reader is
+  // typing, and core's own parse error, with its offset, is the useful answer.
+  if (request.edits === undefined || request.edits.length === 0) {
+    return { ok: true, text };
+  }
+  try {
+    return { ok: true, text: editConfigText(text, request.edits) };
+  } catch (error) {
+    if (error instanceof ConfigError) {
+      return { ok: false, errors: messageLines(error) };
+    }
+    throw error;
+  }
+}
+
+/** The candidate as core loads it, or core's diagnostics, one per line. */
+export function validateCandidate(
+  corpus: Corpus,
+  file: ConfigFile,
+  text: string,
+): { ok: true; loaded: LoadedConfiguration } | { ok: false; errors: string[] } {
+  try {
+    return {
+      ok: true,
+      loaded: parseConfiguration({
+        text,
+        cwd: corpus.rootDir,
+        configPath: file.absolutePath,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof ConfigError) {
+      return { ok: false, errors: messageLines(error) };
+    }
+    throw error;
+  }
+}
+
+function messageLines(error: ConfigError): string[] {
+  return error.message.split("\n").filter((line) => line.trim() !== "");
+}
+
+/** The canonical id of each rule entry, `null` for a custom rule or a name the registry does not know. */
+export function entryRuleIds(config: LintConfig): (string | null)[] {
+  return (config.rules ?? []).map((entry) =>
+    entry.rule !== "custom" && ruleRegistry.has(entry.rule)
+      ? ruleRegistry.resolveId(entry.rule)
+      : null,
+  );
+}
+
+/**
+ * What the candidate would report, compared with what the current config reports now.
+ *
+ * Findings are matched by core's `compareFindings` — on file, rule, line, severity and message, as a
+ * multiset — the comparison the review of a branch uses too, so a config edit and a branch never
+ * disagree about what counts as the same finding.
+ */
+export function previewCandidate(params: {
+  corpus: Corpus;
+  current: readonly LintMessage[];
+  candidate: LoadedConfiguration;
+  text: string;
+  // The candidate's lint, run apart from the server's thread by `CandidateLinter`.
+  linted: { messages: readonly LintMessage[]; documentCount: number };
+}): Preview {
+  const { documentCount } = params.linted;
+  const result = { messages: params.linted.messages };
+  const delta = compareFindings(params.current, result.messages);
+  const added = previewFindings(delta.added);
+  const removed = previewFindings(delta.removed);
+
+  const byRule = new Map<string, { before: number; after: number }>();
+  for (const [messages, side] of [
+    [params.current, "before"],
+    [result.messages, "after"],
+  ] as const) {
+    for (const message of messages) {
+      const entry = byRule.get(message.ruleId) ?? { before: 0, after: 0 };
+      entry[side] += 1;
+      byRule.set(message.ruleId, entry);
+    }
+  }
+
+  return {
+    status: "ok",
+    text: params.text,
+    hash: hashText(params.text),
+    config: params.candidate.config,
+    ruleIds: entryRuleIds(params.candidate.config),
+    documents: {
+      before: params.corpus.documents.size,
+      after: documentCount,
+    },
+    findings: {
+      before: severityCounts(params.current),
+      after: severityCounts(result.messages),
+    },
+    byRule: [...byRule]
+      .sort(([left], [right]) => compareStrings(left, right))
+      .map(([ruleId, counts]) => ({ ruleId, ...counts })),
+    added: added.slice(0, LISTED_FINDINGS),
+    removed: removed.slice(0, LISTED_FINDINGS),
+    addedCount: added.length,
+    removedCount: removed.length,
+  };
+}
+
+// The findings as the preview lists them, in a stable order.
+function previewFindings(messages: readonly LintMessage[]): PreviewFinding[] {
+  const result = messages.map(
+    (message): PreviewFinding => ({
+      filePath: message.filePath,
+      line: message.line,
+      ruleId: message.ruleId,
+      severity: message.severity,
+      message: message.message,
+    }),
+  );
+  return result.sort(
+    (left, right) =>
+      compareStrings(left.filePath, right.filePath) ||
+      left.line - right.line ||
+      compareStrings(left.ruleId, right.ruleId) ||
+      compareStrings(left.message, right.message),
+  );
+}
+
+function severityCounts(messages: readonly LintMessage[]): PreviewCounts {
+  const errors = messages.filter(
+    (message) => message.severity === "error",
+  ).length;
+  return { errors, warnings: messages.length - errors };
+}
+
+export type SaveOutcome =
+  | { status: "saved"; hash: string }
+  | { status: "conflict"; message: string }
+  | { status: "failed"; message: string };
+
+/**
+ * Write a validated candidate over the config, atomically, then read it back.
+ *
+ * `writeFileAtomic` replaces the file in one rename, so a failed write leaves the old file whole. The
+ * read-back catches what it cannot: another program writing the file in the same moment. Different
+ * text on disk after the rename can only have been written after it, so it is the newest version
+ * of the file and stays exactly as it is. Putting the version this page started from back over it
+ * would throw away that program's change to undo the reader's, and leave neither; the reader is told
+ * instead, and reloads to edit what is there now.
+ *
+ * `readBack` reads the file after the write; a test replaces it to stand in for the other program.
+ */
+export async function saveCandidate(params: {
+  file: ConfigFile;
+  text: string;
+  readBack?: (absolutePath: string) => Promise<string>;
+}): Promise<SaveOutcome> {
+  const { file, text } = params;
+  const readBack =
+    params.readBack ?? ((absolutePath) => readFile(absolutePath, "utf8"));
+  try {
+    await writeFileAtomic(file.absolutePath, text);
+  } catch (error) {
+    return {
+      status: "failed",
+      message: `The config could not be written (${(error as NodeJS.ErrnoException).code ?? "write error"}); the file on disk is unchanged.`,
+    };
+  }
+  const written = await readBack(file.absolutePath).catch(() => undefined);
+  if (written === text) {
+    return { status: "saved", hash: hashText(text) };
+  }
+  if (written === undefined) {
+    return {
+      status: "failed",
+      message:
+        "The config was written but could not be read back, so whether it holds this change is unknown. Check the file before the next run.",
+    };
+  }
+  return {
+    status: "conflict",
+    message:
+      "Another program changed the config while it was being saved, and its version is the one on disk now. Reload the page to see it, then make the change again.",
+  };
+}
+
+export type ConfigApi = {
+  // `null` when there is no config file; `reason` then says why there is nothing to edit.
+  file: { path: string; text: string; hash: string } | null;
+  // The file as core parsed it, or core's diagnostics when it does not load.
+  config: LintConfig | null;
+  ruleIds: (string | null)[];
+  errors: string[];
+  writeBlocked: string | null;
+  schema: unknown;
+  rules: {
+    id: string;
+    alias: string;
+    category: string;
+    description: string;
+    defaultSeverity: string;
+    fixable: boolean;
+    docsUrl?: string;
+  }[];
+};
+
+/** Everything the page's script needs to build the editor. */
+export async function configApi(
+  corpus: Corpus,
+  allowWrites: boolean,
+): Promise<ConfigApi> {
+  const file = await readConfigFile(corpus);
+  const validated =
+    file === undefined ? undefined : validateCandidate(corpus, file, file.text);
+  return {
+    file:
+      file === undefined
+        ? null
+        : { path: file.displayPath, text: file.text, hash: file.hash },
+    config: validated?.ok === true ? validated.loaded.config : null,
+    ruleIds:
+      validated?.ok === true ? entryRuleIds(validated.loaded.config) : [],
+    errors: validated?.ok === false ? validated.errors : [],
+    writeBlocked: (await writeBlockedReason(corpus, allowWrites)) ?? null,
+    schema: CONFIG_SCHEMA,
+    rules: registryRules(),
+  };
+}
+
+function registryRules(): ConfigApi["rules"] {
+  return ruleRegistry
+    .getAllMetadata()
+    .map((rule) => ({
+      id: rule.id,
+      alias: rule.alias,
+      category: rule.category,
+      description: rule.description,
+      defaultSeverity: rule.defaultSeverity,
+      fixable: rule.fixable,
+      docsUrl: rule.docsUrl,
+    }))
+    .sort((left, right) => compareStrings(left.id, right.id));
+}
+
+/** The id of the data the editor is built from, which the page's script reads by the same name. */
+export const CONFIG_DATA_ID = "viewer.config-data";
+
+// JSON to place inside a `<script>` element, which ends at the first `</script` whatever the JSON
+// means: every `<` is written as its escape, which reads back as the same text and can neither end
+// the element nor open a comment in it. A config file's own text is part of the data, and may hold
+// either.
+function scriptJson(value: unknown): string {
+  return JSON.stringify(value).replaceAll("<", "\\u003c");
+}
+
+/** What a read-only config page says in place of the editor. */
+export const CONFIG_READ_ONLY =
+  "This page is read-only: the viewer is reachable from other machines (--host), so it previews, saves and opens nothing. Copy the file below to change it elsewhere, or start the viewer on a loopback address to edit it here.";
+
+/**
+ * The page without its script: the file as it is, highlighted, and the registry's rules with the
+ * ones the config runs marked. Editing needs the script, which builds its form from the schema.
+ */
+export async function renderConfigArticle(
+  corpus: Corpus,
+  options: {
+    allowWrites: boolean;
+    // Whether the copy button may offer the file's absolute path (`exposesAbsolutePaths`).
+    showAbsolutePath: boolean;
+    // Whether the file may be shown in the file manager or opened in its default application, which
+    // starts a program on the machine running the viewer.
+    canOpen: boolean;
+    // What the page's script builds the editor from, carried in the page (`CONFIG_DATA_ID`).
+    editor: ConfigApi;
+    // Whether the server takes no change from this page at all — on a binding other machines reach,
+    // where it neither previews nor saves. The page then shows the file and the rules and says why
+    // there is no editor, rather than offering one whose every request would be refused.
+    readOnly: boolean;
+  },
+): Promise<ElementContent[]> {
+  const file = await readConfigFile(corpus);
+  const blocked = options.readOnly
+    ? CONFIG_READ_ONLY
+    : await writeBlockedReason(corpus, options.allowWrites);
+  const nodes: (ElementContent | undefined)[] = [
+    h("h1", "Linter config"),
+    file === undefined
+      ? h(
+          "p",
+          "This repository has no wastech-mdlint config, so the linter runs with no rules. Create one with wastech-mdlint init, then reload this page to edit it.",
+        )
+      : h("p.config-file", [
+          "Config file: ",
+          h("code", file.displayPath),
+          " ",
+          copyPathButton(
+            file.displayPath,
+            options.showAbsolutePath ? file.absolutePath : undefined,
+          ),
+        ]),
+    // Hidden until the script that sends them has run. Left out entirely where opening is off, since
+    // the server would refuse them.
+    file === undefined || !options.canOpen
+      ? undefined
+      : h("p.config-open", { hidden: true }, [
+          h(
+            "button.config-open-button",
+            { type: "button", dataOpen: "reveal" },
+            "Show in folder",
+          ),
+          h(
+            "button.config-open-button",
+            { type: "button", dataOpen: "open" },
+            "Open in default app",
+          ),
+          h("span.config-open-status", { role: "status" }),
+        ]),
+    file === undefined
+      ? undefined
+      : h(
+          "p.config-save-state",
+          blocked ?? "Saving is on: a saved change is written to this file.",
+        ),
+    file === undefined || options.readOnly
+      ? undefined
+      : h("div.config-editor", { hidden: true }, [
+          h("p", "The editor is drawn by the page's script."),
+          // Carried in the page rather than asked for as it opens: asked for, it arrived a frame or
+          // two after the page was drawn, and the form then pushed the file and everything below it
+          // down the page. Read and replaced by the editor as it is built.
+          h(
+            "script",
+            { type: "application/json", id: CONFIG_DATA_ID },
+            scriptJson(options.editor),
+          ),
+        ]),
+    file === undefined
+      ? undefined
+      : h("section.config-current", { ariaLabel: "Current file" }, [
+          h("h2", "Current file"),
+          withCopyButton(await highlight(file.text, "jsonc")),
+        ]),
+    renderRegistry(corpus),
+  ];
+  return nodes.filter((node): node is ElementContent => node !== undefined);
+}
+
+// Every rule the registry knows, with the severity this config runs it at, or a dash where it does
+// not run it.
+function renderRegistry(corpus: Corpus): Element {
+  const configured = new Map(
+    corpus.configuration.rules.map(({ rule, severity }) => [
+      rule.id,
+      severity ?? rule.defaultSeverity,
+    ]),
+  );
+  return h("section.config-registry", { ariaLabel: "Rules" }, [
+    h("h2", "Rules"),
+    h("div.dashboard-table-wrap", [
+      h("table.config-rules", [
+        h(
+          "thead",
+          h("tr", [
+            h("th", { scope: "col" }, "Rule"),
+            h("th", { scope: "col" }, "Description"),
+            h("th", { scope: "col" }, "Default"),
+            h("th", { scope: "col" }, "In this config"),
+          ]),
+        ),
+        h(
+          "tbody",
+          registryRules().map((rule) =>
+            h("tr", [
+              h(
+                "td",
+                rule.docsUrl === undefined
+                  ? h("code", rule.id)
+                  : h(
+                      "a",
+                      {
+                        href: rule.docsUrl,
+                        rel: "noopener noreferrer",
+                        target: "_blank",
+                      },
+                      h("code", rule.id),
+                    ),
+              ),
+              h("td", rule.description),
+              h("td", rule.defaultSeverity),
+              h("td", configured.get(rule.id) ?? "—"),
+            ]),
+          ),
+        ),
+      ]),
+    ]),
+  ]);
+}

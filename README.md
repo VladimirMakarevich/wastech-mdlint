@@ -26,13 +26,14 @@ The full user guide — capabilities grouped by area, a page per rule with examp
 
 ## Workspace layout
 
-`wastech-mdlint` is an npm-workspaces monorepo. `@wastech-mdlint/core` owns the entire pipeline; the CLI and MCP server are thin hosts over it.
+`wastech-mdlint` is an npm-workspaces monorepo. `@wastech-mdlint/core` owns the entire pipeline; the CLI, the MCP server and the viewer are thin hosts over it.
 
 | Package | Role | Bin |
 | --- | --- | --- |
 | [`@wastech-mdlint/core`](packages/core) | Parsing, config, rule engine, graph, and formatting — the whole pipeline. | — |
 | [`@wastech-mdlint/cli`](packages/cli) | commander CLI host: argument parsing, command dispatch, exit codes. | `wastech-mdlint` |
 | [`@wastech-mdlint/mcp-server`](packages/mcp-server) | stdio MCP host: six read-only tools — `lint`, `lint-files`, `context-graph`, `context-slice`, `impact-analysis`, `compile-context`. | `wastech-mdlint-mcp` |
+| [`@wastech-mdlint/viewer`](packages/viewer) | Local web viewer for the linted corpus: rendered pages, Mermaid diagrams, ECharts charts, highlighted code, backlinks, a link graph, search, lint findings on the page with prompts to fix them, a dashboard of the corpus, a config editor with a preview of its findings, display settings for the text, live reload. Experimental. | `wastech-mdlint-viewer` |
 
 Build and test the whole workspace from the repo root:
 
@@ -61,20 +62,21 @@ node packages/cli/dist/index.js lint . --fix      # apply deterministic fixes, t
 ## CLI
 
 ```bash
-wastech-mdlint lint [path] [--config <file>] [--format text|json] [--fail-on error|warning|off] [--fix]
+wastech-mdlint lint [path] [--config <file>] [--format text|json] [--fail-on error|warning|off] [--fix | --since <ref>]
 wastech-mdlint graph [path] [--config <file>] [--format human|json|mermaid|dot]
 wastech-mdlint slice <query> [--config <file>] [--depth <n>] [--format text|json]
-wastech-mdlint impact <file> [--config <file>] [--format text|json]
+wastech-mdlint impact <file> | --since <ref> [--config <file>] [--format text|json]
 wastech-mdlint schema [--out schema.json]
 wastech-mdlint compile [--config <file>] [--outdir <dir>] [--dry-run] [--cwd <dir>]
 wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-ci-workflow] [--with-agent-rule]
 ```
 
 - `lint` is the default command (running `wastech-mdlint` with no subcommand lints the cwd). `scan` is a hidden, deprecated alias of `lint`. Default only in that sense: an unrecognized subcommand is an error, not a path, so a typo'd CI step fails loudly — which also means a bare path needs its subcommand (`wastech-mdlint lint docs`).
-- Exit codes: `0` pass · `1` findings at the `--fail-on` threshold · `2` operational error. `1` is reserved exclusively for findings — a nonexistent `[path]`, an unknown subcommand, or an unwritable file is `2` — so CI can tell a failing document from a broken step.
+- Exit codes: `0` pass · `1` findings at the `--fail-on` threshold · `2` operational error. `1` is reserved exclusively for findings — a nonexistent `[path]`, an unknown subcommand, an unwritable file, or a `--since` that cannot compare (outside a git work tree, no git 2.31+, a ref that names nothing or shares no history, a shallow clone) is `2` — so CI can tell a failing document from a broken step.
 - `graph` prints the context graph to stdout: clusters, hubs, reading order, the nodes a cycle excluded from it, and the coverage signal as `human` text (default); the deterministic `{ nodes, edges, components, readingOrder, excluded, coverage }` shape as `json`; or a `mermaid`/`dot` diagram for rendering elsewhere. The MCP [`context-graph`](docs/guide/mcp-server.md) tool's `format: "summary"` returns that same JSON document.
 - `slice <query> --depth <n>` (default depth `2`) resolves `query` by **exact match only** — a defined ID, a heading/anchor slug (`#slug`), or a file path, never fuzzy/substring/keyword/LLM matching — then prints the files reachable within that many hops. A query that matches nothing is an honest empty result (`matchKind: null` in `--format json`), not an error.
-- `impact <file>` classifies the blast radius of changing `file` and lints the affected subgraph: linting still runs against the whole corpus (so project-scope rules like `GRP-001` see every document), but the reported `lint` messages/files are narrowed to `file` plus everything directly or transitively affected by it.
+- `impact <file>` classifies the blast radius of changing `file` and lints the affected subgraph: linting still runs against the whole corpus (so project-scope rules like `GRP-001` see every document), but the reported `lint` messages/files are narrowed to `file` plus everything directly or transitively affected by it. `impact --since <ref>` takes the place of `<file>` and does the same for every document the work tree changed since its merge-base with `<ref>`.
+- `lint --since <ref>` reports only the findings the work tree adds since where it left a branch, tag or commit (their merge-base, as a pull request is compared), so CI can fail on what a branch adds while old findings are paid down; `--fail-on` gates on those. It reads git, read-only, and cannot be combined with `--fix`. See [`lint --since`](docs/guide/cli.md#lint-default).
 - `slice`/`impact` always scan the current working directory — unlike `graph`, they take no `[path]` argument.
 - `graph`/`slice`/`impact` are read-only reports and exit `0` on success; `impact` exits `2` (with a hint) if `file` is outside the analyzed corpus.
 - `schema` writes the config JSON schema to a local file (never a remote URL).
@@ -108,10 +110,10 @@ Add it to any stdio-based MCP host (Claude Code's `.mcp.json`, Claude Desktop's 
 | Tool | Description | Read-only | Structured output |
 | --- | --- | --- | --- |
 | `lint` | Lint ad-hoc Markdown content against an explicit set of rules. Does not load project config; file-resolving rules such as REF-001/REF-003, SEC-003 and STR-001 may probe or read paths inside the server's working directory; an absolute path or a `..`-escaping relative path is rejected rather than followed. Each entry is either a built-in rule id or a declarative `custom` rule (`rule: "custom"` plus `id` and `options.assert`); code plugins are never loaded. Rules see one synthetic document path, `content.md`, so an `options.files` or `options.exclude` glob that does not match that path selects nothing. | yes | yes |
-| `lint-files` | Lint the project's Markdown files using the resolved config (or the zero-config `**/*.md` default). Read-only. | yes | yes |
+| `lint-files` | Lint the project's Markdown files using the resolved config (or the zero-config `**/*.md` default). With `since` (a branch, tag or commit), report only the findings the work tree adds since where it left that ref, read with git. Read-only. | yes | yes |
 | `context-graph` | Build the project's context graph. `format: "raw"` (default) returns the graph verbatim (nodes, edges, cycles); `format: "summary"` returns nodes, edges, connected components, topological reading order, the nodes a cycle excluded from that order, and the coverage signal (node/edge counts plus Markdown files linked-to but outside the corpus) — the same document the CLI's `graph --format json` prints. Read-only. | yes | yes |
 | `context-slice` | Files reachable within `depth` hops of a resolved query, following graph edges forward. Resolves the query by exact match against defined IDs, heading/anchor slugs, and file paths — no fuzzy, substring, keyword, or LLM matching. Read-only. | yes | yes |
-| `impact-analysis` | Compute the blast radius of changing a Markdown file: files that reference it directly, files affected transitively, and the reading order over the affected subgraph. A file not in the corpus returns an actionable error. Read-only. | yes | yes |
+| `impact-analysis` | Compute the blast radius of changing a Markdown file: files that reference it directly, files affected transitively, and the reading order over the affected subgraph. A file not in the corpus returns an actionable error. With `since` (a branch, tag or commit) in place of `file`, the same for every document the work tree changed since where it left that ref, read with git. Read-only. | yes | yes |
 | `compile-context` | Compile the project skill (SKILL.md) from `config.compile`, producing the same deterministic output as the CLI `compile` command: the skill content plus a Documents/Rules/Components metadata line. Requires `config.compile`; its absence returns an actionable error. Read-only. | yes | no |
 
 <!-- END GENERATED MCP TOOLS -->
@@ -130,7 +132,7 @@ Four hand-authored, host-neutral Agent Skills ship alongside the packages. They 
 | [`mdlint-docs`](skills/mdlint-docs/SKILL.md) | Bring a document that outgrows its `SIZE-001` or `LLM-001` budget back under it without dropping content: compress the wording while no meaning or quality is lost, then split it by meaning or continue it in a file beside it. |
 
 ```bash
-gh skill install VladimirMakarevich/wastech-mdlint mdlint-init --pin v0.3.0
+gh skill install VladimirMakarevich/wastech-mdlint mdlint-init --pin v0.4.0
 ```
 
 **Pin both halves to the same version.** Each skill's `compatibility` frontmatter names the CLI release it was written against, and a test in this repository fails when the two disagree. A skill installed with `--pin` but driving a bare `@wastech-mdlint/cli` — which resolves to whatever is latest at run time — can still reach a CLI whose surface has moved, so the commands inside each skill request `@wastech-mdlint/cli@<version>` explicitly. Details in [the skills guide](docs/guide/skills.md).

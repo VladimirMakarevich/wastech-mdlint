@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  analyzeSince,
   applyFixes,
   classifyImpact,
   compileContext,
@@ -22,6 +23,9 @@ import {
   renderContextGraphText,
   renderContextSliceSummary,
   renderImpactSummary,
+  renderSinceHeader,
+  sinceImpact,
+  sinceLintResult,
   summarizeContextGraph,
   writeFileAtomic,
 } from "@wastech-mdlint/core";
@@ -30,6 +34,8 @@ import type {
   ImpactClassification,
   LintMessage,
   LintResult,
+  LoadedConfiguration,
+  SinceAnalysis,
 } from "@wastech-mdlint/core";
 
 import { createInquirerPrompter } from "./init-prompter.js";
@@ -72,6 +78,8 @@ export type LintCommand = {
   format: OutputFormat;
   failOn: FailOn;
   fix: boolean;
+  // A branch, tag or commit: report only the findings the work tree adds since where it left it.
+  since?: string;
 };
 
 export type GraphFormat = "human" | "json" | "mermaid" | "dot";
@@ -92,11 +100,13 @@ export type SliceCommand = {
   format: OutputFormat;
 };
 
+// Exactly one of `file` and `since`: one changed file, or every document changed since a ref.
 export type ImpactCommand = {
   kind: "impact";
   path: string;
   config?: string;
-  file: string;
+  file?: string;
+  since?: string;
   format: OutputFormat;
 };
 
@@ -173,6 +183,24 @@ export function resolveLintExitCode(params: {
   return params.result.errorCount > 0 ? EXIT_CODE_FINDINGS : EXIT_CODE_SUCCESS;
 }
 
+/**
+ * The work tree's changes since `ref` and what they do to the context, or a usage error naming
+ * why there is nothing to compare — not a git work tree, no `git`, a ref that names nothing — and
+ * how to fix it. Exit 2 rather than "no new findings": a comparison that could not run must not
+ * read as a clean branch in CI.
+ */
+async function analyzeSinceOrThrow(
+  cwd: string,
+  configuration: LoadedConfiguration,
+  ref: string,
+): Promise<SinceAnalysis> {
+  const analysis = await analyzeSince({ cwd, configuration, ref });
+  if ("available" in analysis) {
+    throw new CliUsageError(`${analysis.message} ${analysis.hint}`);
+  }
+  return analysis;
+}
+
 async function handleLint(
   command: LintCommand,
 ): Promise<CommandExecutionResult> {
@@ -180,6 +208,33 @@ async function handleLint(
     cwd: command.path,
     explicitConfigPath: command.config,
   });
+
+  if (command.since !== undefined) {
+    // Refused rather than ordered: fixing rewrites the work tree the comparison reads, so which
+    // findings are "new" would depend on which of the two ran first.
+    if (command.fix) {
+      throw new CliUsageError("--since cannot be combined with --fix.");
+    }
+    const result = sinceLintResult(
+      await analyzeSinceOrThrow(command.path, loaded, command.since),
+    );
+    const output =
+      command.format === "json"
+        ? // The lint payload as `lint --format json` writes it, with the comparison beside it.
+          `${JSON.stringify(
+            {
+              ...(JSON.parse(formatLintResultJson(result)) as object),
+              since: result.since,
+            },
+            null,
+            2,
+          )}\n`
+        : `${renderSinceHeader(result.since)}${formatLintResultText(result)}`;
+    return {
+      output,
+      exitCode: resolveLintExitCode({ failOn: command.failOn, result }),
+    };
+  }
 
   // ESLint-style --fix: apply deterministic fixes in place, then re-lint the result.
   if (command.fix) {
@@ -291,13 +346,10 @@ async function handleSlice(
 
   // An unresolved query is a legitimate answer, not a usage error — `getContextSlice`
   // already returns an empty result rather than throwing, so this command always exits 0.
-  const result = getContextSlice(
-    graph,
-    documents,
-    command.query,
-    command.depth,
-    loaded.settings.idRef,
-  );
+  const result = getContextSlice(graph, documents, command.query, {
+    depth: command.depth,
+    idRef: loaded.settings.idRef,
+  });
 
   const output =
     command.format === "json"
@@ -335,6 +387,15 @@ async function handleImpact(
     cwd: command.path,
     explicitConfigPath: command.config,
   });
+  if (command.since !== undefined) {
+    return impactSince(command, loaded, command.since);
+  }
+  if (command.file === undefined) {
+    throw new CliUsageError(
+      "impact needs a <file>, or --since <ref> for every document changed since a branch, tag or commit.",
+    );
+  }
+
   const { graph } = await loadContext({
     cwd: command.path,
     config: loaded.config,
@@ -397,6 +458,46 @@ async function handleImpact(
   return { output, exitCode: EXIT_CODE_SUCCESS };
 }
 
+// `impact --since`: the blast radius of every document the branch changed, and the findings of the
+// changed and affected documents, linted over the whole corpus as `impact` does for one file.
+async function impactSince(
+  command: ImpactCommand,
+  loaded: LoadedConfiguration,
+  ref: string,
+): Promise<CommandExecutionResult> {
+  if (command.file !== undefined) {
+    throw new CliUsageError(
+      "impact takes a <file> or --since, not both: --since already covers every changed document.",
+    );
+  }
+  const analysis = await analyzeSinceOrThrow(command.path, loaded, ref);
+  const result = sinceImpact(analysis);
+  const affectedFiles = new Set<string>([
+    ...result.files,
+    ...result.directlyAffected.map((entry) => entry.path),
+    ...result.transitivelyAffected.map((entry) => entry.path),
+  ]);
+  const lint = filterLintResult(
+    await lintFiles({
+      cwd: command.path,
+      config: loaded.config,
+      rules: loaded.rules,
+      settings: loaded.settings,
+      graph: analysis.snapshot.graph,
+    }),
+    affectedFiles,
+  );
+
+  if (command.format === "json") {
+    return {
+      output: `${JSON.stringify({ ...result, lint }, null, 2)}\n`,
+      exitCode: EXIT_CODE_SUCCESS,
+    };
+  }
+  const output = `${renderSinceHeader(result.since)}${renderImpactSummary(result)}\n\n${formatLintResultText(lint)}`;
+  return { output, exitCode: EXIT_CODE_SUCCESS };
+}
+
 async function handleSchema(
   command: SchemaCommand,
 ): Promise<CommandExecutionResult> {
@@ -410,7 +511,7 @@ async function handleSchema(
     throw error;
   });
 
-  if (outputStats?.isDirectory()) {
+  if (outputStats?.isDirectory() === true) {
     throw new CliUsageError(
       `Cannot write schema output to directory path: ${command.out}`,
     );

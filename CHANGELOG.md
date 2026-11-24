@@ -1,10 +1,37 @@
 # Changelog
 
-All notable changes to this project are documented here. The three packages — `@wastech-mdlint/core`, `@wastech-mdlint/cli`, and `@wastech-mdlint/mcp-server` — are published together at one version from a single `vX.Y.Z` tag, and the Agent Skills are tagged with them, so one entry below describes all of them.
+All notable changes to this project are documented here. The packages — `@wastech-mdlint/core`, `@wastech-mdlint/cli`, `@wastech-mdlint/mcp-server` and, from 0.4.0, `@wastech-mdlint/viewer` — are published together at one version from a single `vX.Y.Z` tag, and the Agent Skills are tagged with them, so one entry below describes all of them.
 
 This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.4.0]
+
+Breaking for code calling `getContextSlice` with a depth or an ID convention, and for an MCP client generated from the `impact-analysis` `outputSchema`, in which `file` is now optional — see Added and Changed.
+
+### Added
+
+- `@wastech-mdlint/viewer` is published for the first time, as an experimental package at the same version as the others. `npx @wastech-mdlint/viewer [path]` serves the repository's linted Markdown on `127.0.0.1`: rendered pages with Mermaid diagrams, ECharts charts and highlighted code, backlinks and a link graph, search, the linter's findings with prompts to fix them, a dashboard, a review of what the current branch changed, and a config editor with a preview of its findings. Its README lists every option and its security boundary.
+- `lint --since <ref>` reports only the findings the work tree adds since where it left a branch, tag or commit, so CI can fail on what a branch adds while old findings are paid down. The work tree — uncommitted and untracked files included — is compared with the merge-base of `HEAD` and `<ref>`, as a pull request is, so commits that landed on `<ref>` afterwards do not count. The base is linted as the merge-base held every changed corpus document, with the config the merge-base held, and a finding moved by an edit above it, or surviving an edit to its own line, is the same finding, not a new one. Added findings are reported on unchanged documents too, such as an anchor a renamed heading broke, and `--fail-on` gates on them alone. The text report opens with a line naming the comparison (`since main (merge-base 1a2b3c4): 3 changed documents, 1 finding removed`); `--format json` keeps its shape and adds a `since` object with `ref`, `base`, `mergeBase`, `head`, `changed` and `removed` (the findings the change removes). `--since` and `--fix` together exit `2`, since fixing rewrites the work tree the comparison reads.
+- `impact --since <ref>` takes the place of `<file>`: the subject is every corpus document the work tree changed since that merge-base, and a document reached from several of them is listed once, at its shortest distance. The JSON record has `files` (the changed documents still in the corpus; a deleted one is left out, and the documents that linked to it show up as broken links in `lint --since`) where the one-file record has `file`, plus the same `since` object. Giving both a file and `--since`, or neither, exits `2`.
+- The MCP `lint-files` and `impact-analysis` tools take the same `since` option and return the same payloads, built from the same core calls as the CLI. `impact-analysis` takes exactly one of `file` and `since`; its `outputSchema` makes `file` optional and adds `files` and `since`. The server still has six tools, all read-only.
+- Comparing with a ref needs `git` 2.31 or later and a work tree with history back to the merge-base. Outside one, with a ref that names nothing, or in a shallow clone, the CLI exits `2` and the MCP tools answer `INVALID_INPUT`, each with git's remedy, rather than reporting a clean branch. Git runs only to read, from an argument list: it never writes under `.git`, and the repository's own fsmonitor hook, filter drivers, external diff and textconv programs are turned off, as is fetching a missing object in a partial clone, so a repository's config cannot make the linter start a program. Git is started by the absolute path found on `PATH`, never by a bare name, so a `git.exe` committed to a repository is not what runs on Windows.
+- The `mdlint-impact` skill takes a whole change as its subject through `impact --since` or the tool's `since`, and the `mdlint-docs` skill checks that a split added no other finding with `lint --since <base> --format json --fail-on off`.
+- Core exports what a long-running host needs to answer the same questions as the CLI without a second implementation:
+  - **Linting a held corpus.** `lintContext` lints a corpus already loaded with `loadContext` and gives exactly what `lintFiles` gives for the same tree. `parseDocumentWithTree` returns the mdast tree of the same parse beside the `ParsedDocument`, which is why core now depends on `@types/mdast`.
+  - **Measuring and resolving.** `measureDocument` returns a document's bytes, lines and tokens. `createScopeTester` tells whether a path is in the configured scope, and `resolveTargetCandidates` with `filePart`, `candidateEscapesRoot` and `parseLineFragment` resolves link targets as the rules do.
+  - **Editing the config.** `parseConfiguration` validates config text without reading a file, and `editConfigText` applies edits to it, keeping comments and layout.
+  - **Read-only git.** `openGitRepository` returns a `GitRepository` (base, merge-base, changed paths, blobs, file history, blame) or a typed `GitUnavailable` reason. `GitCommandError` and `MINIMUM_GIT_VERSION` are exported with it, and `findExecutable` finds a program on `PATH`'s rooted entries only, never in the working directory, for a host that starts one.
+  - **The branch comparison.**
+    - `reviewBranch`, `branchContext` and `analyzeSince` compare a branch with its base. `sinceLintResult`, `sinceImpact` and `renderSinceHeader` build the `--since` payloads, and `classifyChangeImpact` gives a whole change's blast radius.
+    - `diffText` gives a line and word diff, with moved lines and `contextGaps`. `headChanges`, `changedSections`, `introductionChanged`, `baseLineMap` and `documentSections` place a diff on the current text.
+    - `compareFindings`, `computeContextDelta`, `compareEdges` and `linksIntoChangedLines` compare findings, tokens and links. `rankByInfluence`, `eagerContextPaths`, `eagerContextBudgets` and `eagerContextTokens` order and size the eager agent context.
+  - **Fix prompts.** `buildFindingPrompt` writes a prompt that asks an agent to answer a file's findings.
+
+### Changed
+
+- Breaking for code calling `@wastech-mdlint/core` directly: `getContextSlice(graph, documents, query, options)` takes the depth and the ID convention as one options object, `{ depth?, idRef? }`, instead of two trailing positional arguments, and the type is exported as `ContextSliceOptions`. `getContextSlice(graph, documents, "REQ-1", 3, idRef)` becomes `getContextSlice(graph, documents, "REQ-1", { depth: 3, idRef })`. The depth still defaults to `2`. The CLI `slice` command and the MCP `context-slice` tool are unchanged.
 
 ## [0.3.0]
 
@@ -138,7 +165,8 @@ First public release. Published manually and carries no provenance attestation; 
 - Windows, macOS, and Linux are all supported: paths in public output are normalized to repository-relative POSIX form, ordering uses a code-point comparator rather than locale collation, and every product file is written through an atomic temp-and-rename path so a failed write cannot truncate an existing file.
 - All analysis is local. No external HTTP link checking, no link cache, no remote schema resolution, and no install-time file writes.
 
-[unreleased]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.2.0...v0.2.1

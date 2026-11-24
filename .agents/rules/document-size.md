@@ -2,7 +2,7 @@
 
 This repository lints its own documentation and agent context, and the config gives part of it a size budget: `SIZE-001` per file, `LLM-001` for everything an entrypoint loads eagerly. Which files carry which budget, and every threshold, live in [`wastech-mdlint.config.json`](../../wastech-mdlint.config.json) — read them there, not from memory. `npm run lint:docs` fails only on errors, so a budget warning in its output is still a finding to act on.
 
-`CLAUDE.md` `@`-imports `AGENTS.md` and every file in `.agents/rules/`, so all of them, this page included, spend one shared `LLM-001` budget in every session. That is why these files stay lean, and why a rules file reached by an `@` import costs more than one reached by an ordinary link.
+`CLAUDE.md` `@`-imports `AGENTS.md` and every file in `.agents/rules/` but `viewer.md`, so all of them, this page included, spend one shared `LLM-001` budget in every session. That is why these files stay lean, and why a rules file reached by an `@` import costs more than one reached by an ordinary link: `viewer.md` is linked from `AGENTS.md` because only work on the viewer needs it.
 
 ## Compress Without Loss, Then Split
 

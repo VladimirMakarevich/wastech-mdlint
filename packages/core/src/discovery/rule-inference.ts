@@ -17,6 +17,7 @@ import type {
   SeverityOverride,
 } from "../engine/types.js";
 import { buildContextGraph } from "../graph/build-context-graph.js";
+import type { ContextGraph } from "../graph/context-graph-types.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
 import { loadDocuments } from "../markdown/load-documents.js";
 import type { DocCluster } from "./repo-scan.js";
@@ -401,7 +402,7 @@ function composeRationale(params: {
 // Repeated ids (only SEC-001 can repeat) sort by their first scoped file after the id itself, so
 // the final `rules` order is fully deterministic regardless of cluster traversal order.
 function fileScopeSortKey(rule: InferredRule): string {
-  const files = rule.options?.["files"];
+  const files = rule.options?.files;
   return Array.isArray(files) && typeof files[0] === "string" ? files[0] : "";
 }
 
@@ -422,6 +423,67 @@ export async function inferRuleSet(params: {
   const idIndex = buildIdIndex(registry);
   const rootDir = path.resolve(cwd);
 
+  const documents = await loadInferenceCorpus(rootDir, scope);
+  const corpusFileCount = documents.size;
+  const allDocs = [...documents.values()];
+
+  const settings: ResolvedSettings = scope.settings ?? {};
+  const graph = buildContextGraph(documents, {
+    ...(settings.siteRouter === undefined
+      ? {}
+      : { siteRouter: settings.siteRouter }),
+    ...(settings.idRef === undefined ? {} : { idRef: settings.idRef }),
+  });
+
+  const clusterInferences: ClusterRuleInference[] = clusters.map((cluster) =>
+    inferCluster(cluster, allDocs, idIndex),
+  );
+
+  // Tallied over the corpus itself, not summed across clusters: a merge's `include` can select files
+  // no cluster glob covers, and summing overlapping clusters would double-count. The corpus is the
+  // thing the config lints, so it is the thing the global gates read.
+  const globalPatterns: DetectedPatterns = {
+    ...tallyPatterns(allDocs),
+    adrSections: [],
+  };
+
+  const candidates: RuleCandidate[] = [
+    ...globalCandidates(idIndex, globalPatterns, graph.cycles),
+    ...sec001Candidates(idIndex, clusterInferences),
+  ];
+
+  const { dryRunRules, runnable } = resolveCandidates(candidates, registry);
+
+  // One pass over the corpus already in memory, with the graph already built — the same entry point
+  // `lintFiles` reaches after its own discovery half, so inline `disable` directives, project-scope
+  // rules and severity resolution all behave here exactly as they will for the user.
+  const dryRun = lintCorpus({
+    documents,
+    rules: dryRunRules,
+    rootDir,
+    settings,
+    graph,
+  });
+
+  const rules: InferredRule[] = runnable.map((candidate) =>
+    inferredRule(candidate, dryRun.messages, corpusFileCount),
+  );
+
+  rules.sort((left, right) => {
+    const idDiff = compareStrings(left.rule, right.rule);
+    return idDiff !== 0
+      ? idDiff
+      : compareStrings(fileScopeSortKey(left), fileScopeSortKey(right));
+  });
+
+  return { clusters: clusterInferences, rules, corpusFileCount };
+}
+
+// The corpus the drafted config will lint, keyed by repo-relative POSIX path.
+async function loadInferenceCorpus(
+  rootDir: string,
+  scope: InferenceScope,
+): Promise<Map<string, ParsedDocument>> {
   // Resolved through the same helper the lint path uses, so the defaults a silent key falls back to
   // are identical to the ones the user's first `lint` will apply. Deriving them here instead would
   // put a second copy of the default `exclude` in the tree for the two to disagree over.
@@ -444,60 +506,52 @@ export async function inferRuleSet(params: {
   for (const document of loaded.values()) {
     documents.set(document.path, document);
   }
-  const corpusFileCount = documents.size;
-  const allDocs = [...documents.values()];
+  return documents;
+}
 
-  const settings: ResolvedSettings = scope.settings ?? {};
-  const graph = buildContextGraph(documents, {
-    ...(settings.siteRouter === undefined
-      ? {}
-      : { siteRouter: settings.siteRouter }),
-    ...(settings.idRef === undefined ? {} : { idRef: settings.idRef }),
-  });
-
-  const clusterInferences: ClusterRuleInference[] = clusters.map((cluster) => {
-    // Partitioned by the cluster's own glob rather than by the scan's sample list. That is also what
-    // keeps SEC-001's inferred `files` scope honest: the evidence for an ADR proposal can only come
-    // from files the glob it proposes actually selects, so a scope that checks none of the files
-    // that justified it is unreachable rather than guarded against.
-    const docs = allDocs
-      .filter((doc) => matchesConfigGlob(doc.path, [cluster.includeGlob]))
-      .sort((left, right) => compareStrings(left.path, right.path));
-    const adrSections = detectAdrSections(docs);
-    const patterns: DetectedPatterns = {
-      ...tallyPatterns(docs),
-      adrSections,
-    };
-
-    const contributesTo = Object.entries(PATTERN_GATES)
-      .filter(
-        ([id, definition]) => idIndex.has(id) && definition.gate(patterns),
-      )
-      .map(([id]) => id);
-    if (adrSections.length > 0 && idIndex.has("SEC-001")) {
-      contributesTo.push("SEC-001");
-    }
-    contributesTo.sort(compareStrings);
-
-    return {
-      clusterPath: cluster.path,
-      includeGlob: cluster.includeGlob,
-      files: docs.map((doc) => doc.path),
-      patterns,
-      contributesTo,
-    };
-  });
-
-  // Tallied over the corpus itself, not summed across clusters: a merge's `include` can select files
-  // no cluster glob covers, and summing overlapping clusters would double-count. The corpus is the
-  // thing the config lints, so it is the thing the global gates read.
-  const globalPatterns: DetectedPatterns = {
-    ...tallyPatterns(allDocs),
-    adrSections: [],
+// The patterns one cluster's files show, and the rules they argue for.
+function inferCluster(
+  cluster: DocCluster,
+  allDocs: readonly ParsedDocument[],
+  idIndex: Map<string, RuleMetadata>,
+): ClusterRuleInference {
+  // Partitioned by the cluster's own glob rather than by the scan's sample list. That is also what
+  // keeps SEC-001's inferred `files` scope honest: the evidence for an ADR proposal can only come
+  // from files the glob it proposes actually selects, so a scope that checks none of the files
+  // that justified it is unreachable rather than guarded against.
+  const docs = allDocs
+    .filter((doc) => matchesConfigGlob(doc.path, [cluster.includeGlob]))
+    .sort((left, right) => compareStrings(left.path, right.path));
+  const adrSections = detectAdrSections(docs);
+  const patterns: DetectedPatterns = {
+    ...tallyPatterns(docs),
+    adrSections,
   };
 
-  const candidates: RuleCandidate[] = [];
+  const contributesTo = Object.entries(PATTERN_GATES)
+    .filter(([id, definition]) => idIndex.has(id) && definition.gate(patterns))
+    .map(([id]) => id);
+  if (adrSections.length > 0 && idIndex.has("SEC-001")) {
+    contributesTo.push("SEC-001");
+  }
+  contributesTo.sort(compareStrings);
 
+  return {
+    clusterPath: cluster.path,
+    includeGlob: cluster.includeGlob,
+    files: docs.map((doc) => doc.path),
+    patterns,
+    contributesTo,
+  };
+}
+
+// One candidate per pattern-gated rule whose gate the whole corpus passes.
+function globalCandidates(
+  idIndex: Map<string, RuleMetadata>,
+  globalPatterns: DetectedPatterns,
+  cycles: ContextGraph["cycles"],
+): RuleCandidate[] {
+  const candidates: RuleCandidate[] = [];
   for (const [id, definition] of Object.entries(PATTERN_GATES)) {
     const metadata = idIndex.get(id);
     if (metadata === undefined || !definition.gate(globalPatterns)) {
@@ -505,39 +559,54 @@ export async function inferRuleSet(params: {
     }
     candidates.push({
       metadata,
-      relevance: definition.relevance(globalPatterns, graph.cycles),
+      relevance: definition.relevance(globalPatterns, cycles),
       ownsMessage: (message) => message.ruleId === id,
     });
   }
+  return candidates;
+}
 
+// One SEC-001 candidate per cluster that showed ADR sections, scoped to that cluster's glob.
+function sec001Candidates(
+  idIndex: Map<string, RuleMetadata>,
+  clusterInferences: readonly ClusterRuleInference[],
+): RuleCandidate[] {
   const sec001Metadata = idIndex.get("SEC-001");
-  if (sec001Metadata !== undefined) {
-    for (const cluster of clusterInferences) {
-      if (cluster.patterns.adrSections.length === 0) {
-        continue;
-      }
-      const includeGlob = cluster.includeGlob;
-      candidates.push({
-        metadata: sec001Metadata,
-        relevance: sec001Relevance({
-          includeGlob,
-          adrSections: cluster.patterns.adrSections,
-        }),
-        options: {
-          files: [includeGlob],
-          sections: cluster.patterns.adrSections,
-        },
-        ownsMessage: (message) =>
-          message.ruleId === "SEC-001" &&
-          matchesConfigGlob(message.filePath, [includeGlob]),
-      });
-    }
+  if (sec001Metadata === undefined) {
+    return [];
   }
+  const candidates: RuleCandidate[] = [];
+  for (const cluster of clusterInferences) {
+    if (cluster.patterns.adrSections.length === 0) {
+      continue;
+    }
+    const includeGlob = cluster.includeGlob;
+    candidates.push({
+      metadata: sec001Metadata,
+      relevance: sec001Relevance({
+        includeGlob,
+        adrSections: cluster.patterns.adrSections,
+      }),
+      options: {
+        files: [includeGlob],
+        sections: cluster.patterns.adrSections,
+      },
+      ownsMessage: (message) =>
+        message.ruleId === "SEC-001" &&
+        matchesConfigGlob(message.filePath, [includeGlob]),
+    });
+  }
+  return candidates;
+}
 
-  // Resolve through the registry exactly as the config loader does, so the dry run below exercises
-  // the same options validation the written file will face. A candidate the registry refuses is
-  // dropped rather than thrown on: the same silent degradation a missing id gets, since a draft that
-  // crashes is strictly worse for the user than one proposing one rule fewer.
+// Resolve through the registry exactly as the config loader does, so the dry run exercises the same
+// options validation the written file will face. A candidate the registry refuses is dropped rather
+// than thrown on: the same silent degradation a missing id gets, since a draft that crashes is
+// strictly worse for the user than one proposing one rule fewer.
+function resolveCandidates(
+  candidates: readonly RuleCandidate[],
+  registry: RuleRegistry,
+): { dryRunRules: ResolvedRule[]; runnable: RuleCandidate[] } {
   const dryRunRules: ResolvedRule[] = [];
   const runnable: RuleCandidate[] = [];
   for (const candidate of candidates) {
@@ -550,50 +619,33 @@ export async function inferRuleSet(params: {
       continue;
     }
   }
+  return { dryRunRules, runnable };
+}
 
-  // One pass over the corpus already in memory, with the graph already built — the same entry point
-  // `lintFiles` reaches after its own discovery half, so inline `disable` directives, project-scope
-  // rules and severity resolution all behave here exactly as they will for the user.
-  const dryRun = lintCorpus({
-    documents,
-    rules: dryRunRules,
-    rootDir,
-    settings,
-    graph,
-  });
-
-  const rules: InferredRule[] = runnable.map((candidate) => {
-    const owned = dryRun.messages.filter((message) =>
-      candidate.ownsMessage(message),
-    );
-    const affectedFileCount = new Set(owned.map((message) => message.filePath))
-      .size;
-    const severity = proposedSeverity(owned.length);
-    return {
-      rule: candidate.metadata.id,
-      category: candidate.metadata.category,
-      description: candidate.metadata.description,
-      defaultSeverity: candidate.metadata.defaultSeverity,
-      ...(severity === undefined ? {} : { severity }),
-      fixable: candidate.metadata.fixable,
-      rationale: composeRationale({
-        relevance: candidate.relevance,
-        findingCount: owned.length,
-        affectedFileCount,
-        corpusFileCount,
-      }),
-      ...(candidate.options === undefined
-        ? {}
-        : { options: candidate.options }),
-    };
-  });
-
-  rules.sort((left, right) => {
-    const idDiff = compareStrings(left.rule, right.rule);
-    return idDiff !== 0
-      ? idDiff
-      : compareStrings(fileScopeSortKey(left), fileScopeSortKey(right));
-  });
-
-  return { clusters: clusterInferences, rules, corpusFileCount };
+// The drafted rule entry for one candidate, its severity and rationale taken from what the dry run
+// reported for it.
+function inferredRule(
+  candidate: RuleCandidate,
+  messages: readonly LintMessage[],
+  corpusFileCount: number,
+): InferredRule {
+  const owned = messages.filter((message) => candidate.ownsMessage(message));
+  const affectedFileCount = new Set(owned.map((message) => message.filePath))
+    .size;
+  const severity = proposedSeverity(owned.length);
+  return {
+    rule: candidate.metadata.id,
+    category: candidate.metadata.category,
+    description: candidate.metadata.description,
+    defaultSeverity: candidate.metadata.defaultSeverity,
+    ...(severity === undefined ? {} : { severity }),
+    fixable: candidate.metadata.fixable,
+    rationale: composeRationale({
+      relevance: candidate.relevance,
+      findingCount: owned.length,
+      affectedFileCount,
+      corpusFileCount,
+    }),
+    ...(candidate.options === undefined ? {} : { options: candidate.options }),
+  };
 }

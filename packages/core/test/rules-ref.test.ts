@@ -772,10 +772,10 @@ describe("REF-007 undefined reference labels", () => {
   // off-by-one would accumulate into a wrong line for the last reference.
   it("keeps line numbers exact across many CRLF-separated references", async () => {
     const count = 2000;
-    const content =
-      Array.from({ length: count }, (_, i) => `[t][missing-${i}]`).join(
-        "\r\n",
-      ) + "\r\n";
+    const content = `${Array.from(
+      { length: count },
+      (_, i) => `[t][missing-${i}]`,
+    ).join("\r\n")}\r\n`;
     const cwd = await fixtureRepo({ "a.md": content });
     const result = await lint(cwd, [rule("REF-007")]);
     expect(result.messages).toHaveLength(count);

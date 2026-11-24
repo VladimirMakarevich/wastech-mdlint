@@ -51,7 +51,7 @@ export function createLineNumberLookup(content: string): LineNumberLookup {
       // Bias the midpoint upward so `low` can advance; `(low + high) / 2` would stall at high - 1.
       const middle = Math.floor((low + high + 1) / 2);
 
-      if (lineStarts[middle] <= clamped) {
+      if (lineStarts[middle]! <= clamped) {
         low = middle;
       } else {
         high = middle - 1;

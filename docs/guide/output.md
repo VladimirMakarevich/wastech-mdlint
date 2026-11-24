@@ -60,6 +60,8 @@ Four commands and tools report lint findings, and they do **not** all return the
 
 `messages` is the same array of the shape above on all four. The differences are the wrapper and the counts: only the CLI's `lint` wraps the record in a `summary`, and only the ad-hoc MCP `lint` tool omits `files` — it lints one caller-supplied string, which is not a corpus, so there is no file list to report.
 
+With `--since` / `since`, the lint payloads keep their shape and carry only the findings the branch adds, with a `since` object beside them — `{ ref, base, mergeBase, head, changed, removed }` — and the impact record has `files` in place of `file`, plus that object; both hosts build them from the same core calls. In a lint payload `files` (and the CLI's `summary.files`) are then the changed documents the run compared, not the whole corpus, while `messages` can still name an unchanged one — an anchor elsewhere that a renamed heading broke is a finding the branch adds.
+
 The **impact record** itself — `{ file, directlyAffected, transitivelyAffected, readingOrder, excluded }` — is identical on both hosts, key for key, and the CLI's `lint` key is an addition to it rather than a change in it. So a client generated from the MCP [`impact-analysis`](mcp-server.md#the-6-tools) `outputSchema` reads the CLI's JSON unchanged, and a cross-host test compares the two payloads directly.
 
 ## Exit codes
@@ -68,7 +70,7 @@ The **impact record** itself — `{ file, directlyAffected, transitivelyAffected
 | --- | --- |
 | `0` | Clean — no findings at or above the `--fail-on` threshold. |
 | `1` | Findings at or above `--fail-on` (default `error`). Reserved exclusively for findings. |
-| `2` | Operational/usage error (unknown subcommand, bad flag, a nonexistent target path, missing config section, target outside the corpus, unreadable config, an unwritable file). |
+| `2` | Operational/usage error (unknown subcommand, bad flag, a nonexistent target path, missing config section, target outside the corpus, unreadable config, an unwritable file; and for `--since`, anything that stops the comparison — among them a directory outside a git work tree, `git` missing or older than 2.31, a `<ref>` that names no commit or shares no history with `HEAD`, a shallow clone without the history back to the merge-base, `--since` together with `--fix`, and `impact` given both or neither of `<file>` and `--since`). |
 
 An operational error goes to stderr, naming its path `/`-separated and relative to the directory the command works in (see [the CLI reference](cli.md#exit-codes) for the two cases that are named differently — an argument echoed back as you typed it, and a file written outside that directory, which is named absolutely rather than through a chain of `../` hops), so `1` always means "the linter found problems" and never "the command could not run". The one exception to the stream is `init`: its report stays on stdout even when the command exits `2` — a file it could not write is listed there alongside the files it did write, and so is the `--on-existing merge` refusal to write over a config it cannot load — since an init that half-happened, or deliberately did not, is more useful read as one summary.
 

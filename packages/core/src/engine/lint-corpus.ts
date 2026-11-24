@@ -125,10 +125,7 @@ export function lintCorpus(input: LintCorpusInput): LintResult {
   // naming a required file) has no document to read directives from and is never suppressed.
   const messages = rawMessages.filter((message) => {
     const analysis = analysisByFile.get(message.filePath);
-    return (
-      analysis === undefined ||
-      !analysis.isSuppressed(message.ruleId, message.line)
-    );
+    return analysis?.isSuppressed(message.ruleId, message.line) !== true;
   });
 
   // Directive diagnostics are engine-emitted and always on rather than a registered rule: every

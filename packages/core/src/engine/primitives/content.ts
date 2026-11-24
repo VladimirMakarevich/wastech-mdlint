@@ -12,9 +12,10 @@ export function contentNotMatch(
   options: ContentNotMatchOptions,
 ): PrimitiveFinding[] {
   // matchAll requires the global flag; add it if the caller omitted it.
-  const flags = options.flags?.includes("g")
-    ? options.flags
-    : `${options.flags ?? ""}g`;
+  const flags =
+    options.flags?.includes("g") === true
+      ? options.flags
+      : `${options.flags ?? ""}g`;
   const regex = compileRegex(options.pattern, flags);
 
   const findings: PrimitiveFinding[] = [];
@@ -25,7 +26,7 @@ export function contentNotMatch(
   for (const match of document.content.matchAll(regex)) {
     findings.push({
       message: `Content matches disallowed pattern ${options.pattern}: "${match[0]}".`,
-      line: lineAt(match.index ?? 0),
+      line: lineAt(match.index),
       data: { pattern: options.pattern, match: match[0] },
     });
   }

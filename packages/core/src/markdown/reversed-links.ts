@@ -46,6 +46,99 @@ const WHITESPACE_PATTERN = /\s/;
 const TARGET_LIKE_PATTERN =
   /^(?:[A-Za-z][A-Za-z0-9+.-]*:|\/|\.\.?\/|#|www\.)|\/|\.[A-Za-z][A-Za-z0-9]*(?:#.*)?$/;
 
+// The paren structure of one masked container. `openOf[i]` is the matching `(` for the `)` at `i`
+// (or -1). `escaped[i]` marks a character written after a backslash, which is literal text.
+type ParenPairs = {
+  readonly openOf: Int32Array;
+  readonly escaped: Uint8Array;
+};
+
+type ReversedCandidate = { open: number; text: string; target: string };
+
+// Pair unescaped parens with a stack in one pass, so nesting balances (`(a (b) c)[./x.md]`) and a
+// run of openers with no closer stays linear.
+function pairParens(masked: string): ParenPairs {
+  const length = masked.length;
+  const openOf = new Int32Array(length).fill(-1);
+  const escaped = new Uint8Array(length);
+  const openers: number[] = [];
+
+  for (let index = 0; index < length; index += 1) {
+    const char = masked[index]!;
+    if (
+      char === "\\" &&
+      ASCII_PUNCTUATION_PATTERN.test(masked[index + 1] ?? "")
+    ) {
+      escaped[index + 1] = 1;
+      index += 1;
+      continue;
+    }
+    if (char === "(") {
+      openers.push(index);
+    } else if (char === ")") {
+      const open = openers.pop();
+      if (open !== undefined) {
+        openOf[index] = open;
+      }
+    }
+  }
+  return { openOf, escaped };
+}
+
+// Find the `]` closing the target that opens right after the `)` at `close`, or -1. A link target
+// cannot hold unescaped whitespace, and stopping at the next `[` as well keeps every forward scan
+// disjoint from the next one, so the whole container is still read in linear time.
+function findTargetClose(
+  masked: string,
+  escaped: Uint8Array,
+  close: number,
+): number {
+  for (let index = close + 2; index < masked.length; index += 1) {
+    const char = masked[index]!;
+    if (WHITESPACE_PATTERN.test(char) || char === "[") {
+      return -1;
+    }
+    if (char === "]" && escaped[index] === 0) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+// The reversed link whose text closes with the `)` at `close`, with the index of its `]`, or
+// undefined when that `)` does not end one.
+function reversedCandidateAt(
+  pairs: ParenPairs,
+  masked: string,
+  raw: string,
+  close: number,
+): { candidate: ReversedCandidate; bracketClose: number } | undefined {
+  const open = pairs.openOf[close]!;
+  if (open === -1 || masked[close + 1] !== "[") {
+    return undefined;
+  }
+  const bracketClose = findTargetClose(masked, pairs.escaped, close);
+  if (bracketClose === -1) {
+    return undefined;
+  }
+  // `(note)[x](u)` and `(note)[x][label]` are an inline link and a full reference after a
+  // parenthetical; when they did not resolve, that is REF-001's or REF-007's concern.
+  const after = masked[bracketClose + 1];
+  if (after === "(" || after === "[") {
+    return undefined;
+  }
+
+  const text = raw
+    .slice(open + 1, close)
+    .replace(/[\t\n\r ]+/g, " ")
+    .trim();
+  const target = raw.slice(close + 2, bracketClose);
+  if (text.length === 0 || !TARGET_LIKE_PATTERN.test(target)) {
+    return undefined;
+  }
+  return { candidate: { open, text, target }, bracketClose };
+}
+
 /**
  * Report every `(text)[target]` run in one phrasing container whose bracket content looks like a
  * link target, in source order.
@@ -73,78 +166,16 @@ export function extractReversedLinks(
       (node.type === "link" &&
         content[(node as Link).position?.start.offset ?? -1] === "["),
   );
-  const length = masked.length;
+  const pairs = pairParens(masked);
 
-  // Pair unescaped parens with a stack in one pass, so nesting balances (`(a (b) c)[./x.md]`) and a
-  // run of openers with no closer stays linear. `openOf[i]` is the matching `(` for the `)` at `i`
-  // (or -1). `escaped[i]` marks a character written after a backslash, which is literal text.
-  const openOf = new Int32Array(length).fill(-1);
-  const escaped = new Uint8Array(length);
-  const openers: number[] = [];
+  const candidates: ReversedCandidate[] = [];
 
-  for (let index = 0; index < length; index += 1) {
-    const char = masked[index]!;
-    if (
-      char === "\\" &&
-      ASCII_PUNCTUATION_PATTERN.test(masked[index + 1] ?? "")
-    ) {
-      escaped[index + 1] = 1;
-      index += 1;
-      continue;
+  for (let close = 0; close < masked.length; close += 1) {
+    const found = reversedCandidateAt(pairs, masked, raw, close);
+    if (found !== undefined) {
+      candidates.push(found.candidate);
+      close = found.bracketClose;
     }
-    if (char === "(") {
-      openers.push(index);
-    } else if (char === ")") {
-      const open = openers.pop();
-      if (open !== undefined) {
-        openOf[index] = open;
-      }
-    }
-  }
-
-  const candidates: { open: number; text: string; target: string }[] = [];
-
-  for (let close = 0; close < length; close += 1) {
-    const open = openOf[close]!;
-    if (open === -1 || masked[close + 1] !== "[") {
-      continue;
-    }
-
-    // Find the `]` closing the target. A link target cannot hold unescaped whitespace, and stopping
-    // at the next `[` as well keeps every forward scan disjoint from the next one, so the whole
-    // container is still read in linear time.
-    let bracketClose = -1;
-    for (let index = close + 2; index < length; index += 1) {
-      const char = masked[index]!;
-      if (WHITESPACE_PATTERN.test(char) || char === "[") {
-        break;
-      }
-      if (char === "]" && escaped[index] === 0) {
-        bracketClose = index;
-        break;
-      }
-    }
-    if (bracketClose === -1) {
-      continue;
-    }
-    // `(note)[x](u)` and `(note)[x][label]` are an inline link and a full reference after a
-    // parenthetical; when they did not resolve, that is REF-001's or REF-007's concern.
-    const after = masked[bracketClose + 1];
-    if (after === "(" || after === "[") {
-      continue;
-    }
-
-    const text = raw
-      .slice(open + 1, close)
-      .replace(/[\t\n\r ]+/g, " ")
-      .trim();
-    const target = raw.slice(close + 2, bracketClose);
-    if (text.length === 0 || !TARGET_LIKE_PATTERN.test(target)) {
-      continue;
-    }
-
-    candidates.push({ open, text, target });
-    close = bracketClose;
   }
 
   // Candidates are found in order of their `)`, and a nested one — `((a)[./x.md] b)[./y.md]` —

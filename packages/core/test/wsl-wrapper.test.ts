@@ -52,18 +52,18 @@ const CALLERS = [
   { script: "typecheck-wsl.sh", npmArgs: ["run", "typecheck"] },
 ];
 
-interface StubCall {
+type StubCall = {
   /** Working directory the wrapper handed the Windows child. */
   cwd: string;
   argv: string[];
-}
+};
 
-interface WrapperRun {
+type WrapperRun = {
   status: number | null;
   stderr: string;
   /** `null` when the stub was never reached, which is how a refusal is distinguished from a no-op. */
   calls: StubCall[] | null;
-}
+};
 
 // These are WSL-side bash scripts: they are run by the Linux half of a WSL install (which reports as
 // `linux`), never by native Windows. Skipping matches the documented-reason form used in
@@ -106,14 +106,14 @@ describe.skipIf(process.platform === "win32")("run-npm-windows.sh", () => {
     // `/private/var`) does not read as a different directory.
     writeStub(
       "cmd.exe",
-      [
+      `${[
         "{",
         "  printf 'cwd=%s\\n' \"$(pwd -P)\"",
         "  printf '%s\\n' \"$@\"",
         "  printf '\\n'",
         '} >> "$WSL_STUB_LOG"',
         'exit "${WSL_STUB_EXIT:-0}"',
-      ].join("\n") + "\n",
+      ].join("\n")}\n`,
     );
   });
 

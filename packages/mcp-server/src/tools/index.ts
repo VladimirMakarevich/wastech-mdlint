@@ -15,7 +15,7 @@ import { registerLintTool } from "./lint.js";
 // hand-maintained source of truth that could drift from the real registerTool() calls — exactly the
 // "5 vs 6 tools" mismatch the generated inventory exists to prevent. Doc generation introspects the
 // live McpServer instance instead of reading a name array here.
-const TOOL_REGISTRARS: Array<(server: McpServer) => void> = [
+const TOOL_REGISTRARS: ((server: McpServer) => void)[] = [
   registerLintTool,
   registerLintFilesTool,
   registerContextGraphTool,

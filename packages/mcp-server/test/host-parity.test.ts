@@ -9,6 +9,11 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { assertBuilt } from "../../core/test/support/assert-built.js";
+import {
+  type GitFixture,
+  hasGit,
+  makeRepo,
+} from "../../core/test/support/git-fixture.js";
 import { PARITY_LINT_FIXTURE } from "../../core/test/support/output-parity.js";
 
 // @boundary-guard host-parity
@@ -111,7 +116,7 @@ function runCliBin(args: string[]): { status: number | null; stdout: string } {
 }
 
 function firstText(result: { content: unknown }): string {
-  const content = result.content as Array<{ type: string; text?: string }>;
+  const content = result.content as { type: string; text?: string }[];
   return normalize(content[0]?.text ?? "");
 }
 
@@ -242,3 +247,107 @@ describe("CLI and MCP render the same graph consistently", () => {
     expect(cli.stdout).toContain("reading order (");
   }, 60_000);
 });
+
+// The same comparison asked of both hosts: `lint --since` / `impact --since` from the CLI and the
+// `since` option of `lint-files` / `impact-analysis`. Both run git, so both are started with the
+// fixture's isolated git environment, and the MCP server is a process of its own for that reason.
+describe.skipIf(!hasGit)(
+  'CLI and MCP answer the same "since" (requires git on PATH)',
+  () => {
+    let repo: GitFixture;
+    let sinceClient: Client;
+
+    beforeAll(async () => {
+      repo = await makeRepo();
+      await repo.write(
+        "wastech-mdlint.config.json",
+        `${JSON.stringify({ rules: [{ rule: "REF-001" }] })}\n`,
+      );
+      await repo.write("docs/hub.md", "# Hub\n\n[a](a.md) [b](b.md)\n");
+      await repo.write("docs/a.md", "# A\n\nText.\n");
+      await repo.write("docs/b.md", "# B\n\n[gone](gone.md)\n");
+      repo.commit("base");
+      repo.git("checkout", "-q", "-b", "feature");
+      await repo.write("docs/a.md", "# A\n\nText, and [a typo](hbu.md).\n");
+      await repo.write("docs/b.md", "# B\n\n[hub](hub.md)\n");
+
+      sinceClient = new Client({ name: "mcp-since-parity", version: "0.0.0" });
+      await sinceClient.connect(
+        new StdioClientTransport({
+          command: process.execPath,
+          args: [MCP_DIST],
+          cwd: repo.repo,
+          env: repo.env as Record<string, string>,
+          stderr: "pipe",
+        }),
+      );
+      await sinceClient.listTools();
+    }, 60_000);
+
+    afterAll(async () => {
+      await sinceClient?.close();
+    });
+
+    function runSince(args: string[]): {
+      status: number | null;
+      stdout: string;
+    } {
+      const result = spawnSync(process.execPath, [CLI_DIST, ...args], {
+        cwd: repo.repo,
+        env: repo.env,
+        encoding: "utf8",
+        windowsHide: true,
+      });
+      return { status: result.status, stdout: normalize(result.stdout) };
+    }
+
+    it("renders the same text and carries the same findings and comparison", async () => {
+      const text = runSince(["lint", ".", "--since", "main"]);
+      const json = runSince([
+        "lint",
+        ".",
+        "--since",
+        "main",
+        "--format",
+        "json",
+      ]);
+      const mcp = await sinceClient.callTool({
+        name: "lint-files",
+        arguments: { cwd: repo.repo, since: "main" },
+      });
+
+      expect(firstText(mcp)).toBe(text.stdout);
+      const cliPayload = JSON.parse(json.stdout) as {
+        messages: unknown[];
+        files: string[];
+        since: unknown;
+      };
+      const mcpPayload = mcp.structuredContent as unknown as {
+        messages: unknown[];
+        files: string[];
+        since: unknown;
+      };
+      expect(mcpPayload.messages).toEqual(cliPayload.messages);
+      expect(mcpPayload.files).toEqual(cliPayload.files);
+      expect(mcpPayload.since).toEqual(cliPayload.since);
+      // Non-vacuous: one finding the branch added, and the gate it trips on the CLI.
+      expect(cliPayload.messages).toHaveLength(1);
+      expect(text.status).toBe(1);
+    }, 60_000);
+
+    it("returns the same impact record for every changed document, `lint` the only CLI addition", async () => {
+      const json = runSince(["impact", "--since", "main", "--format", "json"]);
+      const mcp = await sinceClient.callTool({
+        name: "impact-analysis",
+        arguments: { cwd: repo.repo, since: "main" },
+      });
+      const { lint, ...withoutLint } = JSON.parse(json.stdout) as Record<
+        string,
+        unknown
+      >;
+      expect(withoutLint).toEqual(mcp.structuredContent);
+      expect(withoutLint.files).toEqual(["docs/a.md", "docs/b.md"]);
+      expect(lint).toBeDefined();
+    }, 60_000);
+  },
+);

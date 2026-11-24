@@ -2,7 +2,8 @@ import { z } from "zod";
 
 import { matchesConfigGlob } from "../../discovery/globs.js";
 import { defineRule, type RuleDefinition } from "../registry.js";
-import { estimateTokens, TOKEN_ESTIMATE_NOTE } from "../tokens.js";
+import { measureDocument } from "../document-metrics.js";
+import { TOKEN_ESTIMATE_NOTE } from "../tokens.js";
 
 // SIZE-001 — per-file byte / line / token budget. Each metric is independently optional;
 // omitting one disables that check. Metrics stay independent of each other, but the two severities
@@ -74,21 +75,85 @@ const size001OptionsSchema = z
     },
   );
 
+type Size001Options = z.infer<typeof size001OptionsSchema>;
+type Thresholds = z.infer<typeof thresholdSchema>;
+
+export type SizeMetric = Metric;
+
+/** The budget SIZE-001 holds one file to: which override matched it, and each metric's thresholds. */
+export type SizeBudget = {
+  // The first override whose pattern matches the file. Only the first counts: a later, broader one
+  // that also matches supplies nothing.
+  override?: { index: number; pattern: string };
+  // Per metric, the thresholds that apply and where they come from. A metric the matching override
+  // leaves out falls back to the top-level option — not to a broader override further down — and a
+  // metric set in neither place is not measured for this file at all.
+  metrics: Partial<
+    Record<Metric, Thresholds & { from: "override" | "top-level" }>
+  >;
+};
+
+/**
+ * The budget SIZE-001 applies to `filePath` under `options`. The rule measures against exactly this,
+ * and a host that explains a finding (the fix prompts) reads it from here too, so the explanation
+ * cannot describe a different budget from the one that produced the finding.
+ */
+export function sizeBudget(
+  options: Size001Options,
+  filePath: string,
+): SizeBudget {
+  const index = (options.overrides ?? []).findIndex((entry) =>
+    matchesConfigGlob(filePath, [entry.pattern]),
+  );
+  const override = index === -1 ? undefined : options.overrides![index]!;
+  const metrics: SizeBudget["metrics"] = {};
+  for (const metric of METRICS) {
+    const fromOverride = override?.[metric];
+    const thresholds = fromOverride ?? options[metric];
+    if (thresholds !== undefined) {
+      metrics[metric] = {
+        ...thresholds,
+        from: fromOverride === undefined ? "top-level" : "override",
+      };
+    }
+  }
+  return {
+    override:
+      override === undefined ? undefined : { index, pattern: override.pattern },
+    metrics,
+  };
+}
+
+/** `sizeBudget` for options as they stand in a config entry, or `undefined` when they do not parse. */
+export function sizeBudgetForEntry(
+  options: unknown,
+  filePath: string,
+): SizeBudget | undefined {
+  const parsed = size001OptionsSchema.safeParse(options);
+  return parsed.success ? sizeBudget(parsed.data, filePath) : undefined;
+}
+
 const METRIC_UNIT: Record<Metric, string> = {
   bytes: "bytes",
   lines: "lines",
   tokens: "tokens",
 };
 
-function countLines(content: string): number {
-  // Count newline occurrences: matches the legacy line metric.
-  let count = 0;
-  for (let index = 0; index < content.length; index += 1) {
-    if (content.charCodeAt(index) === 10) {
-      count += 1;
-    }
+// The budget `actual` crosses, the error one checked first so it wins when both are crossed, or
+// undefined when it stays within both.
+function budgetBreach(
+  actual: number,
+  thresholds: { warn?: number | undefined; error?: number | undefined },
+):
+  | { severity: "error" | "warning"; budget: string; limit: number }
+  | undefined {
+  if (thresholds.error !== undefined && actual > thresholds.error) {
+    return { severity: "error", budget: "error", limit: thresholds.error };
   }
-  return count;
+  if (thresholds.warn !== undefined && actual > thresholds.warn) {
+    return { severity: "warning", budget: "warn", limit: thresholds.warn };
+  }
+  return undefined;
 }
 
 export const size001: RuleDefinition = defineRule({
@@ -104,20 +169,12 @@ export const size001: RuleDefinition = defineRule({
   optionsSchema: size001OptionsSchema,
   check: (options) => (context) => {
     const document = context.document!;
-    const actuals: Record<Metric, number> = {
-      bytes: Buffer.byteLength(document.content, "utf8"),
-      lines: countLines(document.content),
-      tokens: estimateTokens(document.content),
-    };
+    const actuals: Record<Metric, number> = measureDocument(document.content);
 
-    // First matching override supplies per-metric thresholds; unspecified metrics fall back to the
-    // top-level option.
-    const override = (options.overrides ?? []).find((entry) =>
-      matchesConfigGlob(document.path, [entry.pattern]),
-    );
+    const budget = sizeBudget(options, document.path);
 
     for (const metric of METRICS) {
-      const thresholds = override?.[metric] ?? options[metric];
+      const thresholds = budget.metrics[metric];
       if (thresholds === undefined) {
         continue;
       }
@@ -134,20 +191,7 @@ export const size001: RuleDefinition = defineRule({
       // breach supersedes the warn breach. Both reports carried the same `data`, so the survivor
       // loses nothing — and a config `severity` override (applied by the runner, invisible here) can
       // no longer render the pair as two same-severity messages for one metric.
-      const breach =
-        thresholds.error !== undefined && actual > thresholds.error
-          ? {
-              severity: "error" as const,
-              budget: "error",
-              limit: thresholds.error,
-            }
-          : thresholds.warn !== undefined && actual > thresholds.warn
-            ? {
-                severity: "warning" as const,
-                budget: "warn",
-                limit: thresholds.warn,
-              }
-            : undefined;
+      const breach = budgetBreach(actual, thresholds);
       if (breach === undefined) {
         continue;
       }
@@ -157,9 +201,9 @@ export const size001: RuleDefinition = defineRule({
         // `tokens` alone carries the calibration: `bytes` and `lines` are exact counts a user
         // can reproduce, while a token number is an estimate whose arithmetic was disclosed nowhere
         // a reader of the finding would look.
-        message:
-          `File exceeds ${metric} ${breach.budget} budget: ${actual} ${METRIC_UNIT[metric]} > ${breach.limit}.` +
-          (metric === "tokens" ? ` ${TOKEN_ESTIMATE_NOTE}` : ""),
+        message: `File exceeds ${metric} ${breach.budget} budget: ${actual} ${METRIC_UNIT[metric]} > ${breach.limit}.${
+          metric === "tokens" ? ` ${TOKEN_ESTIMATE_NOTE}` : ""
+        }`,
         line: 0,
         data,
       });

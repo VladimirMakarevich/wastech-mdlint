@@ -78,17 +78,10 @@ function directiveName(directive: InlineDirective): string {
   return `wastech-mdlint-${directive.kind}`;
 }
 
-/**
- * Analyze a document's directives once: the suppression checker its findings are filtered with,
- * plus a diagnostic for each directive that cannot mean what it says.
- *
- * Categories are matched and validated against the same built-in set, so a token reported as an
- * unknown category is also one that suppresses nothing.
- */
-export function analyzeDirectives(
+// Directives in line order with their rule tokens resolved to canonical ids.
+function resolveDirectiveTokens(
   directives: readonly InlineDirective[],
-): DirectiveAnalysis {
-  const diagnostics: DirectiveDiagnostic[] = [];
+): InlineDirective[] {
   // `Array.prototype.sort` is stable, and directives arrive in source order, so two on one line
   // keep their written order.
   // Tokens are resolved through the registry here, once, because the parser canonicalizes them
@@ -96,7 +89,7 @@ export function analyzeDirectives(
   // registry can say it means `REF-002`. Every step below then compares canonical ids. A dash-less
   // token passes through unchanged, since no alias is dash-less, so category semantics hold.
   // `capture`/`restore` tokens are left as written: they are only ever echoed back in a diagnostic.
-  const ordered = [...directives]
+  return [...directives]
     .sort((left, right) => left.line - right.line)
     .map((directive) =>
       directive.kind === "capture" || directive.kind === "restore"
@@ -108,7 +101,15 @@ export function analyzeDirectives(
             ),
           },
     );
-  const knownCategories = ruleRegistry.getReservedPrefixes();
+}
+
+// A diagnostic for every rule token a directive cannot use: any token on `capture`/`restore`, and a
+// dash-less token that names no built-in category.
+function tokenDiagnostics(
+  ordered: readonly InlineDirective[],
+  knownCategories: ReadonlySet<string>,
+): DirectiveDiagnostic[] {
+  const diagnostics: DirectiveDiagnostic[] = [];
   const categoryList = [...knownCategories].sort(compareStrings).join(", ");
 
   for (const directive of ordered) {
@@ -132,13 +133,16 @@ export function analyzeDirectives(
       }
     }
   }
+  return diagnostics;
+}
 
-  // `disable-file` effects form the bottom of the stack before any line is walked, which is what
-  // makes their position irrelevant and puts them out of `restore`'s reach.
-  const base: Effect[] = ordered
-    .filter((directive) => directive.kind === "disable-file")
-    .map((directive) => ({ disabled: true, selectors: directive.ruleIds }));
-
+// The effect stack in force from each directive that changes it on, starting from the
+// `disable-file` base at line 0. An unmatched `restore` is reported into `diagnostics`.
+function buildSegments(
+  ordered: readonly InlineDirective[],
+  base: readonly Effect[],
+  diagnostics: DirectiveDiagnostic[],
+): Segment[] {
   // The effect stack only ever grows between a `capture` and its `restore`, and captures pop LIFO,
   // so truncating back to the length recorded at `capture` returns *exactly* to the captured state
   // — nested pairs included, since an inner restore truncates to a length no shorter than any
@@ -183,6 +187,30 @@ export function analyzeDirectives(
         break;
     }
   }
+  return segments;
+}
+
+/**
+ * Analyze a document's directives once: the suppression checker its findings are filtered with,
+ * plus a diagnostic for each directive that cannot mean what it says.
+ *
+ * Categories are matched and validated against the same built-in set, so a token reported as an
+ * unknown category is also one that suppresses nothing.
+ */
+export function analyzeDirectives(
+  directives: readonly InlineDirective[],
+): DirectiveAnalysis {
+  const ordered = resolveDirectiveTokens(directives);
+  const knownCategories = ruleRegistry.getReservedPrefixes();
+  const diagnostics = tokenDiagnostics(ordered, knownCategories);
+
+  // `disable-file` effects form the bottom of the stack before any line is walked, which is what
+  // makes their position irrelevant and puts them out of `restore`'s reach.
+  const base: Effect[] = ordered
+    .filter((directive) => directive.kind === "disable-file")
+    .map((directive) => ({ disabled: true, selectors: directive.ruleIds }));
+
+  const segments = buildSegments(ordered, base, diagnostics);
 
   const selects = (selectors: readonly string[], ruleId: string): boolean =>
     selectors.length === 0 ||

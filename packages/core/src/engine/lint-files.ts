@@ -4,6 +4,7 @@ import { resolveCorpusScope } from "../config/corpus-scope.js";
 import type { ConfiguredRule } from "../config/load-config.js";
 import { buildContextGraph } from "../graph/build-context-graph.js";
 import type { ContextGraph } from "../graph/context-graph-types.js";
+import type { GraphContext } from "../graph/load-context.js";
 import type { ParsedDocument } from "../markdown/document-types.js";
 import { loadDocuments } from "../markdown/load-documents.js";
 import { lintCorpus, type LintResult } from "./lint-corpus.js";
@@ -93,5 +94,35 @@ export async function lintFiles(input: LintFilesInput): Promise<LintResult> {
     rootDir,
     settings: input.settings,
     graph,
+  });
+}
+
+export type LintContextInput = {
+  cwd: string;
+  // A corpus and graph exactly as `loadContext` returned them, or as a host rebuilt them after
+  // re-parsing a changed file with `parseDocument` and the graph with `buildContextGraph`.
+  context: GraphContext;
+  rules: readonly ConfiguredRule[];
+  settings: ResolvedSettings;
+};
+
+/**
+ * Lint a corpus a host already holds, instead of discovering and parsing it again.
+ *
+ * `lintFiles` is discovery plus `lintCorpus`; a long-running host that keeps the corpus in memory
+ * and re-lints after every edit would pay that discovery and a full re-parse each time — seconds on
+ * a few hundred documents — to recompute what it already has. This takes the discovery half's
+ * product (`loadContext`, which applies the same scope `lintFiles` does) and runs the same
+ * severity resolution and `lintCorpus` step order, so both entry points give identical results for
+ * the same tree. `lintCorpus` itself stays internal: a host still cannot assemble a corpus or
+ * resolve rule severities on its own, only hand back what core gave it.
+ */
+export function lintContext(input: LintContextInput): LintResult {
+  return lintCorpus({
+    documents: input.context.documents,
+    rules: activeRules(input.rules),
+    rootDir: path.resolve(input.cwd),
+    settings: input.settings,
+    graph: input.context.graph,
   });
 }

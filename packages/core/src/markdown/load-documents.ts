@@ -1,3 +1,4 @@
+import type { Dirent } from "node:fs";
 import { readFile, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
@@ -10,6 +11,7 @@ import {
 import {
   matchesConfigGlob,
   normalizeRelativePath,
+  prunesDirectory,
 } from "../discovery/globs.js";
 import type { ParsedDocument } from "./document-types.js";
 import { parseDocument } from "./parse-document.js";
@@ -35,12 +37,28 @@ function isInsideRoot(candidatePath: string, rootRealPath: string): boolean {
   );
 }
 
-function shouldPruneDirectory(
-  relDirectory: string,
-  exclude: string[],
-): boolean {
-  // Probe a synthetic child so directory patterns like `dist/**` prune the directory itself.
-  return matchesConfigGlob(`${relDirectory}/__directory_probe__`, exclude);
+// Whether a non-directory entry is a file the corpus may contain. Symlinks: follow only when the
+// target stays inside the root, mirroring discovery's guard so a link can't pull external files into
+// the deterministic corpus.
+async function isCorpusFileEntry(
+  entry: Dirent,
+  absolutePath: string,
+  rootRealPath: string,
+): Promise<boolean> {
+  if (!entry.isSymbolicLink()) {
+    return entry.isFile();
+  }
+  const resolvedTargetPath = await realpath(absolutePath).catch(
+    () => undefined,
+  );
+  if (
+    resolvedTargetPath === undefined ||
+    !isInsideRoot(resolvedTargetPath, rootRealPath)
+  ) {
+    return false;
+  }
+  const resolvedStats = await stat(absolutePath).catch(() => undefined);
+  return resolvedStats?.isFile() === true;
 }
 
 async function collectFiles(params: {
@@ -69,7 +87,7 @@ async function collectFiles(params: {
     );
 
     if (entry.isDirectory()) {
-      if (shouldPruneDirectory(relPath, params.exclude)) {
+      if (prunesDirectory(relPath, params.exclude)) {
         continue;
       }
       if (isGitIgnored(relPath, true, layers)) {
@@ -85,23 +103,7 @@ async function collectFiles(params: {
       continue;
     }
 
-    // Symlinks: follow only when the target stays inside the root, mirroring discovery's guard so a
-    // link can't pull external files into the deterministic corpus.
-    if (entry.isSymbolicLink()) {
-      const resolvedTargetPath = await realpath(absolutePath).catch(
-        () => undefined,
-      );
-      if (
-        resolvedTargetPath === undefined ||
-        !isInsideRoot(resolvedTargetPath, params.rootRealPath)
-      ) {
-        continue;
-      }
-      const resolvedStats = await stat(absolutePath).catch(() => undefined);
-      if (resolvedStats === undefined || !resolvedStats.isFile()) {
-        continue;
-      }
-    } else if (!entry.isFile()) {
+    if (!(await isCorpusFileEntry(entry, absolutePath, params.rootRealPath))) {
       continue;
     }
 
@@ -134,7 +136,7 @@ export async function loadDocuments(
   const rootDisplayPath = path.resolve(options.cwd);
   const rootStats = await stat(rootDisplayPath).catch(() => undefined);
 
-  if (rootStats === undefined || !rootStats.isDirectory()) {
+  if (rootStats?.isDirectory() !== true) {
     return new Map();
   }
 

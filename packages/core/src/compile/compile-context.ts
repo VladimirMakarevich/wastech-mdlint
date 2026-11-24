@@ -82,19 +82,11 @@ type ActiveLlm001Entry = {
   maxTokensPerEntrypoint: number;
 };
 
-// Reuses LLM-001's own options schema (so budget options are validated exactly the way
-// `resolveRule` validates them) and the shared graph traversal (`query`, edgeTypes: ["import"])
-// instead of re-exporting `llm.ts`'s internal eager-import walk or writing a second BFS.
-function computeBudget(
+// Every LLM-001 entry that is switched on and whose options validate, and whether any entry is
+// switched on at all.
+function activeLlm001Entries(
   rules: readonly (RuleConfigEntry | CustomRuleConfigEntry)[],
-  documents: Map<string, ParsedDocument>,
-  graph: ContextGraph,
-): CompileBudget {
-  let corpusTokenEstimate = 0;
-  for (const document of documents.values()) {
-    corpusTokenEstimate += estimateTokens(document.content);
-  }
-
+): { activeEntries: ActiveLlm001Entry[]; llm001Enabled: boolean } {
   const llm001Metadata = ruleRegistry.getMetadata("LLM-001");
   if (llm001Metadata === undefined) {
     throw new Error(
@@ -126,50 +118,81 @@ function computeBudget(
     }
     activeEntries.push(parsedOptions.data as ActiveLlm001Entry);
   }
+  return { activeEntries, llm001Enabled };
+}
+
+// The strictest (lowest) threshold among every active entry whose `entrypoints` glob matches
+// this file — one rendered row per path, but a violation of *any* configured entry's budget.
+// Undefined when no entry treats the file as an entrypoint.
+function strictestMaxTokens(
+  entrypoint: string,
+  activeEntries: readonly ActiveLlm001Entry[],
+): number | undefined {
+  let strictest: number | undefined;
+  for (const activeEntry of activeEntries) {
+    if (!matchesConfigGlob(entrypoint, activeEntry.entrypoints)) {
+      continue;
+    }
+    if (
+      strictest === undefined ||
+      activeEntry.maxTokensPerEntrypoint < strictest
+    ) {
+      strictest = activeEntry.maxTokensPerEntrypoint;
+    }
+  }
+  return strictest;
+}
+
+// The entrypoint's own tokens plus those of every document it imports eagerly, directly or not.
+function eagerTokenTotal(
+  entrypoint: string,
+  documents: Map<string, ParsedDocument>,
+  graph: ContextGraph,
+): number {
+  let totalTokens = estimateTokens(documents.get(entrypoint)!.content);
+  const reached = query(graph, {
+    start: entrypoint,
+    direction: "forward",
+    edgeTypes: ["import"],
+  });
+  for (const visit of reached.visited) {
+    if (visit.depth === 0) {
+      continue;
+    }
+    totalTokens += estimateTokens(documents.get(visit.path)?.content ?? "");
+  }
+  return totalTokens;
+}
+
+// Reuses LLM-001's own options schema (so budget options are validated exactly the way
+// `resolveRule` validates them) and the shared graph traversal (`query`, edgeTypes: ["import"])
+// instead of re-exporting `llm.ts`'s internal eager-import walk or writing a second BFS.
+function computeBudget(
+  rules: readonly (RuleConfigEntry | CustomRuleConfigEntry)[],
+  documents: Map<string, ParsedDocument>,
+  graph: ContextGraph,
+): CompileBudget {
+  let corpusTokenEstimate = 0;
+  for (const document of documents.values()) {
+    corpusTokenEstimate += estimateTokens(document.content);
+  }
+
+  const { activeEntries, llm001Enabled } = activeLlm001Entries(rules);
 
   const sortedDocumentPaths = [...documents.keys()].sort(compareStrings);
   const overBudget: CompileBudgetEntrypoint[] = [];
   let entrypointsMatched = 0;
 
   for (const entrypoint of sortedDocumentPaths) {
-    // The strictest (lowest) threshold among every active entry whose `entrypoints` glob matches
-    // this file — one rendered row per path, but a violation of *any* configured entry's budget.
-    let strictestMaxTokens: number | undefined;
-    for (const activeEntry of activeEntries) {
-      if (!matchesConfigGlob(entrypoint, activeEntry.entrypoints)) {
-        continue;
-      }
-      if (
-        strictestMaxTokens === undefined ||
-        activeEntry.maxTokensPerEntrypoint < strictestMaxTokens
-      ) {
-        strictestMaxTokens = activeEntry.maxTokensPerEntrypoint;
-      }
-    }
-    if (strictestMaxTokens === undefined) {
+    const maxTokens = strictestMaxTokens(entrypoint, activeEntries);
+    if (maxTokens === undefined) {
       continue;
     }
     entrypointsMatched += 1;
 
-    let totalTokens = estimateTokens(documents.get(entrypoint)!.content);
-    const reached = query(graph, {
-      start: entrypoint,
-      direction: "forward",
-      edgeTypes: ["import"],
-    });
-    for (const visit of reached.visited) {
-      if (visit.depth === 0) {
-        continue;
-      }
-      totalTokens += estimateTokens(documents.get(visit.path)?.content ?? "");
-    }
-
-    if (totalTokens > strictestMaxTokens) {
-      overBudget.push({
-        path: entrypoint,
-        totalTokens,
-        maxTokens: strictestMaxTokens,
-      });
+    const totalTokens = eagerTokenTotal(entrypoint, documents, graph);
+    if (totalTokens > maxTokens) {
+      overBudget.push({ path: entrypoint, totalTokens, maxTokens });
     }
   }
 

@@ -170,7 +170,7 @@ function shellSingleQuote(value: string): string {
  * contract guard, not a silent strip that would mis-target the config.
  *
  * Deliberately npm-universal: this never takes the repo's detected package
- * manager (`detectPackageManager` — bun/pnpm/yarn/npm), and `init-command.ts` does not thread it in
+ * manager (`detectPackageManager` — bun/pnpm/yarn/npm), and `init-opt-in.ts` does not thread it in
  * here. The install step only fetches the external `@wastech-mdlint/cli` tool into a scratch
  * `node_modules` — it never resolves or touches the target repo's own lockfile/workspace — and
  * `actions/setup-node` always provides npm, so every runner can execute this step with no extra
@@ -394,6 +394,43 @@ function collectCustomRules(entries: unknown[]): CustomRuleDefinition[] {
   return [...byId.values()];
 }
 
+// The corpus-scope keys of a fresh write — `include`, `exclude` and `respectGitignore` — with the
+// comment that goes above `exclude`. Returns whether the `include` written is an empty list.
+function setFreshScopeKeys(
+  values: Map<string, string>,
+  leadingComments: Map<string, readonly string[]>,
+  include: GenerateInitConfigParams["include"],
+): boolean {
+  // Fresh write. `include` is written whenever the caller supplied one — including a literal `[]`,
+  // which lints zero files: `lintFiles` defaults `include` only when the key is *absent*, so
+  // omitting it for a deliberate empty selection would invert "lint nothing" into "lint the whole
+  // repo". `undefined` is the caller's way to ask for that default on purpose.
+  let wroteEmptyInclude = false;
+  if (include !== undefined) {
+    values.set("include", indentValue(JSON.stringify(include, null, 2)));
+    wroteEmptyInclude = include.length === 0;
+  }
+  // Both keys stay explicit in the written file so each remains a visible, editable decision.
+  // `respectGitignore: true` is still the load-bearing one: it is pinned rather than left at the
+  // resolver's `false` default, because the scan already skipped gitignored trees and a
+  // config that lints them would contradict the draft the user approved.
+  //
+  // The written `exclude` is not the only thing in force — the same `DEFAULT_EXCLUDE_GLOBS`
+  // applies on every run and a config's own `exclude` *extends* it (`config/corpus-scope.ts`), so
+  // writing it here discloses the default rather than establishing it. The list is kept rather
+  // than trimmed to what the default does not already cover: extend is
+  // exactly what makes *deleting* one of these lines a no-op, and a bare list of a dozen globs
+  // invites that dead edit. The key must also exist for a user to write a negation into. So the
+  // duplication stays, and the comment below is what keeps it from being silent.
+  values.set(
+    "exclude",
+    indentValue(JSON.stringify(DEFAULT_EXCLUDE_GLOBS, null, 2)),
+  );
+  leadingComments.set("exclude", EXCLUDE_KEY_COMMENT);
+  values.set("respectGitignore", "true");
+  return wroteEmptyInclude;
+}
+
 /**
  * Generates the final `wastech-mdlint.config.json` bytes and resolves its `$schema`. Deterministic:
  * identical params produce byte-identical output (no time/random).
@@ -453,32 +490,7 @@ export function generateInitConfig(
       values.set(key, indentValue(JSON.stringify(value, null, 2)));
     }
   } else {
-    // Fresh write. `include` is written whenever the caller supplied one — including a literal `[]`,
-    // which lints zero files: `lintFiles` defaults `include` only when the key is *absent*, so
-    // omitting it for a deliberate empty selection would invert "lint nothing" into "lint the whole
-    // repo". `undefined` is the caller's way to ask for that default on purpose.
-    if (include !== undefined) {
-      values.set("include", indentValue(JSON.stringify(include, null, 2)));
-      wroteEmptyInclude = include.length === 0;
-    }
-    // Both keys stay explicit in the written file so each remains a visible, editable decision.
-    // `respectGitignore: true` is still the load-bearing one: it is pinned rather than left at the
-    // resolver's `false` default, because the scan already skipped gitignored trees and a
-    // config that lints them would contradict the draft the user approved.
-    //
-    // The written `exclude` is not the only thing in force — the same `DEFAULT_EXCLUDE_GLOBS`
-    // applies on every run and a config's own `exclude` *extends* it (`config/corpus-scope.ts`), so
-    // writing it here discloses the default rather than establishing it. The list is kept rather
-    // than trimmed to what the default does not already cover: extend is
-    // exactly what makes *deleting* one of these lines a no-op, and a bare list of a dozen globs
-    // invites that dead edit. The key must also exist for a user to write a negation into. So the
-    // duplication stays, and the comment below is what keeps it from being silent.
-    values.set(
-      "exclude",
-      indentValue(JSON.stringify(DEFAULT_EXCLUDE_GLOBS, null, 2)),
-    );
-    leadingComments.set("exclude", EXCLUDE_KEY_COMMENT);
-    values.set("respectGitignore", "true");
+    wroteEmptyInclude = setFreshScopeKeys(values, leadingComments, include);
   }
 
   values.set("rules", renderRulesValue(ruleItems));

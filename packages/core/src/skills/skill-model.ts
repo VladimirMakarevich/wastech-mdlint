@@ -41,11 +41,11 @@ export const skillModelSchema = z
 
 export type Skill = z.infer<typeof skillModelSchema>;
 
-export interface SkillValidationIssue {
+export type SkillValidationIssue = {
   // Dotted Zod path (`issue.path.join(".")`) to the offending field, e.g. `frontmatter.name`.
   path: string;
   message: string;
-}
+};
 
 export type SkillValidationResult =
   | { ok: true; skill: Skill }

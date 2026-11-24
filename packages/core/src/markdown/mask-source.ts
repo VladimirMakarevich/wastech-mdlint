@@ -1,5 +1,5 @@
 import type { Html, Node, Parent } from "mdast";
-import { SKIP, visit } from "unist-util-visit";
+import { CONTINUE, SKIP, visit } from "unist-util-visit";
 
 // Inline HTML elements whose content an author writes to be shown literally, not read as prose.
 // remark splits `<code>(text)[./a.md]</code>` into an opening `html` node, a `text` node and a
@@ -36,6 +36,41 @@ const RAW_TEXT_ELEMENTS: ReadonlySet<string> = new Set([
 const OPEN_TAG_PATTERN = /^<([A-Za-z][A-Za-z0-9-]*)(?=[\s/>])/;
 const CLOSE_TAG_PATTERN = /^<\/([A-Za-z][A-Za-z0-9-]*)\s*>$/;
 
+// The outermost literal-content element open in a container: its name, the offset its content
+// starts at, and how many openings of that same element are still unclosed.
+type LiteralElement = { element: string; from: number; depth: number };
+
+// Advance the literal-element tracking past one inline `html` tag spanning `[from, to)` and return
+// what is open afterwards. When the tracked element closes, the content between its opening tag and
+// this closing one is handed to `blank`.
+function trackLiteralElement(
+  literal: LiteralElement | undefined,
+  tag: { value: string; from: number; to: number },
+  blank: (from: number, to: number) => void,
+): LiteralElement | undefined {
+  const opened = OPEN_TAG_PATTERN.exec(tag.value)?.[1]?.toLowerCase();
+  if (literal === undefined) {
+    return opened !== undefined &&
+      (CODE_LIKE_ELEMENTS.has(opened) || RAW_TEXT_ELEMENTS.has(opened))
+      ? { element: opened, from: tag.to, depth: 1 }
+      : undefined;
+  }
+  if (opened === literal.element && CODE_LIKE_ELEMENTS.has(opened)) {
+    literal.depth += 1;
+    return literal;
+  }
+  if (
+    CLOSE_TAG_PATTERN.exec(tag.value)?.[1]?.toLowerCase() === literal.element
+  ) {
+    literal.depth -= 1;
+    if (literal.depth === 0) {
+      blank(literal.from, tag.from);
+      return undefined;
+    }
+  }
+  return literal;
+}
+
 /**
  * Blank the source of every descendant `shouldMask` selects to spaces, keeping line breaks so line
  * and column arithmetic on the masked string still lines up with `raw` index for index. `raw` is
@@ -69,7 +104,7 @@ export function maskSource(
   // An element never closed runs to the end of the container, as an unclosed one does in a
   // browser. A different literal element opened inside it needs no tracking: its whole extent is
   // already inside the span being blanked.
-  let literal: { element: string; from: number; depth: number } | undefined;
+  let literal: LiteralElement | undefined;
 
   visit(container as Node, (node) => {
     if (node === container) {
@@ -78,29 +113,14 @@ export function maskSource(
     const from = node.position?.start.offset;
     const to = node.position?.end.offset;
     if (node.type === "html" && from !== undefined && to !== undefined) {
-      const value = (node as Html).value;
-      const opened = OPEN_TAG_PATTERN.exec(value)?.[1]?.toLowerCase();
-      if (literal === undefined) {
-        if (
-          opened !== undefined &&
-          (CODE_LIKE_ELEMENTS.has(opened) || RAW_TEXT_ELEMENTS.has(opened))
-        ) {
-          literal = { element: opened, from: to, depth: 1 };
-        }
-      } else if (opened === literal.element && CODE_LIKE_ELEMENTS.has(opened)) {
-        literal.depth += 1;
-      } else if (
-        CLOSE_TAG_PATTERN.exec(value)?.[1]?.toLowerCase() === literal.element
-      ) {
-        literal.depth -= 1;
-        if (literal.depth === 0) {
-          blank(literal.from, from);
-          literal = undefined;
-        }
-      }
+      literal = trackLiteralElement(
+        literal,
+        { value: (node as Html).value, from, to },
+        blank,
+      );
     }
     if (!shouldMask(node)) {
-      return;
+      return CONTINUE;
     }
     if (from !== undefined && to !== undefined) {
       blank(from, to);

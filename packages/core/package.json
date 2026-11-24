@@ -1,6 +1,6 @@
 {
   "name": "@wastech-mdlint/core",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Markdown linter engine behind wastech-mdlint: parsing, config, lint rules, context graph, and compile.",
   "keywords": [
     "markdown",
@@ -40,6 +40,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@types/mdast": "^4.0.4",
     "github-slugger": "^2.0.0",
     "ignore": "^7.0.5",
     "jsonc-parser": "^3.3.1",

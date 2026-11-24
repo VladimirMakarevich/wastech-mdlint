@@ -20,7 +20,7 @@ function descriptionOf(ruleId: string): string {
 
 describe("describeRules", () => {
   it("groups active built-ins by the real metadata categories and keeps SIZE in the output", () => {
-    const configuredRules: Array<RuleConfigEntry | CustomRuleConfigEntry> = [
+    const configuredRules: (RuleConfigEntry | CustomRuleConfigEntry)[] = [
       { rule: "LLM-001" },
       { rule: "ref001" },
       { rule: "SIZE-001", severity: "warning" },
@@ -253,7 +253,7 @@ describe("describeRules", () => {
   });
 
   it("describes the front matter kinds under the frontmatter target, and FM-001 under its own category", () => {
-    const configuredRules: Array<RuleConfigEntry | CustomRuleConfigEntry> = [
+    const configuredRules: (RuleConfigEntry | CustomRuleConfigEntry)[] = [
       { rule: "FM-001" },
       {
         rule: "custom",
@@ -318,7 +318,7 @@ describe("describeRules", () => {
   });
 
   it("returns the same grouped output across repeated calls and scrambled input order", () => {
-    const configuredRulesA: Array<RuleConfigEntry | CustomRuleConfigEntry> = [
+    const configuredRulesA: (RuleConfigEntry | CustomRuleConfigEntry)[] = [
       { rule: "SIZE-001" },
       {
         rule: "custom",
@@ -329,7 +329,7 @@ describe("describeRules", () => {
       { rule: "TBL-001" },
       { rule: "LLM-001" },
     ];
-    const configuredRulesB: Array<RuleConfigEntry | CustomRuleConfigEntry> = [
+    const configuredRulesB: (RuleConfigEntry | CustomRuleConfigEntry)[] = [
       { rule: "TBL-001" },
       { rule: "LLM-001" },
       { rule: "CTX-003" },

@@ -137,31 +137,44 @@ async function resolveDirectoryArgument(
   return resolved;
 }
 
-export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
-  const stdout = io.stdout ?? process.stdout;
-  const stderr = io.stderr ?? process.stderr;
-  const cwd = io.cwd ?? process.cwd();
+type OutputStream = Pick<NodeJS.WriteStream, "write">;
 
-  let executionResult: CommandExecutionResult | undefined;
+/**
+ * What every command registration needs from the run that owns it. Commander runs an action during
+ * `parseAsync` and discards its return value, so each action hands its result to `record` and
+ * `runCli` reads it back once parsing has finished.
+ */
+type ProgramContext = {
+  program: Command;
+  cwd: string;
+  io: CliIo;
+  stdout: OutputStream;
+  record: (result: CommandExecutionResult) => void;
+};
 
-  const program = new Command()
-    .name("wastech-mdlint")
-    // exitOverride() + configureOutput() + showHelpAfterError() must run before .command() creates
-    // subcommands: commander only copies output/exit/help settings onto a subcommand at the moment
-    // it's created, so subcommands built beforehand would keep writing to the real process streams /
-    // calling process.exit, and would not print the pointer below after their own usage errors.
-    .exitOverride()
-    .configureOutput({
-      writeOut: (text) => stdout.write(text),
-      writeErr: (text) => stderr.write(text),
-    })
-    // A string (not `true`): the full help body after every usage error would bury commander's own
-    // one-line diagnostic, and an unknown subcommand already gets a did-you-mean suggestion.
-    .showHelpAfterError(
-      "(run `wastech-mdlint --help` for the list of commands)",
-    );
+function createProgram(stdout: OutputStream, stderr: OutputStream): Command {
+  return (
+    new Command()
+      .name("wastech-mdlint")
+      // exitOverride() + configureOutput() + showHelpAfterError() must run before .command() creates
+      // subcommands: commander only copies output/exit/help settings onto a subcommand at the moment
+      // it's created, so subcommands built beforehand would keep writing to the real process streams /
+      // calling process.exit, and would not print the pointer below after their own usage errors.
+      .exitOverride()
+      .configureOutput({
+        writeOut: (text) => stdout.write(text),
+        writeErr: (text) => stderr.write(text),
+      })
+      // A string (not `true`): the full help body after every usage error would bury commander's own
+      // one-line diagnostic, and an unknown subcommand already gets a did-you-mean suggestion.
+      .showHelpAfterError(
+        "(run `wastech-mdlint --help` for the list of commands)",
+      )
+  );
+}
 
-  program.version(await readPackageVersion(), "-v, --version");
+function registerLintCommands(context: ProgramContext): void {
+  const { program, cwd } = context;
 
   const lintAction = async (
     targetPath: string,
@@ -170,16 +183,20 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
       format: OutputFormat;
       failOn: FailOn;
       fix?: boolean;
+      since?: string;
     },
   ): Promise<void> => {
-    executionResult = await executeCommand({
-      kind: "lint",
-      path: await resolveDirectoryArgument(cwd, "Target path", targetPath),
-      config: options.config,
-      format: options.format,
-      failOn: options.failOn,
-      fix: options.fix ?? false,
-    });
+    context.record(
+      await executeCommand({
+        kind: "lint",
+        path: await resolveDirectoryArgument(cwd, "Target path", targetPath),
+        config: options.config,
+        format: options.format,
+        failOn: options.failOn,
+        fix: options.fix ?? false,
+        ...(options.since === undefined ? {} : { since: options.since }),
+      }),
+    );
   };
 
   // Register the shared lint options on a command (used by both `lint` and its hidden `scan` alias).
@@ -208,6 +225,12 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
           "apply deterministic fixes in place, then report what remains",
         ),
       )
+      .addOption(
+        new Option(
+          "--since <ref>",
+          "report only the findings the work tree adds since where it left this branch, tag or commit",
+        ),
+      )
       .action(lintAction);
   };
 
@@ -215,8 +238,10 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
   // commander's `isDefault`; `scan` is a hidden, deprecated alias for one minor version.
   addLintCommand("lint", false);
   addLintCommand("scan", true);
+}
 
-  program
+function registerSchemaCommand(context: ProgramContext): void {
+  context.program
     .command("schema")
     .description(
       "Write the config JSON schema to a local file (no remote URL).",
@@ -225,14 +250,19 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
       new Option("--out <file>", "schema output file").default("schema.json"),
     )
     .action(async (options: { out: string }) => {
-      executionResult = await executeCommand({
-        kind: "schema",
-        cwd,
-        out: options.out,
-      });
+      context.record(
+        await executeCommand({
+          kind: "schema",
+          cwd: context.cwd,
+          out: options.out,
+        }),
+      );
     });
+}
 
-  program
+function registerGraphCommand(context: ProgramContext): void {
+  const { cwd } = context;
+  context.program
     .command("graph")
     .description(
       "Build and summarize the Markdown context graph (clusters, hubs, reading order, coverage).",
@@ -249,16 +279,24 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
         targetPath: string,
         options: { config?: string; format: GraphFormat },
       ) => {
-        executionResult = await executeCommand({
-          kind: "graph",
-          path: await resolveDirectoryArgument(cwd, "Target path", targetPath),
-          config: options.config,
-          format: options.format,
-        });
+        context.record(
+          await executeCommand({
+            kind: "graph",
+            path: await resolveDirectoryArgument(
+              cwd,
+              "Target path",
+              targetPath,
+            ),
+            config: options.config,
+            format: options.format,
+          }),
+        );
       },
     );
+}
 
-  program
+function registerSliceCommand(context: ProgramContext): void {
+  context.program
     .command("slice")
     .description(
       `Print the files reachable from a query within --depth hops. ${SLICE_RESOLUTION_DESCRIPTION}`,
@@ -280,45 +318,61 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
         query: string,
         options: { config?: string; depth: number; format: OutputFormat },
       ) => {
-        executionResult = await executeCommand({
-          kind: "slice",
-          path: cwd,
-          config: options.config,
-          query,
-          depth: options.depth,
-          format: options.format,
-        });
+        context.record(
+          await executeCommand({
+            kind: "slice",
+            path: context.cwd,
+            config: options.config,
+            query,
+            depth: options.depth,
+            format: options.format,
+          }),
+        );
       },
     );
+}
 
-  program
+function registerImpactCommand(context: ProgramContext): void {
+  context.program
     .command("impact")
     .description(
       "Classify the blast radius of changing <file> and lint the affected subgraph.",
     )
-    .argument("<file>", "repository-relative path of the changed file")
+    .argument("[file]", "repository-relative path of the changed file")
     .addOption(new Option("--config <file>", "path to a config file"))
     .addOption(
       new Option("--format <format>", "output format")
         .choices(OUTPUT_FORMATS)
         .default("text"),
     )
+    .addOption(
+      new Option(
+        "--since <ref>",
+        "every document the work tree changed since where it left this branch, tag or commit, instead of one <file>",
+      ),
+    )
     .action(
       async (
-        file: string,
-        options: { config?: string; format: OutputFormat },
+        file: string | undefined,
+        options: { config?: string; format: OutputFormat; since?: string },
       ) => {
-        executionResult = await executeCommand({
-          kind: "impact",
-          path: cwd,
-          config: options.config,
-          file,
-          format: options.format,
-        });
+        context.record(
+          await executeCommand({
+            kind: "impact",
+            path: context.cwd,
+            config: options.config,
+            ...(file === undefined ? {} : { file }),
+            ...(options.since === undefined ? {} : { since: options.since }),
+            format: options.format,
+          }),
+        );
       },
     );
+}
 
-  program
+function registerCompileCommand(context: ProgramContext): void {
+  const { cwd } = context;
+  context.program
     .command("compile")
     .description(
       "Generate a deterministic SKILL.md from the document graph, rules, and config.",
@@ -343,23 +397,89 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
         dryRun?: boolean;
         cwd: string;
       }) => {
-        executionResult = await executeCommand({
-          kind: "compile",
-          cwd: await resolveDirectoryArgument(cwd, "--cwd", options.cwd),
-          config: options.config,
-          outdir: options.outdir,
-          dryRun: options.dryRun ?? false,
-        });
+        context.record(
+          await executeCommand({
+            kind: "compile",
+            cwd: await resolveDirectoryArgument(cwd, "--cwd", options.cwd),
+            config: options.config,
+            outdir: options.outdir,
+            dryRun: options.dryRun ?? false,
+          }),
+        );
       },
     );
+}
 
-  program
+type InitActionOptions = {
+  yes?: boolean;
+  onExisting?: ExistingConfigAction;
+  withCiWorkflow?: boolean;
+  withAgentRule?: boolean;
+};
+
+async function runInitAction(
+  context: ProgramContext,
+  targetPath: string | undefined,
+  options: InitActionOptions,
+): Promise<void> {
+  const { cwd, io } = context;
+  const yes = options.yes ?? false;
+  // Both streams must be real terminals: `@inquirer/prompts` reads from stdin and renders to
+  // stdout, so a piped/redirected stdout with a TTY stdin (or vice versa) is just as
+  // unusable interactively as neither being one.
+  const isTty =
+    io.isTty ??
+    ((io.stdinIsTty ?? process.stdin.isTTY) &&
+      (io.stdoutIsTty ?? process.stdout.isTTY));
+
+  // Cheap, important: without this, a piped/CI invocation that forgot --yes would otherwise
+  // hang forever on the first inquirer prompt instead of failing fast.
+  if (!yes && !isTty) {
+    throw new CliUsageError(
+      "init requires an interactive terminal; pass --yes for non-interactive/CI use.",
+    );
+  }
+
+  // `targetPath` may be a relative argument like "." or "docs", or omitted entirely; resolve
+  // it against this run's own `cwd` (the injected `io.cwd`, when set) rather than letting
+  // `findConfig`/`scanRepository` fall back to the real `process.cwd()` inside core. A
+  // nonexistent target is rejected here rather than reaching the write and surfacing as an
+  // ENOENT partial-write summary, which reported the cause as a write failure.
+  const pathWasExplicit = targetPath !== undefined;
+  const resolvedCwd = await resolveDirectoryArgument(
+    cwd,
+    "Target path",
+    targetPath ?? ".",
+  );
+
+  // Construct the real prompter here (not inside commands.ts) so its `confirmDraft` writes
+  // through this run's own `stdout` seam instead of the real `process.stdout` — the same
+  // stream every other command already writes its output through.
+  context.record(
+    await executeCommand(
+      {
+        kind: "init",
+        cwd: resolvedCwd,
+        yes,
+        onExisting: options.onExisting,
+        isTty,
+        withCiWorkflow: options.withCiWorkflow,
+        withAgentRule: options.withAgentRule,
+        pathWasExplicit,
+      },
+      { prompter: io.initPrompter ?? createInquirerPrompter(context.stdout) },
+    ),
+  );
+}
+
+function registerInitCommand(context: ProgramContext): void {
+  context.program
     .command("init")
     .description(
       "Scan the repo, infer a rule set, and write a wastech-mdlint.config.json.",
     )
     // Deliberately no default value here (unlike `lint`/`graph`'s identical-looking `[path]`
-    // arguments): the action callback below must be able to tell "omitted" (`undefined`) apart
+    // arguments): the action callback must be able to tell "omitted" (`undefined`) apart
     // from "typed, and happens to equal cwd" — an explicit target must not be silently re-rooted
     // onto an ancestor's config.
     .argument("[path]", "directory to scan")
@@ -384,96 +504,80 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
         "write the agent rule .agents/rules/wastech-mdlint.md under --yes without prompting",
       ),
     )
-    .action(
-      async (
-        targetPath: string | undefined,
-        options: {
-          yes?: boolean;
-          onExisting?: ExistingConfigAction;
-          withCiWorkflow?: boolean;
-          withAgentRule?: boolean;
-        },
-      ) => {
-        const yes = options.yes ?? false;
-        // Both streams must be real terminals: `@inquirer/prompts` reads from stdin and renders to
-        // stdout, so a piped/redirected stdout with a TTY stdin (or vice versa) is just as
-        // unusable interactively as neither being one.
-        const isTty =
-          io.isTty ??
-          ((io.stdinIsTty ?? process.stdin.isTTY === true) &&
-            (io.stdoutIsTty ?? process.stdout.isTTY === true));
-
-        // Cheap, important: without this, a piped/CI invocation that forgot --yes would otherwise
-        // hang forever on the first inquirer prompt instead of failing fast.
-        if (!yes && !isTty) {
-          throw new CliUsageError(
-            "init requires an interactive terminal; pass --yes for non-interactive/CI use.",
-          );
-        }
-
-        // `targetPath` may be a relative argument like "." or "docs", or omitted entirely; resolve
-        // it against this run's own `cwd` (the injected `io.cwd`, when set) rather than letting
-        // `findConfig`/`scanRepository` fall back to the real `process.cwd()` inside core. A
-        // nonexistent target is rejected here rather than reaching the write and surfacing as an
-        // ENOENT partial-write summary, which reported the cause as a write failure.
-        const pathWasExplicit = targetPath !== undefined;
-        const resolvedCwd = await resolveDirectoryArgument(
-          cwd,
-          "Target path",
-          targetPath ?? ".",
-        );
-
-        // Construct the real prompter here (not inside commands.ts) so its `confirmDraft` writes
-        // through this run's own `stdout` seam instead of the real `process.stdout` — the same
-        // stream every other command already writes its output through.
-        executionResult = await executeCommand(
-          {
-            kind: "init",
-            cwd: resolvedCwd,
-            yes,
-            onExisting: options.onExisting,
-            isTty,
-            withCiWorkflow: options.withCiWorkflow,
-            withAgentRule: options.withAgentRule,
-            pathWasExplicit,
-          },
-          { prompter: io.initPrompter ?? createInquirerPrompter(stdout) },
-        );
-      },
+    .action((targetPath: string | undefined, options: InitActionOptions) =>
+      runInitAction(context, targetPath, options),
     );
+}
+
+// Maps whatever escaped command parsing or an action to the exit code it stands for, writing the
+// diagnostic the user needs on the way.
+function exitCodeForError(
+  error: unknown,
+  stderr: OutputStream,
+  cwd: string,
+): number {
+  // Ctrl+C during any inquirer prompt (matched on `.name`, not `instanceof` a specific imported
+  // class — @inquirer/prompts' own docs recommend this as the version-stable detection) exits
+  // gracefully rather than surfacing as an unexpected-error stack trace.
+  if (error instanceof Error && error.name === "ExitPromptError") {
+    return EXIT_CODE_SUCCESS;
+  }
+
+  if (error instanceof CommanderError) {
+    // Commander reserves exitCode 0 for --help/--version; every other CommanderError (unknown
+    // command/option, invalid choice, missing required option) is a parse/usage failure, reported
+    // as EXIT_CODE_USAGE_ERROR (2) rather than commander's own 1.
+    return error.exitCode === EXIT_CODE_SUCCESS
+      ? EXIT_CODE_SUCCESS
+      : EXIT_CODE_USAGE_ERROR;
+  }
+
+  if (error instanceof CliUsageError || error instanceof ConfigError) {
+    stderr.write(`${error.message}\n`);
+    return EXIT_CODE_USAGE_ERROR;
+  }
+
+  // The backstop for a failure no handler converted into a CliUsageError. It is still an
+  // *operational* failure, so it exits 2, not 1: exit 1 is reserved exclusively for findings at or
+  // above --fail-on, and conflating the two leaves CI unable to tell "the linter found problems"
+  // from "the command could not run". It renders through formatOperationalError rather than
+  // writing `error.message` directly because an fs error that names a path embeds that path
+  // absolutely; every other message is passed through, since here it is the only diagnosis there is.
+  stderr.write(`Operational error: ${formatOperationalError(error, cwd)}\n`);
+  return EXIT_CODE_USAGE_ERROR;
+}
+
+export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
+  const stdout = io.stdout ?? process.stdout;
+  const stderr = io.stderr ?? process.stderr;
+  const cwd = io.cwd ?? process.cwd();
+
+  let executionResult: CommandExecutionResult | undefined;
+
+  const program = createProgram(stdout, stderr);
+  program.version(await readPackageVersion(), "-v, --version");
+
+  const context: ProgramContext = {
+    program,
+    cwd,
+    io,
+    stdout,
+    record: (result) => {
+      executionResult = result;
+    },
+  };
+  registerLintCommands(context);
+  registerSchemaCommand(context);
+  registerGraphCommand(context);
+  registerSliceCommand(context);
+  registerImpactCommand(context);
+  registerCompileCommand(context);
+  registerInitCommand(context);
 
   try {
     await program.parseAsync(routeDefaultCommand(argv), { from: "user" });
   } catch (error) {
-    // Ctrl+C during any inquirer prompt (matched on `.name`, not `instanceof` a specific imported
-    // class — @inquirer/prompts' own docs recommend this as the version-stable detection) exits
-    // gracefully rather than surfacing as an unexpected-error stack trace.
-    if (error instanceof Error && error.name === "ExitPromptError") {
-      return EXIT_CODE_SUCCESS;
-    }
-
-    if (error instanceof CommanderError) {
-      // Commander reserves exitCode 0 for --help/--version; every other CommanderError (unknown
-      // command/option, invalid choice, missing required option) is a parse/usage failure, reported
-      // as EXIT_CODE_USAGE_ERROR (2) rather than commander's own 1.
-      return error.exitCode === EXIT_CODE_SUCCESS
-        ? EXIT_CODE_SUCCESS
-        : EXIT_CODE_USAGE_ERROR;
-    }
-
-    if (error instanceof CliUsageError || error instanceof ConfigError) {
-      stderr.write(`${error.message}\n`);
-      return EXIT_CODE_USAGE_ERROR;
-    }
-
-    // The backstop for a failure no handler converted into a CliUsageError. It is still an
-    // *operational* failure, so it exits 2, not 1: exit 1 is reserved exclusively for findings at or
-    // above --fail-on, and conflating the two leaves CI unable to tell "the linter found problems"
-    // from "the command could not run". It renders through formatOperationalError rather than
-    // writing `error.message` directly because an fs error that names a path embeds that path
-    // absolutely; every other message is passed through, since here it is the only diagnosis there is.
-    stderr.write(`Operational error: ${formatOperationalError(error, cwd)}\n`);
-    return EXIT_CODE_USAGE_ERROR;
+    return exitCodeForError(error, stderr, cwd);
   }
 
   if (executionResult === undefined) {
