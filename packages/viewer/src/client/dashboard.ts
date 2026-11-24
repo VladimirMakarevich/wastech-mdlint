@@ -29,8 +29,12 @@ export function initDashboard(): void {
   // Only the newest request may change the page: an older answer arriving late would show filters
   // the reader has already moved past.
   let controller: AbortController | undefined;
+  // The address last asked for, which is what the reader has chosen even while its answer is on the
+  // way: the page's own address changes only once an answer lands.
+  let latest = location.pathname + location.search;
 
   async function show(address: string): Promise<void> {
+    latest = address;
     controller?.abort();
     const current = new AbortController();
     controller = current;
@@ -41,33 +45,25 @@ export function initDashboard(): void {
       // Superseded by a newer request, or the server is restarting; live reload handles the latter.
       return;
     }
-    const next = new DOMParser().parseFromString(html, "text/html");
-    const nextResults = next.querySelector(".dashboard-results");
-    const nextSummary = next.querySelector(".dashboard-summary");
-    if (nextResults === null || nextSummary === null) {
-      return;
+    if (swapResults(html, form!, results!, summary!)) {
+      history.replaceState(null, "", address);
     }
-    results!.replaceChildren(...nextResults.childNodes);
-    initPromptButtons(results!);
-    summary!.textContent = nextSummary.textContent;
-    // The sort travels in hidden fields, and the server is what decides them, as it does for a
-    // header link it renders; taking them from its answer keeps the next filter change on that sort.
-    for (const field of form!.querySelectorAll('input[type="hidden"]')) {
-      field.remove();
-    }
-    for (const field of next.querySelectorAll(
-      'form.dashboard-filters input[type="hidden"]',
-    )) {
-      form!.append(document.importNode(field, true));
-    }
-    history.replaceState(null, "", address);
   }
 
   const formAddress = (): string => dashboardAddress(form);
 
   function schedule(address: () => string): void {
     window.clearTimeout(timer);
-    timer = window.setTimeout(() => void show(address()), DELAY_MS);
+    timer = window.setTimeout(() => {
+      timer = undefined;
+      void show(address());
+    }, DELAY_MS);
+  }
+
+  function showNow(address: string): void {
+    window.clearTimeout(timer);
+    timer = undefined;
+    void show(address);
   }
 
   form.addEventListener("input", () => {
@@ -78,8 +74,7 @@ export function initDashboard(): void {
   });
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    window.clearTimeout(timer);
-    void show(formAddress());
+    showNow(formAddress());
   });
   results.addEventListener("click", (event) => {
     const link = (event.target as Element).closest<HTMLAnchorElement>(
@@ -89,17 +84,51 @@ export function initDashboard(): void {
       return;
     }
     event.preventDefault();
-    window.clearTimeout(timer);
-    void show(link.getAttribute("href")!);
+    showNow(link.getAttribute("href")!);
   });
 
   // Findings arrive after a save, and an edit changes sizes; either way the rows on screen are stale.
   // A change that adds or removes documents reloads the whole page instead, through live reload.
+  // It asks again for the reader's latest choice, not the page's address, which still names the one
+  // before it while that answer is on the way; and a choice still waiting out its delay is left to
+  // run, since it fetches fresh rows anyway — replacing it would drop the reader's newer filter.
   const refresh = () => {
-    schedule(() => location.pathname + location.search);
+    if (timer === undefined) {
+      schedule(() => latest);
+    }
   };
   onServerEvent("diagnostics", refresh);
   onServerEvent("change", refresh);
+}
+
+// Puts a dashboard page's results, summary and sort fields in place of the ones on screen; `false`
+// when the answer is not a dashboard page.
+function swapResults(
+  html: string,
+  form: HTMLFormElement,
+  results: HTMLElement,
+  summary: HTMLElement,
+): boolean {
+  const next = new DOMParser().parseFromString(html, "text/html");
+  const nextResults = next.querySelector(".dashboard-results");
+  const nextSummary = next.querySelector(".dashboard-summary");
+  if (nextResults === null || nextSummary === null) {
+    return false;
+  }
+  results.replaceChildren(...nextResults.childNodes);
+  initPromptButtons(results);
+  summary.textContent = nextSummary.textContent;
+  // The sort travels in hidden fields, and the server is what decides them, as it does for a header
+  // link it renders; taking them from its answer keeps the next filter change on that sort.
+  for (const field of form.querySelectorAll('input[type="hidden"]')) {
+    field.remove();
+  }
+  for (const field of next.querySelectorAll(
+    'form.dashboard-filters input[type="hidden"]',
+  )) {
+    form.append(document.importNode(field, true));
+  }
+  return true;
 }
 
 // The address the form itself would open when submitted, so a filtered dashboard can be bookmarked.
