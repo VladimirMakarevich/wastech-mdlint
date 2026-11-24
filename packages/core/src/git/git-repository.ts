@@ -344,9 +344,10 @@ export class GitRepository {
   }
 
   /**
-   * The commits `HEAD` and `base.ref` name now, as one string — `undefined` when either names none.
-   * One command, so a long-lived host can ask on every request whether a commit, a checkout or a
-   * fetch has made what it computed from the two stale.
+   * The commits `HEAD` and the base (`base.fullRef`, else `base.ref`) name now, as one string —
+   * `undefined` when either names none. One `rev-parse` after the config scan every command gets,
+   * so a long-lived host can ask on every request whether a commit, a checkout or a fetch has made
+   * what it computed from the two stale.
    */
   async revisionKey(base: GitBase): Promise<string | undefined> {
     // Refused here rather than with `--end-of-options`: outside `--verify` mode `rev-parse` echoes

@@ -16,8 +16,8 @@ import {
 // upload-pack or ssh command of the fetch git makes to get it. Nothing here may let one run, and the
 // repository may not supply `git` itself either. The defenses are in four places: the executable
 // `runGit` starts, found by absolute path; the environment built below; the config every call
-// carries (this file plus the filter and protocol overrides `openGitRepository` adds once it knows
-// the repository); and the flags each diff call passes (`--no-ext-diff --no-textconv`).
+// carries (this file plus the filter and protocol overrides `GitRepository` reads from the
+// repository's config again before each command it starts); and the flags each diff call passes (`--no-ext-diff --no-textconv`).
 
 /** Raised when git ran and failed in a way none of the expected states explains. */
 export class GitCommandError extends Error {
@@ -104,8 +104,8 @@ const BASE_CONFIG: readonly (readonly [string, string])[] = [
   // every transport is refused instead, so the fetch fails before any of those programs is looked
   // up. The generic key sets the default for protocols with no key of their own, and each known
   // protocol is named as well because a repository's `protocol.<name>.allow` outranks the generic
-  // key whatever scope sets it; `openGitRepository` adds the same override for any other protocol a
-  // config names. `core.sshCommand` and `uploadpack` are left alone: git checks a transport is allowed
+  // key whatever scope sets it; `GitRepository` adds the same override, before each command, for any
+  // other protocol a config names. `core.sshCommand` and `uploadpack` are left alone: git checks a transport is allowed
   // before it looks either up, so with every transport refused neither is ever read, and an override
   // would only be one more value to keep right. A read that needs a missing object therefore fails
   // or finds nothing rather than fetching.
