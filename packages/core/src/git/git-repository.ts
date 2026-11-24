@@ -131,8 +131,7 @@ export async function openGitRepository(
   }
 
   return new GitRepository(
-    { cwd: located.topLevel, env: probe.env },
-    inherited,
+    { cwd: located.topLevel, inherited },
     located.prefix,
     located.commonDirReal,
     located.gitDirReal,
@@ -308,13 +307,10 @@ export class GitRepository {
   readonly available = true;
 
   constructor(
-    // The top level with only the fixed settings every call carries: what the repository's own
-    // config is read with before each command, never what a command that could start a program runs
-    // with.
-    private readonly atTopLevel: GitInvocation,
-    // The caller's environment as given, kept so each command's environment is built afresh around
-    // the overrides that call's config scan found.
-    private readonly inherited: NodeJS.ProcessEnv,
+    // Where every command runs — the work tree's top level — and the caller's environment as given,
+    // kept so each command's environment is built afresh around the overrides that call's config
+    // scan found.
+    private readonly launch: { cwd: string; inherited: NodeJS.ProcessEnv },
     // The host root's path from the work tree's top level, without a trailing slash; `""` at the
     // top. Private, so every path crosses between the two coordinate systems inside this class.
     private readonly prefix: string,
@@ -671,12 +667,15 @@ export class GitRepository {
   // and `status` would run its `clean` command. The scan is one `git config` read, which runs
   // nothing; what is left is the moment between the scan and the command it guards.
   private async run(args: readonly string[], input?: string) {
-    const overrides = await repositoryConfigOverrides(this.atTopLevel);
+    const { cwd, inherited } = this.launch;
+    // Read with only the fixed settings every call carries, which is all `git config` needs: it
+    // reads files and starts nothing.
+    const overrides = await repositoryConfigOverrides({
+      cwd,
+      env: gitEnvironment(inherited),
+    });
     return runGit(
-      {
-        cwd: this.atTopLevel.cwd,
-        env: gitEnvironment(this.inherited, overrides),
-      },
+      { cwd, env: gitEnvironment(inherited, overrides) },
       args,
       input,
     );
