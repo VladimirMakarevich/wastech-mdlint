@@ -54,8 +54,12 @@ if (args.kind === "help") {
     }
     let closing = false;
     const shutdown = () => {
+      // A second signal while closing quits at once, with the code a shell gives a process Ctrl+C
+      // ended. Closing waits for the git and lint work already running, and a git that hangs — on a
+      // network file system, a lock, a credential prompt it was told not to show — would otherwise
+      // leave the terminal with no way to stop the viewer but killing it from elsewhere.
       if (closing) {
-        return;
+        process.exit(130);
       }
       closing = true;
       void viewer.close().then(() => process.exit(0));

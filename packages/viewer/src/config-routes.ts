@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { LintMessage } from "@wastech-mdlint/core";
 
+import { CandidateLinter } from "./candidate-lint.js";
 import {
   candidateText,
   configApi,
@@ -26,6 +27,7 @@ export class ConfigRoutes {
   // Saves run one at a time: between checking that the file is the version the page edited and
   // replacing it, a second save must not slip in.
   private configWrites = Promise.resolve();
+  private readonly candidates = new CandidateLinter();
 
   constructor(private readonly ctx: ViewerContext) {}
 
@@ -203,15 +205,33 @@ export class ConfigRoutes {
       );
       return;
     }
+    const { corpus } = this.ctx;
+    const linted = await this.candidates.lint({
+      rootDir: corpus.rootDir,
+      configPath: file.absolutePath,
+      text: candidate.text,
+      sameScope: corpus.sharesScope(validated.loaded),
+      documents: corpus.documents,
+    });
+    if (!linted.ok) {
+      sendJson(response, { status: "failed", error: linted.message }, 503);
+      return;
+    }
     sendJson(
       response,
-      await previewCandidate({
-        corpus: this.ctx.corpus,
+      previewCandidate({
+        corpus,
         current: this.currentFindings(),
         candidate: validated.loaded,
         text: candidate.text,
+        linted,
       }),
     );
+  }
+
+  /** Stops the preview's lint thread, when the viewer closes. */
+  close(): Promise<void> {
+    return this.candidates.close();
   }
 
   // What the config reports now: the background lint's result when it is in, else a lint run here.

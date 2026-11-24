@@ -32,6 +32,11 @@ assertBuilt(
   fileURLToPath(new URL("../dist/client/viewer.js", import.meta.url)),
   fileURLToPath(new URL("../src/client/viewer.ts", import.meta.url)),
 );
+// A preview lints on a worker thread, which loads the built module.
+assertBuilt(
+  fileURLToPath(new URL("../dist/candidate-lint-worker.js", import.meta.url)),
+  fileURLToPath(new URL("../src/candidate-lint-worker.ts", import.meta.url)),
+);
 
 const fixtureRoot = fileURLToPath(new URL("./fixtures/basic", import.meta.url));
 

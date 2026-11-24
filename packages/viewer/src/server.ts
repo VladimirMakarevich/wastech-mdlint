@@ -135,6 +135,7 @@ export async function startViewer(
       stopWatching();
       stopWatchingRefs();
       ctx.events.close();
+      await router.close();
       await changes?.idle();
       await new Promise<void>((resolve) => {
         server.close(() => {

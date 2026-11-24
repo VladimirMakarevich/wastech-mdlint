@@ -256,15 +256,16 @@ export function entryRuleIds(config: LintConfig): (string | null)[] {
  * multiset — the comparison the review of a branch uses too, so a config edit and a branch never
  * disagree about what counts as the same finding.
  */
-export async function previewCandidate(params: {
+export function previewCandidate(params: {
   corpus: Corpus;
   current: readonly LintMessage[];
   candidate: LoadedConfiguration;
   text: string;
-}): Promise<Preview> {
-  const { result, documentCount } = await params.corpus.lintCandidate(
-    params.candidate,
-  );
+  // The candidate's lint, run apart from the server's thread by `CandidateLinter`.
+  linted: { messages: readonly LintMessage[]; documentCount: number };
+}): Preview {
+  const { documentCount } = params.linted;
+  const result = { messages: params.linted.messages };
   const delta = compareFindings(params.current, result.messages);
   const added = previewFindings(delta.added);
   const removed = previewFindings(delta.removed);

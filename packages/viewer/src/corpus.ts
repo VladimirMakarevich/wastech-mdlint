@@ -13,7 +13,6 @@ import {
   isMarkdownFile,
   lintContext,
   loadConfiguration,
-  type GraphContext,
   loadContext,
   parseDocument,
   resolveTargetCandidates,
@@ -403,47 +402,16 @@ export class Corpus {
   }
 
   /**
-   * Lint the corpus a candidate configuration would produce, without adopting it.
+   * Whether a candidate configuration selects the same documents as the loaded one.
    *
-   * Parsing a document does not depend on the config, so only what the candidate changes is redone:
-   * new rules lint the documents already parsed, in a fraction of a second; new link settings
-   * (`siteRouter`, `idRef`) rebuild the graph over them; and only a new `include`, `exclude` or
-   * `respectGitignore` pays for core's discovery and a parse of the corpus that scope selects,
-   * because that is the one change that decides which files are documents.
+   * Parsing a document does not depend on the config, so a candidate that keeps `include`,
+   * `exclude` and `respectGitignore` is linted over the documents already parsed — new rules in a
+   * fraction of a second, new link settings after a rebuild of the graph. Only a new scope pays for
+   * core's discovery and a parse of the corpus it selects, because that is the one change that
+   * decides which files are documents.
    */
-  async lintCandidate(
-    candidate: LoadedConfiguration,
-  ): Promise<{ result: LintResult; documentCount: number }> {
-    const { loaded, documents, graph } = this.state;
-    let context: GraphContext;
-    if (!sameValues(scopeOf(loaded), scopeOf(candidate))) {
-      context = await loadContext({
-        cwd: this.root.rootDir,
-        config: candidate.config,
-        settings: candidate.settings,
-      });
-    } else if (
-      !sameValues(graphSettingsOf(loaded), graphSettingsOf(candidate))
-    ) {
-      context = {
-        documents,
-        graph: buildContextGraph(documents, {
-          siteRouter: candidate.settings.siteRouter,
-          idRef: candidate.settings.idRef,
-        }),
-      };
-    } else {
-      context = { documents, graph };
-    }
-    return {
-      result: lintContext({
-        cwd: this.root.rootDir,
-        context,
-        rules: candidate.rules,
-        settings: candidate.settings,
-      }),
-      documentCount: context.documents.size,
-    };
+  sharesScope(candidate: LoadedConfiguration): boolean {
+    return sameValues(scopeOf(this.state.loaded), scopeOf(candidate));
   }
 
   /** Whether an absolute path is, through any symlinks, inside the repository. */
@@ -613,12 +581,8 @@ function scopeOf(loaded: LoadedConfiguration): unknown[] {
   return [include, exclude, respectGitignore];
 }
 
-function graphSettingsOf(loaded: LoadedConfiguration): unknown[] {
-  return [loaded.settings.siteRouter, loaded.settings.idRef];
-}
-
 // Both sides come from the same JSON config through the same schema, so equal values serialize to
-// equal text; a difference in key order only costs a rebuild that was not needed.
+// equal text; a difference in key order only costs a discovery that was not needed.
 function sameValues(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }

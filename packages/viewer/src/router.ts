@@ -85,6 +85,11 @@ export class ViewerRouter {
     this.prefixes = this.prefixRoutes();
   }
 
+  /** Stops what a route started that outlives a request: the config preview's lint thread. */
+  close(): Promise<void> {
+    return this.config.close();
+  }
+
   // Every exact address, the pages and the data they ask for, as one lookup.
   private exactRoutes(): ReadonlyMap<string, Route> {
     return new Map([...this.pageRoutes(), ...this.dataRoutes()]);
