@@ -56,6 +56,7 @@ export class ChangesRoutes {
       await ctx.page({
         title: "Changes",
         section: "changes",
+        firstScreen: true,
         article: renderChangesArticle(
           review,
           worktree,

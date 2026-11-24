@@ -22,6 +22,7 @@ import {
   renderContextSummary,
   renderDocumentContext,
 } from "./context-view.js";
+import { firstScreenMarker } from "./page.js";
 import { documentHref } from "./render-document.js";
 import {
   type Baseline,
@@ -94,19 +95,26 @@ export function renderChangesArticle(
   if (affected !== undefined) {
     article.push(affected);
   }
-  if (result.config !== undefined) {
-    article.push(configCard(result.config, context));
-  }
-  for (const review of documents) {
-    article.push(
+  const cards = [
+    ...(result.config === undefined
+      ? []
+      : [configCard(result.config, context)]),
+    ...documents.map((review) =>
       documentCard(review, {
         worktree,
         context,
         mark: markOf(review.path),
         reviewed,
       }),
-    );
-  }
+    ),
+  ];
+  // The page is drawn once the overview and the first card are read; the diffs of the rest, most of
+  // the page, follow out of sight.
+  article.push(
+    ...cards.slice(0, 1),
+    ...(cards.length > 1 ? [firstScreenMarker()] : []),
+    ...cards.slice(1),
+  );
   return article;
 }
 

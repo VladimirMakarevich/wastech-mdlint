@@ -337,6 +337,52 @@ describe("dashboardCsv", () => {
 });
 
 describe("renderDashboardArticle", () => {
+  // The page is drawn once its first screen is read: the row after the forty that fill the tallest
+  // screen carries the id the page waits for. A shorter table has none, and is drawn once all of it
+  // is read, as every other page is.
+  it("marks the first row below the first screen", () => {
+    const many = new Map<string, ParsedDocument>(
+      Array.from({ length: 45 }, (_, index) => {
+        const path = `d${String(index).padStart(2, "0")}.md`;
+        return [path, parseDocument({ path, content: `# ${path}\n` })];
+      }),
+    );
+    const long: DashboardSource = {
+      documents: many,
+      graph: buildContextGraph(many, {}),
+      findings: new Map(),
+      ruleIds: [],
+      folders: graphFolders(many.keys()),
+    };
+    const parsed = parseDashboardQuery(new URLSearchParams(), long);
+    if (!parsed.ok) {
+      throw new Error(parsed.message);
+    }
+    const html = toHtml(
+      renderDashboardArticle({
+        params: new URLSearchParams(),
+        source: long,
+        ok: true,
+        query: parsed.query,
+        result: buildDashboard(long, parsed.query),
+      }),
+    );
+    expect(html.match(/id="viewer\.first-screen"/g)).toHaveLength(1);
+    expect(html).toContain(
+      '<tr id="viewer.first-screen"><td class="dashboard-path"><a href="/doc/d40.md">',
+    );
+    const short = toHtml(
+      renderDashboardArticle({
+        params: new URLSearchParams(),
+        source,
+        ok: true,
+        query: query(""),
+        result: buildDashboard(source, query("")),
+      }),
+    );
+    expect(short).not.toContain("viewer.first-screen");
+  });
+
   // The path filter comes back as the field's value and every document path as text, both escaped
   // by the hast serializer; a refused query is repeated in its message the same way.
   it("escapes what the address and the repository put on the page", () => {

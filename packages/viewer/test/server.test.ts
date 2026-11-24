@@ -360,12 +360,15 @@ describe("pages", () => {
   // The blocking script after the tree stops the parser while it is fetched, and a browser drew the
   // header and the tree over an empty article for one frame. Every page is held until its last
   // element is read; that element is an empty one of its own at the very end, since a browser stops
-  // waiting for an element at its start tag, and the layout's start tag comes before the tree.
+  // waiting for an element at its start tag, and the layout's start tag comes before the tree. The
+  // dashboard and the Changes page are long, and wait only for their first screen.
   it("is not drawn before all of it has been read", async () => {
     for (const address of ["/doc/docs/guide.md", "/search?q=x", "/dashboard"]) {
       const { body } = await get(address);
+      const awaited =
+        address === "/dashboard" ? "viewer.first-screen" : "viewer.end";
       expect(body, address).toContain(
-        '<link rel="expect" href="#viewer.end" blocking="render"></head>',
+        `<link rel="expect" href="#${awaited}" blocking="render"></head>`,
       );
       expect(body, address).toMatch(
         /<div id="viewer\.end" hidden><\/div><\/body>/,

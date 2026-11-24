@@ -89,6 +89,10 @@ export type PageParams = {
   // On a document with findings, once the first lint is in: the panel that lists them, above
   // everything else in the article.
   findingsPanel?: Element;
+  // Set by a long page whose article marks where its first screen ends with `FIRST_SCREEN_ID`: the
+  // page is drawn once that much is read. A page that sets it but has no such element, being short
+  // after all, is drawn once all of it is read.
+  firstScreen?: boolean;
 };
 
 export type Section = "graph" | "dashboard" | "changes" | "config";
@@ -108,6 +112,19 @@ export const CONTENT_ID = "viewer.content";
 // `renderHead`). An element of its own rather than the layout around the tree and the article, since
 // a browser stops waiting for an element as soon as it has read its start tag.
 const END_ID = "viewer.end";
+
+/**
+ * The id a long page gives the first element below its first screen, so the page is drawn once
+ * everything above it has been read rather than all of it (`firstScreen`). The Changes page and the
+ * dashboard are several hundred kilobytes, most of it far below the first screen, and waiting for all
+ * of it held them back by a fifth of a second; what arrives after the first frame is out of sight.
+ */
+export const FIRST_SCREEN_ID = "viewer.first-screen";
+
+/** An empty element to place where a long page's first screen ends, when nothing there can carry the id. */
+export function firstScreenMarker(): Element {
+  return h("div", { id: FIRST_SCREEN_ID, hidden: true });
+}
 
 // The theme switch's three choices, one segment each. The stylesheet marks the chosen one from the
 // choice `theme.js` applied before the first paint, so the control is right from the first frame
@@ -217,11 +234,16 @@ function renderHead(params: PageParams): Element {
     h("script", { src: "/assets/theme.js" }),
     h("link", { rel: "stylesheet", href: "/assets/viewer.css" }),
     h("script", { type: "module", src: "/assets/viewer.js" }),
-    // Nothing of the page is drawn until all of it has been read. The blocking script after the tree
-    // stops the parser while it is fetched, and the browser drew what it had by then — the header and
-    // the tree over an empty article — one frame before the rest, so a navigation blinked through an
-    // empty page. Browsers that do not know this link draw as before.
-    h("link", { rel: "expect", href: `#${END_ID}`, blocking: "render" }),
+    // Nothing of the page is drawn until all of it has been read, or on a long page all of its first
+    // screen. The blocking script after the tree stops the parser while it is fetched, and the
+    // browser drew what it had by then — the header and the tree over an empty article — one frame
+    // before the rest, so a navigation blinked through an empty page. Browsers that do not know this
+    // link draw as before.
+    h("link", {
+      rel: "expect",
+      href: `#${params.firstScreen === true ? FIRST_SCREEN_ID : END_ID}`,
+      blocking: "render",
+    }),
   ]);
 }
 

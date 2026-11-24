@@ -204,6 +204,22 @@ describe.skipIf(!hasGit)("the Changes section (requires git on PATH)", () => {
   });
 
   // @boundary-guard host-parity
+  // Most of the Changes page is the diffs of its cards, far below the first screen. The page is drawn
+  // once the overview and the first card are read, and the rest follows out of sight.
+  it("is drawn once the overview and its first card are read", async () => {
+    const { body } = await get(port, "/changes");
+    expect(body).toContain(
+      '<link rel="expect" href="#viewer.first-screen" blocking="render"></head>',
+    );
+    const marker = body.indexOf('<div id="viewer.first-screen" hidden></div>');
+    expect(marker).toBeGreaterThan(0);
+    const cards = [...body.matchAll(/<section class="change-card/g)].map(
+      (match) => match.index,
+    );
+    expect(cards.filter((index) => index < marker)).toHaveLength(1);
+    expect(cards.filter((index) => index > marker).length).toBeGreaterThan(0);
+  });
+
   // The page and `/api/changes` describe one review: the page's list is read back from its text and
   // compared with the JSON, so a count or an order computed twice cannot drift apart unseen.
   it("lists the changed documents most influential first, and the API lists the same", async () => {

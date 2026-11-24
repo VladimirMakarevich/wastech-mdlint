@@ -17,6 +17,7 @@ import {
   type SortDirection,
   type SortKey,
 } from "./dashboard.js";
+import { FIRST_SCREEN_ID } from "./page.js";
 import { documentHref } from "./render-document.js";
 
 // The dashboard page's article: the filter form, the summary line and the table of rows `dashboard.ts`
@@ -353,12 +354,19 @@ function renderTable(
               ),
             ]),
           ]
-        : result.rows.map((row) => renderRow(row)),
+        : result.rows.map((row, index) =>
+            renderRow(row, index === FIRST_SCREEN_ROWS),
+          ),
     ),
   ]);
 }
 
-function renderRow(row: DashboardRow): Element {
+// The rows a first screen holds, on the tallest of screens, below the filters: the page is drawn once
+// they are read, and the row after them carries the id that says so. The other rows of a corpus of
+// hundreds follow out of sight.
+const FIRST_SCREEN_ROWS = 40;
+
+function renderRow(row: DashboardRow, belowFirstScreen: boolean): Element {
   const count = (value: number | null, className: string) =>
     h(
       value !== null && value > 0
@@ -366,7 +374,7 @@ function renderRow(row: DashboardRow): Element {
         : "td.is-numeric",
       value === null ? "—" : String(value),
     );
-  return h("tr", [
+  return h("tr", belowFirstScreen ? { id: FIRST_SCREEN_ID } : {}, [
     h("td.dashboard-path", h("a", { href: documentHref(row.path) }, row.path)),
     row.change === undefined ? undefined : renderChange(row.change),
     count(row.errors, "has-errors"),

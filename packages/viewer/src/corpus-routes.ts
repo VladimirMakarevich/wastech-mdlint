@@ -253,6 +253,7 @@ export class CorpusRoutes {
       await this.ctx.page({
         title: "Dashboard",
         section: "dashboard",
+        firstScreen: true,
         article: renderDashboardArticle(
           parsed.ok
             ? {
