@@ -1,13 +1,19 @@
 import type { Element } from "hast";
 import { h } from "hastscript";
 
-import { diffText, parseDocument, tableRowLines } from "@wastech-mdlint/core";
+import {
+  diffText,
+  documentSections,
+  parseDocument,
+  tableRowLines,
+} from "@wastech-mdlint/core";
 
 import type { DocumentReview, Review } from "./changes.js";
 import {
   contentHash,
   type ReviewMarks,
   type ReviewStatus,
+  type SectionHash,
   type ReviewStore,
   type StoreRead,
 } from "./review-store.js";
@@ -56,8 +62,45 @@ export function markOf(
       path: entry.path,
       ...(entry.oldPath === undefined ? {} : { oldPath: entry.oldPath }),
       hash,
+      sections: sectionHashes(entry),
     }),
   };
+}
+
+/**
+ * The sections of a changed document as the page shows it, each with the hash of its own text: what
+ * marking the document records for them, and what a section's mark must name. None for a deleted
+ * document, which has no text to cut.
+ */
+export function sectionHashes(entry: DocumentReview): SectionHash[] {
+  return entry.headDocument === undefined
+    ? []
+    : documentSections(entry.headDocument).map((section) => ({
+        key: section.key,
+        hash: contentHash(section.text),
+      }));
+}
+
+/** A section's place in the reader's review, keyed by its heading's slug for the outline. */
+export type SectionMark = SectionHash & { status: ReviewStatus };
+
+export function sectionMarksOf(
+  entry: DocumentReview,
+  marks: ReviewMarks,
+): Map<string, SectionMark> {
+  return new Map(
+    sectionHashes(entry).map((section) => [
+      section.key,
+      {
+        ...section,
+        status: marks.sectionStatus({
+          path: entry.path,
+          ...(entry.oldPath === undefined ? {} : { oldPath: entry.oldPath }),
+          ...section,
+        }),
+      },
+    ]),
+  );
 }
 
 function leftOf(documents: ReadonlyMap<string, DocumentMark>): number {
@@ -72,6 +115,14 @@ export type MarkRequest = {
   reviewed: boolean;
   // Which review the page showed: the work tree's, or the last commit's.
   worktree: boolean;
+};
+
+/** A request to mark one section of a changed document reviewed or not, from the outline. */
+export type SectionRequest = {
+  path: string;
+  section: string;
+  hash: string;
+  reviewed: boolean;
 };
 
 /** A request to forget the marks of the documents a page listed. */
@@ -107,6 +158,33 @@ export function parseMarkRequest(body: unknown): Parsed<MarkRequest> {
     };
   }
   return { ok: true, request: { path, hash, reviewed, worktree } };
+}
+
+export function parseSectionRequest(body: unknown): Parsed<SectionRequest> {
+  const fields = objectOf(body, ["path", "section", "hash", "reviewed"]);
+  if (!fields.ok) {
+    return fields;
+  }
+  const { path, section, hash, reviewed } = fields.value;
+  if (typeof path !== "string" || path.length === 0) {
+    return { ok: false, message: '"path" must name a changed document.' };
+  }
+  if (typeof section !== "string") {
+    return {
+      ok: false,
+      message: '"section" must be the slug of a section\'s heading.',
+    };
+  }
+  if (typeof hash !== "string" || !HASH.test(hash)) {
+    return {
+      ok: false,
+      message: '"hash" must name the version of the section the page showed.',
+    };
+  }
+  if (typeof reviewed !== "boolean") {
+    return { ok: false, message: '"reviewed" must be true or false.' };
+  }
+  return { ok: true, request: { path, section, hash, reviewed } };
 }
 
 export function parseResetRequest(body: unknown): Parsed<ResetRequest> {

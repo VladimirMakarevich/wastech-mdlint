@@ -60,6 +60,8 @@ Four commands and tools report lint findings, and they do **not** all return the
 
 `messages` is the same array of the shape above on all four. The differences are the wrapper and the counts: only the CLI's `lint` wraps the record in a `summary`, and only the ad-hoc MCP `lint` tool omits `files` — it lints one caller-supplied string, which is not a corpus, so there is no file list to report.
 
+With `--since` / `since`, the lint payloads keep their shape and carry only the findings the branch adds, with a `since` object beside them — `{ ref, base, mergeBase, head, changed, removed }` — and the impact record has `files` in place of `file`, plus that object; both hosts build them from the same core calls.
+
 The **impact record** itself — `{ file, directlyAffected, transitivelyAffected, readingOrder, excluded }` — is identical on both hosts, key for key, and the CLI's `lint` key is an addition to it rather than a change in it. So a client generated from the MCP [`impact-analysis`](mcp-server.md#the-6-tools) `outputSchema` reads the CLI's JSON unchanged, and a cross-host test compares the two payloads directly.
 
 ## Exit codes

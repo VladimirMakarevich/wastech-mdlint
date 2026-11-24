@@ -94,6 +94,7 @@ describe("gitEnvironment", () => {
     expect(settings).toEqual([
       ["core.fsmonitor", "false"],
       ["core.quotePath", "false"],
+      ["log.showSignature", "false"],
       ["filter.a=b.clean", ""],
     ]);
   });
@@ -394,6 +395,15 @@ describe.skipIf(!hasGit)("openGitRepository (requires git on PATH)", () => {
       expect(atTop.topLevelPath("root.md")).toBe("root.md");
       // One clone, one identity, whichever folder of it the host was started in.
       expect(repository.commonDir).toBe(atTop.commonDir);
+      expect(atTop.gitDir).toBe(atTop.commonDir);
+
+      // An added worktree shares the clone's refs but has a `HEAD` of its own.
+      const other = path.join(fixture.dir, "other");
+      fixture.git("worktree", "add", "-q", other, "main");
+      const added = await open(other, fixture.env);
+      expect(added.commonDir).toBe(atTop.commonDir);
+      expect(added.gitDir).not.toBe(atTop.gitDir);
+      expect(path.dirname(path.dirname(added.gitDir))).toBe(atTop.commonDir);
     },
     TIMEOUT_MS,
   );

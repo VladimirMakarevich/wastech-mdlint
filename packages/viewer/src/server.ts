@@ -18,6 +18,7 @@ import { h } from "hastscript";
 import {
   changedSections,
   compareStrings,
+  type GitRepository,
   headChanges,
   type LintMessage,
   type ParsedDocument,
@@ -36,8 +37,10 @@ import {
   renderHunkTemplate,
   type BannerReview,
   type Review,
+  type ReviewContext,
   type ReviewResult,
 } from "./changes.js";
+import { blameAnnotator } from "./blame.js";
 import { dashboardChanges, graphChanges } from "./branch-changes.js";
 import {
   candidateText,
@@ -82,10 +85,10 @@ import { findingPrompts } from "./prompts.js";
 import {
   renderDocument,
   documentHref,
+  type LineAnnotator,
   type RenderedDocument,
 } from "./render-document.js";
 import { decodeRequestPath } from "./request-path.js";
-import type { ReviewContext } from "./review-context.js";
 import {
   baselineOf,
   type Baseline,
@@ -93,6 +96,9 @@ import {
   markReview,
   parseMarkRequest,
   parseResetRequest,
+  parseSectionRequest,
+  sectionHashes,
+  sectionMarksOf,
   type ReviewMarksView,
   SinceReview,
 } from "./review-state.js";
@@ -109,7 +115,7 @@ import {
   rawFileHeaders,
 } from "./security.js";
 import { defaultStateDir } from "./state-dir.js";
-import { watchRepository } from "./watch.js";
+import { watchGitRefs, watchRepository } from "./watch.js";
 
 export type ViewerOptions = {
   cwd: string;
@@ -172,8 +178,12 @@ const CHANGE_ROUTES = new Set([
   "/api/config/save",
   "/api/config/open",
   "/api/review/mark",
+  "/api/review/section",
   "/api/review/reset",
 ]);
+
+// Enough of a document's history to see who has been changing it lately, without paging through it.
+const HISTORY_COMMITS = 8;
 
 const REVIEW_OFF =
   "Review marks are off: they need a git work tree, and a viewer bound to a loopback address, since a mark records this user's review on this machine.";
@@ -316,28 +326,31 @@ export async function startViewer(
     { document: ParsedDocument; result: Promise<MarkedDocument> }
   >();
 
+  // With blame, nothing is kept: blame is asked for one page at a time, and the blame of a file moves
+  // with every commit, which nothing here would notice.
   function renderMarked(
     document: ParsedDocument,
     review: DocumentReview,
+    annotate?: LineAnnotator,
   ): Promise<MarkedDocument> {
     const entry = marked.get(review);
-    if (entry !== undefined && entry.document === document) {
+    if (
+      annotate === undefined &&
+      entry !== undefined &&
+      entry.document === document
+    ) {
       return entry.result;
     }
     const changes = headChanges(review.diff);
     const result = renderDocument(
       document,
-      {
-        resolve: (fromPath, target, isImage) =>
-          corpus.resolve(fromPath, target, isImage),
-        resolveEmbedded: (target, isImage) =>
-          corpus.resolveEmbedded(document, target, isImage),
-      },
+      resolversFor(document),
       {
         changes,
         basePath: review.oldPath ?? review.path,
         baseText: review.baseText,
       },
+      annotate,
     ).then((rendered) => ({
       rendered,
       changedSections: new Set(
@@ -346,8 +359,10 @@ export async function startViewer(
         ),
       ),
     }));
-    marked.set(review, { document, result });
-    result.catch(() => marked.delete(review));
+    if (annotate === undefined) {
+      marked.set(review, { document, result });
+      result.catch(() => marked.delete(review));
+    }
     return result;
   }
 
@@ -504,6 +519,8 @@ export async function startViewer(
           ),
         );
       }
+    } else if (target === "/api/history") {
+      await sendHistory(response, params);
     } else if (target === "/api/changes/diff") {
       await sendChangeDiff(response, params);
     } else if (target === "/dashboard") {
@@ -566,6 +583,7 @@ export async function startViewer(
         decodeRequestPath(target.slice("/doc/".length)),
         diffViewOf(params),
         baselineOf(params),
+        params.get("blame") === "1",
       );
     } else if (target.startsWith("/file/")) {
       await sendLinkedFile(
@@ -611,6 +629,7 @@ export async function startViewer(
     relPath: string | undefined,
     view: DiffView,
     baseline: Baseline,
+    blame: boolean,
   ): Promise<void> {
     const document =
       relPath === undefined ? undefined : corpus.documents.get(relPath);
@@ -622,13 +641,33 @@ export async function startViewer(
       );
       return;
     }
+    // Blame is asked for in the address and drawn on the server, like the other views of a page. The
+    // file on disk is what git blames, so it is used only while it is the text the corpus holds; a
+    // page asked for between a save and the corpus catching up shows no blame rather than the
+    // wrong lines'.
+    const annotate =
+      blame && git !== undefined
+        ? await blameOf(git, relPath, document.content)
+        : undefined;
     const common = {
       displayPath: relPath,
       absolutePath: absolutePathOf(relPath),
       documentPath: relPath,
       backlinks: corpus.backlinks(relPath),
       neighborCount: documentNeighbors(corpus.graph, relPath).length,
+      ...(git === undefined
+        ? {}
+        : {
+            blameToggle: {
+              on: annotate !== undefined,
+              href: documentPageHref(relPath, view, baseline, !blame),
+            },
+          }),
     };
+    const plain = (): Promise<RenderedDocument> =>
+      annotate === undefined
+        ? render(document)
+        : renderDocument(document, resolversFor(document), undefined, annotate);
     const branchReview = await reviewOf(document);
     const reviewed = await bannerReviewOf(branchReview, baseline);
     // What the page marks: the branch's changes, or the changes since the reader's last review when
@@ -643,13 +682,15 @@ export async function startViewer(
     if (review !== undefined && view === "source") {
       // The diff takes the article's place. The outline is left out with the rendered text, since
       // none of its headings is on this page to jump to.
-      const { title } = await render(document);
+      const { title } = await plain();
       params = {
         ...common,
         localGraphChanges,
         title,
         changeBanner: banner(view),
-        article: [h("div.change-source", renderDiff(review.diff))],
+        article: [
+          h("div.change-source", renderDiff(review.diff, review.headText)),
+        ],
       };
     } else if (
       review !== undefined &&
@@ -662,6 +703,7 @@ export async function startViewer(
       const { rendered, changedSections } = await renderMarked(
         document,
         review,
+        annotate,
       );
       params = {
         ...common,
@@ -675,7 +717,7 @@ export async function startViewer(
         frontmatterChange: rendered.frontmatterChange,
       };
     } else {
-      const { html, title } = await render(document);
+      const { html, title } = await plain();
       params = {
         ...common,
         localGraphChanges,
@@ -691,8 +733,17 @@ export async function startViewer(
       200,
       page({
         ...params,
-        // The "Viewed" checkbox above a changed document sends its mark with it.
-        ...(reviewed === undefined ? {} : { changeToken }),
+        // The "Viewed" checkbox above a changed document sends its mark with it, and so does each
+        // section's in the outline.
+        ...(reviewed === undefined || branchReview === undefined
+          ? {}
+          : {
+              changeToken,
+              sectionMarks: {
+                path: branchReview.path,
+                marks: reviewed.sections,
+              },
+            }),
       }),
       request.method === "HEAD",
     );
@@ -715,6 +766,7 @@ export async function startViewer(
       return undefined;
     }
     const mark = markOf(review, read.marks);
+    const sections = sectionMarksOf(review, read.marks);
     // A document reviewed as it is compares with its own text, which is kept under its hash
     // whichever path it was marked under: the page then shows that nothing changed since.
     const version = mark.status === "reviewed" ? mark.hash : mark.since;
@@ -722,7 +774,100 @@ export async function startViewer(
       baseline === "review" && version !== undefined
         ? await sinceReviews?.of(review, version)
         : undefined;
-    return { mark, baseline, ...(since === undefined ? {} : { since }) };
+    return {
+      mark,
+      baseline,
+      sections,
+      ...(since === undefined ? {} : { since }),
+    };
+  }
+
+  // A document page's address with its views as asked: the changes view, the comparison, and blame.
+  function documentPageHref(
+    relPath: string,
+    view: DiffView,
+    baseline: Baseline,
+    blame: boolean,
+  ): string {
+    const params = new URLSearchParams();
+    if (view !== "rendered") {
+      params.set("diff", view);
+    }
+    if (baseline === "review") {
+      params.set("since", "review");
+    }
+    if (blame) {
+      params.set("blame", "1");
+    }
+    const query = params.toString();
+    return query === ""
+      ? documentHref(relPath)
+      : `${documentHref(relPath)}?${query}`;
+  }
+
+  // The margin notes of one document, or `undefined` when git cannot blame it or the file on disk is
+  // no longer the text being rendered.
+  async function blameOf(
+    repository: GitRepository,
+    relPath: string,
+    content: string,
+  ): Promise<LineAnnotator | undefined> {
+    const onDisk = await readFile(
+      path.join(corpus.rootDir, ...relPath.split("/")),
+      "utf8",
+    ).catch(() => undefined);
+    if (onDisk !== content) {
+      return undefined;
+    }
+    const lines = await repository.blame(relPath).catch(() => []);
+    return lines.length === 0
+      ? undefined
+      : blameAnnotator(lines, showAbsolutePaths);
+  }
+
+  function resolversFor(document: ParsedDocument) {
+    return {
+      resolve: (fromPath: string, target: string, isImage: boolean) =>
+        corpus.resolve(fromPath, target, isImage),
+      resolveEmbedded: (target: string, isImage: boolean) =>
+        corpus.resolveEmbedded(document, target, isImage),
+    };
+  }
+
+  // The commits that last touched a document, for the line above its text: newest first, a few at
+  // most, the author's name only on a loopback binding, as a person's name is kept to this machine.
+  async function sendHistory(
+    response: ServerResponse,
+    params: URLSearchParams,
+  ): Promise<void> {
+    // Only ever compared against the corpus's own paths, like the graph's parameters.
+    const relPath = params.get("path") ?? "";
+    if (git === undefined || !corpus.documents.has(relPath)) {
+      sendJson(
+        response,
+        {
+          error:
+            git === undefined
+              ? NO_CHANGES
+              : "This path is not a document in the corpus.",
+        },
+        404,
+      );
+      return;
+    }
+    const commits = await git
+      .fileHistory(relPath, HISTORY_COMMITS)
+      .catch(() => []);
+    sendJson(response, {
+      path: relPath,
+      commits: commits.map((commit) => ({
+        commit: commit.commit,
+        short: commit.short,
+        date: commit.date,
+        subject: commit.subject,
+        ...(showAbsolutePaths ? { author: commit.author } : {}),
+      })),
+    });
   }
 
   async function sendLinkedFile(
@@ -1211,6 +1356,10 @@ export async function startViewer(
       await openConfig(response, json);
       return;
     }
+    if (target === "/api/review/section") {
+      await changeSectionMark(response, json);
+      return;
+    }
     if (target === "/api/review/mark" || target === "/api/review/reset") {
       await changeMarks(response, target, json);
       return;
@@ -1300,12 +1449,14 @@ export async function startViewer(
             path: entry.path,
             hash: parsed.request.hash,
             text: entry.headText,
+            sections: sectionHashes(entry),
           }
         : {
             kind: "unmark",
             path: entry.path,
             ...(entry.oldPath === undefined ? {} : { oldPath: entry.oldPath }),
             hash: parsed.request.hash,
+            sections: sectionHashes(entry),
           };
     }
     const outcome = await reviewStore.update(change);
@@ -1331,8 +1482,97 @@ export async function startViewer(
         return {
           path: entry.path,
           review: { status: mark.status, hash: mark.hash },
+          // Marking a document marks its sections too, so the outline follows the answer.
+          sections: [...sectionMarksOf(entry, outcome.marks).values()].map(
+            (section) => ({ key: section.key, status: section.status }),
+          ),
         };
       }),
+      left: marks.ok ? marks.left : review.documents.length,
+      total: review.documents.length,
+    });
+  }
+
+  // One section of a changed document marked reviewed or not, from its page's outline. Always the
+  // work tree's review, the one a document's page shows; the section's text is the review's own, and
+  // only the version the page showed may be marked, as for a whole document.
+  async function changeSectionMark(
+    response: ServerResponse,
+    body: unknown,
+  ): Promise<void> {
+    if (reviewStore === undefined || changes === undefined) {
+      sendJson(response, { status: "refused", error: REVIEW_OFF }, 403);
+      return;
+    }
+    const parsed = parseSectionRequest(body);
+    if (!parsed.ok) {
+      sendJson(response, { status: "refused", error: parsed.message }, 400);
+      return;
+    }
+    const review = await changes.review(true);
+    if ("available" in review) {
+      sendJson(response, { status: "refused", error: review.message }, 409);
+      return;
+    }
+    const { request: asked } = parsed;
+    // Only ever compared against the review's own paths and the document's own section keys.
+    const entry = review.documents.find(
+      (document) => document.path === asked.path,
+    );
+    const section =
+      entry === undefined
+        ? undefined
+        : sectionHashes(entry).find(
+            (candidate) => candidate.key === asked.section,
+          );
+    if (
+      entry === undefined ||
+      section === undefined ||
+      section.hash !== asked.hash
+    ) {
+      sendJson(
+        response,
+        {
+          status: "conflict",
+          error:
+            "The section changed since this page showed it, or is no longer there. Reload the page to review it as it is now.",
+        },
+        409,
+      );
+      return;
+    }
+    const outcome = await reviewStore.update({
+      kind: "section",
+      path: entry.path,
+      ...(entry.oldPath === undefined ? {} : { oldPath: entry.oldPath }),
+      key: section.key,
+      hash: section.hash,
+      reviewed: asked.reviewed,
+    });
+    if (!outcome.ok) {
+      sendJson(
+        response,
+        { status: outcome.status, error: outcome.message },
+        outcome.status === "failed"
+          ? 500
+          : outcome.status === "busy"
+            ? 503
+            : 409,
+      );
+      return;
+    }
+    broadcast("review", {});
+    const marks = markReview(review, { ok: true, marks: outcome.marks });
+    const mark = markOf(entry, outcome.marks);
+    sendJson(response, {
+      status: "saved",
+      section: {
+        key: section.key,
+        status: sectionMarksOf(entry, outcome.marks).get(section.key)?.status,
+      },
+      documents: [
+        { path: entry.path, review: { status: mark.status, hash: mark.hash } },
+      ],
       left: marks.ok ? marks.left : review.documents.length,
       total: review.documents.length,
     });
@@ -1728,6 +1968,27 @@ export async function startViewer(
       })
     : () => {};
 
+  // A commit, a checkout, a reset or a fetch moves what the review compares without touching the
+  // work tree. The review is rebuilt as soon as git records the move, and open pages are told only
+  // when it really is a different review: a ref of some other branch moving changes nothing they show.
+  const stopWatchingRefs =
+    options.watch && git !== undefined
+      ? watchGitRefs(git, () => {
+          void refreshAfterGitMove();
+        })
+      : () => {};
+
+  async function refreshAfterGitMove(): Promise<void> {
+    if (changes === undefined) {
+      return;
+    }
+    const before = changes.cached(true);
+    const after = await changes.review(true).catch(() => undefined);
+    if (after !== undefined && after !== before) {
+      broadcast("git", {});
+    }
+  }
+
   const server = createServer((request, response) => {
     handle(request, response).catch((error: unknown) => {
       // Logged locally with the request path only; the response stays generic so an error message
@@ -1764,6 +2025,7 @@ export async function startViewer(
     async close() {
       clearImmediate(initialLint);
       stopWatching();
+      stopWatchingRefs();
       clearInterval(keepAlive);
       for (const client of eventClients) {
         client.end();

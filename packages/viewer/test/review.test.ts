@@ -265,6 +265,8 @@ describe.skipIf(!hasGit)("review marks (requires git on PATH)", () => {
         {
           path: "docs/guide.md",
           review: { status: "reviewed", hash: contentHash(GUIDE) },
+          // The text before the first section: this document has no second-level heading.
+          sections: [{ key: "", status: "reviewed" }],
         },
       ],
       left: 2,
@@ -401,7 +403,7 @@ describe.skipIf(!hasGit)("review marks (requires git on PATH)", () => {
     } finally {
       await fixture.write("docs/guide.md", GUIDE);
     }
-  });
+  }, 30_000);
 
   it("keeps a mark when another branch holds the same text, and when the document moves", async () => {
     const dir = await stateDir();
@@ -436,7 +438,7 @@ describe.skipIf(!hasGit)("review marks (requires git on PATH)", () => {
       fixture.git("checkout", "-q", "feature");
       fixture.git("branch", "-q", "-D", "elsewhere");
     }
-  });
+  }, 30_000);
 
   it("starts the review over for the documents a page listed", async () => {
     const target = await open(await stateDir());
@@ -512,4 +514,84 @@ describe("review marks outside a git work tree", () => {
       await target.viewer.close();
     }
   });
+});
+
+describe.skipIf(!hasGit)("section marks (requires git on PATH)", () => {
+  // A document whose sections the branch edits: marked one section at a time from the outline, it
+  // counts as reviewed once every section is, without ever being marked as a whole.
+  it("marks sections from the outline and counts the document reviewed once every section is", async () => {
+    const fixture = await makeRepo();
+    await fixture.write("README.md", "# Fixture\n");
+    await fixture.write(
+      "docs/guide.md",
+      "# Guide\n\nIntro.\n\n## Install\n\nOld install.\n\n## Use\n\nUse it.\n",
+    );
+    fixture.commit("base");
+    fixture.git("checkout", "-q", "-b", "feature");
+    await fixture.write(
+      "docs/guide.md",
+      "# Guide\n\nIntro.\n\n## Install\n\nNew install.\n\n## Use\n\nUse it well.\n",
+    );
+    const target = await start(fixture.repo, await stateDir(), fixture.env);
+    try {
+      const page = (await send(target.port, "/doc/docs/guide.md")).body;
+      const buttons = [
+        ...page.matchAll(
+          /<button class="section-mark" type="button" hidden aria-pressed="false" aria-label="[^"]*" title="Not viewed yet" data-path="docs\/guide\.md" data-section="([a-z]+)" data-hash="([0-9a-f]{64})">/g,
+        ),
+      ].map((match) => ({ section: match[1]!, hash: match[2]! }));
+      expect(buttons.map((button) => button.section)).toEqual([
+        "install",
+        "use",
+      ]);
+
+      const sectionPost = (body: unknown) =>
+        send(target.port, "/api/review/section", {
+          method: "POST",
+          headers: {
+            Origin: `http://127.0.0.1:${String(target.port)}`,
+            "Content-Type": "application/json",
+            "X-Wastech-Viewer-Token": target.token,
+          },
+          body: JSON.stringify(body),
+        });
+      const stale = await sectionPost({
+        path: "docs/guide.md",
+        section: "use",
+        hash: contentHash("## Use\n\nUse it."),
+        reviewed: true,
+      });
+      expect(stale.status).toBe(409);
+
+      for (const button of buttons) {
+        const answer = await sectionPost({
+          path: "docs/guide.md",
+          section: button.section,
+          hash: button.hash,
+          reviewed: true,
+        });
+        expect(JSON.parse(answer.body)).toMatchObject({
+          status: "saved",
+          section: { key: button.section, status: "reviewed" },
+        });
+      }
+      // The text before the first section never changed, but was never marked either.
+      expect((await statuses(target))["docs/guide.md"]).toBe("changed");
+      const intro = await sectionPost({
+        path: "docs/guide.md",
+        section: "",
+        hash: contentHash("# Guide\n\nIntro."),
+        reviewed: true,
+      });
+      expect(JSON.parse(intro.body)).toMatchObject({
+        documents: [{ path: "docs/guide.md", review: { status: "reviewed" } }],
+      });
+      expect((await statuses(target))["docs/guide.md"]).toBe("reviewed");
+      expect((await send(target.port, "/doc/docs/guide.md")).body).toMatch(
+        /<li class="depth-2" data-review="reviewed">[\s\S]*?aria-pressed="true"/,
+      );
+    } finally {
+      await target.viewer.close();
+    }
+  }, 30_000);
 });

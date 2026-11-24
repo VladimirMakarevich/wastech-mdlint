@@ -3419,6 +3419,46 @@ a:hover {
   font-size: 13px;
 }
 
+/* A line moved rather than removed and added: tinted in the accent rather than red or green, with
+   where it went or came from at its end, so a paragraph cut and pasted reads as one change. */
+.diff-moved {
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+.diff-move {
+  margin-left: var(--space-2);
+  padding: 0 5px;
+  border-radius: 5px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* The button that opens unchanged lines between hunks, drawn like the hunk header it sits beside. */
+.markdown-body .diff-expand td {
+  padding: 2px var(--space-2);
+  background: var(--bg-subtle);
+}
+
+.diff-expand-button {
+  padding: 1px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.diff-expand-button:hover {
+  background: var(--fill);
+}
+
 /* ---------------------------------------------------------------------------------------------
    Review marks: what the reader has reviewed. A reviewed card folds to its header, as a viewed file
    does in a pull request, so what is left stands out; a document changed after its review is marked
@@ -3545,9 +3585,115 @@ a:hover {
 @media print {
   .review-toggle,
   .review-reset,
-  .changes-since {
+  .changes-since,
+  .changes-history,
+  .blame-toggle {
     display: none;
   }
+}
+
+/* A section's own review mark, at the end of its outline entry: an empty box until the section is
+   viewed, a green tick once it is, an amber edge when it changed after it was viewed. */
+.outline li[data-review] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.outline li[data-review] > a {
+  flex: 1;
+  min-width: 0;
+}
+
+.outline li[data-review="reviewed"] > a {
+  color: var(--fg-muted);
+}
+
+.section-mark {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: transparent;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.section-mark[hidden] {
+  display: none;
+}
+
+.section-mark:hover {
+  color: var(--fg-muted);
+}
+
+.section-mark[aria-pressed="true"] {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--diff-added) 16%, transparent);
+  color: var(--diff-added);
+}
+
+.outline li[data-review="changed"] .section-mark {
+  border-color: var(--warning);
+}
+
+/* The commits that last touched a changed document, under the line above its text. */
+.changes-history {
+  flex-basis: 100%;
+  font-size: 13px;
+}
+
+.changes-history[hidden] {
+  display: none;
+}
+
+.changes-history > summary {
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.markdown-body .changes-history-list {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-5);
+}
+
+.changes-history-date,
+.changes-history-author,
+.changes-history-note {
+  color: var(--fg-muted);
+}
+
+/* Who last changed each block, beside its source line number in the right margin. The margin widens
+   while blame is shown, so a hash and a date fit beside the number. */
+.blame-toggle {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--fg-muted);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.blame-toggle:hover,
+.blame-toggle[aria-pressed="true"] {
+  background: var(--fill);
+  color: var(--fg);
+}
+
+.content:has(.markdown-body.has-blame) {
+  padding-right: max(var(--reader-pad-right, 48px), 200px);
+}
+
+.markdown-body.has-blame [data-blame]::after {
+  content: attr(data-line) "\00a0\00a0" attr(data-blame);
+}
+
+.markdown-body.has-blame [data-blame] {
+  cursor: help;
 }
 
 @media (max-width: 1200px) {

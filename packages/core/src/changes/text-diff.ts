@@ -26,7 +26,9 @@ export type DiffSegment = { text: string; changed: boolean };
 /**
  * One line of a hunk, numbered from 1 on each side it exists on. A removed or added line that was
  * paired with its counterpart carries `segments`, which cover the whole line; one without a
- * counterpart close enough to compare is changed as a whole.
+ * counterpart close enough to compare is changed as a whole. A whole line removed in one place and
+ * added unchanged in another is a move: the removed one names the head line it went to
+ * (`movedTo`), the added one the base line it came from (`movedFrom`).
  */
 export type DiffLine =
   | { kind: "context"; baseLine: number; headLine: number; text: string }
@@ -35,12 +37,14 @@ export type DiffLine =
       baseLine: number;
       text: string;
       segments?: DiffSegment[];
+      movedTo?: number;
     }
   | {
       kind: "added";
       headLine: number;
       text: string;
       segments?: DiffSegment[];
+      movedFrom?: number;
     };
 
 /**
@@ -162,6 +166,7 @@ export function diffText(
     removed += removedIndexes.length;
   }
 
+  markMoves(all);
   return {
     hunks: groupHunks(all, context),
     added,
@@ -171,6 +176,90 @@ export function diffText(
       head.lines.length > 0 &&
       base.newlineAtEnd !== head.newlineAtEnd,
   };
+}
+
+// A line shorter than this is not called moved when the same text appears elsewhere: a blank line, a
+// `---` or a closing fence turns up all over a document, and pairing those would mark half a diff
+// as moves. A sentence or a list item with some words in it is long enough to be the same line.
+const MOVE_MIN_LENGTH = 12;
+
+/**
+ * Pair every whole line removed in one place with the same line added in another, in order: a
+ * paragraph or list item cut and pasted elsewhere reads as a move rather than as a deletion and an
+ * unrelated addition. Only lines changed as a whole take part; a line paired as an edit already has
+ * its counterpart.
+ */
+function markMoves(lines: DiffLine[]): void {
+  const added = new Map<string, Extract<DiffLine, { kind: "added" }>[]>();
+  for (const line of lines) {
+    if (
+      line.kind === "added" &&
+      line.segments === undefined &&
+      line.text.trim().length >= MOVE_MIN_LENGTH
+    ) {
+      const waiting = added.get(line.text);
+      if (waiting === undefined) {
+        added.set(line.text, [line]);
+      } else {
+        waiting.push(line);
+      }
+    }
+  }
+  for (const line of lines) {
+    if (line.kind !== "removed" || line.segments !== undefined) {
+      continue;
+    }
+    const partner = added.get(line.text)?.shift();
+    if (partner !== undefined) {
+      line.movedTo = partner.headLine;
+      partner.movedFrom = line.baseLine;
+    }
+  }
+}
+
+/** Unchanged lines a diff leaves out, between two hunks or before the first or after the last. */
+export type DiffGap = {
+  /** The hunk the gap comes before; the number of hunks for the gap after the last one. */
+  before: number;
+  lines: { baseLine: number; headLine: number; text: string }[];
+};
+
+/**
+ * Every run of unchanged lines `diff` does not show, from the head text it was computed against: what
+ * a reader opens to see more context around a change. Unchanged lines are the same on both sides, so
+ * each carries its number on both.
+ */
+export function contextGaps(diff: TextDiff, headText: string): DiffGap[] {
+  const head = splitLines(normalizeText(headText)).lines;
+  const gaps: DiffGap[] = [];
+  let lastBase = 0;
+  let lastHead = 0;
+  const gap = (before: number, from: number, to: number) => {
+    const lines = [];
+    for (let headLine = from; headLine <= to; headLine += 1) {
+      lines.push({
+        baseLine: lastBase + (headLine - lastHead),
+        headLine,
+        text: head[headLine - 1] ?? "",
+      });
+    }
+    if (lines.length > 0) {
+      gaps.push({ before, lines });
+    }
+  };
+  diff.hunks.forEach((hunk, index) => {
+    // A hunk with no head line sits after `headStart`, so the gap above it ends there.
+    const firstHead = hunk.headLines > 0 ? hunk.headStart : hunk.headStart + 1;
+    gap(index, lastHead + 1, firstHead - 1);
+    lastHead =
+      hunk.headLines > 0 ? hunk.headStart + hunk.headLines - 1 : hunk.headStart;
+    lastBase =
+      hunk.baseLines > 0 ? hunk.baseStart + hunk.baseLines - 1 : hunk.baseStart;
+  });
+  if (diff.hunks.length > 0) {
+    gap(diff.hunks.length, lastHead + 1, head.length);
+  }
+  return gaps;
 }
 
 function changeBlock(

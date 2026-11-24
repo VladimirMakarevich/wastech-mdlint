@@ -1,27 +1,22 @@
-import { readFile } from "node:fs/promises";
-
 import type { Element, ElementContent } from "hast";
 import { h } from "hastscript";
 
 import {
-  type ChangeSet,
-  collectChangeSet,
-  type ContextGraph,
-  type CorpusMembership,
+  type BranchContext,
+  branchContext,
+  type BranchReview,
+  contextGaps,
+  type CorpusSnapshot,
+  type DiffGap,
   type DiffLine,
-  diffText,
   type DocumentContextDelta,
-  eagerContextPaths,
   type GitChange,
   type GitRepository,
   type GitUnavailable,
-  type LoadedConfiguration,
   openGitRepository,
-  parseDocument,
-  type ParsedDocument,
-  type RankedChange,
-  rankByInfluence,
-  tableRowLines,
+  type ReviewedConfig,
+  type ReviewedDocument,
+  reviewBranch,
   type TextDiff,
 } from "@wastech-mdlint/core";
 
@@ -37,56 +32,35 @@ import {
   renderContextSummary,
   renderDocumentContext,
 } from "./context-view.js";
-import { computeReviewContext, type ReviewContext } from "./review-context.js";
 import {
   type Baseline,
   type DocumentMark,
   type ReviewMarksView,
   reviewChip,
+  type SectionMark,
   reviewProblem,
   reviewToggle,
 } from "./review-state.js";
 
 // The review of a branch's changes to the corpus: which documents changed against the base branch,
 // most influential first, each with its diff. Everything computed here comes from core — the change
-// set, the order, the diff — and this module only keeps it between requests and lays it out.
+// set, the order, the diff, the context delta — and this module only keeps it between requests and
+// lays it out.
 
-export type DocumentReview = RankedChange & {
-  diff: TextDiff;
-  // The texts the diff compares, "" on the side a document does not exist. The base text holds the
-  // blocks the branch removed, which a document's page puts back; the head text tells that page
-  // whether this diff describes the very text it is rendering.
-  baseText: string;
-  headText: string;
-  // Each side parsed, where it exists: the diff needs their table rows, and the review of the
-  // context lints them, so neither parses a changed document a second time.
-  baseDocument?: ParsedDocument;
-  headDocument?: ParsedDocument;
-};
+// A changed document as core reviewed it. The base text holds the blocks the branch removed, which a
+// document's page puts back; the head text tells that page whether this diff describes the very
+// text it is rendering.
+export type DocumentReview = ReviewedDocument;
 
-export type ConfigReview = {
-  path: string;
-  status: GitChange["status"];
-  diff: TextDiff;
-  // The config's text on each side it exists on: the base side's is what the base was linted with.
-  baseText?: string;
-  headText?: string;
-};
+export type ConfigReview = ReviewedConfig;
 
 /** The corpus as the review read it: one moment, whatever updates land while it is computed. */
-export type ReviewSnapshot = {
-  documents: ReadonlyMap<string, ParsedDocument>;
-  graph: ContextGraph;
-  configuration: LoadedConfiguration;
-  membership: CorpusMembership;
-};
+export type ReviewSnapshot = CorpusSnapshot;
 
-export type Review = {
-  set: ChangeSet;
-  documents: DocumentReview[];
-  config?: ConfigReview;
-  snapshot: ReviewSnapshot;
-};
+export type Review = BranchReview & { snapshot: ReviewSnapshot };
+
+/** What a review's change does to the context, as core computes it. */
+export type ReviewContext = BranchContext;
 
 export type ReviewResult = Review | GitUnavailable;
 
@@ -151,6 +125,11 @@ export class ChangeTracker {
   /** The repository, when git can read it: where review marks are kept is decided from it. */
   get git(): GitRepository | undefined {
     return this.repository.available ? this.repository : undefined;
+  }
+
+  /** The review kept for a mode, without asking git whether it is still current. */
+  cached(worktree: boolean): Review | undefined {
+    return this.cache.get(worktree)?.result;
   }
 
   /** Forget every review; the next request computes a fresh one. */
@@ -230,11 +209,13 @@ export class ChangeTracker {
       this.contexts.delete(review);
       return undefined;
     }
-    return computeReviewContext({
+    return branchContext({
       repository,
       rootDir: this.corpus.rootDir,
       review,
       worktree,
+      disk: worktree.snapshot,
+      ordering: review.snapshot,
     });
   }
 
@@ -245,98 +226,19 @@ export class ChangeTracker {
     // One snapshot of the corpus for the whole computation, so the documents, the graph and the
     // config all describe the same moment even if an update lands meanwhile.
     const corpus = this.corpus;
-    const membership = corpus.membership();
-    const documents = corpus.documents;
-    const graph = corpus.graph;
-    const configuration = corpus.configuration;
-
-    const set = await collectChangeSet(repository, {
-      base: this.base,
-      worktree,
-      corpus: membership,
-    });
-    if ("available" in set) {
-      return set;
-    }
-
-    const configPath = set.configChanged ? membership.configPath : undefined;
-    const basePaths = set.documents.flatMap((change) =>
-      change.status === "A" ? [] : [change.oldPath ?? change.path],
-    );
-    const headPaths = set.documents.flatMap((change) =>
-      change.status === "D" ? [] : [change.path],
-    );
-    if (configPath !== undefined) {
-      basePaths.push(configPath);
-      headPaths.push(configPath);
-    }
-    const baseTexts = await repository.readBlobs(set.mergeBase, basePaths);
-    // Without the work tree, the other side is what `HEAD` holds; with it, what the corpus read
-    // from disk — the same text every other page of the viewer shows.
-    const headBlobs = worktree
-      ? undefined
-      : await repository.readBlobs(set.head, headPaths);
-    const headText = (relPath: string): string | undefined =>
-      headBlobs === undefined
-        ? documents.get(relPath)?.content
-        : headBlobs.get(relPath);
-
-    const ranked = rankByInfluence(set.documents, {
-      graph,
-      eager: eagerContextPaths(graph, configuration.config),
-    });
-    const reviews = ranked.map((change): DocumentReview => {
-      const basePath = change.oldPath ?? change.path;
-      const base = change.status === "A" ? "" : (baseTexts.get(basePath) ?? "");
-      const head = change.status === "D" ? "" : (headText(change.path) ?? "");
-      const baseDocument = parseDocument({ path: basePath, content: base });
-      const headDocument =
-        (headBlobs === undefined ? documents.get(change.path) : undefined) ??
-        parseDocument({ path: change.path, content: head });
-      return {
-        ...change,
-        baseText: base,
-        headText: head,
-        ...(change.status === "A" ? {} : { baseDocument }),
-        ...(change.status === "D" ? {} : { headDocument }),
-        diff: diffText(base, head, {
-          baseTableRows: tableRowLines(baseDocument),
-          headTableRows: tableRowLines(headDocument),
-        }),
-      };
-    });
-
-    let config: ConfigReview | undefined;
-    if (configPath !== undefined) {
-      const base = baseTexts.get(configPath);
-      const head =
-        headBlobs === undefined
-          ? await readConfigText(configuration.configPath)
-          : headBlobs.get(configPath);
-      config = {
-        path: configPath,
-        status: base === undefined ? "A" : head === undefined ? "D" : "M",
-        diff: diffText(base ?? "", head ?? ""),
-        ...(base === undefined ? {} : { baseText: base }),
-        ...(head === undefined ? {} : { headText: head }),
-      };
-    }
-
-    return {
-      set,
-      documents: reviews,
-      config,
-      snapshot: { documents, graph, configuration, membership },
+    const snapshot: ReviewSnapshot = {
+      documents: corpus.documents,
+      graph: corpus.graph,
+      configuration: corpus.configuration,
+      membership: corpus.membership(),
     };
+    const review = await reviewBranch(repository, {
+      ...(this.base === undefined ? {} : { base: this.base }),
+      worktree,
+      corpus: snapshot,
+    });
+    return "available" in review ? review : { ...review, snapshot };
   }
-}
-
-async function readConfigText(
-  absolutePath: string | undefined,
-): Promise<string | undefined> {
-  return absolutePath === undefined
-    ? undefined
-    : readFile(absolutePath, "utf8").catch(() => undefined);
 }
 
 /**
@@ -575,12 +477,21 @@ export function renderChangeBanner(
       },
       "Changes page",
     ),
+    // The commits that last touched the document, asked of git only when the reader opens it: the
+    // page itself never waits for a walk through history. Hidden until the script that loads it has
+    // run. A deleted document has no page to carry it.
+    h("details.changes-history", { hidden: true, dataPath: review.path }, [
+      h("summary", "History"),
+      h("ol.changes-history-list"),
+    ]),
   ]);
 }
 
 /** What the line above a changed document says about the reader's review of it. */
 export type BannerReview = {
   mark: DocumentMark;
+  // Each section's own place in the review, by its key, for the outline.
+  sections: ReadonlyMap<string, SectionMark>;
   baseline: Baseline;
   // The document's review since the reader's last review, when the page compares with that.
   since?: DocumentReview;
@@ -825,6 +736,9 @@ export function renderChangesArticle(
         path: result.config.path,
         note: "The config decides which files are documents and which rules run.",
         diff: result.config.diff,
+        ...(result.config.headText === undefined
+          ? {}
+          : { headText: result.config.headText }),
         context:
           context === undefined
             ? undefined
@@ -849,6 +763,7 @@ export function renderChangesArticle(
         eager: review.eager,
         note: shown.note,
         diff: shown.diff,
+        headText: review.headText,
         context: delta === undefined ? undefined : renderDocumentContext(delta),
         ...(mark === undefined
           ? {}
@@ -914,6 +829,8 @@ function changeCard(card: {
   eager?: boolean;
   note?: string;
   diff: TextDiff;
+  // The text the diff ends in, for the unchanged lines a reader can open around each change.
+  headText?: string;
   context?: Element;
   mark?: DocumentMark;
   toggle?: Element;
@@ -958,7 +875,7 @@ function changeCard(card: {
             ? "Diff"
             : `Show the diff (${plural(lineCount, "line")})`,
         ),
-        renderDiff(card.diff),
+        renderDiff(card.diff, card.headText),
       ]),
     ],
   );
@@ -979,8 +896,13 @@ function stats(diff: TextDiff): string {
 /**
  * A diff as a table: base and head line numbers, a marker, the line. A paired line's changed words —
  * or cells — are `del` and `ins`, so they read as changes to assistive technology as well as by color.
+ * A line moved elsewhere says where to, and the line it became says where from.
+ *
+ * With `headText`, the unchanged lines between the hunks are in the table too, hidden, each run in a
+ * body of its own behind a button the page script shows: the context a reader opens around a change
+ * comes from the server that drew the diff, so the browser never computes a line of its own.
  */
-export function renderDiff(diff: TextDiff): Element {
+export function renderDiff(diff: TextDiff, headText?: string): Element {
   if (diff.hunks.length === 0) {
     return h(
       "p.diff-empty",
@@ -989,8 +911,31 @@ export function renderDiff(diff: TextDiff): Element {
         : "The text is the same on both sides.",
     );
   }
-  const rows: Element[] = [];
-  for (const hunk of diff.hunks) {
+  const gaps = new Map(
+    (headText === undefined ? [] : contextGaps(diff, headText)).map((gap) => [
+      gap.before,
+      gap,
+    ]),
+  );
+  const bodies: Element[] = [];
+  let rows: Element[] = [];
+  const close = () => {
+    if (rows.length > 0) {
+      bodies.push(h("tbody", rows));
+      rows = [];
+    }
+  };
+  const gapBody = (index: number) => {
+    const gap = gaps.get(index);
+    if (gap !== undefined) {
+      close();
+      // Above the first hunk the lines nearest the change are the last ones, so they open from the
+      // bottom; everywhere else from the top, following the hunk above.
+      bodies.push(renderGap(gap, index === 0 ? "end" : "start"));
+    }
+  };
+  diff.hunks.forEach((hunk, index) => {
+    gapBody(index);
     rows.push(
       h("tr.diff-hunk", [
         h(
@@ -1003,7 +948,8 @@ export function renderDiff(diff: TextDiff): Element {
     for (const line of hunk.lines) {
       rows.push(diffRow(line));
     }
-  }
+  });
+  gapBody(diff.hunks.length);
   if (diff.newlineAtEndChanged) {
     rows.push(
       h("tr.diff-note", [
@@ -1011,10 +957,45 @@ export function renderDiff(diff: TextDiff): Element {
       ]),
     );
   }
-  return h("div.diff-wrap", h("table.diff", h("tbody", rows)));
+  close();
+  return h("div.diff-wrap", h("table.diff", bodies));
+}
+
+// How many unchanged lines one press of a gap's button opens.
+const GAP_STEP = 20;
+
+function renderGap(gap: DiffGap, from: "start" | "end"): Element {
+  return h("tbody.diff-gap", { dataFrom: from, dataStep: GAP_STEP }, [
+    h(
+      "tr.diff-expand",
+      { hidden: true },
+      h(
+        "td",
+        { colSpan: 4 },
+        h(
+          "button.diff-expand-button",
+          { type: "button" },
+          gap.lines.length <= GAP_STEP
+            ? `Show ${plural(gap.lines.length, "unchanged line")}`
+            : `Show ${GAP_STEP} of ${gap.lines.length} unchanged lines`,
+        ),
+      ),
+    ),
+    ...gap.lines.map((line) => {
+      const row = diffRow({ kind: "context", ...line });
+      row.properties.hidden = true;
+      return row;
+    }),
+  ]);
 }
 
 function diffRow(line: DiffLine): Element {
+  const moved =
+    line.kind === "removed" && line.movedTo !== undefined
+      ? `moved to line ${line.movedTo}`
+      : line.kind === "added" && line.movedFrom !== undefined
+        ? `moved from line ${line.movedFrom}`
+        : undefined;
   const base = line.kind === "added" ? "" : String(line.baseLine);
   const head = line.kind === "removed" ? "" : String(line.headLine);
   const marker =
@@ -1028,12 +1009,18 @@ function diffRow(line: DiffLine): Element {
             : { type: "text", value: segment.text },
         )
       : [{ type: "text", value: line.text }];
-  return h(`tr.diff-line.diff-${line.kind}`, [
-    h("td.diff-number", base),
-    h("td.diff-number", head),
-    h("td.diff-marker", marker),
-    h("td.diff-code", code),
-  ]);
+  return h(
+    `tr.diff-line.diff-${line.kind}${moved === undefined ? "" : ".diff-moved"}`,
+    [
+      h("td.diff-number", base),
+      h("td.diff-number", head),
+      h("td.diff-marker", marker),
+      h("td.diff-code", [
+        ...code,
+        moved === undefined ? undefined : h("span.diff-move", moved),
+      ]),
+    ],
+  );
 }
 
 function plural(count: number, noun: string): string {

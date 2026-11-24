@@ -227,12 +227,13 @@ describe("ReviewStore", () => {
       "utf8",
     );
     expect(JSON.parse(index)).toEqual({
-      format: 1,
+      format: 2,
       repository: COMMON_DIR,
       documents: {
         "docs/a.md": [contentHash("a\n")],
         "docs/b.md": [contentHash("b\n")],
       },
+      sections: {},
     });
     expect(index.indexOf('"docs/a.md"')).toBeLessThan(
       index.indexOf('"docs/b.md"'),
@@ -355,7 +356,7 @@ describe("ReviewStore", () => {
     const target = store(await stateDir());
     await mkdir(target.directory, { recursive: true });
     const index = path.join(target.directory, "review.json");
-    for (const text of ["{ not json", '{"format":2,"documents":{}}']) {
+    for (const text of ["{ not json", '{"format":3,"documents":{}}']) {
       await writeFile(index, text);
       const read = await target.read();
       expect(read.ok).toBe(false);
@@ -365,6 +366,99 @@ describe("ReviewStore", () => {
       });
       expect(await readFile(index, "utf8")).toBe(text);
     }
+  });
+
+  it("reads marks saved before sections were kept", async () => {
+    const target = store(await stateDir());
+    await mkdir(target.directory, { recursive: true });
+    await writeFile(
+      path.join(target.directory, "review.json"),
+      JSON.stringify({
+        format: 1,
+        repository: COMMON_DIR,
+        documents: { "docs/guide.md": [contentHash("v1\n")] },
+      }),
+    );
+    expect(await statusOf(target, { path: "guide.md", text: "v1\n" })).toEqual({
+      status: "reviewed",
+    });
+  });
+
+  // A document marked as a whole records its sections as they were; an edit to one section leaves
+  // the others reviewed, and that one section can then be marked on its own.
+  it("keeps sections reviewed while their own text holds, and counts a document done when all are", async () => {
+    const target = store(await stateDir());
+    const sections = (intro: string, use: string) => [
+      { key: "", hash: contentHash(intro) },
+      { key: "use", hash: contentHash(use) },
+    ];
+    await saved(target, {
+      ...mark("guide.md", "v1\n"),
+      sections: sections("intro", "use v1"),
+    });
+
+    const read = async () => {
+      const result = await target.read();
+      if (!result.ok) {
+        throw new Error(result.message);
+      }
+      return result.marks;
+    };
+    let marks = await read();
+    const edited = sections("intro", "use v2");
+    expect(
+      marks.status({
+        path: "guide.md",
+        hash: contentHash("v2\n"),
+        sections: edited,
+      }),
+    ).toEqual({ status: "changed", since: contentHash("v1\n") });
+    expect(marks.sectionStatus({ path: "guide.md", ...edited[0]! })).toBe(
+      "reviewed",
+    );
+    expect(marks.sectionStatus({ path: "guide.md", ...edited[1]! })).toBe(
+      "changed",
+    );
+
+    await saved(target, {
+      kind: "section",
+      path: "guide.md",
+      ...edited[1]!,
+      reviewed: true,
+    });
+    marks = await read();
+    expect(
+      marks.status({
+        path: "guide.md",
+        hash: contentHash("v2\n"),
+        sections: edited,
+      }),
+    ).toEqual({ status: "reviewed" });
+
+    await saved(target, {
+      kind: "section",
+      path: "guide.md",
+      ...edited[1]!,
+      reviewed: false,
+    });
+    marks = await read();
+    expect(marks.sectionStatus({ path: "guide.md", ...edited[1]! })).toBe(
+      "changed",
+    );
+
+    await saved(target, {
+      kind: "reset",
+      documents: [{ path: "guide.md", hash: contentHash("v2\n") }],
+    });
+    marks = await read();
+    expect(marks.sectionStatus({ path: "guide.md", ...edited[0]! })).toBe(
+      "unreviewed",
+    );
+    expect(
+      JSON.parse(
+        await readFile(path.join(target.directory, "review.json"), "utf8"),
+      ),
+    ).toMatchObject({ format: 2, documents: {}, sections: {} });
   });
 
   // @boundary-guard write-failure

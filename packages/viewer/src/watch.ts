@@ -13,6 +13,90 @@ export function isRelevantChange(relPath: string): boolean {
 }
 
 /**
+ * Whether a file git changed under its directory can move what a review compares: this work tree's
+ * `HEAD` (a commit, a checkout, a reset), a ref (a branch moved, a fetch), or the packed refs a `gc`
+ * or a fetch rewrites. Lock files are git's staging copies, renamed over the real file when done, and
+ * the rename is what reports the change.
+ */
+export function isRefChange(relPath: string): boolean {
+  if (relPath.endsWith(".lock")) {
+    return false;
+  }
+  return (
+    relPath === "HEAD" ||
+    relPath === "packed-refs" ||
+    relPath === "refs" ||
+    relPath.startsWith("refs/")
+  );
+}
+
+/**
+ * Watch where git records what `HEAD` and the branches point at, and call `onMove` once per burst of
+ * changes. Apart from the corpus watcher, which never looks inside `.git`: a commit, a `reset --soft`
+ * or a fetch moves what a review compares without changing a single file of the work tree, and an
+ * open Changes page should show that without waiting for the reader to reload it.
+ *
+ * `gitDir` holds this work tree's own `HEAD`; `commonDir` the refs every worktree of the clone shares.
+ * They are the same directory in the main work tree. Only the top of each is watched, plus `refs/`
+ * recursively, so the objects a commit or a fetch writes by the thousand never reach the callback.
+ */
+export function watchGitRefs(
+  dirs: { gitDir: string; commonDir: string },
+  onMove: () => void,
+  debounceMs = 150,
+): () => void {
+  let timer: NodeJS.Timeout | undefined;
+  const watchers: FSWatcher[] = [];
+  const schedule = () => {
+    clearTimeout(timer);
+    timer = setTimeout(onMove, debounceMs);
+  };
+  const watchDir = (
+    dir: string,
+    options: { recursive: boolean },
+    toRelPath: (filename: string) => string,
+  ) => {
+    try {
+      // The native realpath, for the reason `watchRepository` gives: libuv aborts the process when an
+      // event's long path does not match a watched 8.3 short name.
+      const watched = watch(
+        realpathSync.native(dir),
+        options,
+        (_event, filename) => {
+          if (filename !== null && isRefChange(toRelPath(filename))) {
+            schedule();
+          }
+        },
+      );
+      watched.on("error", () => {
+        // A ref folder git removed and recreated (a `pack-refs`) ends its watch; the review is still
+        // checked against git on every request, so a page is at worst stale until the next one.
+        watched.close();
+      });
+      watchers.push(watched);
+    } catch {
+      // A folder git has not created yet, such as `refs/remotes` before a first fetch: nothing to watch.
+    }
+  };
+  const posix = (filename: string) => filename.split(path.sep).join("/");
+  watchDir(dirs.gitDir, { recursive: false }, posix);
+  if (dirs.commonDir !== dirs.gitDir) {
+    watchDir(dirs.commonDir, { recursive: false }, posix);
+  }
+  watchDir(
+    path.join(dirs.commonDir, "refs"),
+    { recursive: true },
+    (filename) => `refs/${posix(filename)}`,
+  );
+  return () => {
+    clearTimeout(timer);
+    for (const watched of watchers) {
+      watched.close();
+    }
+  };
+}
+
+/**
  * Watch the repository and report changed repo-relative POSIX paths in batches.
  *
  * Batched because one save is several events: editors write a temp file and rename it over the

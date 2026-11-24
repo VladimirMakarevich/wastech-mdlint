@@ -81,6 +81,9 @@ const BASE_CONFIG: readonly (readonly [string, string])[] = [
   ["core.fsmonitor", "false"],
   // With `-z` output git already leaves names unquoted; this keeps any non-`-z` output the same.
   ["core.quotePath", "false"],
+  // `log` and `blame` would otherwise start gpg to check each signed commit when a config asks for
+  // signatures to be shown, and gpg is a program the repository's config can name.
+  ["log.showSignature", "false"],
 ];
 
 /**

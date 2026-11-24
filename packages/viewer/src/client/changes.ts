@@ -55,8 +55,10 @@ export function initChanges(): void {
   };
   refresh();
   onServerEvent("change", refresh);
-  // A mark saved on any page changes what is left everywhere.
+  // A mark saved on any page changes what is left everywhere, and a commit, a checkout or a fetch
+  // can change what changed at all.
   onServerEvent("review", refresh);
+  onServerEvent("git", refresh);
 }
 
 async function load(section: HTMLAnchorElement): Promise<void> {

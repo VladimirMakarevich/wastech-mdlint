@@ -12,7 +12,7 @@ import type {
 } from "@wastech-mdlint/core";
 
 import { documentHref, fileHref } from "./render-document.js";
-import type { ReviewContext } from "./review-context.js";
+import type { ReviewContext } from "./changes.js";
 
 // The context delta laid out: in the summary of the Changes page, on each document's card, as the
 // group of unchanged documents the change reaches, on the config's card, and as JSON. Everything

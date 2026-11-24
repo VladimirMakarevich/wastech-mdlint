@@ -161,12 +161,14 @@ export type {
   SliceMatchKind,
 } from "./graph/search-index.js";
 export {
+  classifyChangeImpact,
   classifyImpact,
   getImpactSet,
   ImpactAnalysisError,
   relativizeImpact,
 } from "./graph/impact-analysis.js";
 export type {
+  ChangeImpact,
   DirectlyAffected,
   ImpactClassification,
   TransitivelyAffected,
@@ -185,6 +187,8 @@ export {
   openGitRepository,
 } from "./git/git-repository.js";
 export type {
+  BlameLine,
+  FileCommit,
   GitBase,
   GitChange,
   GitUnavailable,
@@ -208,6 +212,7 @@ export type {
   CorpusMembership,
 } from "./changes/change-set.js";
 export {
+  contextGaps,
   diffText,
   lineCorrespondence,
   lineRangeKept,
@@ -215,6 +220,7 @@ export {
   tableRowLines,
 } from "./changes/text-diff.js";
 export type {
+  DiffGap,
   DiffHunk,
   DiffLine,
   DiffSegment,
@@ -255,6 +261,31 @@ export type {
   DocumentContextDelta,
   EagerContextChange,
 } from "./changes/context-delta.js";
+export {
+  analyzeSince,
+  branchContext,
+  reviewBranch,
+} from "./changes/branch-review.js";
+export type {
+  BranchContext,
+  BranchReview,
+  CorpusSnapshot,
+  ReviewedConfig,
+  ReviewedDocument,
+  SinceAnalysis,
+} from "./changes/branch-review.js";
+export {
+  renderSinceHeader,
+  sinceImpact,
+  sinceLintResult,
+} from "./changes/since-report.js";
+export type {
+  SinceImpact,
+  SinceLintResult,
+  SinceSummary,
+} from "./changes/since-report.js";
+export { documentSections } from "./changes/sections.js";
+export type { DocumentSection } from "./changes/sections.js";
 export { parseLineFragment } from "./engine/anchor-resolve.js";
 export { eagerContextTokens } from "./engine/rules/llm.js";
 export {

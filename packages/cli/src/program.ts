@@ -170,6 +170,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
       format: OutputFormat;
       failOn: FailOn;
       fix?: boolean;
+      since?: string;
     },
   ): Promise<void> => {
     executionResult = await executeCommand({
@@ -179,6 +180,7 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
       format: options.format,
       failOn: options.failOn,
       fix: options.fix ?? false,
+      ...(options.since === undefined ? {} : { since: options.since }),
     });
   };
 
@@ -206,6 +208,12 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
         new Option(
           "--fix",
           "apply deterministic fixes in place, then report what remains",
+        ),
+      )
+      .addOption(
+        new Option(
+          "--since <ref>",
+          "report only the findings the work tree adds since where it left this branch, tag or commit",
         ),
       )
       .action(lintAction);
@@ -296,23 +304,30 @@ export async function runCli(argv: string[], io: CliIo = {}): Promise<number> {
     .description(
       "Classify the blast radius of changing <file> and lint the affected subgraph.",
     )
-    .argument("<file>", "repository-relative path of the changed file")
+    .argument("[file]", "repository-relative path of the changed file")
     .addOption(new Option("--config <file>", "path to a config file"))
     .addOption(
       new Option("--format <format>", "output format")
         .choices(OUTPUT_FORMATS)
         .default("text"),
     )
+    .addOption(
+      new Option(
+        "--since <ref>",
+        "every document the work tree changed since where it left this branch, tag or commit, instead of one <file>",
+      ),
+    )
     .action(
       async (
-        file: string,
-        options: { config?: string; format: OutputFormat },
+        file: string | undefined,
+        options: { config?: string; format: OutputFormat; since?: string },
       ) => {
         executionResult = await executeCommand({
           kind: "impact",
           path: cwd,
           config: options.config,
-          file,
+          ...(file === undefined ? {} : { file }),
+          ...(options.since === undefined ? {} : { since: options.since }),
           format: options.format,
         });
       },

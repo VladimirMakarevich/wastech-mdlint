@@ -56,4 +56,4 @@ Phases 01–03 together are the first usable result: a focused, ordered list of 
 
 ## Deliberately not tracked here
 
-Comments on a change, shared or team-wide review state, and any network surface beyond the existing local listener were not part of the discussion and are out of scope. Ideas that were discussed but are not scheduled are in [07](07-deferred.md).
+Comments on a change, shared or team-wide review state, and any network surface beyond the existing local listener were not part of the discussion and are out of scope. Ideas that were discussed but are not scheduled are in [07](07-deferred.md), which the user asked to build after 06. Blocking points, decisions taken without the user and open questions from every phase are collected in [follow-ups](follow-ups.md), to settle once the whole plan has landed.

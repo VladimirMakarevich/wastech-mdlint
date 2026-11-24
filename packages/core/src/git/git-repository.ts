@@ -52,6 +52,22 @@ export type GitChange = {
   oldPath?: string;
 };
 
+/**
+ * A commit as a reader sees it in a file's history. `date` is the commit's own date in UTC as
+ * `YYYY-MM-DD`: fixed for a given repository state, unlike a "3 days ago" that changes with the
+ * clock. `author` is a person's name, which a host shows only where absolute paths may be shown.
+ */
+export type FileCommit = {
+  commit: string;
+  short: string;
+  date: string;
+  author: string;
+  subject: string;
+};
+
+/** The commit that last touched a line, or no commit for a line not committed yet. */
+export type BlameLine = Partial<FileCommit>;
+
 export type OpenGitRepositoryOptions = {
   /** The environment to derive git's from; the process's own when omitted. */
   env?: NodeJS.ProcessEnv;
@@ -131,6 +147,7 @@ export async function openGitRepository(
     "--show-toplevel",
     "--show-prefix",
     "--git-common-dir",
+    "--absolute-git-dir",
   ]);
   if (located.exitCode !== 0) {
     // Matched on git's text, which `LC_ALL=C` keeps untranslated. Ownership is checked before
@@ -155,15 +172,15 @@ export async function openGitRepository(
     throw new GitCommandError("rev-parse", located.exitCode, located.stderr);
   }
 
-  // Three lines in the order asked for; the prefix line is empty at the top level and otherwise
+  // Four lines in the order asked for; the prefix line is empty at the top level and otherwise
   // ends in `/`.
-  const [topLevel = "", prefixLine = "", commonDir = ""] = located.stdout
-    .toString("utf8")
-    .split("\n");
+  const [topLevel = "", prefixLine = "", commonDir = "", gitDir = ""] =
+    located.stdout.toString("utf8").split("\n");
   const prefix = prefixLine.replace(/\/$/, "");
   // Relative to the directory git ran in when it is not absolute. The realpath, so two spellings of
   // one clone (a symlink, an 8.3 short name on Windows) are one identity.
   const commonDirReal = await realpath(path.resolve(probe.cwd, commonDir));
+  const gitDirReal = await realpath(gitDir);
 
   // Filter drivers are named in config and attached to paths by `.gitattributes`; git runs a
   // driver's `clean` command on every work-tree file whose stat changed when it compares the work
@@ -205,6 +222,7 @@ export async function openGitRepository(
     { cwd: topLevel, env: gitEnvironment(inherited, filterOverrides) },
     prefix,
     commonDirReal,
+    gitDirReal,
   );
 }
 
@@ -230,6 +248,13 @@ export class GitRepository {
      * is never shown to a reader.
      */
     readonly commonDir: string,
+    /**
+     * The realpath of this work tree's own git directory: the common one for the main work tree, a
+     * folder under it for each added worktree. Its `HEAD` is this work tree's alone, while branches
+     * and remote refs live in `commonDir` — together the two say where a host watches for a commit,
+     * a checkout or a fetch. Absolute, so it is never shown to a reader.
+     */
+    readonly gitDir: string,
   ) {}
 
   /**
@@ -470,6 +495,62 @@ export class GitRepository {
     return texts;
   }
 
+  /**
+   * The commits that last touched a file, newest first, following it across renames: at most
+   * `limit`. Uncommitted edits are not commits and are not listed. Empty for a file git does not
+   * track or a repository with no commit yet.
+   */
+  async fileHistory(relPath: string, limit: number): Promise<FileCommit[]> {
+    const output = await runGit(this.invocation, [
+      "log",
+      "--follow",
+      "-z",
+      `--max-count=${String(Math.max(1, Math.floor(limit)))}`,
+      // Fields apart by a unit separator, which no hash, date or name holds; `-z` ends each record
+      // with a NUL, so a subject can be anything a commit message's first line can be.
+      "--format=%H%x1f%h%x1f%ct%x1f%an%x1f%s",
+      "--no-decorate",
+      "--no-show-signature",
+      ...SAFE_DIFF_FLAGS,
+      "--",
+      this.toTopLevel(relPath),
+    ]);
+    if (output.exitCode !== 0) {
+      return [];
+    }
+    return output.stdout
+      .toString("utf8")
+      .split("\0")
+      .map((record) => record.replace(/^\n+/, ""))
+      .filter((record) => record.length > 0)
+      .flatMap((record): FileCommit[] => {
+        const [commit = "", short = "", time = "", author = "", subject = ""] =
+          record.split("\x1f");
+        return OBJECT_NAME.test(commit)
+          ? [{ commit, short, date: isoDate(Number(time)), author, subject }]
+          : [];
+      });
+  }
+
+  /**
+   * Who last touched each line of the file as it is in the work tree: one entry per line, numbered
+   * from 1. A line not yet committed has `commit: undefined`. Empty when git cannot blame the file —
+   * not tracked, or no commit yet — so a host can simply show nothing.
+   */
+  async blame(relPath: string): Promise<(BlameLine | undefined)[]> {
+    const output = await runGit(this.invocation, [
+      "blame",
+      "--porcelain",
+      "--no-textconv",
+      "--",
+      this.toTopLevel(relPath),
+    ]);
+    if (output.exitCode !== 0) {
+      return [];
+    }
+    return parseBlamePorcelain(output.stdout.toString("utf8"));
+  }
+
   private async resolveCommit(ref: string): Promise<string | undefined> {
     const output = await runGit(this.invocation, [
       "rev-parse",
@@ -673,6 +754,70 @@ export function composeChanges(
     );
   }
   return [...result.values()];
+}
+
+// The calendar date of a commit time, in UTC: the same answer on every machine, whatever its zone.
+function isoDate(seconds: number): string {
+  return Number.isFinite(seconds)
+    ? new Date(seconds * 1000).toISOString().slice(0, 10)
+    : "";
+}
+
+// The all-zero name blame gives lines the work tree changed since the last commit.
+const UNCOMMITTED = /^0+$/;
+
+/**
+ * Parse `blame --porcelain`: per line a header `<commit> <original line> <final line> [<count>]`,
+ * the commit's details the first time that commit appears (`author`, `committer-time`, `summary`,
+ * among others), then the line's text after a tab. Returns one entry per final line, by its number.
+ */
+export function parseBlamePorcelain(text: string): (BlameLine | undefined)[] {
+  const commits = new Map<string, FileCommit>();
+  const lines: (BlameLine | undefined)[] = [];
+  let current: { commit: string; line: number } | undefined;
+  for (const row of text.split("\n")) {
+    if (row.startsWith("\t")) {
+      if (current !== undefined) {
+        const details = commits.get(current.commit);
+        lines[current.line - 1] = UNCOMMITTED.test(current.commit)
+          ? {}
+          : (details ?? { commit: current.commit });
+      }
+      current = undefined;
+      continue;
+    }
+    const header = /^([0-9a-f]{40}|[0-9a-f]{64}) \d+ (\d+)(?: \d+)?$/.exec(row);
+    if (header !== null) {
+      const commit = header[1]!;
+      current = { commit, line: Number(header[2]) };
+      if (!commits.has(commit)) {
+        commits.set(commit, {
+          commit,
+          short: commit.slice(0, 7),
+          date: "",
+          author: "",
+          subject: "",
+        });
+      }
+      continue;
+    }
+    const details =
+      current === undefined ? undefined : commits.get(current.commit);
+    if (details === undefined) {
+      continue;
+    }
+    const space = row.indexOf(" ");
+    const key = space === -1 ? row : row.slice(0, space);
+    const value = space === -1 ? "" : row.slice(space + 1);
+    if (key === "author") {
+      details.author = value;
+    } else if (key === "committer-time") {
+      details.date = isoDate(Number(value));
+    } else if (key === "summary") {
+      details.subject = value;
+    }
+  }
+  return lines;
 }
 
 /**

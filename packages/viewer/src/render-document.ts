@@ -125,10 +125,20 @@ export function fileHref(relPath: string): string {
  * sanitized like any other, and its links resolve against the current corpus: a link that only
  * worked at the base shows as missing, which is what a reviewer needs to learn about it.
  */
+/**
+ * What the right margin says about the source lines from `start` to `end`, beside the number of the
+ * first: a short `text` and a longer `title` a pointer shows. `undefined` adds nothing.
+ */
+export type LineAnnotator = (
+  start: number,
+  end: number,
+) => { text: string; title: string } | undefined;
+
 export async function renderDocument(
   document: ParsedDocument,
   resolvers: TargetResolvers,
   change?: DocumentChange,
+  annotate?: LineAnnotator,
 ): Promise<RenderedDocument> {
   const head = await renderTree(document, resolvers);
   let frontmatterChange: BlockChange | undefined;
@@ -145,6 +155,21 @@ export async function renderDocument(
   // After the removed blocks are in, so their code is highlighted and their links marked too.
   await replaceCodeBlocks(head.tree);
   markLinks(head.tree, head.missingHrefs);
+  if (annotate !== undefined) {
+    // Every element that carries its source lines — the same ones the margin numbers — and none of
+    // the removed blocks put back, which carry none.
+    visit(head.tree, "element", (node: Element) => {
+      const { dataLine, dataLineEnd } = node.properties;
+      if (dataLine === undefined || dataLineEnd === undefined) {
+        return;
+      }
+      const note = annotate(Number(dataLine), Number(dataLineEnd));
+      if (note !== undefined) {
+        node.properties.dataBlame = note.text;
+        node.properties.title = note.title;
+      }
+    });
+  }
 
   return {
     html: toHtml(head.tree),

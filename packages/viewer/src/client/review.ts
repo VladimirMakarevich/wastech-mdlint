@@ -7,7 +7,12 @@ type ReviewStatus = "unreviewed" | "reviewed" | "changed";
 
 type Saved = {
   status: "saved";
-  documents: { path: string; review: { status: ReviewStatus; hash: string } }[];
+  documents: {
+    path: string;
+    review: { status: ReviewStatus; hash: string };
+    sections?: { key: string; status: ReviewStatus }[];
+  }[];
+  section?: { key: string; status: ReviewStatus };
   left: number;
   total: number;
 };
@@ -42,6 +47,14 @@ export function initReview(documentPath: string | undefined): void {
     const input = toggle.querySelector("input");
     input?.addEventListener("change", () => {
       void mark(toggle, input, token);
+    });
+  }
+  for (const button of document.querySelectorAll<HTMLButtonElement>(
+    ".section-mark",
+  )) {
+    button.hidden = false;
+    button.addEventListener("click", () => {
+      void markSection(button, token);
     });
   }
   const reset = document.querySelector<HTMLButtonElement>(".review-reset");
@@ -81,6 +94,81 @@ async function mark(
   input.checked = status === "reviewed";
   say(toggle, "");
   showStatus(toggle, status);
+  showSections(saved.documents[0]?.sections ?? []);
+  showCount(saved);
+}
+
+/**
+ * Mark one section from the outline, and show what the server answered: the section, and the
+ * document, which is reviewed once every one of its sections is.
+ */
+async function markSection(
+  button: HTMLButtonElement,
+  token: string,
+): Promise<void> {
+  const reviewed = button.getAttribute("aria-pressed") !== "true";
+  button.disabled = true;
+  const answer = await post(token, "/api/review/section", {
+    path: button.dataset.path,
+    section: button.dataset.section,
+    hash: button.dataset.hash,
+    reviewed,
+  });
+  button.disabled = false;
+  const toggle = document.querySelector<HTMLLabelElement>(
+    ".changes-banner .review-toggle",
+  );
+  if (answer.status !== "saved") {
+    if (toggle !== null) {
+      say(toggle, (answer as Refused).error);
+    }
+    return;
+  }
+  const saved = answer as Saved;
+  if (saved.section !== undefined) {
+    showSections([saved.section]);
+  }
+  const status = saved.documents[0]?.review.status;
+  if (toggle !== null && status !== undefined) {
+    const input = toggle.querySelector("input");
+    if (input !== null) {
+      input.checked = status === "reviewed";
+    }
+    say(toggle, "");
+    showStatus(toggle, status);
+  }
+  showCount(saved);
+}
+
+const SECTION_TITLES: Record<ReviewStatus, string> = {
+  reviewed: "Viewed",
+  changed: "Changed since you viewed it",
+  unreviewed: "Not viewed yet",
+};
+
+function showSections(
+  sections: readonly { key: string; status: ReviewStatus }[],
+): void {
+  for (const section of sections) {
+    const button = document.querySelector<HTMLButtonElement>(
+      `.section-mark[data-section="${CSS.escape(section.key)}"]`,
+    );
+    if (button === null) {
+      continue;
+    }
+    button.setAttribute(
+      "aria-pressed",
+      section.status === "reviewed" ? "true" : "false",
+    );
+    button.title = SECTION_TITLES[section.status];
+    const item = button.closest<HTMLElement>("li");
+    if (item !== null) {
+      item.dataset.review = section.status;
+    }
+  }
+}
+
+function showCount(saved: Saved): void {
   const count = document.querySelector(".changes-review-count");
   if (count !== null) {
     count.textContent = `${String(saved.total - saved.left)} of ${String(saved.total)} ${

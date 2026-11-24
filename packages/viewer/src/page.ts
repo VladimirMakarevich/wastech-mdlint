@@ -10,6 +10,7 @@ import {
 } from "@wastech-mdlint/core";
 
 import type { BlockChange } from "./change-marks.js";
+import type { SectionMark } from "./review-state.js";
 import { documentHref } from "./render-document.js";
 
 // Every page is assembled as a hast tree and serialized once, so text from the repository — file
@@ -40,6 +41,9 @@ export type PageParams = {
   // Slugs of the headings whose section the branch changed, marked in the outline so a reader sees
   // where the changes are before scrolling to them.
   changedSections?: ReadonlySet<string>;
+  // On a changed document with review marks on: each section's place in the reader's review, by its
+  // heading's slug, so a section can be marked from the outline on its own.
+  sectionMarks?: { path: string; marks: ReadonlyMap<string, SectionMark> };
   backlinks?: readonly string[];
   // How many documents the page's document links to or is linked from. The rail draws them as a
   // small graph, and leaves the graph out when there are none.
@@ -50,6 +54,9 @@ export type PageParams = {
   frontmatterChange?: BlockChange;
   // Pre-fills the header's search box on a results page.
   query?: string;
+  // On a document page in a git work tree: the link that shows or hides who last changed each block,
+  // in the right margin, and whether it is shown now.
+  blameToggle?: { href: string; on: boolean };
   // Set on the pages that send a change — the config page, and where review marks are on, the Changes
   // page and a changed document's page: the token their scripts send with it, so the server can tell
   // a request from its own page from one another page made the browser send.
@@ -162,6 +169,19 @@ export function renderPage(params: PageParams): string {
             params.displayPath === undefined
               ? undefined
               : copyPathButton(params.displayPath, params.absolutePath),
+            params.blameToggle === undefined
+              ? undefined
+              : h(
+                  "a.blame-toggle",
+                  {
+                    href: params.blameToggle.href,
+                    ariaPressed: params.blameToggle.on ? "true" : "false",
+                    title: params.blameToggle.on
+                      ? "Hide who last changed each block"
+                      : "Show who last changed each block, in the right margin",
+                  },
+                  "Blame",
+                ),
             // A plain GET form, so search works as a results page even before (or without) the
             // script that turns it into a live list.
             h(
@@ -310,14 +330,17 @@ export function renderPage(params: PageParams): string {
               columnResizer("sidebar", "Resize the document tree"),
             ]),
             h("main.content", { id: CONTENT_ID }, [
-              h("article.markdown-body", [
-                params.changeBanner,
-                renderFrontmatter(
-                  params.frontmatter ?? null,
-                  params.frontmatterChange,
-                ),
-                ...params.article,
-              ]),
+              h(
+                `article.markdown-body${params.blameToggle?.on === true ? ".has-blame" : ""}`,
+                [
+                  params.changeBanner,
+                  renderFrontmatter(
+                    params.frontmatter ?? null,
+                    params.frontmatterChange,
+                  ),
+                  ...params.article,
+                ],
+              ),
             ]),
             renderRail(params),
           ]),
@@ -521,20 +544,32 @@ function renderRail(params: PageParams): Element | undefined {
             h("h2", "On this page"),
             h(
               "ul",
-              outline.map((heading) =>
-                h(`li.depth-${heading.depth}`, [
-                  h("a", { href: `#${heading.slug}` }, [
-                    heading.text,
-                    params.changedSections?.has(heading.slug) === true
-                      ? h("span.outline-change", {
-                          role: "img",
-                          ariaLabel: "changed in this branch",
-                          title: "Changed in this branch",
-                        })
-                      : undefined,
-                  ]),
-                ]),
-              ),
+              outline.map((heading) => {
+                const mark = params.sectionMarks?.marks.get(heading.slug);
+                return h(
+                  `li.depth-${heading.depth}`,
+                  { dataReview: mark?.status },
+                  [
+                    h("a", { href: `#${heading.slug}` }, [
+                      heading.text,
+                      params.changedSections?.has(heading.slug) === true
+                        ? h("span.outline-change", {
+                            role: "img",
+                            ariaLabel: "changed in this branch",
+                            title: "Changed in this branch",
+                          })
+                        : undefined,
+                    ]),
+                    mark === undefined || params.sectionMarks === undefined
+                      ? undefined
+                      : sectionMarkButton(
+                          params.sectionMarks.path,
+                          heading.text,
+                          mark,
+                        ),
+                  ],
+                );
+              }),
             ),
           ]),
       backlinks.length === 0
@@ -551,6 +586,38 @@ function renderRail(params: PageParams): Element | undefined {
     ]),
     columnResizer("rail", "Resize the side column"),
   ]);
+}
+
+const SECTION_STATUS: Record<SectionMark["status"], string> = {
+  reviewed: "Viewed",
+  changed: "Changed since you viewed it",
+  unreviewed: "Not viewed yet",
+};
+
+/**
+ * The button that marks one section viewed, beside its outline entry: pressed while the section's
+ * own text is one the reader reviewed. Hidden until the script that sends the mark has run; without
+ * it, the entry's `data-review` still shows where the section stands.
+ */
+function sectionMarkButton(
+  relPath: string,
+  headingText: string,
+  mark: SectionMark,
+): Element {
+  return h(
+    "button.section-mark",
+    {
+      type: "button",
+      hidden: true,
+      ariaPressed: mark.status === "reviewed" ? "true" : "false",
+      ariaLabel: `Mark the section "${headingText}" as viewed`,
+      title: SECTION_STATUS[mark.status],
+      dataPath: relPath,
+      dataSection: mark.key,
+      dataHash: mark.hash,
+    },
+    "✓",
+  );
 }
 
 // A column's width handle, on its edge toward the article. Hidden until the script that drags it has

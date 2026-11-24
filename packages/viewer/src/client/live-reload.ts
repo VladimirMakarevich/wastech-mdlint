@@ -51,6 +51,20 @@ export function initLiveReload(documentPath: string | undefined): void {
       reloadKeepingScroll();
     }
   });
+  // A commit, a checkout or a fetch moved what the branch is compared with. Only the pages that show
+  // that comparison reload: the Changes page, a changed document's line and marks, and the graph or
+  // dashboard asked to show the branch. The header count and the tree refresh on their own.
+  onServerEvent("git", () => {
+    const params = new URLSearchParams(location.search);
+    if (
+      location.pathname === "/changes" ||
+      document.querySelector(".changes-banner") !== null ||
+      params.get("changes") === "1" ||
+      params.get("changed") === "1"
+    ) {
+      reloadKeepingScroll();
+    }
+  });
 }
 
 // Storage can be unavailable (private windows, blocked site data), and losing the scroll position

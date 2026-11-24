@@ -11,7 +11,7 @@ import {
   topologicalSort,
   type ContextGraphSummaryOptions,
 } from "./graph-algorithms.js";
-import type { ImpactClassification } from "./impact-analysis.js";
+import type { ChangeImpact, ImpactClassification } from "./impact-analysis.js";
 import type { ContextSliceResult } from "./search-index.js";
 
 // Deterministic renderers over a `ContextGraph`, shared by the CLI `graph` command and the MCP
@@ -275,11 +275,17 @@ export function renderContextSliceSummary(result: ContextSliceResult): string {
   return lines.join("\n");
 }
 
-export function renderImpactSummary(result: ImpactClassification): string {
-  const lines = [
-    `changed file: ${result.file}`,
-    `directly affected (${result.directlyAffected.length}):`,
-  ];
+export function renderImpactSummary(
+  result: ImpactClassification | ChangeImpact,
+): string {
+  const lines =
+    "file" in result
+      ? [`changed file: ${result.file}`]
+      : [
+          `changed files (${result.files.length}):`,
+          ...result.files.map((file) => `  ${file}`),
+        ];
+  lines.push(`directly affected (${result.directlyAffected.length}):`);
   for (const entry of result.directlyAffected) {
     lines.push(
       `  ${entry.path} (${entry.references} reference${entry.references === 1 ? "" : "s"})`,

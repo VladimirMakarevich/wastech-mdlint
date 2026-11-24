@@ -2,12 +2,19 @@ import {
   formatLintResultText,
   lintFiles,
   type LintResult,
+  renderSinceHeader,
+  sinceLintResult,
 } from "@wastech-mdlint/core";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 import { lintMessageSchema } from "../shared/lint-message-schema.js";
+import {
+  analyzeSinceOrThrow,
+  sinceInput,
+  sinceSummarySchema,
+} from "../shared/since.js";
 import {
   resolveToolConfiguration,
   toolCwdBase,
@@ -27,12 +34,16 @@ import {
 
 // Same `cwd?`/`configPath?` shape as `ToolFileInput`, plus an optional `patterns` override — so the
 // handler can pass `input` straight into `resolveToolConfiguration`.
-type LintFilesToolInput = ToolFileInput & { patterns?: string[] };
+type LintFilesToolInput = ToolFileInput & {
+  patterns?: string[];
+  since?: string;
+};
 
 const lintFilesInputShape = {
   patterns: z.array(z.string()).optional(),
   configPath: z.string().optional(),
   cwd: z.string().optional(),
+  since: sinceInput,
 } as const;
 
 // Mirrors `LintResult` directly — field names already match, so `structured: result` needs no
@@ -42,6 +53,8 @@ const lintFilesOutputShape = {
   files: z.array(z.string()),
   errorCount: z.number().int(),
   warningCount: z.number().int(),
+  // Present when `since` was given: the comparison the findings are new against.
+  since: sinceSummarySchema.optional(),
 } as const;
 
 // Match the required `LintResult` fields on the error path so schema-validating MCP clients accept
@@ -74,6 +87,22 @@ export async function handleLintFiles(
         ? loaded.config
         : { ...loaded.config, include: input.patterns };
 
+    if (input.since !== undefined) {
+      // The CLI's `lint --since` from the same core calls: only the findings the work tree adds
+      // since where the branch left `since`, with the comparison named in both renderings.
+      const since = sinceLintResult(
+        await analyzeSinceOrThrow(
+          loaded.cwd,
+          { ...loaded, config },
+          input.since,
+        ),
+      );
+      return successResult({
+        summary: `${renderSinceHeader(since.since)}${formatLintResultText(since)}`,
+        structured: since,
+      });
+    }
+
     const result: LintResult = await lintFiles({
       cwd: loaded.cwd,
       config,
@@ -96,7 +125,8 @@ export function registerLintFilesTool(server: McpServer): void {
     {
       title: "Lint project files",
       description:
-        "Lint the project's Markdown files using the resolved config (or the zero-config `**/*.md` default). Read-only.",
+        "Lint the project's Markdown files using the resolved config (or the zero-config `**/*.md` default). " +
+        "With `since` (a branch, tag or commit), report only the findings the work tree adds since where it left that ref, read with git. Read-only.",
       inputSchema: lintFilesInputShape,
       outputSchema: withErrorOutput(lintFilesOutputShape),
       annotations: READ_ONLY_ANNOTATIONS,

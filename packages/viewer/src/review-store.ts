@@ -15,7 +15,8 @@ import {
 // force-push brought it there, and turns "changed since review" the moment it differs.
 //
 // On disk, in the clone's own folder of the state directory:
-//   review.json        the index: per path, the hashes of the texts reviewed there, newest first
+//   review.json        the index: per path, the hashes of the texts reviewed there, newest first,
+//                      and per path and section the hashes of the sections' own texts
 //   review.lock        present only while a viewer is writing
 //   texts/<hash>.md    each reviewed text, once, for the diff "since my last review"
 // The texts are kept because the version a reader reviewed may never have been committed, so git
@@ -39,7 +40,9 @@ const EMPTY_HASH = contentHash("");
 
 const HASH = /^[0-9a-f]{64}$/;
 const TEXT_FILE = /^([0-9a-f]{64})\.md$/;
-const FORMAT = 1;
+// Format 2 added per-section marks. A file of format 1 has none and is read as it is; a viewer that
+// knew only format 1 refuses a file of format 2 rather than writing it back without its sections.
+const FORMAT = 2;
 
 // How many reviewed versions a path remembers. More than one, so switching back to a branch whose
 // text was reviewed before finds it reviewed although another version was reviewed in between; a
@@ -52,6 +55,12 @@ const LOCK_STALE_MS = 10_000;
 const LOCK_RETRY_MS = 25;
 const LOCK_WAIT_MS = 3_000;
 
+/** One section of a document as a page shows it: its key and the hash of its own text. */
+export type SectionHash = { key: string; hash: string };
+
+/** Per path, per section key, the hashes of the section texts reviewed there, newest first. */
+export type SectionMarks = Map<string, Map<string, string[]>>;
+
 /** The marks as one read of the index found them, with the questions the pages ask of them. */
 export class ReviewMarks {
   // Every reviewed text but the empty one, for finding a document reviewed under another path.
@@ -60,11 +69,36 @@ export class ReviewMarks {
   constructor(
     // Keyed by path from the work tree's top level, as the index stores them.
     readonly documents: ReadonlyMap<string, readonly string[]>,
+    readonly sections: SectionMarks,
     private readonly keyOf: (relPath: string) => string,
   ) {
     this.hashes = new Set(
       [...documents.values()].flat().filter((hash) => hash !== EMPTY_HASH),
     );
+  }
+
+  /**
+   * Where one section stands: reviewed while its own text is a text reviewed under its key, whatever
+   * happened to the rest of the document since; changed since review when its key has marks for
+   * other texts. A renamed heading has a new key, and starts unreviewed.
+   */
+  sectionStatus(entry: {
+    path: string;
+    oldPath?: string;
+    key: string;
+    hash: string;
+  }): ReviewStatus {
+    const marked = [entry.path, entry.oldPath]
+      .filter((relPath): relPath is string => relPath !== undefined)
+      .flatMap(
+        (relPath) =>
+          this.sections.get(this.keyOf(relPath))?.get(entry.key) ?? [],
+      );
+    return marked.includes(entry.hash)
+      ? "reviewed"
+      : marked.length > 0
+        ? "changed"
+        : "unreviewed";
   }
 
   /**
@@ -74,7 +108,14 @@ export class ReviewMarks {
    * (or the path it was renamed from) has marks for other texts; `since` is the newest of them, the
    * version to compare with.
    */
-  status(entry: { path: string; oldPath?: string; hash: string }): {
+  status(entry: {
+    path: string;
+    oldPath?: string;
+    hash: string;
+    // The document's sections as it is now: when every one is reviewed, so is the document, though
+    // it was never marked as a whole in this version.
+    sections?: readonly SectionHash[];
+  }): {
     status: ReviewStatus;
     since?: string;
   } {
@@ -83,24 +124,60 @@ export class ReviewMarks {
       entry.oldPath === undefined
         ? []
         : (this.documents.get(this.keyOf(entry.oldPath)) ?? []);
+    const sections = entry.sections ?? [];
+    const sectionStatuses = sections.map((section) =>
+      this.sectionStatus({
+        path: entry.path,
+        ...(entry.oldPath === undefined ? {} : { oldPath: entry.oldPath }),
+        ...section,
+      }),
+    );
     if (
       own.includes(entry.hash) ||
       old.includes(entry.hash) ||
-      (entry.hash !== EMPTY_HASH && this.hashes.has(entry.hash))
+      (entry.hash !== EMPTY_HASH && this.hashes.has(entry.hash)) ||
+      (sections.length > 0 &&
+        sectionStatuses.every((status) => status === "reviewed"))
     ) {
       return { status: "reviewed" };
     }
     const since = own[0] ?? old[0];
-    return since === undefined
-      ? { status: "unreviewed" }
-      : { status: "changed", since };
+    if (since !== undefined) {
+      return { status: "changed", since };
+    }
+    // Sections reviewed one at a time, the document never as a whole: started, not finished.
+    return sectionStatuses.some((status) => status !== "unreviewed")
+      ? { status: "changed" }
+      : { status: "unreviewed" };
   }
 }
 
 /** A change to the marks, in the host root's paths; the store restates them from the top level. */
+// Marking a document marks its sections as they are too, so a later edit to one section leaves the
+// others reviewed; unmarking it takes back the marks of its sections as they are.
 export type MarkChange =
-  | { kind: "mark"; path: string; hash: string; text: string }
-  | { kind: "unmark"; path: string; oldPath?: string; hash: string }
+  | {
+      kind: "mark";
+      path: string;
+      hash: string;
+      text: string;
+      sections?: readonly SectionHash[];
+    }
+  | {
+      kind: "unmark";
+      path: string;
+      oldPath?: string;
+      hash: string;
+      sections?: readonly SectionHash[];
+    }
+  | {
+      kind: "section";
+      path: string;
+      oldPath?: string;
+      key: string;
+      hash: string;
+      reviewed: boolean;
+    }
   | {
       kind: "reset";
       documents: readonly { path: string; oldPath?: string; hash: string }[];
@@ -158,7 +235,10 @@ export class ReviewStore {
   async read(): Promise<StoreRead> {
     const index = await this.readIndex();
     return index.ok
-      ? { ok: true, marks: new ReviewMarks(index.documents, this.keyOf) }
+      ? {
+          ok: true,
+          marks: new ReviewMarks(index.documents, index.sections, this.keyOf),
+        }
       : index;
   }
 
@@ -208,7 +288,15 @@ export class ReviewStore {
       const documents = new Map(
         [...index.documents].map(([key, hashes]) => [key, [...hashes]]),
       );
-      applyChange(documents, change, this.keyOf);
+      const sections: SectionMarks = new Map(
+        [...index.sections].map(([key, marks]) => [
+          key,
+          new Map(
+            [...marks].map(([section, hashes]) => [section, [...hashes]]),
+          ),
+        ]),
+      );
+      applyChange({ documents, sections }, change, this.keyOf);
 
       const created: string[] = [];
       if (change.kind === "mark") {
@@ -229,7 +317,7 @@ export class ReviewStore {
       try {
         await writeFileAtomic(
           this.indexPath,
-          serializeIndex(this.commonDir, documents),
+          serializeIndex(this.commonDir, documents, sections),
         );
       } catch (error) {
         await Promise.all(
@@ -238,7 +326,10 @@ export class ReviewStore {
         return failed(error);
       }
       await this.dropUnreferencedTexts(documents);
-      return { ok: true, marks: new ReviewMarks(documents, this.keyOf) };
+      return {
+        ok: true,
+        marks: new ReviewMarks(documents, sections, this.keyOf),
+      };
     } finally {
       await unlink(this.lockPath).catch(() => undefined);
     }
@@ -311,10 +402,7 @@ export class ReviewStore {
     );
   }
 
-  private async readIndex(): Promise<
-    | { ok: true; documents: Map<string, readonly string[]> }
-    | { ok: false; message: string }
-  > {
+  private async readIndex(): Promise<ParsedIndex> {
     let text: string;
     try {
       text = await readFile(this.indexPath, "utf8");
@@ -322,7 +410,7 @@ export class ReviewStore {
       const code = errnoCode(error);
       // Nothing stored yet — or a state directory that is not a directory, where nothing can be.
       if (code === "ENOENT" || code === "ENOTDIR") {
-        return { ok: true, documents: new Map() };
+        return { ok: true, documents: new Map(), sections: new Map() };
       }
       return {
         ok: false,
@@ -373,10 +461,45 @@ export function cloneFolder(commonDir: string): string {
 }
 
 function applyChange(
-  documents: Map<string, string[]>,
+  state: { documents: Map<string, string[]>; sections: SectionMarks },
   change: MarkChange,
   keyOf: (relPath: string) => string,
 ): void {
+  const { documents, sections } = state;
+  const keysOf = (entry: { path: string; oldPath?: string }) =>
+    [entry.path, entry.oldPath]
+      .filter((relPath): relPath is string => relPath !== undefined)
+      .map(keyOf);
+  const markSection = (documentKey: string, section: SectionHash) => {
+    let marks = sections.get(documentKey);
+    if (marks === undefined) {
+      marks = new Map();
+      sections.set(documentKey, marks);
+    }
+    const hashes = marks.get(section.key) ?? [];
+    marks.set(
+      section.key,
+      [section.hash, ...hashes.filter((hash) => hash !== section.hash)].slice(
+        0,
+        VERSIONS_PER_PATH,
+      ),
+    );
+  };
+  const unmarkSection = (
+    documentKeys: readonly string[],
+    section: SectionHash,
+  ) => {
+    for (const documentKey of documentKeys) {
+      const marks = sections.get(documentKey);
+      const hashes = marks?.get(section.key);
+      if (marks !== undefined && hashes !== undefined) {
+        marks.set(
+          section.key,
+          hashes.filter((hash) => hash !== section.hash),
+        );
+      }
+    }
+  };
   // Removing a text removes it under every path, since a text marked under one path counts under
   // all of them; the empty text of a deletion is the exception, counted under its own path only.
   const removeEverywhere = (hash: string, keys: readonly string[]) => {
@@ -399,11 +522,21 @@ function applyChange(
         VERSIONS_PER_PATH,
       ),
     );
+    for (const section of change.sections ?? []) {
+      markSection(key, section);
+    }
   } else if (change.kind === "unmark") {
-    const keys = [change.path, change.oldPath]
-      .filter((entry): entry is string => entry !== undefined)
-      .map(keyOf);
+    const keys = keysOf(change);
     removeEverywhere(change.hash, keys);
+    for (const section of change.sections ?? []) {
+      unmarkSection(keys, section);
+    }
+  } else if (change.kind === "section") {
+    if (change.reviewed) {
+      markSection(keyOf(change.path), change);
+    } else {
+      unmarkSection(keysOf(change), change);
+    }
   } else {
     // Starting over: the documents forget every version reviewed under their paths, not only the
     // current one, or an older mark would leave them "changed since review" rather than unreviewed.
@@ -413,6 +546,7 @@ function applyChange(
         .map(keyOf);
       for (const key of keys) {
         documents.delete(key);
+        sections.delete(key);
       }
       removeEverywhere(entry.hash, keys);
     }
@@ -422,6 +556,16 @@ function applyChange(
       documents.delete(key);
     }
   }
+  for (const [key, marks] of sections) {
+    for (const [section, hashes] of marks) {
+      if (hashes.length === 0) {
+        marks.delete(section);
+      }
+    }
+    if (marks.size === 0) {
+      sections.delete(key);
+    }
+  }
 }
 
 // Paths in code-point order and pretty-printed, so the same marks always make the same file and a
@@ -429,22 +573,47 @@ function applyChange(
 function serializeIndex(
   repository: string,
   documents: ReadonlyMap<string, readonly string[]>,
+  sections: SectionMarks,
 ): string {
   const sorted: Record<string, readonly string[]> = {};
   for (const key of [...documents.keys()].sort(compareStrings)) {
     sorted[key] = documents.get(key)!;
   }
-  return `${JSON.stringify({ format: FORMAT, repository, documents: sorted }, null, 2)}\n`;
+  const sortedSections: Record<string, Record<string, readonly string[]>> = {};
+  for (const key of [...sections.keys()].sort(compareStrings)) {
+    const marks = sections.get(key)!;
+    const entry: Record<string, readonly string[]> = {};
+    for (const section of [...marks.keys()].sort(compareStrings)) {
+      entry[section] = marks.get(section)!;
+    }
+    sortedSections[key] = entry;
+  }
+  return `${JSON.stringify(
+    { format: FORMAT, repository, documents: sorted, sections: sortedSections },
+    null,
+    2,
+  )}\n`;
 }
 
 const UNREADABLE =
   "The review marks file is not one this viewer can read, so it is left as it is. Fix it or delete it to mark documents again.";
 
-function parseIndex(
-  text: string,
-):
-  | { ok: true; documents: Map<string, readonly string[]> }
-  | { ok: false; message: string } {
+type ParsedIndex =
+  | {
+      ok: true;
+      documents: Map<string, readonly string[]>;
+      sections: SectionMarks;
+    }
+  | { ok: false; message: string };
+
+const isHashList = (value: unknown): value is string[] =>
+  Array.isArray(value) &&
+  value.every((hash) => typeof hash === "string" && HASH.test(hash));
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+function parseIndex(text: string): ParsedIndex {
   let json: unknown;
   try {
     json = JSON.parse(text);
@@ -454,7 +623,7 @@ function parseIndex(
   if (typeof json !== "object" || json === null || Array.isArray(json)) {
     return { ok: false, message: UNREADABLE };
   }
-  const { format, documents } = json as Record<string, unknown>;
+  const { format, documents, sections } = json as Record<string, unknown>;
   if (typeof format === "number" && format > FORMAT) {
     return {
       ok: false,
@@ -463,26 +632,40 @@ function parseIndex(
     };
   }
   if (
-    format !== FORMAT ||
-    typeof documents !== "object" ||
-    documents === null ||
-    Array.isArray(documents)
+    (format !== 1 && format !== FORMAT) ||
+    !isRecord(documents) ||
+    (sections !== undefined && !isRecord(sections))
   ) {
     return { ok: false, message: UNREADABLE };
   }
   const parsed = new Map<string, readonly string[]>();
   for (const [key, hashes] of Object.entries(documents)) {
-    if (
-      !Array.isArray(hashes) ||
-      !hashes.every((hash) => typeof hash === "string" && HASH.test(hash))
-    ) {
+    if (!isHashList(hashes)) {
       return { ok: false, message: UNREADABLE };
     }
     if (hashes.length > 0) {
-      parsed.set(key, hashes as string[]);
+      parsed.set(key, hashes);
     }
   }
-  return { ok: true, documents: parsed };
+  const parsedSections: SectionMarks = new Map();
+  for (const [key, marks] of Object.entries(sections ?? {})) {
+    if (!isRecord(marks)) {
+      return { ok: false, message: UNREADABLE };
+    }
+    const entry = new Map<string, string[]>();
+    for (const [section, hashes] of Object.entries(marks)) {
+      if (!isHashList(hashes)) {
+        return { ok: false, message: UNREADABLE };
+      }
+      if (hashes.length > 0) {
+        entry.set(section, hashes);
+      }
+    }
+    if (entry.size > 0) {
+      parsedSections.set(key, entry);
+    }
+  }
+  return { ok: true, documents: parsed, sections: parsedSections };
 }
 
 function failed(error: unknown): WriteOutcome {

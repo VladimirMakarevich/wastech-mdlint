@@ -1,7 +1,7 @@
 import type { Review } from "./changes.js";
 import type { DashboardChange } from "./dashboard.js";
 import type { GraphChanges } from "./graph-view.js";
-import type { ReviewContext } from "./review-context.js";
+import type { ReviewContext } from "./changes.js";
 
 // The review of a branch, restated for the pages that show it beside everything else: the dashboard's
 // Branch column and the graph's marks. Both read the work-tree review, as they show the files on
