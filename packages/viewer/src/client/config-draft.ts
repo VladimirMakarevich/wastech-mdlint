@@ -28,8 +28,9 @@ export type Draft = {
   // Set while a save of this change is on its way: the text sent, and whether the reader changed
   // anything since. The server tells every page to reload once the file is written, which can land
   // before the save's own answer; this is how the reloaded page knows the file it reads is the one
-  // this draft saved, and not one another program wrote.
-  saving?: { text: string; edited: boolean };
+  // this draft saved, and not one another program wrote. `edits` is how many of the form's edits
+  // the saved text already holds; a draft stored before it was kept has none.
+  saving?: { text: string; edited: boolean; edits?: number };
 };
 
 /** The config file a draft is checked against: its text and that text's hash. */
@@ -83,7 +84,8 @@ function isSaving(value: unknown): value is Draft["saving"] {
     typeof value === "object" &&
     value !== null &&
     typeof (value as { text: unknown }).text === "string" &&
-    typeof (value as { edited: unknown }).edited === "boolean"
+    typeof (value as { edited: unknown }).edited === "boolean" &&
+    ["number", "undefined"].includes(typeof (value as { edits: unknown }).edits)
   );
 }
 
@@ -98,8 +100,14 @@ export function draftText(draft: Draft): string | undefined {
 /**
  * What is left of a draft once its save has written `saved`: nothing, when the reader changed
  * nothing while the save was on its way, or the change they made meanwhile, now based on the saved
- * file. Its text and edits are kept as they are — applied to the text they were made to, they give
- * the saved text plus the later change — so restoring it shows the whole later change.
+ * file.
+ *
+ * A change made in the form stays one: the saved text, with the edits made after the save began.
+ * It has to, because a draft whose text is taken for the reader's own replaces the file when it is
+ * later set aside and applied — and the text it held was the one from before the save, so applying
+ * it would put back what another program changed since. A text the reader wrote, or a draft whose
+ * edits cannot be split at the save, keeps its text and edits as they are: applied to the text they
+ * were made to, they give the saved text plus the later change.
  */
 export function afterSave(draft: Draft, saved: FileVersion): Draft | undefined {
   if (
@@ -107,6 +115,22 @@ export function afterSave(draft: Draft, saved: FileVersion): Draft | undefined {
     (draft.edits.length === 0 && draft.text === saved.text)
   ) {
     return undefined;
+  }
+  const savedEdits = draft.saving.edits;
+  if (
+    !draft.textEdited &&
+    savedEdits !== undefined &&
+    savedEdits <= draft.edits.length
+  ) {
+    return {
+      base: saved.hash,
+      text: saved.text,
+      edits: draft.edits.slice(savedEdits),
+      mode: draft.mode,
+      textEdited: false,
+      // The whole changed file is the same text either way: the saved edits are now in `text`.
+      full: draft.full,
+    };
   }
   return {
     base: saved.hash,

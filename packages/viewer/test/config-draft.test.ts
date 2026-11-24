@@ -137,6 +137,45 @@ describe("afterSave", () => {
     });
   });
 
+  // The defect this guards: the kept form change came back as text — the text from before the save —
+  // so once the file changed again and the draft was set aside and applied, it replaced the newer
+  // file with that older text plus the edits, undoing what another program wrote.
+  it("keeps a form change a form change: the saved text, with only the edits made after it", () => {
+    const include = {
+      op: "set" as const,
+      path: ["include"],
+      value: ["**/*.md"],
+    };
+    const later = {
+      ...formDraft,
+      edits: [SEVERITY_EDIT, include],
+      full: undefined,
+      saving: { text: savedText, edited: true, edits: 1 },
+    };
+    const kept = afterSave(later, saved);
+    expect(kept).toEqual({
+      base: "saved",
+      text: savedText,
+      edits: [include],
+      mode: "form",
+      textEdited: false,
+      full: undefined,
+    });
+
+    // Another program then changes the file: the draft replays its one later edit onto that text.
+    const newer = {
+      text: '{ "rules": [], "exclude": ["x/**"] }',
+      hash: "newer",
+    };
+    expect(rebaseDraft(kept!, newer)).toEqual({
+      base: "newer",
+      text: newer.text,
+      edits: [include],
+      mode: "form",
+      textEdited: false,
+    });
+  });
+
   it("drops nothing that was never being saved", () => {
     expect(afterSave(formDraft, saved)).toBeUndefined();
   });

@@ -87,7 +87,7 @@ class ConfigEditor {
   // previewed against the file.
   private previewedText: string | undefined;
   // Set while a save is on its way: the text sent, and whether the reader has changed anything since.
-  private saving: { text: string; edited: boolean } | undefined;
+  private saving: Draft["saving"];
   // A draft made to an earlier version of the file, offered back above the editor.
   private setAside: Draft | undefined;
 
@@ -611,7 +611,12 @@ class ConfigEditor {
     control.disabled = true;
     // Kept in the draft too: the reload the server starts once the file is written can come before
     // this request's answer, and the reloaded page has only the draft to tell that it was saved.
-    this.saving = { text, edited: false };
+    // Only a form change counts its edits: they are what a later change is told apart from.
+    this.saving = {
+      text,
+      edited: false,
+      ...(this.text === this.file.text ? { edits: this.edits.length } : {}),
+    };
     this.saveDraft();
     let result: {
       status: string;
@@ -657,6 +662,10 @@ class ConfigEditor {
       this.text = saved.text;
       this.edits = [];
       this.previewedText = undefined;
+    } else {
+      // What the draft keeps is what the editor holds, so the next draft it stores is that one.
+      this.text = remaining.text;
+      this.edits = remaining.edits;
     }
     this.saveDraft();
     // The server reloads the corpus for the new config and tells every page, this one included,
