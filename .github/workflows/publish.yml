@@ -1,6 +1,6 @@
 name: Publish
 
-# A single `vX.Y.Z` tag publishes all three packages at that version.
+# A single `vX.Y.Z` tag publishes all four packages at that version.
 #
 # Publishing runs in the same job as the gate, not a downstream one, so there is no window in which
 # a green gate and a later publish disagree about which commit they ran on.
@@ -17,7 +17,7 @@ permissions:
   # the provenance attestation with. Authentication carries no stored credential: npm holds a trust
   # relationship between each package and this repository plus this workflow's filename, matched
   # exactly and case-sensitively. Renaming or moving this file therefore breaks publishing until that
-  # relationship is updated on all three packages, which is why the name is not merely cosmetic.
+  # relationship is updated on all four packages, which is why the name is not merely cosmetic.
   id-token: write
 
 jobs:
@@ -44,7 +44,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           tag_version="${GITHUB_REF_NAME#v}"
-          for package in core cli mcp-server; do
+          for package in core cli mcp-server viewer; do
             manifest_version="$(node -p "require('./packages/${package}/package.json').version")"
             if [ "${manifest_version}" != "${tag_version}" ]; then
               echo "Tag ${GITHUB_REF_NAME} does not match @wastech-mdlint/${package}@${manifest_version}." >&2
@@ -65,7 +65,7 @@ jobs:
       - run: npm run lint:docs
       - run: npm pack --dry-run --workspaces
 
-      # `core` first, and separately: `cli` and `mcp-server` pin it by exact version, so publishing
+      # `core` first, and separately: `cli`, `mcp-server` and `viewer` pin it by exact version, so publishing
       # them against a registry that does not yet carry that `core` version leaves the first consumer
       # to install a dependency that cannot resolve.
       #
@@ -100,4 +100,13 @@ jobs:
             echo "@wastech-mdlint/mcp-server@${version} is already in the registry; nothing to publish."
           else
             npm publish -w @wastech-mdlint/mcp-server --provenance
+          fi
+
+      - name: Publish @wastech-mdlint/viewer
+        run: |
+          version="$(node -p "require('./packages/viewer/package.json').version")"
+          if [ -n "$(npm view "@wastech-mdlint/viewer@${version}" version 2>/dev/null)" ]; then
+            echo "@wastech-mdlint/viewer@${version} is already in the registry; nothing to publish."
+          else
+            npm publish -w @wastech-mdlint/viewer --provenance
           fi

@@ -2,15 +2,18 @@
 
 A local web viewer for a repository's Markdown. It serves exactly the corpus [wastech-mdlint](https://github.com/VladimirMakarevich/wastech-mdlint#readme) lints, as pages with the document tree, highlighted code, Mermaid diagrams, ECharts charts, an outline, backlinks, a graph of the links between documents, full-text search, the linter's findings with prompts to fix them, a dashboard of the whole corpus and a review of what the current branch changed in it, lets the linter's config be edited with a preview of what it would report, lets the reader set the fonts, sizes and margins of the text, and reloads an open page when its file changes.
 
-**Experimental.** The package is `private` in this repository and is not published yet.
+**Experimental.** Pages, options and the JSON routes may still change between minor versions. It is released together with [`@wastech-mdlint/core`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/packages/core/README.md) and the CLI, at the same version, from one tag.
 
 ## Run it
 
-From this repository, after `npm run build`:
+Requires Node.js `24.17.0` or later.
 
 ```bash
-node packages/viewer/dist/index.js path/to/repository
+npx @wastech-mdlint/viewer path/to/repository      # run directly, no install
+npm i -D @wastech-mdlint/viewer                      # or install the wastech-mdlint-viewer bin
 ```
+
+From a checkout of this repository, after `npm run build`: `node packages/viewer/dist/index.js path/to/repository`.
 
 It prints the address, by default `http://127.0.0.1:4180/`. The root opens the repository's `README.md`.
 

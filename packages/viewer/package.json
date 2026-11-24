@@ -1,7 +1,6 @@
 {
   "name": "@wastech-mdlint/viewer",
   "version": "0.3.0",
-  "private": true,
   "description": "Local web viewer for a repository's Markdown: the corpus wastech-mdlint lints, rendered with diagrams, charts, highlighted code, backlinks and a link graph, reloading as files change.",
   "keywords": [
     "markdown",
@@ -52,5 +51,9 @@
     "shiki": "^4.6.0",
     "unist-util-visit": "^5.2.0",
     "vfile": "^6.0.3"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }
