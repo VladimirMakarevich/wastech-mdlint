@@ -441,6 +441,17 @@ function registryRules(): ConfigApi["rules"] {
     .sort((left, right) => compareStrings(left.id, right.id));
 }
 
+/** The id of the data the editor is built from, which the page's script reads by the same name. */
+export const CONFIG_DATA_ID = "viewer.config-data";
+
+// JSON to place inside a `<script>` element, which ends at the first `</script` whatever the JSON
+// means: every `<` is written as its escape, which reads back as the same text and can neither end
+// the element nor open a comment in it. A config file's own text is part of the data, and may hold
+// either.
+function scriptJson(value: unknown): string {
+  return JSON.stringify(value).replaceAll("<", "\\u003c");
+}
+
 /**
  * The page without its script: the file as it is, highlighted, and the registry's rules with the
  * ones the config runs marked. Editing needs the script, which builds its form from the schema.
@@ -454,6 +465,8 @@ export async function renderConfigArticle(
     // Whether the file may be shown in the file manager or opened in its default application, which
     // starts a program on the machine running the viewer.
     canOpen: boolean;
+    // What the page's script builds the editor from, carried in the page (`CONFIG_DATA_ID`).
+    editor: ConfigApi;
   },
 ): Promise<ElementContent[]> {
   const file = await readConfigFile(corpus);
@@ -501,6 +514,14 @@ export async function renderConfigArticle(
       ? undefined
       : h("div.config-editor", { hidden: true }, [
           h("p", "The editor is drawn by the page's script."),
+          // Carried in the page rather than asked for as it opens: asked for, it arrived a frame or
+          // two after the page was drawn, and the form then pushed the file and everything below it
+          // down the page. Read and replaced by the editor as it is built.
+          h(
+            "script",
+            { type: "application/json", id: CONFIG_DATA_ID },
+            scriptJson(options.editor),
+          ),
         ]),
     file === undefined
       ? undefined

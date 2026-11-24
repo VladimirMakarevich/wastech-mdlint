@@ -43,8 +43,10 @@ export class ConfigRoutes {
           allowWrites: this.ctx.allowConfigWrites,
           showAbsolutePath: this.ctx.showAbsolutePaths,
           canOpen: this.ctx.openRefused === undefined,
+          editor: await configApi(this.ctx.corpus, this.ctx.allowConfigWrites),
         }),
         changeToken: this.ctx.changeToken,
+        scriptFirst: true,
       }),
       request.method === "HEAD",
     );

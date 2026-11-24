@@ -29,6 +29,9 @@ import type {
   Preview,
 } from "./config-types.js";
 
+/** The id of the data the editor is built from, as the server names it. */
+export const CONFIG_DATA_ID = "viewer.config-data";
+
 // Long enough for a burst of typing to become one preview request.
 const PREVIEW_DELAY_MS = 400;
 
@@ -37,19 +40,18 @@ export function initConfigEditor(): void {
   const token = document.querySelector<HTMLMetaElement>(
     'meta[name="wastech-change-token"]',
   )?.content;
-  if (root === null || token === undefined) {
+  // The page carries what the editor is built from (`CONFIG_DATA_ID` in the server's
+  // `config-editor.ts`, the same data `/api/config` answers), so the form is built as the script
+  // runs, before the page is first drawn, rather than once a request comes back — which pushed the
+  // file below it down the page a frame or two after it was drawn.
+  const data = document.getElementById(CONFIG_DATA_ID)?.textContent ?? "";
+  if (root === null || token === undefined || data === "") {
     return;
   }
-  void fetch("/api/config")
-    .then((response) => response.json() as Promise<ConfigApi>)
-    .then((api) => {
-      if (api.file !== null) {
-        new ConfigEditor(root, api, api.file, token).start();
-      }
-    })
-    .catch(() => {
-      // The server is restarting; live reload brings the page back with a fresh copy.
-    });
+  const api = JSON.parse(data) as ConfigApi;
+  if (api.file !== null) {
+    new ConfigEditor(root, api, api.file, token).start();
+  }
 }
 
 class ConfigEditor {

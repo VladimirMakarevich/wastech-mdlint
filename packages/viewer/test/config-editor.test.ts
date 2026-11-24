@@ -17,7 +17,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { assertBuilt } from "../../core/test/support/assert-built.js";
 import { parseCliArgs } from "../src/cli-args.js";
-import { hashText, saveCandidate } from "../src/config-editor.js";
+import { CONFIG_DATA_ID as CLIENT_CONFIG_DATA_ID } from "../src/client/config-editor.js";
+import {
+  CONFIG_DATA_ID,
+  hashText,
+  saveCandidate,
+} from "../src/config-editor.js";
 import { openCommand, type LaunchCommand } from "../src/open-file.js";
 import { startViewer, type RunningViewer } from "../src/server.js";
 
@@ -277,6 +282,68 @@ describe("config page", () => {
     expect((await send(readOnly.port, "/doc/README.md")).body).toContain(
       '<a class="segment" href="/config">Config</a>',
     );
+  });
+
+  // Asked for as the page opened, the editor's data arrived a frame or two after the page was drawn,
+  // and the form then pushed the file below it down the page. The page carries it instead, the very
+  // answer `/api/config` gives, under the id the page script reads.
+  it("carries the editor's data in the page, the same as /api/config", async () => {
+    const page = (await send(readOnly.port, "/config")).body;
+    const carried =
+      /<script type="application\/json" id="viewer\.config-data">([\s\S]*?)<\/script>/.exec(
+        page,
+      )?.[1];
+    expect(carried).toBeDefined();
+    expect(JSON.parse(carried ?? "")).toEqual(
+      JSON.parse((await send(readOnly.port, "/api/config")).body),
+    );
+    expect(CLIENT_CONFIG_DATA_ID).toBe(CONFIG_DATA_ID);
+    // The page is not drawn before its script has built the editor, which goes above the file; a
+    // document's page does not wait for its script.
+    expect(page).toContain(
+      '<script type="module" src="/assets/viewer.js" blocking="render">',
+    );
+    expect((await send(readOnly.port, "/doc/README.md")).body).toContain(
+      '<script type="module" src="/assets/viewer.js"></script>',
+    );
+  });
+
+  // The data holds the config file's own text, which ends the `<script>` element at the first
+  // `</script` it contains and could open a comment with `<!--`. Every `<` in it is escaped, so the
+  // element ends where the page ends it and the text reads back as written.
+  it("keeps a config's own text from ending the data it is carried in", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "wastech-viewer-script-"));
+    await cp(fixtureRoot, dir, { recursive: true });
+    const hostile = `{\n  // </script><script>alert(1)</script> <!-- here\n  "include": ["**/*.md"]\n}\n`;
+    await writeFile(
+      path.join(dir, "wastech-mdlint.config.json"),
+      hostile,
+      "utf8",
+    );
+    const viewer = await startViewer({
+      cwd: dir,
+      host: "127.0.0.1",
+      port: 0,
+      portExplicit: true,
+      watch: false,
+    });
+    try {
+      const page = (await send(Number(new URL(viewer.url).port), "/config"))
+        .body;
+      expect(page).not.toContain("</script><script>alert(1)");
+      expect(page).not.toContain("<!-- here");
+      const carried =
+        /<script type="application\/json" id="viewer\.config-data">([\s\S]*?)<\/script>/.exec(
+          page,
+        )?.[1] ?? "";
+      expect(carried).not.toContain("<");
+      expect(
+        (JSON.parse(carried) as { file: { text: string } }).file.text,
+      ).toBe(hostile);
+    } finally {
+      await viewer.close();
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it("gives the page script the file, the schema and the registry", async () => {
