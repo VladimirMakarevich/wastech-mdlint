@@ -161,7 +161,14 @@ export function diffText(
       blockEnd += 1;
     }
     index = blockEnd - 1;
-    all.push(...changeBlock(base, head, removedIndexes, addedIndexes, options));
+    all.push(
+      ...changeBlock(
+        base,
+        head,
+        { removed: removedIndexes, added: addedIndexes },
+        options,
+      ),
+    );
     added += addedIndexes.length;
     removed += removedIndexes.length;
   }
@@ -262,18 +269,21 @@ export function contextGaps(diff: TextDiff, headText: string): DiffGap[] {
   return gaps;
 }
 
+// One block of consecutive changes: the 0-based indexes of its removed base lines and of its added
+// head lines.
+type ChangeBlockIndexes = { removed: number[]; added: number[] };
+
 function changeBlock(
   base: SplitText,
   head: SplitText,
-  removedIndexes: number[],
-  addedIndexes: number[],
+  indexes: ChangeBlockIndexes,
   options: TextDiffOptions,
 ): DiffLine[] {
-  const removedLines = removedIndexes.map((index) => ({
+  const removedLines = indexes.removed.map((index) => ({
     line: index + 1,
     text: base.lines[index] ?? "",
   }));
-  const addedLines = addedIndexes.map((index) => ({
+  const addedLines = indexes.added.map((index) => ({
     line: index + 1,
     text: head.lines[index] ?? "",
   }));
@@ -362,18 +372,7 @@ function pairLines(
   };
 
   if (removedCount * addedCount > PAIRING_COMPARISONS) {
-    const pairs: [number, number, Comparison][] = [];
-    for (
-      let index = 0;
-      index < Math.min(removedCount, addedCount);
-      index += 1
-    ) {
-      const comparison = accept(index, index);
-      if (comparison !== undefined) {
-        pairs.push([index, index, comparison]);
-      }
-    }
-    return pairs;
+    return pairLineForLine(Math.min(removedCount, addedCount), accept);
   }
 
   const comparisons: (Comparison | undefined)[][] = Array.from(
@@ -383,7 +382,30 @@ function pairLines(
         accept(removed, added),
       ),
   );
-  // best[r][a]: the highest total similarity pairing removed lines from r and added lines from a.
+  return tracePairing(comparisons, bestPairingTable(comparisons, addedCount));
+}
+
+// The large-block fallback: line `i` removed against line `i` added, for the first `count` lines.
+function pairLineForLine(
+  count: number,
+  accept: (removed: number, added: number) => Comparison | undefined,
+): [number, number, Comparison][] {
+  const pairs: [number, number, Comparison][] = [];
+  for (let index = 0; index < count; index += 1) {
+    const comparison = accept(index, index);
+    if (comparison !== undefined) {
+      pairs.push([index, index, comparison]);
+    }
+  }
+  return pairs;
+}
+
+// best[r][a]: the highest total similarity pairing removed lines from r and added lines from a.
+function bestPairingTable(
+  comparisons: (Comparison | undefined)[][],
+  addedCount: number,
+): number[][] {
+  const removedCount = comparisons.length;
   const best: number[][] = Array.from({ length: removedCount + 1 }, () =>
     new Array<number>(addedCount + 1).fill(0),
   );
@@ -400,7 +422,17 @@ function pairLines(
       row[added] = Math.max(take, skipRemoved, skipAdded);
     }
   }
+  return best;
+}
 
+// Walk the table from the top-left corner, taking a pair wherever doing so is what achieved the
+// best total there, so the pairs come out in order.
+function tracePairing(
+  comparisons: (Comparison | undefined)[][],
+  best: number[][],
+): [number, number, Comparison][] {
+  const removedCount = comparisons.length;
+  const addedCount = (best[0]?.length ?? 1) - 1;
   const pairs: [number, number, Comparison][] = [];
   let removed = 0;
   let added = 0;

@@ -200,11 +200,11 @@ function comparePendingFindings(
 // the reporting boundary where dedup happens.
 function collectEntrypointFindings(
   entrypoint: string,
-  entrypointDoc: ParsedDocument,
   documents: Map<string, ParsedDocument>,
   maxTokens: number,
   siteRouter: SiteRouterSettings | undefined,
 ): PendingFinding[] {
+  const entrypointDoc = documents.get(entrypoint)!;
   const findings: PendingFinding[] = [];
   const traversal = traverse(entrypoint, documents, siteRouter);
   const total = totalTokens(entrypointDoc, traversal.importedPaths, documents);
@@ -279,7 +279,6 @@ export const llm001: RuleDefinition = defineRule({
     for (const entrypoint of entrypoints) {
       for (const finding of collectEntrypointFindings(
         entrypoint,
-        documents.get(entrypoint)!,
         documents,
         options.maxTokensPerEntrypoint,
         context.settings.siteRouter,

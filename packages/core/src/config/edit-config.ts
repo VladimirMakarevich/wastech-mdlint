@@ -156,14 +156,13 @@ function applyEdit(text: string, edit: ConfigEdit, style: Style): string {
         )
       : insertBefore(text, members[index]!, edit.value, style);
   }
-  return setAt(text, root, edit.path, edit.value, style);
+  return setAt(text, root, { path: edit.path, value: edit.value }, style);
 }
 
 function setAt(
   text: string,
   root: Node,
-  path: ConfigEditPath,
-  value: unknown,
+  { path, value }: { path: ConfigEditPath; value: unknown },
   style: Style,
 ): string {
   const existing = findNodeAtLocation(root, path);
@@ -239,6 +238,18 @@ function nestedValue(rest: ConfigEditPath, value: unknown): unknown {
   return { [segment!]: nestedValue(below, value) };
 }
 
+// Where removing a member that starts its line stops: past the line break after its separator (and
+// any comment trailing it there), else past its comma, else at the member's own end.
+function wholeLineRemovalEnd(
+  after: ReturnType<typeof scanAfter>,
+  end: number,
+): number {
+  if (after.lineBreak !== undefined) {
+    return after.lineBreak.offset + after.lineBreak.length;
+  }
+  return after.comma !== undefined ? after.comma + 1 : end;
+}
+
 function removeAt(text: string, root: Node, path: ConfigEditPath): string {
   const found = findNodeAtLocation(root, path);
   if (found === undefined) {
@@ -258,12 +269,7 @@ function removeAt(text: string, root: Node, path: ConfigEditPath): string {
     // The member's whole lines go: from the start of its first line through the line break after its
     // separator and any comment trailing it there.
     const start = lineStart(text, member.offset);
-    const stop =
-      after.lineBreak !== undefined
-        ? after.lineBreak.offset + after.lineBreak.length
-        : after.comma !== undefined
-          ? after.comma + 1
-          : end;
+    const stop = wholeLineRemovalEnd(after, end);
     const edits: TextEdit[] = [
       { offset: start, length: stop - start, content: "" },
     ];

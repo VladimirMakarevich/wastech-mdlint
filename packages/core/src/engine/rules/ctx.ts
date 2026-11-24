@@ -4,6 +4,7 @@ import { compareStrings } from "../../deterministic-sort.js";
 import { matchesConfigGlob } from "../../discovery/globs.js";
 import type {
   ParsedDocument,
+  ParsedTable,
   ParsedTextSpan,
 } from "../../markdown/document-types.js";
 import { allChecked } from "../primitives/checklist.js";
@@ -153,22 +154,33 @@ function loadAliasMap(
         continue;
       }
       termTables += 1;
-      for (const row of table.rows) {
-        const canonical = (row.cells[options.termColumn] ?? "").trim();
-        if (canonical.length === 0) {
-          continue;
-        }
-        for (const alias of (row.cells[aliasColumn] ?? "").split(/\s*,\s*/)) {
-          const trimmed = alias.trim();
-          if (trimmed.length > 0 && trimmed !== canonical) {
-            aliasToCanonical.set(trimmed, canonical);
-          }
-        }
-      }
+      addTableAliases(table, options.termColumn, aliasColumn, aliasToCanonical);
     }
   }
 
   return { aliasToCanonical, matchedGlossaries, termTables };
+}
+
+// Map every alias listed in one glossary term table to its row's canonical term. A row with no
+// term contributes nothing, and an alias spelled like its own term is not an alias.
+function addTableAliases(
+  table: ParsedTable,
+  termColumn: string,
+  aliasColumn: string,
+  aliasToCanonical: Map<string, string>,
+): void {
+  for (const row of table.rows) {
+    const canonical = (row.cells[termColumn] ?? "").trim();
+    if (canonical.length === 0) {
+      continue;
+    }
+    for (const alias of (row.cells[aliasColumn] ?? "").split(/\s*,\s*/)) {
+      const trimmed = alias.trim();
+      if (trimmed.length > 0 && trimmed !== canonical) {
+        aliasToCanonical.set(trimmed, canonical);
+      }
+    }
+  }
 }
 
 // The [start, end) offsets of `content` CTX-003 scans: the whole file, or the body of each section
@@ -279,8 +291,20 @@ function keepsParsedRole(document: ParsedDocument, match: AliasMatch): boolean {
   ) {
     return false;
   }
-  const content = document.content;
+  if (isBetweenLiteralBrackets(document, match)) {
+    return false;
+  }
+  return !AUTOLINK_LITERAL_TRIGGER.test(
+    tokenWithCanonical(document.content, match),
+  );
+}
 
+// Whether `match` sits between a literal `[` and a literal `]` with no paragraph break between them.
+function isBetweenLiteralBrackets(
+  document: ParsedDocument,
+  match: AliasMatch,
+): boolean {
+  const content = document.content;
   const brackets = document.literalBrackets;
   let after = 0;
   while (after < brackets.length && brackets[after]! < match.end) {
@@ -288,17 +312,19 @@ function keepsParsedRole(document: ParsedDocument, match: AliasMatch): boolean {
   }
   const opener = brackets[after - 1];
   const closer = brackets[after];
-  if (
+  return (
     opener !== undefined &&
     closer !== undefined &&
     opener < match.start &&
     content[opener] === "[" &&
     content[closer] === "]" &&
     !/\n[ \t]*\r?\n/.test(content.slice(opener, closer))
-  ) {
-    return false;
-  }
+  );
+}
 
+// The whitespace-delimited token `match` sits in, with the alias already replaced by its canonical
+// term.
+function tokenWithCanonical(content: string, match: AliasMatch): string {
   let tokenStart = match.start;
   while (tokenStart > 0 && !/\s/.test(content[tokenStart - 1]!)) {
     tokenStart -= 1;
@@ -307,10 +333,10 @@ function keepsParsedRole(document: ParsedDocument, match: AliasMatch): boolean {
   while (tokenEnd < content.length && !/\s/.test(content[tokenEnd]!)) {
     tokenEnd += 1;
   }
-  return !AUTOLINK_LITERAL_TRIGGER.test(
+  return (
     content.slice(tokenStart, match.start) +
-      match.canonical +
-      content.slice(match.end, tokenEnd),
+    match.canonical +
+    content.slice(match.end, tokenEnd)
   );
 }
 
@@ -348,7 +374,6 @@ function collectAliasMatches(
   documents: Map<string, ParsedDocument>,
 ): AliasMatch[] {
   const content = document.content;
-  const lineAt = createLineNumberLookup(content);
   // Asked only once a match falls in a heading: the first answer walks every link in the corpus,
   // and most documents have no alias in a heading at all.
   let headingsLinked: boolean | undefined;
@@ -361,24 +386,7 @@ function collectAliasMatches(
     }
     return headingsLinked;
   };
-  const matches: AliasMatch[] = [];
-
-  for (const range of scanRanges(document, section)) {
-    const text = content.slice(range.start, range.end);
-    for (const [alias, canonical] of aliasToCanonical) {
-      for (const match of text.matchAll(wholeWordRegex(alias))) {
-        const start = range.start + match.index + match[1]!.length;
-        matches.push({
-          start,
-          end: start + alias.length,
-          alias,
-          canonical,
-          line: lineAt(start),
-          fixable: false,
-        });
-      }
-    }
-  }
+  const matches = findAliasOccurrences(document, section, aliasToCanonical);
 
   const candidatesBySpan = new Map<ParsedTextSpan, AliasMatch[]>();
   for (const match of matches) {
@@ -399,44 +407,8 @@ function collectAliasMatches(
   }
 
   for (const [span, spanCandidates] of candidatesBySpan) {
-    const ordered = [...spanCandidates].sort(
-      (left, right) =>
-        left.start - right.start ||
-        right.end - right.start - (left.end - left.start) ||
-        compareStrings(left.alias, right.alias),
-    );
-    const winners: AliasMatch[] = [];
-    for (const match of ordered) {
-      if (match.start >= (winners[winners.length - 1]?.end ?? -1)) {
-        winners.push(match);
-      }
-    }
-
-    // Rebuild the span with every winner applied, remembering where each canonical term landed.
-    let replaced = "";
-    let cursor = span.start;
-    const landed: { start: number; end: number }[] = [];
-    for (const winner of winners) {
-      replaced += content.slice(cursor, winner.start);
-      landed.push({
-        start: replaced.length,
-        end: replaced.length + winner.canonical.length,
-      });
-      replaced += winner.canonical;
-      cursor = winner.end;
-    }
-    replaced += content.slice(cursor, span.end);
-
-    const createsAlias = [...aliasToCanonical.keys()].some((alias) =>
-      [...replaced.matchAll(wholeWordRegex(alias))].some((found) => {
-        const foundStart = found.index + found[1]!.length;
-        const foundEnd = foundStart + alias.length;
-        return landed.some(
-          (region) => foundStart < region.end && foundEnd > region.start,
-        );
-      }),
-    );
-    if (!createsAlias) {
+    const winners = overlapWinners(spanCandidates);
+    if (!spanCreatesAlias(content, span, winners, aliasToCanonical)) {
       for (const winner of winners) {
         winner.fixable = true;
       }
@@ -444,6 +416,87 @@ function collectAliasMatches(
   }
 
   return matches;
+}
+
+// Every whole-word occurrence of every alias in the scanned ranges, none marked fixable yet.
+function findAliasOccurrences(
+  document: ParsedDocument,
+  section: string | undefined,
+  aliasToCanonical: Map<string, string>,
+): AliasMatch[] {
+  const content = document.content;
+  const lineAt = createLineNumberLookup(content);
+  const matches: AliasMatch[] = [];
+
+  for (const range of scanRanges(document, section)) {
+    const text = content.slice(range.start, range.end);
+    for (const [alias, canonical] of aliasToCanonical) {
+      for (const match of text.matchAll(wholeWordRegex(alias))) {
+        const start = range.start + match.index + match[1]!.length;
+        matches.push({
+          start,
+          end: start + alias.length,
+          alias,
+          canonical,
+          line: lineAt(start),
+          fixable: false,
+        });
+      }
+    }
+  }
+  return matches;
+}
+
+// The candidates of one span that win overlap resolution: the earliest start, then at the same
+// start the longer alias, then the alphabetically earlier one.
+function overlapWinners(spanCandidates: readonly AliasMatch[]): AliasMatch[] {
+  const ordered = [...spanCandidates].sort(
+    (left, right) =>
+      left.start - right.start ||
+      right.end - right.start - (left.end - left.start) ||
+      compareStrings(left.alias, right.alias),
+  );
+  const winners: AliasMatch[] = [];
+  for (const match of ordered) {
+    if (match.start >= (winners[winners.length - 1]?.end ?? -1)) {
+      winners.push(match);
+    }
+  }
+  return winners;
+}
+
+// Whether applying every winner to the span makes any alias match across or inside a replaced
+// region.
+function spanCreatesAlias(
+  content: string,
+  span: ParsedTextSpan,
+  winners: readonly AliasMatch[],
+  aliasToCanonical: Map<string, string>,
+): boolean {
+  // Rebuild the span with every winner applied, remembering where each canonical term landed.
+  let replaced = "";
+  let cursor = span.start;
+  const landed: { start: number; end: number }[] = [];
+  for (const winner of winners) {
+    replaced += content.slice(cursor, winner.start);
+    landed.push({
+      start: replaced.length,
+      end: replaced.length + winner.canonical.length,
+    });
+    replaced += winner.canonical;
+    cursor = winner.end;
+  }
+  replaced += content.slice(cursor, span.end);
+
+  return [...aliasToCanonical.keys()].some((alias) =>
+    [...replaced.matchAll(wholeWordRegex(alias))].some((found) => {
+      const foundStart = found.index + found[1]!.length;
+      const foundEnd = foundStart + alias.length;
+      return landed.some(
+        (region) => foundStart < region.end && foundEnd > region.start,
+      );
+    }),
+  );
 }
 
 // CTX-003 — glossary alias usage should use the canonical term (project). Builds alias→canonical

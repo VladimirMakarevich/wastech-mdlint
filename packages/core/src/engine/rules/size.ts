@@ -139,6 +139,23 @@ const METRIC_UNIT: Record<Metric, string> = {
   tokens: "tokens",
 };
 
+// The budget `actual` crosses, the error one checked first so it wins when both are crossed, or
+// undefined when it stays within both.
+function budgetBreach(
+  actual: number,
+  thresholds: { warn?: number | undefined; error?: number | undefined },
+):
+  | { severity: "error" | "warning"; budget: string; limit: number }
+  | undefined {
+  if (thresholds.error !== undefined && actual > thresholds.error) {
+    return { severity: "error", budget: "error", limit: thresholds.error };
+  }
+  if (thresholds.warn !== undefined && actual > thresholds.warn) {
+    return { severity: "warning", budget: "warn", limit: thresholds.warn };
+  }
+  return undefined;
+}
+
 export const size001: RuleDefinition = defineRule({
   metadata: {
     id: "SIZE-001",
@@ -174,20 +191,7 @@ export const size001: RuleDefinition = defineRule({
       // breach supersedes the warn breach. Both reports carried the same `data`, so the survivor
       // loses nothing — and a config `severity` override (applied by the runner, invisible here) can
       // no longer render the pair as two same-severity messages for one metric.
-      const breach =
-        thresholds.error !== undefined && actual > thresholds.error
-          ? {
-              severity: "error" as const,
-              budget: "error",
-              limit: thresholds.error,
-            }
-          : thresholds.warn !== undefined && actual > thresholds.warn
-            ? {
-                severity: "warning" as const,
-                budget: "warn",
-                limit: thresholds.warn,
-              }
-            : undefined;
+      const breach = budgetBreach(actual, thresholds);
       if (breach === undefined) {
         continue;
       }

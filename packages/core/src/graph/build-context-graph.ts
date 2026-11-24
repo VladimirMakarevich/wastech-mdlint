@@ -129,6 +129,118 @@ function buildIdRefEdges(
   return edges;
 }
 
+// What every per-document edge collector resolves against: the documents by their own path, the
+// node set a target must belong to, and the router that maps site URLs back to files.
+type EdgeScope = {
+  documentsByPath: Map<string, ParsedDocument>;
+  nodeSet: Set<string>;
+  siteRouter: BuildContextGraphOptions["siteRouter"];
+};
+
+// `link` and `anchor` edges from one document's local-file links.
+function collectLinkEdges(
+  document: ParsedDocument,
+  scope: EdgeScope,
+  edges: ContextGraphEdge[],
+): void {
+  for (const link of document.links) {
+    if (link.kind !== "local-file") {
+      continue;
+    }
+    const target = resolveTarget(
+      document.path,
+      filePart(link.rawTarget),
+      scope.siteRouter,
+      scope.nodeSet,
+    );
+    if (target === undefined || target === document.path) {
+      continue;
+    }
+    const hasFragment = link.anchor !== undefined && link.anchor.length > 0;
+    if (hasFragment) {
+      // An `anchor` edge needs a fragment the target resolves — a heading slug, an HTML `id`/`name`
+      // anchor, `#top` or a GitHub line fragment — decided by the same `anchorResolves` REF-002
+      // uses, under its default (case-sensitive) options. An unresolved fragment is skipped
+      // entirely, not downgraded to a plain `link` edge.
+      const targetDocument = scope.documentsByPath.get(target)!;
+      if (!anchorResolves(targetDocument, link.anchor!)) {
+        continue;
+      }
+    }
+    edges.push({
+      from: document.path,
+      to: target,
+      type: hasFragment ? "anchor" : "link",
+      line: link.line,
+      text: link.text,
+      rawTarget: link.rawTarget,
+    });
+  }
+}
+
+// `image` edges from one document's embedded images.
+function collectImageEdges(
+  document: ParsedDocument,
+  scope: EdgeScope,
+  edges: ContextGraphEdge[],
+): void {
+  for (const image of document.images) {
+    const imageTarget = filePart(image.rawTarget);
+    if (imageTarget.length === 0 || hasScheme(imageTarget)) {
+      continue;
+    }
+    // No router here — see the note on `resolveTarget`.
+    const target = resolveTarget(
+      document.path,
+      imageTarget,
+      undefined,
+      scope.nodeSet,
+    );
+    if (target === undefined || target === document.path) {
+      continue;
+    }
+    // Image edges deliberately carry no `text`, even though `ParsedImage.alt` is available: edge
+    // labels are scoped to link/anchor edges, and giving image edges one would change the graph's
+    // JSON and text output and every host payload built from it for a marginal explainability
+    // gain. Alt text is judged by its own rule instead — revisit only if some output actually
+    // needs per-image labels.
+    edges.push({
+      from: document.path,
+      to: target,
+      type: "image",
+      line: image.line,
+      rawTarget: image.rawTarget,
+    });
+  }
+}
+
+// `import` edges from one document's eager `@path.md` imports.
+function collectImportEdges(
+  document: ParsedDocument,
+  scope: EdgeScope,
+  edges: ContextGraphEdge[],
+): void {
+  for (const importRecord of document.imports) {
+    // `rawTarget` is `@path.md` / `@/path.md`; drop the leading `@` and resolve like a link.
+    const target = resolveTarget(
+      document.path,
+      importRecord.rawTarget.slice(1),
+      scope.siteRouter,
+      scope.nodeSet,
+    );
+    if (target === undefined || target === document.path) {
+      continue;
+    }
+    edges.push({
+      from: document.path,
+      to: target,
+      type: "import",
+      line: importRecord.line,
+      rawTarget: importRecord.rawTarget,
+    });
+  }
+}
+
 // Build the deterministic adjacency-free graph: nodes (with in/out degree), semantic edges typed
 // per the taxonomy, and the explicit cycle list.
 export function buildContextGraph(
@@ -149,89 +261,11 @@ export function buildContextGraph(
   // One edge per source construct — no (from,to) dedup, so multiplicity survives into the graph.
   const edges: ContextGraphEdge[] = [];
 
+  const scope: EdgeScope = { documentsByPath, nodeSet, siteRouter };
   for (const document of documentsByPath.values()) {
-    for (const link of document.links) {
-      if (link.kind !== "local-file") {
-        continue;
-      }
-      const target = resolveTarget(
-        document.path,
-        filePart(link.rawTarget),
-        siteRouter,
-        nodeSet,
-      );
-      if (target === undefined || target === document.path) {
-        continue;
-      }
-      const hasFragment = link.anchor !== undefined && link.anchor.length > 0;
-      if (hasFragment) {
-        // An `anchor` edge needs a fragment the target resolves — a heading slug, an HTML `id`/`name`
-        // anchor, `#top` or a GitHub line fragment — decided by the same `anchorResolves` REF-002
-        // uses, under its default (case-sensitive) options. An unresolved fragment is skipped
-        // entirely, not downgraded to a plain `link` edge.
-        const targetDocument = documentsByPath.get(target)!;
-        if (!anchorResolves(targetDocument, link.anchor!)) {
-          continue;
-        }
-      }
-      edges.push({
-        from: document.path,
-        to: target,
-        type: hasFragment ? "anchor" : "link",
-        line: link.line,
-        text: link.text,
-        rawTarget: link.rawTarget,
-      });
-    }
-
-    for (const image of document.images) {
-      const imageTarget = filePart(image.rawTarget);
-      if (imageTarget.length === 0 || hasScheme(imageTarget)) {
-        continue;
-      }
-      // No router here — see the note on `resolveTarget`.
-      const target = resolveTarget(
-        document.path,
-        imageTarget,
-        undefined,
-        nodeSet,
-      );
-      if (target === undefined || target === document.path) {
-        continue;
-      }
-      // Image edges deliberately carry no `text`, even though `ParsedImage.alt` is available: edge
-      // labels are scoped to link/anchor edges, and giving image edges one would change the graph's
-      // JSON and text output and every host payload built from it for a marginal explainability
-      // gain. Alt text is judged by its own rule instead — revisit only if some output actually
-      // needs per-image labels.
-      edges.push({
-        from: document.path,
-        to: target,
-        type: "image",
-        line: image.line,
-        rawTarget: image.rawTarget,
-      });
-    }
-
-    for (const importRecord of document.imports) {
-      // `rawTarget` is `@path.md` / `@/path.md`; drop the leading `@` and resolve like a link.
-      const target = resolveTarget(
-        document.path,
-        importRecord.rawTarget.slice(1),
-        siteRouter,
-        nodeSet,
-      );
-      if (target === undefined || target === document.path) {
-        continue;
-      }
-      edges.push({
-        from: document.path,
-        to: target,
-        type: "import",
-        line: importRecord.line,
-        rawTarget: importRecord.rawTarget,
-      });
-    }
+    collectLinkEdges(document, scope, edges);
+    collectImageEdges(document, scope, edges);
+    collectImportEdges(document, scope, edges);
   }
 
   if (options.idRef !== undefined) {

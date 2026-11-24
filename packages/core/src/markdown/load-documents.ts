@@ -1,3 +1,4 @@
+import type { Dirent } from "node:fs";
 import { readFile, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
@@ -34,6 +35,30 @@ function isInsideRoot(candidatePath: string, rootRealPath: string): boolean {
     relative === "" ||
     (!relative.startsWith("..") && !path.isAbsolute(relative))
   );
+}
+
+// Whether a non-directory entry is a file the corpus may contain. Symlinks: follow only when the
+// target stays inside the root, mirroring discovery's guard so a link can't pull external files into
+// the deterministic corpus.
+async function isCorpusFileEntry(
+  entry: Dirent,
+  absolutePath: string,
+  rootRealPath: string,
+): Promise<boolean> {
+  if (!entry.isSymbolicLink()) {
+    return entry.isFile();
+  }
+  const resolvedTargetPath = await realpath(absolutePath).catch(
+    () => undefined,
+  );
+  if (
+    resolvedTargetPath === undefined ||
+    !isInsideRoot(resolvedTargetPath, rootRealPath)
+  ) {
+    return false;
+  }
+  const resolvedStats = await stat(absolutePath).catch(() => undefined);
+  return resolvedStats?.isFile() === true;
 }
 
 async function collectFiles(params: {
@@ -78,23 +103,7 @@ async function collectFiles(params: {
       continue;
     }
 
-    // Symlinks: follow only when the target stays inside the root, mirroring discovery's guard so a
-    // link can't pull external files into the deterministic corpus.
-    if (entry.isSymbolicLink()) {
-      const resolvedTargetPath = await realpath(absolutePath).catch(
-        () => undefined,
-      );
-      if (
-        resolvedTargetPath === undefined ||
-        !isInsideRoot(resolvedTargetPath, params.rootRealPath)
-      ) {
-        continue;
-      }
-      const resolvedStats = await stat(absolutePath).catch(() => undefined);
-      if (resolvedStats?.isFile() !== true) {
-        continue;
-      }
-    } else if (!entry.isFile()) {
+    if (!(await isCorpusFileEntry(entry, absolutePath, params.rootRealPath))) {
       continue;
     }
 

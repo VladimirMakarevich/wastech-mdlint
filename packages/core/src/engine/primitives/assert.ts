@@ -255,6 +255,29 @@ export function runAssertion(
         then: assertion.then,
         section: assertion.section,
       });
+    default:
+      return runDocumentAssertion(assertion, context);
+  }
+}
+
+// The kinds that read something other than a table column. Split from `runAssertion` only to keep
+// each dispatch short; the `never` default still makes the two together exhaustive over `Assertion`.
+function runDocumentAssertion(
+  assertion: Exclude<
+    Assertion,
+    {
+      kind:
+        | "requiredColumns"
+        | "columnNotEmpty"
+        | "columnInSet"
+        | "columnMatches"
+        | "columnUnique"
+        | "crossColumn";
+    }
+  >,
+  context: PrimitiveContext,
+): PrimitiveFinding[] {
+  switch (assertion.kind) {
     case "sectionPresent":
       return sectionPresent(context.document, { sections: assertion.sections });
     case "sectionOrder":

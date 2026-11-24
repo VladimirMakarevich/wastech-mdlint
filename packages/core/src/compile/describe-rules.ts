@@ -109,50 +109,61 @@ function summarizeCondition(
   return checks.join(" and ");
 }
 
+// One summarizer per assertion kind, typed as a mapped type over every kind so that adding a kind
+// to `Assertion` without a sentence for it fails to compile instead of rendering nothing.
+const ASSERTION_SUMMARIZERS: {
+  [Kind in Assertion["kind"]]: (
+    assertion: Extract<Assertion, { kind: Kind }>,
+  ) => string;
+} = {
+  requiredColumns: (assertion) =>
+    `requires columns ${formatList(assertion.columns)}${formatSection(assertion.section)}`,
+  columnNotEmpty: (assertion) =>
+    `requires non-empty cells in column ${quote(assertion.column)}${formatSection(assertion.section)}`,
+  // Render from the *resolved* value: annotating only an explicit `true` made a
+  // default-cased rule read identically to a case-insensitive one in the committed skill.
+  // Tested against `=== false` rather than for a truthy value because `describeRules` is public
+  // API and can be handed entries that never passed through Zod, where the key is absent — and
+  // absent means the schema default, not a third state.
+  columnInSet: (assertion) =>
+    `requires values in column ${quote(assertion.column)}${formatSection(assertion.section)} to be one of ${formatList(assertion.values)}${assertion.caseSensitive === false ? " (case-insensitive)" : " (case-sensitive)"}`,
+  columnMatches: (assertion) =>
+    `requires values in column ${quote(assertion.column)}${formatSection(assertion.section)} to match ${formatPattern(assertion.pattern, assertion.flags)}`,
+  columnUnique: (assertion) =>
+    `requires unique values in column ${quote(assertion.column)}${formatSection(assertion.section)} across files${assertion.idPattern === undefined ? "" : ` for values matching ${formatPattern(assertion.idPattern)}`}`,
+  crossColumn: (assertion) =>
+    `requires that when ${summarizeCondition(assertion.when)}, ${summarizeCondition(assertion.then)}${formatSection(assertion.section)}`,
+  sectionPresent: (assertion) =>
+    `requires sections ${formatList(assertion.sections)}`,
+  sectionOrder: (assertion) =>
+    `requires sections ${formatList(assertion.order)} to appear in order${assertion.level === undefined ? "" : ` at heading level ${assertion.level}`}${formatSection(assertion.section, "within")}`,
+  contentNotMatch: (assertion) =>
+    `forbids content matching ${formatPattern(assertion.pattern, assertion.flags)}`,
+  noPlaceholders: (assertion) =>
+    `forbids placeholder content${formatSection(assertion.section)}${assertion.placeholders === undefined ? "" : ` using markers ${formatList(assertion.placeholders)}`}`,
+  allChecked: (assertion) =>
+    `requires all checklist items to be checked${formatSection(assertion.section)}`,
+  linkResolves: (assertion) =>
+    `requires links to resolve${assertion.exclude === undefined ? "" : `, excluding configured patterns ${formatList(assertion.exclude)}`}`,
+  imageResolves: (assertion) =>
+    `requires images to resolve${assertion.exclude === undefined ? "" : `, excluding configured patterns ${formatList(assertion.exclude)}`}`,
+  frontmatterRequired: (assertion) =>
+    `requires front matter keys ${formatList(assertion.keys)}`,
+  frontmatterInSet: (assertion) =>
+    `requires front matter key ${quote(assertion.key)} to be one of ${formatList(assertion.values)}`,
+  frontmatterMatches: (assertion) =>
+    `requires front matter key ${quote(assertion.key)} to match ${formatPattern(assertion.pattern, assertion.flags)}`,
+};
+
 function summarizeAssertion(assertion: Assertion): string {
-  switch (assertion.kind) {
-    case "requiredColumns":
-      return `requires columns ${formatList(assertion.columns)}${formatSection(assertion.section)}`;
-    case "columnNotEmpty":
-      return `requires non-empty cells in column ${quote(assertion.column)}${formatSection(assertion.section)}`;
-    case "columnInSet":
-      // Render from the *resolved* value: annotating only an explicit `true` made a
-      // default-cased rule read identically to a case-insensitive one in the committed skill.
-      // Tested against `=== false` rather than for a truthy value because `describeRules` is public
-      // API and can be handed entries that never passed through Zod, where the key is absent — and
-      // absent means the schema default, not a third state.
-      return `requires values in column ${quote(assertion.column)}${formatSection(assertion.section)} to be one of ${formatList(assertion.values)}${assertion.caseSensitive === false ? " (case-insensitive)" : " (case-sensitive)"}`;
-    case "columnMatches":
-      return `requires values in column ${quote(assertion.column)}${formatSection(assertion.section)} to match ${formatPattern(assertion.pattern, assertion.flags)}`;
-    case "columnUnique":
-      return `requires unique values in column ${quote(assertion.column)}${formatSection(assertion.section)} across files${assertion.idPattern === undefined ? "" : ` for values matching ${formatPattern(assertion.idPattern)}`}`;
-    case "crossColumn":
-      return `requires that when ${summarizeCondition(assertion.when)}, ${summarizeCondition(assertion.then)}${formatSection(assertion.section)}`;
-    case "sectionPresent":
-      return `requires sections ${formatList(assertion.sections)}`;
-    case "sectionOrder":
-      return `requires sections ${formatList(assertion.order)} to appear in order${assertion.level === undefined ? "" : ` at heading level ${assertion.level}`}${formatSection(assertion.section, "within")}`;
-    case "contentNotMatch":
-      return `forbids content matching ${formatPattern(assertion.pattern, assertion.flags)}`;
-    case "noPlaceholders":
-      return `forbids placeholder content${formatSection(assertion.section)}${assertion.placeholders === undefined ? "" : ` using markers ${formatList(assertion.placeholders)}`}`;
-    case "allChecked":
-      return `requires all checklist items to be checked${formatSection(assertion.section)}`;
-    case "linkResolves":
-      return `requires links to resolve${assertion.exclude === undefined ? "" : `, excluding configured patterns ${formatList(assertion.exclude)}`}`;
-    case "imageResolves":
-      return `requires images to resolve${assertion.exclude === undefined ? "" : `, excluding configured patterns ${formatList(assertion.exclude)}`}`;
-    case "frontmatterRequired":
-      return `requires front matter keys ${formatList(assertion.keys)}`;
-    case "frontmatterInSet":
-      return `requires front matter key ${quote(assertion.key)} to be one of ${formatList(assertion.values)}`;
-    case "frontmatterMatches":
-      return `requires front matter key ${quote(assertion.key)} to match ${formatPattern(assertion.pattern, assertion.flags)}`;
-    default: {
-      const exhaustiveCheck: never = assertion;
-      return exhaustiveCheck;
-    }
-  }
+  // `describeRules` is public API and can be handed an entry that never passed through Zod, whose
+  // kind has no summarizer; the assertion is then returned as it came rather than throwing.
+  const summarize = ASSERTION_SUMMARIZERS[assertion.kind] as
+    | ((assertion: Assertion) => string)
+    | undefined;
+  return summarize === undefined
+    ? (assertion as unknown as string)
+    : summarize(assertion);
 }
 
 function describeCustomRule(entry: CustomRuleConfigEntry): string {

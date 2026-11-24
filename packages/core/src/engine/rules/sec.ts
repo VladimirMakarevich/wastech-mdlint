@@ -29,7 +29,7 @@ import {
   formatOutlineHeading,
   matchOutline,
 } from "./sec-outline.js";
-import type { TextEdit } from "../types.js";
+import type { RuleContext, TextEdit } from "../types.js";
 
 // Section + structure rules.
 
@@ -208,84 +208,101 @@ export const sec003: RuleDefinition = defineRule({
     }
 
     if (options.strict === true) {
-      // `level` keeps its exact-depth meaning and filters both sides, so a per-document `# Title`
-      // can still differ when only `##` headings are compared.
-      const atLevel = (heading: ParsedHeading): boolean =>
-        options.level === undefined || heading.depth === options.level;
-      const outline = compileOutline(template.headings.filter(atLevel));
-      for (const [filePath, document] of context.documents!) {
-        if (
-          filePath === options.template ||
-          !matchesFileScope(filePath, options)
-        ) {
-          continue;
-        }
-        const divergence = matchOutline(
-          outline,
-          document.headings.filter(atLevel),
-        );
-        if (divergence === undefined) {
-          continue;
-        }
-        const { expected, actual } = divergence;
-        const expectedText =
-          expected === undefined
-            ? "no further heading"
-            : `"${formatOutlineHeading(expected)}" (template line ${expected.line})`;
-        const actualText =
-          actual === undefined
-            ? "end of document"
-            : `"${formatOutlineHeading(actual)}"`;
-        context.report({
-          message: `Outline diverges from template ${options.template}: expected ${expectedText}, found ${actualText}.`,
-          // Line 0 is the existing "no specific line" sentinel, used when the document ran out.
-          line: actual?.line ?? 0,
-          filePath,
-          data: {
-            template: options.template,
-            expected: headingData(expected),
-            actual: headingData(actual),
-          },
-        });
-      }
+      reportOutlineDivergence(context, options, template);
       return;
     }
-
-    // `level` selects the *exact* heading depth to compare — `level: 2` checks only `##` headings,
-    // not "every heading up to depth 2". Exact-depth is what lets a per-document `# Title` differ
-    // across files without every document being required to share it. Default: compare all depths.
-    const requiredHeadings = [
-      ...new Set(
-        template.headings
-          .filter(
-            (heading) =>
-              options.level === undefined || heading.depth === options.level,
-          )
-          .map((heading) => heading.text),
-      ),
-    ];
-
-    for (const [filePath, document] of context.documents!) {
-      if (
-        filePath === options.template ||
-        !matchesFileScope(filePath, options)
-      ) {
-        continue;
-      }
-      const present = new Set(document.sections);
-      for (const heading of requiredHeadings) {
-        if (!present.has(heading)) {
-          context.report({
-            message: `Section "${heading}" required by template ${options.template} is missing.`,
-            line: 0,
-            filePath,
-            data: { section: heading, template: options.template },
-          });
-        }
-      }
-    }
+    reportMissingSections(context, options, template);
   },
 });
+
+type Sec003Options = {
+  template: string;
+  level?: number | undefined;
+  strict?: boolean | undefined;
+  files?: string[] | undefined;
+  exclude?: string[] | undefined;
+};
+
+// Strict mode: the first place each in-scope document's heading sequence stops matching the
+// template's outline.
+function reportOutlineDivergence(
+  context: RuleContext,
+  options: Sec003Options,
+  template: ParsedDocument,
+): void {
+  // `level` keeps its exact-depth meaning and filters both sides, so a per-document `# Title`
+  // can still differ when only `##` headings are compared.
+  const atLevel = (heading: ParsedHeading): boolean =>
+    options.level === undefined || heading.depth === options.level;
+  const outline = compileOutline(template.headings.filter(atLevel));
+  for (const [filePath, document] of context.documents!) {
+    if (filePath === options.template || !matchesFileScope(filePath, options)) {
+      continue;
+    }
+    const divergence = matchOutline(outline, document.headings.filter(atLevel));
+    if (divergence === undefined) {
+      continue;
+    }
+    const { expected, actual } = divergence;
+    const expectedText =
+      expected === undefined
+        ? "no further heading"
+        : `"${formatOutlineHeading(expected)}" (template line ${expected.line})`;
+    const actualText =
+      actual === undefined
+        ? "end of document"
+        : `"${formatOutlineHeading(actual)}"`;
+    context.report({
+      message: `Outline diverges from template ${options.template}: expected ${expectedText}, found ${actualText}.`,
+      // Line 0 is the existing "no specific line" sentinel, used when the document ran out.
+      line: actual?.line ?? 0,
+      filePath,
+      data: {
+        template: options.template,
+        expected: headingData(expected),
+        actual: headingData(actual),
+      },
+    });
+  }
+}
+
+// Default mode: every template heading missing from an in-scope document.
+function reportMissingSections(
+  context: RuleContext,
+  options: Sec003Options,
+  template: ParsedDocument,
+): void {
+  // `level` selects the *exact* heading depth to compare — `level: 2` checks only `##` headings,
+  // not "every heading up to depth 2". Exact-depth is what lets a per-document `# Title` differ
+  // across files without every document being required to share it. Default: compare all depths.
+  const requiredHeadings = [
+    ...new Set(
+      template.headings
+        .filter(
+          (heading) =>
+            options.level === undefined || heading.depth === options.level,
+        )
+        .map((heading) => heading.text),
+    ),
+  ];
+
+  for (const [filePath, document] of context.documents!) {
+    if (filePath === options.template || !matchesFileScope(filePath, options)) {
+      continue;
+    }
+    const present = new Set(document.sections);
+    for (const heading of requiredHeadings) {
+      if (!present.has(heading)) {
+        context.report({
+          message: `Section "${heading}" required by template ${options.template} is missing.`,
+          line: 0,
+          filePath,
+          data: { section: heading, template: options.template },
+        });
+      }
+    }
+  }
+}
 
 // SEC-004 — heading levels increment by one, with a single title at the start. Three checks, each
 // switchable on its own because each has a legitimate exception: a docs-site page often takes its

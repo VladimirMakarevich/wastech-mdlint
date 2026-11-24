@@ -110,6 +110,35 @@ export async function openGitRepository(
     env: gitEnvironment(inherited),
   };
 
+  const versionProblem = await checkGitVersion(probe);
+  if (versionProblem !== undefined) {
+    return versionProblem;
+  }
+
+  const located = await locateRepository(probe);
+  if ("available" in located) {
+    return located;
+  }
+
+  const atTopLevel: GitInvocation = { cwd: located.topLevel, env: probe.env };
+  const filterOverrides = await filterDriverOverrides(atTopLevel);
+
+  return new GitRepository(
+    {
+      cwd: located.topLevel,
+      env: gitEnvironment(inherited, filterOverrides),
+    },
+    located.prefix,
+    located.commonDirReal,
+    located.gitDirReal,
+  );
+}
+
+// Why git cannot be used at all — no binary, or one older than `MINIMUM_GIT_VERSION` — or
+// undefined when the installed git will do.
+async function checkGitVersion(
+  probe: GitInvocation,
+): Promise<GitUnavailable | undefined> {
   const versionOutput = await runGit(probe, ["version"]).catch(
     (error: unknown) => {
       if (error instanceof GitNotFoundError) {
@@ -141,7 +170,22 @@ export async function openGitRepository(
       "Update git.",
     );
   }
+  return undefined;
+}
 
+// Where the repository around the probe directory lives: its work tree's top level, the probe's
+// prefix inside it (without a trailing slash; `""` at the top), and the realpaths of its common and
+// per-worktree git directories.
+type LocatedRepository = {
+  topLevel: string;
+  prefix: string;
+  commonDirReal: string;
+  gitDirReal: string;
+};
+
+async function locateRepository(
+  probe: GitInvocation,
+): Promise<LocatedRepository | GitUnavailable> {
   const located = await runGit(probe, [
     "rev-parse",
     "--show-toplevel",
@@ -150,45 +194,56 @@ export async function openGitRepository(
     "--absolute-git-dir",
   ]);
   if (located.exitCode !== 0) {
-    // Matched on git's text, which `LC_ALL=C` keeps untranslated. Ownership is checked before
-    // anything else is read, so a repository another user owns never gets as far as its config.
-    if (located.stderr.includes("dubious ownership")) {
-      return unavailable(
-        "dubious-ownership",
-        "git refuses to read this repository because another user owns it.",
-        "If you trust it, add it to git's safe.directory list: git config --global --add safe.directory <path>.",
-      );
-    }
-    if (
-      located.stderr.includes("not a git repository") ||
-      located.stderr.includes("must be run in a work tree")
-    ) {
-      return unavailable(
-        "not-a-repository",
-        "The directory is not inside a git work tree.",
-        "Changes can be reviewed only in a git repository.",
-      );
-    }
-    throw new GitCommandError("rev-parse", located.exitCode, located.stderr);
+    return unlocatedRepository(located.exitCode, located.stderr);
   }
 
   // Four lines in the order asked for; the prefix line is empty at the top level and otherwise
   // ends in `/`.
   const [topLevel = "", prefixLine = "", commonDir = "", gitDir = ""] =
     located.stdout.toString("utf8").split("\n");
-  const prefix = prefixLine.replace(/\/$/, "");
-  // Relative to the directory git ran in when it is not absolute. The realpath, so two spellings of
-  // one clone (a symlink, an 8.3 short name on Windows) are one identity.
-  const commonDirReal = await realpath(path.resolve(probe.cwd, commonDir));
-  const gitDirReal = await realpath(gitDir);
+  return {
+    topLevel,
+    prefix: prefixLine.replace(/\/$/, ""),
+    // Relative to the directory git ran in when it is not absolute. The realpath, so two spellings
+    // of one clone (a symlink, an 8.3 short name on Windows) are one identity.
+    commonDirReal: await realpath(path.resolve(probe.cwd, commonDir)),
+    gitDirReal: await realpath(gitDir),
+  };
+}
 
-  // Filter drivers are named in config and attached to paths by `.gitattributes`; git runs a
-  // driver's `clean` command on every work-tree file whose stat changed when it compares the work
-  // tree. They are emptied — an empty command is no filter — for every driver any config defines,
-  // the user's own included: a legitimate driver such as git-lfs is not told apart from a planted
-  // one, so a Markdown file kept in LFS compares as its pointer text. Listing them runs nothing:
-  // `git config` only reads files.
-  const atTopLevel: GitInvocation = { cwd: topLevel, env: probe.env };
+// The expected reasons `rev-parse` finds no repository; any other failure is thrown.
+function unlocatedRepository(exitCode: number, stderr: string): GitUnavailable {
+  // Matched on git's text, which `LC_ALL=C` keeps untranslated. Ownership is checked before
+  // anything else is read, so a repository another user owns never gets as far as its config.
+  if (stderr.includes("dubious ownership")) {
+    return unavailable(
+      "dubious-ownership",
+      "git refuses to read this repository because another user owns it.",
+      "If you trust it, add it to git's safe.directory list: git config --global --add safe.directory <path>.",
+    );
+  }
+  if (
+    stderr.includes("not a git repository") ||
+    stderr.includes("must be run in a work tree")
+  ) {
+    return unavailable(
+      "not-a-repository",
+      "The directory is not inside a git work tree.",
+      "Changes can be reviewed only in a git repository.",
+    );
+  }
+  throw new GitCommandError("rev-parse", exitCode, stderr);
+}
+
+// Filter drivers are named in config and attached to paths by `.gitattributes`; git runs a
+// driver's `clean` command on every work-tree file whose stat changed when it compares the work
+// tree. They are emptied — an empty command is no filter — for every driver any config defines,
+// the user's own included: a legitimate driver such as git-lfs is not told apart from a planted
+// one, so a Markdown file kept in LFS compares as its pointer text. Listing them runs nothing:
+// `git config` only reads files.
+async function filterDriverOverrides(
+  atTopLevel: GitInvocation,
+): Promise<(readonly [string, string])[]> {
   const filters = await runGit(atTopLevel, [
     "config",
     "-z",
@@ -208,22 +263,13 @@ export async function openGitRepository(
       }
     }
   }
-  const filterOverrides = [...driverNames]
-    .sort(compareStrings)
-    .flatMap((name) => [
-      [`filter.${name}.clean`, ""] as const,
-      [`filter.${name}.smudge`, ""] as const,
-      [`filter.${name}.process`, ""] as const,
-      // A required driver with no command is an error rather than a skipped filter.
-      [`filter.${name}.required`, "false"] as const,
-    ]);
-
-  return new GitRepository(
-    { cwd: topLevel, env: gitEnvironment(inherited, filterOverrides) },
-    prefix,
-    commonDirReal,
-    gitDirReal,
-  );
+  return [...driverNames].sort(compareStrings).flatMap((name) => [
+    [`filter.${name}.clean`, ""] as const,
+    [`filter.${name}.smudge`, ""] as const,
+    [`filter.${name}.process`, ""] as const,
+    // A required driver with no command is an error rather than a skipped filter.
+    [`filter.${name}.required`, "false"] as const,
+  ]);
 }
 
 // Diff flags no review call goes without: an external diff program and a textconv driver are both
@@ -641,19 +687,9 @@ function statusChange(
   filePath: string,
   source: string | undefined,
 ): GitChange | undefined {
-  if (xy === "??") {
-    return { status: "A", path: filePath };
-  }
-  // Unmerged paths, by which side has the file: deleted on both sides is gone; added only by the
-  // other side, or deleted by ours, is absent at `HEAD` and present on disk; the rest exist at both.
-  if (xy === "DD") {
-    return { status: "D", path: filePath };
-  }
-  if (xy === "UA" || xy === "DU") {
-    return { status: "A", path: filePath };
-  }
-  if (xy.includes("U") || xy === "AA") {
-    return { status: "M", path: filePath };
+  const untrackedOrUnmerged = untrackedOrUnmergedChange(xy, filePath);
+  if (untrackedOrUnmerged !== undefined) {
+    return untrackedOrUnmerged;
   }
   const deletedOnDisk = xy[1] === "D";
   if (source !== undefined) {
@@ -673,6 +709,28 @@ function statusChange(
     return { status: "D", path: filePath };
   }
   return { status: "M", path: filePath };
+}
+
+// The change for an untracked path or an unmerged one, or undefined for any other status code.
+function untrackedOrUnmergedChange(
+  xy: string,
+  filePath: string,
+): GitChange | undefined {
+  if (xy === "??") {
+    return { status: "A", path: filePath };
+  }
+  // Unmerged paths, by which side has the file: deleted on both sides is gone; added only by the
+  // other side, or deleted by ours, is absent at `HEAD` and present on disk; the rest exist at both.
+  if (xy === "DD") {
+    return { status: "D", path: filePath };
+  }
+  if (xy === "UA" || xy === "DU") {
+    return { status: "A", path: filePath };
+  }
+  if (xy.includes("U") || xy === "AA") {
+    return { status: "M", path: filePath };
+  }
+  return undefined;
 }
 
 /**
@@ -707,12 +765,14 @@ export function composeChanges(
   };
   const early = side(first);
   const late = side(second);
-  const originAtStart = (middle: string | null) =>
-    middle === null
-      ? null
-      : early.origin.has(middle)
-        ? (early.origin.get(middle) ?? null)
-        : middle;
+  const originAtStart = (middle: string | null): string | null => {
+    if (middle === null) {
+      return null;
+    }
+    return early.origin.has(middle)
+      ? (early.origin.get(middle) ?? null)
+      : middle;
+  };
 
   const result = new Map<string, GitChange>();
   const reached = new Set<string>();
@@ -820,6 +880,15 @@ export function parseBlamePorcelain(text: string): (BlameLine | undefined)[] {
   return lines;
 }
 
+// A one-letter name-status other than a rename or a copy: an addition, a deletion, or — for every
+// other letter, a type change included — a modification.
+function addedDeletedOrModified(kind: string | undefined): "A" | "D" | "M" {
+  if (kind === "A" || kind === "D") {
+    return kind;
+  }
+  return "M";
+}
+
 /**
  * Parse `diff --name-status -z`: a status, then one path, or two for a rename or a copy (old, new).
  * Paths are as git printed them, relative to the work tree's top level.
@@ -846,10 +915,7 @@ export function parseNameStatus(text: string): GitChange[] {
       continue;
     }
     const filePath = fields[index + 1] ?? "";
-    changes.push({
-      status: kind === "A" ? "A" : kind === "D" ? "D" : "M",
-      path: filePath,
-    });
+    changes.push({ status: addedDeletedOrModified(kind), path: filePath });
     index += 2;
   }
   return changes;

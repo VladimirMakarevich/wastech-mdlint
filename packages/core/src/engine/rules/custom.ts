@@ -110,16 +110,12 @@ function invalid(
   });
 }
 
-/**
- * Resolve a `{ rule: "custom", ... }` config entry into a runnable Rule. Enforces the
- * namespaced id grammar and — authoritatively — that its prefix does not shadow a built-in
- * (reserved prefixes derived from the registry). Scope is derived from the assert kind
- * (columnUnique ⇒ project).
- */
-export function resolveCustomRule(
+// The canonical id of a custom rule, or the config error explaining why it cannot be one: it must
+// follow the namespaced grammar and must not collide with any built-in rule's prefix, id or alias.
+function validatedCustomRuleId(
   entry: CustomRuleEntry,
   registry: RuleRegistry,
-): Rule {
+): string {
   const id = canonicalizeRuleId(entry.id);
 
   if (!CUSTOM_ID_GRAMMAR.test(id)) {
@@ -157,6 +153,20 @@ export function resolveCustomRule(
       `id "${id}": "${prefix}" is a reserved built-in prefix — use your own namespace, e.g. "REQ-100".`,
     );
   }
+  return id;
+}
+
+/**
+ * Resolve a `{ rule: "custom", ... }` config entry into a runnable Rule. Enforces the
+ * namespaced id grammar and — authoritatively — that its prefix does not shadow a built-in
+ * (reserved prefixes derived from the registry). Scope is derived from the assert kind
+ * (columnUnique ⇒ project).
+ */
+export function resolveCustomRule(
+  entry: CustomRuleEntry,
+  registry: RuleRegistry,
+): Rule {
+  const id = validatedCustomRuleId(entry, registry);
 
   const assert = entry.options.assert;
 

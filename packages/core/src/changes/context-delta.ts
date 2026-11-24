@@ -144,33 +144,7 @@ export function computeContextDelta(params: {
   const baseFindings = lint(params.cwd, base, baseGraph);
   const headFindings = lint(params.cwd, head, headGraph);
 
-  // A base finding is moved to where its line is now: an unchanged document keeps it where it was,
-  // a deleted one loses it, and a changed one maps it through its diff.
-  const byBasePath = new Map(
-    changes
-      .filter((change) => change.status !== "A")
-      .map((change) => [change.oldPath ?? change.path, change]),
-  );
-  const lineMaps = new Map<
-    ChangedDocument,
-    (line: number) => number | undefined
-  >();
-  const findings = compareFindings(baseFindings, headFindings, (message) => {
-    const change = byBasePath.get(message.filePath);
-    if (change === undefined) {
-      return { filePath: message.filePath, line: message.line };
-    }
-    if (change.status === "D") {
-      return undefined;
-    }
-    let map = lineMaps.get(change);
-    if (map === undefined) {
-      map = baseLineMap(change.diff);
-      lineMaps.set(change, map);
-    }
-    const line = map(message.line);
-    return line === undefined ? undefined : { filePath: change.path, line };
-  });
+  const findings = compareMovedFindings(baseFindings, headFindings, changes);
 
   const renamed = new Map(
     changes.flatMap((change) =>
@@ -179,50 +153,8 @@ export function computeContextDelta(params: {
   );
   const links = compareEdges(baseGraph, headGraph, renamed);
 
-  const documents = changes.map((change): DocumentContextDelta => {
-    const basePath = change.oldPath ?? change.path;
-    const inHead = change.status !== "D";
-    const inBase = change.status !== "A";
-    return {
-      path: change.path,
-      ...(change.oldPath === undefined ? {} : { oldPath: change.oldPath }),
-      findings: {
-        added: inHead
-          ? findings.added.filter((message) => message.filePath === change.path)
-          : [],
-        removed: inBase
-          ? findings.removed.filter((message) => message.filePath === basePath)
-          : [],
-      },
-      ...(change.base === undefined
-        ? {}
-        : { base: measureDocument(change.base.content) }),
-      ...(change.head === undefined
-        ? {}
-        : { head: measureDocument(change.head.content) }),
-      links: {
-        added: inHead
-          ? links.added.filter((edge) => edge.from === change.path)
-          : [],
-        removed: inBase
-          ? links.removed.filter((edge) => edge.from === basePath)
-          : [],
-      },
-    };
-  });
-
-  const changedHead = new Set(
-    changes.flatMap((change) => (change.status === "D" ? [] : [change.path])),
-  );
-  // A link from an unchanged document into a changed one is in the base's graph even when the head's
-  // lost it — an anchor into a heading the change renamed no longer resolves, so it is no edge there.
-  const changedBase = new Set(
-    changes.flatMap((change) =>
-      change.status === "A" ? [] : [change.oldPath ?? change.path],
-    ),
-  );
-  const unchanged = [...head.documents.values()].filter(
-    (document) => !changedHead.has(document.path),
+  const documents = changes.map((change) =>
+    documentDelta(change, findings, links),
   );
 
   const configOnly =
@@ -238,34 +170,15 @@ export function computeContextDelta(params: {
     documents,
     links,
     eager: eagerChanges(base, head),
-    affected: {
-      findings: groupByPath(
-        findings.added.filter(
-          (message) =>
-            !changedHead.has(message.filePath) &&
-            head.documents.has(message.filePath),
-        ),
-      ),
-      codeLinks:
-        params.codeFiles === undefined
-          ? []
-          : linksIntoChangedLines(
-              unchanged,
-              params.codeFiles,
-              head.configuration.settings.siteRouter,
-            ),
-      linking: linkingTo(
-        [
-          ...headGraph.edges.filter((edge) => changedHead.has(edge.to)),
-          ...baseGraph.edges
-            .filter((edge) => changedBase.has(edge.to))
-            .map((edge) => ({ ...edge, to: renamed.get(edge.to) ?? edge.to })),
-        ].filter(
-          (edge) =>
-            head.documents.has(edge.from) && !changedHead.has(edge.from),
-        ),
-      ),
-    },
+    affected: affectedByChanges({
+      base,
+      head,
+      changes,
+      graphs: { base: baseGraph, head: headGraph },
+      addedFindings: findings.added,
+      renamed,
+      codeFiles: params.codeFiles,
+    }),
     newErrors: documents
       .filter((document) =>
         document.findings.added.some((message) => message.severity === "error"),
@@ -275,6 +188,136 @@ export function computeContextDelta(params: {
     scopeChanged:
       JSON.stringify(scopeOf(base.configuration)) !==
       JSON.stringify(scopeOf(head.configuration)),
+  };
+}
+
+// The findings that appeared and disappeared between the two sides. A base finding is moved to
+// where its line is now: an unchanged document keeps it where it was, a deleted one loses it, and a
+// changed one maps it through its diff.
+function compareMovedFindings(
+  baseFindings: LintMessage[],
+  headFindings: LintMessage[],
+  changes: readonly ChangedDocument[],
+): FindingsDelta {
+  const byBasePath = new Map(
+    changes
+      .filter((change) => change.status !== "A")
+      .map((change) => [change.oldPath ?? change.path, change]),
+  );
+  const lineMaps = new Map<
+    ChangedDocument,
+    (line: number) => number | undefined
+  >();
+  return compareFindings(baseFindings, headFindings, (message) => {
+    const change = byBasePath.get(message.filePath);
+    if (change === undefined) {
+      return { filePath: message.filePath, line: message.line };
+    }
+    if (change.status === "D") {
+      return undefined;
+    }
+    let map = lineMaps.get(change);
+    if (map === undefined) {
+      map = baseLineMap(change.diff);
+      lineMaps.set(change, map);
+    }
+    const line = map(message.line);
+    return line === undefined ? undefined : { filePath: change.path, line };
+  });
+}
+
+// One changed document's share of the corpus-wide finding and link deltas, with its size on each
+// side it exists on.
+function documentDelta(
+  change: ChangedDocument,
+  findings: FindingsDelta,
+  links: EdgesDelta,
+): DocumentContextDelta {
+  const basePath = change.oldPath ?? change.path;
+  const inHead = change.status !== "D";
+  const inBase = change.status !== "A";
+  return {
+    path: change.path,
+    ...(change.oldPath === undefined ? {} : { oldPath: change.oldPath }),
+    findings: {
+      added: inHead
+        ? findings.added.filter((message) => message.filePath === change.path)
+        : [],
+      removed: inBase
+        ? findings.removed.filter((message) => message.filePath === basePath)
+        : [],
+    },
+    ...(change.base === undefined
+      ? {}
+      : { base: measureDocument(change.base.content) }),
+    ...(change.head === undefined
+      ? {}
+      : { head: measureDocument(change.head.content) }),
+    links: {
+      added: inHead
+        ? links.added.filter((edge) => edge.from === change.path)
+        : [],
+      removed: inBase
+        ? links.removed.filter((edge) => edge.from === basePath)
+        : [],
+    },
+  };
+}
+
+// What the change reaches in documents it did not touch: their new findings, their line links into
+// changed code, and their links into changed documents.
+function affectedByChanges(params: {
+  base: ContextSide;
+  head: ContextSide;
+  changes: readonly ChangedDocument[];
+  graphs: { base: ContextGraph; head: ContextGraph };
+  addedFindings: LintMessage[];
+  renamed: Map<string, string>;
+  codeFiles:
+    | ReadonlyMap<string, { baseText: string; headText: string }>
+    | undefined;
+}): ContextDelta["affected"] {
+  const { head, changes, graphs, renamed } = params;
+  const changedHead = new Set(
+    changes.flatMap((change) => (change.status === "D" ? [] : [change.path])),
+  );
+  // A link from an unchanged document into a changed one is in the base's graph even when the head's
+  // lost it — an anchor into a heading the change renamed no longer resolves, so it is no edge there.
+  const changedBase = new Set(
+    changes.flatMap((change) =>
+      change.status === "A" ? [] : [change.oldPath ?? change.path],
+    ),
+  );
+  const unchanged = [...head.documents.values()].filter(
+    (document) => !changedHead.has(document.path),
+  );
+
+  return {
+    findings: groupByPath(
+      params.addedFindings.filter(
+        (message) =>
+          !changedHead.has(message.filePath) &&
+          head.documents.has(message.filePath),
+      ),
+    ),
+    codeLinks:
+      params.codeFiles === undefined
+        ? []
+        : linksIntoChangedLines(
+            unchanged,
+            params.codeFiles,
+            head.configuration.settings.siteRouter,
+          ),
+    linking: linkingTo(
+      [
+        ...graphs.head.edges.filter((edge) => changedHead.has(edge.to)),
+        ...graphs.base.edges
+          .filter((edge) => changedBase.has(edge.to))
+          .map((edge) => ({ ...edge, to: renamed.get(edge.to) ?? edge.to })),
+      ].filter(
+        (edge) => head.documents.has(edge.from) && !changedHead.has(edge.from),
+      ),
+    ),
   };
 }
 

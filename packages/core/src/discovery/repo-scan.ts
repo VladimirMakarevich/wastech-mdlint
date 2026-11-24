@@ -142,6 +142,14 @@ function isOwnedByPackageScope(
   );
 }
 
+// One directory the Markdown walk enters: its absolute path, its repo-relative POSIX path (`""` at
+// the root), and the gitignore layers of every directory above it.
+type WalkTarget = {
+  directoryPath: string;
+  relDirectory: string;
+  parentLayers: IgnoreLayer[];
+};
+
 // A private, NOISE-pruned recursive walk collecting every `MARKDOWN_EXTENSIONS` file as a
 // repo-relative POSIX path.
 // Deliberately does not follow symlinks (unlike load-documents.ts's loop-safe symlink
@@ -170,9 +178,7 @@ async function collectMarkdownFiles(
   // where that sink points and in whether pruned directories are recorded: `"collect"` fills the
   // corpus list, `"count"` fills one hidden root's own list.
   async function walk(
-    directoryPath: string,
-    relDirectory: string,
-    parentLayers: IgnoreLayer[],
+    { directoryPath, relDirectory, parentLayers }: WalkTarget,
     mode: "collect" | "count",
     sink: string[],
   ): Promise<void> {
@@ -189,7 +195,11 @@ async function collectMarkdownFiles(
         relDirectory === "" ? entry.name : `${relDirectory}/${entry.name}`;
 
       if (entry.isDirectory()) {
-        const childPath = path.join(directoryPath, entry.name);
+        const child: WalkTarget = {
+          directoryPath: path.join(directoryPath, entry.name),
+          relDirectory: relPath,
+          parentLayers: layers,
+        };
         const classification = classifyPrunedDirName(entry.name, noiseDirNames);
 
         if (classification === "noise") {
@@ -217,7 +227,7 @@ async function collectMarkdownFiles(
         if (classification === "hidden") {
           if (mode === "collect") {
             const hiddenFiles: string[] = [];
-            await walk(childPath, relPath, layers, "count", hiddenFiles);
+            await walk(child, "count", hiddenFiles);
             // Sorted here rather than at the disclosure: `readdir` order is filesystem-dependent, and
             // this list is public API that a caller may render directly.
             hiddenFiles.sort(compareStrings);
@@ -229,12 +239,12 @@ async function collectMarkdownFiles(
           } else {
             // Already inside a recorded hidden root: this subtree is part of that root's own list,
             // not a second entry to disclose, so it keeps writing into the same sink.
-            await walk(childPath, relPath, layers, "count", sink);
+            await walk(child, "count", sink);
           }
           continue;
         }
 
-        await walk(childPath, relPath, layers, mode, sink);
+        await walk(child, mode, sink);
         continue;
       }
 
@@ -248,11 +258,17 @@ async function collectMarkdownFiles(
     }
   }
 
-  await walk(cwd, "", [], "collect", results);
+  await walk(
+    { directoryPath: cwd, relDirectory: "", parentLayers: [] },
+    "collect",
+    results,
+  );
   // `readdir` order is filesystem-dependent, so the record is only deterministic once sorted.
   pruned.sort((left, right) => compareStrings(left.path, right.path));
   return { files: results, pruned };
 }
+
+type ClusterCandidate = { dir: string; subtreeCount: number; score: number };
 
 type ScopeClustersParams = {
   scopeRoot: string;
@@ -281,29 +297,8 @@ function computeScopeClusters(params: ScopeClustersParams): DocCluster[] {
     sampleSize,
   } = params;
 
-  const dirCounts = new Map<string, number>();
-
-  for (const file of files) {
-    let dir = dirnameOf(file);
-
-    for (;;) {
-      dirCounts.set(dir, (dirCounts.get(dir) ?? 0) + 1);
-      if (dir === scopeRoot) {
-        break;
-      }
-
-      const parentDir = dirnameOf(dir);
-      if (parentDir === dir) {
-        // Files are pre-filtered to sit under scopeRoot, so this only guards against an
-        // unexpected mismatch rather than a real case.
-        break;
-      }
-      dir = parentDir;
-    }
-  }
-
-  type Candidate = { dir: string; subtreeCount: number; score: number };
-  const qualifying: Candidate[] = [];
+  const dirCounts = countSubtreeFiles(files, scopeRoot);
+  const qualifying: ClusterCandidate[] = [];
 
   for (const [dir, subtreeCount] of dirCounts) {
     if (dir === scopeRoot) {
@@ -329,7 +324,7 @@ function computeScopeClusters(params: ScopeClustersParams): DocCluster[] {
     return depthDiff !== 0 ? depthDiff : compareStrings(left.dir, right.dir);
   });
 
-  const kept: Candidate[] = [];
+  const kept: ClusterCandidate[] = [];
   for (const candidate of qualifying) {
     const coveredByKept = kept.some(
       (entry) =>
@@ -358,26 +353,69 @@ function computeScopeClusters(params: ScopeClustersParams): DocCluster[] {
     ...workspacePackageTag,
   }));
 
-  const directFiles = files.filter((file) => dirnameOf(file) === scopeRoot);
-  if (directFiles.length > 0) {
-    clusters.push({
-      path: scopeRoot,
-      kind: "root",
-      score: directFiles.length,
-      subtreeCount: directFiles.length,
-      // `./`-prefixed so the pattern keeps its "/" — normalizeConfigGlob (discovery/globs.ts)
-      // rewrites any slash-free pattern to `**/${pattern}`, which would silently turn a
-      // root-only proposal into a repo-wide one once `init` writes it into config.
-      includeGlob:
-        scopeRoot === ""
-          ? `./${MARKDOWN_GLOB_SUFFIX}`
-          : `${escapeGlobPath(scopeRoot)}/${MARKDOWN_GLOB_SUFFIX}`,
-      sampleFiles: directFiles.slice(0, sampleSize),
-      ...workspacePackageTag,
-    });
+  const rootCluster = rootDirectFilesCluster(params, workspacePackageTag);
+  if (rootCluster !== undefined) {
+    clusters.push(rootCluster);
   }
 
   return clusters;
+}
+
+// The number of scope files in each directory's subtree, for every directory from a file's own up
+// to `scopeRoot`.
+function countSubtreeFiles(
+  files: readonly string[],
+  scopeRoot: string,
+): Map<string, number> {
+  const dirCounts = new Map<string, number>();
+
+  for (const file of files) {
+    let dir = dirnameOf(file);
+
+    for (;;) {
+      dirCounts.set(dir, (dirCounts.get(dir) ?? 0) + 1);
+      if (dir === scopeRoot) {
+        break;
+      }
+
+      const parentDir = dirnameOf(dir);
+      if (parentDir === dir) {
+        // Files are pre-filtered to sit under scopeRoot, so this only guards against an
+        // unexpected mismatch rather than a real case.
+        break;
+      }
+      dir = parentDir;
+    }
+  }
+  return dirCounts;
+}
+
+// The low-priority "root"-kind candidate made of the files sitting directly in the scope root, or
+// undefined when it holds none.
+function rootDirectFilesCluster(
+  params: ScopeClustersParams,
+  workspacePackageTag: { workspacePackage?: string },
+): DocCluster | undefined {
+  const { scopeRoot, files, sampleSize } = params;
+  const directFiles = files.filter((file) => dirnameOf(file) === scopeRoot);
+  if (directFiles.length === 0) {
+    return undefined;
+  }
+  return {
+    path: scopeRoot,
+    kind: "root",
+    score: directFiles.length,
+    subtreeCount: directFiles.length,
+    // `./`-prefixed so the pattern keeps its "/" — normalizeConfigGlob (discovery/globs.ts)
+    // rewrites any slash-free pattern to `**/${pattern}`, which would silently turn a
+    // root-only proposal into a repo-wide one once `init` writes it into config.
+    includeGlob:
+      scopeRoot === ""
+        ? `./${MARKDOWN_GLOB_SUFFIX}`
+        : `${escapeGlobPath(scopeRoot)}/${MARKDOWN_GLOB_SUFFIX}`,
+    sampleFiles: directFiles.slice(0, sampleSize),
+    ...workspacePackageTag,
+  };
 }
 
 const CLUSTER_KIND_RANK: Record<DocClusterKind, number> = {
@@ -385,6 +423,38 @@ const CLUSTER_KIND_RANK: Record<DocClusterKind, number> = {
   root: 1,
   fallback: 2,
 };
+
+// Filtering the global file list by prefix is enough to exclude a workspace package's
+// files from the root scope — no special-casing needed, they simply have zero entries in
+// the root scope's dirCounts map. A package scope additionally excludes any file already
+// owned by a deeper nested workspace package (isOwnedByPackageScope), so nested packages
+// aren't scanned twice.
+function filesInScope(
+  allFiles: readonly string[],
+  workspacePackage: string | undefined,
+  workspacePackages: WorkspacePackage[],
+): string[] {
+  if (workspacePackage === undefined) {
+    return allFiles.filter(
+      (file) =>
+        !workspacePackages.some((pkg) => file.startsWith(`${pkg.path}/`)),
+    );
+  }
+  return allFiles.filter((file) =>
+    isOwnedByPackageScope(file, workspacePackage, workspacePackages),
+  );
+}
+
+// Clusters first, then root candidates, then the fallback; within a kind the higher score first,
+// and the path breaks a tie so the order never depends on the walk.
+function compareClusters(left: DocCluster, right: DocCluster): number {
+  const rankDiff = CLUSTER_KIND_RANK[left.kind] - CLUSTER_KIND_RANK[right.kind];
+  if (rankDiff !== 0) {
+    return rankDiff;
+  }
+  const scoreDiff = right.score - left.score;
+  return scoreDiff !== 0 ? scoreDiff : compareStrings(left.path, right.path);
+}
 
 /**
  * Scans a repository for Markdown doc clusters and the package manager in use, so
@@ -445,20 +515,11 @@ export async function scanRepository(
 
   for (const scope of scopes) {
     const workspacePackage = scope.workspacePackage;
-    // Filtering the global file list by prefix is enough to exclude a workspace package's
-    // files from the root scope — no special-casing needed, they simply have zero entries in
-    // the root scope's dirCounts map. A package scope additionally excludes any file already
-    // owned by a deeper nested workspace package (isOwnedByPackageScope), so nested packages
-    // aren't scanned twice.
-    const scopeFiles =
-      workspacePackage === undefined
-        ? allFiles.filter(
-            (file) =>
-              !workspacePackages.some((pkg) => file.startsWith(`${pkg.path}/`)),
-          )
-        : allFiles.filter((file) =>
-            isOwnedByPackageScope(file, workspacePackage, workspacePackages),
-          );
+    const scopeFiles = filesInScope(
+      allFiles,
+      workspacePackage,
+      workspacePackages,
+    );
 
     clusters.push(
       ...computeScopeClusters({
@@ -491,15 +552,7 @@ export async function scanRepository(
     });
   }
 
-  clusters.sort((left, right) => {
-    const rankDiff =
-      CLUSTER_KIND_RANK[left.kind] - CLUSTER_KIND_RANK[right.kind];
-    if (rankDiff !== 0) {
-      return rankDiff;
-    }
-    const scoreDiff = right.score - left.score;
-    return scoreDiff !== 0 ? scoreDiff : compareStrings(left.path, right.path);
-  });
+  clusters.sort(compareClusters);
 
   return {
     clusters,

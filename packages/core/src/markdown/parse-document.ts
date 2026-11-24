@@ -1,14 +1,20 @@
 import GithubSlugger from "github-slugger";
 import type {
+  Code,
   Definition,
+  Heading,
   Html,
   Image,
   ImageReference,
   Link,
   LinkReference,
   ListItem,
+  Nodes,
+  Paragraph,
+  Parents,
   Root,
   Table,
+  TableCell,
   Text,
 } from "mdast";
 import { remark } from "remark";
@@ -459,35 +465,43 @@ function extractHtmlAnchors(
     if (attributes === undefined) {
       continue;
     }
-    const isAnchorElement = tagName === "a";
-    // HTML keeps only the first occurrence of an attribute on a tag and drops later duplicates, so
-    // `<a id="real" id="ghost">` declares `real` alone. A name is marked seen before its value is
-    // checked, because an empty first `id=""` also wins and leaves the element with no anchor.
-    const seenAttributes = new Set<string>();
-
-    for (const attribute of attributes.matchAll(HTML_ATTRIBUTE_PATTERN)) {
-      const attributeName = (attribute[1] ?? "").toLowerCase();
-      if (seenAttributes.has(attributeName)) {
-        continue;
-      }
-      seenAttributes.add(attributeName);
-      if (
-        attributeName !== "id" &&
-        !(attributeName === "name" && isAnchorElement)
-      ) {
-        continue;
-      }
-      const id = attribute[2] ?? attribute[3] ?? attribute[4] ?? "";
-      if (id.length === 0) {
-        continue;
-      }
-      // A block html node spans several lines, so the line comes from the newlines before the tag.
-      anchors.push({
-        id,
-        line: nodeStartLine + findLineNumber(value, tag.index) - 1,
-      });
+    // A block html node spans several lines, so the line comes from the newlines before the tag.
+    const line = nodeStartLine + findLineNumber(value, tag.index) - 1;
+    for (const id of anchorIdsOfTag(attributes, tagName === "a")) {
+      anchors.push({ id, line });
     }
   }
+}
+
+// The fragment-target values one tag declares, in attribute order.
+function anchorIdsOfTag(
+  attributes: string,
+  isAnchorElement: boolean,
+): string[] {
+  const ids: string[] = [];
+  // HTML keeps only the first occurrence of an attribute on a tag and drops later duplicates, so
+  // `<a id="real" id="ghost">` declares `real` alone. A name is marked seen before its value is
+  // checked, because an empty first `id=""` also wins and leaves the element with no anchor.
+  const seenAttributes = new Set<string>();
+
+  for (const attribute of attributes.matchAll(HTML_ATTRIBUTE_PATTERN)) {
+    const attributeName = (attribute[1] ?? "").toLowerCase();
+    if (seenAttributes.has(attributeName)) {
+      continue;
+    }
+    seenAttributes.add(attributeName);
+    if (
+      attributeName !== "id" &&
+      !(attributeName === "name" && isAnchorElement)
+    ) {
+      continue;
+    }
+    const id = attribute[2] ?? attribute[3] ?? attribute[4] ?? "";
+    if (id.length > 0) {
+      ids.push(id);
+    }
+  }
+  return ids;
 }
 
 function extractImports(node: Text): ParsedImport[] {
@@ -667,255 +681,329 @@ export function parseDocumentWithTree(params: {
   if (markLength > 0) {
     shiftOffsetsPastByteOrderMark(tree, markLength);
   }
-  const definitions = getReferenceDefinitions(tree);
-  const slugger = new GithubSlugger();
+  const walk = createDocumentWalk(tree, params.content);
 
-  const headings: ParsedHeading[] = [];
-  const htmlAnchors: ParsedHtmlAnchor[] = [];
+  visit(tree, (node, _index, parent) => {
+    visitDocumentNode(walk, node, parent);
+  });
+
+  for (const definition of walk.referenceDefinitions) {
+    definition.referenced = walk.referencedIdentifiers.has(
+      definition.identifier,
+    );
+  }
+
+  const document: ParsedDocument = {
+    path: params.path,
+    headings: walk.headings,
+    htmlAnchors: walk.htmlAnchors,
+    sections: walk.sections,
+    tables: walk.tables,
+    checkItems: walk.checkItems,
+    links: walk.links,
+    images: walk.images,
+    undefinedReferences: walk.undefinedReferences,
+    reversedLinks: walk.reversedLinks,
+    referenceDefinitions: walk.referenceDefinitions,
+    textSpans: walk.textSpans,
+    literalBrackets: walk.literalBrackets,
+    imports: walk.imports,
+    directives: walk.directives,
+    frontmatter: extractFrontmatter(tree),
+    firstBlock: extractFirstBlock(tree),
+    emphasisParagraphs: extractEmphasisParagraphs(tree),
+    codeFences: walk.codeFences,
+    content: params.content,
+  };
+  return { document, tree };
+}
+
+// Everything the single walk in `parseDocumentWithTree` collects, together with the state it
+// carries from one node to the next. It is one explicit object handed to a small handler per node
+// kind, so each kind's extraction reads on its own while all of them still fill the same facts in
+// the same pre-order pass — splitting the walk into several passes would cost a traversal each and
+// lose the source-order state below.
+type DocumentWalk = {
+  readonly tree: Root;
+  readonly content: string;
+  readonly definitions: Map<string, string>;
+  readonly slugger: GithubSlugger;
+  readonly headings: ParsedHeading[];
+  readonly htmlAnchors: ParsedHtmlAnchor[];
   // Raw-text element left open by an earlier `html` node; carried in source order because the
   // visit is a pre-order walk, so `html` nodes arrive in the order a browser would read them.
-  let openRawText: string | undefined;
-  const sections: string[] = [];
-  const tables: ParsedTable[] = [];
-  const checkItems: ParsedCheckItem[] = [];
-  const links: ParsedLink[] = [];
-  const images: ParsedImage[] = [];
-  const undefinedReferences: ParsedUndefinedReference[] = [];
-  const reversedLinks: ParsedReversedLink[] = [];
-  const imports: ParsedImport[] = [];
-  const directives: InlineDirective[] = [];
-  const referenceDefinitions: ParsedReferenceDefinition[] = [];
-  const referencedIdentifiers = new Set<string>();
-  const textSpans: ParsedTextSpan[] = [];
-  const literalBrackets: number[] = [];
-  const codeFences: ParsedCodeFence[] = [];
+  openRawText: string | undefined;
+  readonly sections: string[];
+  readonly tables: ParsedTable[];
+  readonly checkItems: ParsedCheckItem[];
+  readonly links: ParsedLink[];
+  readonly images: ParsedImage[];
+  readonly undefinedReferences: ParsedUndefinedReference[];
+  readonly reversedLinks: ParsedReversedLink[];
+  readonly imports: ParsedImport[];
+  readonly directives: InlineDirective[];
+  readonly referenceDefinitions: ParsedReferenceDefinition[];
+  readonly referencedIdentifiers: Set<string>;
+  readonly textSpans: ParsedTextSpan[];
+  readonly literalBrackets: number[];
+  readonly codeFences: ParsedCodeFence[];
   // Heading text nodes mapped to their heading's slug. Filled when the walk reaches the heading,
-  // which a pre-order walk does before any of its descendants, so the `text` case can look its
+  // which a pre-order walk does before any of its descendants, so the `text` handler can look its
   // node up without tracking ancestors.
-  const headingSlugByText = new Map<Text, string>();
+  readonly headingSlugByText: Map<Text, string>;
   // Text that is a reference label, not prose: everything inside a shortcut `[label]` or collapsed
   // `[label][]` reference, where the visible text is also the key that finds the definition.
   // Rewriting it would orphan the definition and break the link. A full `[text][label]` reference
   // keeps its label separately, so its text stays prose. Filled the same pre-order way as
   // `headingSlugByText`, so nested formatting such as `[*label*]` is covered too.
-  const referenceLabelText = new Set<Text>();
+  readonly referenceLabelText: Set<Text>;
+  // The most recent heading above the node being visited, whatever its level; tables and check
+  // items record it as their section.
+  currentSection: string | undefined;
+};
 
-  let currentSection: string | undefined;
-
-  // A `yaml` node is a childless literal, not `text`, `link` or `html`, so it falls through to
-  // `default`: nothing inside frontmatter can become a heading, link, `@import` or directive.
-  visit(tree, (node, _index, parent) => {
-    switch (node.type) {
-      case "heading": {
-        const heading = node;
-        const text = collectText(heading);
-        const slug = slugger.slug(text);
-        currentSection = text;
-        sections.push(text);
-        headings.push({
-          text,
-          depth: heading.depth,
-          slug,
-          line: heading.position?.start.line ?? 0,
-        });
-        visit(heading, "text", (child: Text) => {
-          headingSlugByText.set(child, slug);
-        });
-        undefinedReferences.push(
-          ...extractUndefinedReferences(heading, params.content, definitions),
-        );
-        reversedLinks.push(...extractReversedLinks(heading, params.content));
-        return;
-      }
-      // Paragraphs, headings and table cells are the phrasing containers, and they never nest, so
-      // each byte of inline source is scanned for undefined references and for reversed link syntax
-      // exactly once per scanner. No `SKIP`:
-      // their `text`, `link` and `html` descendants must still be visited below.
-      case "paragraph":
-      case "tableCell": {
-        undefinedReferences.push(
-          ...extractUndefinedReferences(node, params.content, definitions),
-        );
-        reversedLinks.push(...extractReversedLinks(node, params.content));
-        return;
-      }
-      case "table": {
-        const table = extractTable(node, currentSection);
-        if (table !== undefined) {
-          tables.push(table);
-        }
-        return;
-      }
-      case "listItem": {
-        const checkItem = extractCheckItem(node, currentSection);
-        if (checkItem !== undefined) {
-          checkItems.push(checkItem);
-        }
-        return;
-      }
-      case "link":
-      case "linkReference": {
-        const linkNode = node;
-        if (
-          linkNode.type === "linkReference" &&
-          linkNode.referenceType !== "full"
-        ) {
-          visit(linkNode, "text", (child: Text) => {
-            referenceLabelText.add(child);
-          });
-        }
-        const rawTarget = resolveRawLinkTarget(linkNode, definitions);
-        if (rawTarget === undefined) {
-          return;
-        }
-        if (linkNode.type === "linkReference") {
-          referencedIdentifiers.add(linkNode.identifier);
-        }
-        const classified = classifyLink(rawTarget);
-        const label = collectText(linkNode);
-        const visibleLabel = collectVisibleText(linkNode);
-        const fragmentRange =
-          linkNode.type === "link" && classified.anchor !== undefined
-            ? locateFragmentRange(linkNode, rawTarget, params.content)
-            : undefined;
-        links.push({
-          rawTarget,
-          text: label.length > 0 ? label : undefined,
-          ...(visibleLabel === label ? {} : { visibleText: visibleLabel }),
-          anchor: classified.anchor,
-          kind: classified.kind,
-          line: linkNode.position?.start.line ?? 0,
-          column: linkNode.position?.start.column,
-          ...(fragmentRange === undefined ? {} : { fragmentRange }),
-        });
-        return;
-      }
-      case "image":
-      case "imageReference": {
-        const imageNode = node;
-        if (imageNode.type === "imageReference") {
-          referencedIdentifiers.add(imageNode.identifier);
-        }
-        const rawTarget = resolveRawLinkTarget(imageNode, definitions);
-        if (rawTarget === undefined) {
-          return;
-        }
-        images.push({
-          rawTarget,
-          alt: imageNode.alt ?? "",
-          line: imageNode.position?.start.line ?? 0,
-          column: imageNode.position?.start.column,
-        });
-        return;
-      }
-      case "html": {
-        const directive = parseDirective(node);
-        if (directive !== undefined) {
-          directives.push(directive);
-        }
-        const extracted = extractHtmlAnchors(node, openRawText);
-        htmlAnchors.push(...extracted.anchors);
-        openRawText = extracted.openRawText;
-        return;
-      }
-      case "definition": {
-        const definition = node;
-        const start = definition.position?.start.offset;
-        const end = definition.position?.end.offset;
-        if (start === undefined || end === undefined) {
-          return;
-        }
-        referenceDefinitions.push({
-          label: definition.label ?? definition.identifier,
-          identifier: definition.identifier,
-          line: definition.position?.start.line ?? 0,
-          endLine: definition.position?.end.line ?? 0,
-          start,
-          end,
-          topLevel: parent === tree,
-          // Filled in after the walk: a reference may come after its definition.
-          referenced: false,
-        });
-        return;
-      }
-      case "code": {
-        const code = node;
-        const start = code.position?.start.offset;
-        if (start === undefined) {
-          return;
-        }
-        // mdast has no fenced/indented flag on `code`, but the node's start offset lands on the
-        // first fence character for a fenced block (past any 1-3 space indent and past `>` or list
-        // markers of a container) and on the indentation itself for an indented block. So the byte
-        // there decides it, without re-scanning the block.
-        const first = params.content[start];
-        if (first !== "`" && first !== "~") {
-          return;
-        }
-        codeFences.push({
-          language: code.lang ?? "",
-          line: code.position?.start.line ?? 0,
-          column: code.position?.start.column ?? 0,
-        });
-        return;
-      }
-      case "text": {
-        const textNode = node;
-        imports.push(...extractImports(textNode));
-        const start = textNode.position?.start.offset;
-        const end = textNode.position?.end.offset;
-        if (start !== undefined && end !== undefined) {
-          literalBrackets.push(
-            ...findUnescapedBrackets(params.content, start, end),
-          );
-        }
-        if (
-          start !== undefined &&
-          end !== undefined &&
-          !referenceLabelText.has(textNode) &&
-          !(parent?.type === "link" && isAutolink(parent, params.content)) &&
-          normalizeLineEndings(params.content.slice(start, end)) ===
-            normalizeLineEndings(textNode.value)
-        ) {
-          const headingSlug = headingSlugByText.get(textNode);
-          textSpans.push(
-            headingSlug === undefined
-              ? { start, end }
-              : { start, end, headingSlug },
-          );
-        }
-        return;
-      }
-      default:
-        return;
-    }
-  });
-
-  for (const definition of referenceDefinitions) {
-    definition.referenced = referencedIdentifiers.has(definition.identifier);
-  }
-
-  const document: ParsedDocument = {
-    path: params.path,
-    headings,
-    htmlAnchors,
-    sections,
-    tables,
-    checkItems,
-    links,
-    images,
-    undefinedReferences,
-    reversedLinks,
-    referenceDefinitions,
-    textSpans,
-    literalBrackets,
-    imports,
-    directives,
-    frontmatter: extractFrontmatter(tree),
-    firstBlock: extractFirstBlock(tree),
-    emphasisParagraphs: extractEmphasisParagraphs(tree),
-    codeFences,
-    content: params.content,
+function createDocumentWalk(tree: Root, content: string): DocumentWalk {
+  return {
+    tree,
+    content,
+    definitions: getReferenceDefinitions(tree),
+    slugger: new GithubSlugger(),
+    headings: [],
+    htmlAnchors: [],
+    openRawText: undefined,
+    sections: [],
+    tables: [],
+    checkItems: [],
+    links: [],
+    images: [],
+    undefinedReferences: [],
+    reversedLinks: [],
+    imports: [],
+    directives: [],
+    referenceDefinitions: [],
+    referencedIdentifiers: new Set<string>(),
+    textSpans: [],
+    literalBrackets: [],
+    codeFences: [],
+    headingSlugByText: new Map<Text, string>(),
+    referenceLabelText: new Set<Text>(),
+    currentSection: undefined,
   };
-  return { document, tree };
+}
+
+// A `yaml` node is a childless literal, not `text`, `link` or `html`, so it falls through to
+// `default`: nothing inside frontmatter can become a heading, link, `@import` or directive.
+function visitDocumentNode(
+  walk: DocumentWalk,
+  node: Nodes,
+  parent: Parents | undefined,
+): void {
+  switch (node.type) {
+    case "heading":
+      recordHeading(walk, node);
+      return;
+    // Paragraphs, headings and table cells are the phrasing containers, and they never nest, so
+    // each byte of inline source is scanned for undefined references and for reversed link syntax
+    // exactly once per scanner. No `SKIP`:
+    // their `text`, `link` and `html` descendants must still be visited below.
+    case "paragraph":
+    case "tableCell":
+      scanPhrasingContainer(walk, node);
+      return;
+    case "table":
+      recordTable(walk, node);
+      return;
+    case "listItem":
+      recordCheckItem(walk, node);
+      return;
+    case "link":
+    case "linkReference":
+      recordLink(walk, node);
+      return;
+    case "image":
+    case "imageReference":
+      recordImage(walk, node);
+      return;
+    case "html":
+      recordHtml(walk, node);
+      return;
+    case "definition":
+      recordDefinition(walk, node, parent);
+      return;
+    case "code":
+      recordCodeFence(walk, node);
+      return;
+    case "text":
+      recordText(walk, node, parent);
+      return;
+    default:
+      return;
+  }
+}
+
+function scanPhrasingContainer(
+  walk: DocumentWalk,
+  node: Heading | Paragraph | TableCell,
+): void {
+  walk.undefinedReferences.push(
+    ...extractUndefinedReferences(node, walk.content, walk.definitions),
+  );
+  walk.reversedLinks.push(...extractReversedLinks(node, walk.content));
+}
+
+function recordHeading(walk: DocumentWalk, heading: Heading): void {
+  const text = collectText(heading);
+  const slug = walk.slugger.slug(text);
+  walk.currentSection = text;
+  walk.sections.push(text);
+  walk.headings.push({
+    text,
+    depth: heading.depth,
+    slug,
+    line: heading.position?.start.line ?? 0,
+  });
+  visit(heading, "text", (child: Text) => {
+    walk.headingSlugByText.set(child, slug);
+  });
+  scanPhrasingContainer(walk, heading);
+}
+
+function recordTable(walk: DocumentWalk, node: Table): void {
+  const table = extractTable(node, walk.currentSection);
+  if (table !== undefined) {
+    walk.tables.push(table);
+  }
+}
+
+function recordCheckItem(walk: DocumentWalk, node: ListItem): void {
+  const checkItem = extractCheckItem(node, walk.currentSection);
+  if (checkItem !== undefined) {
+    walk.checkItems.push(checkItem);
+  }
+}
+
+function recordLink(walk: DocumentWalk, linkNode: LinkLikeNode): void {
+  if (linkNode.type === "linkReference" && linkNode.referenceType !== "full") {
+    visit(linkNode, "text", (child: Text) => {
+      walk.referenceLabelText.add(child);
+    });
+  }
+  const rawTarget = resolveRawLinkTarget(linkNode, walk.definitions);
+  if (rawTarget === undefined) {
+    return;
+  }
+  if (linkNode.type === "linkReference") {
+    walk.referencedIdentifiers.add(linkNode.identifier);
+  }
+  const classified = classifyLink(rawTarget);
+  const label = collectText(linkNode);
+  const visibleLabel = collectVisibleText(linkNode);
+  const fragmentRange =
+    linkNode.type === "link" && classified.anchor !== undefined
+      ? locateFragmentRange(linkNode, rawTarget, walk.content)
+      : undefined;
+  walk.links.push({
+    rawTarget,
+    text: label.length > 0 ? label : undefined,
+    ...(visibleLabel === label ? {} : { visibleText: visibleLabel }),
+    anchor: classified.anchor,
+    kind: classified.kind,
+    line: linkNode.position?.start.line ?? 0,
+    column: linkNode.position?.start.column,
+    ...(fragmentRange === undefined ? {} : { fragmentRange }),
+  });
+}
+
+function recordImage(walk: DocumentWalk, imageNode: ImageLikeNode): void {
+  if (imageNode.type === "imageReference") {
+    walk.referencedIdentifiers.add(imageNode.identifier);
+  }
+  const rawTarget = resolveRawLinkTarget(imageNode, walk.definitions);
+  if (rawTarget === undefined) {
+    return;
+  }
+  walk.images.push({
+    rawTarget,
+    alt: imageNode.alt ?? "",
+    line: imageNode.position?.start.line ?? 0,
+    column: imageNode.position?.start.column,
+  });
+}
+
+function recordHtml(walk: DocumentWalk, node: Html): void {
+  const directive = parseDirective(node);
+  if (directive !== undefined) {
+    walk.directives.push(directive);
+  }
+  const extracted = extractHtmlAnchors(node, walk.openRawText);
+  walk.htmlAnchors.push(...extracted.anchors);
+  walk.openRawText = extracted.openRawText;
+}
+
+function recordDefinition(
+  walk: DocumentWalk,
+  definition: Definition,
+  parent: Parents | undefined,
+): void {
+  const start = definition.position?.start.offset;
+  const end = definition.position?.end.offset;
+  if (start === undefined || end === undefined) {
+    return;
+  }
+  walk.referenceDefinitions.push({
+    label: definition.label ?? definition.identifier,
+    identifier: definition.identifier,
+    line: definition.position?.start.line ?? 0,
+    endLine: definition.position?.end.line ?? 0,
+    start,
+    end,
+    topLevel: parent === walk.tree,
+    // Filled in after the walk: a reference may come after its definition.
+    referenced: false,
+  });
+}
+
+function recordCodeFence(walk: DocumentWalk, code: Code): void {
+  const start = code.position?.start.offset;
+  if (start === undefined) {
+    return;
+  }
+  // mdast has no fenced/indented flag on `code`, but the node's start offset lands on the
+  // first fence character for a fenced block (past any 1-3 space indent and past `>` or list
+  // markers of a container) and on the indentation itself for an indented block. So the byte
+  // there decides it, without re-scanning the block.
+  const first = walk.content[start];
+  if (first !== "`" && first !== "~") {
+    return;
+  }
+  walk.codeFences.push({
+    language: code.lang ?? "",
+    line: code.position?.start.line ?? 0,
+    column: code.position?.start.column ?? 0,
+  });
+}
+
+function recordText(
+  walk: DocumentWalk,
+  textNode: Text,
+  parent: Parents | undefined,
+): void {
+  walk.imports.push(...extractImports(textNode));
+  const start = textNode.position?.start.offset;
+  const end = textNode.position?.end.offset;
+  if (start === undefined || end === undefined) {
+    return;
+  }
+  walk.literalBrackets.push(...findUnescapedBrackets(walk.content, start, end));
+  if (
+    !walk.referenceLabelText.has(textNode) &&
+    !(parent?.type === "link" && isAutolink(parent, walk.content)) &&
+    normalizeLineEndings(walk.content.slice(start, end)) ===
+      normalizeLineEndings(textNode.value)
+  ) {
+    const headingSlug = walk.headingSlugByText.get(textNode);
+    walk.textSpans.push(
+      headingSlug === undefined ? { start, end } : { start, end, headingSlug },
+    );
+  }
 }

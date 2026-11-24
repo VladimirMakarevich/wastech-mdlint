@@ -149,7 +149,7 @@ export async function reviewBranch(
         : headBlobs.get(configPath);
     config = {
       path: configPath,
-      status: base === undefined ? "A" : head === undefined ? "D" : "M",
+      status: configChangeStatus(base, head),
       diff: diffText(base ?? "", head ?? ""),
       ...(base === undefined ? {} : { baseText: base }),
       ...(head === undefined ? {} : { headText: head }),
@@ -157,6 +157,18 @@ export async function reviewBranch(
   }
 
   return { set, documents: reviews, config };
+}
+
+// The config's change from its text at each end: absent at the base means added, absent at the head
+// means deleted, present at both means modified.
+function configChangeStatus(
+  base: string | undefined,
+  head: string | undefined,
+): ReviewedConfig["status"] {
+  if (base === undefined) {
+    return "A";
+  }
+  return head === undefined ? "D" : "M";
 }
 
 async function readConfigText(
@@ -220,11 +232,17 @@ export async function branchContext(params: {
     worktree.config === undefined
       ? disk.configuration
       : configurationFrom(worktree.config.baseText, "base");
-  const headConfiguration = review.set.worktree
-    ? disk.configuration
-    : review.config === undefined
-      ? baseConfiguration
-      : configurationFrom(review.config.headText, "last commit");
+  let headConfiguration: LoadedConfiguration;
+  if (review.set.worktree) {
+    headConfiguration = disk.configuration;
+  } else if (review.config === undefined) {
+    headConfiguration = baseConfiguration;
+  } else {
+    headConfiguration = configurationFrom(
+      review.config.headText,
+      "last commit",
+    );
+  }
 
   const baseDocuments = replaceDocuments(
     new Map(disk.documents),
@@ -309,16 +327,18 @@ async function linkedCodeTexts(
     if (baseText === undefined) {
       continue;
     }
-    const headText =
-      change.status === "D"
-        ? ""
-        : headTexts !== undefined
-          ? (headTexts.get(change.path) ?? "")
-          : // A path git reported under the root, read only to compare it, never served.
-            await readFile(
-              path.join(rootDir, ...change.path.split("/")),
-              "utf8",
-            ).catch(() => "");
+    let headText: string;
+    if (change.status === "D") {
+      headText = "";
+    } else if (headTexts !== undefined) {
+      headText = headTexts.get(change.path) ?? "";
+    } else {
+      // A path git reported under the root, read only to compare it, never served.
+      headText = await readFile(
+        path.join(rootDir, ...change.path.split("/")),
+        "utf8",
+      ).catch(() => "");
+    }
     texts.set(change.path, { baseText, headText });
   }
   return texts;

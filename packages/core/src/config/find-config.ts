@@ -26,7 +26,7 @@ async function fileExists(filePath: string): Promise<boolean> {
  * repo at `$HOME`), not to hide a config that legitimately lives at the caller's own directory.
  *
  * This deliberately diverges from the CLI's own `findRepositoryRoot`/`findInstalledSchemaDir`
- * walks (`packages/cli/src/init-command.ts`), which reject `startDir === $HOME` too and accept
+ * walks (`packages/cli/src/init-opt-in.ts`), which reject `startDir === $HOME` too and accept
  * losing the rare project-rooted-at-`$HOME` case: those two only anchor a write-location fallback,
  * where being overly cautious is harmless. Here, treating a real config at `cwd === $HOME` as "not
  * found" would make `lint`/MCP silently ignore it and would make `init` treat a real existing config

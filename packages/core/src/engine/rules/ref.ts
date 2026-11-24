@@ -11,6 +11,8 @@ import type {
   ParsedDocument,
   ParsedLink,
   ParsedReferenceDefinition,
+  ParsedTable,
+  ParsedTableRow,
 } from "../../markdown/document-types.js";
 import { anchorResolves, caseOnlyAnchorMatches } from "../anchor-resolve.js";
 import {
@@ -126,6 +128,53 @@ type Ref002Failure = {
   edit?: TextEdit;
 };
 
+// The document a link's fragment must resolve in: the linking document itself for a same-file
+// anchor, the resolved target for a local file link. Undefined for any other link, and for a local
+// target that does not exist — missing target files are REF-001's concern.
+function anchorTargetOf(
+  link: ParsedLink,
+  context: RuleContext,
+  router: Parameters<typeof resolveTargetDoc>[3],
+): ParsedDocument | undefined {
+  const document = context.document!;
+  if (link.kind === "same-file-anchor") {
+    return document;
+  }
+  if (link.kind === "local-file") {
+    return resolveTargetDoc(
+      document.path,
+      filePart(link.rawTarget),
+      context,
+      router,
+    );
+  }
+  return undefined;
+}
+
+// The rewrite that repairs an unresolved fragment, or undefined when there is no single safe one.
+// With `ignoreCase` a case-only mismatch already resolved, so candidates are looked for only under
+// case-sensitive matching. The rewrite is made only where it is provably local: one candidate, a
+// known source range for the fragment, and source bytes equal to the decoded anchor (a
+// percent-encoded fragment would need re-encoding, which is a second guess).
+function caseOnlyFragmentEdit(
+  document: ParsedDocument,
+  link: ParsedLink,
+  target: ParsedDocument,
+): TextEdit | undefined {
+  const anchor = link.anchor ?? "";
+  const candidates = caseOnlyAnchorMatches(target, anchor);
+  const range = link.fragmentRange;
+  if (
+    candidates.length !== 1 ||
+    range === undefined ||
+    document.content.slice(range.start, range.end) !== anchor ||
+    !DESTINATION_SAFE_FRAGMENT.test(candidates[0]!)
+  ) {
+    return undefined;
+  }
+  return { start: range.start, end: range.end, newText: candidates[0]! };
+}
+
 // The one evaluation REF-002's check and fix both run, so `--fix` can never rewrite a fragment the
 // report did not mark fixable, and a fixable finding is always one `--fix` repairs.
 function ref002Failures(
@@ -148,20 +197,8 @@ function ref002Failures(
       continue;
     }
 
-    let target: ParsedDocument | undefined;
-    if (link.kind === "same-file-anchor") {
-      target = document;
-    } else if (link.kind === "local-file") {
-      target = resolveTargetDoc(
-        document.path,
-        filePart(link.rawTarget),
-        context,
-        router,
-      );
-      if (target === undefined) {
-        continue;
-      }
-    } else {
+    const target = anchorTargetOf(link, context, router);
+    if (target === undefined) {
       continue;
     }
 
@@ -171,30 +208,9 @@ function ref002Failures(
       continue;
     }
 
-    // With `ignoreCase` a case-only mismatch already resolved above, so candidates are looked for
-    // only under case-sensitive matching. The rewrite is made only where it is provably local: one
-    // candidate, a known source range for the fragment, and source bytes equal to the decoded
-    // anchor (a percent-encoded fragment would need re-encoding, which is a second guess).
-    const candidates = caseOnlyAnchorMatches(target, link.anchor);
-    const range = link.fragmentRange;
-    const fixable =
-      candidates.length === 1 &&
-      range !== undefined &&
-      document.content.slice(range.start, range.end) === link.anchor &&
-      DESTINATION_SAFE_FRAGMENT.test(candidates[0]!);
-
+    const edit = caseOnlyFragmentEdit(document, link, target);
     failures.push(
-      fixable
-        ? {
-            link,
-            target,
-            edit: {
-              start: range.start,
-              end: range.end,
-              newText: candidates[0]!,
-            },
-          }
-        : { link, target },
+      edit === undefined ? { link, target } : { link, target, edit },
     );
   }
 
@@ -309,6 +325,59 @@ function zoneOf(relPath: string, zonesDir: string): string | undefined {
   return parts.length >= 2 ? parts[0] : undefined;
 }
 
+// Declared dependency zones = zone names appearing in any Dependencies-section body of a file in
+// the source zone.
+function declaredZones(
+  context: RuleContext,
+  sourceZone: string,
+  zonesDir: string,
+  dependencyHeading: string,
+): Set<string> {
+  const zoneMentionRegexes = zoneMentionPatterns(
+    context.projectFiles ?? [],
+    zonesDir,
+  );
+  const declared = new Set<string>();
+  for (const other of context.documents!.values()) {
+    if (zoneOf(other.path, zonesDir) !== sourceZone) {
+      continue;
+    }
+    for (const heading of other.headings) {
+      if (heading.text !== dependencyHeading) {
+        continue;
+      }
+      const body = extractSectionBody(other.content, other.headings, heading);
+      for (const [zone, zoneRegex] of zoneMentionRegexes) {
+        if (zoneRegex.test(body)) {
+          declared.add(zone);
+        }
+      }
+    }
+  }
+  return declared;
+}
+
+// Compiled once per zone (guarded by `.has`), not once per file that shares that zone or per
+// heading/document that scans it — `zone` is an arbitrary directory name, so it must be escaped
+// before it becomes regex source (unescaped interpolation crashed on names like "c++"
+// and silently mismatched on names like "node.js").
+function zoneMentionPatterns(
+  projectFiles: readonly string[],
+  zonesDir: string,
+): Map<string, RegExp> {
+  const zoneMentionRegexes = new Map<string, RegExp>();
+  for (const relPath of projectFiles) {
+    const zone = zoneOf(relPath, zonesDir);
+    if (zone !== undefined && !zoneMentionRegexes.has(zone)) {
+      zoneMentionRegexes.set(
+        zone,
+        new RegExp(`(^|[^A-Za-z0-9_-])${escapeRegExp(zone)}([^A-Za-z0-9_-]|$)`),
+      );
+    }
+  }
+  return zoneMentionRegexes;
+}
+
 // REF-004 — cross-zone links must be declared in the source zone's Dependencies section. Document
 // scope, but reads the corpus to learn zones + declarations. The rule as specified was ambiguous
 // about whether a declaration is per-zone or per-document; per-zone is the reading implemented here.
@@ -337,42 +406,12 @@ export const ref004: RuleDefinition = defineRule({
     }
 
     const dependencyHeading = options.dependencySection ?? "Dependencies";
-    // Compiled once per zone (guarded by `.has`), not once per file that shares that zone or per
-    // heading/document that scans it — `zone` is an arbitrary directory name, so it must be escaped
-    // before it becomes regex source (unescaped interpolation crashed on names like "c++"
-    // and silently mismatched on names like "node.js").
-    const zoneMentionRegexes = new Map<string, RegExp>();
-    for (const relPath of context.projectFiles ?? []) {
-      const zone = zoneOf(relPath, options.zonesDir);
-      if (zone !== undefined && !zoneMentionRegexes.has(zone)) {
-        zoneMentionRegexes.set(
-          zone,
-          new RegExp(
-            `(^|[^A-Za-z0-9_-])${escapeRegExp(zone)}([^A-Za-z0-9_-]|$)`,
-          ),
-        );
-      }
-    }
-
-    // Declared dependency zones = zone names appearing in any Dependencies-section body of a file in
-    // the source zone.
-    const declared = new Set<string>();
-    for (const other of context.documents!.values()) {
-      if (zoneOf(other.path, options.zonesDir) !== sourceZone) {
-        continue;
-      }
-      for (const heading of other.headings) {
-        if (heading.text !== dependencyHeading) {
-          continue;
-        }
-        const body = extractSectionBody(other.content, other.headings, heading);
-        for (const [zone, zoneRegex] of zoneMentionRegexes) {
-          if (zoneRegex.test(body)) {
-            declared.add(zone);
-          }
-        }
-      }
-    }
+    const declared = declaredZones(
+      context,
+      sourceZone,
+      options.zonesDir,
+      dependencyHeading,
+    );
 
     for (const link of document.links) {
       if (link.kind !== "local-file") {
@@ -488,6 +527,94 @@ export const ref005: RuleDefinition = defineRule({
   },
 });
 
+type Ref006Options = {
+  stabilityColumn: string;
+  stabilityOrder: string[];
+  definitions: string[];
+  references: string[];
+  idColumn: string;
+  idPattern?: string;
+};
+
+// The tables of a document that carry both the id and the stability column.
+function stabilityTables(
+  document: ParsedDocument,
+  options: Ref006Options,
+): ParsedTable[] {
+  return document.tables.filter(
+    (table) =>
+      table.headers.includes(options.idColumn) &&
+      table.headers.includes(options.stabilityColumn),
+  );
+}
+
+// Build id → stability from definition tables.
+function collectDefinitionStability(
+  context: RuleContext,
+  options: Ref006Options,
+): Map<string, string> {
+  const definitionStability = new Map<string, string>();
+  for (const document of context.documents!.values()) {
+    if (!matchesConfigGlob(document.path, options.definitions)) {
+      continue;
+    }
+    for (const table of stabilityTables(document, options)) {
+      for (const row of table.rows) {
+        const id = (row.cells[options.idColumn] ?? "").trim();
+        const stability = (row.cells[options.stabilityColumn] ?? "").trim();
+        if (id.length > 0 && stability.length > 0) {
+          definitionStability.set(id, stability);
+        }
+      }
+    }
+  }
+  return definitionStability;
+}
+
+// Report every id one reference row depends on whose stability ranks below the row's own. A row
+// whose own stability is not in `stabilityOrder` is not judged at all.
+function reportLessStableDependencies(
+  context: RuleContext,
+  params: {
+    document: ParsedDocument;
+    row: ParsedTableRow;
+    options: Ref006Options;
+    rank: Map<string, number>;
+    idRegex: RegExp;
+    definitionStability: Map<string, string>;
+  },
+): void {
+  const { document, row, options, rank, idRegex, definitionStability } = params;
+  const referencerStability = (row.cells[options.stabilityColumn] ?? "").trim();
+  const referencerRank = rank.get(referencerStability);
+  if (referencerRank === undefined) {
+    return;
+  }
+  const referencedIds = (row.cells[options.idColumn] ?? "")
+    .split(/[\s,]+/)
+    .filter((token) => token.length > 0 && idRegex.test(token));
+
+  for (const referencedId of referencedIds) {
+    const referencedStability = definitionStability.get(referencedId);
+    const referencedRank =
+      referencedStability === undefined
+        ? undefined
+        : rank.get(referencedStability);
+    if (referencedRank !== undefined && referencedRank < referencerRank) {
+      context.report({
+        message: `Depends on "${referencedId}" (stability "${referencedStability}") which is less stable than this entry (stability "${referencerStability}").`,
+        line: row.line,
+        filePath: document.path,
+        data: {
+          referencedId,
+          referencedStability,
+          referencerStability,
+        },
+      });
+    }
+  }
+}
+
 // REF-006 — stability consistency: a row must not depend on a less-stable entity. Reference rows
 // carry the referenced ID (idColumn) and the referencer's own stability (stabilityColumn); the
 // referenced entity's stability comes from the definition tables.
@@ -516,79 +643,24 @@ export const ref006: RuleDefinition = defineRule({
     const rank = new Map(
       options.stabilityOrder.map((value, index) => [value, index]),
     );
-    const idPattern = options.idPattern ?? "^.+$";
-    const definitionStability = new Map<string, string>();
-
-    // Build id → stability from definition tables.
-    for (const document of context.documents!.values()) {
-      if (!matchesConfigGlob(document.path, options.definitions)) {
-        continue;
-      }
-      for (const table of document.tables) {
-        if (
-          !table.headers.includes(options.idColumn) ||
-          !table.headers.includes(options.stabilityColumn)
-        ) {
-          continue;
-        }
-        for (const row of table.rows) {
-          const id = (row.cells[options.idColumn] ?? "").trim();
-          const stability = (row.cells[options.stabilityColumn] ?? "").trim();
-          if (id.length > 0 && stability.length > 0) {
-            definitionStability.set(id, stability);
-          }
-        }
-      }
-    }
-
-    const idRegex = new RegExp(idPattern);
+    const definitionStability = collectDefinitionStability(context, options);
+    const idRegex = new RegExp(options.idPattern ?? "^.+$");
 
     // Reference rows: compare each referenced entity's stability to the referencer's.
     for (const document of context.documents!.values()) {
       if (!matchesConfigGlob(document.path, options.references)) {
         continue;
       }
-      for (const table of document.tables) {
-        if (
-          !table.headers.includes(options.idColumn) ||
-          !table.headers.includes(options.stabilityColumn)
-        ) {
-          continue;
-        }
+      for (const table of stabilityTables(document, options)) {
         for (const row of table.rows) {
-          const referencerStability = (
-            row.cells[options.stabilityColumn] ?? ""
-          ).trim();
-          const referencerRank = rank.get(referencerStability);
-          if (referencerRank === undefined) {
-            continue;
-          }
-          const referencedIds = (row.cells[options.idColumn] ?? "")
-            .split(/[\s,]+/)
-            .filter((token) => token.length > 0 && idRegex.test(token));
-
-          for (const referencedId of referencedIds) {
-            const referencedStability = definitionStability.get(referencedId);
-            const referencedRank =
-              referencedStability === undefined
-                ? undefined
-                : rank.get(referencedStability);
-            if (
-              referencedRank !== undefined &&
-              referencedRank < referencerRank
-            ) {
-              context.report({
-                message: `Depends on "${referencedId}" (stability "${referencedStability}") which is less stable than this entry (stability "${referencerStability}").`,
-                line: row.line,
-                filePath: document.path,
-                data: {
-                  referencedId,
-                  referencedStability,
-                  referencerStability,
-                },
-              });
-            }
-          }
+          reportLessStableDependencies(context, {
+            document,
+            row,
+            options,
+            rank,
+            idRegex,
+            definitionStability,
+          });
         }
       }
     }
