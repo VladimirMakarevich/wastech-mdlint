@@ -44,7 +44,7 @@ export type ViewerOptions = {
   // The branch, tag or commit the Changes section compares with; the detected base branch when
   // omitted.
   base?: string;
-  // The environment git runs with — the process's own unless a test isolates it from the machine's
+  // The environment git runs with - the process's own unless a test isolates it from the machine's
   // git configuration.
   gitEnv?: NodeJS.ProcessEnv;
   // Where review marks are kept: the platform's state directory unless `--state-dir` names another.
@@ -234,8 +234,8 @@ async function applyChanges(
   if (change.changed.length === 0 && !change.structural) {
     return;
   }
-  // Every open page answers this event — a document page by reloading and waiting for its review,
-  // every other page's script by asking for the changes — so the review they will all join is
+  // Every open page answers this event - a document page by reloading and waiting for its review,
+  // every other page's script by asking for the changes - so the review they will all join is
   // started before they ask, and its context after it.
   if (changes !== undefined && events.size > 0) {
     changes.warm();

@@ -38,7 +38,7 @@ function targetResolves(relPath: string, context: ReferenceContext): boolean {
 // and re-resolving the rest would do for a link that only resolves via an excluded candidate. Under
 // a router the list is one target expressed several ways, so "any" is also the honest reading.
 //
-// The whole list goes to `matchesConfigGlob` in one call — that matcher is ordered and negation-aware,
+// The whole list goes to `matchesConfigGlob` in one call - that matcher is ordered and negation-aware,
 // matcher, so evaluating patterns one at a time would lose a leading `!`'s subtraction.
 function targetExcluded(
   candidates: readonly string[],
@@ -55,7 +55,7 @@ export type LinkResolvesOptions = {
   siteRouter?: SiteRouterSettings;
 };
 
-// linkResolves — relative links resolve to a real file (REF-001). Relative links resolve against the
+// linkResolves - relative links resolve to a real file (REF-001). Relative links resolve against the
 // source file; root-relative links go through the site router (same-locale first). Same-file anchors
 // and non-local schemes are out of scope here (REF-002 validates anchors).
 export function linkResolves(
@@ -101,7 +101,7 @@ export function linkResolves(
 
 export type ImageResolvesOptions = { exclude?: string[] };
 
-// imageResolves — relative image targets exist on disk (REF-003). External images (http/data) and
+// imageResolves - relative image targets exist on disk (REF-003). External images (http/data) and
 // excluded targets are skipped. Images are usually not in the Markdown corpus, so this leans on
 // existsSync.
 export function imageResolves(
@@ -121,7 +121,7 @@ export function imageResolves(
 
     // Deliberately router-blind, and the same shared helper the link path uses: a site
     // router maps a URL to *Markdown source* files, so routing an image target would only ever
-    // offer `.md`/`.mdx` candidates for an asset — manufacturing REF-003 findings rather than
+    // offer `.md`/`.mdx` candidates for an asset - manufacturing REF-003 findings rather than
     // resolving them. Root-relative image targets resolve against the repository root, which is
     // is also what the rule's documented behavior promises.
     const candidates = resolveTargetCandidates(document.path, target);

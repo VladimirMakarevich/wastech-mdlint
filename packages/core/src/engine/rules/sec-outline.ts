@@ -85,8 +85,8 @@ function chooseExpected(
 }
 
 // Simulates the outline as an NFA over template positions rather than backtracking, so adjacent
-// wildcards (`* *`, `+ ?`) cost polynomial time — each heading touches at most one state per
-// template position, plus sorting that state set — instead of an exponential search. Only the
+// wildcards (`* *`, `+ ?`) cost polynomial time - each heading touches at most one state per
+// template position, plus sorting that state set - instead of an exponential search. Only the
 // first divergence is returned: once the outline is broken, which template position later
 // headings "should" line up with is ambiguous, and guessing would produce misleading findings.
 export function matchOutline(

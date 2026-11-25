@@ -1,6 +1,6 @@
 // What a page shows between a click that leaves it and the next page appearing. Moving between pages
-// is a full page load, and until the next one can be drawn the old one stays on screen unchanged — on
-// the Changes page or the dashboard for a quarter to half a second — with nothing to say the click
+// is a full page load, and until the next one can be drawn the old one stays on screen unchanged - on
+// the Changes page or the dashboard for a quarter to half a second - with nothing to say the click
 // was taken.
 //
 // So the click answers at once with where it leads: the header's section the next page belongs to
@@ -12,17 +12,17 @@
 
 // How long the server may take before the bar shows. This page is gone the moment the next one's
 // answer arrives, its bar with it, and the frame left on screen until the next page is drawn is its
-// last; so the bar is for a server that keeps the reader waiting — a review computed afresh, a large
-// repository — and never for the moment a document, or a section fetched as the pointer rested on
+// last; so the bar is for a server that keeps the reader waiting - a review computed afresh, a large
+// repository - and never for the moment a document, or a section fetched as the pointer rested on
 // it, takes.
 const SLOW_AFTER_MS = 200;
-// A navigation the browser drops without a word — stopped with Esc, or answered with a file to
-// save — leaves this page standing; after this long it stops saying it is leaving.
+// A navigation the browser drops without a word - stopped with Esc, or answered with a file to
+// save - leaves this page standing; after this long it stops saying it is leaving.
 const GIVE_UP_AFTER_MS = 15_000;
 
 // The Navigation API's `navigate` event, which this TypeScript's DOM types do not describe yet: only
-// what is read here. Where the browser has it, it reports every way of leaving the page — a link, a
-// form, a script setting `location` — with where it leads.
+// what is read here. Where the browser has it, it reports every way of leaving the page - a link, a
+// form, a script setting `location` - with where it leads.
 type NavigateEvent = Event & {
   destination: { url: string; sameDocument: boolean };
   hashChange: boolean;
@@ -32,8 +32,8 @@ type NavigateEvent = Event & {
 export function initNavigationFeedback(): void {
   let slow: number | undefined;
   let giveUp: number | undefined;
-  // Where the page is going, so the same departure reported twice — a link this script followed,
-  // and the navigation that following it starts — is shown once.
+  // Where the page is going, so the same departure reported twice - a link this script followed,
+  // and the navigation that following it starts - is shown once.
   let pending: string | undefined;
   const reset = (): void => {
     window.clearTimeout(slow);
@@ -64,7 +64,7 @@ export function initNavigationFeedback(): void {
     }
   });
   // A link is followed only once the page has drawn where it leads. Followed at once, the next page
-  // — often fetched already as the pointer rested on the link — took this page's place before the
+  // - often fetched already as the pointer rested on the link - took this page's place before the
   // browser drew another frame of it, and the frame left on screen until the next page appeared was
   // the one from before the click. Listened for on the window, after every other listener, so a link
   // a script handles itself, such as the dashboard's column headers, is left to it.
@@ -79,7 +79,7 @@ export function initNavigationFeedback(): void {
       location.assign(url.href);
     });
   });
-  // Every other way of leaving — a form, a script setting `location` — where the browser reports it.
+  // Every other way of leaving - a form, a script setting `location` - where the browser reports it.
   const navigation = (window as Window & { navigation?: EventTarget })
     .navigation;
   navigation?.addEventListener("navigate", (event) => {

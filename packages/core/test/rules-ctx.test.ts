@@ -218,7 +218,7 @@ describe("CTX-003 glossary aliases", () => {
 // corpus that uses canonical terms everywhere: `No problems found.` and exit 0, with the rule inert
 // since whichever day the glossary file or a column header was renamed. Every way to get there is
 // now one error-severity finding attributed to the `glossary` option, naming the stage that came up
-// empty — and `error` specifically, because the default `--fail-on` is `error`, so a warning would
+// empty - and `error` specifically, because the default `--fail-on` is `error`, so a warning would
 // print and still exit 0.
 describe("CTX-003 reports a configuration it cannot honour", () => {
   const WORKING_GLOSSARY =
@@ -604,7 +604,7 @@ describe("CTX file scope (exclude)", () => {
         "docs/a.md",
         "drafts/b.md",
       ]);
-      // The unscoped shape — `exclude` with no `files` beside it to carry the filtering.
+      // The unscoped shape - `exclude` with no `files` beside it to carry the filtering.
       expect(
         await reportedFiles(
           cwd,
@@ -763,7 +763,7 @@ describe("CTX-003 --fix", () => {
   // an alias. Judged one at a time both look fixable, and a second `--fix` would then rewrite the
   // result again; judged as one span, neither is fixed and the file never changes.
   // In `[gql]` and `[gql][]` the text is also the label that finds `[gql]: …`, so replacing it would
-  // leave the link pointing nowhere and the definition unused — which REF-009 would then delete,
+  // leave the link pointing nowhere and the definition unused - which REF-009 would then delete,
   // so a second `--fix` would change the file again. A full `[the gql][gql]` keeps its label apart
   // from its text, and that text is fixed.
   it("leaves shortcut and collapsed reference labels alone, also beside REF-009 on a second run", async () => {
@@ -774,8 +774,8 @@ describe("CTX-003 --fix", () => {
     const rules = [rule("CTX-003", OPTIONS), rule("REF-009")];
     const input = { cwd, config: { rules: [] }, rules, settings: {} };
 
-    // Four alias occurrences on line 1 — the shortcut label, the collapsed label, the full
-    // reference's text and its label — and one in the definition. Only the full reference's text is
+    // Four alias occurrences on line 1 - the shortcut label, the collapsed label, the full
+    // reference's text and its label - and one in the definition. Only the full reference's text is
     // fixable. Counted rather than listed: findings on one line with one message carry no column, so
     // their relative order is not part of the contract.
     const before = await lint(cwd, rules);
@@ -860,7 +860,7 @@ describe("CTX-003 --fix", () => {
 
   // `[gql]` with no `[gql]: …` definition renders as plain text, but `[GraphQL]` would become a link
   // to the `[GraphQL]: …` definition. So an alias between literal brackets is never rewritten,
-  // with or without REF-009 beside it — and with it, the definition stays unused, so REF-009 is
+  // with or without REF-009 beside it - and with it, the definition stays unused, so REF-009 is
   // the one that removes it, once.
   it.each([
     ["alone", false],
@@ -924,7 +924,7 @@ describe("CTX-003 --fix", () => {
   });
 
   // REF-002's fix turns `#GQL` into `#gql` in the same run, so the `# gql` heading becomes a link
-  // target even though no fragment matched it exactly beforehand — and the graph has no edge for a
+  // target even though no fragment matched it exactly beforehand - and the graph has no edge for a
   // fragment that did not resolve. Renaming the heading in that run would break the link REF-002
   // just repaired, from the same file and from another.
   it("leaves a heading alone when REF-002 is fixing a case-only link to it in the same run", async () => {

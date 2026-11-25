@@ -3,7 +3,7 @@ import type { PrimitiveFinding } from "./types.js";
 
 export type AllCheckedOptions = { section?: string };
 
-// allChecked — every task-list item must be checked (CTX-002). With `section`, only items under that
+// allChecked - every task-list item must be checked (CTX-002). With `section`, only items under that
 // section are considered.
 export function allChecked(
   document: ParsedDocument,

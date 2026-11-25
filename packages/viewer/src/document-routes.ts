@@ -42,7 +42,7 @@ import {
   type ViewerContext,
 } from "./viewer-context.js";
 
-// A document's page in every view it has — rendered, its changes marked, its diff, blame — and the
+// A document's page in every view it has - rendered, its changes marked, its diff, blame - and the
 // files it links to, which are served beside it.
 
 // Enough of a document's history to see who has been changing it lately, without paging through it.
@@ -517,7 +517,7 @@ export class DocumentRoutes {
   }
 }
 
-// A linked file that is not an image, as highlighted source — or a line saying why it is not shown.
+// A linked file that is not an image, as highlighted source - or a line saying why it is not shown.
 async function sourceArticle(
   relPath: string,
   absolutePath: string,

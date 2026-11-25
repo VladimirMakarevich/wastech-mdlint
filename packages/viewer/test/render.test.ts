@@ -120,7 +120,7 @@ describe("links", () => {
 
 describe("code blocks", () => {
   // Every highlighted block carries the button that copies it, beside the block rather than inside
-  // it, so it stays in the corner while the code scrolls sideways — in a list item as well as at the
+  // it, so it stays in the corner while the code scrolls sideways - in a list item as well as at the
   // top level. Diagrams and charts are drawings, not code to paste, and get none.
   it("gives every highlighted block a copy button, and diagrams none", async () => {
     const nested = await renderText(

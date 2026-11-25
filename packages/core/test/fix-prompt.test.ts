@@ -116,8 +116,8 @@ describe("buildFindingPrompt", () => {
     );
   });
 
-  // An agent told to shorten a file must meet the same floor the agent rule sets — nothing is cut to
-  // fit — so the policy text is the rule's own, not a paraphrase that could drift from it.
+  // An agent told to shorten a file must meet the same floor the agent rule sets - nothing is cut to
+  // fit - so the policy text is the rule's own, not a paraphrase that could drift from it.
   it("asks for compressing under the agent rule's own floor, with the target to reach", () => {
     const text = prompt({ strategy: "compress" });
     expect(text.startsWith("# Compress `docs/tasks/audit.md`\n")).toBe(true);
@@ -146,7 +146,7 @@ describe("buildFindingPrompt", () => {
     );
   });
 
-  // The obvious edit — an override with only the exceeded metric, appended at the end — is wrong
+  // The obvious edit - an override with only the exceeded metric, appended at the end - is wrong
   // twice: a later override never applies while a broader one matches first, and a metric it leaves
   // out falls back to the top level rather than to the broader override.
   it("raises a SIZE-001 budget with an exact-path override placed first and repeating every threshold", () => {
@@ -158,13 +158,13 @@ describe("buildFindingPrompt", () => {
       "The user has decided that `docs/tasks/audit.md` keeps its size",
     );
     expect(text).toContain(
-      "- `bytes`: fails above 98304 — from the `overrides` entry with pattern `docs/tasks/**`.",
+      "- `bytes`: fails above 98304 - from the `overrides` entry with pattern `docs/tasks/**`.",
     );
     expect(text).toContain(
-      "- `lines`: warns above 800 — from the top-level `lines` option.",
+      "- `lines`: warns above 800 - from the top-level `lines` option.",
     );
     expect(text).toContain(
-      "- `tokens`: warns above 16000, fails above 24000 — from the `overrides` entry with pattern `docs/tasks/**`.",
+      "- `tokens`: warns above 16000, fails above 24000 - from the `overrides` entry with pattern `docs/tasks/**`.",
     );
     expect(text).toContain('`"pattern": "docs/tasks/audit.md"`');
     expect(text).toContain(
@@ -189,7 +189,7 @@ describe("buildFindingPrompt", () => {
       ],
     });
     expect(text).toContain(
-      "- `tokens`: warns above 16000, fails above 24000 — from the `overrides` entry with pattern `docs/tasks/**`.",
+      "- `tokens`: warns above 16000, fails above 24000 - from the `overrides` entry with pattern `docs/tasks/**`.",
     );
     expect(text).not.toContain("warns above 30000");
     expect(
@@ -260,7 +260,7 @@ describe("buildFindingPrompt", () => {
     expect(text).toContain(
       'add a second `LLM-001` entry with `"entrypoints": ["./CLAUDE.md"]`',
     );
-    expect(text).toContain("above 10450 — for example 12000");
+    expect(text).toContain("above 10450 - for example 12000");
     expect(text).toContain('add `"!./CLAUDE.md"` there when a glob matches it');
   });
 
@@ -280,7 +280,7 @@ describe("buildFindingPrompt", () => {
         ],
       });
       expect(text, entrypoints.join()).toContain(
-        "raise that entry's `maxTokensPerEntrypoint` from 10000 to above 10450 — for example 12000",
+        "raise that entry's `maxTokensPerEntrypoint` from 10000 to above 10450 - for example 12000",
       );
       expect(text, entrypoints.join()).not.toContain("add a second `LLM-001`");
     }

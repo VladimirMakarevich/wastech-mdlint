@@ -14,7 +14,7 @@ import type { ContextGraph } from "./context-graph-types.js";
 
 // Coverage signal: report graph size plus on-disk Markdown files that are linked-to from
 // the corpus but fall outside it (excluded from `include`, so they never became graph nodes). This
-// re-scans raw link/image/import targets rather than reusing `ContextGraph` edges — the graph only
+// re-scans raw link/image/import targets rather than reusing `ContextGraph` edges - the graph only
 // ever materializes edges to *corpus* nodes (architecture invariant: `ContextGraph` owns adjacency;
 // coverage widens the on-disk existence check the graph deliberately skips, it does not add a
 // parallel traversal).
@@ -74,9 +74,9 @@ function collectRawTargets(document: ParsedDocument): RawTarget[] {
  * Compute the coverage signal: graph node/edge counts plus the deduped, sorted list of on-disk
  * Markdown files that are linked-to but outside the analyzed corpus. Two hosts consume it: the CLI
  * `graph` command in both its formats and the MCP `context-graph` tool's `summary` branch
- * — each calling this directly rather than through the other.
+ * - each calling this directly rather than through the other.
  *
- * "Markdown file" is `MARKDOWN_EXTENSIONS` (`discovery/markdown-extensions.ts`) — the same set the
+ * "Markdown file" is `MARKDOWN_EXTENSIONS` (`discovery/markdown-extensions.ts`) - the same set the
  * repo scan walks, so a file this reports is one a proposed `include` could actually admit.
  */
 export function computeGraphCoverage(

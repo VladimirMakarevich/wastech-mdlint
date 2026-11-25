@@ -18,7 +18,7 @@ assertBuilt(
 );
 
 // A link to a folder is one REF-001 accepts whenever the folder exists. The viewer opened such a link
-// only on the folder's README and marked every other one missing — a release-notes folder holding one
+// only on the folder's README and marked every other one missing - a release-notes folder holding one
 // subfolder per version, and no README, read as a broken link on a page the linter called clean.
 // These pin the other answer: a folder that holds documents opens as a listing of them.
 

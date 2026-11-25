@@ -53,7 +53,7 @@ describe("handleLintFiles", () => {
 
   // The default `exclude` is core's, not the CLI's: both hosts reach the corpus through
   // `resolveCorpusScope`, so an agent asking this tool about a repository with a dependency tree gets
-  // the same pruned corpus a `lint` run would — and does not spend its context on `node_modules`.
+  // the same pruned corpus a `lint` run would - and does not spend its context on `node_modules`.
   it("inherits the lint-time default exclude with no config present", async () => {
     const dir = await makeTempDir("mcp-lf-default-exclude-");
     await mkdir(path.join(dir, "docs"), { recursive: true });
@@ -103,8 +103,8 @@ describe("handleLintFiles", () => {
 
   // @boundary-guard host-parity
   //
-  // Every MCP success carries two documents — a human `content` block and
-  // `structuredContent` — and until now nothing checked that the first renders the second. The shared
+  // Every MCP success carries two documents - a human `content` block and
+  // `structuredContent` - and until now nothing checked that the first renders the second. The shared
   // readers in `core/test/support/output-parity.ts` parse the text back into rows and restate the
   // location rule, so this is two formulations of the same findings rather than one helper agreeing
   // with itself. The CLI twin lives in `packages/cli/test/lint.e2e.test.ts`; the cross-host leg, where
@@ -181,7 +181,7 @@ describe("handleLintFiles", () => {
   // error occurred.", dropping the errno and the path that are the entire actionable content.
   //
   // Root ignores directory permissions and Windows has no equivalent model, so the fault only exists
-  // for an unprivileged POSIX user — the same precondition, and the same guard, as the CLI's
+  // for an unprivileged POSIX user - the same precondition, and the same guard, as the CLI's
   // write-failure tests. The portable half of this behavior is pinned by synthetic errno cases in
   // `tool-response.test.ts`, which run everywhere.
   it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
@@ -204,9 +204,9 @@ describe("handleLintFiles", () => {
         };
         expect(error.code).toBe("OPERATIONAL_ERROR");
         expect(error.message).toBe("Operational error: EACCES on locked");
-        // No hint by design — the message already carries the whole remedy-bearing content.
+        // No hint by design - the message already carries the whole remedy-bearing content.
         expect(error.hint).toBeUndefined();
-        // The absolute base must not survive anywhere in an `OPERATIONAL_ERROR` payload — the errno's
+        // The absolute base must not survive anywhere in an `OPERATIONAL_ERROR` payload - the errno's
         // path is rendered relative to it. (The `INVALID_INPUT` rejection is the deliberate
         // exception: there the `cwd` is itself the broken thing and is named absolutely.)
         expect(JSON.stringify(result)).not.toContain(dir);

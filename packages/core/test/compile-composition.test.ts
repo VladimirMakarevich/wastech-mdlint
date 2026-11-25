@@ -6,7 +6,7 @@ import { synthesize, type SynthesizeInput } from "../src/compile/synthesize.js";
 
 // What this file measures that no other compile test can: how the artifact's composition responds to
 // the corpus *growing*. A share measured at one corpus size is the same number whether a section is
-// capped or merely small there, which is how the bounding came to be inverted — the dependency block
+// capped or merely small there, which is how the bounding came to be inverted - the dependency block
 // was capped and stated its caps while the inventory table and the reading order grew one entry per
 // document with nothing said about it. At 151 documents those two were 97% of an artifact whose whole
 // purpose is to be loaded into a context window whole, and roughly 20 000 tokens were projected at a
@@ -16,7 +16,7 @@ import { synthesize, type SynthesizeInput } from "../src/compile/synthesize.js";
 // corpus grows, or says in the artifact that it does not. A future section that starts scaling
 // silently fails here even if it looks small in the fixture it was written against.
 //
-// `synthesize` is pure, so this runs on hand-built inputs — no temp directory, no parse pass, and the
+// `synthesize` is pure, so this runs on hand-built inputs - no temp directory, no parse pass, and the
 // two corpus sizes cost microseconds rather than two 139-file materializations.
 
 const SMALL_CORPUS = 50;
@@ -81,7 +81,7 @@ function corpus(count: number): SynthesizeInput {
     documentPaths: paths,
     profiles,
     analysis: {
-      // The last two documents sit in a cycle, so the excluded list — the other uncapped block — is
+      // The last two documents sit in a cycle, so the excluded list - the other uncapped block - is
       // non-empty at both sizes and grows with the corpus rather than being vacuously equal.
       readingOrder: paths.slice(0, -2),
       excludedFromReadingOrder: paths.slice(2).reverse(),
@@ -169,7 +169,7 @@ describe("SKILL.md composition as the corpus grows", () => {
 
   it("accounts for essentially all of its own growth", () => {
     // The scale-free form of the claim. The artifact cannot promise a fixed orientation share at
-    // every corpus size — the reading order and the excluded set are complete by design and grow
+    // every corpus size - the reading order and the excluded set are complete by design and grow
     // forever, so any such floor is eventually false. What it can promise is that the growth is
     // *declared*: nearly every byte the corpus adds lands in a block that says it grows. The
     // remainder is the handful of bytes a wider document count adds to counts and disclosures.

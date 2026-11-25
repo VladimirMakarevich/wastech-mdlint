@@ -171,13 +171,13 @@ export const assertionSchema = z.discriminatedUnion("kind", [
 ]);
 
 // The **input** type, deliberately: `columnInSet.caseSensitive` carries a `.default()`, so `z.infer`
-// would make it a *required* property of every hand-written `columnInSet` assertion — breaking a
+// would make it a *required* property of every hand-written `columnInSet` assertion - breaking a
 // consumer that builds one as a literal, and contradicting `describe-rules.ts`, which is documented
 // as receiving entries that never passed through Zod. Reading a defaulted key off this type therefore
 // yields `boolean | undefined`, which every reader already handles (`?? DEFAULT_…`, or `=== false`).
 export type Assertion = z.input<typeof assertionSchema>;
 
-// The target collection a `kind` operates on — drives the custom rule's scope (columnUnique is the
+// The target collection a `kind` operates on - drives the custom rule's scope (columnUnique is the
 // only project-scoped kind) and lets custom-rule resolution validate the declared `target` against
 // the assert kind.
 export const ASSERTION_TARGETS = {
@@ -239,7 +239,7 @@ export function runAssertion(
       // Unscoped by construction: `custom.ts` dispatches the one project-scoped kind directly to
       // `columnUnique` with the rule's own `files`/`exclude` matcher, so this branch is only ever
       // reached by a caller that has no file scope to apply. A `fileMatches` option that could have
-      // carried one was removed — nothing ever passed it.
+      // carried one was removed - nothing ever passed it.
       return columnUnique(
         context,
         {

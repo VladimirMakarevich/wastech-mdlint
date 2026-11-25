@@ -1,5 +1,5 @@
-// Loaded in <head> as a classic, blocking script — like `tree-state.ts` after the tree, not a deferred
-// module — because it has to run before the first paint. Applied any later, a page whose reader chose
+// Loaded in <head> as a classic, blocking script - like `tree-state.ts` after the tree, not a deferred
+// module - because it has to run before the first paint. Applied any later, a page whose reader chose
 // dark would flash light on every navigation, and a widened side column would snap back to its
 // default width and then jump. It only reads what was stored; the header switch that writes the
 // theme lives in `theme-toggle.ts`, the column edge handles that write the widths in
@@ -32,7 +32,7 @@
     }
     // The reader's display settings, as the custom properties the panel in `display-settings.ts`
     // computed from them and stored beside them. This script cannot import that module, so it takes
-    // the finished values and sets only properties named like the panel's own — `--reader-…` — which
+    // the finished values and sets only properties named like the panel's own - `--reader-…` - which
     // the stylesheet reads with its defaults as fallbacks. The key and the name pattern are
     // `STORAGE_KEY` and `VARIABLE_NAME` in `display-settings-model.ts`, and a test holds them equal.
     const display = JSON.parse(

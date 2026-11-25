@@ -25,7 +25,7 @@ import { fileScopeShape, matchesFileScope } from "./scope.js";
 
 // Content-quality rules.
 
-// CTX-001 — no empty / placeholder sections (whole-body, case-insensitive).
+// CTX-001 - no empty / placeholder sections (whole-body, case-insensitive).
 export const ctx001: RuleDefinition = defineRule({
   metadata: {
     id: "CTX-001",
@@ -56,7 +56,7 @@ export const ctx001: RuleDefinition = defineRule({
   },
 });
 
-// CTX-002 — all checklist items checked.
+// CTX-002 - all checklist items checked.
 export const ctx002: RuleDefinition = defineRule({
   metadata: {
     id: "CTX-002",
@@ -85,7 +85,7 @@ export const ctx002: RuleDefinition = defineRule({
 // Match a term as a whole word (so "APIs" or "myapi" do not match "api"). Escapes regex-special
 // characters in the term. The trailing boundary is a lookahead, not a consumed group: `matchAll`
 // advances `lastIndex` past whatever a match consumes, so consuming the boundary character made
-// adjacent occurrences separated by exactly one character unreachable — "api api api" then
+// adjacent occurrences separated by exactly one character unreachable - "api api api" then
 // under-counted as 2.
 function wholeWordRegex(term: string): RegExp {
   const escaped = escapeRegExp(term);
@@ -184,7 +184,7 @@ function addTableAliases(
 }
 
 // The [start, end) offsets of `content` CTX-003 scans: the whole file, or the body of each section
-// named `section` — the lines after its heading up to the next heading of the same or a shallower
+// named `section` - the lines after its heading up to the next heading of the same or a shallower
 // depth, the same extent `extractSectionBody` gives. Offsets rather than an extracted body, so a
 // match is located in the source itself and can be both reported and rewritten. The `\r` of a CRLF
 // line stays in the scanned text; it is a non-word character to `wholeWordRegex`, exactly like the
@@ -253,9 +253,9 @@ function foldedLinkFragments(
 }
 
 // A term written only with letters, digits, spaces and `.,'’-/+`, opening and closing with a
-// letter or digit. Every other character can be Markdown syntax where it lands — `|` splits a
+// letter or digit. Every other character can be Markdown syntax where it lands - `|` splits a
 // table cell, `*`/`_`/`~` pair into emphasis, `[`, `]`, `<`, `` ` ``, `&` and `\` open links, HTML,
-// code, entities and escapes, `:` and `@` complete an autolink — so a canonical term containing one
+// code, entities and escapes, `:` and `@` complete an autolink - so a canonical term containing one
 // would write syntax into the source, and an alias containing one would remove it. The letter or
 // digit at each end matters too: whether an emphasis delimiter beside the term pairs depends on
 // whether the character next to it is punctuation. Both sides of a substitution must pass.
@@ -346,8 +346,8 @@ function tokenWithCanonical(content: string, match: AliasMatch): string {
 //
 // - It lies wholly inside one prose text span from the parse. Code spans and blocks, HTML, link
 //   and definition targets, autolinks and front matter are never such spans, and neither is the
-//   text of a shortcut `[label]` or collapsed `[label][]` reference — it is the label that finds the
-//   definition, so rewriting it would break the link — nor text written with escapes or entities,
+//   text of a shortcut `[label]` or collapsed `[label][]` reference - it is the label that finds the
+//   definition, so rewriting it would break the link - nor text written with escapes or entities,
 //   whose offsets would not survive the substitution.
 // - The substitution keeps every byte around it in the same parsed role (`keepsParsedRole`): the
 //   alias and the canonical term are plain text, and the match is not inside literal brackets or an
@@ -359,9 +359,9 @@ function tokenWithCanonical(content: string, match: AliasMatch): string {
 // - It wins overlap resolution within its span: the earliest start, then at the same start the
 //   longer alias, then the alphabetically earlier one. One rewrite per region per run.
 // - Its span passes as a whole. The span's winning replacements are applied together and the
-//   result is scanned again; if any alias now matches across or inside a replaced region — a
+//   result is scanned again; if any alias now matches across or inside a replaced region - a
 //   canonical that contains an alias, or replacements that together spell one (`foo baz` becoming
-//   `bar qux` when `bar qux` is itself an alias) — no match in that span is fixable. Judging the
+//   `bar qux` when `bar qux` is itself an alias) - no match in that span is fixable. Judging the
 //   span as a unit is what makes a second `--fix` a no-op: a rejected span is left byte-identical,
 //   so the next run sees the same text and decides the same way, and an accepted span afterwards
 //   holds no alias except ones withheld by the conditions above, which no accepted rewrite can
@@ -499,7 +499,7 @@ function spanCreatesAlias(
   );
 }
 
-// CTX-003 — glossary alias usage should use the canonical term (project). Builds alias→canonical
+// CTX-003 - glossary alias usage should use the canonical term (project). Builds alias→canonical
 // from a glossary table, then scans matched files' content for alias usage. Fixable: the alias
 // bytes are replaced by the canonical term, under the conditions `collectAliasMatches` lists. A
 // project rule fixes by being handed each document in turn, and the alias map it would rebuild for
@@ -527,7 +527,7 @@ export const ctx003: RuleDefinition = defineRule({
     // `aliasColumn` is optional in the schema but load-bearing at run time: with no alias column
     // there is no alias to look for, so the rule can never report anything. Answered before the
     // corpus walk because it is decidable from the options alone, and because it is the cause to
-    // name even when the glossary path is also wrong — fixing the path would not make this config
+    // name even when the glossary path is also wrong - fixing the path would not make this config
     // check anything.
     if (options.aliasColumn === undefined) {
       reportInertConfiguration(context, {
@@ -546,7 +546,7 @@ export const ctx003: RuleDefinition = defineRule({
 
     // An empty alias map used to be a bare `return`: a configured rule, inert, and green, with
     // nothing anywhere distinguishing "this corpus uses canonical terms" from "this rule never ran"
-    // — reachable by renaming the glossary file or a column header, neither of which invalidates
+    // - reachable by renaming the glossary file or a column header, neither of which invalidates
     // the config. All the ways to get here are reported as one error-severity finding attributed to
     // the `glossary` value, naming the stage that came up empty.
     //
@@ -556,7 +556,7 @@ export const ctx003: RuleDefinition = defineRule({
     // `reportInertConfiguration`, but the decision to use it does not: for those options an empty
     // match can be a legitimate state (a corpus with no definitions yet), whereas a glossary rule
     // with no glossary cannot be. Converting one means deciding, per rule, whether emptiness is a
-    // configuration mistake or a valid corpus — a judgment with its own tests, not a sweep.
+    // configuration mistake or a valid corpus - a judgment with its own tests, not a sweep.
     if (aliasToCanonical.size === 0) {
       reportInertConfiguration(context, {
         message: describeEmptyGlossary({
@@ -630,7 +630,7 @@ export const ctx003: RuleDefinition = defineRule({
   },
 });
 
-// Never flag the glossary itself — its alias column is where aliases are supposed to be written —
+// Never flag the glossary itself - its alias column is where aliases are supposed to be written -
 // and honor file scoping. Shared by check and fix so `--fix` rewrites no file the check skipped.
 function isAliasScanned(filePath: string, options: Ctx003Options): boolean {
   return (
@@ -649,11 +649,11 @@ const linkTextPhraseSchema = z
     error: "a link-text phrase must contain a letter or digit",
   });
 
-// CTX-004 — link text describes its target. An agent, like a reader scanning a page, decides whether
+// CTX-004 - link text describes its target. An agent, like a reader scanning a page, decides whether
 // to follow a link from its text alone, and "here" or "подробнее" says nothing about the target.
 // The comparison is on the whole normalised text, so a listed word inside a longer descriptive
 // phrase is fine. `phrases` replaces the default list and `additionalPhrases` extends whichever list
-// is in effect — unlike CTX-001's `placeholders`, which can only extend — because a project in
+// is in effect - unlike CTX-001's `placeholders`, which can only extend - because a project in
 // another language needs to drop the English and Russian defaults, not just add to them. `phrases`
 // has `.min(1)` so an empty list cannot turn the rule into a silent no-op. Defaults are applied with
 // `??` rather than a Zod `.default()`, matching SEC-003 to SEC-006, so the generated schema keeps
@@ -696,7 +696,7 @@ export const ctx004: RuleDefinition = defineRule({
   },
 });
 
-// CTX-005 — images have alt text. A model does not see an image, so its alt text is all of it that
+// CTX-005 - images have alt text. A model does not see an image, so its alt text is all of it that
 // reaches the context; an image with none is a hole in what the model reads. Only empty or
 // whitespace-only alt is reported, never a judgment of how good a description is, so the rule takes
 // no options beyond file scope. Not fixable: writing a description is a judgment call.
@@ -725,14 +725,14 @@ export const ctx005: RuleDefinition = defineRule({
 // A fence language is a single word, so an entry containing whitespace could never match one and
 // would leave the list silently narrower than written; config rejects it at load instead. Written
 // as `.regex` rather than `.refine` because `z.toJSONSchema` carries a regex into the generated
-// schema.json as `pattern`, while a refine predicate is invisible there — the editor would accept
+// schema.json as `pattern`, while a refine predicate is invisible there - the editor would accept
 // an entry that config loading then rejects. No `g` flag: a shared `g`-flagged RegExp carries
 // `lastIndex` between `test` calls.
 const codeLanguageSchema = z.string().min(1).regex(/^\S+$/, {
   error: "a code language must be a single word without whitespace",
 });
 
-// CTX-006 — fenced code blocks declare a language. The language tells an agent whether a block is
+// CTX-006 - fenced code blocks declare a language. The language tells an agent whether a block is
 // a command, a config or output; a bare fence leaves it guessing. `allowed` narrows the accepted
 // languages for a project that wants one name per language (`bash`, not `sh` and `shell`); it has
 // `.min(1)` because an empty list would report every fence, which no one means to configure, and

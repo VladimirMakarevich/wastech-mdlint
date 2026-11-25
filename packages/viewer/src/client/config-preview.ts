@@ -23,7 +23,7 @@ export function okPreview(preview: OkPreview, filePath: string): HTMLElement[] {
   const { before, after } = preview.findings;
   const parts: HTMLElement[] = [
     paragraph(
-      `Now: ${counts(before)}. With this config: ${counts(after)} — ${preview.addedCount} new, ${preview.removedCount} gone.`,
+      `Now: ${counts(before)}. With this config: ${counts(after)} - ${preview.addedCount} new, ${preview.removedCount} gone.`,
       "config-summary",
     ),
   ];

@@ -65,8 +65,8 @@ export function renderHunkTemplate(diff: TextDiff): Element {
 }
 
 /**
- * A diff as a table: base and head line numbers, a marker, the line. A paired line's changed words —
- * or cells — are `del` and `ins`, so they read as changes to assistive technology as well as by color.
+ * A diff as a table: base and head line numbers, a marker, the line. A paired line's changed words -
+ * or cells - are `del` and `ins`, so they read as changes to assistive technology as well as by color.
  * A line moved elsewhere says where to, and the line it became says where from.
  *
  * With `headText`, the unchanged lines between the hunks are in the table too, hidden, each run in a

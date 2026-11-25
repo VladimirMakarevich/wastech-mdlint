@@ -7,8 +7,8 @@ import type {
 import { markReview, type ReviewMarksView } from "./review-state.js";
 import type { ViewerContext } from "./viewer-context.js";
 
-// The questions several pages ask of the branch review — its context, the reader's marks, the
-// review since the last one — answered in one place, so the Changes page, its JSON, the graph and
+// The questions several pages ask of the branch review - its context, the reader's marks, the
+// review since the last one - answered in one place, so the Changes page, its JSON, the graph and
 // the dashboard all read the same answer.
 
 // `worktree=0` limits a review to committed changes; anything else, or nothing, includes the work
@@ -39,7 +39,7 @@ export async function contextOf(
 }
 
 /**
- * What the branch did, for the pages that show it beside everything else — the dashboard and the
+ * What the branch did, for the pages that show it beside everything else - the dashboard and the
  * graph. The work-tree review, as both show the files on disk; `undefined` outside a git work tree
  * or while there is nothing to compare.
  */

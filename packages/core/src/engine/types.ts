@@ -3,7 +3,7 @@
 // Design points from the requirements:
 // - Severity is orchestrator-owned: a rule declares `defaultSeverity`; config overrides
 //     it; `"off"` filters the rule out before it runs. So a *resolved* `Severity` never includes
-//     "off" — that lives only in config (`SeverityOverride`).
+//     "off" - that lives only in config (`SeverityOverride`).
 // - Findings are structured: `column`, `endLine`, `fixable`, `data`, `helpUri`. `helpUri` is
 //     the one a rule does *not* supply: the runner copies it from the rule's `docsUrl` so it is a
 // real documentation URL rather than a restatement of `ruleId`.
@@ -46,7 +46,7 @@ export type SiteRouterSettings = {
 };
 
 // idRef feeds the shared ContextGraph's id-ref edges, mirroring how REF-005 already accepts
-// the same shape as rule options — a shared setting so the orchestrator (which cannot read a
+// the same shape as rule options - a shared setting so the orchestrator (which cannot read a
 // resolved rule's opaque options back out) can wire it into `buildContextGraph` too.
 export type ResolvedSettings = {
   siteRouter?: SiteRouterSettings;
@@ -84,7 +84,7 @@ export type ReportInput = {
   data?: Record<string, unknown>;
 };
 
-// A single finding. Superset of the legacy `Finding` capability — note `filePath` replaces the
+// A single finding. Superset of the legacy `Finding` capability - note `filePath` replaces the
 // legacy `path`, and `line` is required: it is 1-based, and a whole-file finding reports `0`, which
 // `formatLintResultText` renders as `-`. JSON output is the serialization of this shape; the emitted
 // key set is part of the public output contract, so adding or dropping one is a breaking change
@@ -113,11 +113,11 @@ export type LintMessage = {
 // project-scope fail-fast check is meaningful, but the orchestrator always supplies them.
 //
 // Keying: `documents` is keyed by **repo-relative POSIX path** (each doc's own `.path`), which is
-// what rules resolve link/ID targets to — distinct from `loadDocuments()`'s absolute-keyed map,
+// what rules resolve link/ID targets to - distinct from `loadDocuments()`'s absolute-keyed map,
 // which the orchestrator re-keys before building contexts.
 //
 // `rootDir` is the absolute cwd; REF-001/REF-003 need it for `existsSync` resolution of link/image
-// targets that live on disk but outside the Markdown corpus — a linked PDF or image resolves
+// targets that live on disk but outside the Markdown corpus - a linked PDF or image resolves
 // against the filesystem, not against `documents`.
 export type RuleContext = {
   document?: ParsedDocument;

@@ -2,7 +2,7 @@ import type { ParsedDocument } from "../markdown/document-types.js";
 import { type DiffRun, diffSequences } from "./sequence-diff.js";
 
 // The diff a reviewer reads: lines, grouped into hunks with context, and inside each changed line
-// the words — or, in a table row, the cells — that actually changed. Prose in Markdown is usually
+// the words - or, in a table row, the cells - that actually changed. Prose in Markdown is usually
 // one line per paragraph (formatters such as Prettier with `proseWrap: "never"`, and agents writing
 // unwrapped text), so a line diff alone marks a whole paragraph for one changed word.
 
@@ -49,7 +49,7 @@ export type DiffLine =
 
 /**
  * A run of changed lines with up to `context` unchanged lines around it. `baseStart` and
- * `headStart` are the first line numbers the hunk shows on each side — or, on a side the hunk has no
+ * `headStart` are the first line numbers the hunk shows on each side - or, on a side the hunk has no
  * line from, the line after which its lines would sit (0 at the top).
  */
 export type DiffHunk = {
@@ -64,7 +64,7 @@ export type TextDiff = {
   hunks: DiffHunk[];
   added: number;
   removed: number;
-  /** Whether only one side ends with a line break — a change no line shows. */
+  /** Whether only one side ends with a line break - a change no line shows. */
   newlineAtEndChanged: boolean;
 };
 
@@ -87,7 +87,7 @@ const PAIRING_THRESHOLD = 0.5;
 // comparisons lines are paired in order instead.
 const PAIRING_COMPARISONS = 400;
 
-/** Every line number on which a row of a table — header, delimiter or body — sits. */
+/** Every line number on which a row of a table - header, delimiter or body - sits. */
 export function tableRowLines(document: ParsedDocument): Set<number> {
   const lines = new Set<number>();
   for (const table of document.tables) {
@@ -350,8 +350,8 @@ type Comparison = {
 };
 
 /**
- * Pair removed with added lines, in order, maximizing their total similarity — a dynamic program
- * over the block, like a longest common subsequence weighted by similarity — and keep only pairs at
+ * Pair removed with added lines, in order, maximizing their total similarity - a dynamic program
+ * over the block, like a longest common subsequence weighted by similarity - and keep only pairs at
  * or above the threshold. A large block is paired line for line in order instead.
  */
 function pairLines(
@@ -622,7 +622,7 @@ export function lineCorrespondence(
 /**
  * Whether head lines `start .. end` still show what base lines `start .. end` showed: each is an
  * unchanged line that has not moved. A link to `file.ts#L12-L20` written against the base points at
- * different code when lines in that range were edited, or when a change above it shifted them —
+ * different code when lines in that range were edited, or when a change above it shifted them -
  * and at the same code again when changes above it cancel out.
  */
 export function lineRangeKept(

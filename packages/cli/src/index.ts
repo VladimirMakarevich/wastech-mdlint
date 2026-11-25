@@ -15,9 +15,9 @@ const modulePath = fileURLToPath(import.meta.url);
 // ../@wastech-mdlint/cli/dist/index.js). process.argv[1] keeps that symlink path, while
 // import.meta.url is resolved by the ESM loader to the target's realpath, so comparing
 // path.resolve(invokedPath) (which never dereferences symlinks) against modulePath never matched a
-// symlinked invocation — the published bin silently did nothing through npx or a local/global
+// symlinked invocation - the published bin silently did nothing through npx or a local/global
 // install. realpathSync throws on a path that doesn't exist; falling back to the unresolved
-// path there is safe because it can then never equal the other, dereferenced side — the guard
+// path there is safe because it can then never equal the other, dereferenced side - the guard
 // still blocks execution for that case, same as it does when the module is only imported (e.g. by
 // a test).
 function realOrSelf(candidate: string): string {
@@ -31,7 +31,7 @@ function realOrSelf(candidate: string): string {
 // Guards against running the CLI as a side effect of being imported (e.g. by tests); only the
 // real bin invocation should parse process.argv and set the process exit code. Both sides are
 // dereferenced, not just invokedPath: import.meta.url is only a realpath by Node's *default*
-// module resolution — under --preserve-symlinks/--preserve-symlinks-main it keeps the symlink path
+// module resolution - under --preserve-symlinks/--preserve-symlinks-main it keeps the symlink path
 // too, and comparing it unresolved against a dereferenced invokedPath would make the guard reject a
 // legitimate bin invocation in that mode.
 if (
@@ -40,7 +40,7 @@ if (
 ) {
   // `runCli` catches everything its own `try` covers, but that block does not start until after
   // `readPackageVersion()` has already run. A rejection from there (or from anything else outside
-  // it) escapes this top-level `await`, and Node terminates an unhandled rejection with exit **1** —
+  // it) escapes this top-level `await`, and Node terminates an unhandled rejection with exit **1** -
   // the code reserved exclusively for lint findings, so CI could not tell "the linter found
   // problems" from "the CLI could not start". Re-report it
   // through the same formatter and the same exit code the in-process backstop uses (program.ts).

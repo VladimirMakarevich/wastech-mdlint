@@ -79,7 +79,7 @@ export function watchGitRefs(
       });
       watchers.push(watched);
     } catch {
-      // A folder that cannot be watched — gone, or not readable — reports nothing, so the review is
+      // A folder that cannot be watched - gone, or not readable - reports nothing, so the review is
       // checked against git on every request.
       handlers.onLost();
     }
@@ -111,7 +111,7 @@ export function watchGitRefs(
  *
  * Node's recursive `fs.watch` is used directly. On Windows and macOS it is one native subscription
  * for the whole tree; on Linux Node emulates it with one inotify watch per directory, which on a
- * repository with a large `node_modules` can exhaust the per-user watch limit — the known cost of
+ * repository with a large `node_modules` can exhaust the per-user watch limit - the known cost of
  * keeping this dependency-free.
  */
 export function watchRepository(
@@ -125,7 +125,7 @@ export function watchRepository(
   try {
     // The native realpath, because on Windows it also expands 8.3 short names (`C:\Users\VLADIM~1`,
     // which is what `os.tmpdir()` and some shells hand out). libuv compares each event's long path
-    // against the watched directory's path as given and aborts the whole process on a mismatch — a
+    // against the watched directory's path as given and aborts the whole process on a mismatch - a
     // C assertion no JavaScript handler can catch.
     const watchedDir = realpathSync.native(rootDir);
     watcher = watch(watchedDir, { recursive: true }, (_event, filename) => {

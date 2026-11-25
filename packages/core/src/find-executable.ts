@@ -53,7 +53,7 @@ export async function findExecutable(
 }
 
 /**
- * Drop `executable` from the lookup cache — for a caller whose start of it failed with `ENOENT`,
+ * Drop `executable` from the lookup cache - for a caller whose start of it failed with `ENOENT`,
  * meaning it was uninstalled since it was found, so the next lookup searches `PATH` again.
  */
 export function forgetExecutable(executable: string): void {

@@ -9,10 +9,10 @@ import {
 } from "../find-executable.js";
 
 // Every `git` process the product starts goes through `runGit`. Git is run on whatever repository a
-// user points a host at — possibly an archive unpacked from somewhere else, `.git/config` included —
+// user points a host at - possibly an archive unpacked from somewhere else, `.git/config` included -
 // and that config can name programs git starts on its own during a plain read: an fsmonitor hook on
 // any work-tree comparison, a filter driver's `clean` command on every file whose stat changed, an
-// external diff or a textconv driver on a diff, and — in a partial clone missing an object — the
+// external diff or a textconv driver on a diff, and - in a partial clone missing an object - the
 // upload-pack or ssh command of the fetch git makes to get it. Nothing here may let one run, and the
 // repository may not supply `git` itself either. The defenses are in four places: the executable
 // `runGit` starts, found by absolute path; the environment built below; the config every call
@@ -66,7 +66,7 @@ export type GitOutput = {
 // the ones set below. The config-file selectors are kept because they are the user's setup, not the
 // repository's: a user who keeps the global config elsewhere would otherwise lose a `safe.directory`
 // entry it holds. So is `GIT_CEILING_DIRECTORIES`, which only stops the search for a repository
-// from climbing above directories the user named — into a dotfiles repository at the home
+// from climbing above directories the user named - into a dotfiles repository at the home
 // directory, say.
 const KEPT_GIT_VARIABLES = new Set([
   "GIT_CONFIG_GLOBAL",
@@ -75,8 +75,8 @@ const KEPT_GIT_VARIABLES = new Set([
   "GIT_CEILING_DIRECTORIES",
 ]);
 
-// Locale variables are replaced by `LC_ALL=C`, so git's own error messages — matched on to tell "not
-// a repository" from "owned by another user" — are the untranslated ones on every machine.
+// Locale variables are replaced by `LC_ALL=C`, so git's own error messages - matched on to tell "not
+// a repository" from "owned by another user" - are the untranslated ones on every machine.
 const DROPPED_LOCALE_VARIABLES = new Set(["LANG", "LANGUAGE", "LC_ALL"]);
 
 /**
@@ -88,7 +88,7 @@ const DROPPED_LOCALE_VARIABLES = new Set(["LANG", "LANGUAGE", "LC_ALL"]);
 const BASE_CONFIG: readonly (readonly [string, string])[] = [
   // An fsmonitor hook set in repository config is a program git starts on any work-tree comparison.
   // Emptied rather than set to `false`: before git 2.36 the key is read as the hook's path, and only
-  // an empty value turns the hook off — `false` there is a command named `false` to run. From 2.36
+  // an empty value turns the hook off - `false` there is a command named `false` to run. From 2.36
   // it is read as a boolean or a path, and an empty value is false.
   ["core.fsmonitor", ""],
   // With `-z` output git already leaves names unquoted; this keeps any non-`-z` output the same.
@@ -96,8 +96,8 @@ const BASE_CONFIG: readonly (readonly [string, string])[] = [
   // `log` and `blame` would otherwise start gpg to check each signed commit when a config asks for
   // signatures to be shown, and gpg is a program the repository's config can name.
   ["log.showSignature", "false"],
-  // In a partial clone a read that meets a missing object — `cat-file --batch`, `diff-tree -M`,
-  // `blame`, `log --follow` — fetches it from the promisor remote, and a fetch starts programs the
+  // In a partial clone a read that meets a missing object - `cat-file --batch`, `diff-tree -M`,
+  // `blame`, `log --follow` - fetches it from the promisor remote, and a fetch starts programs the
   // repository's config names: `remote.<name>.uploadpack` for a local or `file://` remote,
   // `core.sshCommand` for ssh, a remote helper for `ext::` and its kind. `GIT_NO_LAZY_FETCH` below
   // stops the fetch itself, but only from git 2.45; on the older gits this module still accepts,
@@ -119,7 +119,7 @@ const BASE_CONFIG: readonly (readonly [string, string])[] = [
  * The environment every git call runs with, built from the host's.
  *
  * `PATH` keeps only absolute entries. An empty or `.` entry is resolved against the child's working
- * directory — the repository — so a `git` executable committed there would be the one that runs.
+ * directory - the repository - so a `git` executable committed there would be the one that runs.
  * That alone is not enough on Windows, which `runGit` handles by never starting git by bare name.
  */
 export function gitEnvironment(
@@ -192,8 +192,8 @@ const MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
 const TIMEOUT_MS = 60_000;
 
 /**
- * Run `git <args>` without a shell. Resolves with the exit code for the caller to judge — several
- * expected states (no such ref, no common history) are a non-zero exit — and rejects only when git
+ * Run `git <args>` without a shell. Resolves with the exit code for the caller to judge - several
+ * expected states (no such ref, no common history) are a non-zero exit - and rejects only when git
  * could not be started, timed out, or produced more output than any legitimate call does.
  */
 export async function runGit(
@@ -246,7 +246,7 @@ function spawnGit(
       stderr.push(chunk);
     });
     // Git may exit before reading all of its input (a fatal error on the first line); the broken
-    // pipe that follows is not the failure worth reporting — the exit code is.
+    // pipe that follows is not the failure worth reporting - the exit code is.
     child.stdin.on("error", () => {});
     child.once("error", (error: NodeJS.ErrnoException) => {
       clearTimeout(timer);

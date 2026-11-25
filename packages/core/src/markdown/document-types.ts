@@ -66,7 +66,7 @@ export type ParsedLinkKind =
 export type ParsedHeading = {
   text: string;
   depth: number;
-  // GitHub-style slug (github-slugger, verbatim — never re-derived). Authoritative for REF-002, anchor
+  // GitHub-style slug (github-slugger, verbatim - never re-derived). Authoritative for REF-002, anchor
   // edges, and the slice index, so all three resolve against the identical slug string.
   slug: string;
   line: number;
@@ -87,7 +87,7 @@ export type ParsedTableRow = {
 export type ParsedTable = {
   headers: string[];
   rows: ParsedTableRow[];
-  // Enclosing heading text (most-recent heading above, at any level — flat ownership, not nested);
+  // Enclosing heading text (most-recent heading above, at any level - flat ownership, not nested);
   // undefined if the table precedes every heading.
   section?: string;
   line: number;
@@ -294,7 +294,7 @@ export type ParsedFirstBlock = {
   line: number;
 };
 
-// A top-level paragraph whose only content is one `strong` or `emphasis` node holding plain text —
+// A top-level paragraph whose only content is one `strong` or `emphasis` node holding plain text -
 // the shape of a line like `**Installation**` standing in for a heading. Only top-level paragraphs
 // are recorded: emphasis inside a list item, blockquote or table cell is inline styling of that
 // container, not a stand-in heading. Only the text value is kept, not the node, so the contract
@@ -326,7 +326,7 @@ export type ParsedDocument = {
   referenceDefinitions: ParsedReferenceDefinition[];
   // Document order, non-overlapping.
   textSpans: ParsedTextSpan[];
-  // Source offsets, ascending, of every unescaped `[` and `]` that the parse left as literal text —
+  // Source offsets, ascending, of every unescaped `[` and `]` that the parse left as literal text -
   // inside a `text` node, so not link, image or reference syntax. Such brackets render as written,
   // but whether they stay text depends on the label between them having no definition, so a
   // rewrite inside them can turn text into a link.

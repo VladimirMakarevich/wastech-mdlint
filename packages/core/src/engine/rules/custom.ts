@@ -12,7 +12,7 @@ import { matchesFileScope } from "./scope.js";
 import type { Rule } from "../types.js";
 
 // Declarative custom rule. Composed purely from the closed primitive vocabulary
-// — no code execution — so it is safe inside the MCP server. Its id is user-chosen and cannot
+// - no code execution - so it is safe inside the MCP server. Its id is user-chosen and cannot
 // shadow built-ins.
 
 // Namespaced id grammar: uppercase dash-separated, at least one dash. Exported so
@@ -44,18 +44,18 @@ export type CustomIdCollision = {
  * Uniqueness is not decorative. Two entries under one id both load and both run: their findings are
  * indistinguishable in every report, a `severity` set on one of them applies to findings the other
  * produced with no way to tell which, and a single inline `wastech-mdlint-disable PROJ-DUP` silences
- * both — including the one the author meant to keep. Duplication is the third way to end up with an
+ * both - including the one the author meant to keep. Duplication is the third way to end up with an
  * id that does not identify one rule, alongside a malformed id and one shadowing a built-in prefix,
  * and it was the only one that passed.
  *
  * Deliberately scoped to `custom` entries. Repeating a **built-in** rule is a supported
- * configuration — two `REF-001` entries with different `files` scopes is the way to apply one rule
- * differently to two parts of a repository — and those findings stay attributable because the rule
+ * configuration - two `REF-001` entries with different `files` scopes is the way to apply one rule
+ * differently to two parts of a repository - and those findings stay attributable because the rule
  * is the same rule.
  *
  * Ids are compared in canonical form, so `proj-dup` and `PROJ-DUP` collide: they resolve to one
  * rule id, which is the same comparison the reserved-prefix check performs against the registry.
- * Entries whose `id` is absent or not a string are skipped — shape is the schema's to reject, and
+ * Entries whose `id` is absent or not a string are skipped - shape is the schema's to reject, and
  * reporting a collision between two entries that are already invalid buries the real diagnostic.
  *
  * Returns one collision per offending entry, in entry order, each naming the first claimant.
@@ -86,16 +86,16 @@ export function findDuplicateCustomIds(
  * The message for a duplicate id, in the register the other two id diagnostics use: the offending
  * id, the constraint stated positively, then a remedy with a concrete example.
  *
- * `siblingPath` is rendered by the caller because the two hosts root their paths differently — the
+ * `siblingPath` is rendered by the caller because the two hosts root their paths differently - the
  * config loader anchors every diagnostic at `config`, the MCP tool at the request's own `rules`
- * array — and a cross-reference the reader cannot paste back into the thing they are editing is
+ * array - and a cross-reference the reader cannot paste back into the thing they are editing is
  * worse than no cross-reference.
  */
 export function duplicateCustomIdMessage(params: {
   id: string;
   siblingPath: string;
 }): string {
-  return `id "${params.id}": already used by ${params.siblingPath} — a custom rule id must identify exactly one rule, so give this entry its own (e.g. "${params.id}-2").`;
+  return `id "${params.id}": already used by ${params.siblingPath} - a custom rule id must identify exactly one rule, so give this entry its own (e.g. "${params.id}-2").`;
 }
 
 function invalid(
@@ -129,7 +129,7 @@ function validatedCustomRuleId(
   if (registry.getReservedPrefixes().has(prefix)) {
     throw invalid(
       ["id"],
-      `id "${id}": "${prefix}" is a reserved built-in prefix — use your own namespace, e.g. "REQ-100".`,
+      `id "${id}": "${prefix}" is a reserved built-in prefix - use your own namespace, e.g. "REQ-100".`,
     );
   }
 
@@ -143,14 +143,14 @@ function validatedCustomRuleId(
     const builtin = registry.getMetadata(id)!;
     throw invalid(
       ["id"],
-      `id "${id}": "${builtin.alias}" is the alias of built-in rule "${builtin.id}" — choose another id.`,
+      `id "${id}": "${builtin.alias}" is the alias of built-in rule "${builtin.id}" - choose another id.`,
     );
   }
 
   if (registry.has(id)) {
     throw invalid(
       ["id"],
-      `id "${id}": "${prefix}" is a reserved built-in prefix — use your own namespace, e.g. "REQ-100".`,
+      `id "${id}": "${prefix}" is a reserved built-in prefix - use your own namespace, e.g. "REQ-100".`,
     );
   }
   return id;
@@ -158,7 +158,7 @@ function validatedCustomRuleId(
 
 /**
  * Resolve a `{ rule: "custom", ... }` config entry into a runnable Rule. Enforces the
- * namespaced id grammar and — authoritatively — that its prefix does not shadow a built-in
+ * namespaced id grammar and - authoritatively - that its prefix does not shadow a built-in
  * (reserved prefixes derived from the registry). Scope is derived from the assert kind
  * (columnUnique ⇒ project).
  */

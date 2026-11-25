@@ -196,7 +196,7 @@ afterAll(async () => {
 });
 
 // Showing the config in the file manager, or opening it in its default application, starts a program
-// on the machine running the viewer — so the request is held to every check a save is, may only pick
+// on the machine running the viewer - so the request is held to every check a save is, may only pick
 // one of the two actions, and always applies to the config the corpus was loaded from.
 describe("opening the config", () => {
   it("offers both actions on the config page of a loopback viewer", async () => {
@@ -744,7 +744,7 @@ describe("saveCandidate", () => {
     }
   });
 
-  // Another program — an editor's autosave — writing the config in the same moment as the save. What
+  // Another program - an editor's autosave - writing the config in the same moment as the save. What
   // is on disk after the viewer's rename was written after it, so it is the newest version and must
   // be left alone: writing back the text the page started from would throw that program's change
   // away to undo the reader's, and leave neither. `readBack` stands in for the other program by
@@ -778,7 +778,7 @@ describe("saveCandidate", () => {
 });
 
 describe("save with watching on", () => {
-  // A config passed with `--config` may be called anything. With watching on — the default — the
+  // A config passed with `--config` may be called anything. With watching on - the default - the
   // watcher is what reloads the corpus after a save, so a name it filtered out would leave every page
   // on the old config's findings after the page said the change was saved.
   it("reloads the corpus after saving a config with another name", async () => {

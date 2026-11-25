@@ -60,7 +60,7 @@ describe("loadDocuments", () => {
   });
 
   // The layering the lint-time defaults depend on: the default `exclude` lives in `resolveCorpusScope`,
-  // never here. This loader's contract is "what you pass is what I walk" — `gitignore-layers.test.ts`
+  // never here. This loader's contract is "what you pass is what I walk" - `gitignore-layers.test.ts`
   // compares its corpus against real `git ls-files` with an explicit pattern set, so a loader that
   // silently added the default patterns of its own would make that oracle compare two different trees.
   it("applies no default exclude of its own", async () => {
@@ -147,7 +147,7 @@ describe("loadDocuments", () => {
 
     // `keepme.md` is not restored, and that is deliberate: `shouldPruneDirectory` decides
     // `docs/private` before descending into it, so no file inside is ever offered to the file-level
-    // filter that the negation would rescue. Honoring it would mean walking every excluded tree — the
+    // filter that the negation would rescue. Honoring it would mean walking every excluded tree - the
     // cost `exclude` exists to avoid. Accepted rather than fixed.
     expect([...documents.values()].map((doc) => doc.path)).toEqual([
       "docs/public.md",
@@ -187,7 +187,7 @@ describe("loadDocuments", () => {
   });
 
   it("lets a nested .gitignore negation re-include a file a root pattern ignored", async () => {
-    // Layers are ranked by depth, so `docs/.gitignore` overrides the root's `docs/*.md` — the
+    // Layers are ranked by depth, so `docs/.gitignore` overrides the root's `docs/*.md` - the
     // corpus now matches what `git` keeps. Kept in the loader's own suite so the behavior stays
     // covered here with no `git` on PATH; `gitignore-layers.test.ts` is the against-real-git oracle.
     const root = await createFixtureTree({
@@ -210,7 +210,7 @@ describe("loadDocuments", () => {
   it("keeps a subtree a nested .gitignore re-includes from an excluded parent directory", async () => {
     // The walk-level shape of the same rule, and the one that used to be self-contradictory: the
     // root excludes the *directory* `artifacts/docs` (`artifacts/*` never matches the file itself),
-    // `artifacts/.gitignore` re-includes it, so the walk descended — and then dropped every file
+    // `artifacts/.gitignore` re-includes it, so the walk descended - and then dropped every file
     // inside, because the file verdict re-applied the root's exclusion of a parent the deeper layer
     // had already rescued. `git` keeps these files; the oracle for that lives in
     // `gitignore-layers.test.ts`, and this case keeps the corpus covered with no `git` on PATH.
@@ -293,7 +293,7 @@ describe("loadDocuments", () => {
 
 // The four glob-anchoring shapes are pinned at the matcher in
 // `rule-utils.test.ts` ("matchesConfigGlob anchoring"), which is where the *rule* lives. What no test
-// had was the same table one layer up, against a real tree — and that layer is where the shapes stop
+// had was the same table one layer up, against a real tree - and that layer is where the shapes stop
 // being equivalent: `exclude` prunes whole directories through a synthetic-child probe before any file
 // is offered to the file-level filter, so a root-anchored `node_modules/**` does not merely fail to
 // match a nested copy, it descends into it and parses every file inside. That is the blocker
@@ -321,7 +321,7 @@ describe("loadDocuments glob anchoring over a real tree", () => {
     // "the NOTE.md in the root".
     ["NOTE.md", ["NOTE.md"], [], EVERYTHING],
     ["*.md", ["*.md"], [], EVERYTHING],
-    // A slash — even a leading `./` — root-anchors it. This is the shape a user reaches for when the
+    // A slash - even a leading `./` - root-anchors it. This is the shape a user reaches for when the
     // depth-agnostic answer above is not what they wanted.
     ["./NOTE.md", ["./NOTE.md"], [], ROOT_ONLY],
     // The two `exclude` forms, and the whole reason `DEFAULT_EXCLUDE_GLOBS` carries a `**/` prefix.

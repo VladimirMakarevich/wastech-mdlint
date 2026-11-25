@@ -18,7 +18,7 @@ function compareMessages(left: LintMessage, right: LintMessage): number {
  * Run a list of severity-resolved rules against a single built context, returning deterministic
  * findings. The runner attaches `ruleId`/`severity`/`filePath` to each reported finding.
  *
- * Fail-fast: a `project`-scope rule with no `documents` in context is a programming error — the
+ * Fail-fast: a `project`-scope rule with no `documents` in context is a programming error - the
  * runner throws instead of silently producing nothing. `"off"` rules are expected to be filtered by
  * the orchestrator before reaching here.
  */
@@ -49,8 +49,8 @@ export function runRules(
         fixable: finding.fixable,
         data: finding.data,
         // Attached from the rule, never from the finding. It used to be a per-report
-        // literal, which shipped a bare rule id — duplicating `ruleId` and failing the SARIF
-        // rationale, whose `helpUri` is a link — at 27 sites and no `helpUri` at all at five others.
+        // literal, which shipped a bare rule id - duplicating `ruleId` and failing the SARIF
+        // rationale, whose `helpUri` is a link - at 27 sites and no `helpUri` at all at five others.
         // Sourcing it here makes the value a URL and its presence uniform, and `ReportInput` no
         // longer carries the field so a rule cannot re-introduce either defect.
         helpUri: rule.docsUrl,

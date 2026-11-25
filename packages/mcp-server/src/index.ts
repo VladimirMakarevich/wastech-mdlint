@@ -10,14 +10,14 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 
 import { registerTools } from "./tools/index.js";
 
-// The server shell. Tools are registered through the modular seam in tools/index.ts — one
-// module per tool — so this file stays the transport/lifecycle owner, not a tool mega-file.
+// The server shell. Tools are registered through the modular seam in tools/index.ts - one
+// module per tool - so this file stays the transport/lifecycle owner, not a tool mega-file.
 // Every read-only tool is appended to that seam rather than registered here.
 // The invariants this shell locks in: transport is stdio-only and the server never loads
 // code-plugins.
 
 // Resolves relative to the compiled module (dist/index.js), one level under dist/, so the read
-// keeps finding packages/mcp-server/package.json regardless of the caller's cwd — the same
+// keeps finding packages/mcp-server/package.json regardless of the caller's cwd - the same
 // approach the CLI uses for its version lookup.
 async function readPackageVersion(): Promise<string> {
   const moduleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -52,7 +52,7 @@ export async function startServer(): Promise<void> {
 const invokedPath = process.argv[1];
 const modulePath = fileURLToPath(import.meta.url);
 
-// Same symlink defect as the CLI entrypoint (packages/cli/src/index.ts) — see its comment for the
+// Same symlink defect as the CLI entrypoint (packages/cli/src/index.ts) - see its comment for the
 // full explanation. process.argv[1] keeps the node_modules/.bin symlink path while import.meta.url
 // resolves to the realpath, so dereferencing before comparing is required for the guard to ever
 // match a symlinked invocation.
@@ -67,7 +67,7 @@ function realOrSelf(candidate: string): string {
 // Only auto-start when run as the real bin; importing this module (e.g. from a smoke test) must
 // not spin up a transport that seizes stdio, mirroring the CLI entrypoint guard. Both sides are
 // dereferenced (not just invokedPath): import.meta.url is only a realpath under Node's default
-// module resolution — under --preserve-symlinks/--preserve-symlinks-main it stays the symlink path
+// module resolution - under --preserve-symlinks/--preserve-symlinks-main it stays the symlink path
 // too, and an unresolved comparison there would reject a legitimate bin invocation in that mode.
 if (
   invokedPath !== undefined &&

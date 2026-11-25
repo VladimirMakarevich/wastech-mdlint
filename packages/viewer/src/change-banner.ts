@@ -99,7 +99,7 @@ export function renderChangeBanner(
   ]);
 }
 
-// What the branch did to the document, or — compared with the reader's last review — what changed
+// What the branch did to the document, or - compared with the reader's last review - what changed
 // since then.
 function bannerText(
   review: DocumentReview,

@@ -19,17 +19,17 @@ import {
   withErrorOutput,
 } from "../shared/tool-response.js";
 
-// `context-graph` — build the project's `ContextGraph` and return it either verbatim
+// `context-graph` - build the project's `ContextGraph` and return it either verbatim
 // (`format: "raw"`, the default) or as the derived `ContextGraphSummary` (`format: "summary"`). Core
 // owns graph construction via `resolveToolContext` → `loadContext`; this handler only picks
 // which projection to return, and calls `computeGraphCoverage` for the one that carries coverage.
 //
 // The branch was once named `"json"`. On a JSON-RPC tool *every* projection is JSON,
-// so `json` never named an axis here — and it collided with the CLI's `graph --format json`, which
+// so `json` never named an axis here - and it collided with the CLI's `graph --format json`, which
 // denotes the summary document, not the raw graph. `raw` vs `summary` names the axis that exists.
 
 // Local Zod mirrors of `ContextGraphNode`/`ContextGraphEdge` (hand-maintained per this package's
-// `lint-message-schema.ts` convention — each has a single consumer here, so it stays local rather
+// `lint-message-schema.ts` convention - each has a single consumer here, so it stays local rather
 // than promoted to a shared schema module).
 const contextGraphNodeSchema = z.object({
   path: z.string(),
@@ -63,9 +63,9 @@ const contextGraphInputShape = {
 
 // One tool, two structured shapes: `format: "raw"` returns `{ nodes, edges, cycles }` (the verbatim
 // `ContextGraph`), `format: "summary"` returns
-// `{ nodes, edges, components, readingOrder, excluded, coverage }` — the same document the CLI's
+// `{ nodes, edges, components, readingOrder, excluded, coverage }` - the same document the CLI's
 // `graph --format json` prints, which is the parity between hosts. `registerTool` takes a
-// single `outputSchema`, so the format-specific fields are individually optional — a superset schema
+// single `outputSchema`, so the format-specific fields are individually optional - a superset schema
 // rather than a discriminated union, which would require echoing a `format` field neither core type
 // carries. `nodes`/`edges` stay required because both shapes always carry them.
 const contextGraphOutputShape = {
@@ -151,7 +151,7 @@ export function registerContextGraphTool(server: McpServer): void {
         'Build the project\'s context graph. `format: "raw"` (default) returns the graph verbatim ' +
         '(nodes, edges, cycles); `format: "summary"` returns nodes, edges, connected components, ' +
         "topological reading order, the nodes a cycle excluded from that order, and the coverage " +
-        "signal (node/edge counts plus Markdown files linked-to but outside the corpus) — the same " +
+        "signal (node/edge counts plus Markdown files linked-to but outside the corpus) - the same " +
         "document the CLI's `graph --format json` prints. Read-only.",
       inputSchema: contextGraphInputShape,
       outputSchema: withErrorOutput(contextGraphOutputShape),

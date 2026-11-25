@@ -45,7 +45,7 @@ describe("resolvesOutsideRoot", () => {
     () => {
       // "C:secret.md" is drive-relative (no separator after the colon), so `path.isAbsolute` is
       // false; `path.relative` cannot express "a different drive" as a "../"-prefixed path, so it
-      // returns the absolute `to` path unchanged instead — the escape check must catch that too.
+      // returns the absolute `to` path unchanged instead - the escape check must catch that too.
       expect(
         resolvesOutsideRoot(path.join("D:", "repo", "root"), "C:secret.md"),
       ).toBe(true);
@@ -57,7 +57,7 @@ describe("resolvesOutsideRoot", () => {
 // escape-the-root class REF-001, REF-003 and coverage all had to close. Unlike
 // `resolvesOutsideRoot`, this helper sees only
 // corpus-relative POSIX candidates that `resolveRelativeToSource`/`resolveTargetCandidates`
-// already produced — but those can still normalize to a drive-absolute-looking remainder when a
+// already produced - but those can still normalize to a drive-absolute-looking remainder when a
 // relative link's `..` segments exactly cancel the source directory.
 describe("candidateEscapesRoot", () => {
   it("accepts a legitimate in-root relative candidate", () => {

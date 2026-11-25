@@ -34,7 +34,7 @@ import { fileScopeShape, matchesFileScope } from "./scope.js";
 import type { RuleContext, SiteRouterSettings, TextEdit } from "../types.js";
 
 // Reference-integrity rules. REF rules use the documents map + existsSync + site-router; no
-// graph needed — that is the GRP family's job. REF-007, REF-008 and REF-009 read only the parsed
+// graph needed - that is the GRP family's job. REF-007, REF-008 and REF-009 read only the parsed
 // document itself.
 
 const siteRouterOptionSchema = z
@@ -45,7 +45,7 @@ const siteRouterOptionSchema = z
   })
   .strict();
 
-// REF-001 — relative links resolve to a file. `exclude` is a link-target filter (config example).
+// REF-001 - relative links resolve to a file. `exclude` is a link-target filter (config example).
 export const ref001: RuleDefinition = defineRule({
   metadata: {
     id: "REF-001",
@@ -130,7 +130,7 @@ type Ref002Failure = {
 
 // The document a link's fragment must resolve in: the linking document itself for a same-file
 // anchor, the resolved target for a local file link. Undefined for any other link, and for a local
-// target that does not exist — missing target files are REF-001's concern.
+// target that does not exist - missing target files are REF-001's concern.
 function anchorTargetOf(
   link: ParsedLink,
   context: RuleContext,
@@ -227,7 +227,7 @@ function compileIgnoredPattern(options: Ref002Options): RegExp | undefined {
     : compileRegex(options.ignoredPattern);
 }
 
-// REF-002 — link anchors resolve in their target document: a heading slug (github-slugger), an
+// REF-002 - link anchors resolve in their target document: a heading slug (github-slugger), an
 // HTML `id`/`name` anchor, `#top`, or a GitHub line fragment, all decided by the shared
 // `anchorResolves` so this rule and the graph's anchor edges agree under default options. Same-file
 // anchors validate against the doc itself; cross-file anchors against the resolved target (missing
@@ -287,7 +287,7 @@ export const ref002: RuleDefinition = defineRule({
   },
 });
 
-// REF-003 — images resolve on disk.
+// REF-003 - images resolve on disk.
 export const ref003: RuleDefinition = defineRule({
   metadata: {
     id: "REF-003",
@@ -358,7 +358,7 @@ function declaredZones(
 }
 
 // Compiled once per zone (guarded by `.has`), not once per file that shares that zone or per
-// heading/document that scans it — `zone` is an arbitrary directory name, so it must be escaped
+// heading/document that scans it - `zone` is an arbitrary directory name, so it must be escaped
 // before it becomes regex source (unescaped interpolation crashed on names like "c++"
 // and silently mismatched on names like "node.js").
 function zoneMentionPatterns(
@@ -378,7 +378,7 @@ function zoneMentionPatterns(
   return zoneMentionRegexes;
 }
 
-// REF-004 — cross-zone links must be declared in the source zone's Dependencies section. Document
+// REF-004 - cross-zone links must be declared in the source zone's Dependencies section. Document
 // scope, but reads the corpus to learn zones + declarations. The rule as specified was ambiguous
 // about whether a declaration is per-zone or per-document; per-zone is the reading implemented here.
 export const ref004: RuleDefinition = defineRule({
@@ -445,13 +445,13 @@ function describeScope(globs: readonly string[]): string {
   return globs.map((glob) => `"${glob}"`).join(", ");
 }
 
-// REF-005 — ID traceability: every referenced ID has a definition (dangling ref = error) and every
+// REF-005 - ID traceability: every referenced ID has a definition (dangling ref = error) and every
 // defined ID is referenced (orphan def = warning). Definitions go through the shared
 // `extractDefinedIds` (column + heading discovery) so this rule and the graph's id-ref
 // edges agree on what counts as a defined ID; references stay column-only via `extractColumnIds`.
 //
 // Both messages name the lookup rather than asserting about the corpus. "Is never referenced" is a
-// claim about the world that a reader disproves with one grep — an id mentioned in prose, in a link,
+// claim about the world that a reader disproves with one grep - an id mentioned in prose, in a link,
 // or in a filename is not in an `idColumn`, and the rule never looked there. Being told the rule is
 // wrong about five ids is what makes a reader stop trusting the sixth, which was the real one. The
 // two branches search different things and must say so: references are column-only, definitions are
@@ -615,7 +615,7 @@ function reportLessStableDependencies(
   }
 }
 
-// REF-006 — stability consistency: a row must not depend on a less-stable entity. Reference rows
+// REF-006 - stability consistency: a row must not depend on a less-stable entity. Reference rows
 // carry the referenced ID (idColumn) and the referencer's own stability (stabilityColumn); the
 // referenced entity's stability comes from the definition tables.
 export const ref006: RuleDefinition = defineRule({
@@ -672,7 +672,7 @@ export const ref006: RuleDefinition = defineRule({
 // and collapsed forms are unambiguous attempts at a link.
 const DEFAULT_REF007_INCLUDE_SHORTCUT = false;
 
-// REF-007 — reference-style links and images use a defined label. micromark renders an undefined
+// REF-007 - reference-style links and images use a defined label. micromark renders an undefined
 // `[text][missing]` as the literal brackets and no link, so the parser records each one as an
 // `undefinedReferences` entry and this rule reports it. Error severity because the result is a
 // broken link on the page, exactly as REF-001's; not fixable because there is no target to invent.
@@ -722,7 +722,7 @@ export const ref007: RuleDefinition = defineRule({
 // left to the rules that resolve them.
 const EMPTY_TARGETS: ReadonlySet<string> = new Set(["", "#"]);
 
-// REF-008 — links and images have a target and use link syntax in the right order. An empty `()`
+// REF-008 - links and images have a target and use link syntax in the right order. An empty `()`
 // or bare `(#)` target is skipped by REF-001, REF-002 and REF-003 (there is nothing to resolve), so
 // without this rule a link that goes nowhere passes every check. Reversed `(text)[target]` is
 // recorded by the parser as a `reversedLinks` entry because it renders as literal text and never
@@ -802,7 +802,7 @@ const DEFAULT_REF009_IGNORED_DEFINITIONS = ["//"];
 // The offset where the line holding `offset` starts. A leading byte order mark is not part of the
 // first line: it marks the file's encoding, so the first line starts after it. Otherwise a
 // definition right after the mark would be reported one column late, and deleting its line would
-// delete the mark with it — `"\uFEFF".trim()` is empty, so the mark alone never stops the deletion.
+// delete the mark with it - `"\uFEFF".trim()` is empty, so the mark alone never stops the deletion.
 function lineStartOf(content: string, offset: number): number {
   return Math.max(
     content.lastIndexOf("\n", offset - 1) + 1,
@@ -894,17 +894,17 @@ function definitionRemovalEdits(
   });
 }
 
-// REF-009 — every Markdown link reference definition (`[label]: target`) is used by some reference
+// REF-009 - every Markdown link reference definition (`[label]: target`) is used by some reference
 // link or image in the same document. An unused definition renders nothing, so it is invisible on
 // the page and drifts unnoticed: its target is never checked by a reader following the link,
 // because there is no link. This is the label-level counterpart of REF-007 (a reference with no
 // definition) and is unrelated to REF-005, whose "definitions" are ID table rows and heading tokens
-// — deleting one of those would delete content, which is why this is a rule of its own.
+// - deleting one of those would delete content, which is why this is a rule of its own.
 //
 // Warning severity: an unused definition is dead text, not a broken page. Fixable by deleting the
 // definition's lines; once deleted nothing can report it, so a second `--fix` changes nothing. Not
 // fixed: a definition that is not alone on its lines (see `definitionLineRange`). Duplicate
-// definitions of one label are judged by label, so a used label keeps all of its definitions —
+// definitions of one label are judged by label, so a used label keeps all of its definitions -
 // deciding which duplicate is the dead one depends on which wins resolution, which this rule leaves
 // to the parser.
 export const ref009: RuleDefinition = defineRule({

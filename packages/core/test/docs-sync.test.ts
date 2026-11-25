@@ -34,7 +34,7 @@ describe("README rule table", () => {
   });
 
   it("marks exactly the deterministic-fixable subset as fixable", () => {
-    // The rule cell is `[`ID`](url)` — linked to the rule's `docsUrl` — so a data row is
+    // The rule cell is `[`ID`](url)` - linked to the rule's `docsUrl` - so a data row is
     // recognized by the link opener and the id is read out of the code span inside it rather than
     // being the whole cell. The header and divider rows still fail both.
     const fixable = generateRuleDocs()
@@ -55,7 +55,7 @@ describe("README rule table", () => {
     const rows = generateRuleDocs()
       .split("\n")
       .filter((line) => line.startsWith("| [`"));
-    // One linked row per registered built-in — a rule whose cell lost its link (or gained a
+    // One linked row per registered built-in - a rule whose cell lost its link (or gained a
     // mismatched one) fails here rather than only showing up as a stale README diff. The count comes
     // from the registry so it moves with it; registry-inventory.test.ts pins the exact id set.
     expect(rows).toHaveLength(ruleRegistry.getAllMetadata().length);

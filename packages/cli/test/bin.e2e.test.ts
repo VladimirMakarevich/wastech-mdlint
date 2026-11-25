@@ -28,7 +28,7 @@ import {
 // `npm ci` *before* `npm run typecheck`/`npm run build` ever produces dist/, and reading npm's own
 // bundled `bin-links` package (link-gently.js, shim-bin.js) shows both the POSIX symlink and the
 // Windows .cmd/.ps1 shim are skipped entirely when the bin's target file doesn't exist yet at
-// install time — confirmed live in this repo: a fresh `tsc -b` always emits dist/index.js at mode
+// install time - confirmed live in this repo: a fresh `tsc -b` always emits dist/index.js at mode
 // 644, and even where the ambient symlink already exists, invoking it directly then fails with
 // EACCES, not just "not executable yet". Manufacturing the symlink/junction ourselves and invoking
 // it via `process.execPath` (not the OS's own shebang dispatch) sidesteps both the missing-link and
@@ -36,7 +36,7 @@ import {
 // that is the actual defect.
 //
 // PRECONDITION: packages/cli's own dist must already be built. True under the documented order
-// (`npm run typecheck` == `tsc -b`, which emits before `npm test` runs) — a bare `vitest run` on a
+// (`npm run typecheck` == `tsc -b`, which emits before `npm test` runs) - a bare `vitest run` on a
 // checkout where src/index.ts changed since the last build spawns stale/missing output, so
 // assertBuilt() below fails fast with a clear message. That message, and the mtime heuristic behind
 // it, are shared with the mcp-server twin: see packages/core/test/support/assert-built.ts.
@@ -57,7 +57,7 @@ type Spawned = {
 };
 
 // Every spawn in this file targets either node itself directly via an absolute path, or (for the
-// npx smoke check below) the real `npx` binary resolved through PATH — neither needs a shell on
+// npx smoke check below) the real `npx` binary resolved through PATH - neither needs a shell on
 // either platform this file actually spawns on (the npx check skips itself on win32; see there).
 function run(command: string, args: string[], cwd: string): Spawned {
   const result = spawnSync(command, args, {
@@ -118,7 +118,7 @@ describe("installed-bin shape via symlink/junction", () => {
     );
     if (process.platform === "win32") {
       // Windows requires elevated privileges (or Developer Mode) to symlink a *file*, but
-      // directory junctions need neither — and a junction is exactly what npm creates for a
+      // directory junctions need neither - and a junction is exactly what npm creates for a
       // workspace/global-linked install on Windows (not only the .cmd shim a plain registry
       // install gets, which passes an already-real relative path and never hit the bug: a linked
       // install's junction does, since Node's realpath resolution dereferences junctions the same
@@ -159,7 +159,7 @@ describe("installed-bin shape via symlink/junction", () => {
     expect(result.stdout).toContain("REF-001");
     expect(result.stdout).toContain("missing.md");
     // Pins the exact finding count (1 error, 0 warnings), not just that *a* REF-001 finding
-    // exists — this is the "known finding count" the regression guard is meant to check.
+    // exists - this is the "known finding count" the regression guard is meant to check.
     expect(result.stdout).toContain("1 problem (1 error, 0 warnings)");
   }, 30_000);
 
@@ -187,7 +187,7 @@ describe("installed-bin shape via symlink/junction", () => {
   //
   // `init`'s merge refusal is an exit-code defect and nothing else: the message was
   // always right, so an in-process test that reads stdout sees a correct-looking run either way.
-  // Only a real process has an exit code, which is the whole reason this guard lives here — and the
+  // Only a real process has an exit code, which is the whole reason this guard lives here - and the
   // shape that mattered is a CI `run:` step, which is a spawn too.
   describe("init's merge refusal vs. skip over the same unloadable config", () => {
     async function fixtureWithUnloadableConfig(): Promise<string> {
@@ -240,7 +240,7 @@ describe("installed-bin shape via symlink/junction", () => {
       // operational failure is the behavior under guard, not the no-write itself.
       expectExitCode(result, EXIT_CODE_SUCCESS);
       expect(result.stdout).toContain(
-        "skipped — existing config left untouched.",
+        "skipped - existing config left untouched.",
       );
     }, 30_000);
   });
@@ -248,8 +248,8 @@ describe("installed-bin shape via symlink/junction", () => {
 
 // Lockfile detection, and an exit-code contract at the process boundary. `runCli`'s own
 // try/catch does not start until after `readPackageVersion()` has already run, so a rejection from
-// there escapes the bin's top-level `await`. Node terminates an unhandled rejection with exit 1 —
-// the code reserved for lint findings — so CI could not tell "found problems" from "could not
+// there escapes the bin's top-level `await`. Node terminates an unhandled rejection with exit 1 -
+// the code reserved for lint findings - so CI could not tell "found problems" from "could not
 // start". Only a real spawn can observe that: in-process tests call `runCli` directly and never
 // execute src/index.ts's top level at all.
 describe("top-level rejection handling in the bin", () => {
@@ -265,7 +265,7 @@ describe("top-level rejection handling in the bin", () => {
     });
 
     // `readPackageVersion` reads `<dist>/../package.json`. A *directory* at that path fails the read
-    // with EISDIR on every platform — unlike chmod, which root ignores and Windows does not model.
+    // with EISDIR on every platform - unlike chmod, which root ignores and Windows does not model.
     // Node's own package.json lookup skips a non-file entry and keeps walking up, which is why the
     // ESM marker below still applies to dist/index.js (verified: with `"type": "commonjs"` there,
     // the compiled ESM entrypoint fails to parse).
@@ -297,7 +297,7 @@ describe("top-level rejection handling in the bin", () => {
     expect(result.status).not.toBe(EXIT_CODE_FINDINGS);
     expect(result.stderr).toContain("Operational error:");
     expect(result.stderr).toContain("EISDIR");
-    // Node's own unhandled-rejection banner must be absent — the failure was handled, not escaped.
+    // Node's own unhandled-rejection banner must be absent - the failure was handled, not escaped.
     expect(result.stderr).not.toContain("UnhandledPromiseRejection");
     expect(result.stderr).not.toContain("ERR_UNHANDLED_REJECTION");
     // Exactly one diagnostic line, not a stack trace dump.
@@ -311,9 +311,9 @@ describe("npx smoke check (generated CI workflow parity)", () => {
   // npm's own `npx` (via libnpmexec) resolves its "local bin" by walking up from its own `cwd`
   // looking for the nearest ancestor directory with a package.json or a node_modules folder
   // (@npmcli/config's localPrefix detection), then probes <that dir>/node_modules/.bin/<name>
-  // (libnpmexec's file-exists.js localFileExists) — confirmed by reading both directly, and by
+  // (libnpmexec's file-exists.js localFileExists) - confirmed by reading both directly, and by
   // spawning real `npx` against a manufactured fixture of this shape. Pointing `cwd` at such a
-  // directory therefore *does* redirect npx's local-bin lookup there — contrary to an earlier
+  // directory therefore *does* redirect npx's local-bin lookup there - contrary to an earlier
   // draft's claim that the lookup "can't be redirected into a temp dir", which caused that draft
   // to skip this check unconditionally in every environment, including CI. Verified directly:
   // `npx --no-install wastech-mdlint --version` run with `cwd` pointed at such a fixture resolves
@@ -325,7 +325,7 @@ describe("npx smoke check (generated CI workflow parity)", () => {
   // extension-less file libnpmexec's local-bin probe looks for, and cmd.exe only resolves the bare
   // command name to .cmd via PATHEXT when it actually *runs* the resolved command. Reproducing
   // that reliably means hand-rolling npm's own cmd-shim templating, which is out of scope for this
-  // fix — the guard fix itself is already verified on Windows by the junction-based spawns in the
+  // fix - the guard fix itself is already verified on Windows by the junction-based spawns in the
   // "installed-bin" describe block above, so this block only adds POSIX confidence for the real
   // npx binary specifically.
   it.skipIf(process.platform === "win32")(
@@ -356,8 +356,8 @@ describe("npx smoke check (generated CI workflow parity)", () => {
       const fixtureDir = await fixtureWithError();
       // cwd is npxRoot (the manufactured local-bin fixture above), not the lint fixture dir, so
       // npx's own local-bin lookup resolves the symlinked bin; the lint fixture path is passed as
-      // an argument instead. --no-install is defense-in-depth, not the determinism guarantee —
-      // cwd already guarantees local resolution — but it's included since it was verified to work
+      // an argument instead. --no-install is defense-in-depth, not the determinism guarantee -
+      // cwd already guarantees local resolution - but it's included since it was verified to work
       // against the pinned npm version (unlike a bare --no, which mis-parses and prints npm's own
       // version instead of forwarding to the CLI). This is what
       // packages/core/src/discovery/config-writer.ts's generated CI workflow actually runs

@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 // No product module imports, through any chain, a module that imports it back. In an ES module
 // cycle, whichever module the loader reaches first runs against the other's bindings before they
 // are initialized, so a `const` or class read at load time is a TDZ error that depends on which
-// entrypoint was loaded first — a host can start where a test never does. A cycle also says that
+// entrypoint was loaded first - a host can start where a test never does. A cycle also says that
 // two modules are one concern split in two.
 //
 // Only imports that survive compilation count: `import type` and `export type` are erased, so a

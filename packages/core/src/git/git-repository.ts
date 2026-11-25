@@ -12,8 +12,8 @@ import {
 
 // Read-only access to the git repository a host was pointed at: where its work tree starts, which
 // branch a change is compared with, what changed, and what a file's text was at a commit. Every
-// path in and out is relative to the host's root directory, POSIX-separated — the corpus's own
-// coordinates — and the translation to git's top-level-relative paths happens in this file only.
+// path in and out is relative to the host's root directory, POSIX-separated - the corpus's own
+// coordinates - and the translation to git's top-level-relative paths happens in this file only.
 
 // `GIT_CONFIG_COUNT`, which carries the settings that keep repository config from starting
 // programs, arrived in 2.31; `rev-parse --end-of-options` in 2.30.
@@ -114,7 +114,7 @@ export async function openGitRepository(
 ): Promise<GitRepository | GitUnavailable> {
   const inherited = options.env ?? process.env;
   // Resolved first, so a directory that does not exist fails here as itself rather than as the
-  // `ENOENT` a child started in it reports — which reads exactly like a missing `git`.
+  // `ENOENT` a child started in it reports - which reads exactly like a missing `git`.
   const probe: GitInvocation = {
     cwd: await realpath(rootDir),
     env: gitEnvironment(inherited),
@@ -138,7 +138,7 @@ export async function openGitRepository(
   );
 }
 
-// Why git cannot be used at all — no binary, or one older than `MINIMUM_GIT_VERSION` — or
+// Why git cannot be used at all - no binary, or one older than `MINIMUM_GIT_VERSION` - or
 // undefined when the installed git will do.
 async function checkGitVersion(
   probe: GitInvocation,
@@ -241,13 +241,13 @@ function unlocatedRepository(exitCode: number, stderr: string): GitUnavailable {
 
 // Filter drivers are named in config and attached to paths by `.gitattributes`; git runs a
 // driver's `clean` command on every work-tree file whose stat changed when it compares the work
-// tree. They are emptied — an empty command is no filter — for every driver any config defines,
+// tree. They are emptied - an empty command is no filter - for every driver any config defines,
 // the user's own included: a legitimate driver such as git-lfs is not told apart from a planted
 // one, so a Markdown file kept in LFS compares as its pointer text.
 //
 // Protocols are the same shape of problem: the fixed settings every call carries refuse the
-// transports git knows by name, but a config can allow one of its own — `protocol.<name>.allow`,
-// for a remote helper reached through a `<name>::` URL — and a per-protocol key outranks the generic
+// transports git knows by name, but a config can allow one of its own - `protocol.<name>.allow`,
+// for a remote helper reached through a `<name>::` URL - and a per-protocol key outranks the generic
 // `protocol.allow`. So every protocol any config names is refused by name too.
 //
 // Listing them runs nothing: `git config` only reads files. Exported for tests.
@@ -307,7 +307,7 @@ export class GitRepository {
   readonly available = true;
 
   constructor(
-    // Where every command runs — the work tree's top level — and the caller's environment as given,
+    // Where every command runs - the work tree's top level - and the caller's environment as given,
     // kept so each command's environment is built afresh around the overrides that call's config
     // scan found.
     private readonly launch: { cwd: string; inherited: NodeJS.ProcessEnv },
@@ -323,7 +323,7 @@ export class GitRepository {
     /**
      * The realpath of this work tree's own git directory: the common one for the main work tree, a
      * folder under it for each added worktree. Its `HEAD` is this work tree's alone, while branches
-     * and remote refs live in `commonDir` — together the two say where a host watches for a commit,
+     * and remote refs live in `commonDir` - together the two say where a host watches for a commit,
      * a checkout or a fetch. Absolute, so it is never shown to a reader.
      */
     readonly gitDir: string,
@@ -344,7 +344,7 @@ export class GitRepository {
   }
 
   /**
-   * The commits `HEAD` and the base (`base.fullRef`, else `base.ref`) name now, as one string —
+   * The commits `HEAD` and the base (`base.fullRef`, else `base.ref`) name now, as one string -
    * `undefined` when either names none. One `rev-parse` after the config scan every command gets,
    * so a long-lived host can ask on every request whether a commit, a checkout or a fetch has made
    * what it computed from the two stale.
@@ -465,15 +465,15 @@ export class GitRepository {
   }
 
   /**
-   * The paths under the host root that differ between `from` and the work tree — tracked changes,
-   * staged or not, and untracked files git does not ignore — or between `from` and `HEAD` when
+   * The paths under the host root that differ between `from` and the work tree - tracked changes,
+   * staged or not, and untracked files git does not ignore - or between `from` and `HEAD` when
    * `worktree` is false. Sorted by path.
    *
    * Git detects renames only between paths it tracks, so a file moved on disk and not yet staged
    * reads as a deletion and an addition.
    *
    * `alsoPaths` are files outside the host root to report as well, named relative to the root with
-   * `..` segments — the config file a parent directory holds, which decides what the corpus under
+   * `..` segments - the config file a parent directory holds, which decides what the corpus under
    * the root is. A path that leaves the work tree has no history to compare and is skipped.
    */
   async changedPaths(
@@ -629,8 +629,8 @@ export class GitRepository {
 
   /**
    * Who last touched each line of the file as it is in the work tree: one entry per line, numbered
-   * from 1. A line not yet committed has `commit: undefined`. Empty when git cannot blame the file —
-   * not tracked, or no commit yet — so a host can simply show nothing.
+   * from 1. A line not yet committed has `commit: undefined`. Empty when git cannot blame the file -
+   * not tracked, or no commit yet - so a host can simply show nothing.
    */
   async blame(relPath: string): Promise<(BlameLine | undefined)[]> {
     const output = await this.run([
@@ -661,8 +661,8 @@ export class GitRepository {
   }
 
   // Every command this class starts goes through here, and the repository's filter drivers and
-  // protocol settings are listed again for each one rather than once at open. A long-lived host —
-  // the viewer runs for hours — outlives the config it opened with: a checkout activates an
+  // protocol settings are listed again for each one rather than once at open. A long-lived host -
+  // the viewer runs for hours - outlives the config it opened with: a checkout activates an
   // `[includeIf "onbranch:…"]`, a pull rewrites a tracked file an `[include] path` names, a hand
   // edit lands in `.git/config`. A driver listed only at open would then be unknown, so not emptied,
   // and `status` would run its `clean` command. The scan is one `git config` read, which runs
@@ -694,8 +694,8 @@ export class GitRepository {
     return this.prefix === "" ? relPath : `${this.prefix}/${relPath}`;
   }
 
-  // `toTopLevel` with `..` segments resolved, for a path that may climb out of the host root —
-  // git's `<commit>:<path>` and its pathspecs do not resolve them — or `undefined` when it climbs out
+  // `toTopLevel` with `..` segments resolved, for a path that may climb out of the host root -
+  // git's `<commit>:<path>` and its pathspecs do not resolve them - or `undefined` when it climbs out
   // of the work tree too, or is absolute (a config on another Windows drive has no relative name).
   private resolveTopLevel(relPath: string): string | undefined {
     if (path.posix.isAbsolute(relPath) || path.win32.isAbsolute(relPath)) {
@@ -741,7 +741,7 @@ function fromTopLevelChange(
 
 /**
  * Parse `status --porcelain=v1 -z` into changes from `HEAD` to the work tree. Each entry is `XY`
- * — `X` the index against `HEAD`, `Y` the work tree against the index — a space and a path; a
+ * - `X` the index against `HEAD`, `Y` the work tree against the index - a space and a path; a
  * rename or a copy adds the source path as the next field. Only what the two columns mean together
  * matters here: whether the path exists at `HEAD`, whether it exists on disk, and where it came from.
  */
@@ -821,7 +821,7 @@ function untrackedOrUnmergedChange(
 }
 
 /**
- * Compose two consecutive change lists — `first` from snapshot A to B, `second` from B to C — into
+ * Compose two consecutive change lists - `first` from snapshot A to B, `second` from B to C - into
  * the changes from A to C, following each path back through both: a rename in one and a rename of
  * the result in the other is one rename, an addition later deleted is nothing, a deletion and a
  * re-creation at the same path is a modification.
@@ -967,8 +967,8 @@ export function parseBlamePorcelain(text: string): (BlameLine | undefined)[] {
   return lines;
 }
 
-// A one-letter name-status other than a rename or a copy: an addition, a deletion, or — for every
-// other letter, a type change included — a modification.
+// A one-letter name-status other than a rename or a copy: an addition, a deletion, or - for every
+// other letter, a type change included - a modification.
 function addedDeletedOrModified(kind: string | undefined): "A" | "D" | "M" {
   if (kind === "A" || kind === "D") {
     return kind;

@@ -96,7 +96,7 @@ describe.skipIf(!hasGit)("history and blame (requires git on PATH)", () => {
       404,
     );
     // A changed document carries the place to show it right under its banner, hidden until its
-    // script runs — not inside the banner, which stays pinned while the text scrolls and would carry
+    // script runs - not inside the banner, which stays pinned while the text scrolls and would carry
     // an opened list over the text with it.
     const changed = articleOf((await get(port, "/doc/docs/guide.md")).body);
     expect(changed).toContain(
@@ -133,7 +133,7 @@ describe.skipIf(!hasGit)("history and blame (requires git on PATH)", () => {
     const article = articleOf(blamed.body);
     expect(article).toContain('class="markdown-body has-blame"');
     expect(article).toMatch(
-      /<h1 [^>]*data-blame="[0-9a-f]{7} \d{4}-\d{2}-\d{2}" title="[0-9a-f]{7} · \d{4}-\d{2}-\d{2} · Fixture — Write the guide"/,
+      /<h1 [^>]*data-blame="[0-9a-f]{7} \d{4}-\d{2}-\d{2}" title="[0-9a-f]{7} · \d{4}-\d{2}-\d{2} · Fixture - Write the guide"/,
     );
     expect(article).toMatch(
       /data-blame="uncommitted" title="Not committed yet"[^>]*>First paragraph, not committed\./,

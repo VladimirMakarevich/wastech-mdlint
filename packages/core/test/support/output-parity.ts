@@ -1,10 +1,10 @@
 // Readers that turn a **human** rendering back into structured rows, so it can be compared against
-// the structured payload the same run produced — plus the lint corpus those readers are exercised on,
+// the structured payload the same run produced - plus the lint corpus those readers are exercised on,
 // which belongs here for the same reason: it is chosen to make the comparison non-vacuous.
 //
 // Process-boundary rendering was a whole bucket of missed defects:
 // nothing diffed human text against the structured payload, and three defects lived in that gap at
-// once — a dropped `hint`, a `json` vocabulary collision, and a `summary` missing its `excluded` key.
+// once - a dropped `hint`, a `json` vocabulary collision, and a `summary` missing its `excluded` key.
 // Each was found by reading code. A test can only find them by parsing what the reader actually sees,
 // which is what these do.
 //
@@ -12,7 +12,7 @@
 // two sides come from **different formulations**. Recomputing the human side with the same helper the
 // renderer uses asserts nothing about either format. So the text is parsed back out, and
 // `lintMessagesAsRows` deliberately restates the location rule instead of importing
-// `formatLintResultText`'s `formatLocation` — the same second-formulation discipline
+// `formatLintResultText`'s `formatLocation` - the same second-formulation discipline
 // `rule-utils.test.ts` applies to glob anchoring.
 //
 // Imports **nothing from any package's `src`**: packages/cli and packages/mcp-server import this
@@ -23,8 +23,8 @@
  * The corpus every lint-parity comparison writes, and the location set it must produce.
  *
  * It lives beside the readers because it is what makes them non-vacuous: the three location shapes the
- * human formatter branches on — `-` for a whole-file finding (`SIZE-001`, twice), a bare `line`
- * (`TBL-002` on the empty `Owner` cell) and `line:column` (`REF-001` on the unresolved link) — are the
+ * human formatter branches on - `-` for a whole-file finding (`SIZE-001`, twice), a bare `line`
+ * (`TBL-002` on the empty `Owner` cell) and `line:column` (`REF-001` on the unresolved link) - are the
  * reason a fixture with only one of them would let two branches silently disagree. That is a property
  * of this corpus and this rule set together, so restating either in each suite meant a change to the
  * location vocabulary had to be chased through three files.
@@ -32,13 +32,13 @@
  * The checklist item wrapped onto a second source line is here for the same reason and is the one
  * piece of the corpus that is about the *shape* of a message rather than a location: `CTX-002` quotes
  * the item's text, and a soft line break survives into that text, so the message carries a literal
- * newline. Interpolated into a line-oriented format it produces an unindented continuation line —
- * indistinguishable from a file heading — and every following finding is attributed to a file that
+ * newline. Interpolated into a line-oriented format it produces an unindented continuation line -
+ * indistinguishable from a file heading - and every following finding is attributed to a file that
  * does not exist. A corpus of single-line messages cannot see that, which is how it shipped.
  *
  * Callers write the files with their own fixture helper (each package already has one) and compare
- * their parsed locations against {@link PARITY_LINT_FIXTURE.locations}. A suite that needs more — the
- * cross-host guard also needs a graph with real edges — extends the map rather than restating it.
+ * their parsed locations against {@link PARITY_LINT_FIXTURE.locations}. A suite that needs more - the
+ * cross-host guard also needs a graph with real edges - extends the map rather than restating it.
  */
 export const PARITY_LINT_FIXTURE: {
   readonly files: Readonly<Record<string, string>>;
@@ -83,7 +83,7 @@ export type LintFindingRow = {
 // non-space first character after that strip is what keeps one nesting level from reading another's
 // headers: at `headerIndent = ""` a `  files outside corpus (N):` is skipped, and at `"  "` a
 // top-level `reading order (N):` is. One level per call, so a section's items are never the wrong
-// block's. (`  cluster 1 (76 files):` is excluded at every level by the `(\d+)` — the count is not
+// block's. (`  cluster 1 (76 files):` is excluded at every level by the `(\d+)` - the count is not
 // bare there, which is the one place the human format varies on purpose.)
 const SECTION_HEADER = /^(?<label>[^\s].*) \((?<count>\d+)\):$/;
 
@@ -91,12 +91,12 @@ const SECTION_HEADER = /^(?<label>[^\s].*) \((?<count>\d+)\):$/;
  * Read every `label (N):` section of a human report into `label -> items`.
  *
  * Items are the immediately following lines prefixed by `indent`; the section ends at the first line
- * that is not. Throws when a header's own count disagrees with the items emitted under it — the
+ * that is not. Throws when a header's own count disagrees with the items emitted under it - the
  * header would otherwise be a claim the section contradicts, and every caller wants that to fail.
  *
  * `headerIndent` selects which nesting level to read. It exists because the graph format's coverage
  * block nests one path-bearing section (`  files outside corpus (N):`, items at four spaces), and a
- * reader that could not be pointed at it left the newest section as the one nothing compared —
+ * reader that could not be pointed at it left the newest section as the one nothing compared -
  * exactly the omission shape the shared readers exist to close.
  */
 export function readHumanSections(
@@ -137,7 +137,7 @@ export function readHumanSections(
 }
 
 // One finding line: `  <location>  <severity>  <message>  <ruleId>`. The message is matched greedily
-// so the *last* two-space run before a trailing bare token ends it — a message that itself contains
+// so the *last* two-space run before a trailing bare token ends it - a message that itself contains
 // two consecutive spaces would otherwise split in the wrong place.
 const FINDING_LINE =
   /^ {2}(?<location>\S+) {2}(?<severity>error|warning) {2}(?<message>.*) {2}(?<ruleId>\S+)$/;
@@ -199,12 +199,12 @@ export function readLintSummaryLine(
  *
  * Two rules of the human format are restated here on purpose rather than imported from core, because
  * sharing one implementation would make both sides of the comparison the same code, which is not
- * parity. If a restatement and the renderer ever disagree, one of them is the defect — that is the
+ * parity. If a restatement and the renderer ever disagree, one of them is the defect - that is the
  * point.
  *
  * The first is the location (`-` for a whole-file finding, `line`, or `line:column`). The second is
- * that a row occupies exactly one line, so the structured payload's message — which keeps its
- * newlines, being escaped rather than laid out — has its whitespace runs flattened before comparison.
+ * that a row occupies exactly one line, so the structured payload's message - which keeps its
+ * newlines, being escaped rather than laid out - has its whitespace runs flattened before comparison.
  * What that leaves the comparison asserting is the structural half: how many rows the text renders,
  * which file each is grouped under, and in what order. Those are what a message spilling onto a
  * second line destroys, and they are not weakened by the two sides agreeing about whitespace.

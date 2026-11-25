@@ -2,7 +2,7 @@ import type { RuleContext } from "../types.js";
 
 /**
  * Report that a rule could not run because one of its options names something the analyzed corpus
- * does not contain — a glossary glob matching no document, a template that is not there, a column
+ * does not contain - a glossary glob matching no document, a template that is not there, a column
  * header no table carries.
  *
  * This exists because the alternative is the worst outcome a linter has: a rule configured, inert,
@@ -13,7 +13,7 @@ import type { RuleContext } from "../types.js";
  * Three properties are the point, and each is deliberate:
  *
  * - **`severity: "error"`, whatever the rule's default is.** The CLI's default `--fail-on` is
- *   `error`, so a warning-severity diagnostic prints and still exits `0` — which is the silence
+ *   `error`, so a warning-severity diagnostic prints and still exits `0` - which is the silence
  *   being fixed, one line of output later. A rule entry's own `"severity"` still wins over this
  *   (final severity is `configOverride ?? finding.severity ?? rule.defaultSeverity`), so a user who
  *   has decided this rule is advisory keeps that; what they no longer get is nothing at all.
@@ -23,7 +23,7 @@ import type { RuleContext } from "../types.js";
  *   a normalized rendering of a path that does not work is harder to match against the config than
  *   the original.
  * - **A value outside the corpus is never inline-suppressible.** Message filtering reads disable
- *   directives from the document a finding names, and there is no document at this path — so
+ *   directives from the document a finding names, and there is no document at this path - so
  *   `wastech-mdlint-disable <rule>` cannot put the silence back. That is a consequence of the
  *   attribution above rather than a separate mechanism, and it is the right one here.
  *

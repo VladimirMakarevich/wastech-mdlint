@@ -116,8 +116,8 @@ describe.skipIf(!hasGit)(
       "lints the base with the base's config from a directory below the config, as from its own",
       async () => {
         // The branch turns a rule on in the config at the top and changes no document, so the one
-        // finding it brings exists only under the head's config. Linting `docs` — named as the
-        // path, or as the cwd — puts the config above the root, where a comparison limited to the
+        // finding it brings exists only under the head's config. Linting `docs` - named as the
+        // path, or as the cwd - puts the config above the root, where a comparison limited to the
         // root would not see it change and would lint the base with the head's rules: green, while
         // `lint . --since` on the same branch is red.
         const fixture = await makeRepo();

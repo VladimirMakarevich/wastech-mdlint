@@ -3,7 +3,7 @@
 // attribute regex matches to a line.
 
 // One-shot form: allocates nothing and stops at `index`. Callers that resolve *many* offsets in the
-// same string must hoist a `createLineNumberLookup` instead of calling this in a loop — the scan
+// same string must hoist a `createLineNumberLookup` instead of calling this in a loop - the scan
 // restarts from offset zero every time, which is an O(M·L) hot path.
 export function findLineNumber(content: string, index: number): number {
   const clamped = Math.max(0, Math.min(index, content.length));
@@ -28,7 +28,7 @@ export type LineNumberLookup = (index: number) => number;
  * (clamped the same way) and CRLF content (line starts are derived from `\n` alone).
  */
 export function createLineNumberLookup(content: string): LineNumberLookup {
-  // Index 0 always opens line 1, and each `\n` opens the next line at the following offset — the
+  // Index 0 always opens line 1, and each `\n` opens the next line at the following offset - the
   // same model as counting newlines before an offset, just precomputed.
   const lineStarts = [0];
 

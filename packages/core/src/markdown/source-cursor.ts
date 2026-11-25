@@ -7,7 +7,7 @@
  *
  * A line break is CRLF, a lone LF or a lone CR, exactly as micromark counts them for node
  * positions. Counting LF alone put everything after a lone CR on the line before it, so a finding
- * disagreed with the parser — and with an editor — about which line it was on. CRLF is one break,
+ * disagreed with the parser - and with an editor - about which line it was on. CRLF is one break,
  * not two: the CR is skipped and the LF that follows it counts.
  */
 export function createSourceCursor(

@@ -1,5 +1,5 @@
 // Turns the header's search form into a live list of matches. The form also works without this
-// script — it submits to `/search`, which renders the same results as a page — so this only adds
+// script - it submits to `/search`, which renders the same results as a page - so this only adds
 // typing-as-you-go, keyboard selection and the Ctrl+K shortcut.
 
 type SearchHit = {
@@ -57,7 +57,7 @@ function resultList(
   return list;
 }
 
-// Ctrl+K (Cmd+K on macOS) from anywhere, and `/` when the reader is not already typing — the two
+// Ctrl+K (Cmd+K on macOS) from anywhere, and `/` when the reader is not already typing - the two
 // shortcuts documentation sites have taught people to reach for.
 function bindShortcuts(input: HTMLInputElement): void {
   document.addEventListener("keydown", (event) => {

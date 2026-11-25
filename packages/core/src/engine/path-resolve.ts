@@ -33,14 +33,14 @@ export function escapesRoot(relPath: string): boolean {
 // the literal `..`-prefix check in `escapesRoot`: enough `../` segments can cancel out the source
 // directory and leave a bare drive-absolute remainder (e.g. `c:/Windows/x.md`, from a link like
 // `../c:/Windows/x.md`) that never starts with `..` but that `path.win32.resolve` still treats as
-// absolute, ignoring `rootDir` entirely — a no-op on POSIX, where these candidates never carry a
+// absolute, ignoring `rootDir` entirely - a no-op on POSIX, where these candidates never carry a
 // leading `/` by construction.
 export function candidateEscapesRoot(relPath: string): boolean {
   return escapesRoot(relPath) || path.isAbsolute(relPath);
 }
 
-// True when a raw, filesystem-facing path — as supplied directly by config or an MCP caller, not
-// yet corpus-normalized — would resolve outside `rootDir`. Complements `escapesRoot` above: that
+// True when a raw, filesystem-facing path - as supplied directly by config or an MCP caller, not
+// yet corpus-normalized - would resolve outside `rootDir`. Complements `escapesRoot` above: that
 // helper only ever sees repo-relative POSIX candidates link/image resolution builds internally
 // (never OS-absolute by construction), whereas an option like SEC-003's `template` hands
 // `path.resolve` a raw string that can itself be absolute (which `path.resolve` honors verbatim,
@@ -52,7 +52,7 @@ export function resolvesOutsideRoot(rootDir: string, rawPath: string): boolean {
   const relativeToRoot = path.relative(rootDir, path.resolve(rootDir, rawPath));
   // A Windows drive-relative path (e.g. "D:secret.md") is not `path.isAbsolute`, but resolves
   // against a different drive than `rootDir`. `path.relative` cannot express a cross-drive
-  // relationship as a "../"-prefixed path, so it returns the absolute `to` path unchanged — treat
+  // relationship as a "../"-prefixed path, so it returns the absolute `to` path unchanged - treat
   // that as escaping too, instead of falling through as "inside root".
   return (
     relativeToRoot === ".." ||
@@ -78,7 +78,7 @@ export function sourceLocale(
 // Ordered repo-relative candidates a link/image/import target could resolve to, shared by the graph
 // builder and REF rules so root-relative/router resolution never disagrees between the two
 // consumers. Callers check candidates in order against whatever "exists" means for them (a corpus
-// node set, or the filesystem) — this helper only enumerates possibilities.
+// node set, or the filesystem) - this helper only enumerates possibilities.
 export function resolveTargetCandidates(
   sourcePath: string,
   targetFilePart: string,

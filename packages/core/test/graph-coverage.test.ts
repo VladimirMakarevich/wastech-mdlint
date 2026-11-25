@@ -98,7 +98,7 @@ describe("computeGraphCoverage", () => {
 
   // The reproduction verbatim: coverage used to check `.md` + `.markdown`, so it named
   // an extension no default `include` can admit and stayed silent about the one `init` walks. The
-  // extension set is now shared with the scan and the default include — see
+  // extension set is now shared with the scan and the default include - see
   // `markdown-extensions.test.ts` for the three-site guard.
   it("names a linked `.mdx` file outside the corpus and ignores a `.markdown` one", async () => {
     const root = await fixtureRepo({
@@ -153,7 +153,7 @@ describe("computeGraphCoverage", () => {
   });
 
   // Same drive-absolute-remainder gap as REF-001/REF-003 (see
-  // primitives.test.ts) — a `..`-cancelled link target must not surface a real out-of-root host
+  // primitives.test.ts) - a `..`-cancelled link target must not surface a real out-of-root host
   // path as if it were merely "outside the corpus". Windows-only: the remainder is a harmless
   // relative segment named "C:" on POSIX.
   it.runIf(process.platform === "win32")(

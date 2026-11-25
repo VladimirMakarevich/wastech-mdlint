@@ -3,7 +3,7 @@
 
 /**
  * Every event name the server's `EventHub` sends: each `broadcast` call's name, and `missed`, which
- * the hub sends itself. The stream listens for all of them only to learn their ids — a page that is
+ * the hub sends itself. The stream listens for all of them only to learn their ids - a page that is
  * hidden closes its stream and reopens it from the last id it holds, so an id it never heard would
  * have the server send that event again, and enough of them would read as more missed than it keeps.
  */
@@ -47,8 +47,8 @@ export class StreamPosition {
   }
 
   /**
-   * The stream's address from here. Without an id — a page served without one, which has
-   * received nothing since — the server sends only what happens from now on.
+   * The stream's address from here. Without an id - a page served without one, which has
+   * received nothing since - the server sends only what happens from now on.
    */
   get url(): string {
     return this.seen === undefined

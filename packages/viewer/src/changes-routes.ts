@@ -376,7 +376,7 @@ const FAILURE_STATUS: Record<UpdateFailure["status"], number> = {
 };
 
 // A mark the store could not write: a write that failed, another viewer holding the lock, or marks
-// it refused to change because it cannot read the ones already there — each its own status, so the
+// it refused to change because it cannot read the ones already there - each its own status, so the
 // page can say which.
 function sendUpdateFailure(
   response: ServerResponse,

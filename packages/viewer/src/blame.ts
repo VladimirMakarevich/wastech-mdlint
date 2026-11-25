@@ -3,7 +3,7 @@ import { type BlameLine, compareStrings } from "@wastech-mdlint/core";
 import type { LineAnnotator } from "./render-document.js";
 
 // Blame in the margin: for each block, the commit that last touched any of its lines, from core's
-// `git blame`. A block is one unit to a reader, so the newest of its lines speaks for it — a paragraph
+// `git blame`. A block is one unit to a reader, so the newest of its lines speaks for it - a paragraph
 // edited yesterday reads as edited yesterday, however old its other lines are.
 
 /**
@@ -31,7 +31,7 @@ export function blameAnnotator(
         : "";
     return {
       text: `${short} ${date}`.trim(),
-      title: `${short} · ${date}${author} — ${newest.subject ?? ""}`,
+      title: `${short} · ${date}${author} - ${newest.subject ?? ""}`,
     };
   };
 }

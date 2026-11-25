@@ -24,8 +24,8 @@ export const sinceSummarySchema = z.object({
 });
 
 /**
- * The work tree's changes since `ref`, or an input error naming why there is nothing to compare —
- * not a git work tree, no `git`, a ref that names nothing — with git's remedy as the hint. An error
+ * The work tree's changes since `ref`, or an input error naming why there is nothing to compare -
+ * not a git work tree, no `git`, a ref that names nothing - with git's remedy as the hint. An error
  * rather than an empty answer, because "no new findings" from a comparison that never ran is the
  * plausible answer to a different question.
  */

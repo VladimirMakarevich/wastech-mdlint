@@ -462,7 +462,7 @@ describe.skipIf(!hasGit)("review marks (requires git on PATH)", () => {
 
   // @boundary-guard write-failure
   //
-  // A state directory that cannot hold the marks — here a regular file in its place, which refuses
+  // A state directory that cannot hold the marks - here a regular file in its place, which refuses
   // the folder the first mark creates on every platform. The request must say the mark failed, not
   // that it was saved; the file in the way must be untouched with nothing left beside it; and the
   // page, which draws a mark only from what the server stored, must not show the document reviewed.

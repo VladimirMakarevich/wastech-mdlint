@@ -123,7 +123,7 @@ const ASSERTION_SUMMARIZERS: {
   // Render from the *resolved* value: annotating only an explicit `true` made a
   // default-cased rule read identically to a case-insensitive one in the committed skill.
   // Tested against `=== false` rather than for a truthy value because `describeRules` is public
-  // API and can be handed entries that never passed through Zod, where the key is absent — and
+  // API and can be handed entries that never passed through Zod, where the key is absent - and
   // absent means the schema default, not a third state.
   columnInSet: (assertion) =>
     `requires values in column ${quote(assertion.column)}${formatSection(assertion.section)} to be one of ${formatList(assertion.values)}${assertion.caseSensitive === false ? " (case-insensitive)" : " (case-sensitive)"}`,

@@ -30,7 +30,7 @@ export const regexFlagsSchema = z
 
 // Cross-field check for an options object carrying both `pattern` and `flags`. Validating each field
 // alone is not enough: a pattern can be valid without flags and the flags valid on `.`, yet the pair
-// fail to compile — `\u{110000}` is a harmless literal without `u` and an out-of-range code point
+// fail to compile - `\u{110000}` is a harmless literal without `u` and an out-of-range code point
 // with it. Such a config would load cleanly and then throw from `compileRegex` mid-lint, aborting
 // the whole run; checking the pair here turns it into a config error at the offending `pattern`.
 // Used as `.refine(isValidPatternWithFlags, patternWithFlagsIssue)` on the object schema.

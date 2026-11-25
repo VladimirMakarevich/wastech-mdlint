@@ -87,14 +87,14 @@ export type Layout = {
 //
 // One repulsion for every node would give a hub the same room as a leaf, though it is several times
 // as wide and every one of its links pulls it toward the crowded middle; that is where documents
-// still landed on each other. So each node repels in proportion to its area — scaled so the mean
-// stays the repulsion solved for above — and a link is as long as the gap the layout keeps plus the
+// still landed on each other. So each node repels in proportion to its area - scaled so the mean
+// stays the repulsion solved for above - and a link is as long as the gap the layout keeps plus the
 // radii of the two documents it joins, so two linked hubs end the same gap apart as two leaves.
 //
 // A local graph is a ring of neighbors around the pinned document instead, every link that shapes it
 // the ring's radius long. ECharts moves a node by each other node's repulsion divided by their
-// distance, and on a ring of n neighbors those pushes add up to (n + 1)·r / R straight outward —
-// one r / R from each other neighbor, two from the pinned document — against gravity's g·R inward.
+// distance, and on a ring of n neighbors those pushes add up to (n + 1)·r / R straight outward -
+// one r / R from each other neighbor, two from the pinned document - against gravity's g·R inward.
 // So r = g·R² / (n + 1) is the one repulsion that holds the ring at its radius with no help from the
 // links, and it then spreads the neighbors evenly round it. Measured on a fourteen-neighbor document:
 // with the page graph's repulsion and every link pulling, they settled from 27 to 76 pixels out with
@@ -164,7 +164,7 @@ export function layoutFor(
       gravity,
       repulsion: [weakest, strongest],
       // A link's `value` is its length, and ECharts maps the smallest value in the view onto the
-      // range's second end and the largest onto its first, linearly between them — so this range,
+      // range's second end and the largest onto its first, linearly between them - so this range,
       // written longest first, hands every link back exactly the length it asked for.
       edgeLength: [longestLink, shortestLink],
     },

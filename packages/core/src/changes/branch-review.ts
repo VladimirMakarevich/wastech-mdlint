@@ -37,8 +37,8 @@ import { diffText, tableRowLines, type TextDiff } from "./text-diff.js";
 
 // A branch's review of the corpus: what changed against the base, each changed document read and
 // parsed on both sides with its diff, and what the change does to the context. One sequence for
-// every host — the viewer reviewing a branch, `lint --since` and `impact --since` in the CLI, the
-// MCP tools' `since` — so none of them can pick a different base, read a different side or lint the
+// every host - the viewer reviewing a branch, `lint --since` and `impact --since` in the CLI, the
+// MCP tools' `since` - so none of them can pick a different base, read a different side or lint the
 // base differently.
 
 /** One changed corpus document, both sides read, with its diff and its place in the review. */
@@ -79,7 +79,7 @@ export type BranchReview = {
 
 /**
  * Review a branch's changes to `corpus`. With `worktree`, the head side is the corpus as read from
- * disk — the text every page and every lint of the work tree shows; without it, what `HEAD` holds.
+ * disk - the text every page and every lint of the work tree shows; without it, what `HEAD` holds.
  */
 export async function reviewBranch(
   repository: GitRepository,
@@ -189,7 +189,7 @@ export type BranchContext = {
 
 /**
  * What `review`'s change does to the context. `worktree` is the work-tree review of the same
- * merge-base — `review` itself in that mode — and `disk` the corpus it was made from: only that
+ * merge-base - `review` itself in that mode - and `disk` the corpus it was made from: only that
  * review lists every document that differs from the merge-base, so only it can turn the files on
  * disk into the merge-base's version of the corpus. Without the work tree, the head side is the
  * merge-base's version with the branch's commits applied, so uncommitted edits stay out of it just
@@ -353,7 +353,7 @@ export type SinceAnalysis = {
 /**
  * Everything a command needs to answer "since `ref`": the corpus loaded from `cwd`, the work tree's
  * changes against where the branch left `ref`, and what they do to the context. For a one-shot host
- * — a CLI command, an MCP call — that loads the corpus once and asks once; a long-lived host keeps
+ * - a CLI command, an MCP call - that loads the corpus once and asks once; a long-lived host keeps
  * its own corpus and calls `reviewBranch` and `branchContext` itself.
  *
  * A directory outside any git work tree, a missing `git`, or a `ref` that names nothing answers with

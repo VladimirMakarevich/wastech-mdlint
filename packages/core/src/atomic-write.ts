@@ -12,7 +12,7 @@ import path from "node:path";
 // The single write path for every product file. A bare `writeFile` is
 // truncate-then-write: a crash, an `ENOSPC`, or a permission failure partway through leaves the
 // user's existing config / schema / Markdown truncated with no recovery route. Every write here
-// lands in a temp file in the *target's own directory* first and is then `rename`d into place —
+// lands in a temp file in the *target's own directory* first and is then `rename`d into place -
 // atomic on a single filesystem, so an observer only ever sees the old bytes or the new ones.
 //
 // Boundaries this helper deliberately does not cross:
@@ -23,7 +23,7 @@ import path from "node:path";
 // - **No cross-filesystem fallback.** The temp always sits beside its target, so `rename` never
 //   crosses a mount point and `EXDEV` is unreachable by construction (a shared temp dir would have
 //   made it a real, and much harder, case).
-// - **Directory creation is the caller's job**, matching the `writeFile` calls this replaces —
+// - **Directory creation is the caller's job**, matching the `writeFile` calls this replaces -
 //   creating a missing parent here would silently widen what a "write" is allowed to do.
 
 export type AtomicFileWrite = {
@@ -38,7 +38,7 @@ export type AtomicFileWrite = {
  * were committed and which were not, so it can print an honest partial-write summary instead of
  * leaving the user to guess at the state of their repository.
  *
- * `written`/`notWritten` keep the caller's commit order — it is a meaningful sequence (see
+ * `written`/`notWritten` keep the caller's commit order - it is a meaningful sequence (see
  * `writeFilesAtomic`), not an incidental one. A host that renders these sorts its own copy.
  */
 export type AtomicWriteResult =
@@ -83,7 +83,7 @@ async function stageWrite(write: AtomicFileWrite): Promise<StagedWrite> {
   // Mode is read before the temp exists so a pre-existing `0600` config does not silently widen to
   // the default `0644` when the rename replaces it. Best effort: a target that does not exist yet
   // (or a host that rejects the chmod) simply keeps the default mode, which is what `writeFile`
-  // would have produced anyway. Masked to the permission/setuid bits — POSIX leaves `chmod` with the
+  // would have produced anyway. Masked to the permission/setuid bits - POSIX leaves `chmod` with the
   // file-type bits of `st_mode` still set unspecified.
   const targetMode = await stat(target)
     .then((stats) => stats.mode & 0o7777)
@@ -121,7 +121,7 @@ async function discardTemps(staged: readonly StagedWrite[]): Promise<void> {
  *
  * Two-phase staging is the point. An `ENOSPC` while staging the second file means the first one is
  * never renamed at all, so the common failure mode leaves the repository entirely untouched. Once
- * renaming starts a partial commit is unavoidable without a journal — hence the structured result:
+ * renaming starts a partial commit is unavoidable without a journal - hence the structured result:
  * order the writes so the most consistent prefix is the one that survives (`init` commits the
  * schema before the config, so a failure leaves the old config, and its old `$schema` pointer,
  * intact).
@@ -171,7 +171,7 @@ export async function writeFilesAtomic(
 }
 
 /**
- * Single-file atomic write for the call sites that have nothing partial to report — a failure is
+ * Single-file atomic write for the call sites that have nothing partial to report - a failure is
  * simply thrown, preserving the original fs error (errno included) so the host maps it the same way
  * it mapped the bare `writeFile` this replaces.
  */

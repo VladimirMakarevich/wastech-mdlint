@@ -747,8 +747,8 @@ describe.skipIf(!hasGit)(
 
     // @boundary-guard host-parity
     // The page and `/api/changes` describe one context delta: the page's numbers are read back from
-    // its words — the findings beside each row, every session's budget line, the affected documents
-    // — and compared with the JSON, so a count worded on the page cannot drift from the data.
+    // its words - the findings beside each row, every session's budget line, the affected documents
+    // - and compared with the JSON, so a count worded on the page cannot drift from the data.
     it("shows on the page the same delta the API lists", async () => {
       const { body } = await get(port, "/changes");
       const list =
@@ -946,8 +946,8 @@ describe.skipIf(!hasGit)(
 );
 
 describe.skipIf(!hasGit)("a watched repository (requires git on PATH)", () => {
-  // Every document page asked git whether `HEAD` or the base had moved — one process each, most of
-  // the time the page took — although almost always nothing had. Where git's `HEAD` and refs are
+  // Every document page asked git whether `HEAD` or the base had moved - one process each, most of
+  // the time the page took - although almost always nothing had. Where git's `HEAD` and refs are
   // watched, the kept review answers without asking, the watcher's report drops it once git really
   // moved, and a watch that is lost puts the check on every request back.
   it("keeps the review without asking git until the watcher says git moved", async () => {

@@ -27,12 +27,12 @@ import {
   withErrorOutput,
 } from "../shared/tool-response.js";
 
-// `lint-files` — lint the project's Markdown files. Configuration (and its resolved rules/settings)
+// `lint-files` - lint the project's Markdown files. Configuration (and its resolved rules/settings)
 // comes from `resolveToolConfiguration`, the shared helper over core's `loadConfiguration`;
 // core stays the sole owner of the pipeline (this handler is a thin adapter, mirroring the CLI's
 // `handleLint` without `--fix` and without graph loading).
 
-// Same `cwd?`/`configPath?` shape as `ToolFileInput`, plus an optional `patterns` override — so the
+// Same `cwd?`/`configPath?` shape as `ToolFileInput`, plus an optional `patterns` override - so the
 // handler can pass `input` straight into `resolveToolConfiguration`.
 type LintFilesToolInput = ToolFileInput & {
   patterns?: string[];
@@ -46,7 +46,7 @@ const lintFilesInputShape = {
   since: sinceInput,
 } as const;
 
-// Mirrors `LintResult` directly — field names already match, so `structured: result` needs no
+// Mirrors `LintResult` directly - field names already match, so `structured: result` needs no
 // reshaping.
 const lintFilesOutputShape = {
   messages: z.array(lintMessageSchema),
@@ -77,10 +77,10 @@ export async function handleLintFiles(
     const loaded = await resolveToolConfiguration(input);
 
     // An explicit `patterns` arg *replaces* `config.include` (not merges). When it's absent we leave
-    // `config.include` untouched so core's own defaults apply — `resolveCorpusScope`
+    // `config.include` untouched so core's own defaults apply - `resolveCorpusScope`
     // (`config/corpus-scope.ts`) supplies both `DEFAULT_INCLUDE_GLOBS` and the default `exclude`.
     // That "what is the corpus when the config is silent" decision stays core's job, not
-    // reimplemented here — which also means an explicit `patterns` naming a path under a
+    // reimplemented here - which also means an explicit `patterns` naming a path under a
     // default-excluded tree still resolves to nothing.
     const config =
       input.patterns === undefined

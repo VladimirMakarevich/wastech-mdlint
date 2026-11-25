@@ -57,8 +57,8 @@ if (args.kind === "help") {
     const shutdown = (signal: NodeJS.Signals) => {
       // A second signal while closing quits at once, with the code a shell gives a process that
       // signal ended: 128 plus its number, 130 for Ctrl+C and 143 for a SIGTERM. Closing waits for
-      // the git and lint work already running, and a git that hangs — on a network file system, a
-      // lock, a credential prompt it was told not to show — would otherwise leave the terminal with
+      // the git and lint work already running, and a git that hangs - on a network file system, a
+      // lock, a credential prompt it was told not to show - would otherwise leave the terminal with
       // no way to stop the viewer but killing it from elsewhere.
       if (closing) {
         process.exit(128 + os.constants.signals[signal]);

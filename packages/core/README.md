@@ -2,7 +2,7 @@
 
 The pipeline behind [`wastech-mdlint`](https://github.com/VladimirMakarevich/wastech-mdlint), packaged as a library: Markdown parsing, config loading, lint orchestration, context-graph construction, compile, and result formatting.
 
-Core owns all of it. [`@wastech-mdlint/cli`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/packages/cli/README.md) and [`@wastech-mdlint/mcp-server`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/packages/mcp-server/README.md) are thin hosts over this package — argument parsing and exit codes on one side, tool registration and structured output on the other — not parallel implementations. Reach for this package when you want the analysis inside your own program; reach for the CLI or the MCP server when you want to run it.
+Core owns all of it. [`@wastech-mdlint/cli`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/packages/cli/README.md) and [`@wastech-mdlint/mcp-server`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/packages/mcp-server/README.md) are thin hosts over this package - argument parsing and exit codes on one side, tool registration and structured output on the other - not parallel implementations. Reach for this package when you want the analysis inside your own program; reach for the CLI or the MCP server when you want to run it.
 
 ```bash
 npm install @wastech-mdlint/core
@@ -14,7 +14,7 @@ npm install @wastech-mdlint/core
 
 ## Usage
 
-Lint a project the way the CLI does — load the config, then run the pipeline:
+Lint a project the way the CLI does - load the config, then run the pipeline:
 
 ```ts
 import { lintFiles, loadConfiguration } from "@wastech-mdlint/core";
@@ -33,9 +33,9 @@ const result = await lintFiles({
 console.log(result.errorCount, result.warningCount);
 ```
 
-With no config file present, `loadConfiguration` returns the zero-config default — every `**/*.md` outside the always-excluded trees, with an empty ruleset — so the call above is a clean pass until you add rules.
+With no config file present, `loadConfiguration` returns the zero-config default - every `**/*.md` outside the always-excluded trees, with an empty ruleset - so the call above is a clean pass until you add rules.
 
-The context graph is shared infrastructure rather than a lint-only detail — the same graph feeds graph-aware rules, slice, impact, and compile — and is available on its own:
+The context graph is shared infrastructure rather than a lint-only detail - the same graph feeds graph-aware rules, slice, impact, and compile - and is available on its own:
 
 ```ts
 import { buildContextGraph, loadDocuments } from "@wastech-mdlint/core";
@@ -50,7 +50,7 @@ const documents = await loadDocuments(["**/*.md"], {
 const graph = buildContextGraph(documents); // { nodes, edges, cycles }
 ```
 
-A long-running host — an editor integration, a local server — can load the corpus once and lint it again after every change, without discovering and parsing every file each time:
+A long-running host - an editor integration, a local server - can load the corpus once and lint it again after every change, without discovering and parsing every file each time:
 
 ```ts
 import { lintContext, loadContext } from "@wastech-mdlint/core";
@@ -70,16 +70,16 @@ const findings = lintContext({
 
 `lintContext` gives exactly what `lintFiles` gives for the same tree. After an edit, re-parse the changed file with `parseDocument`, rebuild the graph with `buildContextGraph`, and pass the updated context. To render a document, `parseDocumentWithTree` returns the mdast tree of the same parse alongside the `ParsedDocument`, so a page's heading ids and link targets are the ones the rules checked.
 
-Every path in a public result is a repository-relative POSIX path, and every collection is sorted, on all three platforms — output is safe to commit or diff.
+Every path in a public result is a repository-relative POSIX path, and every collection is sorted, on all three platforms - output is safe to commit or diff.
 
 ## Documentation
 
-The rule table, the option reference, and a page per rule live in the repository, not here — they are generated from the rule metadata, and a copy in this file would be a second thing to keep in sync.
+The rule table, the option reference, and a page per rule live in the repository, not here - they are generated from the rule metadata, and a copy in this file would be a second thing to keep in sync.
 
-- [Project README](https://github.com/VladimirMakarevich/wastech-mdlint#readme) — what the tool checks, and the full rule table
+- [Project README](https://github.com/VladimirMakarevich/wastech-mdlint#readme) - what the tool checks, and the full rule table
 - [User guide](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/README.md) · [Concepts](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/concepts.md) · [Configuration](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/configuration.md)
 - [Context graph](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/context-graph.md) · [Output & exit codes](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/output.md)
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT - see [LICENSE](./LICENSE).

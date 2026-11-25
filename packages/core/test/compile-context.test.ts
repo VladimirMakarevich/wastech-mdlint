@@ -157,7 +157,7 @@ describe("compileContext", () => {
 
   it("uses the strictest matching LLM-001 threshold when multiple entries target the same file", async () => {
     // Finding: `rules[]` may configure LLM-001 more than once, and the engine evaluates every
-    // entry independently — a later, stricter entry for the same file must not be silently
+    // entry independently - a later, stricter entry for the same file must not be silently
     // shadowed by an earlier, looser one that "claims" the entrypoint first.
     const root = await fixtureRepo({ "CLAUDE.md": "# Claude\n" });
     const config = loadedConfig({
@@ -193,7 +193,7 @@ describe("compileContext", () => {
     const root = await fixtureRepo({
       "src/content/docs/entry.md": "# Entry\n@/big.md\n",
       // Under the starlight preset, `@/big.md`'s route path is "big.md" (imports always carry a
-      // literal `.md` suffix), whose first router candidate is `<contentDir>/big.md.md` — an
+      // literal `.md` suffix), whose first router candidate is `<contentDir>/big.md.md` - an
       // unusual but valid repo-relative path, chosen deliberately so this fixture only resolves
       // through real router candidate generation, not a coincidental leading-slash strip.
       "src/content/docs/big.md.md": `${"x".repeat(400)}\n`,
@@ -238,7 +238,7 @@ describe("compileContext", () => {
 
   it("reports a truthful zero-match budget state when LLM-001 is enabled but its glob matches nothing", async () => {
     // Finding: an active LLM-001 rule whose `entrypoints` glob matches zero corpus files must not
-    // be reported as "LLM-001 not enabled" — it is enabled, just misconfigured or aimed at a file
+    // be reported as "LLM-001 not enabled" - it is enabled, just misconfigured or aimed at a file
     // that doesn't exist in this corpus.
     const root = await fixtureRepo({ "a.md": "# A\n" });
     const config = loadedConfig({
@@ -281,7 +281,7 @@ describe("compileContext", () => {
   it("computes the corpus token estimate against a CJK document's exact character count", async () => {
     // The token estimator (Math.ceil(text.length / 4)) counts UTF-16 code units, not UTF-8 bytes.
     // `expected` is computed from that locked formula directly against the literal fixture
-    // string — not by calling `estimateTokens` itself — so a future regression to a byte-based
+    // string - not by calling `estimateTokens` itself - so a future regression to a byte-based
     // measure changes only the code under test, not this assertion's expectation, and the test
     // still catches the drift instead of moving in lockstep with it.
     const fileContent = `# 概要\n\n${"日本語のテスト文章です。".repeat(5)}\n`;
@@ -452,11 +452,11 @@ describe("compileContext at corpus scale", () => {
 
   it("gives the budget back: the two listings shrink and orientation grows", () => {
     // Measured in the field at 151 documents: the dependency block 71%, the inventory table 26%, and
-    // everything a reader would call orientation — the corpus estimate, the rule list, the workflow —
+    // everything a reader would call orientation - the corpus estimate, the rule list, the workflow -
     // 2.4%. Both listings are capped now, so the bars below are what keeps that from inverting again.
     // `REFERENCE_DOCUMENT_LIMIT` and `ARCHITECTURE_DOCUMENT_LIMIT` are the dials.
     //
-    // What these bars cannot see is *growth* — a share measured at one corpus size is the same
+    // What these bars cannot see is *growth* - a share measured at one corpus size is the same
     // number whether the section is capped or merely small here. `compile-composition.test.ts`
     // compiles two corpus sizes and is where that half is proven.
     expect(sectionShare("## Document Architecture")).toBeLessThanOrEqual(0.15);

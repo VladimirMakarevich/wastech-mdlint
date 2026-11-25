@@ -160,14 +160,14 @@ describe("graph command over the fixture corpus", () => {
   // structurally cannot see: `files outside corpus` lives *inside* the coverage block, header at two
   // spaces and items at four, so the shared reader has to be pointed at that nesting level. It is
   // diffed here rather than on the large corpus because only this fixture has a file outside `include`
-  // — an empty section would agree with an empty JSON array vacuously, which is how the last section
+  // - an empty section would agree with an empty JSON array vacuously, which is how the last section
   // to become line-oriented would have stayed the one nothing compares. It also pins the line bound here: a
   // comma-joined `files outside corpus (1): appendix.md` no longer ends in `:` and the reader stops
   // finding the section at all.
   //
   // @boundary-guard host-parity
   //
-  // Tags this file for both parity assertions in it — this one and the top-level path-section diff
+  // Tags this file for both parity assertions in it - this one and the top-level path-section diff
   // below. The renderer-level twin in `packages/core/test/graph-render.test.ts` stays untagged on
   // purpose: it compares two functions, not what a host hands a reader, and the category is about
   // the process boundary.
@@ -244,7 +244,7 @@ describe("graph command over the fixture corpus", () => {
 describe("graph command over the large corpus", () => {
   // The human format's line shape is a property of what a terminal receives, so it is asserted at
   // the command boundary as well as in core's renderer unit tests. `graph . --format human | head`
-  // — the documented invocation — truncates by line, which does nothing for a comma-joined blob.
+  // - the documented invocation - truncates by line, which does nothing for a comma-joined blob.
   let root: string;
 
   beforeAll(async () => {
@@ -279,7 +279,7 @@ describe("graph command over the large corpus", () => {
   // passed through would still look fine in a unit test.
   //
   // Widened from `excluded` alone to all three *top-level* sections, through the shared
-  // `readHumanSections` reader — checking one of three is how the next missing key stays invisible. The
+  // `readHumanSections` reader - checking one of three is how the next missing key stays invisible. The
   // format's fourth path section, the coverage block's nested `files outside corpus`, is diffed by
   // "reports the same nested coverage section…" above, on the fixture corpus where it is non-empty.
   it("reports the same top-level path sections in the human and JSON formats", async () => {
@@ -316,7 +316,7 @@ describe("graph command over the large corpus", () => {
     );
   }, 60_000);
 
-  // The `top hubs` list is the one path-bearing section the parity reader above cannot see — its
+  // The `top hubs` list is the one path-bearing section the parity reader above cannot see - its
   // header carries no count, deliberately, because the JSON document has no hub array to diff it
   // against. So it is compared against the JSON's per-node degrees instead: the two numbers a hub
   // line prints must be the two the node carries, or the human report is quietly its own source.
@@ -362,7 +362,7 @@ describe("graph command over the large corpus", () => {
 
   it("honours a configured hubMinInDegree through the command boundary", async () => {
     // Above the corpus's own maximum in-degree, so the only correct answer is that this repository
-    // has no hubs — which is what the generated skill would say about it at the same threshold.
+    // has no hubs - which is what the generated skill would say about it at the same threshold.
     const tunedRoot = await mkdtemp(
       path.join(os.tmpdir(), "wastech-mdlint-cli-hub-threshold-"),
     );
@@ -450,7 +450,7 @@ describe("impact command over the fixture corpus", () => {
       { path: "index.md", depth: 2, via: "guide.md" },
     ]);
 
-    // The affected subgraph is {requirements.md, design.md, guide.md, index.md} — cycle-a.md and
+    // The affected subgraph is {requirements.md, design.md, guide.md, index.md} - cycle-a.md and
     // orphan.md sit outside it, so their GRP-001/GRP-002 findings must not leak into the scoped report.
     expect(payload.lint.files).toEqual([
       "design.md",
@@ -470,7 +470,7 @@ describe("impact command over the fixture corpus", () => {
 
   it("includes cycle-excluded nodes in the JSON payload for parity with human output", async () => {
     // cycle-b.md's affected subgraph is exactly the cycle-a.md ↔ cycle-b.md 2-cycle, so topo-sort
-    // emits nothing and both nodes land in `excluded` — the field a JSON consumer needs to explain
+    // emits nothing and both nodes land in `excluded` - the field a JSON consumer needs to explain
     // why readingOrder is empty despite affected files existing.
     const result = await run(
       ["impact", "cycle-b.md", "--format", "json"],

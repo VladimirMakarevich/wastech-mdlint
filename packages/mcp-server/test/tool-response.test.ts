@@ -13,7 +13,7 @@ import {
 } from "../src/shared/tool-response.js";
 
 // A synthetic Node errno exception. Built here rather than provoked from the filesystem so the
-// classifier's branches are exercised identically on Windows, macOS, and Linux — the real triggers
+// classifier's branches are exercised identically on Windows, macOS, and Linux - the real triggers
 // (an unreadable directory, a `readdir` on a vanished path) are platform-conditional, and their
 // end-to-end coverage lives in `lint-files.test.ts` / `stdio-integration.test.ts`.
 function errnoError(params: {
@@ -118,7 +118,7 @@ describe("errorResult", () => {
   });
 
   // An errno naming a path inside the analyzed directory is the host's environment
-  // failing, not an unexpected internal fault, and errno-plus-path is the whole actionable content —
+  // failing, not an unexpected internal fault, and errno-plus-path is the whole actionable content -
   // the same sentence the CLI prints before exiting 2.
   it("classifies an errno inside the cwd as OPERATIONAL_ERROR with a repo-relative POSIX path", () => {
     const result = errorResult(
@@ -166,8 +166,8 @@ describe("errorResult", () => {
   });
 
   it("sanitizes an errno that names no path", () => {
-    // `ENOSPC: no space left on device, write` — and, on POSIX, `EISDIR` raised by the `read`
-    // syscall — carry no `path`, so there is nothing to render and the raw message stays withheld.
+    // `ENOSPC: no space left on device, write` - and, on POSIX, `EISDIR` raised by the `read`
+    // syscall - carry no `path`, so there is nothing to render and the raw message stays withheld.
     const result = errorResult(
       errnoError({
         code: "ENOSPC",

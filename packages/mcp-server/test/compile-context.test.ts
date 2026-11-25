@@ -44,7 +44,7 @@ describe("handleCompileContext", () => {
     expect(result.isError).toBeFalsy();
 
     // Independent oracle: call core's own pipeline directly (not through the shared helper) and prove
-    // the tool reshapes nothing — `skillContent` byte-for-byte, metadata line character-for-character.
+    // the tool reshapes nothing - `skillContent` byte-for-byte, metadata line character-for-character.
     // This proves the AC's determinism/parity criterion without hand-computing counts (which depend
     // on describeRules/graph internals) or cross-importing the CLI (mcp-server depends only on core).
     const loaded = await loadConfiguration({ cwd: dir });

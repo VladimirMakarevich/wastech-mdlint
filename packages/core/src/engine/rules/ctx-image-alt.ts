@@ -17,7 +17,7 @@ import type { PrimitiveFinding } from "../primitives/types.js";
 // - There is no decorative-image escape. CommonMark has no marker for a purely decorative image,
 //   so the rule cannot tell one apart; an inline disable or the `exclude` option covers that case.
 // - Reference images (`![alt][ref]`, `![alt][]`, `![alt]`) take their alt from their own brackets,
-//   exactly as inline images do. One whose definition is missing never reaches `images` — the
+//   exactly as inline images do. One whose definition is missing never reaches `images` - the
 //   dangling reference is a reference-integrity finding, not an alt-text one.
 // - Raw HTML `<img>` is not a parsed image, so it is not checked.
 //

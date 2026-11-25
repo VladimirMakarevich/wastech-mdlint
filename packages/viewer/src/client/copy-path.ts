@@ -1,7 +1,7 @@
 import { copyText } from "./clipboard.js";
 import { attachMenu } from "./menu.js";
 
-// The copy buttons beside a file's path — in the header of a document or a linked file, and beside
+// The copy buttons beside a file's path - in the header of a document or a linked file, and beside
 // the config file on the config page. Each offers the path relative to the repository, as links and
 // findings name it, and the absolute path on this machine, for a terminal or an editor's "open file".
 // The server writes both onto the button; the absolute one only when the viewer is bound to a

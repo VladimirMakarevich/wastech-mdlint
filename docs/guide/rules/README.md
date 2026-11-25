@@ -4,7 +4,7 @@
 
 `wastech-mdlint` ships **35 built-in rules** across 9 categories, plus the declarative [`custom`](custom.md) rule. Every rule has a Zod-validated options schema, a fixed **scope** (`document` = per file · `project` = once over the whole corpus), and a default **severity** (`error` | `warning`) you can override per entry. Enable rules in your [config](../configuration.md); most accept `files`/`exclude` to narrow their reach.
 
-> There is **no `CHK` category** — checklist completeness is [CTX-002](CTX-002.md).
+> There is **no `CHK` category** - checklist completeness is [CTX-002](CTX-002.md).
 
 ## All rules
 
@@ -45,24 +45,24 @@
 | [SIZE-001](SIZE-001.md) | `file-size-budget` | SIZE | document | warning | no | File stays within byte / line / token budgets. |
 | [LLM-001](LLM-001.md) | `context-token-budget` | LLM | project | warning | no | Eager-import context stays within the per-entrypoint token budget. |
 | [FM-001](FM-001.md) | `valid-front-matter` | FM | document | error | no | Front matter is valid YAML and matches the declared keys, values and patterns. |
-| [custom](custom.md) | — | custom | derived | error | no | Declarative rule composed from a closed assertion vocabulary. |
+| [custom](custom.md) | - | custom | derived | error | no | Declarative rule composed from a closed assertion vocabulary. |
 
-Each built-in rule has an **alias**, a readable name accepted wherever its ID is — as a config [`rule`](../configuration.md#rule-entries) and in an [inline suppression](../suppression.md) directive — while findings always report the ID. The built-in rows mirror the machine-generated table in the top-level [README](../../../README.md) (`npm run generate:docs`). The per-rule pages here add prose, options tables, and examples.
+Each built-in rule has an **alias**, a readable name accepted wherever its ID is - as a config [`rule`](../configuration.md#rule-entries) and in an [inline suppression](../suppression.md) directive - while findings always report the ID. The built-in rows mirror the machine-generated table in the top-level [README](../../../README.md) (`npm run generate:docs`). The per-rule pages here add prose, options tables, and examples.
 
 ## Categories
 
-- **TBL — tables.** Enforce table schemas: required columns, non-empty cells, allowed/patterned values, cross-column rules, and cross-file ID uniqueness.
-- **SEC — sections.** Required sections, section order, and template conformance.
-- **STR — structure.** Required files exist.
-- **REF — references.** Links, anchors, and images resolve; reference labels are defined and definitions are used; cross-zone dependency declaration; ID traceability and stability direction.
-- **CTX — content quality.** No empty/placeholder sections, checklist completeness, glossary term usage, descriptive link text, image alt text, fenced code languages.
-- **GRP — graph integrity.** No cycles, no orphans, ID chains across stages — over the shared [context graph](../context-graph.md).
-- **SIZE / LLM — context hygiene.** Byte/line/token budgets per file, and eager-import token budgets per entrypoint.
-- **FM — front matter.** Front matter is valid YAML, carries its required keys, and holds allowed or patterned values.
-- **custom — declarative.** Compose the closed assertion vocabulary from config, no code.
+- **TBL - tables.** Enforce table schemas: required columns, non-empty cells, allowed/patterned values, cross-column rules, and cross-file ID uniqueness.
+- **SEC - sections.** Required sections, section order, and template conformance.
+- **STR - structure.** Required files exist.
+- **REF - references.** Links, anchors, and images resolve; reference labels are defined and definitions are used; cross-zone dependency declaration; ID traceability and stability direction.
+- **CTX - content quality.** No empty/placeholder sections, checklist completeness, glossary term usage, descriptive link text, image alt text, fenced code languages.
+- **GRP - graph integrity.** No cycles, no orphans, ID chains across stages - over the shared [context graph](../context-graph.md).
+- **SIZE / LLM - context hygiene.** Byte/line/token budgets per file, and eager-import token budgets per entrypoint.
+- **FM - front matter.** Front matter is valid YAML, carries its required keys, and holds allowed or patterned values.
+- **custom - declarative.** Compose the closed assertion vocabulary from config, no code.
 
 ## Severity & suppression
 
 - Set `severity` per entry to `"error" | "warning" | "off"`; `"off"` documents but disables a rule.
-- Suppress individual findings inline — see [Suppression](../suppression.md).
+- Suppress individual findings inline - see [Suppression](../suppression.md).
 - Five rules are **fixable** via `lint --fix`: [SEC-001](SEC-001.md), [TBL-002](TBL-002.md), [REF-002](REF-002.md), [REF-009](REF-009.md) and [CTX-003](CTX-003.md).

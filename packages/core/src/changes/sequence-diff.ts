@@ -1,4 +1,4 @@
-// A shortest edit script between two sequences — Myers' O(ND) algorithm — for lines, words and
+// A shortest edit script between two sequences - Myers' O(ND) algorithm - for lines, words and
 // table cells alike. Written here rather than taken from a package: core is published, the
 // algorithm is short, and the review needs custom equality (a table cell compared without its
 // padding) that a text-oriented library would have to be bent to. Its output is deterministic for a
@@ -30,8 +30,8 @@ export function diffSequences<T>(
   equals: (left: T, right: T) => boolean = Object.is,
   maxEdits: number = DEFAULT_MAX_EDITS,
 ): DiffRun[] {
-  // The common start and end never take part in the search, which keeps the typical review — a few
-  // edits in a long document — far from the edit limit.
+  // The common start and end never take part in the search, which keeps the typical review - a few
+  // edits in a long document - far from the edit limit.
   let prefix = 0;
   while (
     prefix < base.length &&

@@ -296,7 +296,7 @@ describe("analyzeDirectives · diagnostics", () => {
         data: { directive: "disable", token: "FOO" },
       },
     ]);
-    // The unknown token matches nothing — not even a custom id sharing its prefix — and the valid
+    // The unknown token matches nothing - not even a custom id sharing its prefix - and the valid
     // id beside it still acts.
     expect(isSuppressed("FOO-001", 3)).toBe(false);
     expect(isSuppressed("REF-001", 3)).toBe(true);

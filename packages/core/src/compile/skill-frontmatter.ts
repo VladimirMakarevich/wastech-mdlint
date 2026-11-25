@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// SKILL.md frontmatter schema. `synthesize` is the first consumer — it validates generated
+// SKILL.md frontmatter schema. `synthesize` is the first consumer - it validates generated
 // frontmatter against this schema before rendering it. The hand-authored static skills and the CI
 // check that validates them must import this exact export rather than redefine it, so the shape
 // never forks across the three call sites.

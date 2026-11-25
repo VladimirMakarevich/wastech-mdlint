@@ -10,7 +10,7 @@ import type { LintConfig } from "./config-schema.js";
 import { resolveCorpusScope } from "./corpus-scope.js";
 
 // The corpus scope applied to one path at a time, for a long-running host that has to judge a single
-// path — one a watcher reported, one a document links to — without walking the repository again.
+// path - one a watcher reported, one a document links to - without walking the repository again.
 // The walk in `loadDocuments` decides the same question for every file at once; both go through
 // `resolveCorpusScope`, `prunesDirectory` and `isGitIgnored`, in the same order, so a path this
 // calls out of scope is one the walk would never have reached.
@@ -22,7 +22,7 @@ export type ScopeTester = {
    */
   includes(relPath: string): boolean;
   /**
-   * Whether `exclude`, or a `.gitignore` this tester honors, keeps `relPath` out of the walk — by
+   * Whether `exclude`, or a `.gitignore` this tester honors, keeps `relPath` out of the walk - by
    * matching the path itself, or by pruning a directory above it. `isDirectory` picks the form of the
    * question the walk asks of a directory: pruned with its subtree, and matched by directory-only
    * `.gitignore` patterns such as `build/`.

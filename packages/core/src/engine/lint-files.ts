@@ -11,8 +11,8 @@ import { lintCorpus, type LintResult } from "./lint-corpus.js";
 import type { LintConfig } from "../config/config-schema.js";
 import type { ResolvedRule, ResolvedSettings } from "./types.js";
 
-// Re-exported from its new home so every existing importer — `format-lint-result.ts`, `src/index.ts`,
-// and both hosts through the barrel — keeps resolving `LintResult` from here. It moved to
+// Re-exported from its new home so every existing importer - `format-lint-result.ts`, `src/index.ts`,
+// and both hosts through the barrel - keeps resolving `LintResult` from here. It moved to
 // `lint-corpus.ts`, which is the layer that now produces it.
 export type { LintResult } from "./lint-corpus.js";
 
@@ -50,7 +50,7 @@ function activeRules(rules: readonly ConfiguredRule[]): ResolvedRule[] {
  * parse it, resolve rule severities, build the shared graph, then hand all of that to
  * {@link lintCorpus}, which owns the step order from there.
  *
- * This function is the *discovery* half — everything that needs config and the filesystem. The split
+ * This function is the *discovery* half - everything that needs config and the filesystem. The split
  * exists so the ad-hoc text path (`lintContent`) reaches the same steps in the same order instead of
  * re-assembling them in a host.
  */
@@ -66,7 +66,7 @@ export async function lintFiles(input: LintFilesInput): Promise<LintResult> {
     respectGitignore: scope.respectGitignore,
   });
 
-  // Re-key the loader's absolute-path map to repo-relative POSIX paths — the identity rules resolve
+  // Re-key the loader's absolute-path map to repo-relative POSIX paths - the identity rules resolve
   // link/ID targets against.
   const documents = new Map<string, ParsedDocument>();
   for (const document of loaded.values()) {
@@ -77,7 +77,7 @@ export async function lintFiles(input: LintFilesInput): Promise<LintResult> {
   // resolve root-relative links identically to the REF rules; `idRef` makes id-ref edges
   // materialize whenever that shared setting is configured. Those two settings are the builder's
   // whole input: it deliberately takes no `exclude`/`entryPoints`,
-  // because the graph is corpus-wide, so every rule reasons over the same relationships — which is why
+  // because the graph is corpus-wide, so every rule reasons over the same relationships - which is why
   // every option the GRP rules do keep filters their *reporting* rather than the graph: GRP-002's
   // `files`/`exclude`/`entryPoints` and GRP-001's `minCycleLength` all act on
   // findings already produced. Callers may pass a graph to override (e.g. tests).
@@ -110,8 +110,8 @@ export type LintContextInput = {
  * Lint a corpus a host already holds, instead of discovering and parsing it again.
  *
  * `lintFiles` is discovery plus `lintCorpus`; a long-running host that keeps the corpus in memory
- * and re-lints after every edit would pay that discovery and a full re-parse each time — seconds on
- * a few hundred documents — to recompute what it already has. This takes the discovery half's
+ * and re-lints after every edit would pay that discovery and a full re-parse each time - seconds on
+ * a few hundred documents - to recompute what it already has. This takes the discovery half's
  * product (`loadContext`, which applies the same scope `lintFiles` does) and runs the same
  * severity resolution and `lintCorpus` step order, so both entry points give identical results for
  * the same tree. `lintCorpus` itself stays internal: a host still cannot assemble a corpus or

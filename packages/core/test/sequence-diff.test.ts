@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { type DiffRun, diffSequences } from "../src/changes/sequence-diff.js";
 
 // Rebuilds the head from the base and the script, and checks the runs cover both sequences exactly
-// once and in order — the contract every consumer of a script relies on.
+// once and in order - the contract every consumer of a script relies on.
 function apply<T>(
   base: readonly T[],
   head: readonly T[],

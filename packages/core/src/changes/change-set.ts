@@ -10,8 +10,8 @@ import type {
 
 // Which of a branch's changes a review of the corpus shows. Git reports every changed path; a
 // reviewer of documents needs them sorted into the documents the linter checks, the config that
-// decides what those are, Markdown the scope leaves out — counted, so a narrowed scope never reads
-// as "no changes" — and everything else, which a document may still link to.
+// decides what those are, Markdown the scope leaves out - counted, so a narrowed scope never reads
+// as "no changes" - and everything else, which a document may still link to.
 
 /** What a change set is judged against: the corpus as the host loaded it from the work tree. */
 export type CorpusMembership = {
@@ -128,7 +128,7 @@ export type ChangeSet = ClassifiedChanges & {
 
 /**
  * Resolve the base, find where the branch left it, list what changed since, and classify it
- * against the corpus — the one sequence every host showing a review runs, so none of them can pick
+ * against the corpus - the one sequence every host showing a review runs, so none of them can pick
  * a different base or a different comparison.
  */
 export async function collectChangeSet(
@@ -150,8 +150,8 @@ export async function collectChangeSet(
   }
   // A merge-base exists only when HEAD has a commit, so this is defined here.
   const head = (await repository.headCommit()) ?? mergeBase;
-  // The config is asked for by name because it may sit above the root — found in a parent
-  // directory, or given as `../…` — where a comparison limited to the root would never see it
+  // The config is asked for by name because it may sit above the root - found in a parent
+  // directory, or given as `../…` - where a comparison limited to the root would never see it
   // change, and the base would be linted with the head's config. Inside the root it is reported
   // anyway, and naming it again changes nothing.
   const changes = await repository.changedPaths(mergeBase, {

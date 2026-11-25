@@ -28,7 +28,7 @@ export type FieldSpec = {
   label: string;
   required: boolean;
   // Names the "not set" choice of a select or segmented control, where the default is known better
-  // than the schema says — a rule's own default severity, for one.
+  // than the schema says - a rule's own default severity, for one.
   unsetLabel?: string;
   // A list's row is a bare input: the list names it, and an empty row stays a row being typed into
   // rather than removing the value.
@@ -102,7 +102,7 @@ export class FieldRenderer {
     return this.jsonField(spec);
   }
 
-  // A few choices — a boolean, a severity — are shown all at once as a segmented control, one click
+  // A few choices - a boolean, a severity - are shown all at once as a segmented control, one click
   // to change; a longer list stays a select, where a row of segments would run off the form.
   private choiceField(spec: FieldSpec, choices: unknown[]): HTMLElement {
     return choices.length <= 3
@@ -143,7 +143,7 @@ export class FieldRenderer {
   private selectField(spec: FieldSpec, choices: unknown[]): HTMLElement {
     const { path } = spec;
     const select = document.createElement("select");
-    select.append(new Option(unsetLabel(spec, "—"), ""));
+    select.append(new Option(unsetLabel(spec, "-"), ""));
     for (const choice of choices) {
       select.append(new Option(String(choice), JSON.stringify(choice)));
     }
@@ -360,7 +360,7 @@ export class FieldRenderer {
     return container;
   }
 
-  // For a value the form has no inputs for — a map from names to lists, say — the value itself, as
+  // For a value the form has no inputs for - a map from names to lists, say - the value itself, as
   // JSON. It is applied when it parses, and core judges it like any other.
   private jsonField(spec: FieldSpec): HTMLElement {
     const { path } = spec;

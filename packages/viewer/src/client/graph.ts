@@ -60,7 +60,7 @@ export function initLocalGraph(): void {
   }
   // The layout is sized from the box, and a box with no size cannot hold one: the server renders it
   // hidden, and on a narrow screen the whole side column is hidden by CSS. So it is drawn the first
-  // time it has a size — at once on a wide screen, when the window widens on a narrow one, and never
+  // time it has a size - at once on a wide screen, when the window widens on a narrow one, and never
   // on a phone, which then also never downloads ECharts for it.
   canvas.hidden = false;
   // How to zoom is not what a reader expects of a box in a side column, so it says so; without this
@@ -217,7 +217,7 @@ class DrawnGraph {
   }
 
   // The layout is sized for its box: its forces fill it and the focused document is pinned in its
-  // middle. When the box changes for good — the window resized, a side column dragged wider — the
+  // middle. When the box changes for good - the window resized, a side column dragged wider - the
   // graph is laid out again for the new one, from where every document is and at the reader's zoom.
   // A drag resizes the box every frame, so that waits until the size has held for a moment; the
   // canvas itself follows every frame.
@@ -662,7 +662,7 @@ function linkData(context: OptionContext): object[] {
 }
 
 // ECharts runs this for every label whenever it lays labels out, a zoom included, which is what lets
-// names come in with the zoom without a new option — and a new option would restart the layout.
+// names come in with the zoom without a new option - and a new option would restart the layout.
 function labelLayoutFor(
   context: OptionContext,
   zoomNow: () => number,

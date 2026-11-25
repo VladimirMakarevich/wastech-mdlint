@@ -38,7 +38,7 @@ async function lint(cwd: string, rules: ConfiguredRule[]) {
 }
 
 // Front matter on lines 1–5. It is missing `owner`, has a `status` outside the allowed set and an
-// `id` that does not match its pattern — one violation of each configured check.
+// `id` that does not match its pattern - one violation of each configured check.
 const VIOLATING = [
   "---",
   "status: bogus",
@@ -224,7 +224,7 @@ describe("FM file scope (exclude)", () => {
       "docs/a.md",
       "drafts/b.md",
     ]);
-    // The unscoped shape — `exclude` with no `files` beside it to carry the filtering.
+    // The unscoped shape - `exclude` with no `files` beside it to carry the filtering.
     expect(
       await reportedFiles(cwd, rule({ ...options, exclude: ["drafts/**"] })),
     ).toEqual(["docs/a.md"]);

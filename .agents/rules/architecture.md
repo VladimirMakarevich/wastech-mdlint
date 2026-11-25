@@ -12,7 +12,7 @@ These invariants govern implementation work. They are stated here in full; the c
   - Viewer: HTTP serving, HTML rendering, highlighting, live reload, and its review marks and their store. Which core function each of its pages takes its answer from is in [`viewer.md`](viewer.md).
 - Shared computational behavior belongs in core, not in host packages.
 
-The reason is not tidiness. Two hosts that each compute an answer will eventually compute two different answers, and because each package's own tests pass, nothing reports the divergence — which is why a cross-host parity guard exists in the test suite as well.
+The reason is not tidiness. Two hosts that each compute an answer will eventually compute two different answers, and because each package's own tests pass, nothing reports the divergence - which is why a cross-host parity guard exists in the test suite as well.
 
 ## Pipeline Invariants
 
@@ -25,7 +25,7 @@ The reason is not tidiness. Two hosts that each compute an answer will eventuall
 ## Config And Surface Rules
 
 - Config is JSONC in `wastech-mdlint.config.json`.
-- Config uses a local `$schema` — a relative path into the installed package, never a URL. Schema resolution stays offline and version-matched, so an editor validates against the version actually installed rather than whatever the network serves.
+- Config uses a local `$schema` - a relative path into the installed package, never a URL. Schema resolution stays offline and version-matched, so an editor validates against the version actually installed rather than whatever the network serves.
 - No `.cjs`, `.mjs`, or runtime TypeScript config loading.
 - MCP stays stdio-only, and its six shipped tools stay read-only.
 - External HTTP link checking, external link caches, LSP, and docs-site work are outside scope unless explicitly requested. The local viewer is the one requested exception: it serves a repository on this machine, not a published site.

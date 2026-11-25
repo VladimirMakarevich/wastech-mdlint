@@ -2,16 +2,16 @@
 
 > [Guide index](README.md) · [Configuration guide](configuration.md) · [Rules index](rules/README.md)
 
-This is a single `wastech-mdlint.config.json` that exercises **every** option the linter accepts, with a comment on each. It is a _reference_, not a recommended starting config — you would never enable all 35 rules at once with every option. Copy the pieces you need. For a curated starter, run [`wastech-mdlint init`](cli.md#init).
+This is a single `wastech-mdlint.config.json` that exercises **every** option the linter accepts, with a comment on each. It is a _reference_, not a recommended starting config - you would never enable all 35 rules at once with every option. Copy the pieces you need. For a curated starter, run [`wastech-mdlint init`](cli.md#init).
 
-Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys — top-level, in any rule's `options`, or under `compile` — are rejected. Every field below is drawn from the generated schema (`wastech-mdlint schema`).
+Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys - top-level, in any rule's `options`, or under `compile` - are rejected. Every field below is drawn from the generated schema (`wastech-mdlint schema`).
 
 ```jsonc
 {
   // Local path to the JSON schema for editor completion. NEVER a remote URL.
   // `init` points this at ./node_modules/@wastech-mdlint/cli/schema.json when the CLI is installed
   // locally, or at a project-local ./schema.json when custom rules are present or nothing is
-  // installed to point at (the `npx` case). It generates that file unless one is already there —
+  // installed to point at (the `npx` case). It generates that file unless one is already there -
   // an existing schema.json is never replaced, so check the write summary if you had one.
   "$schema": "./node_modules/@wastech-mdlint/cli/schema.json",
 
@@ -25,11 +25,11 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
   "include": ["**/*.md"],
 
   // Globs to remove from the set. `exclude` WINS over `include`. Same anchoring and ordering as
-  // `include` — but a "!" here cannot reach into a directory an earlier entry already pruned.
+  // `include` - but a "!" here cannot reach into a directory an earlier entry already pruned.
   //
   // Every run already excludes 13 noise globs (node_modules, dist, build, .git, .venv, worktrees,
   // …) before you write anything, and what you put here is APPENDED to them rather than replacing
-  // them — so "[]" is not an opt-out, and deleting an entry cannot remove a default. Negate one
+  // them - so "[]" is not an opt-out, and deleting an entry cannot remove a default. Negate one
   // instead ("!**/build/**" for a single tree, "!**" for all of them). Each one names a dependency
   // tree, a build tree or a git worktree checkout; a directory is never excluded merely for
   // starting with a dot, so .github/ and .agents/ are linted by default even though the `init`
@@ -37,7 +37,7 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
   // Full list and rules: ./configuration.md#what-is-excluded-before-you-write-anything
   "exclude": ["**/node_modules/**", "**/dist/**", "**/.git/**"],
 
-  // When true, also skip files ignored by .gitignore. Default: false, deliberately — a .gitignore
+  // When true, also skip files ignored by .gitignore. Default: false, deliberately - a .gitignore
   // says what not to commit, which is not the same as "do not lint this", and the trees a first run
   // must skip are covered by the default `exclude` above. A fresh `init` write does set an explicit
   // true, matching the trees its own scan skipped (a `merge` never adds it).
@@ -68,7 +68,7 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
   // disabled). Omitting severity uses the rule's built-in default. Rule IDs are case-insensitive
   // and dash-optional (ref-001 → REF-001).
   "rules": [
-    // ── TBL — tables ────────────────────────────────────────────────────────────────────────
+    // ── TBL - tables ────────────────────────────────────────────────────────────────────────
     // TBL-001: required header columns exist.
     {
       "rule": "TBL-001",
@@ -135,7 +135,7 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
       },
     },
 
-    // ── SEC — sections ──────────────────────────────────────────────────────────────────────
+    // ── SEC - sections ──────────────────────────────────────────────────────────────────────
     // SEC-001: required sections present. FIXABLE (--fix appends a scaffold `## X` + TODO body).
     {
       "rule": "SEC-001",
@@ -158,7 +158,7 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
     {
       "rule": "SEC-003",
       "options": {
-        // required: template file — repo-relative only; an absolute or `..`-escaping
+        // required: template file - repo-relative only; an absolute or `..`-escaping
         // path is rejected unread so a config cannot read outside the analyzed root
         "template": "docs/_templates/adr.md",
         "level": 2, // heading level to compare (optional)
@@ -191,7 +191,7 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
       },
     },
 
-    // ── STR — structure ─────────────────────────────────────────────────────────────────────
+    // ── STR - structure ─────────────────────────────────────────────────────────────────────
     // STR-001: required files exist (project scope). `files` is the required SET, not a filter.
     {
       "rule": "STR-001",
@@ -202,7 +202,7 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
       },
     },
 
-    // ── REF — references ────────────────────────────────────────────────────────────────────
+    // ── REF - references ────────────────────────────────────────────────────────────────────
     // REF-001: relative links resolve to a file.
     {
       "rule": "REF-001",
@@ -290,7 +290,7 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
       },
     },
 
-    // ── CTX — content quality ───────────────────────────────────────────────────────────────
+    // ── CTX - content quality ───────────────────────────────────────────────────────────────
     // CTX-001: sections are not empty or placeholder-only.
     {
       "rule": "CTX-001",
@@ -301,7 +301,7 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
         "exclude": [],
       },
     },
-    // CTX-002: all checklist items are checked. (Checklist completeness lives here — there is no CHK category.)
+    // CTX-002: all checklist items are checked. (Checklist completeness lives here - there is no CHK category.)
     {
       "rule": "CTX-002",
       "options": {
@@ -343,7 +343,7 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
       },
     },
 
-    // ── GRP — graph integrity (all project scope) ───────────────────────────────────────────
+    // ── GRP - graph integrity (all project scope) ───────────────────────────────────────────
     // GRP-001: no circular references between documents. The graph itself is corpus-wide and cannot be
     // scoped per rule (narrow it with the top-level include/exclude); minCycleLength filters this
     // rule's own findings, and at its default of 3 a two-document mutual link is not reported.
@@ -388,10 +388,10 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
       },
     },
 
-    // ── SIZE / LLM — context hygiene ────────────────────────────────────────────────────────
+    // ── SIZE / LLM - context hygiene ────────────────────────────────────────────────────────
     // SIZE-001: file stays within byte/line/token budgets. Metrics are independent; within one
     // metric the highest crossed threshold is reported (one finding per metric). At least one budget
-    // is required — bytes/lines/tokens at the top level or inside an overrides entry — and each
+    // is required - bytes/lines/tokens at the top level or inside an overrides entry - and each
     // threshold object needs a warn or an error; a config that sets none is rejected at load.
     {
       "rule": "SIZE-001",
@@ -417,7 +417,7 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
       },
     },
 
-    // ── FM — front matter ──────────────────────────────────────────────────────────────────
+    // ── FM - front matter ──────────────────────────────────────────────────────────────────
     // FM-001: front matter is valid YAML (failsafe: every scalar is a string) and matches a schema.
     // Key paths use dots for nesting; list values are checked item by item.
     {
@@ -431,7 +431,7 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
       },
     },
 
-    // ── custom — declarative rule ───────────────────────────────────────────────────────────
+    // ── custom - declarative rule ───────────────────────────────────────────────────────────
     // Composes the closed assertion vocabulary from config. `id` must be namespaced and must not
     // shadow a built-in prefix (CTX/FM/GRP/LLM/REF/SEC/SIZE/STR/TBL). See rules/custom.md for all kinds.
     {
@@ -466,7 +466,7 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
     },
     // Wording of the generated "Working with dependencies" block. Default "generic".
     "commandPreset": "generic", // "claude" | "generic" | "none"
-    // In-degree threshold for a hub — used by the SKILL.md Role column and by
+    // In-degree threshold for a hub - used by the SKILL.md Role column and by
     // `graph`'s top-hubs list, which is why both call the same document a hub. Default 3.
     "hubMinInDegree": 3,
   },
@@ -499,7 +499,7 @@ Invalid config at wastech-mdlint.config.json:
 
 The second is a `SIZE-001` entry whose `tokens` budget was spelled `token`: every rule's option object is strict, so a typo'd key is rejected rather than silently ignored.
 
-The last is the one mistake the diagnostic explains rather than merely reports, because being told "unknown key" answers the wrong question when the key is one most other rules have. A rule that takes no file scope says so and points at the top-level `include`/`exclude`; the two rules whose `exclude` filters link and image _targets_ ([REF-001](rules/REF-001.md), [REF-003](rules/REF-003.md)) also say what that key next door actually does — reaching for `files` and settling for `exclude` there type-checks, runs, and quietly filters something else.
+The last is the one mistake the diagnostic explains rather than merely reports, because being told "unknown key" answers the wrong question when the key is one most other rules have. A rule that takes no file scope says so and points at the top-level `include`/`exclude`; the two rules whose `exclude` filters link and image _targets_ ([REF-001](rules/REF-001.md), [REF-003](rules/REF-003.md)) also say what that key next door actually does - reaching for `files` and settling for `exclude` there type-checks, runs, and quietly filters something else.
 
 A **syntax** error is reported differently, because it happens before the schema sees anything: `Failed to parse JSONC config at wastech-mdlint.config.json: CloseBraceExpected at offset 412`. Byte offsets rather than config paths are the only location a half-parsed file can honestly offer.
 
@@ -509,5 +509,5 @@ See [Validation & errors](configuration.md#validation--errors) for the notation 
 
 - The `custom` entry shows one assertion; the [custom rule page](rules/custom.md) lists all 16 assertion kinds (`requiredColumns`, `columnNotEmpty`, `columnInSet`, `columnMatches`, `columnUnique`, `crossColumn`, `sectionPresent`, `sectionOrder`, `contentNotMatch`, `noPlaceholders`, `allChecked`, `linkResolves`, `imageResolves`, `frontmatterRequired`, `frontmatterInSet`, `frontmatterMatches`).
 - `siteRouter` shown on individual REF rules (REF-001/REF-002 only) **overrides** `settings.siteRouter` for that rule; most projects set it once under `settings`. The graph rules read it only through the shared graph, so they take no `siteRouter` of their own.
-- Rules that operate over the whole corpus (identity/graph rules) may intentionally omit `files`/`exclude` — see each rule's page for its exact option set. Two of them spell one of the names with a different meaning, which is why the comments above call it out inline: `STR-001.files` is the required-file set, and `REF-001`/`REF-003`'s `exclude` filters link/image targets.
+- Rules that operate over the whole corpus (identity/graph rules) may intentionally omit `files`/`exclude` - see each rule's page for its exact option set. Two of them spell one of the names with a different meaning, which is why the comments above call it out inline: `STR-001.files` is the required-file set, and `REF-001`/`REF-003`'s `exclude` filters link/image targets.
 - On the rules that do take file scope, it also bounds `--fix` (SEC-001, TBL-002): an excluded file is never rewritten, not just never reported.

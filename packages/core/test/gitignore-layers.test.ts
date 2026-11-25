@@ -107,7 +107,7 @@ describe("isGitIgnored · layer precedence", () => {
   it("keeps a file whose excluded ancestor directory a deeper layer re-included", () => {
     // The subtree form of the same bug, and the one a single layer's `test()` cannot get right: the
     // root excludes the *directory* `artifacts/docs` (`artifacts/*` does not cross `/`, so it never
-    // matches the file), and `artifacts/.gitignore` re-includes it. Real `git` keeps the file — it
+    // matches the file), and `artifacts/.gitignore` re-includes it. Real `git` keeps the file - it
     // resolves the ancestor across all three lists, while `Ignore.test()` re-applied the root
     // layer's own directory exclusion to a parent the deeper layer had already un-ignored.
     const layers = [layer("", "artifacts/*\n"), layer("artifacts", "!docs/\n")];
@@ -140,7 +140,7 @@ describe("isGitIgnored · layer precedence", () => {
 
   it("treats the array order as the precedence contract: outermost first", () => {
     // Pins the reversal rather than leaving it incidental. The same two rule sets in the opposite
-    // array order must produce the opposite verdict — which is why `IgnoreLayer` documents the order
+    // array order must produce the opposite verdict - which is why `IgnoreLayer` documents the order
     // its producers must build, and why neither walk may sort or dedupe on the way in.
     const outermostFirst = [
       layer("", "docs/*.md\n"),
@@ -175,7 +175,7 @@ describe("isGitIgnored · layer precedence", () => {
   });
 });
 
-// Explicit argv lists and no shell — a spawned command must never be built by interpolation. `git`
+// Explicit argv lists and no shell - a spawned command must never be built by interpolation. `git`
 // resolves through PATH (+PATHEXT on Windows) without one.
 function runGit(
   root: string,
@@ -196,8 +196,8 @@ function runGit(
 }
 
 // Neutralize every ignore source outside the fixture's own `.gitignore` files, so the oracle answers
-// the same question the matcher does. A developer's global `core.excludesFile` — or an inherited
-// GIT_DIR from a wrapper — would otherwise make the two disagree for reasons the fixture cannot see.
+// the same question the matcher does. A developer's global `core.excludesFile` - or an inherited
+// GIT_DIR from a wrapper - would otherwise make the two disagree for reasons the fixture cannot see.
 // GIT_CONFIG_GLOBAL/GIT_CONFIG_SYSTEM pointed at absent paths read as empty (git >= 2.32). The
 // absent paths live beside the fixture, not inside it, so they can never appear in a walk.
 function gitEnv(root: string): NodeJS.ProcessEnv {
@@ -246,7 +246,7 @@ async function initGitRepo(root: string): Promise<void> {
     throw new Error(`git init failed with status ${String(init.status)}`);
   }
   // `--exclude-standard` reads `.git/info/exclude`, which `git init` seeds from the template with a
-  // comment-only file — truncating it removes even the possibility of a template-dependent verdict.
+  // comment-only file - truncating it removes even the possibility of a template-dependent verdict.
   const infoDir = path.join(root, ".git", "info");
   await mkdir(infoDir, { recursive: true });
   await writeFile(path.join(infoDir, "exclude"), "", "utf8");
@@ -379,7 +379,7 @@ describe.skipIf(!hasGit)(
     it("matches git when a nested negation sits under an excluded parent", async () => {
       // Git cannot re-include a file whose parent directory is excluded, and no *deeper* layer
       // rescues `generated/` here, so the exclusion stands and the nested `!*.md` cannot bring the
-      // file back. Verified against both oracles — `git check-ignore` does report the ancestor
+      // file back. Verified against both oracles - `git check-ignore` does report the ancestor
       // `generated/` as the deciding pattern for `generated/x.md`, so it is a valid oracle here too,
       // not only `ls-files`.
       const root = await createFixtureTree({
@@ -403,7 +403,7 @@ describe.skipIf(!hasGit)(
     it("matches git when a deeper layer re-includes an excluded parent directory", async () => {
       // The subtree half of precedence, which is where the ancestor question stops being a walk
       // detail and becomes the matcher's: the root excludes a *directory* and a nested `.gitignore`
-      // re-includes it, so git keeps the files inside — no pattern matches them directly, since
+      // re-includes it, so git keeps the files inside - no pattern matches them directly, since
       // `artifacts/*` does not cross `/` and `!docs/` is directory-only. Both spellings of the root
       // exclusion are here (the wildcard form and the anchored `dir/` form) because they reach the
       // file through different patterns, and `docs/generated/sub/` pins that it holds at any depth.
@@ -452,7 +452,7 @@ describe.skipIf(!hasGit)(
  *
  * The `workspaces` declaration is asserted rather than expanded as globs: pinning it means a member
  * rooted anywhere but `packages/*` fails this test loudly, instead of leaving a package silently
- * unscanned — which is exactly the failure mode a hardcoded package list already had.
+ * unscanned - which is exactly the failure mode a hardcoded package list already had.
  */
 async function workspaceSourceDirs(): Promise<string[]> {
   const rootManifest = JSON.parse(
@@ -491,8 +491,8 @@ describe("gitignore matching has exactly one implementation", () => {
   // The structural half of the same criterion, asserted rather than assumed: a second matcher in
   // either walk would let `init` propose an `include` for a tree the config it writes then refuses to
   // lint, and one in the scope tester would let a host judge a single path differently from the walk
-  // that built its corpus. Substring checks so reformatting the multi-line import — which Prettier
-  // does on its own — cannot fail this.
+  // that built its corpus. Substring checks so reformatting the multi-line import - which Prettier
+  // does on its own - cannot fail this.
   const callSites = [
     "packages/core/src/markdown/load-documents.ts",
     "packages/core/src/discovery/repo-scan.ts",
@@ -511,8 +511,8 @@ describe("gitignore matching has exactly one implementation", () => {
 
   it("has no third call site anywhere in the workspace's product code", async () => {
     // Pins the *set*, not just its members: the loop above only checks what it lists, so a third
-    // consumer could otherwise appear untested. Scanning every workspace package's `src` — derived
-    // from the workspace, not listed here — is what makes "exactly these call sites" a claim that
+    // consumer could otherwise appear untested. Scanning every workspace package's `src` - derived
+    // from the workspace, not listed here - is what makes "exactly these call sites" a claim that
     // stays checked as packages are added.
     const consumers: string[] = [];
 

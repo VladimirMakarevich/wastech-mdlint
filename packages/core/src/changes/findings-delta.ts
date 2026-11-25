@@ -1,12 +1,12 @@
 import type { LintMessage } from "../engine/types.js";
 
 // Two lint runs compared: the findings the second adds and the ones it no longer reports. Every
-// host that shows such a difference — a config edit previewed before it is saved, a branch reviewed
-// against its base — goes through this one comparison, so two of them can never disagree about what
+// host that shows such a difference - a config edit previewed before it is saved, a branch reviewed
+// against its base - goes through this one comparison, so two of them can never disagree about what
 // counts as the same finding.
 
 /**
- * Where a finding of the earlier run would sit in the later run's text — its file and line there —
+ * Where a finding of the earlier run would sit in the later run's text - its file and line there -
  * or `undefined` when the line it was on is gone. Two runs over the same text need none; across a
  * branch, a paragraph inserted above a finding moves it down without changing it.
  */
@@ -23,8 +23,8 @@ export type FindingsDelta = {
 
 /**
  * Compare two runs' findings as multisets. Findings are the same when file, rule, line, severity and
- * message all match, so one that changed any of them — a budget message whose number moved, a
- * warning made an error — is gone in its old form and new in its new one, which is what a reader
+ * message all match, so one that changed any of them - a budget message whose number moved, a
+ * warning made an error - is gone in its old form and new in its new one, which is what a reader
  * needs to see. With `locate`, the earlier run's findings are moved to the later run's file and line
  * first, and one that cannot be moved is removed.
  */

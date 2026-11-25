@@ -97,7 +97,7 @@ function promptButton(
       dataPath: relPath,
       dataRule: finding?.ruleId,
       // Not `data-line`: inside the article that attribute is a block's source line, and the
-      // stylesheet draws it in the right margin of whatever element carries it — a finding's line
+      // stylesheet draws it in the right margin of whatever element carries it - a finding's line
       // there showed up as a stray number beside the button.
       dataFindingLine: finding === undefined ? undefined : String(finding.line),
     },

@@ -17,7 +17,7 @@ import type { InferredRule } from "../src/discovery/rule-inference.js";
 
 // The fresh-write `exclude` mirrors the scanner's pruned noise directories as depth-agnostic globs
 // (the scan prunes by basename at any depth), sorted by the same host-independent comparator as
-// production — and nothing else: the scan's shape-based hidden-directory prune deliberately has no
+// production - and nothing else: the scan's shape-based hidden-directory prune deliberately has no
 // lint-time counterpart, so a hidden directory that is not a dependency tree stays linted.
 const EXPECTED_EXCLUDE = DEFAULT_NOISE_DIR_NAMES.map(
   (name) => `**/${name}/**`,
@@ -104,13 +104,13 @@ describe("generateInitConfig · fresh", () => {
     // actual contract, and literals passed while nested noise was still being linted.
     const exclude = config.exclude as string[];
     for (const excluded of [
-      // Noise nested under a monorepo package — the case a root-anchored glob misses.
+      // Noise nested under a monorepo package - the case a root-anchored glob misses.
       "packages/foo/node_modules/somelib/README.md",
       "packages/foo/dist/OUT.md",
-      // Root-level regression guard — this is what makes the leading `**/` matching zero segments a
+      // Root-level regression guard - this is what makes the leading `**/` matching zero segments a
       // contract rather than an assumption about picomatch.
       "node_modules/somelib/README.md",
-      // `dot: true` still applies through the new prefix — and a hidden dependency/build tree must
+      // `dot: true` still applies through the new prefix - and a hidden dependency/build tree must
       // prune through BOTH matcher entry points: the plain file test and `shouldPruneDirectory`'s
       // synthetic `__directory_probe__` child (which is what makes loadDocuments skip the directory
       // instead of walking it).
@@ -140,8 +140,8 @@ describe("generateInitConfig · fresh", () => {
   });
 
   it("explains above the exclude key that the list is a default a user entry extends", () => {
-    // The block is a verbatim copy of the lint-time default, so the natural edit — delete the line
-    // you disagree with — is a no-op, because a user `exclude` *extends* the default. The list is
+    // The block is a verbatim copy of the lint-time default, so the natural edit - delete the line
+    // you disagree with - is a no-op, because a user `exclude` *extends* the default. The list is
     // kept and the duplication made explicit rather than omitted, so the comment is the deliverable.
     const { configText } = generateInitConfig(FRESH_PARAMS);
     const excludeIndex = configText.indexOf('"exclude"');
@@ -159,7 +159,7 @@ describe("generateInitConfig · fresh", () => {
 
   it('writes a literal "include": [] when the caller passes an empty array', () => {
     // An empty selection is an explicit "lint nothing", and omitting the key would invert
-    // it into `lintFiles`'s `**/*.md` default — the exact opposite of what the user asked for.
+    // it into `lintFiles`'s `**/*.md` default - the exact opposite of what the user asked for.
     const result = generateInitConfig({
       action: "fresh",
       include: [],
@@ -187,7 +187,7 @@ describe("generateInitConfig · fresh", () => {
     expect(parse(result.configText).$schema).toBe("./schema.json");
     expect(result.projectSchema?.fileName).toBe("schema.json");
     expect(result.projectSchema?.reason).toBe("no-installed-package");
-    // With no custom rules the fallback schema is exactly the built-in one — no custom-id branches
+    // With no custom rules the fallback schema is exactly the built-in one - no custom-id branches
     // invented for a config that has none.
     expect(result.projectSchema?.text).toBe(generateConfigSchema());
   });
@@ -217,7 +217,7 @@ describe("generateInitConfig · fresh", () => {
       newRules: [buildRule({ rule: "REF-001" })],
       packageSchemaRef: "../node_modules/@wastech-mdlint/cli/schema.json",
     });
-    // The writer does not hardcode a root-relative literal — it serializes the CLI-computed ref, so a
+    // The writer does not hardcode a root-relative literal - it serializes the CLI-computed ref, so a
     // config written into a subdirectory can point up at the hoisted node_modules.
     expect(parse(result.configText).$schema).toBe(
       "../node_modules/@wastech-mdlint/cli/schema.json",
@@ -363,7 +363,7 @@ describe("generateInitConfig · merge", () => {
   });
 
   it("does not seed a project schema from a custom id the loader would reject", () => {
-    // `foo` has no dash and `REF-OWNER` reuses a reserved built-in prefix — both fail
+    // `foo` has no dash and `REF-OWNER` reuses a reserved built-in prefix - both fail
     // resolveCustomRule's grammar/prefix checks, so a project schema claiming they are valid would
     // disagree with loadConfiguration.
     for (const invalidId of ["foo", "ref-owner"]) {
@@ -390,7 +390,7 @@ describe("generateInitConfig · merge", () => {
       expect(result.schemaRef).toBe(
         "./node_modules/@wastech-mdlint/cli/schema.json",
       );
-      // The user's own entry is still preserved verbatim (canonicalized) — only the schema is withheld.
+      // The user's own entry is still preserved verbatim (canonicalized) - only the schema is withheld.
       expect(
         (parse(result.configText).rules as Record<string, unknown>[])[0]?.rule,
       ).toBe("custom");
@@ -417,7 +417,7 @@ describe("generateInitConfig · rationale comment safety", () => {
 
     // The whole file still parses as JSONC to the expected data.
     expect(parse(result.configText).rules).toEqual([{ rule: "GRP-001" }]);
-    // The rationale collapsed to one line — no raw line terminator survives inside the comment.
+    // The rationale collapsed to one line - no raw line terminator survives inside the comment.
     expect(result.configText).toContain("// cycle a.md -> weird b.md");
     const commentLine = result.configText
       .split("\n")
@@ -458,7 +458,7 @@ describe("buildCiWorkflowYaml", () => {
 
   it("rejects a config path with a line terminator rather than emit a broken/mis-run workflow", () => {
     // The lint step is a YAML block scalar; an embedded newline would split the shell command, and
-    // stripping it would mis-target the config — so the contract is to reject (the CLI declines the
+    // stripping it would mis-target the config - so the contract is to reject (the CLI declines the
     // opt-in workflow before reaching this).
     expect(() =>
       buildCiWorkflowYaml("bad\nname/wastech-mdlint.config.json"),
@@ -468,10 +468,10 @@ describe("buildCiWorkflowYaml", () => {
     ).toThrow(/line terminator/);
   });
 
-  // The function takes no package-manager input at all — it is npm-universal by
+  // The function takes no package-manager input at all - it is npm-universal by
   // design, not a detection result that got lost on the way in. See the function's own doc comment
   // for why (the install step only fetches the external CLI, never the target repo's dependencies).
-  it("has no package-manager parameter — the workflow is npm-universal by design", () => {
+  it("has no package-manager parameter - the workflow is npm-universal by design", () => {
     // Only `configPath` is accepted; there is no second parameter a caller could use to thread a
     // detected package manager through.
     expect(buildCiWorkflowYaml.length).toBe(1);
@@ -565,7 +565,7 @@ describe("identifyExistingRule", () => {
 
   it("marks unidentifiable entries invalid (non-object, non-string rule, bad/absent custom id)", () => {
     // Custom entries need a schemaable string id; `foo` fails the grammar and `SEC` reuses a reserved
-    // built-in prefix, so both are invalid — the loader would reject them too.
+    // built-in prefix, so both are invalid - the loader would reject them too.
     for (const entry of [
       "REF-001",
       null,

@@ -19,7 +19,7 @@ import { computeGraphCoverage } from "../src/graph/coverage.js";
 import type { ParsedDocument } from "../src/markdown/document-types.js";
 import { loadDocuments } from "../src/markdown/load-documents.js";
 
-// Three subsystems used to disagree on what "a Markdown file" is — coverage said
+// Three subsystems used to disagree on what "a Markdown file" is - coverage said
 // `.md`+`.markdown`, the `init` scan said `.md`+`.mdx`, the default `include` said `.md`. This suite
 // is the exit criterion for that: it drives the three sites end to end rather than comparing
 // constants, so a site that stops reading the shared module fails here even though the module itself
@@ -62,7 +62,7 @@ describe("one Markdown-extension definition across the three sites", () => {
     for (const extension of LINTED_MARKDOWN_EXTENSIONS) {
       expect(MARKDOWN_EXTENSIONS).toContain(extension);
     }
-    // Every extension is dotted and lower-case — `isMarkdownFile` compares against
+    // Every extension is dotted and lower-case - `isMarkdownFile` compares against
     // `path.posix.extname(...).toLowerCase()`, so an entry shaped otherwise could never match.
     for (const extension of MARKDOWN_EXTENSIONS) {
       expect(extension).toBe(extension.toLowerCase());
@@ -93,7 +93,7 @@ describe("one Markdown-extension definition across the three sites", () => {
       { rootDir: root },
     );
 
-    // Sorted with the product's own comparator — `filesOutsideCorpus` is `compareStrings`-sorted,
+    // Sorted with the product's own comparator - `filesOutsideCorpus` is `compareStrings`-sorted,
     // so a hand-rolled sort here would drift from it as soon as the set grows.
     expect(coverage.filesOutsideCorpus).toEqual(
       [...linked].sort(compareStrings),
@@ -130,7 +130,7 @@ describe("one Markdown-extension definition across the three sites", () => {
     expect(isMarkdownFile("docs/page.md")).toBe(true);
     expect(isMarkdownFile("docs/notes.txt")).toBe(false);
     // A file whose whole name is the extension has no extension by `path.posix.extname`, so it is
-    // not a Markdown file here — unlike an `endsWith` check, which coverage used to rely on.
+    // not a Markdown file here - unlike an `endsWith` check, which coverage used to rely on.
     expect(isMarkdownFile(".md")).toBe(false);
     // `.markdown` ends with neither member; the old coverage helper's `endsWith` would have said
     // `.md` matched it.

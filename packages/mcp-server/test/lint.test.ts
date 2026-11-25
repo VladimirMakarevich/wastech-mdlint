@@ -15,8 +15,8 @@ import {
   readLintSummaryLine,
 } from "../../core/test/support/output-parity.js";
 
-// Exercises the computational layer (`handleLint`) directly — wire-level McpServer testing lives in
-// the stdio suite — so these assert the structured output / error contract without a transport.
+// Exercises the computational layer (`handleLint`) directly - wire-level McpServer testing lives in
+// the stdio suite - so these assert the structured output / error contract without a transport.
 
 function structured(
   result: ReturnType<typeof handleLint>,
@@ -70,7 +70,7 @@ describe("handleLint", () => {
   // @boundary-guard host-parity
   //
   // Output parity on the ad-hoc tool: the text block must render exactly the messages
-  // `structuredContent` carries. Worth its own assertion rather than inheriting `lint-files`' — this
+  // `structuredContent` carries. Worth its own assertion rather than inheriting `lint-files`' - this
   // tool builds a narrower structured document (no `files`) from the same `LintResult`, and dropping a
   // field on the way out is precisely the class of defect the reading passes kept missing.
   it("renders its own structured messages in the text block", () => {
@@ -181,7 +181,7 @@ describe("handleLint", () => {
 
   it("runs a declarative document-scope custom rule", () => {
     // Direction (A): a `custom` entry is pure data, so ad-hoc lint executes it exactly as
-    // `lint-files` would from config — no code plugin is ever loaded.
+    // `lint-files` would from config - no code plugin is ever loaded.
     const result = handleLint({
       content: "| ID | Owner |\n| --- | --- |\n| REQ-1 |  |\n",
       rules: [
@@ -227,7 +227,7 @@ describe("handleLint", () => {
   it("runs a project-scope custom assert (columnUnique) without tripping the corpus fail-fast", () => {
     // `columnUnique` is the one project-scope assert; the tool's corpus-of-one satisfies the
     // fail-fast, so it must report intra-document duplicates instead of degrading to INTERNAL_ERROR.
-    // A corpus of one can only ever see duplicates *within* `content` — cross-file uniqueness needs
+    // A corpus of one can only ever see duplicates *within* `content` - cross-file uniqueness needs
     // `lint-files`.
     const result = handleLint({
       content: "| ID |\n| --- |\n| X-1 |\n| X-1 |\n",
@@ -287,7 +287,7 @@ describe("handleLint", () => {
   it("rejects two custom entries sharing an id, naming both request indices", () => {
     // This tool resolves rules from the request rather than from a config, so it never passes
     // through the loader's uniqueness check and needed its own. Both entries would otherwise run and
-    // emit findings labelled identically — on this host, to a model that cannot then attribute
+    // emit findings labelled identically - on this host, to a model that cannot then attribute
     // either one, and with a `severity` on one governing the other's findings.
     const result = handleLint({
       content: "- [ ] todo\n",
@@ -337,13 +337,13 @@ describe("handleLint", () => {
     expect(output.code).toBe("INVALID_INPUT");
     expect(output.message).toMatch(/spelled one way/);
     expect(output.hint).toBe(
-      'rules[1].rule: rule "no-broken-anchors" names "REF-002", which rules[0] names as "REF-002" — spell every entry for one rule the same way.',
+      'rules[1].rule: rule "no-broken-anchors" names "REF-002", which rules[0] names as "REF-002" - spell every entry for one rule the same way.',
     );
   });
 
   it("selects nothing when a custom rule's `files` glob misses the synthetic path", () => {
     // The document is always `content.md`, so a caller-supplied glob scoped to a directory silently
-    // matches no file — the foot-gun the tool description now discloses.
+    // matches no file - the foot-gun the tool description now discloses.
     const result = handleLint({
       content: "| ID | Owner |\n| --- | --- |\n| REQ-1 |  |\n",
       rules: [
@@ -443,7 +443,7 @@ describe("handleLint", () => {
 
   it("honors an existing on-disk template for SEC-003 (core disk fallback preserved)", () => {
     // The repo-root README.md is guaranteed present under the test cwd; SEC-003 must load it via
-    // core's disk fallback and check conformance against it — proving ad-hoc lint reuses core's
+    // core's disk fallback and check conformance against it - proving ad-hoc lint reuses core's
     // normal template loading rather than misreporting a real template as missing.
     const result = handleLint({
       content: "# Title\n",
@@ -457,10 +457,10 @@ describe("handleLint", () => {
     ).toBe(true);
   });
 
-  it("rejects an absolute SEC-003 template path — closes the MCP host-read attack surface", async () => {
+  it("rejects an absolute SEC-003 template path - closes the MCP host-read attack surface", async () => {
     // The `lint` tool takes its whole `rules` array from the caller and hard-codes
     // `rootDir: process.cwd()`; an absolute `template` must be rejected before any read, not just
-    // reported as "not found" — otherwise a prompt-injected caller turns this read-only tool into a
+    // reported as "not found" - otherwise a prompt-injected caller turns this read-only tool into a
     // host file-read primitive.
     const outsideRoot = await mkdtemp(
       path.join(os.tmpdir(), "wastech-mdlint-mcp-sec-"),
@@ -486,7 +486,7 @@ describe("handleLint", () => {
     ).toBe(false);
   });
 
-  it("rejects an absolute STR-001 required path — same containment as SEC-003", async () => {
+  it("rejects an absolute STR-001 required path - same containment as SEC-003", async () => {
     // STR-001's disk probe is reachable from the same caller-supplied `rules` array, so it
     // is held to the same boundary: rejected outright, never answered as present/absent.
     const outsideRoot = await mkdtemp(
@@ -516,7 +516,7 @@ describe("handleLint", () => {
   });
 
   it("satisfies an in-root STR-001 required file via the disk probe", () => {
-    // The repo-root package.json exists under the test cwd but is never in a Markdown corpus —
+    // The repo-root package.json exists under the test cwd but is never in a Markdown corpus -
     // exactly the literal-entry shape, checked at the MCP surface.
     const result = handleLint({
       content: "# Title\n",
@@ -529,7 +529,7 @@ describe("handleLint", () => {
 
   it("resolves an existing on-disk REF-001 target via core's standard disk fallback", () => {
     // A link to a file that really exists under the server cwd (repo-root package.json) resolves,
-    // exactly as it would under `lint-files` — ad-hoc lint reuses core REF resolution unchanged.
+    // exactly as it would under `lint-files` - ad-hoc lint reuses core REF resolution unchanged.
     const result = handleLint({
       content: "# Title\n\n[real file on disk](package.json)\n",
       rules: [{ rule: "REF-001" }],
@@ -547,7 +547,7 @@ describe("handleLint", () => {
  * The structural half: both lint paths reach the same steps in the same order.
  *
  * The behavioral tests above pass whether this handler calls core's `lintContent` or re-assembles the
- * sequence itself — that is exactly why the duplication survived two review passes. So this asserts
+ * sequence itself - that is exactly why the duplication survived two review passes. So this asserts
  * the shape instead: the step primitives are no longer named here, which is what makes "a step added
  * to the core entry point reaches this tool" true by construction rather than by a differential test
  * that has to be kept in step with the sequence (`packages/core/test/lint-content.test.ts` holds the
@@ -566,7 +566,7 @@ describe("the ad-hoc lint step order lives in core, not in this handler", () => 
   );
 
   // The absence assertions run against the import statements alone, not the whole module text. What
-  // this guard is about is what the handler *pulls in*, and a comment naming a step is not that —
+  // this guard is about is what the handler *pulls in*, and a comment naming a step is not that -
   // the handler's current comment paraphrases all three ("parse, corpus of one, scope split,
   // inline-disable, counts") precisely to stay out of a haystack that included prose, which is a
   // constraint the guard should not be imposing on a future writer at all.

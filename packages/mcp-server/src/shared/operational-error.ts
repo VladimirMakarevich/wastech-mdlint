@@ -7,7 +7,7 @@ import {
 
 // Classify a raw Node errno into the shared `OPERATIONAL_ERROR` payload. The code lives
 // in core's closed taxonomy; the mapping lives here because deciding that a throwable is an
-// environment failure rather than an internal one is a host-boundary judgement — the same split
+// environment failure rather than an internal one is a host-boundary judgement - the same split
 // `INVALID_INPUT`/`ToolInputError` already uses. Core's `isStructuredError` is deliberately NOT
 // widened to duck-type errnos (its comment says why), so this is the only door such an error has.
 //
@@ -40,7 +40,7 @@ function errnoPath(error: unknown): string | undefined {
  * anything the caller should keep treating as a sanitized `INTERNAL_ERROR`.
  *
  * **Both fields are required.** An errno with no `path` (`ENOSPC: no space left on device, write`)
- * has nothing to name, and its own message is the only diagnostic there is — but that message is
+ * has nothing to name, and its own message is the only diagnostic there is - but that message is
  * exactly the unvetted text `INTERNAL_ERROR` exists to withhold, so it falls through rather than
  * being surfaced. The CLI can afford the opposite choice because its output is a terminal, not a
  * machine contract.
@@ -51,7 +51,7 @@ function errnoPath(error: unknown): string | undefined {
  * naming a file outside the analyzed root. Two caller-supplied paths do come back: the `cwd`, in the
  * `INVALID_INPUT` message (`tool-context.ts`), where the value is the caller's own and is the broken
  * thing being reported; and a `configPath`, which core renders relative to `cwd` with no containment
- * check of its own. What this function must not do is add a *third* — a path the run discovered
+ * check of its own. What this function must not do is add a *third* - a path the run discovered
  * rather than the caller named. The CLI keeps the `../` form on purpose (see
  * `operational-errors.ts`); the two hosts differ here by decision, which is why this is not that
  * function.
@@ -79,7 +79,7 @@ export function toOperationalErrorInfo(
 
   // Byte-identical to the CLI's stderr line (`formatOperationalError` behind its `Operational error:`
   // prefix), so "both hosts name the errno and the path" is literally true and a user comparing the
-  // two surfaces sees one sentence. `""` — the failing path being `cwd` itself — renders as `.`.
+  // two surfaces sees one sentence. `""` - the failing path being `cwd` itself - renders as `.`.
   const rendered = normalizeRelativePath(relative);
   return {
     code: "OPERATIONAL_ERROR",

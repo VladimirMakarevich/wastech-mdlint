@@ -5,8 +5,8 @@ import type {
 } from "./context-graph-types.js";
 
 // The unified traversal: the one BFS that `impact`, `getContextSlice`, the MCP tools, and
-// compile call instead of each hand-rolling its own walk. Cycle-safety is by construction — a node
-// enters `visited` at most once and is never re-expanded — so cyclic graphs terminate without any
+// compile call instead of each hand-rolling its own walk. Cycle-safety is by construction - a node
+// enters `visited` at most once and is never re-expanded - so cyclic graphs terminate without any
 // cycle-removal step; GRP-001 (`graph.cycles`) stays the sole owner of *reporting* cycles.
 
 const byPath = compareStrings;
@@ -19,7 +19,7 @@ export type QueryOptions = {
   direction: QueryDirection;
   // Hop bound; omitted traverses to exhaustion (full closure).
   depth?: number;
-  // `undefined` follows every edge type; `[]` follows none (start-only result) — documented
+  // `undefined` follows every edge type; `[]` follows none (start-only result) - documented
   // explicitly because the two are easy to conflate at call sites.
   edgeTypes?: ContextGraphEdgeType[];
 };
@@ -29,7 +29,7 @@ export type QueryVisit = {
   // Hops from `start`; the start node itself is 0.
   depth: number;
   // Predecessor node path that first reached this node; null for `start`. Kept as a node path
-  // (not the edge) — minimal per YAGNI, richer edge metadata can be added when a phase needs it.
+  // (not the edge) - minimal per YAGNI, richer edge metadata can be added when a phase needs it.
   via: string | null;
 };
 
@@ -38,7 +38,7 @@ export type QueryResult = {
 };
 
 // Directional, typed, deduped adjacency local to this module: forward reads `from -> to`, reverse
-// reads `to -> from`. Deliberately not `buildDedupedViews` from graph-algorithms.ts — that helper is
+// reads `to -> from`. Deliberately not `buildDedupedViews` from graph-algorithms.ts - that helper is
 // untyped, forward-only, and has no predecessor direction, so it cannot serve `impact`'s reverse walk.
 function buildAdjacency(
   graph: ContextGraph,
@@ -87,7 +87,7 @@ export function query(graph: ContextGraph, options: QueryOptions): QueryResult {
   visited.set(start, { path: start, depth: 0, via: null });
 
   // Level-order BFS. `frontier` is always kept sorted, so within a level the smallest node is
-  // processed first — the first predecessor to reach an unvisited neighbor claims it, giving a
+  // processed first - the first predecessor to reach an unvisited neighbor claims it, giving a
   // deterministic `via` (smallest predecessor at minimal depth) without a tie-break pass.
   let frontier = [start];
   let currentDepth = 0;

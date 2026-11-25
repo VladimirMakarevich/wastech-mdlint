@@ -6,7 +6,7 @@ import type { PrimitiveFinding } from "./types.js";
 
 export type ContentNotMatchOptions = { pattern: string; flags?: string };
 
-// contentNotMatch — the raw content must NOT match the pattern; each match is reported at its line.
+// contentNotMatch - the raw content must NOT match the pattern; each match is reported at its line.
 export function contentNotMatch(
   document: ParsedDocument,
   options: ContentNotMatchOptions,
@@ -48,7 +48,7 @@ export type NoPlaceholdersOptions = {
   placeholders?: string[];
 };
 
-// Whole-body placeholder check (case-insensitive, optional trailing `:`) — NOT substring, so prose
+// Whole-body placeholder check (case-insensitive, optional trailing `:`) - NOT substring, so prose
 // that merely mentions a token is not flagged.
 function classifyBody(
   body: string,
@@ -65,7 +65,7 @@ function classifyBody(
   return placeholders.has(normalized) ? "placeholder" : undefined;
 }
 
-// noPlaceholders — sections must have real content: neither empty nor a bare placeholder token
+// noPlaceholders - sections must have real content: neither empty nor a bare placeholder token
 // (CTX-001). With `section`, only that section is checked; otherwise every section is.
 export function noPlaceholders(
   document: ParsedDocument,

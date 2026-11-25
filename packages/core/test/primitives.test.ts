@@ -187,7 +187,7 @@ describe("table primitives", () => {
   // @boundary-guard determinism
   //
   // A `RegExp` carrying `g`/`y` keeps `lastIndex` between `.test()` calls, so a shared
-  // instance makes findings depend on evaluation order — the determinism invariant's failure mode
+  // instance makes findings depend on evaluation order - the determinism invariant's failure mode
   // that no amount of in-process rule testing surfaces unless a case deliberately alternates
   // matching and non-matching rows, as this one does.
   it('columnMatches is order-independent under a stateful "g" flag', () => {
@@ -418,7 +418,7 @@ describe("reference primitives", () => {
   // Escape-the-root sweep: a relative link/image target whose leading `../` segments exactly
   // cancel the source directory can leave a bare drive-absolute remainder (e.g. `C:/Users/...`)
   // that `escapesRoot`'s literal `..`-prefix check would miss, and that `path.win32.resolve` then
-  // treats as absolute — ignoring `rootDir` entirely, just like SEC-003's `template`. Windows-only:
+  // treats as absolute - ignoring `rootDir` entirely, just like SEC-003's `template`. Windows-only:
   // on POSIX the remainder is just a harmless relative segment named "C:".
   it.runIf(process.platform === "win32")(
     "linkResolves rejects a `..`-cancelled drive-absolute target instead of treating it as resolved",
@@ -621,7 +621,7 @@ describe("front matter primitives", () => {
   //
   // A list value is tested item by item with one compiled RegExp. Under a `g` flag that instance
   // carries `lastIndex` from one item into the next, so without a reset a matching item can make
-  // the following matching item fail — the result would depend on list order and on how many times
+  // the following matching item fail - the result would depend on list order and on how many times
   // the check had already run.
   it('frontmatterMatches is order-independent under a stateful "g" flag', () => {
     const listDoc = doc("---\nids: [REQ-1, REQ-2, BUG-1, REQ-3]\n---\n# T\n");

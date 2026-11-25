@@ -5,14 +5,14 @@ import { defineRule, type RuleDefinition } from "../registry.js";
 import { measureDocument } from "../document-metrics.js";
 import { TOKEN_ESTIMATE_NOTE } from "../tokens.js";
 
-// SIZE-001 — per-file byte / line / token budget. Each metric is independently optional;
+// SIZE-001 - per-file byte / line / token budget. Each metric is independently optional;
 // omitting one disables that check. Metrics stay independent of each other, but the two severities
 // within one metric no longer are: a metric emits at most one finding, from the highest crossed
 // threshold. Severity is per-finding (which threshold was crossed); the config `severity`
 // override clamps via the runner.
 //
 // What per-metric optionality could not be allowed to mean is *all three* omitted. `{"rule":
-// "SIZE-001"}` then read as a valid, enabled rule that measured nothing and reported nothing — a rule
+// "SIZE-001"}` then read as a valid, enabled rule that measured nothing and reported nothing - a rule
 // enabled into inertness, and the only rule in the registry that permitted it: LLM-001 requires its
 // entrypoints and token budget, SEC-001 its sections, SEC-002 its order. The two refinements below
 // close that at both levels, matching LLM-001 rather than inventing a default budget (any byte or line
@@ -21,8 +21,8 @@ import { TOKEN_ESTIMATE_NOTE } from "../tokens.js";
 const METRICS = ["bytes", "lines", "tokens"] as const;
 type Metric = (typeof METRICS)[number];
 
-// A threshold set with neither severity is the same defect one level down — `{"bytes":{}}` names a
-// metric and still measures nothing — so it is rejected here rather than skipped at runtime.
+// A threshold set with neither severity is the same defect one level down - `{"bytes":{}}` names a
+// metric and still measures nothing - so it is rejected here rather than skipped at runtime.
 const thresholdSchema = z
   .object({
     warn: z.number().int().positive().optional(),
@@ -47,7 +47,7 @@ const overrideSchema = z
 // Enforced by refinement rather than by the schema shape because "at least one of three" has no shape
 // Zod can express, and the alternatives are worse: marking one metric required would force a byte
 // budget on a config that only wants a token one. The cost is that JSON Schema generation drops
-// refinements, so an editor cannot surface this — it is a load-time diagnostic only. Accepted:
+// refinements, so an editor cannot surface this - it is a load-time diagnostic only. Accepted:
 // the alternative is duplicating the constraint into hand-written schema that would then drift.
 //
 // An `overrides`-only config is legitimate: per-glob thresholds with no top-level fallback measures
@@ -86,7 +86,7 @@ export type SizeBudget = {
   // that also matches supplies nothing.
   override?: { index: number; pattern: string };
   // Per metric, the thresholds that apply and where they come from. A metric the matching override
-  // leaves out falls back to the top-level option — not to a broader override further down — and a
+  // leaves out falls back to the top-level option - not to a broader override further down - and a
   // metric set in neither place is not measured for this file at all.
   metrics: Partial<
     Record<Metric, Thresholds & { from: "override" | "top-level" }>
@@ -189,7 +189,7 @@ export const size001: RuleDefinition = defineRule({
 
       // One finding per metric, not one per crossed threshold: the error
       // breach supersedes the warn breach. Both reports carried the same `data`, so the survivor
-      // loses nothing — and a config `severity` override (applied by the runner, invisible here) can
+      // loses nothing - and a config `severity` override (applied by the runner, invisible here) can
       // no longer render the pair as two same-severity messages for one metric.
       const breach = budgetBreach(actual, thresholds);
       if (breach === undefined) {

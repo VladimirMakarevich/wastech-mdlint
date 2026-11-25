@@ -85,14 +85,14 @@ async function help(args: string[]): Promise<string> {
  * wrapped description continues at a much deeper one), and commander renders every option as
  * `--config <file>` in the command's own help.
  *
- * The hidden `scan` alias is deliberately absent — it is not in root help, and it is registered by
+ * The hidden `scan` alias is deliberately absent - it is not in root help, and it is registered by
  * the same `addLintCommand` builder and dispatches to `handleLint`, so `lint`'s row covers it. Root
  * help cannot surface a hidden command at all, so a future one that takes `--config` has to be added
  * to `ROWS` by hand; this derivation will not find it.
  *
  * The flag is matched independently of its metavar. Probing for the literal `--config <file>` would
  * drop a future command declared `--config <path>` from the derived set, leaving the equality
- * assertion green while the new handler goes unparametrized — the silent uncoverage this derivation
+ * assertion green while the new handler goes unparametrized - the silent uncoverage this derivation
  * exists to prevent. Safe today: no other command's help text contains the token `--config`.
  */
 async function commandsAcceptingConfig(): Promise<string[]> {
@@ -123,7 +123,7 @@ type Row = { command: string; argv: string[]; cwdSuffix: string };
 
 // `cwdSuffix` is the injected cwd relative to the fixture root: `lint`/`graph` take the analyzed
 // directory as `[path]`, `compile` as `--cwd`, while `slice`/`impact` have no such argument and
-// analyze the CLI's own cwd — so for those two the caller has to stand inside `proj` instead.
+// analyze the CLI's own cwd - so for those two the caller has to stand inside `proj` instead.
 const ROWS: Row[] = [
   {
     command: "lint",
@@ -174,7 +174,7 @@ describe("--config resolution base", () => {
     },
   );
 
-  it("loads — not merely finds — the config named relative to [path]", async () => {
+  it("loads - not merely finds - the config named relative to [path]", async () => {
     // The reproduced case from the finding, strengthened: a `--config` that resolved but was not
     // applied would still exit `0` here, so the assertion is that the config's own rule fired.
     const root = await fixtureRepo({

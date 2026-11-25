@@ -25,7 +25,7 @@ import { highlight, withCopyButton } from "./highlight.js";
 import { copyPathButton } from "./page.js";
 
 // The config page: the config as it is on disk, the rules the registry offers, a preview of what a
-// changed config would report, and — only when the viewer was started to allow it — saving the
+// changed config would report, and - only when the viewer was started to allow it - saving the
 // change. Reading, validating and editing the config are core's (`parseConfiguration`,
 // `editConfigText`, the generated schema); this module decides which file that is, compares a
 // candidate's findings with today's, and guards the one write the viewer can make.
@@ -40,7 +40,7 @@ export type ConfigFile = {
 };
 
 // What a request to change the config carries: the file version it was made against, and either
-// edits to that version, a whole new text, or new text plus edits on top of it — the page's text
+// edits to that version, a whole new text, or new text plus edits on top of it - the page's text
 // mode and its form can be used one after the other.
 export type ChangeRequest = {
   base: string;
@@ -77,7 +77,7 @@ export type Preview =
 const LISTED_FINDINGS = 200;
 
 // The package's schema, not a project-local one: it carries the same branch for every built-in rule
-// and the generic custom-rule branch the form builds a custom rule from. Built once — it only
+// and the generic custom-rule branch the form builds a custom rule from. Built once - it only
 // changes with the installed package.
 const CONFIG_SCHEMA = JSON.parse(generateConfigSchema()) as unknown;
 
@@ -252,8 +252,8 @@ export function entryRuleIds(config: LintConfig): (string | null)[] {
 /**
  * What the candidate would report, compared with what the current config reports now.
  *
- * Findings are matched by core's `compareFindings` — on file, rule, line, severity and message, as a
- * multiset — the comparison the review of a branch uses too, so a config edit and a branch never
+ * Findings are matched by core's `compareFindings` - on file, rule, line, severity and message, as a
+ * multiset - the comparison the review of a branch uses too, so a config edit and a branch never
  * disagree about what counts as the same finding.
  */
 export function previewCandidate(params: {
@@ -472,7 +472,7 @@ export async function renderConfigArticle(
     canOpen: boolean;
     // What the page's script builds the editor from, carried in the page (`CONFIG_DATA_ID`).
     editor: ConfigApi;
-    // Whether the server takes no change from this page at all — on a binding other machines reach,
+    // Whether the server takes no change from this page at all - on a binding other machines reach,
     // where it neither previews nor saves. The page then shows the file and the rules and says why
     // there is no editor, rather than offering one whose every request would be refused.
     readOnly: boolean;
@@ -587,7 +587,7 @@ function renderRegistry(corpus: Corpus): Element {
               ),
               h("td", rule.description),
               h("td", rule.defaultSeverity),
-              h("td", configured.get(rule.id) ?? "—"),
+              h("td", configured.get(rule.id) ?? "-"),
             ]),
           ),
         ),

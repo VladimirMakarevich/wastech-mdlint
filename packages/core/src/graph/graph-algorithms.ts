@@ -8,12 +8,12 @@ import type { ContextGraph } from "./context-graph-types.js";
 // this module consumes that data rather than re-running SCC, so the two can never disagree about
 // what a cycle is. Every returned array is sorted before it leaves a function, and
 // all ordering uses the shared host-independent string comparator on repo-relative POSIX node paths
-// — matching build-context-graph.ts — so output is byte-stable across filesystems.
+// - matching build-context-graph.ts - so output is byte-stable across filesystems.
 
 const byPath = compareStrings;
 
 // Deduped, reachability-oriented views of the edge list. `node.inDegree` and the raw edge list
-// retain edge multiplicity — two `A→B` edges are two references — but the algorithms
+// retain edge multiplicity - two `A→B` edges are two references - but the algorithms
 // here reason about *whether* one node reaches another, where a repeated edge is the same
 // relationship. Collapsing parallel edges is not cosmetic: Kahn's would otherwise leave a node fed by
 // a doubled `A→B` stuck at in-degree 2, never reaching zero, and wrongly report it as cycle-excluded.
@@ -36,7 +36,7 @@ function buildDedupedViews(graph: ContextGraph): DedupedViews {
   }
 
   // One entry per distinct (from,to): the builder never emits self-edges, but guarding here keeps the
-  // algorithms correct for any caller-supplied graph — a self-loop would deadlock Kahn's.
+  // algorithms correct for any caller-supplied graph - a self-loop would deadlock Kahn's.
   const seen = new Set<string>();
   for (const edge of graph.edges) {
     if (edge.from === edge.to) {
@@ -65,7 +65,7 @@ function buildDedupedViews(graph: ContextGraph): DedupedViews {
 export type TopologicalSortResult = {
   // Reading order: a node appears only after every node that links to it, ties broken by path.
   order: string[];
-  // Nodes never emitted — cycle members plus everything reachable only through them. Reported
+  // Nodes never emitted - cycle members plus everything reachable only through them. Reported
   // rather than dropped: an earlier topo-sort silently truncated to a shorter array, hiding the loss; here the
   // excluded set is reported explicitly so callers can state *what* the cycles (see `graph.cycles`)
   // kept out of reading order.
@@ -150,7 +150,7 @@ export function getComponents(graph: ContextGraph): string[][] {
     components.push(component);
   }
 
-  // Size descending, then by the component's smallest node path ascending — after the per-component
+  // Size descending, then by the component's smallest node path ascending - after the per-component
   // sort above that smallest path is `component[0]`. Without the tiebreak, equal-sized components
   // came out in whatever order they were discovered.
   components.sort(
@@ -167,7 +167,7 @@ const TOP_HUB_LIMIT = 5;
  *
  * Defined here rather than beside the skill's node classifier because two surfaces answer "is this a
  * hub" and they must answer it the same way: this summary's `top hubs` list and the generated
- * skill's `Role` column. They once disagreed — the list ranked by `inDegree + outDegree`, so an index
+ * skill's `Role` column. They once disagreed - the list ranked by `inDegree + outDegree`, so an index
  * referencing 67 documents and referenced by one ranked third while the corpus's real hub, at
  * in-degree 45, ranked fourth, and the classifier called that same index a `bridge`. A reader opening
  * the graph report to find what must not break was handed the document that depends on everything
@@ -195,7 +195,7 @@ export function formatContextGraphSummary(
     .map((node) => node.path)
     .sort(byPath);
 
-  // Ranked by in-degree — how heavily a document is *referenced* — because that is what the word
+  // Ranked by in-degree - how heavily a document is *referenced* - because that is what the word
   // "hub" denotes everywhere else in this product. Out-degree breaks ties ahead of path so that among
   // equally-referenced documents the more connected one leads; both keys are needed for a stable
   // order, since a tie broken by `graph.nodes` order would be deterministic only by accident.
@@ -211,7 +211,7 @@ export function formatContextGraphSummary(
 
   // Entry points are a header plus one indented path per line, matching `top hubs` below.
   // Comma-joining them produced a 3497-character single line on a 139-node graph, in a format whose
-  // name promises a report readable in a terminal — and whose documented usage pipes it through
+  // name promises a report readable in a terminal - and whose documented usage pipes it through
   // `head`, which truncates by line and so never shortens a blob.
   const lines = [
     `nodes: ${graph.nodes.length}`,
@@ -227,7 +227,7 @@ export function formatContextGraphSummary(
   if (hubs.length === 0) {
     // An empty list is a fact about the corpus, not a broken section: nothing here is referenced
     // often enough to be a hub, which is exactly what the skill's `Role` column says about the same
-    // corpus. Naming the threshold keeps the reader from reading the silence as a bug. ASCII only —
+    // corpus. Naming the threshold keeps the reader from reading the silence as a bug. ASCII only -
     // this goes to a terminal.
     lines.push(
       `  (none: no document has ${hubMinInDegree} or more incoming references)`,

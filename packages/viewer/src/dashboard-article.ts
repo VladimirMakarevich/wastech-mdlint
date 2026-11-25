@@ -372,7 +372,7 @@ function renderRow(row: DashboardRow, belowFirstScreen: boolean): Element {
       value !== null && value > 0
         ? `td.is-numeric.${className}`
         : "td.is-numeric",
-      value === null ? "—" : String(value),
+      value === null ? "-" : String(value),
     );
   return h("tr", belowFirstScreen ? { id: FIRST_SCREEN_ID } : {}, [
     h("td.dashboard-path", h("a", { href: documentHref(row.path) }, row.path)),

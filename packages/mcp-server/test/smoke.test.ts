@@ -59,7 +59,7 @@ describe("mcp-server", () => {
     expect(lint?.description).toContain("code plugins are never loaded");
     expect(lint?.description).toContain("content.md");
 
-    // The widened input schema must survive JSON Schema conversion *and* be advertised — an agent
+    // The widened input schema must survive JSON Schema conversion *and* be advertised - an agent
     // can only send a custom entry if the custom branch is visible here. Converting `assertionSchema`
     // is the risky part (a `z.toJSONSchema` failure throws during `listTools`), so this pins the
     // branch itself, not merely that the server still answers.

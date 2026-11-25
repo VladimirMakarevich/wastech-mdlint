@@ -118,7 +118,7 @@ export function renderChangesArticle(
   return article;
 }
 
-// What to compare: the work tree or the commits only, and — with review marks — the base branch or
+// What to compare: the work tree or the commits only, and - with review marks - the base branch or
 // the reader's last review.
 function renderControls(
   worktree: boolean,

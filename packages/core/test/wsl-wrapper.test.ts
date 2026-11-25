@@ -16,13 +16,13 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // `scripts/run-npm-windows.sh` used to flatten the argument vector into one string
-// and interpolate it — together with the repository path, unquoted — into a `cmd.exe` command line.
+// and interpolate it - together with the repository path, unquoted - into a `cmd.exe` command line.
 // A checkout under `C:\my repo` therefore ran `cd /d C:\my repo && npm ...`, and one containing `&`
 // injected. Building a command line by interpolation is exactly what a spawn must never do, so the
 // wrapper now changes directory on the bash side and hands cmd.exe an explicit argv.
 //
 // What this suite can and cannot show: it stubs `wslpath` and `cmd.exe` on PATH, so it pins the
-// argument vector cmd.exe receives, the working directory it is handed, and the UNC refusal — the
+// argument vector cmd.exe receives, the working directory it is handed, and the UNC refusal - the
 // parts that are ours. It cannot exercise real WSL interop (cwd translation, PATHEXT resolution of
 // `npm`); those were reasoned about, not run, and both fail loudly rather than silently if the
 // reasoning is wrong. The checkout deliberately sits in a directory whose name contains a space,
@@ -126,7 +126,7 @@ describe.skipIf(process.platform === "win32")("run-npm-windows.sh", () => {
     extraEnv: Record<string, string> = {},
   ): WrapperRun {
     const logPath = path.join(sandbox, `cmd-log-${String(++runCounter)}.txt`);
-    // Explicit argv and no `shell` — a suite about shell
+    // Explicit argv and no `shell` - a suite about shell
     // interpolation has no business introducing any. `cwd` is the sandbox rather than the
     // checkout, so a wrapper that failed to change directory itself would be visible.
     const result = spawnSync("bash", [path.join(checkout, "scripts", script)], {
@@ -157,7 +157,7 @@ describe.skipIf(process.platform === "win32")("run-npm-windows.sh", () => {
     };
   }
 
-  // Every test below spawns a real bash script, which in turn spawns the stubs — three process
+  // Every test below spawns a real bash script, which in turn spawns the stubs - three process
   // creations per `run()`, and `verify-wsl.sh` makes four such rounds. In isolation each finishes
   // in about two seconds, but process creation competes with the rest of the suite for the host,
   // and under a fully parallel run the same work measured over eleven. The default per-test budget
@@ -216,7 +216,7 @@ describe.skipIf(process.platform === "win32")("run-npm-windows.sh", () => {
     "propagates the Windows exit code to its caller",
     () => {
       // The wrapper `exec`s, so this is really a check that nothing swallows the status on the way
-      // back through the caller script — the property that makes these usable in CI-style chains.
+      // back through the caller script - the property that makes these usable in CI-style chains.
       const { status } = run("build-wsl.sh", { WSL_STUB_EXIT: "7" });
       expect(status).toBe(7);
     },
@@ -234,7 +234,7 @@ describe.skipIf(process.platform === "win32")("run-npm-windows.sh", () => {
       expect(status).not.toBe(0);
       expect(stderr).toContain(uncPath);
       // Nothing was spawned: cmd.exe silently ignores a UNC working directory and falls back to
-      // C:\Windows, where npm reports a missing script — a failure that reads as a broken repository.
+      // C:\Windows, where npm reports a missing script - a failure that reads as a broken repository.
       expect(calls).toBeNull();
     },
     SPAWN_BUDGET_MS,

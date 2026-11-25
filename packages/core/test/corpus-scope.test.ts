@@ -18,7 +18,7 @@ function directoryProbe(relativeDirectory: string): string {
 }
 
 describe("DEFAULT_EXCLUDE_GLOBS", () => {
-  // Reconstructed independently rather than imported from the production list — the same
+  // Reconstructed independently rather than imported from the production list - the same
   // reconstruction `config-writer.test.ts` already pins for what `init` writes. Two tests deriving
   // the same patterns from `DEFAULT_NOISE_DIR_NAMES` is what proves the "one list, reachable from
   // both `init` and lint" criterion without either test importing the other's expectation.

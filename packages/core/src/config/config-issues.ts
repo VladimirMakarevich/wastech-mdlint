@@ -7,7 +7,7 @@ import { ruleEntryBranchIndex } from "./config-schema.js";
  * The one place a config validation issue becomes user-visible text.
  *
  * Both validation stages render through `formatConfigIssue`, so `config.rules[0].severity` is the
- * single notation the product speaks — the loader used to emit `config.rules.0` from stage 1 and
+ * single notation the product speaks - the loader used to emit `config.rules.0` from stage 1 and
  * `rules[1].options` from stage 2 for the same array.
  *
  * It sits in the config layer rather than in `engine/` because stage 2 (per-rule options) has no
@@ -43,12 +43,12 @@ function isRuleEntryPath(issuePath: readonly PropertyKey[]): boolean {
  * Pick the branch whose issues describe what the user meant.
  *
  * For a `rules[]` entry that is `rule: "custom"` vs everything else. Anywhere else the schema offers
- * no discriminator, so the closest match by issue count is the best available guess — and it is a
+ * no discriminator, so the closest match by issue count is the best available guess - and it is a
  * guess with a floor, since every branch's issues describe the same input.
  *
  * Only reached when Zod reports `invalid_union`. Zod returns a single branch's issues directly when
  * that branch alone failed without aborting, so for `rules[]` the choice made here is only right if
- * the branch the author did not mean always aborts — which `standardRuleEntrySchema`'s refine
+ * the branch the author did not mean always aborts - which `standardRuleEntrySchema`'s refine
  * guarantees for custom entries.
  */
 function selectBranch(
@@ -78,7 +78,7 @@ function collect(
     const issuePath = [...prefix, ...issue.path];
 
     // `errors: []` is the discriminated-union no-match case (`assertionSchema`'s `kind`), whose own
-    // message already lists the allowed values — there is nothing to expand.
+    // message already lists the allowed values - there is nothing to expand.
     if (issue.code === "invalid_union" && issue.errors.length > 0) {
       collect(
         selectBranch(issue.errors, issuePath, root),
@@ -97,7 +97,7 @@ function collect(
  * Flatten Zod's issue tree into path-anchored config issues, expanding `invalid_union` instead of
  * discarding its per-branch detail.
  *
- * Before this, a union failure rendered as its own top-level message — `Invalid input` — which named
+ * Before this, a union failure rendered as its own top-level message - `Invalid input` - which named
  * neither the offending key nor the allowed values, and covered every rule family: `severity` is a
  * strict enum and `ruleEntrySchema` is `.strict()`, so `"severity": "warn"` or any unknown key on any
  * rule entry failed both branches and collapsed.

@@ -66,8 +66,8 @@ export function isAllowedHostHeader(
  * Whether a request was made by another site's page rather than by navigating to us.
  *
  * Navigations are allowed from anywhere: following a link to a document is the point of the tool,
- * and the response goes to the user, not to the linking page. Everything else from another origin —
- * a `fetch`, an `EventSource`, an `<img>` or `<script>` tag — is refused. `same-site` counts as
+ * and the response goes to the user, not to the linking page. Everything else from another origin -
+ * a `fetch`, an `EventSource`, an `<img>` or `<script>` tag - is refused. `same-site` counts as
  * foreign too, because every other port on localhost is the same site, and another dev server the
  * user runs is exactly the kind of page that should not reach this one.
  */
@@ -156,8 +156,8 @@ export function assetHeaders(): Record<string, string> {
  * request with a body at all.
  *
  * Every such request makes the server act for whoever sent it: a preview lints the repository under a
- * config the request supplies — a scope widened past `.gitignore`, a custom rule whose finding quotes
- * the text it matched, which together read any file in the checkout — a save rewrites the config, an
+ * config the request supplies - a scope widened past `.gitignore`, a custom rule whose finding quotes
+ * the text it matched, which together read any file in the checkout - a save rewrites the config, an
  * open starts a program, a mark records a review in this user's name. On a loopback binding the
  * sender is on this machine. With `--host` it is anyone who reaches the port, and a token carried in a
  * page every one of them can load proves nothing about who they are. So off loopback there is no

@@ -10,7 +10,7 @@ function normalizePathValue(value: string): string {
 // that as a negation would rewrite the working `**/!(x).md` into `!**/(x).md` and invert a scope.
 //
 // The whole run is peeled rather than just the first `!`, so an even count cancels in picomatch's own
-// `negate()` — which is what the slash-containing branch below already does by passing through
+// `negate()` - which is what the slash-containing branch below already does by passing through
 // untouched, and the two branches must not disagree.
 function globNegationLength(pattern: string): number {
   let length = 0;
@@ -29,7 +29,7 @@ export function normalizeConfigGlob(pattern: string): string {
   const normalizedPattern = normalizePathValue(pattern);
   // The depth-agnostic prefix belongs on the pattern *body*, not on the pattern: `!keep.md` has to
   // become `!**/keep.md`, because `**/!keep.md` is a literal-filename pattern and therefore a silent
-  // no-op. A `./` the prefix would hide needs no handling — picomatch strips it
+  // no-op. A `./` the prefix would hide needs no handling - picomatch strips it
   // relative to the start it advances past for the negation, so `!./docs/**` anchors like
   // `!docs/**`.
   const negationLength = globNegationLength(normalizedPattern);
@@ -39,7 +39,7 @@ export function normalizeConfigGlob(pattern: string): string {
     return normalizedPattern;
   }
 
-  // With no negation this is `**/${normalizedPattern}` — byte-identical to what this function
+  // With no negation this is `**/${normalizedPattern}` - byte-identical to what this function
   // emitted before negations were handled at all, which is what keeps `init`'s root-only
   // `./*.{md,mdx}` proposal and every other non-negated config matching exactly as before.
   return `${normalizedPattern.slice(0, negationLength)}**/${body}`;
@@ -74,8 +74,8 @@ export function matchGlobList(
   list: readonly string[],
   patterns: readonly string[],
 ): string[] {
-  // This is the ordered-list algorithm micromatch runs, written directly over picomatch — which is
-  // all micromatch did for this call — so the selection rules are unchanged while the tree loses
+  // This is the ordered-list algorithm micromatch runs, written directly over picomatch - which is
+  // all micromatch did for this call - so the selection rules are unchanged while the tree loses
   // `braces`. That package has no patched release for a stack-exhaustion advisory on deeply nested
   // brace patterns, so `npm audit` reported it as high severity in every repository that installed
   // this package, even though nothing here ever called it: picomatch compiles `{a,b}` itself.
@@ -91,7 +91,7 @@ export function matchGlobList(
   for (const pattern of patterns) {
     const matcher = picomatch(pattern, { dot: true }, true);
     // A pattern that opens with `!(` compiles to a negated extglob, not a negation, yet it still
-    // selects by exclusion — so it subtracts like `!x` and counts toward the all-negations case.
+    // selects by exclusion - so it subtracts like `!x` and counts toward the all-negations case.
     const negated =
       matcher.state.negated || matcher.state.negatedExtglob === true;
 
@@ -128,10 +128,10 @@ export function matchesConfigGlob(
   filePath: string,
   patterns: string[],
 ): boolean {
-  // Match a one-item list (`matchGlobList`) rather than asking "does any pattern match?" — the two
+  // Match a one-item list (`matchGlobList`) rather than asking "does any pattern match?" - the two
   // are not interchangeable. Taken one at a time, a `!` entry compiles to an *inverting* matcher, so
   // `["docs/public/**", "!docs/private/**"]` would read as "under docs/public OR not under
-  // docs/private" — true for almost every path in a repository. Only the list form applies negation
+  // docs/private" - true for almost every path in a repository. Only the list form applies negation
   // across the set, and it is the same call `workspace-packages.ts` makes for the same reason.
   //
   // A one-item list keeps the semantics per-path: no two paths can interact. With no negated entry

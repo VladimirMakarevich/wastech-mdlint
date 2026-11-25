@@ -48,7 +48,7 @@ describe("toWriteTargetPath", () => {
 
   it("falls back to the absolute path once the relative form needs a leading '..'", () => {
     // The motivating case: a single hop already reads worse than the absolute path, and the observed
-    // report had five of them. Platform-native separators on purpose — this is a path to open.
+    // report had five of them. Platform-native separators on purpose - this is a path to open.
     const target = path.resolve(CWD, "..", "skill-out", "SKILL.md");
     expect(toWriteTargetPath(CWD, target)).toBe(target);
     expect(toWriteTargetPath(CWD, target)).not.toContain("..");
@@ -62,7 +62,7 @@ describe("toWriteTargetPath", () => {
   });
 
   // `path.relative` only ever returns an absolute path when the two paths share no root, which on
-  // POSIX cannot happen — so this branch is genuinely unreachable off Windows and is left to CI's
+  // POSIX cannot happen - so this branch is genuinely unreachable off Windows and is left to CI's
   // windows runner rather than faked.
   it.runIf(process.platform === "win32")(
     "falls back to the absolute path across Windows drives, where no relative form exists",
@@ -91,7 +91,7 @@ describe("formatOperationalError", () => {
 
   it("keeps the message of an errno that names no path", () => {
     // Node only omits `path` when the syscall had none to report, so this message has nothing to
-    // leak — and it is strictly more useful than the bare code the backstop would otherwise print.
+    // leak - and it is strictly more useful than the bare code the backstop would otherwise print.
     const error = errnoError({
       code: "ENOSPC",
       message: "ENOSPC: no space left on device, write",

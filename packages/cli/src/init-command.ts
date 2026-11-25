@@ -114,7 +114,7 @@ export {
 type InitRun = {
   options: InitCommandOptions;
   prompter: InitPrompter;
-  // The directory the whole flow scans, infers and writes from — the target, or the directory of a
+  // The directory the whole flow scans, infers and writes from - the target, or the directory of a
   // config found at its ancestor.
   cwd: string;
   existingConfigPath: string | undefined;
@@ -144,7 +144,7 @@ type InitDraft = {
  * Resolves the existing-config disposition. When no `[path]` was explicitly typed, a config found at
  * a strict ancestor of `options.cwd` governs the whole run (scan/inference/write all re-root to that
  * ancestor's directory). When `options.pathWasExplicit` is true, only a config found exactly at
- * `options.cwd` counts as existing — an ancestor's config is left untouched and reported as "none
+ * `options.cwd` counts as existing - an ancestor's config is left untouched and reported as "none
  * found" for this target directory.
  */
 async function resolveExistingConfig(
@@ -154,7 +154,7 @@ async function resolveExistingConfig(
   const discoveredConfigPath = await findConfig(options.cwd);
   const targetDir = path.resolve(options.cwd);
 
-  // An explicit `[path]` names the exact directory init must operate on — a config found at a
+  // An explicit `[path]` names the exact directory init must operate on - a config found at a
   // strict ancestor of that directory does not govern it, and must not be silently re-rooted onto
   // it. Only a config found exactly at the target counts as this run's existing config in that
   // case. A bare/default invocation (no `[path]` typed) keeps the re-root behavior below.
@@ -166,7 +166,7 @@ async function resolveExistingConfig(
       : discoveredConfigPath;
 
   // `findConfig` walks up to an ancestor directory when the target is a subdirectory of a repo that
-  // already has a config — the config being merged/overwritten governs from *its own* directory, so
+  // already has a config - the config being merged/overwritten governs from *its own* directory, so
   // the whole flow re-roots there too. Scanning/inferring against the original target instead would
   // produce include globs/rule scopes relative to the wrong root and could miss a lockfile that only
   // lives at the real root. A no-op when the config is already at the target directory.
@@ -174,7 +174,7 @@ async function resolveExistingConfig(
     existingConfigPath === undefined
       ? options.cwd
       : path.dirname(existingConfigPath);
-  // Relative to the ORIGINAL target directory, not `cwd` above — so a config found at an ancestor
+  // Relative to the ORIGINAL target directory, not `cwd` above - so a config found at an ancestor
   // renders honestly as `../…` instead of the bare filename the previous re-pointed computation
   // produced. Repository-relative POSIX path (public-output invariant), computed up front so
   // both the existing-config prompt and the printed summary use it instead of the raw absolute path.
@@ -201,7 +201,7 @@ async function resolveExistingConfig(
 }
 
 /**
- * `skip` leaves the config and its schema byte-unchanged and never scans or drafts — but it skips
+ * `skip` leaves the config and its schema byte-unchanged and never scans or drafts - but it skips
  * only the config. The CI workflow and agent rule depend on nothing but where the config lives, and
  * a repository that already has one is exactly the one that wants to add them without overwriting
  * or merging it; ending the run at the skip once ignored `--with-ci-workflow` and
@@ -215,7 +215,7 @@ async function runSkip(
   const repoRoot = (await findRepositoryRoot(cwd)) ?? cwd;
   // The package manager comes from lockfile detection alone. The write path asks the user when
   // nothing is detected, but here its only effect is the agent rule's runner line, whose
-  // undetected fallback is the npm form — a package-manager question would be out of place in a
+  // undetected fallback is the npm form - a package-manager question would be out of place in a
   // run whose whole point is to leave the config alone.
   const packageManager = await detectPackageManager(cwd);
   const { ciWorkflow, agentRule } = await offerOptInFiles({
@@ -238,12 +238,12 @@ async function runSkip(
   };
 }
 
-/** Scans the repository, then asks which clusters to keep and — when undetected — the package manager. */
+/** Scans the repository, then asks which clusters to keep and - when undetected - the package manager. */
 async function scanAndConfirm(run: InitRun): Promise<ConfirmedScan> {
   const { options, prompter } = run;
   const scanResult = await scanRepository({ cwd: run.cwd });
 
-  // Separates "the user turned every cluster down" from "the scan found nothing to turn down" — the
+  // Separates "the user turned every cluster down" from "the scan found nothing to turn down" - the
   // two need opposite `include` values further down, and `confirmedClusters` alone
   // cannot tell them apart once both have collapsed to an empty array.
   const clustersWereOffered = scanResult.clusters.length > 0;
@@ -290,7 +290,7 @@ function inferenceScopeFor(
 
 /**
  * Re-runs inference against the confirmed cluster subset (so global gates and the cycle heuristic
- * reflect what the user actually kept), asks which categories to keep, and — on a merge — drops the
+ * reflect what the user actually kept), asks which categories to keep, and - on a merge - drops the
  * rules the existing config already lists.
  */
 async function selectRules(
@@ -306,7 +306,7 @@ async function selectRules(
   });
 
   const groupedByCategory = groupInferredRulesByCategory(inference.rules);
-  // Only categories with >=1 inferred rule are offered — the other built-ins have a required
+  // Only categories with >=1 inferred rule are offered - the other built-ins have a required
   // option with no safe way to derive from a corpus without inventing a threshold (see
   // rule-inference.ts's own note on the 7 gated ids), so a category with nothing to add would be a
   // dead, confusing checkbox entry.
@@ -337,8 +337,8 @@ async function selectRules(
   return selectedRules;
 }
 
-// Copies only the two fields the draft names, so the draft and the write summary — both fed from the
-// same `generateInitConfig` result — cannot disagree about which schema file the config points at.
+// Copies only the two fields the draft names, so the draft and the write summary - both fed from the
+// same `generateInitConfig` result - cannot disagree about which schema file the config points at.
 function draftSchemaPlan(result: GeneratedInitConfig): DraftSchemaPlan {
   return {
     ref: result.schemaRef,
@@ -371,7 +371,7 @@ async function buildDraft(
     existingConfigAction === "merge" ? "merge" : "fresh";
 
   // Reuse the snapshot the merge baseline read. On a merge that survives the unreadable-config
-  // abort, `existingDocument.raw` is defined (parsed + additively mergeable) — no second read, no
+  // abort, `existingDocument.raw` is defined (parsed + additively mergeable) - no second read, no
   // window for a fresh-overwrite that drops the existing keys.
   const existing: ExistingConfigDocument | undefined =
     action === "merge" && baseline.existingDocument?.raw !== undefined
@@ -380,8 +380,8 @@ async function buildDraft(
 
   // The package `$schema` ref is computed relative to the config's own directory (not a fixed
   // literal), anchored on the *actual* installed schema, so a subdirectory config wires
-  // `../node_modules/...` instead of a dead path nested under it. When nothing is installed — the
-  // ordinary `npx` case — there is no anchor and no ref: the previous project-root fallback emitted
+  // `../node_modules/...` instead of a dead path nested under it. When nothing is installed - the
+  // ordinary `npx` case - there is no anchor and no ref: the previous project-root fallback emitted
   // `./node_modules/@wastech-mdlint/cli/schema.json` for a file that does not exist.
   // `undefined` tells `generateInitConfig` to generate and point at a project-local `./schema.json`.
   const schemaAnchor = await findInstalledSchemaDir(cwd);
@@ -393,7 +393,7 @@ async function buildDraft(
     scan.clustersWereOffered,
   );
   // Generated *before* the draft, not at write time, because the draft has to name the schema file
-  // this run would create — and generation is pure, so the only observable difference is that the
+  // this run would create - and generation is pure, so the only observable difference is that the
   // one anchor lookup above now also happens on a run the user goes on to decline. The same `result`
   // is what gets written later, so no second generation can disagree with what was confirmed.
   const result = generateInitConfig({
@@ -432,8 +432,8 @@ async function buildDraft(
 
 /**
  * Stages the write batch, committed schema-first, config-last. The order is load-bearing: the config
- * is what points at the schema, so if the schema rename fails the old config — and its old,
- * still-accurate `$schema` — survives untouched. The previous config-first order produced the
+ * is what points at the schema, so if the schema rename fails the old config - and its old,
+ * still-accurate `$schema` - survives untouched. The previous config-first order produced the
  * opposite: a rewritten config pointing at a stale schema. `writeFilesAtomic` stages every temp
  * before renaming any of them, so the common failure (no space, no permission on the directory)
  * leaves the repository entirely untouched.
@@ -484,7 +484,7 @@ async function writeConfirmedDraft(
   // root (a nested workspace package must still anchor at the real repo root, not `packages/foo`)
   // and only falls back to a nearer `package.json`/`node_modules` outside a git repo. It walks *up*
   // from the write dir, so the root is always an ancestor and reported paths never contain a "..".
-  // Falls back to `cwd` outside any recognizable project (best effort — no parent anchor to report).
+  // Falls back to `cwd` outside any recognizable project (best effort - no parent anchor to report).
   const repoRoot = (await findRepositoryRoot(cwd)) ?? cwd;
   const toRepoRelative = (absolutePath: string): string =>
     normalizeRelativePath(path.relative(repoRoot, absolutePath));
@@ -494,13 +494,13 @@ async function writeConfirmedDraft(
   // the only safe outcome (no config, no schema, no CI workflow touch the disk here).
   if (run.existingConfigAction === "merge" && existingConfigUnreadable) {
     // `relativeConfigPath` (not `toRepoRelative(existingConfigPath)`) so this message names the same
-    // path the draft summary above already showed — target-directory-relative, can read `../…` — and
+    // path the draft summary above already showed - target-directory-relative, can read `../…` - and
     // never mismatches it for the same file, which it did while the two used different bases.
     return {
       output: composeOutput(formatNotWrittenSummary(run.relativeConfigPath)),
       // An operational failure, not a deliberate no-write: the user confirmed the draft and asked for
       // a merge, and it is the *state of their file* that made it impossible. Exiting 0 here made a
-      // CI merge step that produced nothing report success — `--on-existing skip`
+      // CI merge step that produced nothing report success - `--on-existing skip`
       // is the outcome that legitimately writes nothing.
       outcome: "invalid-existing-config",
     };
@@ -518,7 +518,7 @@ async function writeConfirmedDraft(
   if (!writeResult.ok) {
     // Return the failure summary on stdout rather than throwing: a failed write used to leave stdout
     // *empty*, so the user could not tell what state their repository was in. The
-    // CI-workflow offer is deliberately skipped — prompting to add a workflow for a config that was
+    // CI-workflow offer is deliberately skipped - prompting to add a workflow for a config that was
     // never written would be nonsense.
     return {
       output: composeOutput(

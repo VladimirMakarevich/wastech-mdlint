@@ -167,7 +167,7 @@ describe("REF-002 anchors", () => {
   //
   // `ignoredPattern` is compiled once per resolved rule and shared across every link, document and
   // run. Had it carried a `g` flag, `lastIndex` would survive a successful `.test()`, so the second
-  // of two consecutive matching fragments would fail to match and be reported — and a second run
+  // of two consecutive matching fragments would fail to match and be reported - and a second run
   // with the same rule would start from a different `lastIndex` than the first. Consecutive matches
   // interleaved with misses, linted twice through one rule instance, is the shape that exposes it.
   it("gives identical findings when one `ignoredPattern` rule is run twice", async () => {
@@ -229,7 +229,7 @@ describe.each([
       "docs/a.md",
       "drafts/b.md",
     ]);
-    // The unscoped shape — `exclude` with no `files` beside it to carry the filtering.
+    // The unscoped shape - `exclude` with no `files` beside it to carry the filtering.
     expect(
       await reportedFiles(cwd, rule(ruleId, { exclude: ["drafts/**"] })),
     ).toEqual(["docs/a.md"]);
@@ -244,13 +244,13 @@ describe.each([
 
 // Same key, opposite subject: REF-001/REF-003 filter the *target* they are about to probe
 // (`primitives/reference.ts`), not the document being scanned. A reader who assumes file scope here
-// would expect the second half of each pair to fall silent — it must not.
+// would expect the second half of each pair to fall silent - it must not.
 describe("REF-001 / REF-003 exclude is a link-target filter, not file scope", () => {
   it("REF-001 silences a link pointing into the excluded directory, not links written there", async () => {
     const cwd = await fixtureRepo({
-      // Target `drafts/x.md` — matched by the exclude.
+      // Target `drafts/x.md` - matched by the exclude.
       "docs/a.md": "[into drafts](../drafts/x.md)\n",
-      // Target `docs/missing.md` — outside the exclude, though the *source* is in `drafts/`.
+      // Target `docs/missing.md` - outside the exclude, though the *source* is in `drafts/`.
       "drafts/b.md": "[out of drafts](../docs/missing.md)\n",
     });
 
@@ -292,8 +292,8 @@ describe("REF-001 / REF-003 exclude is a link-target filter, not file scope", ()
 });
 
 // `exclude` used to be applied on only one of `linkResolves`'s two resolution
-// branches, so *any* configured router — including a bare `{}`, which validates because every
-// siteRouter field is optional — silently turned the option off. These pin that the two options
+// branches, so *any* configured router - including a bare `{}`, which validates because every
+// siteRouter field is optional - silently turned the option off. These pin that the two options
 // compose, on the inherited setting and on the per-rule override alike.
 describe("REF-001 exclude applies with a site router configured", () => {
   const GENERATED_LINK = "[gen](/generated/x.md)\n";
@@ -301,7 +301,7 @@ describe("REF-001 exclude applies with a site router configured", () => {
   it("skips an excluded root-relative target under an inherited empty siteRouter", async () => {
     const cwd = await fixtureRepo({ "docs/a.md": GENERATED_LINK });
 
-    // The control: no router at all. Both runs must agree — that agreement is the whole finding.
+    // The control: no router at all. Both runs must agree - that agreement is the whole finding.
     expect(
       await lint(cwd, [rule("REF-001", { exclude: ["generated/**"] })]),
     ).toMatchObject({ messages: [] });
@@ -363,7 +363,7 @@ describe("REF option schemas (file scope inventory)", () => {
   }
 
   // Every REF rule except REF-002, REF-007, REF-008 and REF-009 is whole-corpus or identity-based by design, so `files` is not a
-  // silently ignored key — it fails resolution. This is what makes the pairing above unambiguous.
+  // silently ignored key - it fails resolution. This is what makes the pairing above unambiguous.
   it.each([
     ["REF-001", {}],
     ["REF-003", {}],
@@ -532,7 +532,7 @@ describe("REF-005 ID traceability", () => {
 
   it("states the lookup each branch performed rather than a claim about the corpus", async () => {
     // An id mentioned in prose, in a link, or in a filename is not in an `idColumn`, and the rule
-    // never looked there — so a bare "is never referenced" is refuted by one grep, and a reader who
+    // never looked there - so a bare "is never referenced" is refuted by one grep, and a reader who
     // catches it that way stops trusting the findings that were real. Asserted on the text, because a
     // count-based assertion reads identically before and after the wording is fixed.
     const cwd = await fixtureRepo({
@@ -558,7 +558,7 @@ describe("REF-005 ID traceability", () => {
       'Definition "REQ-2" is not referenced: it is not in the "ID" column of any table in "design.md".',
     );
     // The dangling branch searched the definition globs, and definitions are column *plus* heading
-    // tokens — the asymmetry is real, so the two messages must not be interchangeable.
+    // tokens - the asymmetry is real, so the two messages must not be interchangeable.
     expect(
       result.messages.find((message) => message.severity === "error")?.message,
     ).toBe(

@@ -101,8 +101,8 @@ describe("detectPackageManager", () => {
   });
 });
 
-// An earlier check looked only at `cwd`, so a monorepo member — which by construction has
-// no lockfile of its own — reported "not detected" and made `init` prompt for something it could
+// An earlier check looked only at `cwd`, so a monorepo member - which by construction has
+// no lockfile of its own - reported "not detected" and made `init` prompt for something it could
 // have read off disk.
 describe("detectPackageManager · ancestor walk", () => {
   it("finds a lockfile at an ancestor of the scanned directory", async () => {
@@ -140,7 +140,7 @@ describe("detectPackageManager · ancestor walk", () => {
     expect(
       await detectPackageManager(path.join(root, "outer", "repo", "docs")),
     ).toBeUndefined();
-    // The boundary is not a blanket refusal — a lockfile at the repo root itself is still found.
+    // The boundary is not a blanket refusal - a lockfile at the repo root itself is still found.
     await writeFile(path.join(root, "outer", "repo", "bun.lock"), "", "utf8");
     expect(
       await detectPackageManager(path.join(root, "outer", "repo", "docs")),

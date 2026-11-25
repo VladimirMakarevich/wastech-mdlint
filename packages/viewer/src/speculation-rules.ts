@@ -9,13 +9,13 @@ import { assetHeaders } from "./security.js";
  * Served as a file the pages name in a `Speculation-Rules` header rather than inline, which the
  * Content-Security-Policy, allowing scripts from this origin only, would refuse.
  *
- * Only fetching, never rendering ahead: a page rendered in the background would run its scripts —
+ * Only fetching, never rendering ahead: a page rendered in the background would run its scripts -
  * restoring the tree from a scroll position saved before the click, opening an event stream of its
- * own — before the reader ever saw it. A fetched page is only text until it is opened, and when it
+ * own - before the reader ever saw it. A fetched page is only text until it is opened, and when it
  * is opened later than it was fetched, its event stream sends it what happened in between.
  *
  * Left out: links within the page (`#…`), and the header's Blame switch, which makes git blame
- * every line — work for a click that may never come.
+ * every line - work for a click that may never come.
  *
  * The header's sections are fetched the same way: the Changes page and the dashboard are the
  * longest waits in the viewer, a fifth of a second of the server's and more, and a reader rests on

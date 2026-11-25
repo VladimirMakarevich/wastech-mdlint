@@ -30,7 +30,7 @@ function isMapping(value: FrontmatterValue): value is FrontmatterMapping {
 }
 
 // Classify a document's front matter once for every primitive. A block that is not valid YAML, or
-// whose root is not a mapping, yields the single finding that explains why — and every primitive
+// whose root is not a mapping, yields the single finding that explains why - and every primitive
 // reports it rather than skipping the document. Skipping would let a custom rule used without
 // FM-001 pass green over a block it never managed to read, which is indistinguishable from a block
 // that satisfies it.
@@ -109,7 +109,7 @@ function scalarValues(value: FrontmatterValue): string[] | undefined {
 
 export type FrontmatterRequiredOptions = { keys: string[] };
 
-// frontmatterRequired — every listed key path is present. A document without front matter is
+// frontmatterRequired - every listed key path is present. A document without front matter is
 // missing every key, so it is reported at line 0 (the whole-file sentinel) since there is no block
 // to point at.
 export function frontmatterRequired(
@@ -189,7 +189,7 @@ function checkValues(
 
 export type FrontmatterInSetOptions = { key: string; values: string[] };
 
-// frontmatterInSet — the key's value (each item, for a list) is one of an allowed set. Compared
+// frontmatterInSet - the key's value (each item, for a list) is one of an allowed set. Compared
 // exactly: under the failsafe schema the value is the parsed YAML string with no type resolution,
 // so there is no number, boolean or case folding to account for.
 export function frontmatterInSet(
@@ -214,7 +214,7 @@ export type FrontmatterMatchesOptions = {
   flags?: string;
 };
 
-// frontmatterMatches — the key's value (each item, for a list) matches a regex.
+// frontmatterMatches - the key's value (each item, for a list) matches a regex.
 export function frontmatterMatches(
   document: ParsedDocument,
   options: FrontmatterMatchesOptions,

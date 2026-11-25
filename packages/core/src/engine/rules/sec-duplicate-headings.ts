@@ -10,7 +10,7 @@ export type DuplicateHeadingOptions = {
 // Headings are compared by exact `heading.text`: the parser already renders it (inline formatting
 // stripped, so `**Usage**` and `Usage` are the same text), and it is the identity every `section`
 // option matches against (`heading.text === section` in the section primitives, `table.section ===
-// section` in the TBL rules) — so exact-text repeats are precisely the ones that make `section`
+// section` in the TBL rules) - so exact-text repeats are precisely the ones that make `section`
 // ambiguous. Case is deliberately not folded: `Usage` and `usage` still collide
 // as slugs, but a case-insensitive rule would report headings that `section` tells apart.
 //

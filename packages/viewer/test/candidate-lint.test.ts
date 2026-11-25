@@ -68,7 +68,7 @@ describe("CandidateLinter", () => {
   });
 
   // The defect this guards: every preview the page had already dropped still ran, in order, so the
-  // newest one waited behind all of them — up to the time limit each while a pattern ran away.
+  // newest one waited behind all of them - up to the time limit each while a pattern ran away.
   it("skips a job whose request was abandoned before its turn", async () => {
     const linter = new CandidateLinter(5_000);
     try {

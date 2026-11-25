@@ -390,7 +390,7 @@ describe("TBL file scope (exclude)", () => {
         "docs/a.md",
         "drafts/b.md",
       ]);
-      // The unscoped shape — `exclude` with no `files` beside it to carry the filtering.
+      // The unscoped shape - `exclude` with no `files` beside it to carry the filtering.
       expect(
         await reportedFiles(
           cwd,
@@ -455,7 +455,7 @@ describe("TBL-002 --fix", () => {
   });
 
   // The other scope gate on this path, and the one no rule option controls: the corpus default.
-  // `applyFixes` resolves it so a file the lint pass never read is not one `--fix` rewrites —
+  // `applyFixes` resolves it so a file the lint pass never read is not one `--fix` rewrites -
   // otherwise a zero-config run would rewrite vendored Markdown inside `node_modules`, an edit to
   // files the user does not own and never saw reported. Carried only by a comment naming
   // `lintFiles` until this pinned it.
@@ -479,7 +479,7 @@ describe("TBL-002 --fix", () => {
   });
 
   // `emptyCellEdits` only ever edits *between* a row's pipes, so its offsets were already CRLF-safe
-  // (`content.split("\n")` leaves the `\r` outside the cell range) — this pins that down so the
+  // (`content.split("\n")` leaves the `\r` outside the cell range) - this pins that down so the
   // newline normalization on the write path cannot regress it in the other direction.
   it("fills the cell without disturbing a CRLF document's line endings", async () => {
     const cwd = await fixtureRepo({ "a.md": TABLE.replace(/\n/g, "\r\n") });
@@ -514,7 +514,7 @@ describe.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
       const cwd = await fixtureRepo({ "a.md": TABLE, "sub/b.md": TABLE });
       const readOnlyDir = path.join(cwd, "sub");
       // `r-x` keeps `sub/b.md` readable (so it still enters the corpus) while making the temp write
-      // inside `sub/` fail — the closest thing to a real mid-write fault without a fault injector.
+      // inside `sub/` fail - the closest thing to a real mid-write fault without a fault injector.
       await chmod(readOnlyDir, 0o555);
 
       try {

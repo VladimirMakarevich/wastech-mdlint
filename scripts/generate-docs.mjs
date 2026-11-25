@@ -7,7 +7,7 @@
 // mcp-server dist, so the bytes written here are identical to what the sync tests regenerate.
 //
 // mcp-server is imported by relative path into its built dist rather than by package name: its
-// package.json is bin-only (no `exports`/`main`), by design — it's a host you run, not a library.
+// package.json is bin-only (no `exports`/`main`), by design - it's a host you run, not a library.
 // Adding an export solely for this one internal dev script would needlessly widen its npm surface,
 // so this mirrors how the script already reaches packages/cli/schema.json by relative path.
 

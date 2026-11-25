@@ -16,7 +16,7 @@ import { runCli } from "../src/program.js";
 
 // Drift guard (deliverable 3, CLI half): every CLI command and flag the shipped skills instruct users
 // to run must still exist in the real program. A renamed/removed command makes `--help` exit 2 here;
-// a renamed flag makes the flag assertion fail — either way CI catches skill-vs-product drift.
+// a renamed flag makes the flag assertion fail - either way CI catches skill-vs-product drift.
 const skillsDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../../skills",
@@ -41,15 +41,15 @@ function referencedInAnySkill(needle: string): boolean {
   return skillBodies.some((body) => body.includes(needle));
 }
 
-// Extract the CLI invocations the skills actually document — every `[npx] wastech-mdlint <cmd> …` run,
+// Extract the CLI invocations the skills actually document - every `[npx] wastech-mdlint <cmd> …` run,
 // capturing the command and the flags on the same invocation (up to a line break or the closing
-// backtick of an inline code span). Deriving the surface from the skill text — rather than trusting a
-// hand-kept list — is what makes this an honest drift guard: a skill that adds/renames a CLI command
+// backtick of an inline code span). Deriving the surface from the skill text - rather than trusting a
+// hand-kept list - is what makes this an honest drift guard: a skill that adds/renames a CLI command
 // reference, or moves a flag onto a different command, changes this parse and fails the match below.
 function parseCliInvocations(): Map<string, Set<string>> {
   const invocations = new Map<string, Set<string>>();
   // Anchor on a package runner (`npx`/`pnpm exec`/`yarn`/`bunx`) so prose mentions like
-  // "wastech-mdlint findings" are not mistaken for command invocations — only real run lines count.
+  // "wastech-mdlint findings" are not mistaken for command invocations - only real run lines count.
   const pattern = /(?:npx|exec|yarn|bunx) wastech-mdlint (\w[\w-]*)([^\n`]*)/g;
   for (const match of allSkillText.matchAll(pattern)) {
     const command = match[1]!;
@@ -160,7 +160,7 @@ const COMMANDS: {
 describe("skills reference a live CLI surface", () => {
   // Before the live `--help` checks, prove the hand-kept matrix still mirrors what the skills actually
   // document. If a skill invocation adds/renames a command or moves a flag onto a different command,
-  // the derived parse diverges from COMMANDS and this fails — closing the "stale matrix" gap.
+  // the derived parse diverges from COMMANDS and this fails - closing the "stale matrix" gap.
   it("COMMANDS matches the CLI invocations documented in the skills", () => {
     const parsed = parseCliInvocations();
 
@@ -187,7 +187,7 @@ describe("skills reference a live CLI surface", () => {
     // Completeness guard, made command-aware: invocation-line parsing alone misses flags mentioned only
     // in prose (e.g. the init skill discusses `lint`'s `--config` in a sentence). For EVERY `--flag`
     // token anywhere in the skills, require the matrix to name the owning command(s) and then verify the
-    // flag against THAT command's live `--help` — never against a repo-wide flag set, so a prose flag
+    // flag against THAT command's live `--help` - never against a repo-wide flag set, so a prose flag
     // cannot pass just because some unrelated command happens to expose it.
     //
     // Flags that are real skill references but not `wastech-mdlint` subcommand options:
@@ -266,7 +266,7 @@ describe("skills reference a live CLI surface", () => {
 // Deliverable 3 goes beyond `--help`: the skills tell agents to consume the CLI's `--format json`
 // payloads by specific key. A guard that only checks help text would not fail if those payload keys
 // drifted, so run each documented JSON command against a tiny fixture repo and assert every
-// skill-mentioned field exists on BOTH sides — documented in the skill AND present in the real payload.
+// skill-mentioned field exists on BOTH sides - documented in the skill AND present in the real payload.
 describe("skills reference the real CLI JSON contract", () => {
   const tempDirs: string[] = [];
 
@@ -392,7 +392,7 @@ describe("skills reference the real CLI JSON contract", () => {
   });
 
   // The docs skill reads a budget finding's numbers out of its `data`, so those keys are as much a
-  // contract as the top-level ones — and they exist only on SIZE-001 and LLM-001 findings, which the
+  // contract as the top-level ones - and they exist only on SIZE-001 and LLM-001 findings, which the
   // shared fixture above never produces.
   it("lint --format json emits the SIZE-001/LLM-001 data the docs skill reads", async () => {
     const cwd = await fixtureRepo();
@@ -552,7 +552,7 @@ function expectSinceContract(
 
 // The agent rule `init` writes is a skill in all but name: a page of instructions an agent follows
 // verbatim, naming CLI commands and flags. It is generated rather than committed, so nothing above
-// reads it — this renders every runner variant and holds each invocation against the live `--help`
+// reads it - this renders every runner variant and holds each invocation against the live `--help`
 // of the command it names, so a renamed command or flag fails here rather than in a user's agent.
 describe("the agent rule init writes references a live CLI surface", () => {
   const variants = [

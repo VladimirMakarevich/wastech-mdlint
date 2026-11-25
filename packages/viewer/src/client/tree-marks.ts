@@ -1,7 +1,7 @@
 // The marks beside the tree's files and on the header's Changes section, as the page script redraws
 // them when an event says they changed. The server draws the same marks into every page
-// (`tree-marks.ts` beside the server's modules), and these builders produce exactly its markup — a
-// test renders both and holds them equal — so a mark redrawn here looks like the one it replaces.
+// (`tree-marks.ts` beside the server's modules), and these builders produce exactly its markup - a
+// test renders both and holds them equal - so a mark redrawn here looks like the one it replaces.
 // They describe a mark rather than build it, so that test can read them without a page.
 
 export type ReviewStatus = "unreviewed" | "reviewed" | "changed";

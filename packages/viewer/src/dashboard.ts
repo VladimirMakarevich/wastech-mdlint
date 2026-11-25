@@ -12,9 +12,9 @@ import {
 } from "@wastech-mdlint/core";
 
 // The dashboard: one row per corpus document, with its findings, its size and its place in the link
-// graph, filtered and sorted by what the address asks for. Every number comes from core — findings
+// graph, filtered and sorted by what the address asks for. Every number comes from core - findings
 // from the lint run, sizes from `measureDocument` (the counts SIZE-001 checks), links from the
-// corpus's `ContextGraph` and `getComponents` — and this module only selects and orders them, and
+// corpus's `ContextGraph` and `getComponents` - and this module only selects and orders them, and
 // writes them as CSV; `dashboard-article.ts` lays them out as a page. The page script asks the server for the same page again rather than filtering on its own, so
 // the selection a reader sees with script is the one a link without script opens.
 
@@ -64,7 +64,7 @@ export type DashboardQuery = {
 
 /**
  * What the branch did to a document: its letter, when the branch changed it, and the findings the
- * change gave it and took from it — which an unchanged document can have too, when a link of its
+ * change gave it and took from it - which an unchanged document can have too, when a link of its
  * broke.
  */
 export type DashboardChange = {
@@ -625,8 +625,8 @@ const BRANCH_CSV_COLUMNS = ["change", "findingsAdded", "findingsRemoved"];
 /**
  * The selection as CSV: RFC 4180 quoting and CRLF rows, sizes in bytes as measured.
  *
- * A cell a spreadsheet would read as a formula — one starting with `=`, `+`, `-` or `@`, or with a
- * tab or carriage return that some of them skip first — gets a leading apostrophe. A file name is
+ * A cell a spreadsheet would read as a formula - one starting with `=`, `+`, `-` or `@`, or with a
+ * tab or carriage return that some of them skip first - gets a leading apostrophe. A file name is
  * the repository's to choose, and opening an export must not run what someone named a file.
  */
 export function dashboardCsv(result: DashboardResult): string {

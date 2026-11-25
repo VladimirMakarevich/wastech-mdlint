@@ -72,7 +72,7 @@ jobs:
       # Each step skips a version the registry already carries. The registry refuses to overwrite a
       # published version, so without the check a release that failed partway cannot be re-run: it
       # would abort on the package that already succeeded and never reach the ones that did not. The
-      # same check is what lets a tag be pushed for a release published by other means — the earliest
+      # same check is what lets a tag be pushed for a release published by other means - the earliest
       # version of each package predates any trust relationship npm could authenticate this workflow
       # against, so it was published by hand.
       - name: Publish @wastech-mdlint/core

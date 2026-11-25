@@ -18,7 +18,7 @@ import type {
 // The lint pipeline's **step order**, over a corpus that is already in memory: split rules by scope,
 // run document rules per file and project rules once, apply inline-disable, sort, count.
 //
-// Split out of `lint-files.ts`. The order used to exist twice — once here (as part
+// Split out of `lint-files.ts`. The order used to exist twice - once here (as part
 // of `lintFiles`) and once hand-assembled inside the MCP `lint` tool's handler, which lints ad-hoc
 // text rather than a discovered corpus. Every step there composed a core export, so it was never a
 // fork of the pipeline; the problem was that **a step added to `lintFiles` would silently not reach
@@ -31,7 +31,7 @@ import type {
 //
 // This layer takes the corpus, the resolved rules, and an optional graph as *given*. Deciding what
 // the corpus is (`resolveCorpusScope` + `loadDocuments`), which rules are active, and whether to
-// build a `ContextGraph` stays in `lintFiles`, because those answers differ per caller — an ad-hoc
+// build a `ContextGraph` stays in `lintFiles`, because those answers differ per caller - an ad-hoc
 // one-document corpus has no config to scope and no meaningful graph.
 
 export type LintResult = {
@@ -42,7 +42,7 @@ export type LintResult = {
 };
 
 export type LintCorpusInput = {
-  // Keyed by **repo-relative POSIX path** (each document's own `.path`) — the identity rules resolve
+  // Keyed by **repo-relative POSIX path** (each document's own `.path`) - the identity rules resolve
   // link and ID targets against, and the keys that become `files`. Note this is *not*
   // `loadDocuments`' absolute-keyed map; `lintFiles` re-keys before calling here.
   documents: Map<string, ParsedDocument>;
@@ -74,7 +74,7 @@ function compareMessages(left: LintMessage, right: LintMessage): number {
  *
  * Document rules run once per file in sorted path order; project rules run once over the whole
  * corpus and self-attribute each finding to a file. Missing `documents` for a project rule throws
- * — unreachable from here, since the corpus is always passed.
+ * - unreachable from here, since the corpus is always passed.
  */
 export function lintCorpus(input: LintCorpusInput): LintResult {
   const projectFiles = [...input.documents.keys()].sort(compareStrings);
@@ -105,7 +105,7 @@ export function lintCorpus(input: LintCorpusInput): LintResult {
   }
 
   // Project rules: once over the corpus. They get no `document`/`filePath`, which is what forces
-  // them to attribute every finding explicitly — the property that makes running them once correct.
+  // them to attribute every finding explicitly - the property that makes running them once correct.
   if (projectRules.length > 0) {
     rawMessages.push(...runRules(projectRules, sharedContext));
   }

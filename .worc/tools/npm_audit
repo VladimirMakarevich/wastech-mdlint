@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""npm_audit — npm-native dependency and supply-chain evidence for the security_audit flow.
+"""npm_audit - npm-native dependency and supply-chain evidence for the security_audit flow.
 
 **Why this exists.** The core-owned `dependency_scan` checker runs a fixed scanner set
 (`pip-audit`, `osv-scanner`) that a flow cannot extend, and a scanner that is not installed
-contributes no findings *and does not fail* — so on this npm workspace repository that node reports
+contributes no findings *and does not fail* - so on this npm workspace repository that node reports
 an empty, confident result. This tool is the npm-ecosystem half the core set does not cover.
 
 **Why a `tool` node and not a prompt.** A `tool` node runs as an orchestrator child process, outside
 the agent sandbox. An analysis *agent* node here is `read-only`, and under `read-only` the Claude
-adapter has no shell at all — so `npm audit` simply cannot be run from a role prompt on the primary
+adapter has no shell at all - so `npm audit` simply cannot be run from a role prompt on the primary
 provider. Putting the scan here makes it provider-independent and deterministic.
 
 **Evidence, not a gate.** `outcome` is always `pass` (exit 0) so the graph never routes on it,
 mirroring `dependency_scan`. Downstream nodes read the findings through `{npm_audit_path}` and decide
-what matters; the reachability judgement belongs to the analysis and verification nodes, not here —
+what matters; the reachability judgement belongs to the analysis and verification nodes, not here -
 an advisory against a package whose vulnerable path this product never calls is not a vulnerability.
 
 Self-contained: standard library only, no third-party imports, so it stays portable. POSIX runs it
@@ -21,15 +21,15 @@ via the shebang + `+x` bit; Windows runs the sibling `npm_audit.cmd` wrapper.
 
 What it collects:
 
-1. `npm audit --json` — advisories per package, one finding each, severity mapped to the
+1. `npm audit --json` - advisories per package, one finding each, severity mapped to the
    orchestrator's high/medium/low.
-2. `npm audit signatures` — registry provenance / integrity attestation for the installed tree.
-3. The lockfile: presence and `lockfileVersion`. A missing lockfile is a finding on its own — an
+2. `npm audit signatures` - registry provenance / integrity attestation for the installed tree.
+3. The lockfile: presence and `lockfileVersion`. A missing lockfile is a finding on its own - an
    unpinned install resolves differently on every machine and in CI.
 4. Lifecycle scripts (`preinstall`, `install`, `postinstall`, `prepare`, `prepack`,
-   `prepublishOnly`) declared by this repository's own manifests, as data — they run on `npm ci` and
+   `prepublishOnly`) declared by this repository's own manifests, as data - they run on `npm ci` and
    on publish, so they are the repo's own install-time execution surface.
-5. GitHub Actions `uses:` references that are not pinned to a full 40-hex commit SHA — a movable tag
+5. GitHub Actions `uses:` references that are not pinned to a full 40-hex commit SHA - a movable tag
    is a supply-chain hole in CI, and CI here has repository write access.
 """
 
@@ -145,7 +145,7 @@ def _advisory_findings(audit_json: dict[str, Any]) -> tuple[list[dict[str, Any]]
                 "severity": _SEVERITY_MAP.get(severity, "low"),
                 "reason": (
                     f"npm advisory ({severity}) for '{name}': {detail} [{fix_note}]"
-                    + (f" — {urls[0]}" if urls else "")
+                    + (f" - {urls[0]}" if urls else "")
                 ),
                 "paths": ["package-lock.json"],
             }
@@ -162,7 +162,7 @@ def _lockfile_evidence(repo: Path) -> tuple[list[dict[str, Any]], dict[str, Any]
                 {
                     "severity": "high",
                     "reason": (
-                        "no package-lock.json — dependency resolution is not pinned, so a build "
+                        "no package-lock.json - dependency resolution is not pinned, so a build "
                         "can silently install a different (possibly compromised) version than the "
                         "one audited"
                     ),
@@ -249,7 +249,7 @@ def main() -> int:
                 "severity": "medium",
                 "reason": (
                     "npm is not on PATH for the orchestrator, so no npm advisory data was "
-                    "collected — treat the dependency surface as UNAUDITED, not as clean"
+                    "collected - treat the dependency surface as UNAUDITED, not as clean"
                 ),
                 "paths": ["package.json"],
             }
@@ -271,7 +271,7 @@ def main() -> int:
                     "severity": "medium",
                     "reason": (
                         "npm audit produced no parseable JSON (offline, registry error, or an "
-                        "unexpected shape) — the dependency surface is UNAUDITED, not clean"
+                        "unexpected shape) - the dependency surface is UNAUDITED, not clean"
                     ),
                     "paths": ["package-lock.json"],
                 }
@@ -287,7 +287,7 @@ def main() -> int:
                 {
                     "severity": "high",
                     "reason": (
-                        "npm audit signatures did not pass — one or more installed packages lack a "
+                        "npm audit signatures did not pass - one or more installed packages lack a "
                         "verifiable registry signature or provenance attestation"
                     ),
                     "paths": ["package-lock.json"],

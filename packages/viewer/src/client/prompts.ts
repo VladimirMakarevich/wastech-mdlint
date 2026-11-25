@@ -3,8 +3,8 @@ import { attachMenu, type MenuItem } from "./menu.js";
 
 // The "Prompt" buttons beside findings: in a document's findings panel, one per finding and one for
 // all of them, and one per document with findings on the dashboard. Each opens a menu of the ways
-// the findings can be answered — compress, split or a larger budget for a size finding, a fix for
-// any other — and copies the chosen prompt for a coding agent. The prompts are written on the
+// the findings can be answered - compress, split or a larger budget for a size finding, a fix for
+// any other - and copies the chosen prompt for a coding agent. The prompts are written on the
 // server, by core, from the latest lint run, so they are fetched as the menu opens: a prompt never
 // describes findings the page showed before a save changed them.
 
@@ -30,7 +30,7 @@ export function promptButton(
   if (finding !== undefined) {
     button.dataset.rule = finding.ruleId;
     // Not `data-line`: inside the article that attribute is a block's source line, and the stylesheet
-    // draws it in the right margin of whatever element carries it — a finding's line there showed up
+    // draws it in the right margin of whatever element carries it - a finding's line there showed up
     // as a stray number beside the button.
     button.dataset.findingLine = String(finding.line);
   }

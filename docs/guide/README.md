@@ -1,6 +1,6 @@
-# wastech-mdlint — User Guide
+# wastech-mdlint - User Guide
 
-`wastech-mdlint` is a deterministic, **local-first** linter and analysis toolkit for the Markdown context in a repository — `README.md`, `CLAUDE.md`, `AGENTS.md`, requirements tables, and `skills/**/SKILL.md`-style files. It runs a registry-driven rule engine over a single Markdown parse pass, builds a context graph of how documents reference each other, and can compile a project-specific agent skill.
+`wastech-mdlint` is a deterministic, **local-first** linter and analysis toolkit for the Markdown context in a repository - `README.md`, `CLAUDE.md`, `AGENTS.md`, requirements tables, and `skills/**/SKILL.md`-style files. It runs a registry-driven rule engine over a single Markdown parse pass, builds a context graph of how documents reference each other, and can compile a project-specific agent skill.
 
 This guide is the full reference. For a one-page summary see the top-level [README](../../README.md).
 
@@ -8,12 +8,12 @@ This guide is the full reference. For a one-page summary see the top-level [READ
 
 ## Start here
 
-- [Getting started](getting-started.md) — install, build, and run your first lint.
-- [Use cases](use-cases/README.md) — task-driven recipes for common goals (one page per scenario).
-- [CLI reference](cli.md) — every command, flag, and exit code.
-- [Configuration](configuration.md) — how the config file is found, loaded, and validated.
-- [Annotated config reference](config-reference.md) — one config with **every** option, commented.
-- [Running alongside markdownlint](markdownlint.md) — which tool owns which checks, the overlapping rules, and a ready markdownlint config.
+- [Getting started](getting-started.md) - install, build, and run your first lint.
+- [Use cases](use-cases/README.md) - task-driven recipes for common goals (one page per scenario).
+- [CLI reference](cli.md) - every command, flag, and exit code.
+- [Configuration](configuration.md) - how the config file is found, loaded, and validated.
+- [Annotated config reference](config-reference.md) - one config with **every** option, commented.
+- [Running alongside markdownlint](markdownlint.md) - which tool owns which checks, the overlapping rules, and a ready markdownlint config.
 
 ## Capabilities
 
@@ -33,17 +33,17 @@ This guide is the full reference. For a one-page summary see the top-level [READ
 
 35 built-in rules across 9 categories, plus the declarative `custom` rule. See the [rules index](rules/README.md) for the full table with a page per rule.
 
-- **TBL** (tables) — [TBL-001](rules/TBL-001.md) … [TBL-007](rules/TBL-007.md)
-- **SEC** (sections) — [SEC-001](rules/SEC-001.md) … [SEC-006](rules/SEC-006.md)
-- **STR** (structure) — [STR-001](rules/STR-001.md)
-- **REF** (references) — [REF-001](rules/REF-001.md) … [REF-009](rules/REF-009.md)
-- **CTX** (content quality) — [CTX-001](rules/CTX-001.md) … [CTX-006](rules/CTX-006.md)
-- **GRP** (graph integrity) — [GRP-001](rules/GRP-001.md) … [GRP-003](rules/GRP-003.md)
-- **SIZE** / **LLM** (context hygiene) — [SIZE-001](rules/SIZE-001.md) · [LLM-001](rules/LLM-001.md)
-- **custom** (declarative) — [custom](rules/custom.md)
+- **TBL** (tables) - [TBL-001](rules/TBL-001.md) … [TBL-007](rules/TBL-007.md)
+- **SEC** (sections) - [SEC-001](rules/SEC-001.md) … [SEC-006](rules/SEC-006.md)
+- **STR** (structure) - [STR-001](rules/STR-001.md)
+- **REF** (references) - [REF-001](rules/REF-001.md) … [REF-009](rules/REF-009.md)
+- **CTX** (content quality) - [CTX-001](rules/CTX-001.md) … [CTX-006](rules/CTX-006.md)
+- **GRP** (graph integrity) - [GRP-001](rules/GRP-001.md) … [GRP-003](rules/GRP-003.md)
+- **SIZE** / **LLM** (context hygiene) - [SIZE-001](rules/SIZE-001.md) · [LLM-001](rules/LLM-001.md)
+- **custom** (declarative) - [custom](rules/custom.md)
 
 ## Design boundaries
 
 - **Local & deterministic.** No external HTTP link checking, no network, no timestamps in output.
-- **No code execution.** Config is data-only JSONC; custom rules compose a closed primitive vocabulary — no `.ts`/`.cjs`/`.mjs` config and no user-code plugins.
+- **No code execution.** Config is data-only JSONC; custom rules compose a closed primitive vocabulary - no `.ts`/`.cjs`/`.mjs` config and no user-code plugins.
 - **Cross-platform.** Reports use repository-relative POSIX paths on Windows, macOS, and Linux.

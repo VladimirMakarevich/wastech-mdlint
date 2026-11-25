@@ -1,4 +1,4 @@
-# Packaged built-in flow: merge — the operator-driven conflict resolver for `worc merge-task`.
+# Packaged built-in flow: merge - the operator-driven conflict resolver for `worc merge-task`.
 #
 # This flow is NOT dispatched for incoming tasks. The orchestrator runs it ONLY when, during
 # `worc merge-task <id>`, pulling the base branch into the task branch produces conflicts. A clean
@@ -9,7 +9,7 @@
 # The flow performs NO git operations: there is deliberately no PR-publishing node (its terminal is a
 # `publish` node with `policy: none`, a graph terminal that touches nothing). Finalizing the merge
 # commit, pushing, and merging the PR remain the orchestrator's job (the hard invariant: only the
-# orchestrator commits / pushes / PRs / merges). The flow runs transactionally — on failure the
+# orchestrator commits / pushes / PRs / merges). The flow runs transactionally - on failure the
 # orchestrator runs `git merge --abort` and leaves the PR open.
 #
 # Shape: conflict_resolution(agent) -> testing(checks) -> done; testing fails loop back through
@@ -53,7 +53,7 @@ flow:
       # timeout_seconds: 7200
       # network_access: false
       # extra_args: []
-    # Graph terminal only: `policy: none` touches no git — the orchestrator commits the merge and
+    # Graph terminal only: `policy: none` touches no git - the orchestrator commits the merge and
     # merges the PR after this flow returns a clean, green tree.
     - id: done
       kind: publish

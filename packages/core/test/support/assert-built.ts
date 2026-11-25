@@ -9,20 +9,20 @@ import { existsSync, statSync } from "node:fs";
 //
 // A fifth caller spawns nothing: `packages/core/test/package-payload.test.ts`
 // packs a tree it does not build (`npm pack --workspaces` runs no lifecycle script), and now asserts
-// on what `dist` contains. Same precondition, arrived at from the other direction — the artifact is
+// on what `dist` contains. Same precondition, arrived at from the other direction - the artifact is
 // the subject rather than the runner.
 //
 // Two near-identical copies became one helper for a reason. The defect was in the
 // *message*, not the check: both told the reader to run `npm run build` / `npm run typecheck`, and
 // both of those are `tsc -b`, whose up-to-date decision is content-aware. So when a source file's
-// timestamp moved but its content did not — `git checkout --`, a stash pop, a copy that resets
-// mtimes — `tsc -b` exits `0` without re-emitting, this comparison still fails, and the message
+// timestamp moved but its content did not - `git checkout --`, a stash pop, a copy that resets
+// mtimes - `tsc -b` exits `0` without re-emitting, this comparison still fails, and the message
 // names the command just run. Verified in this tree: touching `packages/cli/src/index.ts` forward
 // left `npm run build` a no-op and the guard red; `npx tsc -b --force` re-emitted and cleared it.
 //
 // The check itself stays a modification-time comparison: comparing real build state would mean
 // re-deriving `tsc -b`'s own `.tsbuildinfo` bookkeeping, which is a second implementation of the
-// thing being verified. Naming the forced build as the fallback closes the harmful half — a message
+// thing being verified. Naming the forced build as the fallback closes the harmful half - a message
 // that names a command which does not fix the problem is worse than no message. The residual
 // imprecision is accepted; the message below is what carries the remedy to the reader.
 //
@@ -31,7 +31,7 @@ import { existsSync, statSync } from "node:fs";
 
 // One string, so the callers cannot drift on the remedy again.
 const REMEDY =
-  "This suite runs against the compiled output, not the TypeScript source — run `npm run build` first. " +
+  "This suite runs against the compiled output, not the TypeScript source - run `npm run build` first. " +
   "If that does not clear this message, run `npx tsc -b --force`: `tsc -b` decides up-to-dateness " +
   "from content, so a source file whose timestamp moved without its content changing leaves " +
   "`dist/` untouched and this check still failing.";

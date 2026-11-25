@@ -45,7 +45,7 @@ describe("generateConfigSchema", () => {
 
   // `z.toJSONSchema`'s default `io: "output"` emits a `.default()` key as `required`, which
   // would make this schema reject every config that omits it. Nothing in the product validates against
-  // schema.json, so only an editor would ever have said so — hence an explicit guard rather than
+  // schema.json, so only an editor would ever have said so - hence an explicit guard rather than
   // trusting the byte-sync test, which only proves the file matches whatever the generator produces.
   it.each([
     ["GRP-002", "entryPoints"],
@@ -83,7 +83,7 @@ describe("generateConfigSchema", () => {
   // The `it.each` above names two of the keys the trap can reach; this covers every one of them,
   // including `GRP-001.minCycleLength` and the `columnInSet.caseSensitive` that appears under both
   // the known-custom and generic-custom `assert` branches. Without it, a regression to
-  // `io: "output"` on an unnamed path would surface only as a byte-sync diff — which a regeneration
+  // `io: "output"` on an unnamed path would surface only as a byte-sync diff - which a regeneration
   // absorbs without anyone reading it.
   it("never lists a defaulted property as required, anywhere in the schema", () => {
     const offenders: string[] = [];
@@ -149,7 +149,7 @@ describe("generateConfigSchema", () => {
 
   // The two custom branches spelled this enum as a literal, so a new assert kind carrying a
   // new target needed two hand edits in an otherwise metadata-driven file. The byte-sync test cannot
-  // see the difference — it only proves schema.json matches whatever the generator produces — so the
+  // see the difference - it only proves schema.json matches whatever the generator produces - so the
   // derivation needs its own guard.
   it("derives every custom branch's target enum from ASSERTION_TARGETS", () => {
     const schema = JSON.parse(
@@ -230,7 +230,7 @@ describe("generateConfigSchema", () => {
     // Namespaced custom id passes; a known custom id and reserved-prefix ids are excluded.
     expect(pattern.test("TEAM-STYLE")).toBe(true);
     expect(pattern.test("REQ-OWNER")).toBe(false);
-    // An upper-cased built-in alias is rejected by the loader, so the schema must reject it too —
+    // An upper-cased built-in alias is rejected by the loader, so the schema must reject it too -
     // but only the whole id: a longer id that merely starts with an alias is still a valid custom id.
     expect(pattern.test("NO-BROKEN-ANCHORS")).toBe(false);
     expect(pattern.test("NO-BROKEN-ANCHORS-2")).toBe(true);

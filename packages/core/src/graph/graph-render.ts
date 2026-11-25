@@ -15,7 +15,7 @@ import type { ChangeImpact, ImpactClassification } from "./impact-analysis.js";
 import type { ContextSliceResult } from "./search-index.js";
 
 // Deterministic renderers over a `ContextGraph`, shared by the CLI `graph` command and the MCP
-// `summary` fields. All traversal/analysis is delegated to the algorithm modules — this file
+// `summary` fields. All traversal/analysis is delegated to the algorithm modules - this file
 // only projects their outputs into JSON-shaped structs or byte-stable text, so hosts never duplicate
 // graph logic (core-hosts-the-pipeline decision).
 
@@ -37,20 +37,20 @@ export type ContextGraphSummary = {
   readingOrder: string[];
   // The nodes a cycle kept out of `readingOrder`. Always present, never optional: it is the
   // same field name and `string[]` shape `ImpactClassification.excluded` already ships, and a
-  // machine consumer that had to derive it as `nodes` minus `readingOrder` was the defect — at 43 of
+  // machine consumer that had to derive it as `nodes` minus `readingOrder` was the defect - at 43 of
   // 139 nodes on the large-corpus fixture, the omission reads as a silently truncated reading order.
   // The human renderer drops the section when it is empty (a report for a reader omits empty
   // sections); a machine contract must not drop a key, so this side of the parity always carries it.
   excluded: string[];
   // Coverage: included only when the host supplies it. Both the CLI `graph` command and the MCP
-  // `context-graph` tool's `summary` branch do — but a caller that summarizes a bare graph without
+  // `context-graph` tool's `summary` branch do - but a caller that summarizes a bare graph without
   // disk access can still omit it, so it stays optional.
   coverage?: GraphCoverage;
 };
 
 // The shipped JSON key set is `{ nodes, edges, components, readingOrder, excluded, coverage? }`.
 // It mirrors `renderContextGraphText`'s optional-coverage parameter so both formats expose the same
-// signals — a key present in one and absent from the other is the drift this pairing exists to
+// signals - a key present in one and absent from the other is the drift this pairing exists to
 // prevent. `components`/`readingOrder`/`excluded` reuse the algorithm modules verbatim rather than
 // recomputing clusters/order here.
 export function summarizeContextGraph(
@@ -74,7 +74,7 @@ export function summarizeContextGraph(
 }
 
 // Every path-bearing section of the human format is a `header (count):` line followed by one
-// indented item per line — the shape `top hubs` and `files (N):` already had, and now the shape all
+// indented item per line - the shape `top hubs` and `files (N):` already had, and now the shape all
 // of them have. Comma-joining produced 3500–3900-character single lines on a 139-node graph
 // and left the format internally inconsistent, three sections line-oriented and three not.
 function pushPathList(
@@ -99,11 +99,11 @@ function pushPathList(
  *
  * Counts rather than a per-node label, and on its own line rather than inside the header. The header
  * is `label (N):` with a bare count, which is the contract the human-versus-structured parity reader
- * parses — text inside those parentheses would make the section invisible to it, and a section that
+ * parses - text inside those parentheses would make the section invisible to it, and a section that
  * silently drops out of the parity comparison is the exact drift that guard exists to catch.
  *
- * Per-node attribution — naming, for each excluded document, the cycle or the upstream node that
- * excluded it — is deliberately not done here. It is a wider change than it looks: the same excluded
+ * Per-node attribution - naming, for each excluded document, the cycle or the upstream node that
+ * excluded it - is deliberately not done here. It is a wider change than it looks: the same excluded
  * set is rendered by the human `graph` report, its structured payload, the MCP tool that returns the
  * graph, and the generated `SKILL.md`, whose byte-for-byte content hash consumers diff and cache
  * against. Adding a per-node reason therefore changes an artifact contract, and it needs a decision
@@ -111,7 +111,7 @@ function pushPathList(
  * are the half that carries most of the value at none of that cost.
  *
  * Cycle membership comes from the Tarjan pass the graph already ran, so this costs a set build and a
- * filter — no second traversal, and no widening of `topologicalSort`'s result.
+ * filter - no second traversal, and no widening of `topologicalSort`'s result.
  */
 function summarizeExclusionCauses(
   graph: ContextGraph,

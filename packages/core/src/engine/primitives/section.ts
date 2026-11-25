@@ -6,8 +6,8 @@ import type { PrimitiveFinding } from "./types.js";
 
 export type SectionPresentOptions = { sections: string[] };
 
-// sectionPresent — each required section (by heading text) must appear (SEC-001). Absent sections
-// have no line, so they report at line 0 — the "section absent" convention across SEC rules.
+// sectionPresent - each required section (by heading text) must appear (SEC-001). Absent sections
+// have no line, so they report at line 0 - the "section absent" convention across SEC rules.
 export function sectionPresent(
   document: ParsedDocument,
   options: SectionPresentOptions,
@@ -56,7 +56,7 @@ function headingsInSection(
   return scoped;
 }
 
-// sectionOrder — sections listed in `order` must appear in that relative order (SEC-002). Only
+// sectionOrder - sections listed in `order` must appear in that relative order (SEC-002). Only
 // present sections are ordered (presence is SEC-001's job); the first inversion is reported.
 export function sectionOrder(
   document: ParsedDocument,

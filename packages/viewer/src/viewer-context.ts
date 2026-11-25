@@ -83,7 +83,7 @@ export type ViewerContext = {
     response: ServerResponse,
     message: string,
   ): Promise<void>;
-  // A repository file's path on this machine, in the platform's own form, for the copy button — or
+  // A repository file's path on this machine, in the platform's own form, for the copy button - or
   // nothing when pages are read from other machines.
   absolutePathOf(relPath: string): string | undefined;
   relint(): void;

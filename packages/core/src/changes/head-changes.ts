@@ -6,13 +6,13 @@ import { documentSections } from "./sections.js";
 import type { DiffLine, TextDiff } from "./text-diff.js";
 
 // A diff restated in the head side's own line numbers: which lines of the current text are new or
-// edited, and where lines that left the base used to stand. A page showing the current text — its
-// blocks, its outline — can then say where each change sits without reading the hunks itself, and
+// edited, and where lines that left the base used to stand. A page showing the current text - its
+// blocks, its outline - can then say where each change sits without reading the hunks itself, and
 // every host that ever shows changes in place reads them the same way.
 
 /**
  * How one head line differs from the base. `edited` lines were paired with the base line they
- * replace, so only some of their words changed; `added` lines were compared with nothing — new text,
+ * replace, so only some of their words changed; `added` lines were compared with nothing - new text,
  * or a rewrite too different from what it replaced to pair with it. `hunk` indexes `TextDiff.hunks`.
  */
 export type HeadLineChange = { kind: "added" | "edited"; hunk: number };
@@ -64,7 +64,7 @@ export function headChanges(diff: TextDiff): HeadChanges {
 
       // Lines are paired in order, so the n-th paired removed line became the n-th paired added
       // one. A removed line left unpaired stood after the counterpart of the last paired line above
-      // it — or, with none above it, where the block starts.
+      // it - or, with none above it, where the block starts.
       const editedHeads = added
         .filter((entry) => entry.segments !== undefined)
         .map((entry) => entry.headLine);
@@ -103,8 +103,8 @@ export function headChanges(diff: TextDiff): HeadChanges {
  * it moved it, an edited line where its paired counterpart is, and a line removed without a
  * counterpart nowhere. Line 0, which findings about a whole file use, stays 0.
  *
- * Edited lines are followed too, so a finding that survives an edit to its paragraph — the same
- * rule, the same message, on the line that replaced it — matches its earlier self instead of reading
+ * Edited lines are followed too, so a finding that survives an edit to its paragraph - the same
+ * rule, the same message, on the line that replaced it - matches its earlier self instead of reading
  * as one finding removed and another added.
  */
 export function baseLineMap(
@@ -168,7 +168,7 @@ export function baseLineMap(
 /**
  * The headings whose section holds a change: a new or edited line, or the place removed lines stood.
  * A section runs from its heading to the line before the next heading of the same or a higher level,
- * so a change deep inside a subsection marks every heading above it as well — which is what lets an
+ * so a change deep inside a subsection marks every heading above it as well - which is what lets an
  * outline that lists only the upper levels still show where the change is.
  */
 export function changedSections(
@@ -188,7 +188,7 @@ export function changedSections(
 }
 
 /**
- * Whether a change falls in the text before a document's first section — the one unit
+ * Whether a change falls in the text before a document's first section - the one unit
  * `documentSections` cuts that has no outline heading of its own, so `changedSections` cannot name
  * it. Lines removed above the first line count as its own, and so do lines removed right after its
  * last one, as `changedSections` gives a removal to the section it stood at the end of.

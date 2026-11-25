@@ -71,8 +71,8 @@ export type TargetResolvers = {
 // `name` makes it a property of `window` or `document`, shadowing what a script reads there.
 //
 // `clobberPrefix` is emptied because the prefix would rename every heading and HTML anchor
-// (`id="setup"` → `id="user-content-setup"`), and then the anchors REF-002 validates — heading slugs
-// and `<a id>`/`<a name>` targets alike — would not exist on the page. An `id` only shadows a global
+// (`id="setup"` → `id="user-content-setup"`), and then the anchors REF-002 validates - heading slugs
+// and `<a id>`/`<a name>` targets alike - would not exist on the page. An `id` only shadows a global
 // read through `window.<name>`, which the viewer's scripts never do.
 //
 // `name` is therefore allowed on `<a>` alone, where it is an anchor and makes nothing a property of
@@ -119,7 +119,7 @@ export function fileHref(relPath: string): string {
  * linter checks, so heading ids are core's slugs taken verbatim rather than recomputed: an anchor
  * REF-002 accepts is an anchor that exists on this page.
  *
- * Order matters. Author content — Markdown and the raw HTML inside it — is sanitized first, as one
+ * Order matters. Author content - Markdown and the raw HTML inside it - is sanitized first, as one
  * tree. Only then are code blocks replaced with Shiki's output and the Mermaid and chart
  * placeholders, because that markup is the viewer's own: Shiki colors tokens with `style` attributes
  * the sanitizer would (rightly) strip from an author, and it escapes the code text itself.
@@ -160,7 +160,7 @@ export async function renderDocument(
   await replaceCodeBlocks(head.tree);
   markLinks(head.tree, head.missingHrefs);
   if (annotate !== undefined) {
-    // Every element that carries its source lines — the same ones the margin numbers — and none of
+    // Every element that carries its source lines - the same ones the margin numbers - and none of
     // the removed blocks put back, which carry none.
     visit(head.tree, "element", (node: Element) => {
       const { dataLine, dataLineEnd } = node.properties;
@@ -441,8 +441,8 @@ const SCROLLING_BLOCKS = new Set(["table", "pre"]);
 
 /**
  * Give each block and each list item the line it starts on in the Markdown file, as `data-line`,
- * for the page to show beside it — so a reader can go from the page to the file, and from a
- * finding's "line 42" to the block it is about — and the line it ends on, as `data-line-end`, so a
+ * for the page to show beside it - so a reader can go from the page to the file, and from a
+ * finding's "line 42" to the block it is about - and the line it ends on, as `data-line-end`, so a
  * block's whole range is known without guessing it from where the next block starts.
  *
  * Done on the sanitized tree: the attributes are the viewer's own, and the sanitizer has already
@@ -541,7 +541,7 @@ async function replaceCodeBlocks(tree: HastRoot): Promise<void> {
 /**
  * An `echarts` block: a chart option written as JSON, drawn in the browser like a Mermaid diagram.
  *
- * JSON and nothing else — not a JavaScript object literal, never a function — because the option is
+ * JSON and nothing else - not a JavaScript object literal, never a function - because the option is
  * author content and the page must not evaluate it. The block is checked here rather than only in
  * the browser so that a block which can never become a chart shows its reason beside the source
  * without script, and the browser skips it.

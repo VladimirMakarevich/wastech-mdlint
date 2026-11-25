@@ -113,7 +113,7 @@ describe("LLM-001 eager-import budget", () => {
   it("resolves a routed root-relative eager import through settings.siteRouter", async () => {
     // Regression pin: LLM-001's resolver now reuses `resolveTargetCandidates`
     // instead of an ad hoc slash-strip, so a root-relative import under a configured `siteRouter`
-    // must resolve to the router's candidate — asserted here directly against the rule, not just
+    // must resolve to the router's candidate - asserted here directly against the rule, not just
     // via a compile-vs-lint parity check that could pass if both sides drifted the same wrong way.
     const entrypointContent = "# Entry\n@/big.md\n";
     const importedContent = `${"x".repeat(400)}\n`;
@@ -172,7 +172,7 @@ describe("LLM-001 eager-import budget", () => {
 
     expect(result.messages).toHaveLength(1);
     // Pin the exact routed fallback path (first starlight candidate), not just the message prefix
-    // — a regression back to the old ad hoc slash-strip resolver would resolve to a different path
+    // - a regression back to the old ad hoc slash-strip resolver would resolve to a different path
     // ("missing.md") and still match a prefix-only assertion.
     expect(result.messages[0]?.message).toBe(
       "Missing eager import @/missing.md; resolved to src/content/docs/missing.md.md.",
@@ -215,7 +215,7 @@ describe("LLM-001 eager-import budget", () => {
       }),
     ]);
 
-    // The whole list, not a filtered count — this pins emission count *and* order together.
+    // The whole list, not a filtered count - this pins emission count *and* order together.
     expect(renderMessages(result.messages)).toEqual([
       "shared/hub.md:2 Missing eager import @missing.md; resolved to shared/missing.md.",
       "shared/loop.md:2 Eager import cycle detected: shared/hub.md -> shared/loop.md -> shared/hub.md.",

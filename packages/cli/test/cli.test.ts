@@ -87,7 +87,7 @@ describe("command dispatch", () => {
   });
 
   // Default-command routing moved out of commander's `isDefault` and into argv, which shifts
-  // several argv shapes at once — the empty argv, a leading option, `--help`/`-v`, `help <cmd>`, and
+  // several argv shapes at once - the empty argv, a leading option, `--help`/`-v`, `help <cmd>`, and
   // an unknown operand. Each is pinned here (with the `--help`/`-v` cases above and in "version and
   // errors") because getting one wrong is silent: a mis-routed `--help` renders lint's help, and a
   // mis-routed operand lints an empty corpus and exits 0.
@@ -112,7 +112,7 @@ describe("command dispatch", () => {
 
     const result = await run(["bogus-command"], cwd);
     // The CI-typo scenario: this used to become lint's `[path]`, lint an empty corpus, and
-    // exit 0 "No problems found." — a broken workflow step passing green.
+    // exit 0 "No problems found." - a broken workflow step passing green.
     expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
     expect(result.stderr).toContain("unknown command 'bogus-command'");
     expect(result.stderr).toContain("--help");
@@ -152,7 +152,7 @@ describe("version and errors", () => {
     const result = await run(["lint", cwd, "--bogus"], cwd);
     expect(result.exitCode).toBe(EXIT_CODE_USAGE_ERROR);
     // The help pointer is inherited by subcommands only because showHelpAfterError() runs before
-    // .command() creates them — assert it here so that ordering can't silently regress.
+    // .command() creates them - assert it here so that ordering can't silently regress.
     expect(result.stderr).toContain("--help");
   });
 
@@ -406,7 +406,7 @@ describe("compile command", () => {
   });
 
   // The default directory was renamed, so a repository that relied on the old default still holds
-  // that release's SKILL.md after upgrading — a second, stale copy of the same skill for any agent
+  // that release's SKILL.md after upgrading - a second, stale copy of the same skill for any agent
   // host. The run has to say so, and must not touch a file it did not write this time.
   it("points out a SKILL.md left at the pre-rename default outdir, without touching it", async () => {
     const legacy = '---\nname: "docs-skill"\ndescription: "old"\n---\n';
@@ -434,7 +434,7 @@ describe("compile command", () => {
   });
 
   // An explicit outdir is a choice the user already made about where the skill lives, so a file in
-  // the old default directory is not compile's to comment on — it may be exactly where they point.
+  // the old default directory is not compile's to comment on - it may be exactly where they point.
   it("says nothing about the pre-rename directory when an outdir is configured", async () => {
     const cwd = await fixtureRepo({
       "a.md": "# A\n",
@@ -457,7 +457,7 @@ describe("compile command", () => {
 
   it("resolves a relative --config path against --cwd, not the process cwd", async () => {
     // The process running this test has its own cwd (the repo root), which differs from the
-    // fixture directory — the only scenario in which the two bases can be told apart. The handler
+    // fixture directory - the only scenario in which the two bases can be told apart. The handler
     // used to pre-resolve `--config` itself; core now owns the resolve for all six call
     // sites and this stays as the compile-shaped regression guard over that one base.
     const cwd = await fixtureRepo({
@@ -578,7 +578,7 @@ describe("compile command", () => {
   });
 
   it("reports an --outdir outside --cwd absolutely, not as a chain of '..' hops", async () => {
-    // The repo-relative rendering is right inside the repository and unreadable outside it —
+    // The repo-relative rendering is right inside the repository and unreadable outside it -
     // the observed report opened with five parent hops before an absolute-looking tail.
     const cwd = await fixtureRepo({
       "a.md": "# A\n",

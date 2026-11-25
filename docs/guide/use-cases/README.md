@@ -2,7 +2,7 @@
 
 > [Guide index](../README.md) · [Configuration](../configuration.md) · [Annotated config](../config-reference.md) · [Rules index](../rules/README.md)
 
-Task-driven recipes: each page starts from a real goal, shows the config and commands, and says what you get. Configs are fragments — merge the `rules` entries you need into one [`wastech-mdlint.config.json`](../configuration.md). Every rule referenced has a [detailed page](../rules/README.md).
+Task-driven recipes: each page starts from a real goal, shows the config and commands, and says what you get. Configs are fragments - merge the `rules` entries you need into one [`wastech-mdlint.config.json`](../configuration.md). Every rule referenced has a [detailed page](../rules/README.md).
 
 | # | Use case | Primary features |
 | --- | --- | --- |
@@ -21,6 +21,6 @@ Task-driven recipes: each page starts from a real goal, shows the config and com
 
 ## See also
 
-- [Rules index](../rules/README.md) — every rule with options and examples.
-- [Annotated config reference](../config-reference.md) — every option in one commented file.
+- [Rules index](../rules/README.md) - every rule with options and examples.
+- [Annotated config reference](../config-reference.md) - every option in one commented file.
 - [CLI reference](../cli.md) · [Context graph](../context-graph.md) · [Compile](../compile.md) · [MCP server](../mcp-server.md)

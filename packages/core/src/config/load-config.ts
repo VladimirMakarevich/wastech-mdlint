@@ -43,7 +43,7 @@ export type LoadedConfiguration = {
   settings: ResolvedSettings;
 };
 
-// Zero-config default: lint every Markdown file with no rules — a clean pass. `init`
+// Zero-config default: lint every Markdown file with no rules - a clean pass. `init`
 // writes a real ruleset.
 function defaultConfiguration(): LoadedConfiguration {
   return {
@@ -97,7 +97,7 @@ function formatRuleResolutionError(
  * (`tool-response.ts`), so an interpolated absolute path leaks the checkout location and breaks the
  * POSIX-relative-path invariant every other report in the product honors.
  *
- * The anchor is `params.cwd` because that is the only one core has — deliberately *not* a repo root,
+ * The anchor is `params.cwd` because that is the only one core has - deliberately *not* a repo root,
  * which core never computes. Hosts pass the directory being analyzed (for `lint`/`graph`/`slice`/
  * `impact` that is the `[path]` operand, not the repository root), so a root config reached from
  * `lint docs` renders as `../wastech-mdlint.config.json`: relative and pointing at the file actually
@@ -106,7 +106,7 @@ function formatRuleResolutionError(
  * An explicit config path is *resolved* against `params.cwd` too, so resolution and
  * rendering share one base. That is what makes `Config file not found:` name the path the
  * user actually typed: while the two disagreed, `lint proj --config cfg.json` reported
- * `../cfg.json` — a path nobody wrote, produced by relativizing a process-cwd lookup against the
+ * `../cfg.json` - a path nobody wrote, produced by relativizing a process-cwd lookup against the
  * lint root.
  */
 function displayConfigPath(cwd: string, configPath: string): string {
@@ -242,7 +242,7 @@ function resolveRules(
  * alias; the resolved rules always carry the canonical id. Returns the validated config, the
  * resolved rules (with severity overrides), and the resolved settings.
  *
- * **One base for `explicitConfigPath`: `params.cwd`** — the directory being analyzed,
+ * **One base for `explicitConfigPath`: `params.cwd`** - the directory being analyzed,
  * which is `[path]` for `lint`/`graph`, the CLI's own cwd for `slice`/`impact`, `--cwd` for `compile`,
  * and the tool `cwd` for the five file-based MCP tools. It used to resolve against `process.cwd()`
  * instead, which silently diverged whenever a host analyzed a different directory than the shell was
@@ -271,7 +271,7 @@ export async function loadConfiguration(params: {
       `Config file not found: ${displayConfigPath(params.cwd, explicitConfigPath)}`,
       // Names the base, because the message above names a *relative* path and a reader has no other
       // way to tell which directory it was looked for under.
-      "Check that configPath/cwd points to an existing wastech-mdlint.config.json — a relative configPath is resolved against the directory being analyzed — or omit it to use the zero-config default.",
+      "Check that configPath/cwd points to an existing wastech-mdlint.config.json - a relative configPath is resolved against the directory being analyzed - or omit it to use the zero-config default.",
     );
   }
 
@@ -290,7 +290,7 @@ export async function loadConfiguration(params: {
 }
 
 /**
- * Validate config text that is not, or not yet, on disk — everything `loadConfiguration` does after
+ * Validate config text that is not, or not yet, on disk - everything `loadConfiguration` does after
  * reading the file, with the same two stages and the same diagnostics.
  *
  * A host that lets a user edit the config checks the candidate here before writing it, so the file

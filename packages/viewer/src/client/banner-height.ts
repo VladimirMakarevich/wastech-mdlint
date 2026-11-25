@@ -1,5 +1,5 @@
 // The line above a changed document stays pinned under the header while the text scrolls, so a jump
-// to a heading has to land below both — and so does the outline's idea of which section is being
+// to a heading has to land below both - and so does the outline's idea of which section is being
 // read, which it takes from the same scroll padding. The stylesheet assumes the line stands on one
 // row, its height at any width wide enough to pin it; at a narrower one its controls wrap onto a
 // second row and a heading would land under it. This keeps the stylesheet's figure to the line's

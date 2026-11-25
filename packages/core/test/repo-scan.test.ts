@@ -161,7 +161,7 @@ describe("scanRepository", () => {
 
     // Known, accepted tradeoff: the fallback proposes the tool's actual zero-config default
     // (`.md` only), not a scan-specific glob, so it honestly loads nothing when the discovered
-    // corpus is `.mdx`-only — the proposal is a starting point for `init`, not a guarantee.
+    // corpus is `.mdx`-only - the proposal is a starting point for `init`, not a guarantee.
     const documents = await loadDocuments([result.clusters[0].includeGlob], {
       cwd: root,
     });
@@ -358,7 +358,7 @@ describe("scanRepository", () => {
     ]);
 
     // A caller pruning "packages" from scan noise must have that respected by workspace
-    // detection too — not just the Markdown walk.
+    // detection too - not just the Markdown walk.
     const withCustomNoise = await scanRepository({
       cwd: root,
       noiseDirNames: [...DEFAULT_NOISE_DIR_NAMES, "packages"],
@@ -431,7 +431,7 @@ describe("scanRepository · hidden and gitignored trees", () => {
     const paths = result.clusters.map((cluster) => cluster.path);
 
     expect(paths).toEqual(["docs"]);
-    // Not merely unproposed as a cluster — invisible to sampling too, so rule inference never
+    // Not merely unproposed as a cluster - invisible to sampling too, so rule inference never
     // sniffs a file the written config excludes.
     for (const cluster of result.clusters) {
       expect(cluster.sampleFiles.every((file) => !file.includes("/."))).toBe(
@@ -460,7 +460,7 @@ describe("scanRepository · hidden and gitignored trees", () => {
     expect(paths).not.toContain("generated-docs/api");
     expect(paths).toContain("docs");
 
-    // `notes` has one surviving file, so it does not clear minClusterSize — but that surviving file
+    // `notes` has one surviving file, so it does not clear minClusterSize - but that surviving file
     // must be the negated one, proving the layer's negation was applied rather than the whole
     // directory being dropped.
     const sampled = result.clusters.flatMap((cluster) => cluster.sampleFiles);
@@ -498,7 +498,7 @@ describe("scanRepository · hidden and gitignored trees", () => {
     const result = await scanRepository({ cwd: root });
     const paths = result.clusters.map((cluster) => cluster.path);
 
-    // `build` is a DEFAULT_NOISE_DIR_NAMES entry, so it stays pruned regardless of the negation —
+    // `build` is a DEFAULT_NOISE_DIR_NAMES entry, so it stays pruned regardless of the negation -
     // the name prune runs first and is not gitignore's to override. (Git would not re-include
     // `build/docs/` here either, since its parent is excluded; the negation below is the shape
     // that actually re-includes a subtree.)
@@ -540,7 +540,7 @@ describe("scanRepository · hidden and gitignored trees", () => {
 });
 
 // The scan records what it pruned so `init` can disclose it. The record is the whole
-// point — a second directory walk to produce the same numbers is a second thing to disagree with the
+// point - a second directory walk to produce the same numbers is a second thing to disagree with the
 // first, so these tests pin what the *scan* reports rather than what a re-walk would find.
 describe("scanRepository · the pruning record", () => {
   it("records a hidden directory with the Markdown it holds", async () => {
@@ -553,7 +553,7 @@ describe("scanRepository · the pruning record", () => {
 
     const result = await scanRepository({ cwd: root });
 
-    // Only the hidden *roots* are recorded — a nested `.a/b` is part of `.a`'s own list,
+    // Only the hidden *roots* are recorded - a nested `.a/b` is part of `.a`'s own list,
     // not a second entry, so the files can never be double-read. The paths are repo-relative rather
     // than relative to the hidden root, because the disclosure has to match them against the
     // repo-relative `include` the config will carry.
@@ -678,7 +678,7 @@ describe("scanRepository · the pruning record", () => {
     // The disclosed files and the corpus are produced by one function under two modes, so today
     // they cannot disagree about noise, gitignore or extensions. The tests above assert the list
     // against hand-written expectations, which would keep passing if the count branch were ever
-    // split into a walk of its own — and a divergence there is invisible: two plausible results,
+    // split into a walk of its own - and a divergence there is invisible: two plausible results,
     // both green. This compares the list against a real collect walk over the same directory, so
     // the day the branches separate is the day it fails. Compared as sets in both directions rather
     // than by size, because a walk that dropped one file and gained another agrees on the total.
@@ -697,7 +697,7 @@ describe("scanRepository · the pruning record", () => {
 
     const disclosed = (await scanRepository({ cwd: root })).pruned.directories;
 
-    // The corpus loader over the same directory, under the lint-time defaults — a different
+    // The corpus loader over the same directory, under the lint-time defaults - a different
     // implementation of the same three rules, which is what makes this a comparison rather than a
     // restatement. It follows the precedent above of resolving a scan result against a real
     // `loadDocuments` walk.
@@ -708,8 +708,8 @@ describe("scanRepository · the pruning record", () => {
     });
 
     // Non-vacuous on both sides, and the value is what makes the comparison mean something: all
-    // three rules had to fire to leave these two — `generated/` gitignored, `notes.txt` not
-    // Markdown, `node_modules` noise — so a walk that dropped any one of them would differ.
+    // three rules had to fire to leave these two - `generated/` gitignored, `notes.txt` not
+    // Markdown, `node_modules` noise - so a walk that dropped any one of them would differ.
     expect(disclosed).toEqual([
       {
         path: ".tooling",

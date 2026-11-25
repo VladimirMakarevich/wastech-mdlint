@@ -29,20 +29,20 @@ export type SchemaWriteOutcome = {
  * governs the config write. This write once had no guard at all, unlike the sibling CI-workflow
  * write. Byte-compares an existing file against the freshly generated text first:
  * identical bytes mean there is nothing to preserve, so a repeat `init` run reports "unchanged"
- * (no write) instead of the "kept" warning — that warning is reserved for a real divergence worth
+ * (no write) instead of the "kept" warning - that warning is reserved for a real divergence worth
  * flagging. Only once the bytes actually differ does `"overwrite"` bypass the guard; `"merge"` and
- * `"none"` both leave a differing file untouched. Pure so the decision itself — not just its
- * string rendering — is directly testable.
+ * `"none"` both leave a differing file untouched. Pure so the decision itself - not just its
+ * string rendering - is directly testable.
  *
  * `existingSchemaUnreadable` takes precedence over every other check and is a required field:
  * the read that produces `existingSchemaText` degrades *any* failure to `undefined`, which used to be
- * harmless because the write would then fail identically. Atomic writes changed that — `rename` needs
- * write permission on the *directory*, not on the target — so without this signal a present-but-
+ * harmless because the write would then fail identically. Atomic writes changed that - `rename` needs
+ * write permission on the *directory*, not on the target - so without this signal a present-but-
  * unreadable `schema.json` would be silently replaced, exactly the implicit file-clobbering the
  * guard exists to prevent.
  *
  * `reason` narrows the one destructive outcome. `--on-existing overwrite` is a disposition for the
- * *config* — the user never named `schema.json` — so it may only reach a pre-existing schema whose
+ * *config* - the user never named `schema.json` - so it may only reach a pre-existing schema whose
  * contents this config actually determines, i.e. `"custom-rules"`. Under `"no-installed-package"`
  * the file is generated purely as a resolvable target for `$schema`, and `schema.json` is a common
  * name for something else entirely (an OpenAPI document, a product schema), so a differing file
@@ -96,7 +96,7 @@ export async function planProjectSchemaWrite(params: {
   const schemaPath = path.join(params.cwd, projectSchema.fileName);
   const schemaRelativePath = params.toRepoRelative(schemaPath);
   // A full read (not just fileExists) so an identical repeat run can report "unchanged" rather
-  // than the "kept" warning — any read failure (missing file, permission error) degrades to
+  // than the "kept" warning - any read failure (missing file, permission error) degrades to
   // undefined, the same "treat it as absent" behavior fileExists has.
   const existingSchemaText = await readFile(schemaPath, "utf8").catch(
     () => undefined,

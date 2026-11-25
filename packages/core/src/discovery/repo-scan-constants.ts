@@ -2,8 +2,8 @@
 // detection). Both modules need the same NOISE list; a single source avoids duplicating the
 // literal array and avoids a value-level import cycle between the two.
 
-// Directories pruned from every scan: build output, VCS metadata, dependency trees — hidden or
-// not — and git worktree checkouts never contain source-of-truth Markdown worth clustering. A
+// Directories pruned from every scan: build output, VCS metadata, dependency trees - hidden or
+// not - and git worktree checkouts never contain source-of-truth Markdown worth clustering. A
 // worktree is the odd one out: it is not generated, but it is a full second checkout of the same
 // repository, so walking it lints every tracked document twice and proposes every doc cluster
 // twice. Agent tools park them under a `worktrees` directory inside the repository (Claude Code
@@ -14,7 +14,7 @@
 // so the rule for adding to it is narrower than "the scan would rather not walk this": a hidden
 // directory earns a place here only when it is a dependency or build tree, never merely for being
 // hidden. `.venv` and `.yarn` are here for that reason, which keeps the hidden-directory *count*
-// walk in repo-scan.ts off a virtualenv or a Yarn Berry cache — but only off *those two*. The
+// walk in repo-scan.ts off a virtualenv or a Yarn Berry cache - but only off *those two*. The
 // bound is name-based, so any unlisted hidden cache (`.tox`, `.gradle`, `.terraform`, `.turbo`, …)
 // classifies as `"hidden"` and is walked to size it. That cost is accepted rather than fixed:
 // name-listing every cache tool in existence would rot faster than the walk costs, and the walk
@@ -39,8 +39,8 @@ export const DEFAULT_NOISE_DIR_NAMES: readonly string[] = [
  * Why a repo-scan walk skipped a directory, or `undefined` when it did not. Noise is tested first,
  * so a dot-prefixed dependency tree (`.git`, `.venv`, `.yarn`, `.next`, `.cache`) reports as
  * `"noise"` and only the rest (`.github`, `.claude`, `.agents`, `.husky`, …) as `"hidden"`. The two
- * classes carry different consequences downstream — noise is also excluded at lint time, hidden is
- * not — so the distinction has to be made once, here, rather than re-derived per caller.
+ * classes carry different consequences downstream - noise is also excluded at lint time, hidden is
+ * not - so the distinction has to be made once, here, rather than re-derived per caller.
  *
  * Hidden directories are pruned from the *scan* by shape rather than by name because a
  * name list can never enumerate them, and a tooling directory proposed as a doc cluster is a

@@ -5,7 +5,7 @@ import { initPromptButtons } from "./prompts.js";
 // Filters and sorts the dashboard as the reader types, without reloading. It does not filter on its
 // own: on every change it asks the server for the same page the form would open and swaps in that
 // page's results, so the selection and its rows are computed and laid out in one place, and the
-// address it leaves behind opens exactly what is on screen — with or without this script.
+// address it leaves behind opens exactly what is on screen - with or without this script.
 
 // Long enough to let a number be typed without a request per digit, short enough to feel immediate.
 const DELAY_MS = 150;

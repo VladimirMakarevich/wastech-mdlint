@@ -105,7 +105,7 @@ describe("summarizeContextGraph", () => {
 
   it("includes the coverage signal when one is supplied, and omits it otherwise", () => {
     const graph = graphOf({ "a.md": "# A\n" });
-    // No links/images/imports, so coverage never touches disk — rootDir is required but unused here.
+    // No links/images/imports, so coverage never touches disk - rootDir is required but unused here.
     const coverage = computeGraphCoverage(
       new Map([["a.md", parseDocument({ path: "a.md", content: "# A\n" })]]),
       graph,
@@ -194,7 +194,7 @@ describe("renderContextGraphText", () => {
   it("appends the coverage signal when a GraphCoverage is supplied", () => {
     const graph = graphOf({ "a.md": "# A\n" });
     // No links/images/imports on "a.md", so computeGraphCoverage never resolves a candidate against
-    // disk — rootDir is a required option but unused on this path, so a placeholder is safe here.
+    // disk - rootDir is a required option but unused on this path, so a placeholder is safe here.
     const coverage = computeGraphCoverage(
       new Map([["a.md", parseDocument({ path: "a.md", content: "# A\n" })]]),
       graph,
@@ -303,7 +303,7 @@ describe("the renderers at corpus scale", () => {
 
   // Parity at the renderer level: one graph, both formats, the same sets. The human
   // sections are the source the JSON keys had to match, so they are parsed back out of the text rather
-  // than recomputed — a shared `topologicalSort` call would assert nothing about what either format
+  // than recomputed - a shared `topologicalSort` call would assert nothing about what either format
   // ships.
   //
   // Widened from the `excluded` set alone to all three of the top-level path sections,

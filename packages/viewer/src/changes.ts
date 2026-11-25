@@ -21,8 +21,8 @@ import {
 import type { ReviewMarksView } from "./review-state.js";
 
 // The review of a branch's changes to the corpus: which documents changed against the base branch,
-// most influential first, each with its diff. Everything computed here comes from core — the change
-// set, the order, the diff, the context delta — and this module only keeps it between requests and
+// most influential first, each with its diff. Everything computed here comes from core - the change
+// set, the order, the diff, the context delta - and this module only keeps it between requests and
 // lays it out as data; the pages draw it from `changes-article.ts`, `change-banner.ts` and
 // `change-diff.ts`.
 
@@ -48,8 +48,8 @@ type Cached = { key: string; result: Review };
 /**
  * Keeps the review between requests, for as long as the viewer runs.
  *
- * A review is stale when the work tree changed — which the corpus watcher reports, and the server
- * passes on through `invalidate` — or when `HEAD` or the base moved without the work tree changing,
+ * A review is stale when the work tree changed - which the corpus watcher reports, and the server
+ * passes on through `invalidate` - or when `HEAD` or the base moved without the work tree changing,
  * as a commit, a `reset --soft` or a fetch does. Where the repository is watched, the watcher on
  * git's `HEAD` and refs reports the second too, through `gitMoved`, and a kept review is answered
  * without asking git: that one short process was most of the time a document page took to answer,
@@ -84,7 +84,7 @@ export class ChangeTracker {
 
   /**
    * A tracker for the repository holding the corpus, or `undefined` outside any git work tree or
-   * without git — where there is no branch to review and the viewer shows no Changes section. A
+   * without git - where there is no branch to review and the viewer shows no Changes section. A
    * repository git refuses to read (owned by another user, or a git too old) still gets a tracker, so
    * the section can say why it is empty.
    */
@@ -125,7 +125,7 @@ export class ChangeTracker {
 
   /**
    * Compute the work-tree review and what it does to the context in the background, ahead of the
-   * first page that needs them. The context — the base linted beside the head — is what the Changes
+   * first page that needs them. The context - the base linted beside the head - is what the Changes
    * page, the dashboard's Branch column and a changed document's small graph wait for, a second or so
    * on a corpus of six hundred documents. Every page used to ask for the changes as it opened, which
    * computed it on the way; pages now draw the branch's marks from the review alone, so without this
@@ -294,7 +294,7 @@ export class ChangeTracker {
 /**
  * `/api/changes`: what the page lists, as data. Diffs are left to `/api/changes/diff`. With the
  * review's context, every document carries its findings, size and links, and the list is in the
- * page's order; without it — it could not be computed — those are `null`. With review marks, every
+ * page's order; without it - it could not be computed - those are `null`. With review marks, every
  * document carries its status and the hash a mark must name, and `review` counts what is left; both
  * are `null` where marks are off, and `review` says why when they could not be read. No time from the
  * marks appears here, so the payload depends only on the files and the marks.
@@ -398,7 +398,7 @@ export function documentContext(
 }
 
 /**
- * The diff of one path in the review — a document or the config — or `undefined` when the review
+ * The diff of one path in the review - a document or the config - or `undefined` when the review
  * holds no such path. The path is only ever compared with the review's own, never read from disk.
  */
 export function diffPayload(review: Review, relPath: string): unknown {

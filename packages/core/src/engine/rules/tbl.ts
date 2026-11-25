@@ -24,9 +24,9 @@ import { lineStartOffsets } from "../text-position.js";
 import { fileScopeShape, matchesFileScope } from "./scope.js";
 import type { TextEdit } from "../types.js";
 
-// The seven table rules — thin presets over the shared table primitives plus file scoping.
+// The seven table rules - thin presets over the shared table primitives plus file scoping.
 
-// TBL-001 — required columns present.
+// TBL-001 - required columns present.
 export const tbl001: RuleDefinition = defineRule({
   metadata: {
     id: "TBL-001",
@@ -58,7 +58,7 @@ export const tbl001: RuleDefinition = defineRule({
 });
 
 // Locate the [start, end) offsets of cell `cellIndex` within a canonical (leading-pipe) table row.
-// Returns undefined for non-canonical rows or a cell beyond the row's pipes — the fix is then
+// Returns undefined for non-canonical rows or a cell beyond the row's pipes - the fix is then
 // skipped rather than risk corrupting the source.
 function locateCellRange(
   lineText: string,
@@ -79,7 +79,7 @@ function locateCellRange(
   return { start: pipes[cellIndex]! + 1, end: pipes[cellIndex + 1]! };
 }
 
-// TBL-002 fix: replace each empty target cell with ` TODO ` — deterministic, so it is safe to apply
+// TBL-002 fix: replace each empty target cell with ` TODO ` - deterministic, so it is safe to apply
 // unattended. Padding cells are skipped through the same `isPaddingCell` predicate `columnNotEmpty`
 // uses, so the fix never rewrites a cell the check did not report. `locateCellRange` happens to
 // reject most of them anyway, but only because the row lacks the pipes, which is not a contract.
@@ -130,7 +130,7 @@ function emptyCellEdits(
   return edits;
 }
 
-// TBL-002 — target cells non-empty (fixable: empty → TODO).
+// TBL-002 - target cells non-empty (fixable: empty → TODO).
 export const tbl002: RuleDefinition = defineRule({
   metadata: {
     id: "TBL-002",
@@ -170,7 +170,7 @@ export const tbl002: RuleDefinition = defineRule({
       : [],
 });
 
-// TBL-003 — cell values within an allowed set.
+// TBL-003 - cell values within an allowed set.
 export const tbl003: RuleDefinition = defineRule({
   metadata: {
     id: "TBL-003",
@@ -185,7 +185,7 @@ export const tbl003: RuleDefinition = defineRule({
     .object({
       column: z.string().min(1),
       values: z.array(z.string()).min(1),
-      // Same `.default()` as the `columnInSet` assertion — the two shapes must agree, or a
+      // Same `.default()` as the `columnInSet` assertion - the two shapes must agree, or a
       // built-in and its declarative twin would compare cell values differently from one config.
       caseSensitive: z.boolean().default(DEFAULT_COLUMN_IN_SET_CASE_SENSITIVE),
       section: z.string().optional(),
@@ -207,7 +207,7 @@ export const tbl003: RuleDefinition = defineRule({
   },
 });
 
-// TBL-004 — cell values match a regex.
+// TBL-004 - cell values match a regex.
 export const tbl004: RuleDefinition = defineRule({
   metadata: {
     id: "TBL-004",
@@ -243,7 +243,7 @@ export const tbl004: RuleDefinition = defineRule({
   },
 });
 
-// TBL-005 — cross-column conditional (when → then).
+// TBL-005 - cross-column conditional (when → then).
 export const tbl005: RuleDefinition = defineRule({
   metadata: {
     id: "TBL-005",
@@ -276,7 +276,7 @@ export const tbl005: RuleDefinition = defineRule({
   },
 });
 
-// TBL-006 — column IDs unique across files (project scope).
+// TBL-006 - column IDs unique across files (project scope).
 export const tbl006: RuleDefinition = defineRule({
   metadata: {
     id: "TBL-006",
@@ -310,7 +310,7 @@ export const tbl006: RuleDefinition = defineRule({
   },
 });
 
-// TBL-007 — every body row has as many cells as the header. Error by default: an over-long row
+// TBL-007 - every body row has as many cells as the header. Error by default: an over-long row
 // silently loses content when rendered, and a malformed row changes what every other TBL rule
 // reads. Not fixable: padding a short row is deterministic, but for an over-long row there is no
 // safe way to choose which cell to drop, and a fix that handles only one direction would be

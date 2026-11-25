@@ -151,7 +151,7 @@ describe("formatContextGraphSummary", () => {
         "entry points (1):",
         "  index.md",
         "top hubs:",
-        // Nothing here is referenced three times, so this corpus has no hubs — which is the same
+        // Nothing here is referenced three times, so this corpus has no hubs - which is the same
         // answer the skill's `Role` column gives it. Stating the threshold keeps an empty section
         // from reading as a renderer that gave up.
         "  (none: no document has 3 or more incoming references)",

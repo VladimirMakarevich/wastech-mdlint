@@ -19,7 +19,7 @@ describe("isStructuredError", () => {
   });
 
   it("rejects a Node-style error whose code is outside the closed set", () => {
-    // A raw fs error carries a string `.code` (ENOENT) but must not duck-type through — otherwise
+    // A raw fs error carries a string `.code` (ENOENT) but must not duck-type through - otherwise
     // an unrelated system code could leak to an MCP client instead of a sanitized INTERNAL_ERROR.
     const enoent = Object.assign(new Error("no such file"), { code: "ENOENT" });
     expect(isStructuredError(enoent)).toBe(false);
@@ -40,7 +40,7 @@ describe("isStructuredError", () => {
   it("carries the operational code the host classifier produces", () => {
     // No core error class throws this one: a host maps a vetted errno onto it (mcp-server's
     // `toOperationalErrorInfo`). The membership assertion is what keeps the advertised MCP
-    // `outputSchema` enum and the CLI's taxonomy agreeing that the code exists at all — and the raw
+    // `outputSchema` enum and the CLI's taxonomy agreeing that the code exists at all - and the raw
     // ENOENT case above is the paired guard that adding it did not open duck-typing.
     expect(TOOL_ERROR_CODES).toContain("OPERATIONAL_ERROR");
   });

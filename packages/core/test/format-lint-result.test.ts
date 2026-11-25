@@ -14,7 +14,7 @@ import { readLintFindingLines } from "./support/output-parity.js";
 
 // The human report's grammar is positional: an unindented line names a file and an indented line is a
 // finding under it. Nothing else in the format carries that information, so any interpolated value
-// that can hold a line break can invent a file — and the summary counts, which come from the
+// that can hold a line break can invent a file - and the summary counts, which come from the
 // structured result rather than from the text, stay correct while it happens.
 
 function message(overrides: Partial<LintMessage> = {}): LintMessage {
@@ -39,7 +39,7 @@ function result(messages: LintMessage[]): LintResult {
 }
 
 // The lines a reader of the format would take for file headings: everything unindented except the
-// blank separator and the totals line. Deliberately *not* the renderer's own notion of a heading —
+// blank separator and the totals line. Deliberately *not* the renderer's own notion of a heading -
 // the claim under test is what a consumer sees, not what the renderer believed it emitted.
 function headingLines(text: string): string[] {
   return text
@@ -87,7 +87,7 @@ describe("formatLintResultText line grammar", () => {
 
   it("emits one heading per distinct file even when a path carries a line break", () => {
     // A finding attributed to a config entry rather than to a location reports the path the *user*
-    // wrote, unnormalized — a missing STR-001 required file, an unresolvable SEC-003 template. That
+    // wrote, unnormalized - a missing STR-001 required file, an unresolvable SEC-003 template. That
     // makes the heading a user-supplied string on the one line the whole grammar rests on.
     const messages = [
       message({ filePath: "docs/a.md" }),

@@ -57,8 +57,8 @@ function markdownFilesOnDiskUnder(absoluteDir: string): string[] {
 }
 
 // The Markdown a reader or an agent loads: root documents, the user guide, the agent rules, the
-// shipped skills, and each package's README. Everything else that is tracked Markdown — test fixtures
-// that are broken by design, task files, tool configuration under `.worc/` and `.claude/` — is
+// shipped skills, and each package's README. Everything else that is tracked Markdown - test fixtures
+// that are broken by design, task files, tool configuration under `.worc/` and `.claude/` - is
 // outside it on purpose.
 const SELF_LINT_TREES = ["docs", ".agents", "skills"];
 
@@ -92,14 +92,14 @@ function selfLintTargetsOnDisk(): string[] {
   return [...rootFiles, ...treeFiles, ...packageReadmes];
 }
 
-// Reading and parsing the whole real corpus is seconds of work — several times the default per-test
-// budget once the rest of the suite is running in parallel — so both directions below share one
+// Reading and parsing the whole real corpus is seconds of work - several times the default per-test
+// budget once the rest of the suite is running in parallel - so both directions below share one
 // walk and both raise the budget. Shrinking the corpus to make it fast would defeat the point: the
 // subject under test is the scope this repository actually lints.
 const CORPUS_WALK_TIMEOUT_MS = 30_000;
 
-// Compose the real lint path — load this repository's own config, resolve its corpus scope, walk it
-// — so the assertions below see the same corpus a `lint` run does.
+// Compose the real lint path - load this repository's own config, resolve its corpus scope, walk it
+// - so the assertions below see the same corpus a `lint` run does.
 let selfLintCorpus: Promise<string[]> | undefined;
 
 function loadSelfLintCorpus(): Promise<string[]> {
@@ -117,8 +117,8 @@ function loadSelfLintCorpus(): Promise<string[]> {
 }
 
 // This guards the one way the CI docs gate can rot without anyone noticing: a narrowed `include`.
-// The gate is green when it analyzes nothing, so dropping half the corpus — a stray `exclude`, a
-// pattern narrowed to one subdirectory, a `*.md` tail lost in a refactor — looks exactly like a
+// The gate is green when it analyzes nothing, so dropping half the corpus - a stray `exclude`, a
+// pattern narrowed to one subdirectory, a `*.md` tail lost in a refactor - looks exactly like a
 // clean run. Comparing against the tracked-file list in both directions is what makes the silence
 // audible.
 //
@@ -139,8 +139,8 @@ describe.skipIf(!hasGit)("repository self-lint scope", () => {
       // against a pinned count. A constant floor is only ever accurate on the day it is written: an
       // earlier one kept passing long after the corpus it described had changed size, which is the
       // same silence this file exists to break. Reading the trees from disk and intersecting them with
-      // the tracked list keeps both failure directions live — a predicate that stops matching pages it
-      // should, and one that starts matching files outside the scope — while an untracked scratch page
+      // the tracked list keeps both failure directions live - a predicate that stops matching pages it
+      // should, and one that starts matching files outside the scope - while an untracked scratch page
       // a contributor left under `docs/` fails nobody's local run.
       expect(expected).toEqual(
         selfLintTargetsOnDisk()
@@ -150,7 +150,7 @@ describe.skipIf(!hasGit)("repository self-lint scope", () => {
 
       // Anchors against both sides collapsing together: if a tree were emptied or the predicate
       // stopped matching anything, the equality above would compare two short lists and pass. Each
-      // of these is permanent — the guide's index, and the two agent entrypoints every session loads —
+      // of these is permanent - the guide's index, and the two agent entrypoints every session loads -
       // so its absence from the lint scope is never the correct state.
       expect(expected).toEqual(
         expect.arrayContaining([
@@ -171,7 +171,7 @@ describe.skipIf(!hasGit)("repository self-lint scope", () => {
       const corpus = await loadSelfLintCorpus();
 
       // Checked structurally rather than against git, so an untracked scratch file a contributor left
-      // under `docs/` fails nobody's local run — the widening this direction exists to catch is a
+      // under `docs/` fails nobody's local run - the widening this direction exists to catch is a
       // pattern that reaches the deliberately broken test fixtures under `packages/` or the task and
       // tool trees, not a draft.
       expect(corpus.filter((relPath) => !isSelfLintTarget(relPath))).toEqual(

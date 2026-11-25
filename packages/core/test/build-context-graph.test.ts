@@ -373,7 +373,7 @@ describe("buildContextGraph · siteRouter resolution", () => {
   });
 
   // The builder's invariant is that its resolution mirrors the REF rules, and
-  // REF-003 resolves a root-relative image target against the repository root — a router maps a URL
+  // REF-003 resolves a root-relative image target against the repository root - a router maps a URL
   // to Markdown source, never to an asset. So the same root-relative target yields a link edge and
   // no image edge.
   it("routes links but not images (REF-003's model)", () => {
@@ -426,12 +426,12 @@ describe("buildContextGraph · node identity matches loadDocuments() output dire
 });
 
 // Depth bound: `detectCycles`/`cyclePath` recurse once per node along the current DFS path,
-// so the supported depth — the longest simple path inside one connected component — is bounded by the
+// so the supported depth - the longest simple path inside one connected component - is bounded by the
 // JS call stack rather than by anything in the code. A linear chain is the simplest shape that reaches
 // full depth, so these two tests use it to pin the documented bound empirically: DEPTH is the depth we
 // promise works, chosen with a ~4x margin under the measured overflow point (~4,750 in a cold Node
 // main thread) so the assertion stays stable across platforms and JIT warmup states instead of sitting
-// near the cliff. Deliberately *no* test asserts a crash at some larger depth — the exact limit is
+// near the cliff. Deliberately *no* test asserts a crash at some larger depth - the exact limit is
 // stack-size dependent and would be flaky. Raising DEPTH means re-measuring the limit first.
 const DEPTH = 1000;
 
@@ -496,7 +496,7 @@ describe("buildContextGraph · deep reference chains within the documented depth
 });
 
 // A closed path is valid when it starts and ends on the same node, visits no member twice in
-// between, and every hop is an edge the graph actually holds — so it is a cycle that exists, not
+// between, and every hop is an edge the graph actually holds - so it is a cycle that exists, not
 // merely a list of the component's members.
 function expectClosedPathAlongEdges(
   cycle: string[],
@@ -518,7 +518,7 @@ function expectClosedPathAlongEdges(
 // the documents `x1…xk` all link to one another, only `x1` links on to `z`, and `z -> a`. Every `x…`
 // sorts before `z`, so a depth-first search out of `x1` enters the clique before it tries `z`.
 // A search that unmarks members on backtrack then tries every ordering of the clique before giving
-// up on it — on the order of k! paths — while one that marks permanently exhausts it once. Measured
+// up on it - on the order of k! paths - while one that marks permanently exhausts it once. Measured
 // before the fix, a whole `lint` run of this shape took ~5 s at k = 11 and ~65 s at k = 12, growing
 // by a factor of about k per step, so k = 14 leaves no machine fast enough for that regression to
 // pass.

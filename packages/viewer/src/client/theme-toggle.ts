@@ -29,8 +29,8 @@ export function effectiveTheme(): Theme {
 
 /**
  * Call `listener` whenever the theme the page shows changes: from the switch, or from the operating
- * system while the choice is "Auto". Parts of the page that cannot follow CSS alone — Mermaid bakes
- * its colors into each SVG — redraw on it.
+ * system while the choice is "Auto". Parts of the page that cannot follow CSS alone - Mermaid bakes
+ * its colors into each SVG - redraw on it.
  */
 export function onThemeChange(listener: (theme: Theme) => void): void {
   document.addEventListener(CHANGE_EVENT, () => {

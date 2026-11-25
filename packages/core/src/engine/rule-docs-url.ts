@@ -1,5 +1,5 @@
 // The one place a rule's documentation URL is constructed. Two consumers
-// need it — `helpUri` on every finding and the README rule table's link — and shipping two fields
+// need it - `helpUri` on every finding and the README rule table's link - and shipping two fields
 // or two spellings that both mean "a rule's documentation page" is exactly the drift this task
 // closes, so both read this constant.
 //

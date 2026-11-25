@@ -20,8 +20,8 @@ import { writeFileAtomic, writeFilesAtomic } from "../src/atomic-write.js";
 // @boundary-guard write-failure
 //
 // The unit half of the write-failure category: a partially-failed batch must
-// leave no temp file behind and no half-written target. The end-to-end half — a real `init` run
-// whose config write fails — lives in packages/cli/test/init.e2e.test.ts.
+// leave no temp file behind and no half-written target. The end-to-end half - a real `init` run
+// whose config write fails - lives in packages/cli/test/init.e2e.test.ts.
 
 const tempDirs: string[] = [];
 
@@ -72,7 +72,7 @@ describe("writeFilesAtomic", () => {
     const root = await fixtureDir();
     const first = path.join(root, "a.json");
     await writeFile(first, "old\n", "utf8");
-    // The parent directory does not exist, so the *temp* write fails before any rename happens —
+    // The parent directory does not exist, so the *temp* write fails before any rename happens -
     // the two-phase staging property this helper exists for.
     const second = path.join(root, "missing-dir", "b.json");
 

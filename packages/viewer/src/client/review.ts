@@ -1,7 +1,7 @@
 // The reader's review marks: the "Viewed" checkbox on each card of the Changes page and above a
 // changed document, the button that starts the review over, and the keys that move through what is
 // left. The server renders every status, so a page reads right without this script; the script only
-// sends a mark and shows the answer — never a mark it was not told was saved.
+// sends a mark and shows the answer - never a mark it was not told was saved.
 
 type ReviewStatus = "unreviewed" | "reviewed" | "changed";
 

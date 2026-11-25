@@ -114,7 +114,7 @@ function indexGraph(
 ): DocProfileGraphIndex {
   // `graph-analysis.ts` owns the degree classifier; profile extraction looks the role up there so
   // `compile.hubMinInDegree` threads through one place instead of forked logic drifting. This
-  // caches that classifier's result — it does not reimplement it.
+  // caches that classifier's result - it does not reimplement it.
   const roles = new Map(
     classifyNodes(graph, options).map((entry) => [entry.path, entry.role]),
   );

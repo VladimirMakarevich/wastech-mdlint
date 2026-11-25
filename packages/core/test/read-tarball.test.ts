@@ -7,8 +7,8 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { readTarball } from "./support/read-tarball.js";
 
-// `read-tarball.ts` is hand-rolled binary parsing, and `package-payload.test.ts` — the only thing
-// that exercises it — cannot tell a reader bug from a packaging defect: every entry the walk drops
+// `read-tarball.ts` is hand-rolled binary parsing, and `package-payload.test.ts` - the only thing
+// that exercises it - cannot tell a reader bug from a packaging defect: every entry the walk drops
 // surfaces there as `"<pkg> ships no <entry>"`. Its dangerous failure is therefore a *partial* map,
 // not an empty one, and that suite's positive control (`payload().size > 0`) only sees the empty
 // case. So the cases below are the ones that would truncate the walk mid-archive: a misread header
@@ -87,7 +87,7 @@ function tarball(...parts: Buffer[]): string {
 
 describe("readTarball", () => {
   it("keeps reading past a directory entry, a pax header and an unpadded body", () => {
-    // One archive rather than four, so the assertion is that the walk arrives at the *last* entry —
+    // One archive rather than four, so the assertion is that the walk arrives at the *last* entry -
     // which is the property each of these entry shapes could break, and which four separate
     // single-entry archives would never test.
     const tgz = tarball(
@@ -115,7 +115,7 @@ describe("readTarball", () => {
 
   it("joins a path split across the prefix and name fields", () => {
     // The `name` field is 100 bytes; anything longer is split, and a reader that ignored `prefix`
-    // would key the entry by its tail alone — present in the map, unfindable by its real path.
+    // would key the entry by its tail alone - present in the map, unfindable by its real path.
     const tgz = tarball(
       entry(
         { prefix: "package/deeply/nested/directory", name: "file.md" },

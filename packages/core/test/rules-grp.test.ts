@@ -26,7 +26,7 @@ async function fixtureRepo(files: Record<string, string>): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-grp-"));
   tempDirs.push(root);
   for (const [relativePath, content] of Object.entries(files)) {
-    // Nested keys need their parent directory created, as `rules-size.test.ts` already does — the
+    // Nested keys need their parent directory created, as `rules-size.test.ts` already does - the
     // any-depth entry-point cases below (`docs/README.md`) would otherwise ENOENT.
     const absolutePath = path.join(root, relativePath);
     await mkdir(path.dirname(absolutePath), { recursive: true });
@@ -66,7 +66,7 @@ describe("GRP-001 cycles (reads the injected graph)", () => {
   });
 
   // The two edge-kind cases below are two-node cycles, so they opt out of the default
-  // `minCycleLength` of 3 — they are about which edges close a cycle, not about the length filter.
+  // `minCycleLength` of 3 - they are about which edges close a cycle, not about the length filter.
   it("detects a cycle formed purely by @import edges (no links)", async () => {
     const cwd = await fixtureRepo({ "a.md": "@b.md\n", "b.md": "@a.md\n" });
     const result = await lint(cwd, [rule("GRP-001", { minCycleLength: 2 })]);
@@ -189,7 +189,7 @@ describe("GRP-002 orphans", () => {
 
   it("prunes an excluded orphan from the report while it still contributes its outgoing edge", async () => {
     // a.md is reachable only from draft.md, so the two halves are separable: `exclude` scopes
-    // reporting, not the corpus-wide graph — which is why this option survived when the dead ones went.
+    // reporting, not the corpus-wide graph - which is why this option survived when the dead ones went.
     const files = {
       "index.md": "# Index\n",
       "a.md": "# A\n",
@@ -208,7 +208,7 @@ describe("GRP-002 orphans", () => {
     // draft.md silenced; a.md still non-orphan because the excluded file's edge survives.
     expect(withExclude.messages).toEqual([]);
 
-    // Same outcome with a `files` list beside it — `exclude` wins over `files`, so the pairing
+    // Same outcome with a `files` list beside it - `exclude` wins over `files`, so the pairing
     // cannot be what makes the filtering work (the exclude-only path above is the one an unscoped rule
     // proved could rot untested).
     const withBoth = await lint(await fixtureRepo(files), [

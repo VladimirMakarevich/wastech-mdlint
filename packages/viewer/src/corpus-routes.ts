@@ -30,7 +30,7 @@ import { workTreeChanges } from "./review-queries.js";
 import { pageHeaders } from "./security.js";
 import type { ViewerContext } from "./viewer-context.js";
 
-// The pages about the corpus as a whole — search, the link graph, the dashboard — and the findings
+// The pages about the corpus as a whole - search, the link graph, the dashboard - and the findings
 // and fix prompts every document page asks for.
 
 const FOLDER_NOT_FOUND = "No folder at this address holds corpus documents.";

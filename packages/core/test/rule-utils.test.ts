@@ -37,7 +37,7 @@ describe("matchesFileScope (glob-match)", () => {
 
 // The absence of an ordered-negation case here is what let the shared matcher ship
 // with `isMatch(input, patterns)`, a first-truthy OR in which a `!` entry compiles to an *inverting*
-// matcher — so every one of these expectations was the opposite before ordered negation landed.
+// matcher - so every one of these expectations was the opposite before ordered negation landed.
 describe("matchesConfigGlob ordered negation", () => {
   it("subtracts a negated entry from a top-level include", () => {
     const include = ["docs/**", "!docs/private/**"];
@@ -53,7 +53,7 @@ describe("matchesConfigGlob ordered negation", () => {
     const exclude = ["docs/private/**", "!docs/private/keepme.md"];
 
     // The blocker: `README.md` is not `docs/private/keepme.md`, so it matched the inverted entry and
-    // every file in the repository was excluded — an empty corpus that exits 0 with findings unseen.
+    // every file in the repository was excluded - an empty corpus that exits 0 with findings unseen.
     expect(matchesConfigGlob("README.md", exclude)).toBe(false);
     expect(matchesConfigGlob("docs/private/other.md", exclude)).toBe(true);
     expect(matchesConfigGlob("docs/private/keepme.md", exclude)).toBe(false);
@@ -102,7 +102,7 @@ describe("matchesConfigGlob ordered negation", () => {
     expect(matchesConfigGlob("src/a.md", ["!docs/**"])).toBe(true);
     expect(matchesConfigGlob("docs/a.md", ["!docs/**"])).toBe(false);
 
-    // "Everything" is literally every path, not every Markdown path — the reason the guide tells you
+    // "Everything" is literally every path, not every Markdown path - the reason the guide tells you
     // to keep a positive entry alongside a negation rather than relying on the fallback.
     expect(matchesConfigGlob("notes.txt", ["!docs/**"])).toBe(true);
     expect(matchesConfigGlob("notes.txt", ["**/*.md", "!docs/**"])).toBe(false);
@@ -148,7 +148,7 @@ describe("matchesConfigGlob ordered negation", () => {
   it("matches a filename that starts with `!` through a bracket class", () => {
     // The escape hatch a user needs and the one `escapeGlobPath` (discovery/repo-scan.ts) emits. A
     // backslash escape is not it: normalizeConfigGlob rewrites every `\` to `/` for Windows paths,
-    // so `\!keep.md` becomes `/!keep.md` and matches nothing — pre-existing, and why the escaper
+    // so `\!keep.md` becomes `/!keep.md` and matches nothing - pre-existing, and why the escaper
     // uses bracket classes.
     expect(matchesConfigGlob("!keep.md", ["[!]keep.md"])).toBe(true);
     expect(matchesConfigGlob("docs/!keep.md", ["[!]keep.md"])).toBe(true);
@@ -213,7 +213,7 @@ describe("matchesConfigGlob anchoring", () => {
     expect(matchesConfigGlob("docs/NOTE.md", ["./NOTE.md"])).toBe(false);
 
     // Why a documented `node_modules/**` under-excluded a monorepo, and why `**/node_modules/**` is
-    // the form to copy — a globstar segment matches zero segments, so the root copy stays covered
+    // the form to copy - a globstar segment matches zero segments, so the root copy stays covered
     // while every nested copy is reached too.
     expect(matchesConfigGlob("node_modules/l/a.md", ["node_modules/**"])).toBe(
       true,
@@ -343,7 +343,7 @@ describe("regexStringSchema", () => {
 
 describe("escapeRegExp", () => {
   it("escapes metacharacters so a raw string embeds as a literal, not a pattern", () => {
-    // "c++" is itself an invalid regex ("nothing to repeat") — go through
+    // "c++" is itself an invalid regex ("nothing to repeat") - go through
     // `regexStringSchema` rather than a literal `new RegExp("c++")` here, since the
     // no-invalid-regexp lint rule would (rightly) flag that as unescaped regex source.
     expect(regexStringSchema.safeParse("c++").success).toBe(false);

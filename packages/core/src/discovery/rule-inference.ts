@@ -26,12 +26,12 @@ import type { DocCluster } from "./repo-scan.js";
 // proposal with per-rule rationale, ready for `init`'s confirmation prompt.
 //
 // Every number this module states is measured over the corpus the config it drafts will actually
-// lint — never over a sample of it. Reading three-to-five files per cluster was cheaper and produced
+// lint - never over a sample of it. Reading three-to-five files per cluster was cheaper and produced
 // rationales off by more than an order of magnitude (29 checklist items claimed for a corpus holding
 // 433), which then went into the config as a permanent justification nobody could reproduce. On a
 // merge it was worse than imprecise: the existing `include` is preserved verbatim while the scan
 // walks the whole repository, so a rule could be appended whose only evidence lived in files that
-// config will never read. Measuring the corpus is what makes both impossible — the evidence and the
+// config will never read. Measuring the corpus is what makes both impossible - the evidence and the
 // run are the same file set by construction.
 
 export type DetectedPatterns = {
@@ -48,24 +48,24 @@ export type DetectedPatterns = {
 export type InferredRule = {
   rule: string;
   category: RuleCategory;
-  // metadata.description, verbatim — proves the mapping tracks the registry rather than a
+  // metadata.description, verbatim - proves the mapping tracks the registry rather than a
   // parallel hardcoded string.
   description: string;
   defaultSeverity: Severity;
   // The severity the written entry carries; absent when the entry runs at `defaultSeverity`. Only
-  // ever `"off"` today — see `proposedSeverity`.
+  // ever `"off"` today - see `proposedSeverity`.
   severity?: SeverityOverride;
   fixable: boolean;
   rationale: string;
   // Only set when derivable from the corpus without guessing (currently: SEC-001's cluster-scoped
-  // files/sections — see "why global vs cluster-scoped" below).
+  // files/sections - see "why global vs cluster-scoped" below).
   options?: Record<string, unknown>;
 };
 
 export type ClusterRuleInference = {
   clusterPath: string;
   includeGlob: string;
-  // The corpus files this cluster's glob selects — the evidence its patterns were measured on.
+  // The corpus files this cluster's glob selects - the evidence its patterns were measured on.
   files: string[];
   patterns: DetectedPatterns;
   // Canonical ids this cluster's own evidence alone would justify (a subset of the global `rules`
@@ -95,8 +95,8 @@ export type RuleInferenceResult = {
   corpusFileCount: number;
 };
 
-// Structural pattern tally. This decides *relevance* — does the corpus contain the construct a rule
-// inspects at all — and is deliberately presence-only (count > 0, no magic thresholds). It is a
+// Structural pattern tally. This decides *relevance* - does the corpus contain the construct a rule
+// inspects at all - and is deliberately presence-only (count > 0, no magic thresholds). It is a
 // separate question from the severity decision below, which asks whether the rule is satisfied
 // today; conflating the two would either propose a rule for a corpus with nothing to check, or
 // judge a rule by how much material it has rather than by how much of it is wrong.
@@ -106,7 +106,7 @@ export type RuleInferenceResult = {
 // here.
 //
 // The link/image counts must mirror what `linkResolves`/`imageResolves` (REF-001/003) and
-// GRP-001's graph edges actually evaluate — otherwise a rule gets proposed from evidence it would
+// GRP-001's graph edges actually evaluate - otherwise a rule gets proposed from evidence it would
 // never look at (an empty `[]()` target, or an `http:`/`data:` image `imageResolves` skips
 // outright), which is not a "justified" proposal.
 function tallyPatterns(
@@ -138,7 +138,7 @@ function tallyPatterns(
     }
     for (const image of doc.images) {
       const target = filePart(image.rawTarget);
-      // Mirrors imageResolves (REF-003)'s *skip guards* — it counts, it does not resolve: skip an
+      // Mirrors imageResolves (REF-003)'s *skip guards* - it counts, it does not resolve: skip an
       // empty target and any scheme-qualified target (http:, https:, data:, …), neither of which
       // REF-003 ever evaluates.
       if (target.length === 0 || /^[a-z][a-z0-9+.-]*:/i.test(target)) {
@@ -173,12 +173,12 @@ const ADR_VOCABULARY = new Set([
 // evidence towards the >=2-of-3 threshold); the exact-string intersection below decides *what to
 // require* from every file in it. `sectionPresent` (SEC-001's primitive) matches section names
 // case-sensitively, so requiring a heading whose exact casing isn't guaranteed across every document
-// would risk a false SEC-001 finding later — this sidesteps that risk and only risks a missed
+// would risk a false SEC-001 finding later - this sidesteps that risk and only risks a missed
 // (not false) proposal.
 //
 // The result preserves the *first* document's reading order rather than alphabetizing:
 // `doc.sections` is a reading-order sequence, not a set, and SEC-001's fix scaffolds any missing
-// section at EOF in the order `options.sections` lists them — alphabetizing here would silently
+// section at EOF in the order `options.sections` lists them - alphabetizing here would silently
 // reorder that downstream scaffold order away from how the ADRs actually read.
 function detectAdrSections(docs: ParsedDocument[]): string[] {
   let sharedSections: string[] | undefined;
@@ -242,7 +242,7 @@ function pickCitedCycle(cycles: string[][]): string[] | undefined {
 // The one place gate ids are referenced as string literals; each is used purely as a lookup key
 // into the registry-derived `idIndex` below, never as a standalone hardcoded metadata object. If a
 // lookup misses (a rule renamed or removed from the registry), the caller skips that proposal
-// silently instead of emitting a dangling id or crashing — that degradation is what "no hardcoded
+// silently instead of emitting a dangling id or crashing - that degradation is what "no hardcoded
 // drift" buys.
 //
 // Why these 8 and not the other 24 built-ins: every other rule but three has a *required* option
@@ -254,16 +254,16 @@ function pickCitedCycle(cycles: string[][]): string[] | undefined {
 // finding, so a gate could only ever propose the rule to a corpus that already fails it.
 //
 // That scope was re-examined for the two rules the README leads with, SIZE-001 and LLM-001, and
-// reached the same answer: both are budgets, and a budget is a choice rather than a measurement —
+// reached the same answer: both are budgets, and a budget is a choice rather than a measurement -
 // the corpus can say how large a document is, not how large it ought to be. So inference was
-// deliberately not widened; the gap is made visible instead — `init`'s draft names both rules and
+// deliberately not widened; the gap is made visible instead - `init`'s draft names both rules and
 // points at their guide pages. Changing that means changing the disclosure too.
 const PATTERN_GATES: Record<
   string,
   {
     gate: (patterns: DetectedPatterns) => boolean;
-    // The clause naming what in the corpus makes this rule relevant. The verdict clause — what the
-    // rule reports over that same corpus today — is appended by `composeRationale` for every rule
+    // The clause naming what in the corpus makes this rule relevant. The verdict clause - what the
+    // rule reports over that same corpus today - is appended by `composeRationale` for every rule
     // alike, so no gate can forget to state it.
     relevance: (patterns: DetectedPatterns, cycles: string[][]) => string;
   }
@@ -308,7 +308,7 @@ const PATTERN_GATES: Record<
   },
   "GRP-001": {
     gate: (patterns) => patterns.localLinkCount > 0,
-    // Three forms, because the useful thing to say depends on what the graph holds — and the third
+    // Three forms, because the useful thing to say depends on what the graph holds - and the third
     // is the one that has to be said out loud. A cycle below GRP-001's floor is real, visible to
     // anyone reading the two documents, and deliberately not reported: two documents indexing each
     // other is an ordinary documentation shape, and failing a build on it invites disabling the rule
@@ -336,7 +336,7 @@ function sec001Relevance(cluster: {
   return `Files in ${cluster.includeGlob} share the ADR sections ${cluster.adrSections.join(", ")}; SEC-001 checks that every file in this cluster has all of them.`;
 }
 
-// Groups registry metadata by category and flattens it into an id-keyed lookup — the mapping this
+// Groups registry metadata by category and flattens it into an id-keyed lookup - the mapping this
 // module uses to turn a gate id into real, current rule metadata instead of a duplicated table.
 function buildIdIndex(registry: RuleRegistry): Map<string, RuleMetadata> {
   const byCategory = new Map<RuleCategory, RuleMetadata[]>();
@@ -375,7 +375,7 @@ type RuleCandidate = {
 // remaining instead of performing it on day one.
 //
 // A gate that reports hundreds of findings the first time it runs is ignored, then disabled, and
-// takes the rules that *were* clean down with it — and a first run offered alongside a CI workflow
+// takes the rules that *were* clean down with it - and a first run offered alongside a CI workflow
 // makes that failure the new adopter's first build. An entry written `"off"` with the count beside
 // it costs one word to reverse and keeps the number in front of whoever reverses it.
 function proposedSeverity(findingCount: number): SeverityOverride | undefined {
@@ -411,7 +411,7 @@ function fileScopeSortKey(rule: InferredRule): string {
  * reference/table/checklist/placeholder/ADR/cycle patterns across it, runs the candidate rules over
  * it once, and maps the result to a draft, registry-sourced rule set with per-rule rationale.
  *
- * Read-only — it writes nothing, and the lint pass it runs is the ordinary in-memory one.
+ * Read-only - it writes nothing, and the lint pass it runs is the ordinary in-memory one.
  */
 export async function inferRuleSet(params: {
   cwd: string;
@@ -454,7 +454,7 @@ export async function inferRuleSet(params: {
 
   const { dryRunRules, runnable } = resolveCandidates(candidates, registry);
 
-  // One pass over the corpus already in memory, with the graph already built — the same entry point
+  // One pass over the corpus already in memory, with the graph already built - the same entry point
   // `lintFiles` reaches after its own discovery half, so inline `disable` directives, project-scope
   // rules and severity resolution all behave here exactly as they will for the user.
   const dryRun = lintCorpus({

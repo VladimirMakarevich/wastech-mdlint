@@ -1,6 +1,6 @@
 # Document Size Rules
 
-This repository lints its own documentation and agent context, and the config gives part of it a size budget: `SIZE-001` per file, `LLM-001` for everything an entrypoint loads eagerly. Which files carry which budget, and every threshold, live in [`wastech-mdlint.config.json`](../../wastech-mdlint.config.json) — read them there, not from memory. `npm run lint:docs` fails only on errors, so a budget warning in its output is still a finding to act on.
+This repository lints its own documentation and agent context, and the config gives part of it a size budget: `SIZE-001` per file, `LLM-001` for everything an entrypoint loads eagerly. Which files carry which budget, and every threshold, live in [`wastech-mdlint.config.json`](../../wastech-mdlint.config.json) - read them there, not from memory. `npm run lint:docs` fails only on errors, so a budget warning in its output is still a finding to act on.
 
 `CLAUDE.md` `@`-imports `AGENTS.md` and every file in `.agents/rules/` but `viewer.md`, so all of them, this page included, spend one shared `LLM-001` budget in every session. That is why these files stay lean, and why a rules file reached by an `@` import costs more than one reached by an ordinary link: `viewer.md` is linked from `AGENTS.md` because only work on the viewer needs it.
 
@@ -8,7 +8,7 @@ This repository lints its own documentation and agent context, and the config gi
 
 - **A budget is never a reason to drop content.** The requested edit goes in, in full. Refusing it, leaving part of it out, or deleting other useful text to make room are forbidden.
 - **First compress, for as long as no meaning and no quality is lost.** Remove repetition and restatement, merge statements that say the same thing, cut filler, and turn a wordy passage into a shorter sentence, a list or a table carrying the same facts.
-- **Compressing stops where meaning or quality would start to go.** Every fact, constraint, example, edge case and the reason behind a rule stays — a rule stripped of its reason is the same defect here as a comment stripped of one. No telegraphic fragments, private abbreviations, or a vaguer generalisation in place of specific statements. The check: a reader of the compressed text learns everything the original taught, just as easily. Once every sentence carries something of its own, compressing is over.
+- **Compressing stops where meaning or quality would start to go.** Every fact, constraint, example, edge case and the reason behind a rule stays - a rule stripped of its reason is the same defect here as a comment stripped of one. No telegraphic fragments, private abbreviations, or a vaguer generalisation in place of specific statements. The check: a reader of the compressed text learns everything the original taught, just as easily. Once every sentence carries something of its own, compressing is over.
 - **Only then split:** into finer-grained files, one topic each, when the document covers several topics; or into a continuation file beside it, named after the original, when it is one topic that runs long. Split at a section boundary, never mid-thought. The original path stays the entry point and links to each part, every statement ends up in exactly one part, and each part lands well under its warning threshold.
 - **Do not raise a threshold** unless a whole class of files has grown, and only with the user's agreement. Never silence a budget with an inline disable.
 
@@ -26,7 +26,7 @@ While a decision waits for the user, the requested edit is still made in full, t
 ## What A Split Here Must Also Update
 
 - **Links into a moved section**, in the same change. `npm run lint:docs` reports a broken link or anchor and a new reference cycle.
-- **The import line of `CLAUDE.md`** for a new file in `.agents/rules/` — or a link from `AGENTS.md` instead, when the file need not load in every session.
+- **The import line of `CLAUDE.md`** for a new file in `.agents/rules/` - or a link from `AGENTS.md` instead, when the file need not load in every session.
 - **The skills drift guards.** The skills-surface tests in the CLI and MCP suites read only each `SKILL.md`, so a CLI invocation or JSON field moved into a supporting file beside it is no longer checked against the product. Keep those in `SKILL.md`, or extend the guards in the same change.
 
 ## One Policy, Three Copies

@@ -91,7 +91,7 @@ export function replayEdits(
 
 /**
  * A JSON value as a label or a field shows it: a string as itself, another scalar as its literal,
- * nothing as empty, and an array or object as its JSON — never the `[object Object]` that `String`
+ * nothing as empty, and an array or object as its JSON - never the `[object Object]` that `String`
  * would give it.
  */
 export function displayText(value: unknown): string {

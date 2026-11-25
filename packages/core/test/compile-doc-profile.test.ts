@@ -261,7 +261,7 @@ describe("extractDocProfiles · one document", () => {
 
 // One index per call is what makes a corpus affordable, and it is also the one thing
 // that can go wrong: the index's edge buckets are shared across a batch, so a profile handing one
-// out directly would alias another document's list. These assertions are that guard — a whole-corpus
+// out directly would alias another document's list. These assertions are that guard - a whole-corpus
 // call must produce exactly what one-document calls produce, edge order included.
 describe("extractDocProfiles · corpus", () => {
   it("produces the same pinned profile as a one-document call, edge order included", () => {
@@ -315,7 +315,7 @@ describe("extractDocProfiles · corpus", () => {
 
   it("lists a self-edge as both an outgoing and an incoming reference", () => {
     // `buildContextGraph` never emits a self-edge, but the two `filter` passes this replaced would
-    // have counted one on both sides — a hand-built graph pins that the single pass still does.
+    // have counted one on both sides - a hand-built graph pins that the single pass still does.
     const document = parseDocument({ path: "self.md", content: "# Self\n" });
     const selfEdge: ContextGraphEdge = {
       from: "self.md",

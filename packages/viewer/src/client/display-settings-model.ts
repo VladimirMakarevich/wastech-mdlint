@@ -1,5 +1,5 @@
 // What the reader can change about how the viewer looks: the accent color and fonts of the whole
-// site, and the article's own fonts, sizes, spacing, width and margins. Pure — no DOM, no storage — so the rules that turn a stored or typed value
+// site, and the article's own fonts, sizes, spacing, width and margins. Pure - no DOM, no storage - so the rules that turn a stored or typed value
 // into CSS are tested on their own, and the panel in `display-settings.ts` only wires inputs to them.
 //
 // Every setting becomes one `--reader-*` custom property on <html>, and the stylesheet reads each one
@@ -14,7 +14,7 @@ export type Accent = "blue" | "indigo" | "purple" | "red" | "teal" | "graphite";
 
 /**
  * The accent colors the reader can pick, each with its caption and its light and dark value. A closed
- * list rather than a free color: the accent carries small text — links, rule ids — so each light value
+ * list rather than a free color: the accent carries small text - links, rule ids - so each light value
  * is dark enough for 4.5:1 on white and each dark value light enough for the same on the dark page,
  * which a picked color would not be. Green and amber are left out because they already mean "added"
  * and "changed" on every changed document, and a link in either would read as a change mark. The red
@@ -42,7 +42,7 @@ export function accentColor(accent: Accent): string {
 export type DisplaySettings = {
   // The color of links, focus rings, the chosen tab and the other marks of the interface.
   accent: Accent;
-  // The fonts of the whole site — header, tree, side column, panels, dashboard — and the ones the
+  // The fonts of the whole site - header, tree, side column, panels, dashboard - and the ones the
   // article uses while its own are left at "same as the site".
   siteFont: TextFont;
   customSiteFont: string;
@@ -145,7 +145,7 @@ const WIDE_STACK =
   'Verdana, "DejaVu Sans", "Bitstream Vera Sans", Geneva, sans-serif';
 
 // The two layers of stacks. The stylesheet keeps the system's own as `--font-sans-system` and
-// `--font-mono-system`, and makes `--font-sans` and `--font-mono` — which the whole page reads — the
+// `--font-mono-system`, and makes `--font-sans` and `--font-mono` - which the whole page reads - the
 // site fonts, falling back to those. A site choice is built on the system stacks; an article choice
 // on the site's, so "same as the site" is the article's default. Building a site font on
 // `--font-sans` itself would make that property refer to itself, which CSS treats as invalid.
@@ -210,7 +210,7 @@ export function parseSettings(value: unknown): DisplaySettings {
 }
 
 /**
- * The fields that are not a choice among fixed options — font names, switches and numbers — each
+ * The fields that are not a choice among fixed options - font names, switches and numbers - each
  * taken only when it has the right type, so a missing or mistyped one keeps its default.
  */
 function copyFreeFields(

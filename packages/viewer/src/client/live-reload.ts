@@ -5,8 +5,8 @@ import { SERVER_EVENTS, StreamPosition } from "./live-reload-model.js";
 //
 // And open only while the page is shown. The server speaks HTTP/1.1, for which a browser opens about
 // six connections to one host across all of its tabs; a stream holds one for as long as it is open,
-// so six viewer tabs left open would hold them all, and every other request to the viewer — a page,
-// a fetch, a save — would wait behind them forever. A hidden page closes its stream and opens a new
+// so six viewer tabs left open would hold them all, and every other request to the viewer - a page,
+// a fetch, a save - would wait behind them forever. A hidden page closes its stream and opens a new
 // one when it is shown again, from the last event it received, so the server first sends it what
 // happened meanwhile and the page catches up as if it had listened all along.
 
@@ -161,11 +161,11 @@ let owedReload: MutationObserver | undefined;
  * a navigation the reader started. A reload the reader asked for themselves, after a save, does not.
  */
 export function reloadKeepingScroll(): void {
-  // A page already leaving for another — a click taken, the next page on its way — is not reloaded
+  // A page already leaving for another - a click taken, the next page on its way - is not reloaded
   // now: the reload would replace that navigation, and the reader would land back on the page they
   // left. The page they are going to is served fresh anyway, so usually the reload is simply never
-  // needed. But a navigation can also end with the page still standing — stopped with Esc, answered
-  // with a file to save, or brought back from the back-forward cache — and then the marker is
+  // needed. But a navigation can also end with the page still standing - stopped with Esc, answered
+  // with a file to save, or brought back from the back-forward cache - and then the marker is
   // removed and this page is still showing what was stale. Dropping the reload outright left such a
   // page stale until the next change happened to arrive, so it is owed instead, and paid once the
   // marker is gone.

@@ -1,7 +1,7 @@
 import { ruleRegistry } from "./rules/index.js";
 
 // Generated README rule table. One metadata source drives the registry, schema.json,
-// AND this table — so docs never drift. Includes the per-rule fixable column, whose
+// AND this table - so docs never drift. Includes the per-rule fixable column, whose
 // `yes` set is exactly the rules whose metadata declares a deterministic `--fix`.
 export function generateRuleDocs(): string {
   const header =
@@ -9,7 +9,7 @@ export function generateRuleDocs(): string {
   const divider = "| --- | --- | --- | --- | --- | --- | --- |";
   const rows = ruleRegistry.getAllMetadata().map((metadata) => {
     const fixable = metadata.fixable ? "yes" : "no";
-    // The generator is the second reader of `docsUrl` — it previously had none — so the table's
+    // The generator is the second reader of `docsUrl` - it previously had none - so the table's
     // link and a finding's `helpUri` cannot point at different pages. No `Docs` column: linking the
     // id is enough, and every added column shifts the positions `docs-sync.test.ts` reads by index.
     // The shipped fix skill reads the `Fixable` column by its header name, so an inserted column

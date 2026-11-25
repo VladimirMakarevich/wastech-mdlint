@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-// A generated 139-document corpus — a scale this repository had no fixture for. The unbounded-line
+// A generated 139-document corpus - a scale this repository had no fixture for. The unbounded-line
 // and artifact-size defects only appear past a scale the existing 8-file fixtures
 // cannot reach: on those, compile output was 1415 bytes; on a real corpus, 110 789. The
 // corpus is generated rather than checked in so its shape stays legible (each group below states
@@ -25,7 +25,7 @@ const STAGE_COUNT = 40;
 const ISOLATED_COUNT = 46;
 const AREA_SIZE = 5;
 // Each topic and each stage links to its next three siblings, which is what gives interior
-// documents an in-degree of 3 — exactly `DEFAULT_HUB_MIN_IN_DEGREE`, so they classify as `hub`.
+// documents an in-degree of 3 - exactly `DEFAULT_HUB_MIN_IN_DEGREE`, so they classify as `hub`.
 const SIBLING_FANOUT = 3;
 
 export const LARGE_CORPUS_DOCUMENT_COUNT = 139;
@@ -39,7 +39,7 @@ export const LARGE_CORPUS_HUB_PATH = "reference/api-reference.md";
  */
 export const LARGE_CORPUS_HUB_IN_DEGREE = 124;
 
-/** `inDegree === 0` nodes — the isolated documents plus the guides, which is how the summary counts them. */
+/** `inDegree === 0` nodes - the isolated documents plus the guides, which is how the summary counts them. */
 export const LARGE_CORPUS_ENTRY_POINT_COUNT = ISOLATED_COUNT + GUIDE_COUNT;
 
 /** The 3-node cycle plus the 40-document tail reachable only through it. */
@@ -101,7 +101,7 @@ function link(from: string, to: string, text: string, anchor = ""): string {
   return `[${text}](${target}${anchor})`;
 }
 
-// Two headings so the `#requests` / `#responses` fragments resolve to real slugs — the graph
+// Two headings so the `#requests` / `#responses` fragments resolve to real slugs - the graph
 // builder drops an anchor edge whose fragment matches no heading, which would silently cost the
 // hub two thirds of its in-degree.
 function hubContent(): string {
@@ -174,7 +174,7 @@ function guideContent(index: number): string {
   ];
 
   // Only the first four guides cite an appendix, so each appendix keeps in-degree 1 and out-degree
-  // 0 — the `leaf` role, which nothing else in the corpus produces.
+  // 0 - the `leaf` role, which nothing else in the corpus produces.
   if (index < APPENDIX_COUNT) {
     lines.push(
       `Background: ${link(self, appendixPath(index), `appendix ${index}`)}.`,
@@ -247,7 +247,7 @@ function isolatedContent(index: number): string {
 
 /**
  * The corpus as repo-relative POSIX path → Markdown. Pure and deterministic: no randomness, no
- * clock, no filesystem — the same object every call, which is what lets a determinism assertion
+ * clock, no filesystem - the same object every call, which is what lets a determinism assertion
  * mean something.
  */
 export function largeCorpusFiles(): Record<string, string> {
@@ -280,7 +280,7 @@ export function largeCorpusFiles(): Record<string, string> {
 /**
  * The config `compileContext` requires (it throws `CompileConfigMissingError` without a `compile`
  * section). The rule list is a realistic option-free selection across five families, so
- * `Document Rules` renders the grouped output the size caps exist to give budget back to —
+ * `Document Rules` renders the grouped output the size caps exist to give budget back to -
  * an empty `rules` array would collapse that section to "(no rules configured)" and make the
  * section-share assertion vacuous.
  */

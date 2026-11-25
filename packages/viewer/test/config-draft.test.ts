@@ -137,7 +137,7 @@ describe("afterSave", () => {
     });
   });
 
-  // The defect this guards: the kept form change came back as text — the text from before the save —
+  // The defect this guards: the kept form change came back as text - the text from before the save -
   // so once the file changed again and the draft was set aside and applied, it replaced the newer
   // file with that older text plus the edits, undoing what another program wrote.
   it("keeps a form change a form change: the saved text, with only the edits made after it", () => {
