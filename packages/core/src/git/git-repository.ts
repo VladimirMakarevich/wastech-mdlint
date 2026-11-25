@@ -50,7 +50,15 @@ export type GitBase = {
    * local branch named `origin/main`, over the ref the base came from.
    */
   fullRef?: string;
+  /**
+   * Where the name came from: given for this run (`--base`, `--since <ref>`, the MCP `since`), the
+   * config's `git.base`, or detected because neither named one. Kept so a host can say why it
+   * compares with this branch, and how to choose another, when the guess is wrong.
+   */
+  source: GitBaseSource;
 };
+
+export type GitBaseSource = "given" | "config" | "detected";
 
 /**
  * One changed path. `R` keeps the old path; a copy, a type change and an unmerged path read as an
@@ -373,40 +381,20 @@ export class GitRepository {
   }
 
   /**
-   * The branch or commit to compare with: `ref` when given, otherwise the branch `origin/HEAD`
-   * points at, then a local `main`, then `master`.
+   * The branch or commit to compare with: `ref` when given for this run, otherwise `configured` —
+   * the config's `git.base` — and only without either the branch `origin/HEAD` points at, then a
+   * local `main`, then `master`. A name given or configured that resolves to nothing is reported,
+   * never replaced by the guess: a review against a branch nobody chose would read as a real one.
    */
-  async resolveBase(ref?: string): Promise<GitBase | GitUnavailable> {
+  async resolveBase(
+    ref?: string,
+    configured?: string,
+  ): Promise<GitBase | GitUnavailable> {
     if (ref !== undefined) {
-      // Refused before git sees it: a ref is a positional argument, and one starting with `-`
-      // would be read as an option.
-      if (ref.length === 0 || ref.startsWith("-")) {
-        return unavailable(
-          "invalid-ref",
-          `"${ref}" is not a branch, tag or commit name.`,
-          "Name the base by a branch, a tag or a commit id.",
-        );
-      }
-      const commit = await this.resolveCommit(ref);
-      if (commit !== undefined) {
-        return { ref, commit };
-      }
-      // Comparing with the last commit before there is one — a fresh repository, an orphan branch —
-      // is an ordinary request, and "fetch the branch first" would send the reader the wrong way.
-      // Decided from the repository rather than the spelling: a `HEAD` naming a commit git cannot
-      // read is a damaged repository, which "make a first commit" would misdescribe just as badly.
-      if ((ref === "HEAD" || ref === "@") && (await this.headIsUnborn())) {
-        return unavailable(
-          "base-not-found",
-          "HEAD has no commits yet.",
-          "Make a first commit to compare with it.",
-        );
-      }
-      return unavailable(
-        "base-not-found",
-        `"${ref}" does not name a commit in this repository.`,
-        "Check the name, or fetch the branch first.",
-      );
+      return this.resolveNamedBase(ref, "given");
+    }
+    if (configured !== undefined) {
+      return this.resolveNamedBase(configured, "config");
     }
 
     const candidates: { ref: string; fullRef: string }[] = [];
@@ -429,13 +417,59 @@ export class GitRepository {
     for (const candidate of candidates) {
       const commit = await this.resolveCommit(candidate.fullRef);
       if (commit !== undefined) {
-        return { ref: candidate.ref, commit, fullRef: candidate.fullRef };
+        return {
+          ref: candidate.ref,
+          commit,
+          fullRef: candidate.fullRef,
+          source: "detected",
+        };
       }
     }
     return unavailable(
       "base-not-found",
       "No base branch was found: origin/HEAD is not set and there is no main or master branch.",
-      "Name the branch to compare with.",
+      "Set git.base in the config, or name the branch to compare with.",
+    );
+  }
+
+  // A base named for this run or by the config. A config's name is reported as the config's, so
+  // the reader fixes the file rather than a command line that named nothing.
+  private async resolveNamedBase(
+    ref: string,
+    source: "given" | "config",
+  ): Promise<GitBase | GitUnavailable> {
+    const named =
+      source === "config" ? `"${ref}", the config's git.base,` : `"${ref}"`;
+    // Refused before git sees it: a ref is a positional argument, and one starting with `-` would
+    // be read as an option.
+    if (ref.length === 0 || ref.startsWith("-")) {
+      return unavailable(
+        "invalid-ref",
+        `${named} is not a branch, tag or commit name.`,
+        "Name the base by a branch, a tag or a commit id.",
+      );
+    }
+    const commit = await this.resolveCommit(ref);
+    if (commit !== undefined) {
+      return { ref, commit, source };
+    }
+    // Comparing with the last commit before there is one — a fresh repository, an orphan branch —
+    // is an ordinary request, and "fetch the branch first" would send the reader the wrong way.
+    // Decided from the repository rather than the spelling: a `HEAD` naming a commit git cannot
+    // read is a damaged repository, which "make a first commit" would misdescribe just as badly.
+    if ((ref === "HEAD" || ref === "@") && (await this.headIsUnborn())) {
+      return unavailable(
+        "base-not-found",
+        "HEAD has no commits yet.",
+        "Make a first commit to compare with it.",
+      );
+    }
+    return unavailable(
+      "base-not-found",
+      `${named} does not name a commit in this repository.`,
+      source === "config"
+        ? "Fetch the branch, or correct git.base in the config."
+        : "Check the name, or fetch the branch first.",
     );
   }
 

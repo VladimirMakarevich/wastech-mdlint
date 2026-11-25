@@ -14,7 +14,10 @@ import type { SinceAnalysis } from "./branch-review.js";
 
 /** Which comparison a "since" answer describes. */
 export type SinceSummary = {
-  /** The ref as given, and the commit it named. */
+  /**
+   * The ref compared with — as given, else the config's `git.base`, else the detected base branch —
+   * and the commit it named.
+   */
   ref: string;
   base: string;
   /** Where the branch left it: the base side of every comparison. */

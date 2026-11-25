@@ -62,10 +62,10 @@ node packages/cli/dist/index.js lint . --fix      # apply deterministic fixes, t
 ## CLI
 
 ```bash
-wastech-mdlint lint [path] [--config <file>] [--format text|json] [--fail-on error|warning|off] [--fix | --since <ref>]
+wastech-mdlint lint [path] [--config <file>] [--format text|json] [--fail-on error|warning|off] [--fix | --since [ref]]
 wastech-mdlint graph [path] [--config <file>] [--format human|json|mermaid|dot]
 wastech-mdlint slice <query> [--config <file>] [--depth <n>] [--format text|json]
-wastech-mdlint impact <file> | --since <ref> [--config <file>] [--format text|json]
+wastech-mdlint impact <file> | --since [ref] [--config <file>] [--format text|json]
 wastech-mdlint schema [--out schema.json]
 wastech-mdlint compile [--config <file>] [--outdir <dir>] [--dry-run] [--cwd <dir>]
 wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-ci-workflow] [--with-agent-rule]
@@ -76,7 +76,7 @@ wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-
 - `graph` prints the context graph to stdout: clusters, hubs, reading order, the nodes a cycle excluded from it, and the coverage signal as `human` text (default); the deterministic `{ nodes, edges, components, readingOrder, excluded, coverage }` shape as `json`; or a `mermaid`/`dot` diagram for rendering elsewhere. The MCP [`context-graph`](docs/guide/mcp-server.md) tool's `format: "summary"` returns that same JSON document.
 - `slice <query> --depth <n>` (default depth `2`) resolves `query` by **exact match only** — a defined ID, a heading/anchor slug (`#slug`), or a file path, never fuzzy/substring/keyword/LLM matching — then prints the files reachable within that many hops. A query that matches nothing is an honest empty result (`matchKind: null` in `--format json`), not an error.
 - `impact <file>` classifies the blast radius of changing `file` and lints the affected subgraph: linting still runs against the whole corpus (so project-scope rules like `GRP-001` see every document), but the reported `lint` messages/files are narrowed to `file` plus everything directly or transitively affected by it. `impact --since <ref>` takes the place of `<file>` and does the same for every document the work tree changed since its merge-base with `<ref>`.
-- `lint --since <ref>` reports only the findings the work tree adds since where it left a branch, tag or commit (their merge-base, as a pull request is compared), so CI can fail on what a branch adds while old findings are paid down; `--fail-on` gates on those. It reads git, read-only, and cannot be combined with `--fix`. See [`lint --since`](docs/guide/cli.md#lint-default).
+- `lint --since [ref]` reports only the findings the work tree adds since where it left a branch, tag or commit (their merge-base, as a pull request is compared), so CI can fail on what a branch adds while old findings are paid down; `--fail-on` gates on those. Without a ref it compares with the config's `git.base`, else the detected base branch. It reads git, read-only, and cannot be combined with `--fix`. See [`lint --since`](docs/guide/cli.md#lint-default).
 - `slice`/`impact` always scan the current working directory — unlike `graph`, they take no `[path]` argument.
 - `graph`/`slice`/`impact` are read-only reports and exit `0` on success; `impact` exits `2` (with a hint) if `file` is outside the analyzed corpus.
 - `schema` writes the config JSON schema to a local file (never a remote URL).

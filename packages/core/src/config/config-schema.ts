@@ -177,12 +177,32 @@ export function ruleEntryBranchIndex(entry: unknown): number {
     : 1;
 }
 
+// How a review of the work tree against git reads the repository. `base` is the branch, tag or
+// commit a change is compared with wherever none is named for the run — the viewer's Changes page,
+// `lint --since` and `impact --since` given no ref — in place of guessing it from `origin/HEAD`,
+// then `main`, then `master`, which picks the wrong branch wherever work starts from another one,
+// such as a `develop` branch. A ref is a positional argument to git, where one starting with `-`
+// would be read as an option, so it is refused here, naming the key, rather than at every
+// comparison.
+const gitConfigSchema = z
+  .object({
+    base: z
+      .string()
+      .min(1)
+      .refine((ref) => !ref.startsWith("-"), {
+        error: "a branch, tag or commit name cannot start with '-'",
+      })
+      .optional(),
+  })
+  .strict();
+
 export const lintConfigSchema = z
   .object({
     $schema: z.string().optional(),
     include: z.array(z.string()).optional(),
     exclude: z.array(z.string()).optional(),
     respectGitignore: z.boolean().optional(),
+    git: gitConfigSchema.optional(),
     settings: settingsSchema.optional(),
     // Optional so a minimal config lints nothing rather than erroring; init writes a real set.
     rules: z.array(ruleEntryUnionSchema).optional(),

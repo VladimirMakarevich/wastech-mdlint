@@ -1013,6 +1013,7 @@ describe.skipIf(!hasGit)("resolving the base (requires git on PATH)", () => {
       expect(await repository.resolveBase("HEAD")).toEqual({
         ref: "HEAD",
         commit: await repository.headCommit(),
+        source: "given",
       });
     },
     TIMEOUT_MS,
@@ -1054,6 +1055,7 @@ describe.skipIf(!hasGit)("resolving the base (requires git on PATH)", () => {
         ref: "main",
         commit: head,
         fullRef: "refs/heads/main",
+        source: "detected",
       });
 
       fixture.git("update-ref", "refs/remotes/origin/develop", "HEAD");
@@ -1066,6 +1068,7 @@ describe.skipIf(!hasGit)("resolving the base (requires git on PATH)", () => {
         ref: "origin/develop",
         commit: head,
         fullRef: "refs/remotes/origin/develop",
+        source: "detected",
       });
 
       fixture.git("symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
@@ -1074,10 +1077,67 @@ describe.skipIf(!hasGit)("resolving the base (requires git on PATH)", () => {
         ref: "master",
         commit: head,
         fullRef: "refs/heads/master",
+        source: "detected",
       });
 
       fixture.git("branch", "-q", "-m", "master", "trunk");
-      expectUnavailable(await repository.resolveBase(), "base-not-found");
+      expect(await repository.resolveBase()).toMatchObject({
+        available: false,
+        reason: "base-not-found",
+        hint: "Set git.base in the config, or name the branch to compare with.",
+      });
+    },
+    TIMEOUT_MS,
+  );
+
+  // Work that starts from a branch other than the default one — a `develop` — is compared with
+  // the base the config names rather than the guess, while a ref named for the run still wins: a
+  // reader comparing with another branch for once should not have to edit the config.
+  it(
+    "takes the config's base over the guess, and a ref given for the run over both",
+    async () => {
+      const fixture = await makeRepo();
+      await fixture.write("a.md", "a\n");
+      fixture.commit("base");
+      fixture.git("branch", "-q", "develop");
+      const repository = await open(fixture.repo, fixture.env);
+      const head = await repository.headCommit();
+
+      expect(await repository.resolveBase(undefined, "develop")).toEqual({
+        ref: "develop",
+        commit: head,
+        source: "config",
+      });
+      expect(await repository.resolveBase("main", "develop")).toEqual({
+        ref: "main",
+        commit: head,
+        source: "given",
+      });
+    },
+    TIMEOUT_MS,
+  );
+
+  // A configured base that resolves to nothing is reported as the config's, so the reader fixes the
+  // file; it is never replaced by the guess, which would review against a branch nobody chose.
+  it(
+    "reports a configured base that names nothing as the config's, without guessing another",
+    async () => {
+      const fixture = await makeRepo();
+      await fixture.write("a.md", "a\n");
+      fixture.commit("base");
+      const repository = await open(fixture.repo, fixture.env);
+      expect(
+        await repository.resolveBase(undefined, "origin/develop"),
+      ).toMatchObject({
+        available: false,
+        reason: "base-not-found",
+        message: `"origin/develop", the config's git.base, does not name a commit in this repository.`,
+        hint: "Fetch the branch, or correct git.base in the config.",
+      });
+      expect(
+        await repository.resolveBase(undefined, "--output=planted"),
+      ).toMatchObject({ available: false, reason: "invalid-ref" });
+      expect(existsSync(path.join(fixture.repo, "planted"))).toBe(false);
     },
     TIMEOUT_MS,
   );

@@ -39,6 +39,18 @@
       "type": "boolean",
       "default": false
     },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "base": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^-]",
+          "description": "The branch, tag or commit changes are compared with wherever a run names none: the viewer's Changes page, and `lint --since` / `impact --since` given no ref. Without it the base is guessed — the branch origin/HEAD names, then main, then master — which is wrong wherever work starts from another branch. Write a remote-tracking name such as \"origin/develop\" so every clone has it."
+        }
+      }
+    },
     "settings": {
       "type": "object",
       "additionalProperties": false,

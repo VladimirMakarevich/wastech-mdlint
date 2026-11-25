@@ -26,6 +26,9 @@ The same discovery runs for every host (CLI and MCP server) because both go thro
   "include": ["**/*.md"],
   "exclude": ["**/node_modules/**", "**/dist/**", "**/.git/**"],
   "respectGitignore": false,
+  "git": {
+    "base": "origin/develop",
+  },
   "settings": {
     /* shared settings inherited by rules */
   },
@@ -46,6 +49,7 @@ Unknown top-level keys are rejected. Validation is two-stage: the root shape fir
 | `include` | string[] | `["**/*.md"]` | Globs of files to lint. |
 | `exclude` | string[] | [13 noise globs](#what-is-excluded-before-you-write-anything) | Globs to remove; **`exclude` wins over `include`**. What you write **extends** the default rather than replacing it. |
 | `respectGitignore` | boolean | `false` | Off by default on purpose: a `.gitignore` records what should not be committed, which is not the same statement as "do not lint this" — and the trees a first run must skip are already covered by the default `exclude`. When `true`, also skip `.gitignore`d files — root and nested alike, with git's own precedence: the **deepest** `.gitignore` that has a pattern for a path decides, so a nested `!keep.md` re-includes a file a root pattern ignored. An excluded **directory** takes its whole subtree with it, and that exclusion is resolved the same way — a nested `!generated/` re-includes the directory, and the files inside are then judged on the patterns that match them directly. A fresh `init` write sets an explicit `true`; a `merge` never adds it. |
+| `git` | object | — | [`git.base`](#gitbase): the branch, tag or commit changes are compared with when a run names none. |
 | `settings` | object | — | Shared settings (`siteRouter`, `idRef`) inherited by rules. |
 | `rules` | array | `[]` | The rules to run (see below). |
 | `compile` | object | — | Config for [`compile`](compile.md); required by that command. |
@@ -208,6 +212,25 @@ Feeds the shared [context graph](context-graph.md)'s `id-ref` edges, so ID refer
 ```
 
 All three `idRef` fields (`idPattern`, `definitions`, `idColumn`) are required when `idRef` is set.
+
+## `git.base`
+
+The branch, tag or commit a change is compared with wherever a run names none: the viewer's Changes page, and [`lint --since`](cli.md#lint-default) and [`impact --since`](cli.md#impact-file) given no ref. A review compares the work tree with where the branch left this base — their merge-base, as a pull request is compared.
+
+```jsonc
+"git": {
+  "base": "origin/develop"
+}
+```
+
+**Without it, the base is guessed:** the branch `origin/HEAD` names (the remote's default branch, set by `git clone`), then a local `main`, then `master`. That guess is wrong wherever work starts from another branch — a team that branches from `develop` while the default branch is `main` would be shown everything `develop` holds that `main` does not. Set `git.base` once, in the config the team shares, and every clone compares with the same branch.
+
+- **Write a remote-tracking name** such as `origin/develop`. Every clone that has fetched has it, while a local `develop` exists only where someone checked it out; it moves when you fetch.
+- **A ref named for the run wins.** The viewer's `--base`, `lint --since <ref>` and the MCP tools' `since` compare with what they name, so comparing with another branch once needs no config edit.
+- **A base that names nothing is an error, not a fallback.** The viewer's Changes page and `--since` say that `git.base` names no commit, and `--since` exits `2`, rather than quietly guessing another branch — a review against a branch nobody chose would read as a real one.
+- The viewer's Changes page says which it used: the base the config names, one named with `--base`, or a guess, with how to choose another.
+
+A value starting with `-` is rejected when the config loads, since git would read it as an option.
 
 ## The `custom` rule
 
