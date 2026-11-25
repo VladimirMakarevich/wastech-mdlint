@@ -121,9 +121,10 @@ export function isFitted(view: ZoomView, frame: Frame): boolean {
 
 /**
  * What a click on the image does. From the fitted view it zooms in about the click: to the natural size
- * when the image was shrunk to fit, since that is where every pixel of a screenshot is readable, and to
- * twice the fitted size when it already fit at full size, so the click always visibly enlarges. From
- * any other view it returns to the fitted one.
+ * when that is at least half again as large as the fitted one, since that is where every pixel of a
+ * screenshot is readable; otherwise - an image shrunk only a little, or one that already fit at full
+ * size - to twice the fitted size, so the click always visibly enlarges. From any other view it
+ * returns to the fitted one.
  */
 export function toggleZoom(
   view: ZoomView,
@@ -133,8 +134,65 @@ export function toggleZoom(
   if (!isFitted(view, frame)) {
     return fittedView(frame);
   }
-  const target = Math.max(1, fitScale(frame) * 2);
+  const fit = fitScale(frame);
+  const target = 1 / fit >= 1.5 ? 1 : fit * 2;
   return zoomAt(view, target / view.scale, point, frame);
+}
+
+/**
+ * The view after the stage changes size. A fitted image stays fitted to the new stage; a zoomed one
+ * keeps its scale and is held inside the new stage. Whether it was fitted is judged against the stage
+ * it was drawn on, not the new one, whose fitted scale it no longer has.
+ */
+export function resizeView(
+  view: ZoomView,
+  before: Frame,
+  after: Frame,
+): ZoomView {
+  return isFitted(view, before) ? fittedView(after) : clampView(view, after);
+}
+
+// How far one arrow key press moves a zoomed image, in stage pixels.
+export const PAN_STEP = 64;
+
+export type KeyAction =
+  | { kind: "zoom"; factor: number }
+  | { kind: "fit" }
+  | { kind: "pan"; delta: Point };
+
+/**
+ * What a key pressed in the enlarged view does: `+`/`=` and `-`/`_` zoom, `0` fits, and the arrows move
+ * a zoomed image, so a reader without a pointer can reach every part of it. An arrow shows more of the
+ * image on its side, which moves the image the other way. A key held with Ctrl, Alt or the Command key
+ * does nothing here: with those the browser zooms the whole page, which the reader may still want.
+ */
+export function keyAction(
+  key: string,
+  modified: boolean,
+): KeyAction | undefined {
+  if (modified) {
+    return undefined;
+  }
+  switch (key) {
+    case "+":
+    case "=":
+      return { kind: "zoom", factor: ZOOM_STEP };
+    case "-":
+    case "_":
+      return { kind: "zoom", factor: 1 / ZOOM_STEP };
+    case "0":
+      return { kind: "fit" };
+    case "ArrowLeft":
+      return { kind: "pan", delta: { x: PAN_STEP, y: 0 } };
+    case "ArrowRight":
+      return { kind: "pan", delta: { x: -PAN_STEP, y: 0 } };
+    case "ArrowUp":
+      return { kind: "pan", delta: { x: 0, y: PAN_STEP } };
+    case "ArrowDown":
+      return { kind: "pan", delta: { x: 0, y: -PAN_STEP } };
+    default:
+      return undefined;
+  }
 }
 
 /**

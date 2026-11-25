@@ -5,7 +5,10 @@ import {
   fitScale,
   fittedView,
   isFitted,
+  keyAction,
+  PAN_STEP,
   panBy,
+  resizeView,
   scaleLimits,
   toggleZoom,
   wheelFactor,
@@ -150,5 +153,81 @@ describe("zoomLabel", () => {
   it("shows the share of the natural size in whole percent", () => {
     expect(zoomLabel(0.5)).toBe("50%");
     expect(zoomLabel(1.234)).toBe("123%");
+  });
+});
+
+describe("toggleZoom between fit and natural size", () => {
+  // At 70% the natural size is about 1.43 times the fitted one, too small a step to read as a zoom,
+  // so the click doubles instead; at 60% the natural size is two-thirds larger and the click goes
+  // there. Fit 0.5 alone cannot tell the two rules apart, since both give 1.
+  it.each([
+    [1600, 1],
+    [1666, 1],
+    [1428, 1.4],
+  ])("fits a %d px wide image, then zooms it to %d", (width, scale) => {
+    const frame = { image: { width, height: 100 }, stage: STAGE };
+    const fitted = fittedView(frame);
+    expect(toggleZoom(fitted, { x: 524, y: 424 }, frame).scale).toBeCloseTo(
+      scale,
+      2,
+    );
+  });
+});
+
+describe("resizeView", () => {
+  const smaller = { image: SCREENSHOT, stage: { width: 648, height: 448 } };
+
+  it("keeps a fitted image fitted to the new stage", () => {
+    expect(resizeView(fittedView(FRAME), FRAME, smaller)).toEqual(
+      fittedView(smaller),
+    );
+  });
+
+  it("keeps a zoomed image's scale and holds it inside the new stage", () => {
+    const zoomed = { scale: 1, x: -1000, y: -200 };
+    expect(resizeView(zoomed, FRAME, smaller)).toEqual({
+      scale: 1,
+      x: -1000,
+      y: -200,
+    });
+    const wider = { image: SCREENSHOT, stage: { width: 1800, height: 900 } };
+    // The old offset would leave 800 px of empty stage on the right; it moves only as far as needed.
+    expect(resizeView(zoomed, FRAME, wider)).toEqual({
+      scale: 1,
+      x: -200,
+      y: -100,
+    });
+  });
+});
+
+describe("keyAction", () => {
+  it("zooms, fits and pans on the viewer's own keys", () => {
+    expect(keyAction("+", false)).toEqual({ kind: "zoom", factor: ZOOM_STEP });
+    expect(keyAction("=", false)).toEqual({ kind: "zoom", factor: ZOOM_STEP });
+    expect(keyAction("-", false)).toEqual({
+      kind: "zoom",
+      factor: 1 / ZOOM_STEP,
+    });
+    expect(keyAction("0", false)).toEqual({ kind: "fit" });
+    // An arrow shows more of the image on its side, so the image moves the other way.
+    expect(keyAction("ArrowRight", false)).toEqual({
+      kind: "pan",
+      delta: { x: -PAN_STEP, y: 0 },
+    });
+    expect(keyAction("ArrowUp", false)).toEqual({
+      kind: "pan",
+      delta: { x: 0, y: PAN_STEP },
+    });
+  });
+
+  it("leaves a modified key to the browser, which zooms the page with it", () => {
+    expect(keyAction("+", true)).toBeUndefined();
+    expect(keyAction("0", true)).toBeUndefined();
+  });
+
+  it("does nothing for the page's own shortcut keys", () => {
+    for (const key of ["n", "p", "v", "/", "k"]) {
+      expect(keyAction(key, false)).toBeUndefined();
+    }
   });
 });

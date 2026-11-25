@@ -1780,10 +1780,12 @@ a:hover {
 
 /* The enlarged image: the whole window, dark in both themes as a photo viewer is, so the picture's own
    colors are judged against neutral ground rather than against the page. */
+/* Sized in percent of the viewport, not in `vw`: `100vw` counts a classic scrollbar, so a scrolling page
+   would push the dialog's right edge, the fitted image and the toolbar's center under it. */
 .image-zoom {
-  width: 100vw;
+  width: 100%;
   max-width: none;
-  height: 100dvh;
+  height: 100%;
   max-height: none;
   margin: 0;
   padding: 0;
@@ -1837,7 +1839,7 @@ a:hover {
   align-items: center;
   align-self: center;
   gap: var(--space-1);
-  max-width: calc(100vw - 2 * var(--space-3));
+  max-width: calc(100% - 2 * var(--space-3));
   margin: 0 var(--space-3) var(--space-3);
   padding: var(--space-1);
   border-radius: var(--radius-md);

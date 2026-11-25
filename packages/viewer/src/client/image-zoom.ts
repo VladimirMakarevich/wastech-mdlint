@@ -2,14 +2,15 @@ import {
   type Frame,
   type Point,
   type Size,
+  type KeyAction,
   type ZoomView,
-  clampView,
   fittedView,
   isFitted,
+  keyAction,
   panBy,
+  resizeView,
   toggleZoom,
   wheelFactor,
-  ZOOM_STEP,
   zoomAt,
   zoomLabel,
 } from "./image-zoom-model.js";
@@ -60,22 +61,13 @@ export function initImageZoom(): void {
   let viewer: Viewer | undefined;
   const open = (source: HTMLImageElement): void => {
     const size = naturalSize(source);
-    if (size === undefined) {
+    if (!source.classList.contains("zoomable") || size === undefined) {
       return;
     }
     viewer ??= buildViewer();
     show(viewer, source, size);
   };
   for (const image of images) {
-    image.classList.add("zoomable");
-    // Reachable from the keyboard as well as by the pointer, and announced as what it now does.
-    image.tabIndex = 0;
-    image.setAttribute("role", "button");
-    image.setAttribute("aria-haspopup", "dialog");
-    image.setAttribute(
-      "aria-label",
-      image.alt === "" ? "Enlarge image" : `Enlarge image: ${image.alt}`,
-    );
     image.addEventListener("click", () => {
       open(image);
     });
@@ -85,11 +77,41 @@ export function initImageZoom(): void {
         open(image);
       }
     });
+    // Offered only once there is a picture to enlarge: an image still loading - a lazy one below the
+    // fold - gains it when it arrives, and one that failed never claims to be a button that opens
+    // nothing.
+    if (image.complete) {
+      setZoomable(image, image.naturalWidth > 0 || image.clientWidth > 0);
+    }
+    image.addEventListener("load", () => {
+      setZoomable(image, true);
+    });
+    image.addEventListener("error", () => {
+      setZoomable(image, false);
+    });
   }
 }
 
+function setZoomable(image: HTMLImageElement, zoomable: boolean): void {
+  image.classList.toggle("zoomable", zoomable);
+  // An empty alt is the author saying the image is decoration, so it stays out of the tab order and
+  // unannounced; a pointer can still enlarge it. Any other image becomes a keyboard stop announced as
+  // what it now does.
+  if (!zoomable || image.alt === "") {
+    image.removeAttribute("tabindex");
+    image.removeAttribute("role");
+    image.removeAttribute("aria-haspopup");
+    image.removeAttribute("aria-label");
+    return;
+  }
+  image.tabIndex = 0;
+  image.setAttribute("role", "button");
+  image.setAttribute("aria-haspopup", "dialog");
+  image.setAttribute("aria-label", `Enlarge image: ${image.alt}`);
+}
+
 // The image's own pixel size. An SVG with no width or height of its own reports none, and then the size
-// it is drawn at in the document stands in; an image that never loaded has neither.
+// it is drawn at in the document stands in. A failed image is never asked: it is not zoomable.
 function naturalSize(image: HTMLImageElement): Size | undefined {
   if (image.complete && image.naturalWidth > 0 && image.naturalHeight > 0) {
     return { width: image.naturalWidth, height: image.naturalHeight };
@@ -253,37 +275,50 @@ function stageCenter(viewer: Viewer): Point {
 
 // The toolbar, and the keys that do what its buttons do.
 function wireControls(viewer: Viewer): void {
-  const zoomIn = (): void => {
-    zoomBy(viewer, ZOOM_STEP, stageCenter(viewer), true);
+  const run = (action: KeyAction): void => {
+    if (action.kind === "fit") {
+      fit(viewer);
+    } else if (action.kind === "zoom") {
+      zoomBy(viewer, action.factor, stageCenter(viewer), true);
+    } else {
+      update(viewer, true, (view, frame) => panBy(view, action.delta, frame));
+    }
   };
-  const zoomOut = (): void => {
-    zoomBy(viewer, 1 / ZOOM_STEP, stageCenter(viewer), true);
-  };
-  const fitView = (): void => {
-    fit(viewer);
-  };
-  viewer.zoomIn.addEventListener("click", zoomIn);
-  viewer.zoomOut.addEventListener("click", zoomOut);
-  viewer.fit.addEventListener("click", fitView);
+  for (const [control, key] of [
+    [viewer.zoomIn, "+"],
+    [viewer.zoomOut, "-"],
+    [viewer.fit, "0"],
+  ] as const) {
+    control.addEventListener("click", () => {
+      const action = keyAction(key, false);
+      if (action !== undefined) {
+        run(action);
+      }
+    });
+  }
   viewer.close.addEventListener("click", () => {
     viewer.dialog.close();
   });
-  const keys = new Map<string, () => void>([
-    ["+", zoomIn],
-    ["=", zoomIn],
-    ["-", zoomOut],
-    ["_", zoomOut],
-    ["0", fitView],
-  ]);
   viewer.dialog.addEventListener("keydown", (event) => {
-    // Ctrl or ⌘ with these keys zooms the whole page, which the reader may still want.
-    if (event.ctrlKey || event.metaKey || event.altKey) {
-      return;
-    }
-    const action = keys.get(event.key);
+    // No key pressed here reaches the page's own shortcuts on `document`: behind the modal they would
+    // act on a page the reader cannot see - the review keys move to another document or mark this one
+    // reviewed, the search key focuses a box the modal makes unfocusable. Stopping the event does not
+    // stop the browser's default actions, so Tab still moves focus and Escape still closes the dialog.
+    event.stopPropagation();
+    const action = keyAction(
+      event.key,
+      event.ctrlKey || event.metaKey || event.altKey,
+    );
     if (action !== undefined) {
       event.preventDefault();
-      action();
+      run(action);
+    }
+  });
+  // A click on the dialog itself - the strip beside the toolbar - closes it like a click beside the
+  // image does; the stage handles its own clicks.
+  viewer.dialog.addEventListener("click", (event) => {
+    if (event.target === viewer.dialog) {
+      viewer.dialog.close();
     }
   });
 }
@@ -374,18 +409,24 @@ function wirePointer(viewer: Viewer): void {
   stage.addEventListener("pointercancel", (event) => {
     release(event, true);
   });
+  // Capture can also end without a release - the dialog closing mid-drag, another element taking it -
+  // and a press left behind would pan the next image the pointer merely moves over.
+  stage.addEventListener("lostpointercapture", (event) => {
+    release(event, true);
+  });
+  viewer.dialog.addEventListener("close", () => {
+    press = undefined;
+    stage.classList.remove("is-dragging");
+  });
 }
 
 function wireLifecycle(viewer: Viewer): void {
-  // A window that changes size keeps a fitted image fitted, and holds a zoomed one inside the new
-  // stage. Whether it was fitted is judged against the stage it was drawn on, not the new one, whose
-  // fitted scale it no longer has.
   window.addEventListener("resize", () => {
     if (!viewer.dialog.open) {
       return;
     }
     update(viewer, false, (view, frame, before) =>
-      isFitted(view, before) ? fittedView(frame) : clampView(view, frame),
+      resizeView(view, before, frame),
     );
   });
   viewer.dialog.addEventListener("close", () => {
