@@ -104,7 +104,7 @@ export function viewerContext(
     const findingsPanel = findingsPanelOf(state, params.documentPath);
     const marks = await treeMarksOf({
       diagnostics: state.diagnostics,
-      review: state.changes?.cached(true),
+      review: state.changes?.cached("branch"),
       reviewStore: state.reviewStore,
       watch: state.watch,
     });

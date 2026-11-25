@@ -388,13 +388,25 @@ export class GitRepository {
         );
       }
       const commit = await this.resolveCommit(ref);
-      return commit === undefined
-        ? unavailable(
-            "base-not-found",
-            `"${ref}" does not name a commit in this repository.`,
-            "Check the name, or fetch the branch first.",
-          )
-        : { ref, commit };
+      if (commit !== undefined) {
+        return { ref, commit };
+      }
+      // Comparing with the last commit before there is one — a fresh repository, an orphan branch —
+      // is an ordinary request, and "fetch the branch first" would send the reader the wrong way.
+      // Decided from the repository rather than the spelling: a `HEAD` naming a commit git cannot
+      // read is a damaged repository, which "make a first commit" would misdescribe just as badly.
+      if ((ref === "HEAD" || ref === "@") && (await this.headIsUnborn())) {
+        return unavailable(
+          "base-not-found",
+          "HEAD has no commits yet.",
+          "Make a first commit to compare with it.",
+        );
+      }
+      return unavailable(
+        "base-not-found",
+        `"${ref}" does not name a commit in this repository.`,
+        "Check the name, or fetch the branch first.",
+      );
     }
 
     const candidates: { ref: string; fullRef: string }[] = [];
@@ -644,6 +656,26 @@ export class GitRepository {
       return [];
     }
     return parseBlamePorcelain(output.stdout.toString("utf8"));
+  }
+
+  // Whether `HEAD` names a branch that has no commit yet. `symbolic-ref` answers only while `HEAD`
+  // names a branch, and `rev-parse --verify` on that branch's ref fails only when the ref does not
+  // exist: resolving a ref never reads the object it names, so a ref left pointing at a missing
+  // commit still resolves and is not mistaken for a branch waiting for its first commit.
+  private async headIsUnborn(): Promise<boolean> {
+    const head = await this.run(["symbolic-ref", "--quiet", "HEAD"]);
+    const branch = head.stdout.toString("utf8").trim();
+    if (head.exitCode !== 0 || !branch.startsWith("refs/heads/")) {
+      return false;
+    }
+    const resolved = await this.run([
+      "rev-parse",
+      "--verify",
+      "--quiet",
+      "--end-of-options",
+      branch,
+    ]);
+    return resolved.exitCode !== 0;
   }
 
   private async resolveCommit(ref: string): Promise<string | undefined> {

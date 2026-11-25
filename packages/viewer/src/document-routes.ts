@@ -22,7 +22,7 @@ import {
   renderChangeBanner,
 } from "./change-banner.js";
 import { renderDiff, renderHunkTemplate } from "./change-diff.js";
-import type { DocumentReview } from "./changes.js";
+import type { CompareMode, DocumentReview } from "./changes.js";
 import { documentNeighbors } from "./graph-view.js";
 import { highlight, languageForPath, withCopyButton } from "./highlight.js";
 import { sendHtml, sendJson } from "./http-send.js";
@@ -77,6 +77,9 @@ export type DocumentRequest = {
   relPath: string | undefined;
   view: DiffView;
   baseline: Baseline;
+  // The Changes page's comparison the reader came from. The page shows the branch's changes
+  // whichever it is; it only keeps it in its links, so the way back returns to the same list.
+  compare: CompareMode;
   blame: boolean;
 };
 
@@ -167,7 +170,7 @@ export class DocumentRoutes {
     if (this.ctx.changes === undefined) {
       return undefined;
     }
-    const review = await this.ctx.changes.review(true);
+    const review = await this.ctx.changes.review("branch");
     if ("available" in review) {
       return undefined;
     }
@@ -291,12 +294,10 @@ export class DocumentRoutes {
         : {
             blameToggle: {
               on: shown.annotate !== undefined,
-              href: documentPageHref(
-                relPath,
-                shown.view,
-                shown.baseline,
-                !shown.blame,
-              ),
+              href: documentPageHref(relPath, {
+                ...shown,
+                blame: !shown.blame,
+              }),
             },
           }),
     };
@@ -317,7 +318,7 @@ export class DocumentRoutes {
       changeBanner:
         branchReview === undefined
           ? undefined
-          : renderChangeBanner(branchReview, view, reviewed),
+          : renderChangeBanner(branchReview, view, shown.compare, reviewed),
     };
     if (review !== undefined && view === "source") {
       // The diff takes the article's place. The outline is left out with the rendered text, since
@@ -547,12 +548,16 @@ async function sourceArticle(
   ];
 }
 
-// A document page's address with its views as asked: the changes view, the comparison, and blame.
+// A document page's address with its views as asked: the changes view, the baseline, the Changes
+// page's comparison the reader came from, and blame.
 function documentPageHref(
   relPath: string,
-  view: DiffView,
-  baseline: Baseline,
-  blame: boolean,
+  {
+    view,
+    baseline,
+    compare,
+    blame,
+  }: Pick<DocumentRequest, "view" | "baseline" | "compare" | "blame">,
 ): string {
   const params = new URLSearchParams();
   if (view !== "rendered") {
@@ -560,6 +565,9 @@ function documentPageHref(
   }
   if (baseline === "review") {
     params.set("since", "review");
+  }
+  if (compare !== "branch") {
+    params.set("compare", compare);
   }
   if (blame) {
     params.set("blame", "1");

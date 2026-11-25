@@ -992,6 +992,55 @@ describe.skipIf(!hasGit)("resolving the base (requires git on PATH)", () => {
     TIMEOUT_MS,
   );
 
+  // Comparing with the last commit is how a host shows only what is not committed yet; before the
+  // first commit the generic "fetch the branch" hint would point the reader somewhere useless.
+  it(
+    "says HEAD has no commits yet when the last commit is asked for before the first one",
+    async () => {
+      const fixture = await makeRepo();
+      await fixture.write("a.md", "a\n");
+      const repository = await open(fixture.repo, fixture.env);
+      for (const ref of ["HEAD", "@"]) {
+        expect(await repository.resolveBase(ref), ref).toMatchObject({
+          available: false,
+          reason: "base-not-found",
+          message: "HEAD has no commits yet.",
+          hint: "Make a first commit to compare with it.",
+        });
+      }
+
+      fixture.commit("base");
+      expect(await repository.resolveBase("HEAD")).toEqual({
+        ref: "HEAD",
+        commit: await repository.headCommit(),
+      });
+    },
+    TIMEOUT_MS,
+  );
+
+  // A branch ref left naming a commit the repository does not have is damage, not a branch waiting
+  // for its first commit: "make a first commit" would be the wrong remedy, so the generic one stays.
+  it(
+    "does not call a HEAD that names a missing commit a branch without commits",
+    async () => {
+      const fixture = await makeRepo();
+      await fixture.write("a.md", "a\n");
+      fixture.commit("base");
+      const branch = fixture.git("symbolic-ref", "HEAD").trim();
+      await writeFile(
+        path.join(fixture.repo, ".git", ...branch.split("/")),
+        `${"1".repeat(40)}\n`,
+      );
+      const repository = await open(fixture.repo, fixture.env);
+      expect(await repository.resolveBase("HEAD")).toMatchObject({
+        available: false,
+        reason: "base-not-found",
+        message: '"HEAD" does not name a commit in this repository.',
+      });
+    },
+    TIMEOUT_MS,
+  );
+
   it(
     "prefers the branch origin/HEAD names, then main, then master",
     async () => {
