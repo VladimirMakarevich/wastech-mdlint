@@ -381,20 +381,21 @@ export class GitRepository {
   }
 
   /**
-   * The branch or commit to compare with: `ref` when given for this run, otherwise `configured` —
+   * The branch or commit to compare with: `given` when named for this run, otherwise `configured` —
    * the config's `git.base` — and only without either the branch `origin/HEAD` points at, then a
    * local `main`, then `master`. A name given or configured that resolves to nothing is reported,
    * never replaced by the guess: a review against a branch nobody chose would read as a real one.
+   * Named fields rather than two positional strings, which a caller could swap without a type error
+   * and so report a run's own ref as the config's mistake.
    */
   async resolveBase(
-    ref?: string,
-    configured?: string,
+    named: { given?: string; configured?: string } = {},
   ): Promise<GitBase | GitUnavailable> {
-    if (ref !== undefined) {
-      return this.resolveNamedBase(ref, "given");
+    if (named.given !== undefined) {
+      return this.resolveNamedBase(named.given, "given");
     }
-    if (configured !== undefined) {
-      return this.resolveNamedBase(configured, "config");
+    if (named.configured !== undefined) {
+      return this.resolveNamedBase(named.configured, "config");
     }
 
     const candidates: { ref: string; fullRef: string }[] = [];
@@ -487,12 +488,17 @@ export class GitRepository {
     if (output.exitCode === 0 && OBJECT_NAME.test(commit)) {
       return commit;
     }
+    // A base the config named is said to be the config's, as when it names nothing at all: the
+    // reader named no branch, and the file is what to look at.
+    const fromConfig = base.source === "config";
     // Asked now rather than at open: a clone deepened while a host runs is no longer shallow.
     const shallow = await this.run(["rev-parse", "--is-shallow-repository"]);
     if (shallow.stdout.toString("utf8").trim() === "true") {
       return unavailable(
         "shallow-history",
-        `This is a shallow clone, and the history it has does not reach back to where the branch left ${base.ref}.`,
+        `This is a shallow clone, and the history it has does not reach back to where the branch left ${
+          fromConfig ? `"${base.ref}", the config's git.base` : base.ref
+        }.`,
         "Fetch more history with git fetch --deepen=<n>, or all of it with git fetch --unshallow.",
       );
     }
@@ -503,11 +509,17 @@ export class GitRepository {
         "Make a first commit to compare with a base.",
       );
     }
-    return unavailable(
-      "base-not-found",
-      `HEAD and ${base.ref} share no history.`,
-      "Name a base branch this branch was made from.",
-    );
+    return fromConfig
+      ? unavailable(
+          "base-not-found",
+          `HEAD and "${base.ref}", the config's git.base, share no history.`,
+          "Set git.base in the config to a branch this branch was made from, or name one for this run.",
+        )
+      : unavailable(
+          "base-not-found",
+          `HEAD and ${base.ref} share no history.`,
+          "Name a base branch this branch was made from.",
+        );
   }
 
   /**

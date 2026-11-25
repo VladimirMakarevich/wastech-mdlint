@@ -747,7 +747,9 @@ describe("compile config", () => {
       /config\.compile:.*"bogus"/,
     );
   });
+});
 
+describe("git config", () => {
   it("takes the branch to compare with from git.base", async () => {
     const root = await writeConfig(
       JSON.stringify({ git: { base: "origin/develop" }, rules: [] }),

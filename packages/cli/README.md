@@ -25,7 +25,7 @@ wastech-mdlint init [path] [--yes] [--on-existing overwrite|merge|skip] [--with-
 
 `lint` is the default command, so a bare `wastech-mdlint` lints the current directory. Default only in that sense: an unrecognized subcommand is an error rather than a path, so a typo'd CI step fails loudly — which also means a bare path still needs its subcommand (`wastech-mdlint lint docs`).
 
-`lint --since [ref]` reports only the findings the work tree adds since where it left a branch, tag or commit — compared with their merge-base, as a pull request is — so CI can fail on new errors while old ones are paid down. `impact --since [ref]` gives the blast radius of every document changed since then. Without a ref, both compare with the config's [`git.base`](../../docs/guide/configuration.md#gitbase), else the branch `origin/HEAD` names, then `main`, then `master`. Both read git, read-only, and need git 2.31 or later.
+`lint --since [ref]` reports only the findings the work tree adds since where it left a branch, tag or commit — compared with their merge-base, as a pull request is — so CI can fail on new errors while old ones are paid down. `impact --since [ref]` gives the blast radius of every document changed since then. Without a ref, both compare with the config's [`git.base`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/configuration.md#gitbase), else the branch `origin/HEAD` names, then `main`, then `master`. Both read git, read-only, and need git 2.31 or later.
 
 ```bash
 wastech-mdlint lint . --since main     # fail CI only on what this branch adds

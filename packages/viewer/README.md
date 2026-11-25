@@ -25,7 +25,7 @@ It prints the address, by default `http://127.0.0.1:4180/`. The root opens the r
 | `-c, --config <file>` | The `wastech-mdlint.config.json` to use instead of the one found in the repository. |
 | `--no-watch` | Do not watch files or reload pages. |
 | `--allow-config-writes` | Let the config page save changes to the config file. Off by default, and refused together with a `--host` that is not a loopback address. |
-| `--base <ref>` | The branch, tag or commit the Changes section compares with. Without it: the config's [`git.base`](../../docs/guide/configuration.md#gitbase), else the branch `origin/HEAD` names, then `main`, then `master`. A name that matches nothing is reported when the viewer starts, which then serves everything else as usual. |
+| `--base <ref>` | The branch, tag or commit the Changes section compares with. Without it: the config's [`git.base`](https://github.com/VladimirMakarevich/wastech-mdlint/blob/main/docs/guide/configuration.md#gitbase), else the branch `origin/HEAD` names, then `main`, then `master`. A name that matches nothing is reported when the viewer starts, which then serves everything else as usual. |
 | `--state-dir <dir>` | Where review marks are kept. Without it: `%LOCALAPPDATA%\wastech-mdlint\viewer` on Windows, `~/Library/Application Support/wastech-mdlint/viewer` on macOS, `$XDG_STATE_HOME/wastech-mdlint/viewer` (or `~/.local/state/wastech-mdlint/viewer`) elsewhere. Inside, one folder per clone, named after it and shared by all its worktrees; deleting that folder clears its marks. |
 
 ## What it shows

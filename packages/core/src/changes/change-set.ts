@@ -142,7 +142,12 @@ export async function collectChangeSet(
     corpus: CorpusMembership;
   },
 ): Promise<ChangeSet | GitUnavailable> {
-  const base = await repository.resolveBase(params.base, params.configuredBase);
+  const base = await repository.resolveBase({
+    ...(params.base === undefined ? {} : { given: params.base }),
+    ...(params.configuredBase === undefined
+      ? {}
+      : { configured: params.configuredBase }),
+  });
   if ("available" in base) {
     return base;
   }

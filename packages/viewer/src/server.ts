@@ -41,8 +41,8 @@ export type ViewerOptions = {
   // Starts the program that reveals or opens the config file. Replaced in tests, so a test run checks
   // what would be started without opening a window on the machine running it.
   launch?: Launcher;
-  // The branch, tag or commit the Changes section compares with; the detected base branch when
-  // omitted.
+  // The branch, tag or commit the Changes section compares with. Omitted, the config's `git.base`
+  // decides, and only without one is the base branch detected.
   base?: string;
   // The environment git runs with — the process's own unless a test isolates it from the machine's
   // git configuration.
@@ -79,8 +79,9 @@ export async function startViewer(
     watched: options.watch,
   });
   if (changes !== undefined) {
-    // Computed once now: a `--base` that names nothing is reported where it was typed, and the first
-    // visit to the Changes section finds the review ready.
+    // Computed once now: a `--base` or a config `git.base` that names nothing is reported when the
+    // viewer starts, where the person who set it is looking, and the first visit to the Changes
+    // section finds the review ready.
     const first = await changes.review("branch");
     if ("available" in first) {
       notices.push(`changes: ${first.message} ${first.hint}`);

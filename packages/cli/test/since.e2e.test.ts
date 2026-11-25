@@ -91,8 +91,9 @@ describe.skipIf(!hasGit)(
         const fixture = await developBranch("develop");
         const text = run(fixture, ["lint", ".", "--since"]);
         expect(text.status).toBe(1);
+        // The first line says the base is the config's, so it cannot pass for one named here.
         expect(text.stdout).toMatch(
-          /^since develop \(merge-base [0-9a-f]{7}\): 1 changed document, 0 findings removed\ndocs\/a\.md\n/,
+          /^since develop \(git\.base, merge-base [0-9a-f]{7}\): 1 changed document, 0 findings removed\ndocs\/a\.md\n/,
         );
         expect(text.stdout).not.toContain("docs/dev.md");
 
@@ -101,23 +102,46 @@ describe.skipIf(!hasGit)(
         expect(json.status).toBe(0);
         expect(JSON.parse(json.stdout)).toMatchObject({
           files: ["docs/a.md"],
-          since: { ref: "develop" },
+          since: { ref: "develop", source: "config" },
         });
 
         const named = run(fixture, ["lint", ".", "--since", "main"]);
-        expect(named.stdout).toMatch(/^since main \(/);
+        expect(named.stdout).toMatch(/^since main \(merge-base [0-9a-f]{7}\)/);
         expect(named.stdout).toContain("docs/dev.md");
+        const namedJson = run(fixture, [
+          "lint",
+          ".",
+          "--since",
+          "main",
+          "--format",
+          "json",
+        ]);
+        expect(JSON.parse(namedJson.stdout)).toMatchObject({
+          since: { ref: "main", source: "given" },
+        });
+
+        // A quoted empty variable is refused; only an unquoted one vanishes into a bare `--since`,
+        // whose first line then names the base it fell back to.
+        expect(run(fixture, ["lint", ".", "--since", ""]).status).toBe(2);
       },
       TIMEOUT_MS,
     );
 
+    // A guess may not be the branch the reader meant — here it blames the feature for what `develop`
+    // added — so the report says it is one, and how to choose another.
     it(
-      "falls back to the detected base branch without git.base",
+      "falls back to the detected base branch without git.base, and says it guessed",
       async () => {
         const fixture = await developBranch();
         const text = run(fixture, ["lint", ".", "--since"]);
-        expect(text.stdout).toMatch(/^since main \(/);
+        expect(text.stdout).toMatch(
+          /^since main \(found by default, set git\.base to choose another; merge-base [0-9a-f]{7}\): /,
+        );
         expect(text.stdout).toContain("docs/dev.md");
+        const json = run(fixture, ["lint", ".", "--since", "--format", "json"]);
+        expect(JSON.parse(json.stdout)).toMatchObject({
+          since: { ref: "main", source: "detected" },
+        });
       },
       TIMEOUT_MS,
     );

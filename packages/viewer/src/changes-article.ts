@@ -224,8 +224,9 @@ function baseText(set: Review["set"], mode: CompareMode): (string | Element)[] {
 
 // Why the review compares with this branch. A guessed base is said to be one, with the way to name
 // another, since a repository whose work starts from a branch other than its default one gets a
-// review of everything that branch holds and no other hint of why; one named with `--base` needs no
-// word, as the reader just named it.
+// review of everything that branch holds and no other hint of why. One named with `--base` is said
+// to be, too: whoever reads the page may not be whoever started the viewer, and the config's base
+// is not the one in use.
 function baseSourceText(source: GitBaseSource): (string | Element)[] {
   switch (source) {
     case "config":
@@ -237,7 +238,7 @@ function baseSourceText(source: GitBaseSource): (string | Element)[] {
         " in the config to choose another)",
       ];
     case "given":
-      return [];
+      return [", named with ", h("code", "--base"), ","];
   }
 }
 

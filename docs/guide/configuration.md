@@ -228,7 +228,7 @@ The branch, tag or commit a change is compared with wherever a run names none: t
 - **Write a remote-tracking name** such as `origin/develop`. Every clone that has fetched has it, while a local `develop` exists only where someone checked it out; it moves when you fetch.
 - **A ref named for the run wins.** The viewer's `--base`, `lint --since <ref>` and the MCP tools' `since` compare with what they name, so comparing with another branch once needs no config edit.
 - **A base that names nothing is an error, not a fallback.** The viewer's Changes page and `--since` say that `git.base` names no commit, and `--since` exits `2`, rather than quietly guessing another branch — a review against a branch nobody chose would read as a real one.
-- The viewer's Changes page says which it used: the base the config names, one named with `--base`, or a guess, with how to choose another.
+- Every comparison says which it used — the base the config names, one named for the run, or a guess, with how to choose another: the viewer's Changes page in its summary line, `--since` in its first line and in the `source` of its JSON `since` object.
 
 A value starting with `-` is rejected when the config loads, since git would read it as an option.
 

@@ -1184,9 +1184,9 @@ describe.skipIf(!hasGit)(
           "docs/dev.md",
           "docs/guide.md",
         ]);
-        // Named on the command line, the base needs no word on where it came from.
+        // Named on the command line, and said to be: the config's base is not the one in use.
         expect((await get(port, "/changes")).body).toContain(
-          "Compared with <code>main</code> at its tip",
+          "Compared with <code>main</code>, named with <code>--base</code>, at its tip",
         );
       } finally {
         await given.close();
