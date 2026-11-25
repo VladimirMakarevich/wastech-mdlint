@@ -16,7 +16,8 @@ Options:
       --host <host>  Address to bind (default: ${DEFAULT_HOST}, this machine only)
   -c, --config <f>   wastech-mdlint config file (default: found in the repository)
       --base <ref>   Branch, tag or commit the Changes section compares with
-                     (default: the branch origin/HEAD names, then main, then master)
+                     (default: the config's git.base, else the branch origin/HEAD
+                     names, then main, then master)
       --no-watch     Do not reload pages when files change
       --allow-config-writes
                      Let the config page save changes to the config file

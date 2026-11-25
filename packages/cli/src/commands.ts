@@ -78,9 +78,16 @@ export type LintCommand = {
   format: OutputFormat;
   failOn: FailOn;
   fix: boolean;
-  // A branch, tag or commit: report only the findings the work tree adds since where it left it.
-  since?: string;
+  // Report only the findings the work tree adds since where it left the base `since` names.
+  since?: SinceBase;
 };
+
+/**
+ * What `--since` compares with: the branch, tag or commit `ref` names, or — given without one — the
+ * config's `git.base`, else the detected base branch, so a repository whose work starts from a
+ * branch other than `main` can say so once rather than on every command line.
+ */
+export type SinceBase = { ref?: string };
 
 export type GraphFormat = "human" | "json" | "mermaid" | "dot";
 
@@ -106,7 +113,7 @@ export type ImpactCommand = {
   path: string;
   config?: string;
   file?: string;
-  since?: string;
+  since?: SinceBase;
   format: OutputFormat;
 };
 
@@ -184,17 +191,21 @@ export function resolveLintExitCode(params: {
 }
 
 /**
- * The work tree's changes since `ref` and what they do to the context, or a usage error naming
- * why there is nothing to compare — not a git work tree, no `git`, a ref that names nothing — and
- * how to fix it. Exit 2 rather than "no new findings": a comparison that could not run must not
- * read as a clean branch in CI.
+ * The work tree's changes since the base and what they do to the context, or a usage error naming
+ * why there is nothing to compare — not a git work tree, no `git`, a ref that names nothing, no
+ * base to find — and how to fix it. Exit 2 rather than "no new findings": a comparison that could
+ * not run must not read as a clean branch in CI.
  */
 async function analyzeSinceOrThrow(
   cwd: string,
   configuration: LoadedConfiguration,
-  ref: string,
+  since: SinceBase,
 ): Promise<SinceAnalysis> {
-  const analysis = await analyzeSince({ cwd, configuration, ref });
+  const analysis = await analyzeSince({
+    cwd,
+    configuration,
+    ...(since.ref === undefined ? {} : { ref: since.ref }),
+  });
   if ("available" in analysis) {
     throw new CliUsageError(`${analysis.message} ${analysis.hint}`);
   }
@@ -392,7 +403,7 @@ async function handleImpact(
   }
   if (command.file === undefined) {
     throw new CliUsageError(
-      "impact needs a <file>, or --since <ref> for every document changed since a branch, tag or commit.",
+      "impact needs a <file>, or --since [ref] for every document changed since a branch, tag or commit.",
     );
   }
 
@@ -463,14 +474,14 @@ async function handleImpact(
 async function impactSince(
   command: ImpactCommand,
   loaded: LoadedConfiguration,
-  ref: string,
+  since: SinceBase,
 ): Promise<CommandExecutionResult> {
   if (command.file !== undefined) {
     throw new CliUsageError(
       "impact takes a <file> or --since, not both: --since already covers every changed document.",
     );
   }
-  const analysis = await analyzeSinceOrThrow(command.path, loaded, ref);
+  const analysis = await analyzeSinceOrThrow(command.path, loaded, since);
   const result = sinceImpact(analysis);
   const affectedFiles = new Set<string>([
     ...result.files,

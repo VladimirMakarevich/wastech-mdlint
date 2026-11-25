@@ -76,7 +76,7 @@ wastech-mdlint impact docs/requirements/auth.md --format json
 
 Linting still runs over the **whole** corpus (so project rules see every document), but the reported messages/files are narrowed to `file` plus everything it affects. If `<file>` is outside the analyzed corpus, `impact` exits `2` with a hint.
 
-`impact --since <ref>` takes the place of `<file>` and gives the same report for every corpus document the work tree changed since its merge-base with `<ref>`, read with git; see [`impact` in the CLI reference](cli.md#impact-file).
+`impact --since [ref]` takes the place of `<file>` and gives the same report for every corpus document the work tree changed since its merge-base with `[ref]` — the config's `git.base` when no ref is given — read with git; see [`impact` in the CLI reference](cli.md#impact-file).
 
 In `--format json` those findings arrive under a `lint` key holding the lint **record** — `{ messages, files, errorCount, warningCount }`, the same shape MCP `lint-files` returns — not the `{ summary, messages, files }` wrapper `lint --format json` prints. See [Output & exit codes](output.md#where-each-host-puts-the-findings).
 

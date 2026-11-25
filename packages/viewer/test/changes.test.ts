@@ -82,7 +82,7 @@ type ChangedDocument = {
 
 type ChangesPayload = {
   status: string;
-  base: { ref: string; commit: string };
+  base: { ref: string; commit: string; source: string };
   mergeBase: string;
   head: string;
   compare: string;
@@ -250,9 +250,13 @@ describe.skipIf(!hasGit)("the Changes section (requires git on PATH)", () => {
       (await get(port, "/api/changes")).body,
     ) as ChangesPayload;
     expect(api.status).toBe("ready");
-    expect(api.base.ref).toBe("main");
+    expect(api.base).toMatchObject({ ref: "main", source: "detected" });
     expect(api.compare).toBe("branch");
     expect(api.worktree).toBe(true);
+    // A guessed base says it is one, and how to name another.
+    expect(body).toContain(
+      "Compared with <code>main</code> (found by default; set <code>git.base</code> in the config to choose another) at its tip",
+    );
 
     const rows = listedRows(body);
     expect(rows).toEqual(
@@ -1108,6 +1112,84 @@ describe.skipIf(!hasGit)(
         expect(plain.rows[0]).not.toHaveProperty("change");
       } finally {
         await viewer.close();
+      }
+    }, 60_000);
+  },
+);
+
+// Work that starts from `develop`: `develop` adds a document of its own, and the feature branch made
+// from it edits another. The config names `develop` as the base, so the review holds the feature's
+// edit alone, where the guess — `main` — would also count everything `develop` added.
+async function developBranch(): Promise<GitFixture> {
+  const fixture = await makeRepo();
+  await fixture.write(
+    "wastech-mdlint.config.json",
+    `${JSON.stringify({ git: { base: "develop" }, rules: [] })}\n`,
+  );
+  await fixture.write("docs/guide.md", "# Guide\n\nOld text.\n");
+  fixture.commit("base");
+  fixture.git("checkout", "-q", "-b", "develop");
+  await fixture.write("docs/dev.md", "# Dev\n\nFrom develop.\n");
+  fixture.commit("develop work");
+  fixture.git("checkout", "-q", "-b", "feature");
+  await fixture.write("docs/guide.md", "# Guide\n\nNew text.\n");
+  return fixture;
+}
+
+describe.skipIf(!hasGit)(
+  "a base the config names (requires git on PATH)",
+  () => {
+    it("compares with git.base, says so, and lets --base name another for the run", async () => {
+      const fixture = await developBranch();
+      const configured = await startViewer({
+        cwd: fixture.repo,
+        host: "127.0.0.1",
+        port: 0,
+        portExplicit: true,
+        watch: false,
+        gitEnv: fixture.env,
+      });
+      try {
+        const port = portOf(configured);
+        const api = JSON.parse(
+          (await get(port, "/api/changes")).body,
+        ) as ChangesPayload;
+        expect(api.base).toMatchObject({ ref: "develop", source: "config" });
+        expect(api.documents.map((entry) => entry.path)).toEqual([
+          "docs/guide.md",
+        ]);
+        expect((await get(port, "/changes")).body).toContain(
+          "Compared with <code>develop</code>, the config's <code>git.base</code>, at its tip",
+        );
+      } finally {
+        await configured.close();
+      }
+
+      const given = await startViewer({
+        cwd: fixture.repo,
+        host: "127.0.0.1",
+        port: 0,
+        portExplicit: true,
+        watch: false,
+        base: "main",
+        gitEnv: fixture.env,
+      });
+      try {
+        const port = portOf(given);
+        const api = JSON.parse(
+          (await get(port, "/api/changes")).body,
+        ) as ChangesPayload;
+        expect(api.base).toMatchObject({ ref: "main", source: "given" });
+        expect(api.documents.map((entry) => entry.path)).toEqual([
+          "docs/dev.md",
+          "docs/guide.md",
+        ]);
+        // Named on the command line, and said to be: the config's base is not the one in use.
+        expect((await get(port, "/changes")).body).toContain(
+          "Compared with <code>main</code>, named with <code>--base</code>, at its tip",
+        );
+      } finally {
+        await given.close();
       }
     }, 60_000);
   },

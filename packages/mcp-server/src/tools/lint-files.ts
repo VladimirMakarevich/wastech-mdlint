@@ -126,7 +126,7 @@ export function registerLintFilesTool(server: McpServer): void {
       title: "Lint project files",
       description:
         "Lint the project's Markdown files using the resolved config (or the zero-config `**/*.md` default). " +
-        "With `since` (a branch, tag or commit), report only the findings the work tree adds since where it left that ref, read with git. Read-only.",
+        "With `since` (a branch, tag or commit; a project config may name its base branch in `git.base`), report only the findings the work tree adds since where it left that ref, read with git. Read-only.",
       inputSchema: lintFilesInputShape,
       outputSchema: withErrorOutput(lintFilesOutputShape),
       annotations: READ_ONLY_ANNOTATIONS,

@@ -134,13 +134,20 @@ export type ChangeSet = ClassifiedChanges & {
 export async function collectChangeSet(
   repository: GitRepository,
   params: {
-    /** A branch, tag or commit to compare with; the detected base branch when omitted. */
+    /** A branch, tag or commit named for this run; it wins over `configuredBase`. */
     base?: string;
+    /** The config's `git.base`; without either, the base branch is detected. */
+    configuredBase?: string;
     worktree: boolean;
     corpus: CorpusMembership;
   },
 ): Promise<ChangeSet | GitUnavailable> {
-  const base = await repository.resolveBase(params.base);
+  const base = await repository.resolveBase({
+    ...(params.base === undefined ? {} : { given: params.base }),
+    ...(params.configuredBase === undefined
+      ? {}
+      : { configured: params.configuredBase }),
+  });
   if ("available" in base) {
     return base;
   }

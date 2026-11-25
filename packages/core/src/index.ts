@@ -191,6 +191,7 @@ export type {
   BlameLine,
   FileCommit,
   GitBase,
+  GitBaseSource,
   GitChange,
   GitUnavailable,
   GitUnavailableReason,

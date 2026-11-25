@@ -123,6 +123,7 @@ const TOP_LEVEL_KEY_ORDER = [
   "include",
   "exclude",
   "respectGitignore",
+  "git",
   "settings",
   "rules",
   "compile",

@@ -1,7 +1,7 @@
 import type { Element, ElementContent } from "hast";
 import { h } from "hastscript";
 
-import type { GitChange, TextDiff } from "@wastech-mdlint/core";
+import type { GitBaseSource, GitChange, TextDiff } from "@wastech-mdlint/core";
 
 import { BASELINES, changesHref, documentViewHref } from "./change-banner.js";
 import { plural, renderDiff, stats, statusBadge } from "./change-diff.js";
@@ -211,6 +211,7 @@ function baseText(set: Review["set"], mode: CompareMode): (string | Element)[] {
   return [
     "Compared with ",
     h("code", set.base.ref),
+    ...baseSourceText(set.base.source),
     set.mergeBase === set.base.commit
       ? " at its tip "
       : " where this branch left it, at ",
@@ -219,6 +220,26 @@ function baseText(set: Review["set"], mode: CompareMode): (string | Element)[] {
       ? ", including uncommitted and untracked files."
       : ", up to the last commit.",
   ];
+}
+
+// Why the review compares with this branch. A guessed base is said to be one, with the way to name
+// another, since a repository whose work starts from a branch other than its default one gets a
+// review of everything that branch holds and no other hint of why. One named with `--base` is said
+// to be, too: whoever reads the page may not be whoever started the viewer, and the config's base
+// is not the one in use.
+function baseSourceText(source: GitBaseSource): (string | Element)[] {
+  switch (source) {
+    case "config":
+      return [", the config's ", h("code", "git.base"), ","];
+    case "detected":
+      return [
+        " (found by default; set ",
+        h("code", "git.base"),
+        " in the config to choose another)",
+      ];
+    case "given":
+      return [", named with ", h("code", "--base"), ","];
+  }
 }
 
 function renderReviewProgress(result: Review, marks: ReviewMarksView): Element {

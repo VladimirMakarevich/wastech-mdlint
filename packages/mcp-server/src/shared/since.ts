@@ -16,6 +16,9 @@ export const sinceInput = z.string().optional();
 
 export const sinceSummarySchema = z.object({
   ref: z.string(),
+  // Where the ref came from. Always "given" here, since `since` names its ref, but the record is the
+  // one the CLI writes, where a bare `--since` takes the config's `git.base` or a detected base.
+  source: z.enum(["given", "config", "detected"]),
   base: z.string(),
   mergeBase: z.string(),
   head: z.string(),
@@ -37,7 +40,10 @@ export async function analyzeSinceOrThrow(
   if (ref.trim() === "") {
     throw new ToolInputError(
       "since must name a branch, tag or commit",
-      'Pass the base branch, for example "main", or omit "since".',
+      // The project's own base branch, when its config names one, rather than a default such as
+      // "main": a team whose work starts from `develop` would otherwise get every finding `develop`
+      // added reported as the branch's own.
+      'Pass the base branch — the config\'s git.base when it sets one, otherwise for example "main" — or omit "since".',
     );
   }
   const analysis = await analyzeSince({ cwd, configuration, ref });
