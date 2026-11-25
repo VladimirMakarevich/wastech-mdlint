@@ -67,7 +67,7 @@ Prefer the MCP tool when the host exposes it (honest host semantics); otherwise 
 | --- | --- | --- |
 | `file` | the changed file (string); absent with `since` | same |
 | `files` | with `since` only: the changed documents still in the corpus (`string[]`) - a deleted one is left out, and the documents that linked to it show up as broken links in `lint --since` | same |
-| `since` | with `since` only: `{ ref, base, mergeBase, head, changed, removed }` - the comparison, `changed` the changed documents | same |
+| `since` | with `since` only: `{ ref, source, base, mergeBase, head, changed, removed }` - the comparison, `changed` the changed documents | same |
 | `directlyAffected` | `{ path, references }[]` | same |
 | `transitivelyAffected` | `{ path, depth, via }[]` | same |
 | `readingOrder` | `string[]` | same |

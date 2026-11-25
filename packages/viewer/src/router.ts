@@ -12,6 +12,7 @@ import {
   sendSpeculationRules,
   SPECULATION_RULES_PATH,
 } from "./speculation-rules.js";
+import { compareOf } from "./review-queries.js";
 import { baselineOf } from "./review-state.js";
 import {
   CHANGES_OFF_REMOTELY,
@@ -222,6 +223,7 @@ export class ViewerRouter {
             relPath: decodeRequestPath(rest),
             view: diffViewOf(params),
             baseline: baselineOf(params),
+            compare: compareOf(params),
             blame: params.get("blame") === "1",
           }),
       ],

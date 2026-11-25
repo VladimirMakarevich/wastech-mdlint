@@ -8,7 +8,12 @@ import {
   tableRowLines,
 } from "@wastech-mdlint/core";
 
-import type { DocumentReview, Review } from "./changes.js";
+import {
+  COMPARE_MODES,
+  type CompareMode,
+  type DocumentReview,
+  type Review,
+} from "./changes.js";
 import {
   contentHash,
   type ReviewMarks,
@@ -121,8 +126,9 @@ export type MarkRequest = {
   path: string;
   hash: string;
   reviewed: boolean;
-  // Which review the page showed: the work tree's, or the last commit's.
-  worktree: boolean;
+  // Which review the page showed, whose text the hash must match: an uncommitted review lists only
+  // some of the branch's documents, and a commits-only review holds another text for them.
+  compare: CompareMode;
 };
 
 /** A request to mark one section of a changed document reviewed or not, from the outline. */
@@ -135,7 +141,7 @@ export type SectionRequest = {
 
 /** A request to forget the marks of the documents a page listed. */
 export type ResetRequest = {
-  worktree: boolean;
+  compare: CompareMode;
   documents: { path: string; hash: string }[];
 };
 
@@ -143,13 +149,20 @@ type Parsed<T> = { ok: true; request: T } | { ok: false; message: string };
 
 const HASH = /^[0-9a-f]{64}$/;
 
+const COMPARE_REFUSED =
+  '"compare" must be "branch", "commits" or "uncommitted": the comparison the page showed.';
+
+function isCompareMode(value: unknown): value is CompareMode {
+  return COMPARE_MODES.some((mode) => mode === value);
+}
+
 /** Check a mark request's shape; whether it names the version on disk is the server's to judge. */
 export function parseMarkRequest(body: unknown): Parsed<MarkRequest> {
-  const fields = objectOf(body, ["path", "hash", "reviewed", "worktree"]);
+  const fields = objectOf(body, ["path", "hash", "reviewed", "compare"]);
   if (!fields.ok) {
     return fields;
   }
-  const { path, hash, reviewed, worktree } = fields.value;
+  const { path, hash, reviewed, compare } = fields.value;
   if (typeof path !== "string" || path.length === 0) {
     return { ok: false, message: '"path" must name a changed document.' };
   }
@@ -159,13 +172,13 @@ export function parseMarkRequest(body: unknown): Parsed<MarkRequest> {
       message: '"hash" must name the version of the document the page showed.',
     };
   }
-  if (typeof reviewed !== "boolean" || typeof worktree !== "boolean") {
-    return {
-      ok: false,
-      message: '"reviewed" and "worktree" must be true or false.',
-    };
+  if (typeof reviewed !== "boolean") {
+    return { ok: false, message: '"reviewed" must be true or false.' };
   }
-  return { ok: true, request: { path, hash, reviewed, worktree } };
+  if (!isCompareMode(compare)) {
+    return { ok: false, message: COMPARE_REFUSED };
+  }
+  return { ok: true, request: { path, hash, reviewed, compare } };
 }
 
 export function parseSectionRequest(body: unknown): Parsed<SectionRequest> {
@@ -196,13 +209,13 @@ export function parseSectionRequest(body: unknown): Parsed<SectionRequest> {
 }
 
 export function parseResetRequest(body: unknown): Parsed<ResetRequest> {
-  const fields = objectOf(body, ["worktree", "documents"]);
+  const fields = objectOf(body, ["compare", "documents"]);
   if (!fields.ok) {
     return fields;
   }
-  const { worktree, documents } = fields.value;
-  if (typeof worktree !== "boolean") {
-    return { ok: false, message: '"worktree" must be true or false.' };
+  const { compare, documents } = fields.value;
+  if (!isCompareMode(compare)) {
+    return { ok: false, message: COMPARE_REFUSED };
   }
   const listed: { path: string; hash: string }[] = [];
   if (!Array.isArray(documents)) {
@@ -227,7 +240,7 @@ export function parseResetRequest(body: unknown): Parsed<ResetRequest> {
     }
     listed.push({ path: document.value.path, hash: document.value.hash });
   }
-  return { ok: true, request: { worktree, documents: listed } };
+  return { ok: true, request: { compare, documents: listed } };
 }
 
 function objectOf(
@@ -358,7 +371,7 @@ export function reviewChip(
 export function reviewToggle(
   entry: DocumentReview,
   mark: DocumentMark,
-  worktree: boolean,
+  compare: CompareMode,
 ): Element {
   return h(
     "label.review-toggle",
@@ -367,7 +380,7 @@ export function reviewToggle(
       dataPath: entry.path,
       dataOldPath: entry.oldPath,
       dataHash: mark.hash,
-      dataWorktree: worktree ? "1" : "0",
+      dataCompare: compare,
       title: "Mark as viewed (v)",
     },
     [

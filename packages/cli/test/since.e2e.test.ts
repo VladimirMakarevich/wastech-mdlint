@@ -60,6 +60,109 @@ async function linkBranch(): Promise<GitFixture> {
   return fixture;
 }
 
+// Work that starts from `develop`, not `main`: `develop` adds a broken link of its own, and the
+// feature branch made from it adds another. Compared with `main`, the feature would be blamed for
+// both; compared with `develop`, only for its own. `base` is the config's `git.base`, if any.
+async function developBranch(base?: string): Promise<GitFixture> {
+  const fixture = await makeRepo();
+  await fixture.write(
+    "wastech-mdlint.config.json",
+    `${JSON.stringify({
+      ...(base === undefined ? {} : { git: { base } }),
+      rules: [{ rule: "REF-001" }],
+    })}\n`,
+  );
+  await fixture.write("docs/a.md", "# A\n\nText.\n");
+  fixture.commit("base");
+  fixture.git("checkout", "-q", "-b", "develop");
+  await fixture.write("docs/dev.md", "# Dev\n\n[missing](nowhere.md)\n");
+  fixture.commit("develop work");
+  fixture.git("checkout", "-q", "-b", "feature");
+  await fixture.write("docs/a.md", "# A\n\nText, and [a typo](hbu.md).\n");
+  return fixture;
+}
+
+describe.skipIf(!hasGit)(
+  "lint and impact --since with no ref (requires git on PATH)",
+  () => {
+    it(
+      "compares with the config's git.base, and a ref named for the run wins over it",
+      async () => {
+        const fixture = await developBranch("develop");
+        const text = run(fixture, ["lint", ".", "--since"]);
+        expect(text.status).toBe(1);
+        // The first line says the base is the config's, so it cannot pass for one named here.
+        expect(text.stdout).toMatch(
+          /^since develop \(git\.base, merge-base [0-9a-f]{7}\): 1 changed document, 0 findings removed\ndocs\/a\.md\n/,
+        );
+        expect(text.stdout).not.toContain("docs/dev.md");
+
+        // `--since` followed by another option still takes no ref.
+        const json = run(fixture, ["impact", "--since", "--format", "json"]);
+        expect(json.status).toBe(0);
+        expect(JSON.parse(json.stdout)).toMatchObject({
+          files: ["docs/a.md"],
+          since: { ref: "develop", source: "config" },
+        });
+
+        const named = run(fixture, ["lint", ".", "--since", "main"]);
+        expect(named.stdout).toMatch(/^since main \(merge-base [0-9a-f]{7}\)/);
+        expect(named.stdout).toContain("docs/dev.md");
+        const namedJson = run(fixture, [
+          "lint",
+          ".",
+          "--since",
+          "main",
+          "--format",
+          "json",
+        ]);
+        expect(JSON.parse(namedJson.stdout)).toMatchObject({
+          since: { ref: "main", source: "given" },
+        });
+
+        // A quoted empty variable is refused; only an unquoted one vanishes into a bare `--since`,
+        // whose first line then names the base it fell back to.
+        expect(run(fixture, ["lint", ".", "--since", ""]).status).toBe(2);
+      },
+      TIMEOUT_MS,
+    );
+
+    // A guess may not be the branch the reader meant - here it blames the feature for what `develop`
+    // added - so the report says it is one, and how to choose another.
+    it(
+      "falls back to the detected base branch without git.base, and says it guessed",
+      async () => {
+        const fixture = await developBranch();
+        const text = run(fixture, ["lint", ".", "--since"]);
+        expect(text.stdout).toMatch(
+          /^since main \(found by default, set git\.base to choose another; merge-base [0-9a-f]{7}\): /,
+        );
+        expect(text.stdout).toContain("docs/dev.md");
+        const json = run(fixture, ["lint", ".", "--since", "--format", "json"]);
+        expect(JSON.parse(json.stdout)).toMatchObject({
+          since: { ref: "main", source: "detected" },
+        });
+      },
+      TIMEOUT_MS,
+    );
+
+    // A wrong git.base is the config's mistake and is reported as such; falling back to the guess
+    // would gate CI on a comparison nobody asked for.
+    it(
+      "exits 2 naming git.base when the config's base names nothing",
+      async () => {
+        const fixture = await developBranch("origin/develop");
+        const result = run(fixture, ["lint", ".", "--since"]);
+        expect(result.status).toBe(2);
+        expect(result.stderr).toContain(
+          `"origin/develop", the config's git.base, does not name a commit in this repository. Fetch the branch, or correct git.base in the config.`,
+        );
+      },
+      TIMEOUT_MS,
+    );
+  },
+);
+
 describe.skipIf(!hasGit)(
   "lint and impact --since (requires git on PATH)",
   () => {

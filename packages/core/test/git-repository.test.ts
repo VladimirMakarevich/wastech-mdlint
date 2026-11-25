@@ -60,7 +60,7 @@ function expectUnavailable(
 }
 
 async function mergeBaseWithMain(repository: GitRepository): Promise<string> {
-  const base = await repository.resolveBase("main");
+  const base = await repository.resolveBase({ given: "main" });
   if ("available" in base) {
     throw new Error(`expected a base, got ${base.reason}`);
   }
@@ -968,10 +968,13 @@ describe.skipIf(!hasGit)("resolving the base (requires git on PATH)", () => {
       fixture.commit("base");
       const repository = await open(fixture.repo, fixture.env);
       expectUnavailable(
-        await repository.resolveBase("--output=planted"),
+        await repository.resolveBase({ given: "--output=planted" }),
         "invalid-ref",
       );
-      expectUnavailable(await repository.resolveBase(""), "invalid-ref");
+      expectUnavailable(
+        await repository.resolveBase({ given: "" }),
+        "invalid-ref",
+      );
       expect(existsSync(path.join(fixture.repo, "planted"))).toBe(false);
     },
     TIMEOUT_MS,
@@ -985,9 +988,61 @@ describe.skipIf(!hasGit)("resolving the base (requires git on PATH)", () => {
       fixture.commit("base");
       const repository = await open(fixture.repo, fixture.env);
       expectUnavailable(
-        await repository.resolveBase("no-such-branch"),
+        await repository.resolveBase({ given: "no-such-branch" }),
         "base-not-found",
       );
+    },
+    TIMEOUT_MS,
+  );
+
+  // Comparing with the last commit is how a host shows only what is not committed yet; before the
+  // first commit the generic "fetch the branch" hint would point the reader somewhere useless.
+  it(
+    "says HEAD has no commits yet when the last commit is asked for before the first one",
+    async () => {
+      const fixture = await makeRepo();
+      await fixture.write("a.md", "a\n");
+      const repository = await open(fixture.repo, fixture.env);
+      for (const ref of ["HEAD", "@"]) {
+        expect(await repository.resolveBase({ given: ref }), ref).toMatchObject(
+          {
+            available: false,
+            reason: "base-not-found",
+            message: "HEAD has no commits yet.",
+            hint: "Make a first commit to compare with it.",
+          },
+        );
+      }
+
+      fixture.commit("base");
+      expect(await repository.resolveBase({ given: "HEAD" })).toEqual({
+        ref: "HEAD",
+        commit: await repository.headCommit(),
+        source: "given",
+      });
+    },
+    TIMEOUT_MS,
+  );
+
+  // A branch ref left naming a commit the repository does not have is damage, not a branch waiting
+  // for its first commit: "make a first commit" would be the wrong remedy, so the generic one stays.
+  it(
+    "does not call a HEAD that names a missing commit a branch without commits",
+    async () => {
+      const fixture = await makeRepo();
+      await fixture.write("a.md", "a\n");
+      fixture.commit("base");
+      const branch = fixture.git("symbolic-ref", "HEAD").trim();
+      await writeFile(
+        path.join(fixture.repo, ".git", ...branch.split("/")),
+        `${"1".repeat(40)}\n`,
+      );
+      const repository = await open(fixture.repo, fixture.env);
+      expect(await repository.resolveBase({ given: "HEAD" })).toMatchObject({
+        available: false,
+        reason: "base-not-found",
+        message: '"HEAD" does not name a commit in this repository.',
+      });
     },
     TIMEOUT_MS,
   );
@@ -1005,6 +1060,7 @@ describe.skipIf(!hasGit)("resolving the base (requires git on PATH)", () => {
         ref: "main",
         commit: head,
         fullRef: "refs/heads/main",
+        source: "detected",
       });
 
       fixture.git("update-ref", "refs/remotes/origin/develop", "HEAD");
@@ -1017,6 +1073,7 @@ describe.skipIf(!hasGit)("resolving the base (requires git on PATH)", () => {
         ref: "origin/develop",
         commit: head,
         fullRef: "refs/remotes/origin/develop",
+        source: "detected",
       });
 
       fixture.git("symbolic-ref", "--delete", "refs/remotes/origin/HEAD");
@@ -1025,10 +1082,109 @@ describe.skipIf(!hasGit)("resolving the base (requires git on PATH)", () => {
         ref: "master",
         commit: head,
         fullRef: "refs/heads/master",
+        source: "detected",
       });
 
       fixture.git("branch", "-q", "-m", "master", "trunk");
-      expectUnavailable(await repository.resolveBase(), "base-not-found");
+      expect(await repository.resolveBase()).toMatchObject({
+        available: false,
+        reason: "base-not-found",
+        hint: "Set git.base in the config, or name the branch to compare with.",
+      });
+    },
+    TIMEOUT_MS,
+  );
+
+  // Work that starts from a branch other than the default one - a `develop` - is compared with
+  // the base the config names rather than the guess, while a ref named for the run still wins: a
+  // reader comparing with another branch for once should not have to edit the config.
+  it(
+    "takes the config's base over the guess, and a ref given for the run over both",
+    async () => {
+      const fixture = await makeRepo();
+      await fixture.write("a.md", "a\n");
+      fixture.commit("base");
+      fixture.git("branch", "-q", "develop");
+      const repository = await open(fixture.repo, fixture.env);
+      const head = await repository.headCommit();
+
+      expect(await repository.resolveBase({ configured: "develop" })).toEqual({
+        ref: "develop",
+        commit: head,
+        source: "config",
+      });
+      expect(
+        await repository.resolveBase({ given: "main", configured: "develop" }),
+      ).toEqual({
+        ref: "main",
+        commit: head,
+        source: "given",
+      });
+    },
+    TIMEOUT_MS,
+  );
+
+  // A configured base that resolves to nothing is reported as the config's, so the reader fixes the
+  // file; it is never replaced by the guess, which would review against a branch nobody chose.
+  it(
+    "reports a configured base that names nothing as the config's, without guessing another",
+    async () => {
+      const fixture = await makeRepo();
+      await fixture.write("a.md", "a\n");
+      fixture.commit("base");
+      const repository = await open(fixture.repo, fixture.env);
+      expect(
+        await repository.resolveBase({ configured: "origin/develop" }),
+      ).toMatchObject({
+        available: false,
+        reason: "base-not-found",
+        message: `"origin/develop", the config's git.base, does not name a commit in this repository.`,
+        hint: "Fetch the branch, or correct git.base in the config.",
+      });
+      expect(
+        await repository.resolveBase({ configured: "--output=planted" }),
+      ).toMatchObject({ available: false, reason: "invalid-ref" });
+      expect(existsSync(path.join(fixture.repo, "planted"))).toBe(false);
+    },
+    TIMEOUT_MS,
+  );
+
+  // A configured base that exists but shares no history with HEAD is still the config's mistake:
+  // the reader named no branch, so the message points at git.base rather than asking them to name
+  // one, while a base named for the run keeps the plain message.
+  it(
+    "names git.base when the config's base shares no history with HEAD",
+    async () => {
+      const fixture = await makeRepo();
+      await fixture.write("a.md", "a\n");
+      fixture.commit("base");
+      fixture.git("checkout", "-q", "--orphan", "unrelated");
+      await fixture.write("b.md", "b\n");
+      fixture.commit("unrelated root");
+      fixture.git("checkout", "-q", "main");
+      const repository = await open(fixture.repo, fixture.env);
+
+      const configured = await repository.resolveBase({
+        configured: "unrelated",
+      });
+      if ("available" in configured) {
+        throw new Error(`expected a base, got ${configured.reason}`);
+      }
+      expect(await repository.mergeBase(configured)).toMatchObject({
+        available: false,
+        reason: "base-not-found",
+        message: `HEAD and "unrelated", the config's git.base, share no history.`,
+        hint: "Set git.base in the config to a branch this branch was made from, or name one for this run.",
+      });
+
+      const given = await repository.resolveBase({ given: "unrelated" });
+      if ("available" in given) {
+        throw new Error(`expected a base, got ${given.reason}`);
+      }
+      expect(await repository.mergeBase(given)).toMatchObject({
+        message: "HEAD and unrelated share no history.",
+        hint: "Name a base branch this branch was made from.",
+      });
     },
     TIMEOUT_MS,
   );
@@ -1081,7 +1237,7 @@ describe.skipIf(!hasGit)("resolving the base (requires git on PATH)", () => {
       ]);
 
       const repository = await open(clone, origin.env);
-      const base = await repository.resolveBase("origin/main");
+      const base = await repository.resolveBase({ given: "origin/main" });
       if ("available" in base) {
         throw new Error(`expected a base, got ${base.reason}`);
       }

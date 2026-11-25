@@ -8,7 +8,13 @@ import {
   type Review,
 } from "./changes.js";
 import { sendHtml, sendJson } from "./http-send.js";
-import { contextOf, marksOf, sinceOf, worktreeOf } from "./review-queries.js";
+import {
+  asMarked,
+  compareOf,
+  contextOf,
+  marksOf,
+  sinceOf,
+} from "./review-queries.js";
 import {
   baselineOf,
   markOf,
@@ -46,8 +52,8 @@ export class ChangesRoutes {
       await ctx.sendNotFound(request, response, NO_CHANGES);
       return;
     }
-    const worktree = worktreeOf(params);
-    const review = await ctx.changes.review(worktree);
+    const mode = compareOf(params);
+    const review = await ctx.changes.review(mode);
     const marks = await marksOf(ctx, review);
     const baseline = baselineOf(params);
     sendHtml(
@@ -59,7 +65,7 @@ export class ChangesRoutes {
         firstScreen: true,
         article: renderChangesArticle(
           review,
-          worktree,
+          mode,
           await contextOf(ctx, review),
           marks === undefined || "available" in review
             ? undefined
@@ -88,11 +94,13 @@ export class ChangesRoutes {
       sendJson(response, { error: NO_CHANGES }, 404);
       return;
     }
-    const review = await ctx.changes.review(worktreeOf(params));
+    const mode = compareOf(params);
+    const review = await ctx.changes.review(mode);
     sendJson(
       response,
       changesPayload(
         review,
+        mode,
         await contextOf(ctx, review),
         await marksOf(ctx, review),
       ),
@@ -108,9 +116,10 @@ export class ChangesRoutes {
       sendJson(response, { error: NO_CHANGES }, 404);
       return;
     }
-    const review = await changes.review(worktreeOf(params));
+    const mode = compareOf(params);
+    const review = await changes.review(mode);
     if ("available" in review) {
-      sendJson(response, changesPayload(review), 409);
+      sendJson(response, changesPayload(review, mode), 409);
       return;
     }
     // Only ever compared against the review's own paths, like the graph's parameters.
@@ -182,11 +191,14 @@ export class ChangesRoutes {
       sendJson(response, { status: "refused", error: parsed.message }, 400);
       return;
     }
-    const review = await changes.review(parsed.request.worktree);
-    if ("available" in review) {
-      sendJson(response, { status: "refused", error: review.message }, 409);
+    const shown = await changes.review(parsed.request.compare);
+    if ("available" in shown) {
+      sendJson(response, { status: "refused", error: shown.message }, 409);
       return;
     }
+    // Named as the marks know them, so a reset or an unmark also reaches the marks a document kept
+    // under the name it had before the branch renamed it.
+    const review = await asMarked(this.ctx, shown);
     const matched = listedEntries(review, parsed.request);
     if (!matched.ok) {
       sendJson(response, { status: "conflict", error: matched.message }, 409);
@@ -238,7 +250,7 @@ export class ChangesRoutes {
       sendJson(response, { status: "refused", error: parsed.message }, 400);
       return;
     }
-    const review = await changes.review(true);
+    const review = await changes.review("branch");
     if ("available" in review) {
       sendJson(response, { status: "refused", error: review.message }, 409);
       return;

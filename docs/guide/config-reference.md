@@ -43,6 +43,15 @@ Config is **JSONC**: `//` comments and trailing commas are allowed. Unknown keys
   // true, matching the trees its own scan skipped (a `merge` never adds it).
   "respectGitignore": false,
 
+  // How changes are compared with git.
+  "git": {
+    // The branch, tag or commit a change is compared with when a run names none: the viewer's
+    // Changes page, and `lint --since` / `impact --since` given no ref. Without it the base is
+    // guessed - the branch origin/HEAD names, then main, then master. A remote-tracking name exists
+    // in every clone that fetched. A ref named for the run (--base, --since <ref>, MCP `since`) wins.
+    "base": "origin/develop",
+  },
+
   // Shared settings inherited by the rules that understand them.
   "settings": {
     // Docs-site URL→file routing (e.g. Astro Starlight). Inherited by REF rules and graph rules;

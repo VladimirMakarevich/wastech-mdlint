@@ -1,6 +1,7 @@
 import { compareStrings } from "../deterministic-sort.js";
 import type { LintResult } from "../engine/lint-corpus.js";
 import type { LintMessage } from "../engine/types.js";
+import type { GitBaseSource } from "../git/git-repository.js";
 import {
   type ChangeImpact,
   classifyChangeImpact,
@@ -14,8 +15,17 @@ import type { SinceAnalysis } from "./branch-review.js";
 
 /** Which comparison a "since" answer describes. */
 export type SinceSummary = {
-  /** The ref as given, and the commit it named. */
+  /**
+   * The ref compared with - as given, else the config's `git.base`, else the detected base branch -
+   * and the commit it named.
+   */
   ref: string;
+  /**
+   * Where `ref` came from: named for the run, the config's `git.base`, or detected. Reported so a
+   * comparison nobody chose - a bare `--since`, an unquoted empty variable after it - never passes
+   * for one somebody did.
+   */
+  source: GitBaseSource;
   base: string;
   /** Where the branch left it: the base side of every comparison. */
   mergeBase: string;
@@ -35,6 +45,7 @@ function summaryOf(analysis: SinceAnalysis): SinceSummary {
   const { set } = analysis.review;
   return {
     ref: set.base.ref,
+    source: set.base.source,
     base: set.base.commit,
     mergeBase: set.mergeBase,
     head: set.head,
@@ -81,12 +92,20 @@ export function sinceImpact(analysis: SinceAnalysis): SinceImpact {
 
 /**
  * The line a human report starts with, naming the comparison, so a reader of "No problems found."
- * knows it means "nothing new since this commit" and not "nothing at all".
+ * knows it means "nothing new since this commit" and not "nothing at all". A base the run did not
+ * name says where it came from - a guess also says how to choose another - since it may not be the
+ * branch the reader meant.
  */
 export function renderSinceHeader(summary: SinceSummary): string {
   const changed = summary.changed.length;
   const removed = summary.removed.length;
-  return `since ${summary.ref} (merge-base ${summary.mergeBase.slice(0, 7)}): ${changed} changed document${
+  return `since ${summary.ref} (${SOURCE_NOTE[summary.source]}merge-base ${summary.mergeBase.slice(0, 7)}): ${changed} changed document${
     changed === 1 ? "" : "s"
   }, ${removed} finding${removed === 1 ? "" : "s"} removed\n`;
 }
+
+const SOURCE_NOTE: Record<GitBaseSource, string> = {
+  given: "",
+  config: "git.base, ",
+  detected: "found by default, set git.base to choose another; ",
+};

@@ -81,7 +81,7 @@ export async function handleImpactAnalysis(
     if ((input.file === undefined) === (input.since === undefined)) {
       throw new ToolInputError(
         'impact-analysis takes either "file" or "since"',
-        'Pass "file" for one changed Markdown file, or "since" (a branch, tag or commit) for every document the work tree changed since where it left that ref.',
+        'Pass "file" for one changed Markdown file, or "since" (a branch, tag or commit - git.base in the config, when it sets one) for every document the work tree changed since where it left that ref.',
       );
     }
     if (input.since !== undefined) {
@@ -136,7 +136,8 @@ export function registerImpactAnalysisTool(server: McpServer): void {
       description:
         "Compute the blast radius of changing a Markdown file: files that reference it directly, " +
         "files affected transitively, and the reading order over the affected subgraph. A file not " +
-        "in the corpus returns an actionable error. With `since` (a branch, tag or commit) in place " +
+        "in the corpus returns an actionable error. With `since` (a branch, tag or commit; a project " +
+        "config may name its base branch in `git.base`) in place " +
         "of `file`, the same for every document the work tree changed since where it left that ref, " +
         "read with git. Read-only.",
       inputSchema: impactAnalysisInputShape,

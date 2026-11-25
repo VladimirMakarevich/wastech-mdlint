@@ -749,6 +749,32 @@ describe("compile config", () => {
   });
 });
 
+describe("git config", () => {
+  it("takes the branch to compare with from git.base", async () => {
+    const root = await writeConfig(
+      JSON.stringify({ git: { base: "origin/develop" }, rules: [] }),
+    );
+    const loaded = await loadConfiguration({ cwd: root, registry });
+    expect(loaded.config.git).toEqual({ base: "origin/develop" });
+  });
+
+  // A ref is a positional argument to git, where one starting with `-` is read as an option; the
+  // config refuses it naming the key, rather than every later comparison failing without one.
+  it("rejects a git.base that is empty, reads as an option, or sits beside an unknown key", async () => {
+    for (const [git, pattern] of [
+      [{ base: "--output=planted" }, /git\.base.*cannot start with '-'/],
+      [{ base: "" }, /git\.base/],
+      [{ base: "main", remote: "origin" }, /config\.git:.*"remote"/],
+    ] as const) {
+      const root = await writeConfig(JSON.stringify({ git, rules: [] }));
+      await expect(
+        loadConfiguration({ cwd: root, registry }),
+        JSON.stringify(git),
+      ).rejects.toThrow(pattern);
+    }
+  });
+});
+
 describe("findConfig", () => {
   it("walks up parent directories to locate the config", async () => {
     const root = await writeConfig(JSON.stringify({ rules: [] }));

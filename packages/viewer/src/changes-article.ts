@@ -1,12 +1,13 @@
 import type { Element, ElementContent } from "hast";
 import { h } from "hastscript";
 
-import type { GitChange, TextDiff } from "@wastech-mdlint/core";
+import type { GitBaseSource, GitChange, TextDiff } from "@wastech-mdlint/core";
 
 import { BASELINES, changesHref, documentViewHref } from "./change-banner.js";
 import { plural, renderDiff, stats, statusBadge } from "./change-diff.js";
 import {
   changeCardId,
+  type CompareMode,
   type DocumentReview,
   documentContext,
   ordered,
@@ -57,14 +58,14 @@ export type ReviewView = {
  */
 export function renderChangesArticle(
   result: ReviewResult,
-  worktree: boolean,
+  mode: CompareMode,
   context?: ReviewContext,
   reviewed?: ReviewView,
 ): ElementContent[] {
   const baseline = reviewed?.baseline ?? "base";
   const article: ElementContent[] = [
     h("h1", "Changes"),
-    renderControls(worktree, baseline, reviewed),
+    renderControls(mode, baseline, reviewed),
   ];
   if ("available" in result) {
     article.push(
@@ -74,7 +75,7 @@ export function renderChangesArticle(
     return article;
   }
 
-  article.push(...renderSummary(result, worktree, context));
+  article.push(...renderSummary(result, mode, context));
   if (reviewed !== undefined && result.documents.length > 0) {
     article.push(renderReviewProgress(result, reviewed.marks));
   }
@@ -88,7 +89,9 @@ export function renderChangesArticle(
     article.push(renderOutsideCorpus(result.set.outsideCorpus));
   }
   if (result.documents.length > 0) {
-    article.push(renderFileList({ documents, context, markOf, reviewed }));
+    article.push(
+      renderFileList({ documents, mode, context, markOf, reviewed }),
+    );
   }
   const affected =
     context === undefined ? undefined : renderAffected(context.delta);
@@ -101,7 +104,7 @@ export function renderChangesArticle(
       : [configCard(result.config, context)]),
     ...documents.map((review) =>
       documentCard(review, {
-        worktree,
+        mode,
         context,
         mark: markOf(review.path),
         reviewed,
@@ -118,32 +121,42 @@ export function renderChangesArticle(
   return article;
 }
 
-// What to compare: the work tree or the commits only, and - with review marks - the base branch or
-// the reader's last review.
+// The comparisons the switch offers. The whole branch is the default and comes first; each of the
+// other two leaves part of it out - the work not committed yet, or everything already committed.
+const COMPARE_SEGMENTS: readonly (readonly [CompareMode, string])[] = [
+  ["branch", "Branch"],
+  ["commits", "Commits only"],
+  ["uncommitted", "Uncommitted"],
+];
+
+// What the review starts from, named for a sentence: the base branch, or - for uncommitted work -
+// the last commit, which a reader would not recognise as "the base branch".
+function startName(mode: CompareMode): string {
+  return mode === "uncommitted" ? "the last commit" : "the base branch";
+}
+
+// What to compare: the whole branch, its commits only or the uncommitted work alone, and - with
+// review marks - what the review starts from or the reader's last review.
 function renderControls(
-  worktree: boolean,
+  mode: CompareMode,
   baseline: Baseline,
   reviewed: ReviewView | undefined,
 ): Element {
   return h("div.changes-controls", [
-    h("nav.changes-mode.segmented", { ariaLabel: "What to compare" }, [
-      h(
-        "a.segment",
-        {
-          href: changesHref(true, baseline),
-          ariaCurrent: worktree ? "page" : undefined,
-        },
-        "Work tree",
+    h(
+      "nav.changes-mode.segmented",
+      { ariaLabel: "What to compare" },
+      COMPARE_SEGMENTS.map(([value, label]) =>
+        h(
+          "a.segment",
+          {
+            href: changesHref(value, baseline),
+            ariaCurrent: value === mode ? "page" : undefined,
+          },
+          label,
+        ),
       ),
-      h(
-        "a.segment",
-        {
-          href: changesHref(false, baseline),
-          ariaCurrent: worktree ? undefined : "page",
-        },
-        "Commits only",
-      ),
-    ]),
+    ),
     reviewed === undefined
       ? undefined
       : h(
@@ -153,10 +166,12 @@ function renderControls(
             h(
               "a.segment",
               {
-                href: changesHref(worktree, value),
+                href: changesHref(mode, value),
                 ariaCurrent: value === baseline ? "page" : undefined,
               },
-              label,
+              value === "base" && mode === "uncommitted"
+                ? "Last commit"
+                : label,
             ),
           ),
         ),
@@ -165,7 +180,7 @@ function renderControls(
 
 function renderSummary(
   result: Review,
-  worktree: boolean,
+  mode: CompareMode,
   context: ReviewContext | undefined,
 ): ElementContent[] {
   const { set } = result;
@@ -178,19 +193,53 @@ function renderSummary(
         : `${plural(result.documents.length, "document")} changed`,
       result.documents.length === 0 ? "" : ` · +${added} −${removed}`,
     ]),
-    h("p.changes-base", [
-      "Compared with ",
-      h("code", set.base.ref),
-      set.mergeBase === set.base.commit
-        ? " at its tip "
-        : " where this branch left it, at ",
-      h("code", set.mergeBase.slice(0, 7)),
-      worktree
-        ? ", including uncommitted and untracked files."
-        : ", up to the last commit.",
-    ]),
+    h("p.changes-base", baseText(set, mode)),
     ...(context === undefined ? [] : renderContextSummary(context)),
   ];
+}
+
+// The sentence naming the comparison. An uncommitted review's base is `HEAD` itself, so "compared
+// with HEAD at its tip" would be true and say nothing; it names the last commit instead.
+function baseText(set: Review["set"], mode: CompareMode): (string | Element)[] {
+  if (mode === "uncommitted") {
+    return [
+      "Compared with the last commit, ",
+      h("code", set.mergeBase.slice(0, 7)),
+      ": only what is not committed yet, untracked files included.",
+    ];
+  }
+  return [
+    "Compared with ",
+    h("code", set.base.ref),
+    ...baseSourceText(set.base.source),
+    set.mergeBase === set.base.commit
+      ? " at its tip "
+      : " where this branch left it, at ",
+    h("code", set.mergeBase.slice(0, 7)),
+    mode === "branch"
+      ? ", including uncommitted and untracked files."
+      : ", up to the last commit.",
+  ];
+}
+
+// Why the review compares with this branch. A guessed base is said to be one, with the way to name
+// another, since a repository whose work starts from a branch other than its default one gets a
+// review of everything that branch holds and no other hint of why. One named with `--base` is said
+// to be, too: whoever reads the page may not be whoever started the viewer, and the config's base
+// is not the one in use.
+function baseSourceText(source: GitBaseSource): (string | Element)[] {
+  switch (source) {
+    case "config":
+      return [", the config's ", h("code", "git.base"), ","];
+    case "detected":
+      return [
+        " (found by default; set ",
+        h("code", "git.base"),
+        " in the config to choose another)",
+      ];
+    case "given":
+      return [", named with ", h("code", "--base"), ","];
+  }
 }
 
 function renderReviewProgress(result: Review, marks: ReviewMarksView): Element {
@@ -230,6 +279,7 @@ function renderOutsideCorpus(
 
 function renderFileList(list: {
   documents: DocumentReview[];
+  mode: CompareMode;
   context: ReviewContext | undefined;
   markOf: (relPath: string) => DocumentMark | undefined;
   reviewed: ReviewView | undefined;
@@ -251,7 +301,7 @@ function renderFileList(list: {
           " ",
           h(
             "span.change-stats",
-            stats(shownDiff(review, mark, list.reviewed).diff),
+            stats(shownDiff(review, mark, list.reviewed, list.mode).diff),
           ),
           reviewChip(mark),
           review.eager ? eagerBadge() : undefined,
@@ -297,7 +347,7 @@ function configCard(
 function documentCard(
   review: DocumentReview,
   shown: {
-    worktree: boolean;
+    mode: CompareMode;
     context: ReviewContext | undefined;
     mark: DocumentMark | undefined;
     reviewed: ReviewView | undefined;
@@ -306,7 +356,7 @@ function documentCard(
   const { mark, reviewed } = shown;
   const baseline = reviewed?.baseline ?? "base";
   const delta = documentContext(shown.context, review.path);
-  const diff = shownDiff(review, mark, reviewed);
+  const diff = shownDiff(review, mark, reviewed, shown.mode);
   return changeCard({
     id: changeCardId(review.path),
     status: review.status,
@@ -314,7 +364,12 @@ function documentCard(
     href:
       review.status === "D"
         ? undefined
-        : documentViewHref(documentHref(review.path), "rendered", baseline),
+        : documentViewHref(
+            documentHref(review.path),
+            "rendered",
+            baseline,
+            shown.mode,
+          ),
     oldPath: review.oldPath,
     eager: review.eager,
     note: diff.note,
@@ -323,7 +378,7 @@ function documentCard(
     context: delta === undefined ? undefined : renderDocumentContext(delta),
     ...(mark === undefined
       ? {}
-      : { mark, toggle: reviewToggle(review, mark, shown.worktree) }),
+      : { mark, toggle: reviewToggle(review, mark, shown.mode) }),
   });
 }
 
@@ -337,13 +392,14 @@ const NO_DIFF: TextDiff = {
 /**
  * The diff a card shows and what it is against. Comparing with the reader's last review, a document
  * changed since then shows the diff from the version they reviewed; one they reviewed as it is has
- * nothing to show; one never reviewed, or whose reviewed text is no longer kept, falls back to the
- * base branch, and the card says so rather than passing one comparison off as the other.
+ * nothing to show; one never reviewed, or whose reviewed text is no longer kept, falls back to what
+ * the review starts from, and the card says so rather than passing one comparison off as the other.
  */
 function shownDiff(
   review: DocumentReview,
   mark: DocumentMark | undefined,
   reviewed: ReviewView | undefined,
+  mode: CompareMode,
 ): { diff: TextDiff; note?: string } {
   if (reviewed?.baseline !== "review" || mark === undefined) {
     return { diff: review.diff };
@@ -359,8 +415,8 @@ function shownDiff(
     diff: review.diff,
     note:
       mark.status === "changed"
-        ? "The version you reviewed is no longer kept, so this compares with the base branch."
-        : "Not reviewed yet, so this compares with the base branch.",
+        ? `The version you reviewed is no longer kept, so this compares with ${startName(mode)}.`
+        : `Not reviewed yet, so this compares with ${startName(mode)}.`,
   };
 }
 

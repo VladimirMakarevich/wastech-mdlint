@@ -6,6 +6,18 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Breaking for code that builds a `GitBase` itself: it gains a required `source` - see Changed.
+
+### Added
+
+- The config can name the branch changes are compared with: `"git": { "base": "origin/develop" }`. It applies wherever a run names none - the viewer's Changes page, and `lint --since` / `impact --since` given no ref. Without it the base is still guessed (the branch `origin/HEAD` names, then `main`, then `master`), which is wrong wherever work starts from another branch. A ref named for the run - the viewer's `--base`, `--since <ref>`, the MCP `since` - still wins. A `git.base` that names nothing, or shares no history with `HEAD`, is reported as the config's, never replaced by the guess; one starting with `-` is refused when the config loads.
+- `lint --since` and `impact --since` take the ref as optional. Given alone, they compare with `git.base`, else the detected base branch.
+
+### Changed
+
+- Every comparison says where its base came from. The `since` object `lint --since`, `impact --since` and the MCP `lint-files` and `impact-analysis` return gains `source` - `given`, `config` or `detected` - and the text report's first line names a configured or guessed base (`since develop (git.base, merge-base 1a2b3c4): …`). The viewer's Changes page says it in its summary line, and `/api/changes` carries it as `base.source`.
+- In `@wastech-mdlint/core`, `GitRepository.resolveBase` takes its names as `{ given, configured }`, and the `GitBase` it returns has a required `source`. Every `GitBase` comes from `resolveBase`; code that built one by hand to pass to `mergeBase` or `revisionKey` has to add it.
+
 ## [0.4.1]
 
 ### Fixed

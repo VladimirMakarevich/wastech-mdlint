@@ -23,6 +23,7 @@ import {
   type FailOn,
   type GraphFormat,
   type OutputFormat,
+  type SinceBase,
 } from "./commands.js";
 import type { ExistingConfigAction, InitPrompter } from "./init-command.js";
 import { createInquirerPrompter } from "./init-prompter.js";
@@ -173,6 +174,15 @@ function createProgram(stdout: OutputStream, stderr: OutputStream): Command {
   );
 }
 
+// `--since` as commander parses its optional value: absent, given alone (`true`), or given a ref.
+// Given alone it compares with the config's `git.base`, else the detected base branch.
+function sinceOf(since: string | true | undefined): { since?: SinceBase } {
+  if (since === undefined) {
+    return {};
+  }
+  return { since: since === true ? {} : { ref: since } };
+}
+
 function registerLintCommands(context: ProgramContext): void {
   const { program, cwd } = context;
 
@@ -183,7 +193,7 @@ function registerLintCommands(context: ProgramContext): void {
       format: OutputFormat;
       failOn: FailOn;
       fix?: boolean;
-      since?: string;
+      since?: string | true;
     },
   ): Promise<void> => {
     context.record(
@@ -194,7 +204,7 @@ function registerLintCommands(context: ProgramContext): void {
         format: options.format,
         failOn: options.failOn,
         fix: options.fix ?? false,
-        ...(options.since === undefined ? {} : { since: options.since }),
+        ...sinceOf(options.since),
       }),
     );
   };
@@ -227,8 +237,8 @@ function registerLintCommands(context: ProgramContext): void {
       )
       .addOption(
         new Option(
-          "--since <ref>",
-          "report only the findings the work tree adds since where it left this branch, tag or commit",
+          "--since [ref]",
+          "report only the findings the work tree adds since where it left this branch, tag or commit (default: the config's git.base, else the detected base branch)",
         ),
       )
       .action(lintAction);
@@ -347,14 +357,18 @@ function registerImpactCommand(context: ProgramContext): void {
     )
     .addOption(
       new Option(
-        "--since <ref>",
-        "every document the work tree changed since where it left this branch, tag or commit, instead of one <file>",
+        "--since [ref]",
+        "every document the work tree changed since where it left this branch, tag or commit, instead of one <file> (default: the config's git.base, else the detected base branch)",
       ),
     )
     .action(
       async (
         file: string | undefined,
-        options: { config?: string; format: OutputFormat; since?: string },
+        options: {
+          config?: string;
+          format: OutputFormat;
+          since?: string | true;
+        },
       ) => {
         context.record(
           await executeCommand({
@@ -362,7 +376,7 @@ function registerImpactCommand(context: ProgramContext): void {
             path: context.cwd,
             config: options.config,
             ...(file === undefined ? {} : { file }),
-            ...(options.since === undefined ? {} : { since: options.since }),
+            ...sinceOf(options.since),
             format: options.format,
           }),
         );

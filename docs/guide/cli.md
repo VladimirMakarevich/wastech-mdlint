@@ -5,10 +5,10 @@
 The binary is `wastech-mdlint` (package [`@wastech-mdlint/cli`](../../packages/cli), a thin [commander](https://github.com/tj/commander.js) host over core). All commands are read-only except `lint --fix`, `compile` (writes `SKILL.md`), and `init` (writes a config).
 
 ```text
-wastech-mdlint lint    [path]    [--config <file>] [--format text|json] [--fail-on error|warning|off] [--fix | --since <ref>]
+wastech-mdlint lint    [path]    [--config <file>] [--format text|json] [--fail-on error|warning|off] [--fix | --since [ref]]
 wastech-mdlint graph   [path]    [--config <file>] [--format human|json|mermaid|dot]
 wastech-mdlint slice   <query>   [--config <file>] [--depth <n>] [--format text|json]
-wastech-mdlint impact  <file> | --since <ref>   [--config <file>] [--format text|json]
+wastech-mdlint impact  <file> | --since [ref]   [--config <file>] [--format text|json]
 wastech-mdlint compile           [--config <file>] [--outdir <dir>] [--dry-run] [--cwd <dir>]
 wastech-mdlint init    [path]    [--yes] [--on-existing overwrite|merge|skip] [--with-ci-workflow] [--with-agent-rule]
 wastech-mdlint schema            [--out <file>]
@@ -23,7 +23,7 @@ Every command uses the same taxonomy:
 | --- | --- |
 | `0` | Success / clean (no findings at the `--fail-on` threshold). |
 | `1` | Findings at or above the `--fail-on` severity (lint-style commands). Reserved exclusively for findings. |
-| `2` | Operational/usage error - unknown subcommand, bad flag, invalid choice, a `[path]`/`--cwd` that does not exist or is not a directory, missing config section, target outside the corpus, unreadable config, or a file it could not write; and for `--since`, anything that stops the comparison - among them a directory outside a git work tree, `git` missing or older than 2.31, a `<ref>` that names no commit or shares no history with `HEAD`, a shallow clone without the history back to the merge-base, `--since` together with `--fix`, and `impact` given both or neither of `<file>` and `--since`. |
+| `2` | Operational/usage error - unknown subcommand, bad flag, invalid choice, a `[path]`/`--cwd` that does not exist or is not a directory, missing config section, target outside the corpus, unreadable config, or a file it could not write; and for `--since`, anything that stops the comparison - among them a directory outside a git work tree, `git` missing or older than 2.31, a `<ref>` or a config `git.base` that names no commit or shares no history with `HEAD`, no base branch to find when neither names one, a shallow clone without the history back to the merge-base, `--since` together with `--fix`, and `impact` given both or neither of `<file>` and `--since`. |
 
 `--help` and `--version` always exit `0`.
 
@@ -44,7 +44,7 @@ A path still needs its subcommand: `wastech-mdlint docs` is `error: unknown comm
 | `--format text\|json` | `text` | Human report vs machine `{ summary, messages, files }`. |
 | `--fail-on error\|warning\|off` | `error` | Minimum severity that forces exit `1`. `off` never fails. |
 | `--fix` | - | Apply deterministic fixes in place (SEC-001, TBL-002, REF-002, REF-009, CTX-003), then re-report what remains. |
-| `--since <ref>` | - | Report only the findings the work tree adds since where it left a branch, tag or commit (see below). Not with `--fix`. |
+| `--since [ref]` | - | Report only the findings the work tree adds since where it left a branch, tag or commit (see below); without a ref, the config's [`git.base`](configuration.md#gitbase), else the detected base branch. Not with `--fix`. |
 
 ```bash
 wastech-mdlint lint .
@@ -52,13 +52,18 @@ wastech-mdlint lint docs --format json > report.json
 wastech-mdlint lint . --fail-on warning     # fail CI on warnings too
 wastech-mdlint lint . --fix
 wastech-mdlint lint . --since main          # fail CI only on what this branch adds
+wastech-mdlint lint . --since               # the same, against the config's git.base
 ```
 
 **A relative `--config` is resolved against the directory the command analyzes, not against your shell.** For `lint` and `graph` that is `[path]`, so `wastech-mdlint lint docs --config cfg.json` reads `docs/cfg.json`; for `slice` and `impact` it is the cwd (they take no `[path]`), and for `compile` it is `--cwd`. One rule, every command - and the MCP server's `configPath` follows it too, against that tool's own `cwd`. An absolute `--config` is used as given. If a relative one is not there, the error names it exactly as you typed it - resolution and reporting share the one base, which is what stopped `lint proj --config cfg.json` from blaming a `../cfg.json` nobody wrote; an absolute one that is missing is still reported relative to the analyzed directory, like every other path (see [Exit codes](#exit-codes)).
 
 `--fix` writes only inside the scope of the rule instance that produced the fix: if a fixable rule's entry - [SEC-001](rules/SEC-001.md), [TBL-002](rules/TBL-002.md), [REF-002](rules/REF-002.md), [REF-009](rules/REF-009.md) or [CTX-003](rules/CTX-003.md) - sets `files`/`exclude`, files outside that scope are left byte-unchanged. The two surfaces are separate passes over the corpus, so "reported" and "rewritten" could in principle drift apart - they are held together deliberately, since a `--fix` that edited files the report never mentions would be the worst kind of surprise.
 
-**`--since <ref>` reports what the branch adds, not everything that is wrong.** It compares the work tree - uncommitted and untracked files included - with the merge-base of `HEAD` and `<ref>`, as a pull request is compared, so commits that landed on `<ref>` afterwards are not counted. The base is linted as the merge-base held every changed corpus document, with the config the merge-base held - a config found in a parent of `[path]` included; a finding moved by an edit above it, or surviving an edit to its own line, is the same finding, not a new one. The report lists only the added findings - on unchanged documents too, such as an anchor a renamed heading broke - and `--fail-on` gates on them, so CI can fail on new errors while old ones are paid down. A first line names the comparison (`since main (merge-base 1a2b3c4): 3 changed documents, 1 finding removed`); `--format json` adds a `since` object: `ref`, `base` (the commit `ref` names), `mergeBase`, `head`, `changed` (the changed documents) and `removed` (the findings the change removes). In that record `files` and `summary.files` count the changed documents the run compared, not the whole corpus, while `messages` can still name an unchanged document, as with the broken anchor above. It needs `git` 2.31 or later and a work tree with history back to the merge-base; outside one, with a `<ref>` that names nothing or in a shallow clone, it exits `2` with git's remedy rather than reporting a clean branch. Git runs read-only, from the absolute path `PATH` gives it rather than any `git` in the repository, with the repository's own filter, diff and fsmonitor programs turned off, and it never fetches an object a partial clone is missing.
+**`--since [ref]` reports what the branch adds, not everything that is wrong.** It compares the work tree - uncommitted and untracked files included - with the merge-base of `HEAD` and `<ref>`, as a pull request is compared, so commits that landed on `<ref>` afterwards are not counted. The base is linted as the merge-base held every changed corpus document, with the config the merge-base held - a config found in a parent of `[path]` included; a finding moved by an edit above it, or surviving an edit to its own line, is the same finding, not a new one. The report lists only the added findings - on unchanged documents too, such as an anchor a renamed heading broke - and `--fail-on` gates on them, so CI can fail on new errors while old ones are paid down. A first line names the comparison (`since main (merge-base 1a2b3c4): 3 changed documents, 1 finding removed`); `--format json` adds a `since` object: `ref`, `source` (where `ref` came from: `given` on the command line, `config` for `git.base`, `detected` for a guess), `base` (the commit `ref` names), `mergeBase`, `head`, `changed` (the changed documents) and `removed` (the findings the change removes). In that record `files` and `summary.files` count the changed documents the run compared, not the whole corpus, while `messages` can still name an unchanged document, as with the broken anchor above. It needs `git` 2.31 or later and a work tree with history back to the merge-base; outside one, with a `<ref>` that names nothing or in a shallow clone, it exits `2` with git's remedy rather than reporting a clean branch.
+
+**`--since` with no ref compares with the base the config names.** It takes [`git.base`](configuration.md#gitbase) from the config, and without one the base it would guess: the branch `origin/HEAD` names, then `main`, then `master`. The first line names the branch it settled on and where it came from: `since develop (git.base, merge-base 1a2b3c4): …` for the config's, `since main (found by default, set git.base to choose another; merge-base 1a2b3c4): …` for a guess. A `git.base` that names nothing exits `2` naming the key, rather than falling back to the guess, which would gate CI on a comparison nobody chose. Put `[path]` before a bare `--since` - `lint . --since` - since a word after it is read as the ref. Quote a variable after it (`--since "$BASE_REF"`): unquoted and empty, it disappears, and the bare `--since` left behind compares with `git.base` or a guess instead of failing - the first line says so - while a quoted empty ref exits `2`. A ref on the command line always wins over the config.
+
+Git runs read-only, from the absolute path `PATH` gives it rather than any `git` in the repository, with the repository's own filter, diff and fsmonitor programs turned off, and it never fetches an object a partial clone is missing.
 
 See [Output](output.md) for the report shapes and [Suppression](suppression.md) for inline disables.
 
@@ -95,7 +100,7 @@ Classifies the blast radius of changing `<file>` and lints the affected subgraph
 
 - Takes no `[path]` argument (always the cwd) - so a relative `--config <file>` is resolved against the cwd, as for `slice`.
 - Exits `2` with a hint if `<file>` is outside the analyzed corpus.
-- `--since <ref>` takes the place of `<file>`: the subject is every corpus document the work tree changed since the merge-base with `<ref>`, compared as `lint --since` compares. A document reached from several of them is listed once, at its shortest distance. The JSON record has `files` (the changed documents still in the corpus) where the one-file record has `file`, plus the `since` object `lint --since` writes. Giving both, or neither, exits `2`.
+- `--since [ref]` takes the place of `<file>`: the subject is every corpus document the work tree changed since the merge-base with `[ref]` - or, without one, the config's `git.base`, else the detected base branch - compared as `lint --since` compares. A document reached from several of them is listed once, at its shortest distance. The JSON record has `files` (the changed documents still in the corpus) where the one-file record has `file`, plus the `since` object `lint --since` writes. Giving both, or neither, exits `2`.
 
 ## `compile`
 

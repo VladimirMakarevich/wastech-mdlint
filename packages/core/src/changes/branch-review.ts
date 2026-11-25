@@ -86,8 +86,12 @@ export async function reviewBranch(
   params: { base?: string; worktree: boolean; corpus: CorpusSnapshot },
 ): Promise<BranchReview | GitUnavailable> {
   const { documents, graph, configuration, membership } = params.corpus;
+  // The base the config names is read from the configuration the corpus was loaded with, so every
+  // host reviewing this corpus compares with the same branch unless its run names another.
+  const configuredBase = configuration.config.git?.base;
   const set = await collectChangeSet(repository, {
     ...(params.base === undefined ? {} : { base: params.base }),
+    ...(configuredBase === undefined ? {} : { configuredBase }),
     worktree: params.worktree,
     corpus: membership,
   });
@@ -352,7 +356,8 @@ export type SinceAnalysis = {
 
 /**
  * Everything a command needs to answer "since `ref`": the corpus loaded from `cwd`, the work tree's
- * changes against where the branch left `ref`, and what they do to the context. For a one-shot host
+ * changes against where the branch left `ref` - or, without one, the config's `git.base`, else the
+ * detected base branch - and what they do to the context. For a one-shot host
  * - a CLI command, an MCP call - that loads the corpus once and asks once; a long-lived host keeps
  * its own corpus and calls `reviewBranch` and `branchContext` itself.
  *
@@ -362,7 +367,7 @@ export type SinceAnalysis = {
 export async function analyzeSince(params: {
   cwd: string;
   configuration: LoadedConfiguration;
-  ref: string;
+  ref?: string;
   env?: NodeJS.ProcessEnv;
 }): Promise<SinceAnalysis | GitUnavailable> {
   const rootDir = path.resolve(params.cwd);
@@ -396,7 +401,7 @@ export async function analyzeSince(params: {
     },
   };
   const review = await reviewBranch(repository, {
-    base: params.ref,
+    ...(params.ref === undefined ? {} : { base: params.ref }),
     worktree: true,
     corpus: snapshot,
   });

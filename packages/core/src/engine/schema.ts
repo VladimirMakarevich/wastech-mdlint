@@ -150,6 +150,24 @@ function knownCustomBranch(id: string): JsonSchema {
   };
 }
 
+// The config's `git` section. `base`'s pattern mirrors the loader's refusal of a leading `-`, which
+// git would read as an option, so an editor flags it as it is typed rather than at the first
+// comparison; its description names the guess it replaces, since an editor tooltip is where a user
+// decides whether to set it at all, and the guess is invisible unless named.
+const GIT_CONFIG_SCHEMA: JsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    base: {
+      type: "string",
+      minLength: 1,
+      pattern: "^[^-]",
+      description:
+        'The branch, tag or commit changes are compared with wherever a run names none: the viewer\'s Changes page, and `lint --since` / `impact --since` given no ref. Without it the base is guessed - the branch origin/HEAD names, then main, then master - which is wrong wherever work starts from another branch. Write a remote-tracking name such as "origin/develop" so every clone has it.',
+    },
+  },
+};
+
 /**
  * Generate the config JSON Schema as deterministic, pretty-printed text (the exact bytes of
  * schema.json). No `opts` ⇒ the package schema (built-in rules only); `opts.customRules` ⇒ a
@@ -204,6 +222,7 @@ export function generateConfigSchema(opts?: {
         type: "boolean",
         default: DEFAULT_RESPECT_GITIGNORE,
       },
+      git: GIT_CONFIG_SCHEMA,
       settings: {
         type: "object",
         additionalProperties: false,

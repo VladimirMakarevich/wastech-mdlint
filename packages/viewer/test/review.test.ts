@@ -201,7 +201,7 @@ describe.skipIf(!hasGit)("review marks (requires git on PATH)", () => {
       path: "docs/guide.md",
       hash: contentHash(GUIDE),
       reviewed,
-      worktree: true,
+      compare: "branch",
     });
   }
 
@@ -214,7 +214,7 @@ describe.skipIf(!hasGit)("review marks (requires git on PATH)", () => {
       page.body.match(/<label class="review-toggle" hidden/g),
     ).toHaveLength(3);
     expect(page.body).toContain(
-      `<label class="review-toggle" hidden data-path="docs/guide.md" data-hash="${contentHash(GUIDE)}" data-worktree="1" title="Mark as viewed (v)">`,
+      `<label class="review-toggle" hidden data-path="docs/guide.md" data-hash="${contentHash(GUIDE)}" data-compare="branch" title="Mark as viewed (v)">`,
     );
     expect(page.body).toContain("0 of 3 documents reviewed");
     expect(page.body).toContain("Only files left to review");
@@ -311,7 +311,7 @@ describe.skipIf(!hasGit)("review marks (requires git on PATH)", () => {
       path: "docs/guide.md",
       hash: contentHash("# Guide\n\nThe old text.\n"),
       reviewed: true,
-      worktree: true,
+      compare: "branch",
     });
     expect(stale.status).toBe(409);
     expect(JSON.parse(stale.body)).toMatchObject({ status: "conflict" });
@@ -319,12 +319,130 @@ describe.skipIf(!hasGit)("review marks (requires git on PATH)", () => {
       path: "README.md",
       hash: contentHash("# Fixture\n\n[Guide](docs/guide.md)\n"),
       reviewed: true,
-      worktree: true,
+      compare: "branch",
     });
     expect(outside.status).toBe(409);
+    // The hash is judged against the comparison the page showed: everything here is committed, so
+    // the uncommitted review holds no such document to mark.
+    const notUncommitted = await post(target, "mark", {
+      path: "docs/guide.md",
+      hash: contentHash(GUIDE),
+      reviewed: true,
+      compare: "uncommitted",
+    });
+    expect(notUncommitted.status).toBe(409);
     const shapeless = await post(target, "mark", { path: "docs/guide.md" });
     expect(shapeless.status).toBe(400);
+    // The boolean that named the comparison before there were three is refused, not guessed at.
+    for (const stale of [
+      { compare: true },
+      { compare: "worktree" },
+      { worktree: true },
+    ]) {
+      const refused = await post(target, "mark", {
+        path: "docs/guide.md",
+        hash: contentHash(GUIDE),
+        reviewed: true,
+        ...stale,
+      });
+      expect(refused.status, JSON.stringify(stale)).toBe(400);
+    }
     expect(await readdir(dir)).toEqual([]);
+  });
+
+  // A mark records the text the page showed, not the comparison it was shown in: marked while
+  // reading only the uncommitted edits, the same text counts as reviewed for the whole branch.
+  it("marks a document from the uncommitted comparison, and the branch's review sees it", async () => {
+    const own = await makeRepo();
+    await own.write("docs/guide.md", "# Guide\n\nThe old text.\n");
+    own.commit("base");
+    own.git("checkout", "-q", "-b", "feature");
+    await own.write("docs/added.md", "# Added\n\nCommitted on the branch.\n");
+    own.commit("feature work");
+    await own.write("docs/guide.md", GUIDE);
+
+    const target = await start(own.repo, await stateDir(), own.env);
+    running.push(target);
+    const page = await send(target.port, "/changes?compare=uncommitted");
+    expect(page.body).toContain(
+      `<label class="review-toggle" hidden data-path="docs/guide.md" data-hash="${contentHash(GUIDE)}" data-compare="uncommitted" title="Mark as viewed (v)">`,
+    );
+    expect(page.body).not.toContain('data-path="docs/added.md"');
+    expect(page.body).toContain("0 of 1 document reviewed");
+
+    const marked = await post(target, "mark", {
+      path: "docs/guide.md",
+      hash: contentHash(GUIDE),
+      reviewed: true,
+      compare: "uncommitted",
+    });
+    expect(marked.status).toBe(200);
+    expect(JSON.parse(marked.body)).toMatchObject({ left: 0, total: 1 });
+    expect(await statuses(target)).toEqual({
+      "docs/added.md": "unreviewed",
+      "docs/guide.md": "reviewed",
+    });
+  });
+
+  // The uncommitted comparison starts after the commit that renamed a document, so it lists the
+  // document under its new name alone. Its marks under the old name must still count there, or one
+  // document reads as not reviewed in one comparison and as changed since review in the other - and
+  // a reset from there must forget them too, as the branch's own reset does.
+  it("finds and resets a renamed document's marks from the uncommitted comparison", async () => {
+    const own = await makeRepo();
+    const lines = (edits: Record<number, string>) =>
+      `${[
+        "# Alpha",
+        "",
+        ...Array.from(
+          { length: 12 },
+          (_, index) => edits[index] ?? `Line ${String(index)} stays.`,
+        ),
+      ].join("\n")}\n`;
+    await own.write("docs/a.md", lines({}));
+    own.commit("base");
+    own.git("checkout", "-q", "-b", "feature");
+    const reviewedText = lines({ 0: "Line 0 was edited." });
+    await own.write("docs/a.md", reviewedText);
+    own.commit("edit a");
+
+    const dir = await stateDir();
+    const before = await start(own.repo, dir, own.env);
+    try {
+      const marked = await post(before, "mark", {
+        path: "docs/a.md",
+        hash: contentHash(reviewedText),
+        reviewed: true,
+        compare: "branch",
+      });
+      expect(marked.status).toBe(200);
+    } finally {
+      await before.viewer.close();
+    }
+
+    own.git("mv", "docs/a.md", "docs/b.md");
+    await own.write("docs/b.md", lines({ 0: "Line 0 was edited.", 1: "1!" }));
+    own.commit("rename a to b");
+    const onDisk = lines({ 0: "Line 0 was edited.", 1: "1!", 2: "2!" });
+    await own.write("docs/b.md", onDisk);
+
+    const target = await start(own.repo, dir, own.env);
+    running.push(target);
+    const branch = await changes(target);
+    expect(branch.documents).toMatchObject([
+      { path: "docs/b.md", status: "R", review: { status: "changed" } },
+    ]);
+    const uncommitted = await changes(target, "?compare=uncommitted");
+    expect(uncommitted.documents).toMatchObject([
+      { path: "docs/b.md", status: "M", review: { status: "changed" } },
+    ]);
+
+    const reset = await post(target, "reset", {
+      compare: "uncommitted",
+      documents: [{ path: "docs/b.md", hash: contentHash(onDisk) }],
+    });
+    expect(reset.status).toBe(200);
+    expect(await statuses(target)).toEqual({ "docs/b.md": "unreviewed" });
   });
 
   it("refuses a mark from another origin, without the page's token, or not sent as JSON", async () => {
@@ -334,7 +452,7 @@ describe.skipIf(!hasGit)("review marks (requires git on PATH)", () => {
       path: "docs/guide.md",
       hash: contentHash(GUIDE),
       reviewed: true,
-      worktree: true,
+      compare: "branch",
     };
     const refusals = await Promise.all([
       post(target, "mark", body, { Origin: "http://evil.example" }),
@@ -393,7 +511,7 @@ describe.skipIf(!hasGit)("review marks (requires git on PATH)", () => {
         path: "docs/guide.md",
         hash: contentHash("# Guide\n\nThe newer text.\n"),
         reviewed: true,
-        worktree: true,
+        compare: "branch",
       });
       expect(marked.status).toBe(200);
       const unchanged = articleOf(
@@ -416,7 +534,7 @@ describe.skipIf(!hasGit)("review marks (requires git on PATH)", () => {
           path: "docs/new.md",
           hash: contentHash("# New\n\nAll new.\n"),
           reviewed: true,
-          worktree: true,
+          compare: "branch",
         })
       ).status,
     ).toBe(200);
@@ -446,7 +564,7 @@ describe.skipIf(!hasGit)("review marks (requires git on PATH)", () => {
     expect((await markGuide(target)).status).toBe(200);
     const payload = await changes(target);
     const reset = await post(target, "reset", {
-      worktree: true,
+      compare: "branch",
       documents: payload.documents.map((entry) => ({
         path: entry.path,
         hash: entry.review?.hash,
@@ -506,7 +624,7 @@ describe("review marks outside a git work tree", () => {
         path: "README.md",
         hash: contentHash("# Plain\n"),
         reviewed: true,
-        worktree: true,
+        compare: "branch",
       });
       expect(answer.status).toBe(403);
       expect(JSON.parse(answer.body)).toMatchObject({ status: "refused" });
