@@ -21,7 +21,7 @@ async function fileExists(filePath: string): Promise<boolean> {
  * the filesystem root. `--config` overrides this (handled by the loader).
  *
  * The home-directory boundary only rejects ANCESTORS at or above `$HOME`: a config
- * sitting exactly at `cwd` is always returned, even when `cwd` is the home directory itself — the
+ * sitting exactly at `cwd` is always returned, even when `cwd` is the home directory itself - the
  * boundary exists to stop the walk from wandering into unrelated ancestor territory (e.g. a dotfiles
  * repo at `$HOME`), not to hide a config that legitimately lives at the caller's own directory.
  *
@@ -30,7 +30,7 @@ async function fileExists(filePath: string): Promise<boolean> {
  * losing the rare project-rooted-at-`$HOME` case: those two only anchor a write-location fallback,
  * where being overly cautious is harmless. Here, treating a real config at `cwd === $HOME` as "not
  * found" would make `lint`/MCP silently ignore it and would make `init` treat a real existing config
- * as absent — bypassing its overwrite prompt entirely and reaching an unconditional write. That is
+ * as absent - bypassing its overwrite prompt entirely and reaching an unconditional write. That is
  * the same silent-data-loss class this boundary exists to remove, so the two walks cannot share
  * that particular tradeoff even though they share the same ancestor-boundary ordering otherwise.
  */
@@ -38,7 +38,7 @@ export async function findConfig(cwd: string): Promise<string | undefined> {
   const start = path.resolve(cwd);
   const homeDir = path.resolve(os.homedir());
 
-  // The starting directory is checked unconditionally — the loop below only ever inspects strict
+  // The starting directory is checked unconditionally - the loop below only ever inspects strict
   // ancestors of it, so gating this first check on the home-directory boundary would incorrectly
   // hide a config living directly at `cwd === $HOME`.
   const startCandidate = path.join(start, CONFIG_FILE_NAME);

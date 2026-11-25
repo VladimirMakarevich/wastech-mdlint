@@ -115,7 +115,7 @@ describe("parseDocument · tables", () => {
   });
 
   // GFM splits table cells before inline parsing, so an unescaped `|` inside backticks is a cell
-  // separator — GitHub renders it that way too. The written count follows micromark rather than a
+  // separator - GitHub renders it that way too. The written count follows micromark rather than a
   // hand-rolled tokenizer, so TBL-007 agrees with the renderer and with `cells`.
   it("counts an unescaped pipe inside backticks as a separator, as GFM does", () => {
     const doc = parse(
@@ -266,7 +266,7 @@ describe("parseDocument · links & images", () => {
 
   // CTX-005 judges `alt` alone, so its exact semantics are pinned here: whitespace is not trimmed
   // by the parser (so the rule sees `" "`, not `""`), inline markup flattens to its text, and a
-  // reference image takes the alt from its own brackets — never from the definition — in all three
+  // reference image takes the alt from its own brackets - never from the definition - in all three
   // reference forms.
   it("records each image's alt text as the parser decoded it, inline and reference forms alike", () => {
     const doc = parse(
@@ -368,7 +368,7 @@ describe("parseDocument · eager imports", () => {
 
   it("anchors column to the matched import, not an earlier @-substring on the line", () => {
     // `foo@early.md` is not an import (the `@` is not at a word boundary), so only the second token
-    // matches — the column must point at that match, not the earlier `@early.md` text on the line.
+    // matches - the column must point at that match, not the earlier `@early.md` text on the line.
     const doc = parse("foo@early.md see @late.md here\n");
 
     expect(doc.imports).toEqual([
@@ -521,7 +521,7 @@ describe("parseDocument · html anchors", () => {
   });
 
   // HTML drops every repeat of an attribute after the first, in any letter case, so a later `id` or
-  // `name` names nothing on the rendered page — including after an empty first value.
+  // `name` names nothing on the rendered page - including after an empty first value.
   it("keeps only the first occurrence of a repeated attribute", () => {
     const doc = parse(
       [
@@ -926,7 +926,7 @@ describe("parseDocument · frontmatter", () => {
   });
 
   // Recognition is anchored to the very start of the file. A block that starts one line down is
-  // ordinary Markdown again, setext heading included — that is the standard behaviour every
+  // ordinary Markdown again, setext heading included - that is the standard behaviour every
   // remark-based tool and GitHub share.
   it("only recognises a block whose opening fence is the first line", () => {
     const doc = parse("\n---\nname: x\n---\n# T\n");
@@ -1578,7 +1578,7 @@ describe("parseDocument · fix offsets", () => {
 
 // A UTF-8 byte order mark only marks the encoding: the file means the same with or without it.
 // micromark drops it before tokenizing, while `content` keeps it, so the fixture is parsed both ways
-// and every result must agree — values, lines and columns as they are, source offsets one later.
+// and every result must agree - values, lines and columns as they are, source offsets one later.
 describe("parseDocument · byte order mark", () => {
   const BOM = "\uFEFF";
   const body = [

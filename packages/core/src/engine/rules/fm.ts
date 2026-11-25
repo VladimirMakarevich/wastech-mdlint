@@ -13,7 +13,7 @@ import { fileScopeShape, matchesFileScope } from "./scope.js";
 
 // Front matter rules.
 
-// FM-001 — front matter is valid YAML and matches the declared required keys, allowed values and
+// FM-001 - front matter is valid YAML and matches the declared required keys, allowed values and
 // value patterns. With no options it still checks that the block parses and is a mapping, which is
 // worth having on its own: a broken block is invisible in rendered Markdown.
 //

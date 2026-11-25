@@ -8,8 +8,8 @@ import { compileRegex } from "../regex.js";
 import type { PrimitiveContext, PrimitiveFinding } from "./types.js";
 
 // Table-scoping shared by every table primitive: restrict to tables under a given section, or all
-// tables when `section` is omitted. Section ownership is flat — a table belongs to the nearest
-// preceding heading and not to any ancestor of it — so a rule scoped to a parent section does not
+// tables when `section` is omitted. Section ownership is flat - a table belongs to the nearest
+// preceding heading and not to any ancestor of it - so a rule scoped to a parent section does not
 // silently sweep in the tables of every subsection beneath it.
 function tablesInScope(
   document: ParsedDocument,
@@ -28,7 +28,7 @@ function tableHasColumn(table: ParsedTable, column: string): boolean {
 
 export type RequiredColumnsOptions = { columns: string[]; section?: string };
 
-// requiredColumns — every scoped table must declare each required column (TBL-001).
+// requiredColumns - every scoped table must declare each required column (TBL-001).
 export function requiredColumns(
   document: ParsedDocument,
   options: RequiredColumnsOptions,
@@ -62,7 +62,7 @@ export function isPaddingCell(row: ParsedTableRow, cellIndex: number): boolean {
 
 export type ColumnNotEmptyOptions = { columns?: string[]; section?: string };
 
-// columnNotEmpty — cells in the target column(s) must be non-empty (TBL-002). When `columns` is
+// columnNotEmpty - cells in the target column(s) must be non-empty (TBL-002). When `columns` is
 // omitted, every column of each scoped table is checked. Padding cells of a short row are skipped
 // (see `isPaddingCell`); a cell written empty is still reported. The skip lives here rather than in
 // TBL-002 so the declarative `assert.columnNotEmpty` keeps agreeing with the built-in. Findings are
@@ -106,12 +106,12 @@ export function columnNotEmpty(
 
 export type RowCellCountOptions = { section?: string };
 
-// rowCellCount — every body row has exactly as many cells as the header (TBL-007). The header's own
+// rowCellCount - every body row has exactly as many cells as the header (TBL-007). The header's own
 // count needs no check: GFM recognises a table only when the header and delimiter rows agree. The
 // message names the rendering consequence, because the two directions fail differently: extra cells
 // vanish from the rendered table, missing ones render as blanks. Only the row's own count takes a
-// noun, and it can be 1 — a GFM row always has at least one cell, so a lone cell under a wider
-// header is an ordinary short row — so the noun agrees with that count instead of staying plural.
+// noun, and it can be 1 - a GFM row always has at least one cell, so a lone cell under a wider
+// header is an ordinary short row - so the noun agrees with that count instead of staying plural.
 export function rowCellCount(
   document: ParsedDocument,
   options: RowCellCountOptions,
@@ -155,11 +155,11 @@ export type ColumnInSetOptions = {
 // here with no `.default()` in either Zod schema, so nothing recorded it: `schema.json` emitted a plain
 // boolean, one guide page documented the inverse, and the skill renderer treated "absent" as a third
 // state. Both option schemas (TBL-003's and the `columnInSet` assertion's) now default to this
-// constant, so a resolved option is never `undefined` in product code — the fallback below survives
+// constant, so a resolved option is never `undefined` in product code - the fallback below survives
 // only for direct primitive callers, which do not pass through Zod.
 export const DEFAULT_COLUMN_IN_SET_CASE_SENSITIVE = true;
 
-// columnInSet — cell values must be one of an allowed set (TBL-003).
+// columnInSet - cell values must be one of an allowed set (TBL-003).
 export function columnInSet(
   document: ParsedDocument,
   options: ColumnInSetOptions,
@@ -199,7 +199,7 @@ export type ColumnMatchesOptions = {
   section?: string;
 };
 
-// columnMatches — cell values must match a regex (TBL-004).
+// columnMatches - cell values must match a regex (TBL-004).
 export function columnMatches(
   document: ParsedDocument,
   options: ColumnMatchesOptions,
@@ -264,7 +264,7 @@ function evaluateCondition(value: string, condition: ColumnCondition): boolean {
   return true;
 }
 
-// crossColumn — when a row's `when` column satisfies its condition, the `then` column must satisfy
+// crossColumn - when a row's `when` column satisfies its condition, the `then` column must satisfy
 // its condition (TBL-005). Rows missing either column are skipped (nothing to assert against).
 export function crossColumn(
   document: ParsedDocument,
@@ -316,7 +316,7 @@ export type ColumnUniqueOptions = {
 
 type UniqueOccurrence = { filePath: string; line: number };
 
-// columnUnique — a column's values must be unique across every scoped table in the corpus (TBL-006,
+// columnUnique - a column's values must be unique across every scoped table in the corpus (TBL-006,
 // project). Duplicates are attributed to the *second and later* occurrences, with the first
 // occurrence surfaced in `data.firstSeenIn` for actionable diagnostics.
 export function columnUnique(
@@ -337,7 +337,7 @@ export function columnUnique(
   );
 
   for (const document of documents) {
-    // File scope is this callback and nothing else — it applies both `files` and `exclude` (see the
+    // File scope is this callback and nothing else - it applies both `files` and `exclude` (see the
     // call sites in rules/tbl.ts and rules/custom.ts). An unread `files` option that used to sit
     // beside it was removed: gating on it would have silently skipped the exclude-only case.
     if (!fileMatches(document.path)) {

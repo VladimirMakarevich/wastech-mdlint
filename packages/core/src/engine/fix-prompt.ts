@@ -19,7 +19,7 @@ import type { LintMessage } from "./types.js";
 // A size finding (SIZE-001, or LLM-001's context budget) can be answered three ways, and the reader
 // picks one: compress the wording, split the file, or raise the budget for this one path. The first
 // two reuse the agent rule's own policy text word for word, so an agent told to shorten a file meets
-// the same floor — nothing is cut to fit — that the rule page sets. Raising a budget is the reader's
+// the same floor - nothing is cut to fit - that the rule page sets. Raising a budget is the reader's
 // explicit decision, which the policy requires before a threshold moves; the prompt says so and
 // spells out how SIZE-001 picks a budget, since the obvious edit gets it wrong. Every other finding
 // gets one prompt: fix it in the document, never silence it.
@@ -297,14 +297,14 @@ function sizeBudgetSteps(
         thresholds.from === "override" && budget.override !== undefined
           ? `from the \`overrides\` entry with pattern ${codeSpan(budget.override.pattern)}`
           : `from the top-level ${codeSpan(metric)} option`;
-      lines.push(`- ${codeSpan(metric)}: ${limits} — ${source}.`);
+      lines.push(`- ${codeSpan(metric)}: ${limits} - ${source}.`);
     }
     lines.push("");
   }
   const broader =
     budget?.override === undefined
       ? ""
-      : ` — today that is the entry with pattern ${codeSpan(budget.override.pattern)}`;
+      : ` - today that is the entry with pattern ${codeSpan(budget.override.pattern)}`;
   lines.push(
     `Add an entry to SIZE-001's \`options.overrides\` with \`"pattern": "${exactPattern(input.filePath)}"\`, the exact path, and place it before every other entry in that list whose pattern also matches ${file}${broader}: SIZE-001 uses the first override that matches and ignores the rest. A metric the new entry leaves out falls back to the top-level option, not to a broader override, so repeat in it every threshold listed above, and raise only the ones the file exceeds:`,
     "",
@@ -354,7 +354,7 @@ function raiseSteps(size: SizeData): string[] {
   const newWarn = roomAbove(size.actual, 1.1);
   if (warnExceeded) {
     steps.push(
-      `- ${codeSpan(size.metric)} \`warn\`: above ${size.actual}, for example ${newWarn} — some room above today's size, so the next small edit does not trip it again.`,
+      `- ${codeSpan(size.metric)} \`warn\`: above ${size.actual}, for example ${newWarn} - some room above today's size, so the next small edit does not trip it again.`,
     );
   }
   if (errorExceeded) {
@@ -383,14 +383,14 @@ function contextBudgetSteps(
   const context = contextData(findings[0]!)!;
   const pattern = exactPattern(input.filePath);
   // An entry that names this file alone is already its own budget, and taking the file out of it
-  // would leave `entrypoints: []`, which the config schema refuses — so the agent raises it there.
+  // would leave `entrypoints: []`, which the config schema refuses - so the agent raises it there.
   if (namesOnly(reportingContextEntry(input, context), input.filePath)) {
     return [
-      `LLM-001 holds ${file} to an entry that names only this file, so raise that entry's \`maxTokensPerEntrypoint\` from ${context.maxTokens} to above ${context.totalTokens} — for example ${roomAbove(context.totalTokens, 1.1)}, some room above today's total. Do not take the file out of that entry: its \`entrypoints\` would be left empty, which the config refuses. A pattern without a \`/\` matches that name in every folder, so a same-named entrypoint elsewhere gets the raised budget too.`,
+      `LLM-001 holds ${file} to an entry that names only this file, so raise that entry's \`maxTokensPerEntrypoint\` from ${context.maxTokens} to above ${context.totalTokens} - for example ${roomAbove(context.totalTokens, 1.1)}, some room above today's total. Do not take the file out of that entry: its \`entrypoints\` would be left empty, which the config refuses. A pattern without a \`/\` matches that name in every folder, so a same-named entrypoint elsewhere gets the raised budget too.`,
     ];
   }
   return [
-    `LLM-001 holds every entrypoint an entry matches to that entry's one \`maxTokensPerEntrypoint\` (${context.maxTokens} today), so raising it there would raise it for every other entrypoint too. Instead, add a second \`LLM-001\` entry with \`"entrypoints": ["${pattern}"]\` and a \`maxTokensPerEntrypoint\` above ${context.totalTokens} — for example ${roomAbove(context.totalTokens, 1.1)}, some room above today's total — and make the existing entry stop matching ${file}: remove it from that entry's \`entrypoints\`, or add \`"!${pattern}"\` there when a glob matches it.`,
+    `LLM-001 holds every entrypoint an entry matches to that entry's one \`maxTokensPerEntrypoint\` (${context.maxTokens} today), so raising it there would raise it for every other entrypoint too. Instead, add a second \`LLM-001\` entry with \`"entrypoints": ["${pattern}"]\` and a \`maxTokensPerEntrypoint\` above ${context.totalTokens} - for example ${roomAbove(context.totalTokens, 1.1)}, some room above today's total - and make the existing entry stop matching ${file}: remove it from that entry's \`entrypoints\`, or add \`"!${pattern}"\` there when a glob matches it.`,
   ];
 }
 
@@ -421,8 +421,8 @@ function reportingContextEntry(
 // Whether every pattern an entry adds names `filePath` itself: removing the file would then leave
 // nothing. A glob, even one that matches only this file today, is left to the general steps, which
 // tell the agent to exclude the file with a `!` pattern instead of emptying the list. So is a bare
-// name that reaches this file only through its depth-agnostic reading — `README.md` selecting
-// `docs/README.md` — since it selects every `README.md` and the `!` form leaves the rest of it.
+// name that reaches this file only through its depth-agnostic reading - `README.md` selecting
+// `docs/README.md` - since it selects every `README.md` and the `!` form leaves the rest of it.
 function namesOnly(
   entry: { entrypoints: string[] } | undefined,
   filePath: string,
@@ -442,7 +442,7 @@ function namesOnly(
 }
 
 // The config pattern that matches `filePath` and nothing else. Config globs without a `/` are
-// depth-agnostic — `README.md` is read as `**/README.md` — so a root file's bare name would hand
+// depth-agnostic - `README.md` is read as `**/README.md` - so a root file's bare name would hand
 // the raised budget to every same-named file in the repository, and its `!` form would pull every
 // nested one out of the existing entry too. A leading `./` anchors it to the root, the same form
 // `init` writes for its root-only patterns; a path that already has a `/` is anchored as it stands.
@@ -502,6 +502,6 @@ function verifySection(
     ];
   }
   return [
-    `${run} None of the findings above may remain, and no new one may appear — a change like this most often breaks a link or an anchor (\`REF-001\`, \`REF-002\`) or closes a reference cycle (\`GRP-001\`), where the config enables them.`,
+    `${run} None of the findings above may remain, and no new one may appear - a change like this most often breaks a link or an anchor (\`REF-001\`, \`REF-002\`) or closes a reference cycle (\`GRP-001\`), where the config enables them.`,
   ];
 }

@@ -5,7 +5,7 @@ import { visit } from "unist-util-visit";
 import type { HeadChanges, HeadRemoval } from "@wastech-mdlint/core";
 
 // Marks on a rendered document for what the branch changed in it. The page's blocks are the ones it
-// numbers with their source line — every top-level block and every list item — and the diff is core's,
+// numbers with their source line - every top-level block and every list item - and the diff is core's,
 // restated in head line numbers by `headChanges`, so a block is matched to a change by line ranges
 // alone and the rendered text never has to be compared with anything.
 
@@ -35,8 +35,8 @@ type Block = LineRange & {
   // A list is never marked itself, only its items, so a changed item is not drowned in a bar along
   // the whole list.
   list: boolean;
-  // A list's items; for anything else, the lists inside it — a list item's nested lists, or a list
-  // in a block quote — whose items are blocks of their own.
+  // A list's items; for anything else, the lists inside it - a list item's nested lists, or a list
+  // in a block quote - whose items are blocks of their own.
   children: Block[];
 };
 
@@ -270,7 +270,7 @@ type LostAt = "start" | "middle" | "end";
 
 /**
  * Read the base against the diff. `removed`: the base's blocks whose every line of text left without
- * a counterpart, outermost first — a list whose items all went is one removed list, while a list that
+ * a counterpart, outermost first - a list whose items all went is one removed list, while a list that
  * kept some items has its removed items listed one by one; a block with an edited line is not removed,
  * since the head shows it, changed. `lost`: removed lines that were part of a block that survived,
  * such as a table's last row or a line of a wrapped paragraph.
@@ -466,8 +466,8 @@ function fold(container: Container, blocks: Block[]): Element {
 }
 
 /**
- * A removed block, ready to show inside the head's page. An item keeps its own list around it — an
- * ordered one starting at the number the item had — so it renders as the item it was. Everything
+ * A removed block, ready to show inside the head's page. An item keeps its own list around it - an
+ * ordered one starting at the number the item had - so it renders as the item it was. Everything
  * that ties it to its place in the base goes: base line numbers, which are not lines of this file,
  * and ids and anchor names, which could duplicate the head's and send a link to the removed copy.
  */

@@ -122,21 +122,21 @@ export function renderChangesArticle(
 }
 
 // The comparisons the switch offers. The whole branch is the default and comes first; each of the
-// other two leaves part of it out — the work not committed yet, or everything already committed.
+// other two leaves part of it out - the work not committed yet, or everything already committed.
 const COMPARE_SEGMENTS: readonly (readonly [CompareMode, string])[] = [
   ["branch", "Branch"],
   ["commits", "Commits only"],
   ["uncommitted", "Uncommitted"],
 ];
 
-// What the review starts from, named for a sentence: the base branch, or — for uncommitted work —
+// What the review starts from, named for a sentence: the base branch, or - for uncommitted work -
 // the last commit, which a reader would not recognise as "the base branch".
 function startName(mode: CompareMode): string {
   return mode === "uncommitted" ? "the last commit" : "the base branch";
 }
 
-// What to compare: the whole branch, its commits only or the uncommitted work alone, and — with
-// review marks — what the review starts from or the reader's last review.
+// What to compare: the whole branch, its commits only or the uncommitted work alone, and - with
+// review marks - what the review starts from or the reader's last review.
 function renderControls(
   mode: CompareMode,
   baseline: Baseline,

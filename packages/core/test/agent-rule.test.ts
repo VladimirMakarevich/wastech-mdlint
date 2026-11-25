@@ -31,7 +31,7 @@ describe("buildAgentRuleMarkdown", () => {
   });
 
   // A nested config is invisible from the repository root, where the page lives and where an agent
-  // most likely starts — a bare `lint` there would find no config at all.
+  // most likely starts - a bare `lint` there would find no config at all.
   it("names a nested config's directory as the place to run from", () => {
     const text = buildAgentRuleMarkdown({
       ...ROOT_INSTALLED,
@@ -78,7 +78,7 @@ describe("buildAgentRuleMarkdown", () => {
 
   // The budget policy is an order, not a list of options: compress while nothing is lost, and split
   // only what that cannot fit. Each assertion guards one way an edit to the page could quietly break
-  // it — permitting compression without its floor reads as licence to drop examples and reasons
+  // it - permitting compression without its floor reads as licence to drop examples and reasons
   // until a file fits, and swapping the order sends agents into needless splits of redundant text.
   it("orders the budget policy: compress without loss first, split only after", () => {
     const text = buildAgentRuleMarkdown(ROOT_INSTALLED);
@@ -122,7 +122,7 @@ describe("buildAgentRuleMarkdown", () => {
   });
 
   // The directory name is the one generated string an arbitrary repository controls, and a code
-  // span with a backtick inside closes early — the page would then name a directory that does not
+  // span with a backtick inside closes early - the page would then name a directory that does not
   // exist. Checked against the parser rather than by eye, because the delimiter rule is CommonMark's.
   it("keeps a directory name containing backticks intact inside its code span", () => {
     const directory = "odd `name` dir";

@@ -91,7 +91,7 @@ describe("STR-001 required files", () => {
     expect(glob.messages).toEqual([]);
   });
 
-  it("keeps glob entries corpus-scoped — a non-Markdown match on disk is still missing", async () => {
+  it("keeps glob entries corpus-scoped - a non-Markdown match on disk is still missing", async () => {
     const cwd = await fixtureRepo({
       "README.md": "# Readme\n",
       "assets/logo.png": "not really a png\n",

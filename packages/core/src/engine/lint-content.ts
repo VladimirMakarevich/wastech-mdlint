@@ -39,7 +39,7 @@ export type LintContentInput = {
  * instead of throwing.
  *
  * No `ContextGraph` is built. Graph-aware rules (GRP-001/002) no-op gracefully without one, and a
- * graph over a single document could only ever report that document as an orphan — while building it
+ * graph over a single document could only ever report that document as an orphan - while building it
  * needs the `siteRouter`/`idRef` wiring an ad-hoc `{ path, content }` call has no corpus to make
  * meaningful. An intentional boundary, not a gap.
  */

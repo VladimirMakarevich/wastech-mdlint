@@ -16,7 +16,7 @@ import ignore, { type Ignore } from "ignore";
  *
  * **The order of a layer array is part of this type's contract: outermost first.** Both walks and the
  * scope tester build it that way, appending each directory's own layer as they descend, and `isGitIgnored` reads it in
- * reverse — the reversal *is* git's precedence rule, so a caller that hands over a differently
+ * reverse - the reversal *is* git's precedence rule, so a caller that hands over a differently
  * ordered array gets a differently ordered precedence.
  */
 /**
@@ -24,10 +24,10 @@ import ignore, { type Ignore } from "ignore";
  *
  * Two constraints on a producer, both relied on by `isGitIgnored`. The array of layers must be
  * ordered shallowest-first, because precedence is resolved by walking it from the end. And a layer's
- * `ig` must not be mutated — via `ig.add(...)` or otherwise — after the layer is first queried:
+ * `ig` must not be mutated - via `ig.add(...)` or otherwise - after the layer is first queried:
  * ancestor-neutralized copies of it are memoized under its object identity, so later additions would
  * be invisible to every cached answer. Every current producer builds one `Ignore` per directory and
- * never adds to it — the walks per walk, the scope tester once for its lifetime — which satisfies
+ * never adds to it - the walks per walk, the scope tester once for its lifetime - which satisfies
  * this by construction.
  */
 export type IgnoreLayer = { baseRel: string; ig: Ignore };
@@ -35,7 +35,7 @@ export type IgnoreLayer = { baseRel: string; ig: Ignore };
 /**
  * What one layer, or all of them together, says about a path. The third state is the whole reason
  * precedence is expressible at all: "no rule here" has to fall through to the next layer, while "a
- * negation kept it" has to stop the search — the boolean `ignores()` collapses both into `false`.
+ * negation kept it" has to stop the search - the boolean `ignores()` collapses both into `false`.
  */
 type Verdict = "ignored" | "kept" | "no-opinion";
 
@@ -71,7 +71,7 @@ const neutralizedLayers = new WeakMap<Ignore, Map<number, Ignore>>();
  * `.gitignore` and wrong across several: a deeper `.gitignore` may have re-included the very
  * directory this layer excluded (`artifacts/*` at the root, `!docs/` in `artifacts/.gitignore`), and
  * git then judges the files inside on patterns that match them directly. Layer precedence therefore
- * has to own the ancestor question — see `isGitIgnored` — and each layer has to answer for the path
+ * has to own the ancestor question - see `isGitIgnored` - and each layer has to answer for the path
  * alone.
  */
 function neutralizedFor(ig: Ignore, ancestorDepth: number): Ignore {
@@ -91,7 +91,7 @@ function neutralizedFor(ig: Ignore, ancestorDepth: number): Ignore {
   // none can ever match a file query, and added last so they win under gitignore's last-match-wins.
   // Naming the depths rather than splicing the actual directory names into pattern text is what
   // keeps a directory called `we[i]rd`, `a#b`, or `!x` from becoming a different pattern than its
-  // own name — path text is never pattern text here.
+  // own name - path text is never pattern text here.
   const negations: string[] = [];
   for (let depth = 1; depth <= ancestorDepth; depth += 1) {
     negations.push(`!/${"*/".repeat(depth)}`);
@@ -161,7 +161,7 @@ export function isGitIgnored(
   layers: IgnoreLayer[],
 ): boolean {
   // Git decides this in two independent steps, and both of them obey layer precedence. First, an
-  // excluded *directory* takes its whole subtree with it — nothing under it can be re-included.
+  // excluded *directory* takes its whole subtree with it - nothing under it can be re-included.
   // Second, if no ancestor is excluded, only patterns matching the path itself count. Resolving the
   // ancestors here rather than leaving them to each layer's own `test()` is what lets a deeper
   // `!docs/` re-include a directory a root `artifacts/*` excluded and then keep the files inside it,
@@ -180,7 +180,7 @@ export function isGitIgnored(
 
 /**
  * Read the `.gitignore` owned by `directoryPath` into a layer, or undefined when there is none (or
- * it cannot be read — an unreadable ignore file means "no rules here", never a scan failure).
+ * it cannot be read - an unreadable ignore file means "no rules here", never a scan failure).
  */
 export async function readIgnoreLayer(
   directoryPath: string,

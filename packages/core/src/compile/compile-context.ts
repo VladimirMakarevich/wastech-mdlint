@@ -26,7 +26,7 @@ import {
 } from "./synthesize.js";
 
 // Compile orchestration: the entry point both the CLI and MCP call. Reuses
-// `loadContext`/`analyzeGraph`/`extractDocProfile`/`describeRules`/`query`/`estimateTokens` — no
+// `loadContext`/`analyzeGraph`/`extractDocProfile`/`describeRules`/`query`/`estimateTokens` - no
 // parallel parsing, graph traversal, or token-estimation logic lives here.
 
 // Thrown when `config.compile` is absent. Mirrors `ImpactAnalysisError`'s hint-carrying pattern so
@@ -53,8 +53,8 @@ type ResolvedCompileSettings = {
 };
 
 // `config-schema.ts`'s strict `compileConfigSchema` already validated presence and shape of every
-// leaf, so only *absent* optional leaves need a default here — no more per-leaf `safeParse`
-// defaulting. `outdir` still isn't read here — that stays the CLI's job.
+// leaf, so only *absent* optional leaves need a default here - no more per-leaf `safeParse`
+// defaulting. `outdir` still isn't read here - that stays the CLI's job.
 function resolveCompileSettings(
   compileConfig: CompileConfig,
 ): ResolvedCompileSettings {
@@ -122,7 +122,7 @@ function activeLlm001Entries(
 }
 
 // The strictest (lowest) threshold among every active entry whose `entrypoints` glob matches
-// this file — one rendered row per path, but a violation of *any* configured entry's budget.
+// this file - one rendered row per path, but a violation of *any* configured entry's budget.
 // Undefined when no entry treats the file as an entrypoint.
 function strictestMaxTokens(
   entrypoint: string,
@@ -208,7 +208,7 @@ function computeBudget(
 
 // The doc's illustrative signature (`compileContext(config, cwd): CompileResult`) is shorthand, not
 // literal: building a `CompileResult` requires `loadContext`, which is async, and every comparable
-// core entry point (`lintFiles`, `loadConfiguration`) is already async — so this one is too.
+// core entry point (`lintFiles`, `loadConfiguration`) is already async - so this one is too.
 export async function compileContext(
   config: LoadedConfiguration,
   cwd: string,
@@ -230,7 +230,7 @@ export async function compileContext(
   const documentPaths = [...documents.keys()].sort(compareStrings);
   // One batch, so the corpus-wide graph index (roles + edge partition) is built once. Calling
   // `extractDocProfile` per document reclassified every node and rescanned `graph.edges` N times
-  // — O(N² + N·E) in corpus size. Sorted the same way as `documentPaths` so the
+  // - O(N² + N·E) in corpus size. Sorted the same way as `documentPaths` so the
   // returned Map's order matches the render order, even though `synthesize` only ever looks
   // profiles up by path.
   const profiles = extractDocProfiles(

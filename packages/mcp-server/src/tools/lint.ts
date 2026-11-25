@@ -28,7 +28,7 @@ import {
   withErrorOutput,
 } from "../shared/tool-response.js";
 
-// `lint` — lint ad-hoc Markdown text against an explicit set of rules. This tool never loads a
+// `lint` - lint ad-hoc Markdown text against an explicit set of rules. This tool never loads a
 // project config (that is `lint-files`' job): the whole contract is "content + rules in, findings
 // out", so the input carries the rules to run rather than resolving them from a config. Core still
 // owns rule semantics, so file-resolving rules may inspect paths under the server cwd.
@@ -45,7 +45,7 @@ const AD_HOC_DOCUMENT_PATH = "content.md";
 //
 // Widened to a union so "executes declarative custom rules" holds for ad-hoc `lint`
 // too. Custom-first, because the strict built-in branch would reject a custom entry's `id`/`target`
-// keys. The second branch is `ruleEntrySchema` — the permissive one — deliberately NOT the config-only
+// keys. The second branch is `ruleEntrySchema` - the permissive one - deliberately NOT the config-only
 // `ruleEntryUnionSchema`, whose standard branch refine-rejects the literal `"custom"`: the SDK
 // `safeParseAsync`s this schema *before* the handler runs and turns a failure into an
 // `InvalidParams` result carrying raw validation text and no `structuredContent`, so any shape
@@ -100,9 +100,9 @@ function toToolInputError(error: RuleResolutionError): ToolInputError {
 
 // Re-validate a `rule: "custom"` request inside the handler. The wire schema's permissive branch lets
 // a malformed custom entry through on purpose (see `ruleRequestSchema`), and `entry.rule === "custom"`
-// does not narrow `RuleConfigEntry` away — its `rule` is an open `z.string()` — so this parses rather
+// does not narrow `RuleConfigEntry` away - its `rule` is an open `z.string()` - so this parses rather
 // than casts. That also means `handleLint`, which tests call directly, never reaches
-// `resolveCustomRule` with an absent `id` — the same crash the config boundary already guards.
+// `resolveCustomRule` with an absent `id` - the same crash the config boundary already guards.
 function resolveCustomRequest(entry: LintRuleRequest): Rule {
   const parsed = customRuleEntrySchema.safeParse(entry);
   if (!parsed.success) {
@@ -118,13 +118,13 @@ function resolveCustomRequest(entry: LintRuleRequest): Rule {
 }
 
 // Resolve requested entries to runnable rules, mirroring lintFiles' resolve-then-filter of `"off"`
-// (that helper isn't exported and is only ~6 lines — not worth a core export for one caller).
+// (that helper isn't exported and is only ~6 lines - not worth a core export for one caller).
 function resolveRequestedRules(
   entries: readonly LintRuleRequest[],
 ): ResolvedRule[] {
   // Checked here as well as in the config loader because this tool resolves its rules from the
   // request rather than from a config, so it never passes through that check. Two custom entries
-  // under one id both run and produce findings labelled identically — which on this host means a
+  // under one id both run and produce findings labelled identically - which on this host means a
   // model reading them cannot attribute either. Refused before any rule resolves, since the whole
   // request is unusable rather than one entry of it.
   const collision = findDuplicateCustomIds(entries)[0];
@@ -180,8 +180,8 @@ function resolveRequestedRules(
 
 export function handleLint(input: LintToolInput): CallToolResult {
   try {
-    // Rule *resolution* stays here — `resolveRequestedRules` owns translating a `RuleResolutionError`
-    // into this host's `{ code, message, hint }` contract — and every step after it is core's
+    // Rule *resolution* stays here - `resolveRequestedRules` owns translating a `RuleResolutionError`
+    // into this host's `{ code, message, hint }` contract - and every step after it is core's
     // `lintContent`: parse, corpus of one, scope split, inline-disable, counts. Those steps used to
     // be assembled in this function, which made this the one place `lintFiles`' step
     // order existed twice; a step added there would silently not have reached this tool.
@@ -189,7 +189,7 @@ export function handleLint(input: LintToolInput): CallToolResult {
     // `rootDir` is the server cwd, mirroring the fallback `resolveToolCwd` applies to the file-based
     // tools. It is a bare `process.cwd()` call, not that helper: this tool takes no `cwd` input, so
     // there is nothing caller-supplied to validate. Passing a real directory rather than a bespoke
-    // corpus-only mode is deliberate — REF-001/003 resolve `rootDir` into `existsSync` for targets
+    // corpus-only mode is deliberate - REF-001/003 resolve `rootDir` into `existsSync` for targets
     // outside the corpus, so on-disk targets resolve exactly as they do under `lint-files`, and core
     // stays the single owner of REF/SEC resolution semantics.
     const result = lintContent({

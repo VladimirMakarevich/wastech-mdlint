@@ -7,14 +7,14 @@ import {
 
 // Unified skill model. Static skills and the compiler's generated output are the
 // same shape so the two provenances stay provably interchangeable. The `frontmatter` field is the
-// the compile path's `skillFrontmatterSchema` by import — never a parallel definition — which is what keeps
+// the compile path's `skillFrontmatterSchema` by import - never a parallel definition - which is what keeps
 // generated and static skills validating against one contract.
 export type SkillKind = "static" | "generated";
 
 // `Skill.path` is public core data, so it must be an already-normalized repository-relative POSIX
 // path here rather than trusting callers: no backslashes (Windows separators) and no drive-rooted
 // prefix, and every `/`-segment must be a real name. Splitting and rejecting empty, `.`, and `..`
-// segments enforces the full normalized form in one pass — it rules out absolute paths (leading
+// segments enforces the full normalized form in one pass - it rules out absolute paths (leading
 // empty segment), `//` and trailing slashes (empty segments), `.`/`./` (dot segments), and any
 // `..` that would escape the repository root. A failing path is rejected (surfaced as a
 // validation issue) instead of silently normalized, so CI gets a diagnostic pointing at the

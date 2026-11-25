@@ -22,7 +22,7 @@ export type DocumentSection = {
   /** The section's lines, from 1, both included; empty text has `end` below `start`. */
   start: number;
   end: number;
-  /** Its own text only — the next section, at whatever level, starts where this one ends. */
+  /** Its own text only - the next section, at whatever level, starts where this one ends. */
   text: string;
 };
 

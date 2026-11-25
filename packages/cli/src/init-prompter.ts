@@ -28,12 +28,12 @@ const PACKAGE_MANAGER_CHOICES: {
 // Real `@inquirer/prompts` calls can't be driven in a test without a live TTY (confirmed: even a
 // redirected `/dev/null` stdin just hangs rather than resolving/rejecting), so these two builders
 // are split out and exported purely so a test can assert the exact `default` handed to `select()`
-// — the config that decides what plain Enter resolves to — without needing to render a prompt.
+// - the config that decides what plain Enter resolves to - without needing to render a prompt.
 
 /**
  * `default` mirrors `DEFAULT_EXISTING_CONFIG_ACTION` (the same constant `--yes` falls back to
  * with no `--on-existing`), so pressing Enter through the interactive flow can never resolve to
- * the destructive `"overwrite"` — `@inquirer/select` otherwise defaults to the first choice.
+ * the destructive `"overwrite"` - `@inquirer/select` otherwise defaults to the first choice.
  */
 export function buildExistingConfigActionPromptConfig(configPath: string): {
   message: string;
@@ -44,14 +44,14 @@ export function buildExistingConfigActionPromptConfig(configPath: string): {
     message: `An existing config was found at ${configPath}. What should init do?`,
     choices: [
       {
-        name: "Overwrite — replace it with the freshly inferred config",
+        name: "Overwrite - replace it with the freshly inferred config",
         value: "overwrite",
       },
       {
-        name: "Merge — keep every existing rule, append only the new ones",
+        name: "Merge - keep every existing rule, append only the new ones",
         value: "merge",
       },
-      { name: "Skip — leave it untouched", value: "skip" },
+      { name: "Skip - leave it untouched", value: "skip" },
     ],
     default: DEFAULT_EXISTING_CONFIG_ACTION,
   };
@@ -59,7 +59,7 @@ export function buildExistingConfigActionPromptConfig(configPath: string): {
 
 /**
  * `default: undefined` selects the "none of these" choice, matching `--yes`'s own behavior of
- * leaving an undetected package manager unset (printed as "not detected") — `@inquirer/select`
+ * leaving an undetected package manager unset (printed as "not detected") - `@inquirer/select`
  * otherwise defaults to the first real choice (`"bun"`), inventing evidence the scan never found.
  */
 export function buildPackageManagerPromptConfig(): {
@@ -76,7 +76,7 @@ export function buildPackageManagerPromptConfig(): {
 }
 
 /**
- * `default: false` — "ask first, don't write silently" means a bare Enter must not opt into
+ * `default: false` - "ask first, don't write silently" means a bare Enter must not opt into
  * dropping a CI workflow file; `@inquirer/confirm` otherwise defaults to yes.
  */
 export function buildCiWorkflowPromptConfig(): {
@@ -121,12 +121,12 @@ function toWritableStream(stream: Pick<NodeJS.WriteStream, "write">): Writable {
 }
 
 /**
- * The only module that imports `@inquirer/prompts` — a thin pass-through to a well-tested
+ * The only module that imports `@inquirer/prompts` - a thin pass-through to a well-tested
  * third-party library, deliberately not unit-tested beyond a light smoke check (the rest of the
  * codebase doesn't unit-test thin host adapters like `commander` itself beyond their own logic).
  *
- * `stdout` is the CLI's own injected stream (mirrors `CliIo.stdout`). Every prompt call — not just
- * `confirmDraft`'s manual draft write — renders through it via Inquirer's `context.output`, so
+ * `stdout` is the CLI's own injected stream (mirrors `CliIo.stdout`). Every prompt call - not just
+ * `confirmDraft`'s manual draft write - renders through it via Inquirer's `context.output`, so
  * interactive `init` never splits its output across the injected seam and the real
  * `process.stdout`.
  */
@@ -183,7 +183,7 @@ export function createInquirerPrompter(
     },
 
     async confirmDraft(summary: string): Promise<boolean> {
-      // Shown exactly once, here — `runInitCommand` relies on this and does not re-print `summary`
+      // Shown exactly once, here - `runInitCommand` relies on this and does not re-print `summary`
       // itself after a confirmed interactive run (see the `InitPrompter.confirmDraft` contract).
       stdout.write(summary);
       return confirm(

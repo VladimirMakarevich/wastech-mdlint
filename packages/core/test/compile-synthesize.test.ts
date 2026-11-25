@@ -291,8 +291,8 @@ describe("synthesize", () => {
   });
 
   it("carries the degrees the Role bucket rounds off in a Refs column", () => {
-    // The role vocabulary collapses at scale — `hub` and `isolated` hold 86% of the 139-document
-    // fixture — so the row must let a reader tell a 3-reference hub from a 124-reference one.
+    // The role vocabulary collapses at scale - `hub` and `isolated` hold 86% of the 139-document
+    // fixture - so the row must let a reader tell a 3-reference hub from a 124-reference one.
     const edge = (from: string, to: string): ContextGraphEdge => ({
       from,
       to,
@@ -393,7 +393,7 @@ describe("synthesize", () => {
     expect(result.skillContent).toContain("- `a.md -> b.md -> a.md`");
     // One excluded path per bullet: rendered as a single line this measured 3702 characters, which
     // no reader and no diff can use.
-    // Uncapped, unlike the fan-out — a document missing from reading order with no explanation is
+    // Uncapped, unlike the fan-out - a document missing from reading order with no explanation is
     // exactly the silent truncation this block exists to prevent. The `Complete:` line says so in
     // the artifact, because a count alone cannot tell a reader whether a list was capped.
     expect(result.skillContent).toContain(
@@ -448,7 +448,7 @@ describe("synthesize", () => {
   it("does not claim an empty corpus when every document is cycle-excluded", () => {
     // Finding: an all-cyclic corpus has `readingOrder: []` but a non-empty corpus, so the Reading
     // Order block must not fall back to the same "(no documents found)" text an actually-empty
-    // corpus gets — those are different facts.
+    // corpus gets - those are different facts.
     const result = synthesize(
       input({
         documentPaths: ["a.md", "b.md"],
@@ -520,7 +520,7 @@ describe("synthesize", () => {
       );
       const lines = result.skillContent.split("\n");
 
-      // The count is the *total*, not the number shown — a truncated list that presents itself as
+      // The count is the *total*, not the number shown - a truncated list that presents itself as
       // complete is the failure this disclosure exists to prevent.
       expect(lines).toContain("- from (124, showing 10):");
       // The empty direction carries its count in the same position, so one scan finds both.
@@ -679,7 +679,7 @@ describe("synthesize", () => {
         "The 25 most-referenced of 30 documents are shown; the other 5 are omitted, and Reading Order below still lists every one.",
       );
       // The five least-referenced documents are the ones dropped, and the survivors are in path
-      // order rather than rank order — rank decides *which* rows exist, not where a reader looks.
+      // order rather than rank order - rank decides *which* rows exist, not where a reader looks.
       expect(rows[0]).toContain("| doc-05.md |");
       expect(rows.at(-1)).toContain("| doc-29.md |");
       // The same 25 documents the References block details, so a row never lacks an entry.
@@ -698,7 +698,7 @@ describe("synthesize", () => {
 
     it("does not point at Reading Order when the dependency section is gated off", () => {
       // The pointer names a heading inside `Document Dependencies`. With that section disabled the
-      // claim would send a reader to a heading the artifact does not contain, so it is dropped —
+      // claim would send a reader to a heading the artifact does not contain, so it is dropped -
       // the bound and the omission count are still stated.
       const block = architectureBlock(
         synthesize(
@@ -818,7 +818,7 @@ describe("synthesize", () => {
     expect(result.metadata.componentCount).toBe(2);
     expect(result.metadata.contentHash).toMatch(/^[0-9a-f]{16}$/);
     // The provenance line must actually be present in `skillContent`, and its
-    // embedded hash must be the exact same value returned in `metadata.contentHash` — a regression
+    // embedded hash must be the exact same value returned in `metadata.contentHash` - a regression
     // that drops or mismatches this line would otherwise pass unnoticed.
     expect(result.skillContent).toContain(
       `Generated from 3 docs, 3 rules · content hash sha256:${result.metadata.contentHash}`,
@@ -929,7 +929,7 @@ describe("synthesize", () => {
 
   it("renders a CJK skill name and description intact in frontmatter and the heading", () => {
     // Finding: JSON.stringify does not escape non-ASCII BMP characters, so the hand-rolled YAML
-    // frontmatter renderer passes CJK through byte-for-byte — this pins that (the schema has no ASCII
+    // frontmatter renderer passes CJK through byte-for-byte - this pins that (the schema has no ASCII
     // assumption), it doesn't change any rendering code.
     const result = synthesize(
       input({

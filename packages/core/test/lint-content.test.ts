@@ -10,7 +10,7 @@ import { ruleRegistry } from "../src/engine/rules/index.js";
 import type { ResolvedRule } from "../src/engine/types.js";
 
 // `lintContent` exists so the ad-hoc lint path reaches the same steps in the same
-// order as `lintFiles` — the MCP `lint` tool used to assemble that sequence itself, and nothing
+// order as `lintFiles` - the MCP `lint` tool used to assemble that sequence itself, and nothing
 // failed when the two disagreed. This suite is the differential: the same bytes through both entry
 // points must produce the same `LintResult`.
 //
@@ -95,7 +95,7 @@ describe("lintContent agrees with lintFiles on the same document", () => {
     // the same sequence and are exactly what a host would otherwise recompute for itself.
     expect(viaContent).toEqual(viaFiles);
 
-    // Non-vacuous in both directions — each rule fired, and the suppressed link did not.
+    // Non-vacuous in both directions - each rule fired, and the suppressed link did not.
     expect(viaContent.messages.map((message) => message.ruleId).sort()).toEqual(
       ["REF-001", "SIZE-001", "TBL-006"],
     );
@@ -110,7 +110,7 @@ describe("lintContent agrees with lintFiles on the same document", () => {
   it("attributes a project rule's finding without a document in context", () => {
     // The one behavior the extraction changed: `handleLint` used to hand every rule a `document` and
     // `filePath`, so a project rule that forgot to attribute a finding would have inherited the
-    // ad-hoc path. Under the shared pipeline it inherits `""` instead — which is why every shipped
+    // ad-hoc path. Under the shared pipeline it inherits `""` instead - which is why every shipped
     // project rule self-attributes, and why that is worth pinning at this entry point rather than
     // only at `lintFiles`, where a real corpus makes the fallback look harmless.
     const result = lintContent({
@@ -126,7 +126,7 @@ describe("lintContent agrees with lintFiles on the same document", () => {
 
   it("runs a graph-aware rule as a no-op rather than throwing without a graph", () => {
     // `lintContent` builds no `ContextGraph` (documented on the entry point). GRP-001 must degrade
-    // quietly: the alternative — a crash — would reach an MCP caller as INTERNAL_ERROR for a request
+    // quietly: the alternative - a crash - would reach an MCP caller as INTERNAL_ERROR for a request
     // that is entirely valid.
     const result = lintContent({
       path: AD_HOC_PATH,
@@ -163,7 +163,7 @@ describe("lintContent agrees with lintFiles on the same document", () => {
 // Frontmatter occupies source lines without producing nodes a rule sees, so the risk is that a line
 // number or a directive's target line drifts by the height of the block. Line numbers are absolute
 // source lines either way; this pins that suppression and reporting both still use them. The block
-// itself carries a disable directive to prove it is not read as one — otherwise it would swallow
+// itself carries a disable directive to prove it is not read as one - otherwise it would swallow
 // the unsuppressed finding too.
 describe("lintContent on a document with frontmatter", () => {
   it("suppresses by absolute line and reports the remaining finding at its source line", () => {

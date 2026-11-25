@@ -7,7 +7,7 @@ import type { ContextGraph } from "./context-graph-types.js";
 import { query as runQuery, type QueryVisit } from "./query.js";
 
 // Deterministic search index + slice resolution. The shared `query`/`slice` only accept an
-// already-resolved start path; this module supplies the missing piece — resolving a user-facing
+// already-resolved start path; this module supplies the missing piece - resolving a user-facing
 // query string (an ID, a heading/anchor slug, or a file path) to one or more start nodes via plain
 // index lookups. Exact match only, never fuzzy/substring/keyword/LLM, so `slice` results stay
 // deterministic and the CLI/MCP surfaces can advertise honest semantics.
@@ -31,11 +31,11 @@ export type ContextSliceResult = {
 };
 
 // Exported so the CLI `--help` text and the MCP tool description quote this exact sentence instead of
-// drifting into separately worded (and possibly over-promising) copy — the single honesty
+// drifting into separately worded (and possibly over-promising) copy - the single honesty
 // requirement is satisfied by both hosts importing the same string rather than restating it.
 export const SLICE_RESOLUTION_DESCRIPTION =
   "Resolves the query by exact match against defined IDs, heading/anchor slugs, and file paths " +
-  "— no fuzzy, substring, keyword, or LLM matching.";
+  "- no fuzzy, substring, keyword, or LLM matching.";
 
 // Mirrors `parse-document.ts`'s private fragment decode so a `#slug` query decodes identically to a
 // same-file anchor link and lands on the same `bySlug` key. Kept local rather than exported: it is a
@@ -68,7 +68,7 @@ function addToIndex(
  * Build the index `resolveQuery` searches. Node identity is `document.path`, re-keyed here (never
  * the caller's Map key) to match `buildContextGraph`'s identity rule.
  *
- * `idRef` is optional: when omitted, `byId` stays empty and ID queries never match — the same
+ * `idRef` is optional: when omitted, `byId` stays empty and ID queries never match - the same
  * coupling `buildContextGraph` has with its own optional `idRef` (id-ref edges only exist when a
  * host supplies one). Callers that want ID resolution must load config and pass `idRef` through.
  */
@@ -116,7 +116,7 @@ export function buildSearchIndex(
 /**
  * Resolve a query string to zero or more start files. Exact match only, fixed precedence: a
  * leading `#` is always an anchor/heading-slug lookup and never falls through to another category;
- * otherwise path, then ID, then heading slug — the first category with at least one match wins and
+ * otherwise path, then ID, then heading slug - the first category with at least one match wins and
  * all of its files are returned. Cross-category collisions are rare in practice (paths carry
  * `.md`/`/`, IDs match `idPattern`, slugs are lowercased) so a fixed precedence keeps results
  * deterministic without ranking or merging across categories.
@@ -186,7 +186,7 @@ export type ContextSliceOptions = {
 
 /**
  * Resolve `query` via `buildSearchIndex`/`resolveQuery`, then run the shared forward `query()` from
- * every resolved start and merge the results — "closest start wins" for any node reachable from
+ * every resolved start and merge the results - "closest start wins" for any node reachable from
  * more than one start. Exact resolution only (see `SLICE_RESOLUTION_DESCRIPTION`); a query that
  * resolves to nothing returns an empty result rather than guessing.
  */
@@ -202,7 +202,7 @@ export function getContextSlice(
     return { query, matchKind: null, starts: [], files: [], visited: [] };
   }
 
-  // `query()` already no-ops on an unknown start, but filtering here keeps `starts` itself honest —
+  // `query()` already no-ops on an unknown start, but filtering here keeps `starts` itself honest -
   // it should never list a node the graph doesn't have.
   const nodePaths = new Set(graph.nodes.map((node) => node.path));
   const starts = resolved.starts

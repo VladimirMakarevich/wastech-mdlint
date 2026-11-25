@@ -1,4 +1,4 @@
-Another round on the same change. What arrived since your last turn is in the context files above — read those, not the task from the start.
+Another round on the same change. What arrived since your last turn is in the context files above - read those, not the task from the start.
 
 - Address every finding recorded this round, and the same class of defect elsewhere in the files you touch.
 - Start from this round's findings and check log; use the change overview only to locate the files they name, and open the full diff only when a finding cannot be placed without it.

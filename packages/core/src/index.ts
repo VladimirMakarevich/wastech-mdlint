@@ -41,7 +41,7 @@ export {
 } from "./discovery/globs.js";
 export { compareStrings } from "./deterministic-sort.js";
 
-// Atomic writes — the single write path both hosts use, so no surface re-invents
+// Atomic writes - the single write path both hosts use, so no surface re-invents
 // truncate-and-write. The newline helpers behind `--fix` stay core-internal.
 export { writeFileAtomic, writeFilesAtomic } from "./atomic-write.js";
 export type { AtomicFileWrite, AtomicWriteResult } from "./atomic-write.js";
@@ -136,7 +136,7 @@ export type {
 // are core's own `graph/search-index.ts` and `compile/compile-context.ts` (besides `impact()` in the
 // same module). They stay exported as deliberate library surface all the same. `query` is the
 // single traversal every graph feature composes, so a consumer builds on it rather than writing a
-// second walk with different visited-set and depth semantics — the "no parallel traversal" property
+// second walk with different visited-set and depth semantics - the "no parallel traversal" property
 // the whole graph layer rests on. `getImpactSet` is the raw affected-set closure that
 // `classifyImpact` projects into its directly/transitively/reading-order buckets, so it is the
 // useful form for a consumer that wants its own classification. Four neighbouring exports in the
@@ -177,7 +177,7 @@ export type {
 export { loadContext } from "./graph/load-context.js";
 export type { GraphContext } from "./graph/load-context.js";
 
-// Git — read-only access to the repository a host was pointed at, for comparing the corpus with a
+// Git - read-only access to the repository a host was pointed at, for comparing the corpus with a
 // base branch. In core rather than in a host because what it feeds (which documents changed, and
 // how) is shared computation: two hosts asking git separately would disagree on the base, the
 // prefix or the rename rules. The process runner and its environment stay internal, so no caller
@@ -202,7 +202,7 @@ export { GitCommandError } from "./git/git-command.js";
 // file manager) cannot be made to run a same-named file from the repository it serves.
 export { findExecutable } from "./find-executable.js";
 
-// Changes — what a branch changed in the corpus, and the diff a reviewer reads. The sequence diff
+// Changes - what a branch changed in the corpus, and the diff a reviewer reads. The sequence diff
 // under them stays internal: hosts compare texts, not arbitrary sequences.
 export { classifyChanges, collectChangeSet } from "./changes/change-set.js";
 export {
@@ -379,7 +379,7 @@ export type {
   LintResult,
 } from "./engine/lint-files.js";
 // The ad-hoc entry point over the shared step order: `lintContent` is the MCP `lint` tool's whole
-// body. `lintCorpus` itself stays **unexported** on purpose — its callers are `lintFiles`,
+// body. `lintCorpus` itself stays **unexported** on purpose - its callers are `lintFiles`,
 // `lintContext` and `lintContent`, all inside core, and it takes an already-parsed corpus plus
 // already-resolved rules. A host can hold a parsed corpus only as `loadContext` returned it and
 // rules only as `loadConfiguration` returned them, which is exactly what `lintContext` accepts, so
@@ -501,7 +501,7 @@ export type {
 } from "./config/config-schema.js";
 export { ConfigError } from "./config/config-error.js";
 
-// Structured error taxonomy — defined once here, shared by cli + mcp-server.
+// Structured error taxonomy - defined once here, shared by cli + mcp-server.
 export { TOOL_ERROR_CODES, isStructuredError } from "./errors.js";
 export type { StructuredErrorInfo, ToolErrorCode } from "./errors.js";
 export { CONFIG_FILE_NAME, findConfig } from "./config/find-config.js";

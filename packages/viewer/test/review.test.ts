@@ -386,7 +386,7 @@ describe.skipIf(!hasGit)("review marks (requires git on PATH)", () => {
 
   // The uncommitted comparison starts after the commit that renamed a document, so it lists the
   // document under its new name alone. Its marks under the old name must still count there, or one
-  // document reads as not reviewed in one comparison and as changed since review in the other — and
+  // document reads as not reviewed in one comparison and as changed since review in the other - and
   // a reset from there must forget them too, as the branch's own reset does.
   it("finds and resets a renamed document's marks from the uncommitted comparison", async () => {
     const own = await makeRepo();
@@ -580,7 +580,7 @@ describe.skipIf(!hasGit)("review marks (requires git on PATH)", () => {
 
   // @boundary-guard write-failure
   //
-  // A state directory that cannot hold the marks — here a regular file in its place, which refuses
+  // A state directory that cannot hold the marks - here a regular file in its place, which refuses
   // the folder the first mark creates on every platform. The request must say the mark failed, not
   // that it was saved; the file in the way must be untouched with nothing left beside it; and the
   // page, which draws a mark only from what the server stored, must not show the document reviewed.

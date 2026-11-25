@@ -102,7 +102,7 @@ export class ReviewMarks {
 
   /**
    * Where a document stands. Reviewed when its text was marked under its path, under the path a
-   * rename took it from, or under any path at all — so a document moved without an edit, or found
+   * rename took it from, or under any path at all - so a document moved without an edit, or found
    * on another branch under another name, is not reviewed twice. Changed since review when its path
    * (or the path it was renamed from) has marks for other texts; `since` is the newest of them, the
    * version to compare with.
@@ -407,7 +407,7 @@ export class ReviewStore {
       text = await readFile(this.indexPath, "utf8");
     } catch (error) {
       const code = errnoCode(error);
-      // Nothing stored yet — or a state directory that is not a directory, where nothing can be.
+      // Nothing stored yet - or a state directory that is not a directory, where nothing can be.
       if (code === "ENOENT" || code === "ENOTDIR") {
         return { ok: true, documents: new Map(), sections: new Map() };
       }

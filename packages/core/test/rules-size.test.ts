@@ -184,7 +184,7 @@ describe("SIZE-001 threshold supersession", () => {
   });
 });
 
-// `{"rule":"SIZE-001"}` used to be a valid, enabled rule that measured nothing — the only rule
+// `{"rule":"SIZE-001"}` used to be a valid, enabled rule that measured nothing - the only rule
 // in the registry that could be enabled into inertness.
 describe("SIZE-001 requires at least one budget", () => {
   function resolutionError(options: unknown): RuleResolutionError {

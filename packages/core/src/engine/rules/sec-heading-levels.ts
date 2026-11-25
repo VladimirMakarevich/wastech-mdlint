@@ -16,7 +16,7 @@ export type HeadingLevelOptions = {
 };
 
 // Passes when the first rendered block is a heading at `level`, or when front matter carries
-// `titleKey` with any value — presence only, because judging the value is what FM-001's `patterns`
+// `titleKey` with any value - presence only, because judging the value is what FM-001's `patterns`
 // is for. Front matter that cannot be read is not reported here (FM-001 owns that error); the
 // heading branch is still tried, and if it fails too the message says why the front matter could
 // not rescue the document, so the outcome is never a silent pass.

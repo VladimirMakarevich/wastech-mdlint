@@ -229,7 +229,7 @@ describe("findMixedRuleSpellings", () => {
         siblingPath: "config.rules[0]",
       }),
     ).toBe(
-      'rule "no-broken-links" names "REF-001", which config.rules[0] names as "REF-001" — spell every entry for one rule the same way.',
+      'rule "no-broken-links" names "REF-001", which config.rules[0] names as "REF-001" - spell every entry for one rule the same way.',
     );
   });
 });

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { isRootedPathEntry } from "../src/find-executable.js";
 
-// A `PATH` entry that is not pinned to one directory resolves against wherever the host runs —
-// usually the repository it reads — so a program found through it could be a file that repository
+// A `PATH` entry that is not pinned to one directory resolves against wherever the host runs -
+// usually the repository it reads - so a program found through it could be a file that repository
 // supplies. Only an entry that names the same folder from any working directory may be searched.
 describe("isRootedPathEntry", () => {
   it("accepts drive-letter and UNC entries on Windows", () => {

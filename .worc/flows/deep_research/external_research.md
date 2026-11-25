@@ -1,12 +1,12 @@
-Gather **external** evidence that bears on the research question — but only when the question genuinely turns on how an upstream contract, spec, or library actually behaves. If the answer is fully determined by the repository itself (an internal design question, a plan the project's own docs already state), do not go looking for external sources — restate nothing external research would add.
+Gather **external** evidence that bears on the research question - but only when the question genuinely turns on how an upstream contract, spec, or library actually behaves. If the answer is fully determined by the repository itself (an internal design question, a plan the project's own docs already state), do not go looking for external sources - restate nothing external research would add.
 
-{?refinement_path}Use the refined brief at {refinement_path} to decide whether any sub-question needs external grounding.{/refinement_path} The analysis passes upstream list the assumptions the code makes — validate the load-bearing ones against their authoritative source:
+{?refinement_path}Use the refined brief at {refinement_path} to decide whether any sub-question needs external grounding.{/refinement_path} The analysis passes upstream list the assumptions the code makes - validate the load-bearing ones against their authoritative source:
 
 {?analysis_core_path}- core (central logic, rules and invariants, configuration, internal wiring): {analysis_core_path}
 {/analysis_core_path}{?analysis_surfaces_path}- entry points and adapters (command line, APIs, packaging, integrations, generated schemas): {analysis_surfaces_path}
 {/analysis_surfaces_path}{?analysis_docs_tests_path}- plan of record and the test suite: {analysis_docs_tests_path}
 {/analysis_docs_tests_path}
 
-Prioritize primary, authoritative sources for whatever the code actually depends on — the specs of protocols and file formats it implements, the docs of the libraries/frameworks it relies on, and the runtime whose APIs it uses — over blog posts or secondary summaries.
+Prioritize primary, authoritative sources for whatever the code actually depends on - the specs of protocols and file formats it implements, the docs of the libraries/frameworks it relies on, and the runtime whose APIs it uses - over blog posts or secondary summaries.
 
 Use only the network access the flow grants; if network is unavailable, say so and fall back to what the repository documents. Record each source with a stable reference (URL or precise citation) and a one-line note on what it establishes and whether the implementation matches it. Read only; do not edit code or write files. Return the typed structured result required by the output schema.

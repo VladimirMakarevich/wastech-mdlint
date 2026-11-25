@@ -62,8 +62,8 @@ function buildCluster(
   };
 }
 
-// The scope a fresh `init` writes for these clusters. Passing it — rather than letting the call
-// default to something — is what makes these tests measure the corpus the drafted config lints.
+// The scope a fresh `init` writes for these clusters. Passing it - rather than letting the call
+// default to something - is what makes these tests measure the corpus the drafted config lints.
 function scopeFor(clusters: DocCluster[]): InferenceScope {
   return { include: clusters.map((cluster) => cluster.includeGlob) };
 }
@@ -166,7 +166,7 @@ describe("inferRuleSet · end to end", () => {
       "TBL-002",
       "TBL-007",
     ]);
-    // The cycle in this corpus is `docs/a.md -> docs/b.md -> docs/a.md`, two documents — below
+    // The cycle in this corpus is `docs/a.md -> docs/b.md -> docs/a.md`, two documents - below
     // GRP-001's floor of 3. The entry must not carry an option lowering that floor: the floor is
     // there because an index and a member linking each other is an ordinary shape, and a config that
     // reinstates it at `error` hands a new adopter a failing build for writing documentation
@@ -201,7 +201,7 @@ describe("inferRuleSet · end to end", () => {
     const sec001 = result.rules.find((rule) => rule.rule === "SEC-001");
     expect(sec001).toMatchObject({
       // Reading order from the ADRs ("## Status" then "## Context" then "## Decision"),
-      // not alphabetical — SEC-001's fix scaffolds missing sections in this order.
+      // not alphabetical - SEC-001's fix scaffolds missing sections in this order.
       options: {
         files: ["adr/**/*.{md,mdx}"],
         sections: ["Status", "Context", "Decision"],
@@ -239,7 +239,7 @@ describe("inferRuleSet · end to end", () => {
 describe("inferRuleSet · severity policy", () => {
   // The defect this pins: a rationale measured on three-to-five sampled files decided a rule that
   // then ran over everything. A document holding forty unchecked boxes sorts last here, so a
-  // five-file sample never reaches it — the proposal has to come from the corpus or not at all.
+  // five-file sample never reaches it - the proposal has to come from the corpus or not at all.
   it("counts a checklist volume no sample would reach, and writes the rule off rather than red", async () => {
     const filler = Object.fromEntries(
       ["a", "b", "c", "d", "e"].map((name) => [
@@ -376,7 +376,7 @@ describe("inferRuleSet · per-pattern isolation", () => {
 describe("inferRuleSet · corpus scope decides the evidence", () => {
   // The property that makes a merge safe: a rule can only be justified by files the config being
   // written will read. Here the images and tables live outside the scope, so neither REF-003 nor
-  // TBL-002 has any evidence at all — not evidence that is later filtered out.
+  // TBL-002 has any evidence at all - not evidence that is later filtered out.
   it("ignores files outside the scope entirely, however the clusters were drawn", async () => {
     const root = await createFixtureTree({
       "docs/a.md": "# A\n\n## Overview\n\nProse with a [link](b.md).\n",
@@ -410,7 +410,7 @@ describe("inferRuleSet · corpus scope decides the evidence", () => {
       "REF-001",
     ]);
     expect(result.corpusFileCount).toBe(2);
-    // The out-of-scope cluster is still reported, with an empty file list — the confirmation prompt
+    // The out-of-scope cluster is still reported, with an empty file list - the confirmation prompt
     // needs to show it was considered, and an empty list is how it shows nothing backed it.
     const assets = result.clusters.find(
       (cluster) => cluster.clusterPath === "assets",
@@ -529,7 +529,7 @@ describe("inferRuleSet · ADR detection", () => {
   it("finds no ADR evidence in .mdx files a `**/*.md` scope does not select", async () => {
     // The scan's global fallback cluster uses the literal glob "**/*.md" even where the directory
     // holds .mdx files, mirroring the tool's real zero-config default rather than the scan's own
-    // discovery criteria. SEC-001 scoped to that glob would be a dead rule — valid config checking
+    // discovery criteria. SEC-001 scoped to that glob would be a dead rule - valid config checking
     // none of the files that justified it. Measuring the corpus that glob selects makes that
     // unreachable rather than guarded against: the .mdx files are never read, so they cannot
     // contribute evidence in the first place.
@@ -592,7 +592,7 @@ describe("inferRuleSet · registry drift safety", () => {
     });
 
     // Trimmed registry (registry.test.ts style): a real rule can be renamed or removed without
-    // inferRuleSet crashing or emitting a dangling id — every gate id is a lookup key, not a
+    // inferRuleSet crashing or emitting a dangling id - every gate id is a lookup key, not a
     // standalone hardcoded metadata object.
     const trimmedRegistry = new RuleRegistry(
       ["REF-001", "REF-002", "REF-003", "TBL-002", "CTX-001", "GRP-001"].map(
@@ -678,7 +678,7 @@ describe("inferRuleSet · the cycle a GRP-001 rationale cites", () => {
   });
 
   it("resolves a root-relative link the same way the shared reference pipeline does", async () => {
-    // Root-relative targets resolve from the repo root, not from the source file's directory —
+    // Root-relative targets resolve from the repo root, not from the source file's directory -
     // resolving against "docs/a.md" instead would misread "/other/b.md" as "docs/other/b.md" and
     // miss the real document at "other/b.md" entirely.
     const root = await createFixtureTree({
@@ -698,7 +698,7 @@ describe("inferRuleSet · the cycle a GRP-001 rationale cites", () => {
   });
 
   it("does not treat a broken anchor as a graph edge", async () => {
-    // b.md's only heading ("# B") slugs to "b", not "missing-heading" — REF-002's evidence, not a
+    // b.md's only heading ("# B") slugs to "b", not "missing-heading" - REF-002's evidence, not a
     // real edge back to a.md, so there is no cycle here at all.
     const root = await createFixtureTree({
       "docs/a.md": "# A\n\nSee [B](b.md#missing-heading).\n",
@@ -754,7 +754,7 @@ describe("inferRuleSet · the cycle a GRP-001 rationale cites", () => {
     expect(grp001?.rationale).not.toContain("reference each other");
     expect(grp001?.rationale).not.toContain("will NOT report");
     expect(grp001?.options).toBeUndefined();
-    // Three documents is the rule's own floor, so this cycle *is* reported — which is exactly why
+    // Three documents is the rule's own floor, so this cycle *is* reported - which is exactly why
     // the entry is written disabled rather than failing the first run.
     expect(grp001?.severity).toBe("off");
   });

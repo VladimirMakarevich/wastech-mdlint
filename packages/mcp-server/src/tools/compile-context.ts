@@ -10,7 +10,7 @@ import {
 } from "../shared/tool-context.js";
 import { errorResult, READ_ONLY_ANNOTATIONS } from "../shared/tool-response.js";
 
-// `compile-context` — compile the project skill (the same deterministic `SKILL.md` the CLI's
+// `compile-context` - compile the project skill (the same deterministic `SKILL.md` the CLI's
 // `compile` command produces) over MCP. Core owns the whole pipeline; this handler is a thin
 // adapter.
 //
@@ -19,7 +19,7 @@ import { errorResult, READ_ONLY_ANNOTATIONS } from "../shared/tool-response.js";
 // `context-slice`, `impact-analysis`), and this one returns two content blocks instead. A compiled
 // SKILL.md is a document, not a record set: there is no field a client would read out of it that
 // the text does not already carry. So the
-// `registerTool` call omits `outputSchema` and the handler returns exactly two text blocks — hence
+// `registerTool` call omits `outputSchema` and the handler returns exactly two text blocks - hence
 // `successResult` (which always attaches `structuredContent`) is deliberately not reused here.
 
 // Identical `cwd?`/`configPath?` shape to `ToolFileInput`; this tool adds no field, so it takes
@@ -41,7 +41,7 @@ export async function handleCompileContext(
 
     // `compileContext` throws `CompileConfigMissingError` (code `COMPILE_CONFIG_MISSING`, already in
     // `TOOL_ERROR_CODES`, carrying `.hint`) when `config.compile` is absent, so `errorResult` passes
-    // it through verbatim with no translation wrapper — exactly like `impact-analysis`, and unlike
+    // it through verbatim with no translation wrapper - exactly like `impact-analysis`, and unlike
     // `lint.ts` whose `RuleResolutionError` codes aren't in the taxonomy.
     const result = await compileContext(loaded, loaded.cwd);
     const { documentCount, ruleCount, componentCount } = result.metadata;
@@ -52,7 +52,7 @@ export async function handleCompileContext(
         // CLI and this tool share the same `compileContext` call boundary, so returning it verbatim
         // guarantees identical output. The metadata line is a plain-text summary, not Markdown, and
         // lives here as a local template because it has exactly one call site today (the CLI prints
-        // `skillContent` or a write confirmation, never this line) — promote it to core only if a
+        // `skillContent` or a write confirmation, never this line) - promote it to core only if a
         // second consumer appears.
         { type: "text", text: result.skillContent },
         {

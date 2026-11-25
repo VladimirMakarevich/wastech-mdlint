@@ -10,8 +10,8 @@ import { describe, expect, it } from "vitest";
 import { createServer } from "../src/index.js";
 
 // Drift guard (deliverable 3, MCP half): the MCP tools/inputs/results the impact skill documents must
-// match the server's live advertised schema. Rather than hand-maintaining a separate matrix — which
-// could silently fall out of step with the skill — this test PARSES the tool snippets straight out of
+// match the server's live advertised schema. Rather than hand-maintaining a separate matrix - which
+// could silently fall out of step with the skill - this test PARSES the tool snippets straight out of
 // the skill body and asserts the parsed contract against the live input/output schemas. A skill that
 // documents a different tool, or renames/moves a field, changes this parse and fails here.
 const impactSkill = readFileSync(
@@ -39,7 +39,7 @@ function braceFields(span: string): string[] {
 }
 
 // Extract every MCP tool the skill documents (a dashed tool name followed by the word "tool"), then
-// read its input brace (the `{…}` after "Input", or — for tools configured inline like context-graph —
+// read its input brace (the `{…}` after "Input", or - for tools configured inline like context-graph -
 // the first brace in its section) and its result brace (the `{…}` after "returns"/"shaped", if any).
 function parseDocumentedTools(): DocumentedTool[] {
   const mentions = [...impactSkill.matchAll(/`([a-z]+-[a-z]+)` tool/g)];
@@ -102,7 +102,7 @@ describe("skills reference a live MCP surface", () => {
       const tool = byName.get(name);
       expect(tool, `tool ${name} is not advertised`).toBeDefined();
 
-      // The parse must have found something to check — an empty field list would silently pass.
+      // The parse must have found something to check - an empty field list would silently pass.
       expect(
         inputFields.length,
         `no documented inputs parsed for ${name}`,
@@ -139,7 +139,7 @@ describe("skills reference a live MCP surface", () => {
 });
 
 // The agent rule `init` writes names MCP tools from core, which has no view of what this server
-// registers — so a tool renamed here would leave every generated page sending agents to a tool that
+// registers - so a tool renamed here would leave every generated page sending agents to a tool that
 // does not exist, with nothing on either side failing. Its tool mentions are parsed the way the
 // skill's are above (a dashed name in a code span followed by the word "tool"), and must all be live.
 describe("the agent rule init writes names live MCP tools", () => {

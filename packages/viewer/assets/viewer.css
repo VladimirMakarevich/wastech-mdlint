@@ -1,10 +1,10 @@
 /* Every color is a token holding both a light and a dark value. `light-dark()` picks one from the
    element's `color-scheme`, which follows the operating system until the header switch pins it with
-   `data-theme` on <html> — so one set of tokens serves all three modes, with no duplicated dark
+   `data-theme` on <html> - so one set of tokens serves all three modes, with no duplicated dark
    block to drift out of step with the light one.
 
-   The palette is the one iOS and macOS draw their own controls in — grouped gray backgrounds, gray
-   fills instead of outlines, a green switch — with two deliberate departures: the light theme's blue
+   The palette is the one iOS and macOS draw their own controls in - grouped gray backgrounds, gray
+   fills instead of outlines, a green switch - with two deliberate departures: the light theme's blue
    and red are a shade darker than the system's, because the system's own are below 4.5:1 on white
    and here they carry small text (links, rule ids, error counts), not just glyphs. */
 :root {
@@ -130,7 +130,7 @@ html {
    Browsers without cross-document transitions load the page as before.
 
    Nothing fades. Laid over each other without a fade, the old and the new picture of the bar showed
-   wherever they differed — a longer path, which the bar's translucent material also lets through —
+   wherever they differed - a longer path, which the bar's translucent material also lets through -
    as doubled text for the whole transition; crossfading the article laid two texts over each other;
    and fading the new article in left an empty frame between the two pages, which reads as a blink.
    The new page is drawn with every mark already in place, so what it shows first is what stays. */
@@ -342,8 +342,8 @@ a:hover {
 }
 
 /* Segmented control: a gray track with the chosen segment lifted onto a white (in the dark theme,
-   gray) thumb. Used wherever one of a few choices is picked — the header's sections, the theme, the
-   config's form or text view, an alignment, a severity — so every one-of-few choice looks alike. */
+   gray) thumb. Used wherever one of a few choices is picked - the header's sections, the theme, the
+   config's form or text view, an alignment, a severity - so every one-of-few choice looks alike. */
 .segmented {
   display: inline-flex;
   flex: none;
@@ -783,8 +783,8 @@ a:hover {
   color: var(--fg);
 }
 
-/* Without script the theme and settings controls are hidden, as they could do nothing. With script —
-   marked on <html> before the first paint — they are laid out from the first frame, so neither
+/* Without script the theme and settings controls are hidden, as they could do nothing. With script -
+   marked on <html> before the first paint - they are laid out from the first frame, so neither
    appears later and pushes the rest of the bar aside; the module that wires them runs whenever it
    runs. */
 .theme-switch[hidden],
@@ -802,7 +802,7 @@ a:hover {
 /* The same for the controls in the page that take room: a document's history line, the box the
    local graph is drawn in and its hint, the review checkboxes and buttons, and the prompt buttons.
    Shown only once their module had run, each pushed what was below or beside it aside after the page
-   was drawn — the history line the whole article, the graph's box the outline by its height. Each
+   was drawn - the history line the whole article, the graph's box the outline by its height. Each
    module still unhides its own, which then changes nothing; none of them hides one again. A button
    in a corner that takes no room, such as the code block's Copy, is left to appear with its script. */
 :root[data-script] .changes-history[hidden],
@@ -924,7 +924,7 @@ a:hover {
 /* ---------------------------------------------------------------------------------------------
    Display settings: a column that slides in over the right edge, under the header, and leaves the
    article in view beside it so a change is judged on the text it changes. Laid out as a grouped
-   list — a small heading over a rounded card of rows — the way Settings lays out its own. Kept laid
+   list - a small heading over a rounded card of rows - the way Settings lays out its own. Kept laid
    out while closed, off screen and invisible, so opening it can slide rather than appear.
    --------------------------------------------------------------------------------------------- */
 .settings-panel {
@@ -1605,7 +1605,7 @@ a:hover {
   font-size: 13px;
 }
 
-/* The rail's sections — the local graph, the outline, the backlinks — each start below a hairline,
+/* The rail's sections - the local graph, the outline, the backlinks - each start below a hairline,
    so a heading reads as the start of its own group rather than as one more line of the list above
    it. A heading is small muted capitals; the entries under it are full-strength text set in from a
    hairline of their own, the way the tree hangs a folder's files. */
@@ -1973,7 +1973,7 @@ a:hover {
 }
 
 /* A code block and the copy button in its corner. The button shows while the block is hovered or the
-   button has focus — always on a screen without hover — and stays out of a selection of the text,
+   button has focus - always on a screen without hover - and stays out of a selection of the text,
    so copying a passage of the article does not pick up the word "Copy". */
 .code-block {
   position: relative;
@@ -2033,8 +2033,8 @@ a:hover {
 }
 
 /* An author's own `<details>`: a card whose summary carries the same chevron as the tree. Written
-   with `:where()`, so the viewer's own disclosures in the article — the findings panel, a rule in the
-   config editor — restyle it with a plain class selector instead of out-specifying each rule here. */
+   with `:where()`, so the viewer's own disclosures in the article - the findings panel, a rule in the
+   config editor - restyle it with a plain class selector instead of out-specifying each rule here. */
 .markdown-body :where(details) {
   padding: 10px var(--space-4);
   border: 1px solid var(--border-subtle);
@@ -2076,7 +2076,7 @@ a:hover {
 
 /* ---------------------------------------------------------------------------------------------
    Lint findings for this document: a tinted card above the article. Each finding is one row of a
-   grid — severity, rule, message, where, prompt — with every short cell aligned to the message's
+   grid - severity, rule, message, where, prompt - with every short cell aligned to the message's
    first line, so a message that wraps does not drag "whole file" and the button to its middle.
    --------------------------------------------------------------------------------------------- */
 .markdown-body .diagnostics {
@@ -3251,8 +3251,8 @@ a:hover {
 
 /* The outline goes first. */
 /* ---------------------------------------------------------------------------------------------
-   Changes: the branch's changes to the documents. A letter marks each changed file — Added,
-   Modified, Deleted, Renamed — in the tree, on the document's page and on the Changes page, colored
+   Changes: the branch's changes to the documents. A letter marks each changed file - Added,
+   Modified, Deleted, Renamed - in the tree, on the document's page and on the Changes page, colored
    like the diff lines it leads to.
    --------------------------------------------------------------------------------------------- */
 :root {
@@ -3332,8 +3332,8 @@ a:hover {
 
 /* Pinned under the header while the text scrolls, so the views and the "Viewed" mark stay in reach
    on a long document rather than a scroll back to the top away. Material, as the header is, so the
-   text passing under it stays faintly visible. Above the article's own positioned pieces — the
-   source line numbers, a changed block's bar — which would otherwise paint over it. Nearly opaque,
+   text passing under it stays faintly visible. Above the article's own positioned pieces - the
+   source line numbers, a changed block's bar - which would otherwise paint over it. Nearly opaque,
    since the text under it is the same size as its own and would otherwise read through it. A jump
    to a heading keeps clear of it as it keeps clear of the header: the room is the banner's height on
    one row, which the page script replaces with its real height once the controls wrap.
@@ -3406,7 +3406,7 @@ a:hover {
 }
 
 /* A changed block on a document's page: a bar along its left edge, in the color of the tree's
-   letter for the same change — amber for changed, green for added. It sits in the left margin, clear
+   letter for the same change - amber for changed, green for added. It sits in the left margin, clear
    of the source line numbers in the right one, and is drawn by the stylesheet, so it is there
    without script; the page script lays a button over it that shows the block's hunks. */
 .markdown-body [data-change] {

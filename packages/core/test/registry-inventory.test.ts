@@ -125,7 +125,7 @@ describe("BUILTIN_RULE_DEFINITIONS inventory", () => {
 });
 
 // `docsUrl` is what makes a finding's `helpUri` a link instead of a restatement of
-// `ruleId`, so "the URL resolves" is the property that has to hold — a page renamed or a rule added
+// `ruleId`, so "the URL resolves" is the property that has to hold - a page renamed or a rule added
 // without one turns every one of its findings' `helpUri` into a 404 that nothing else would catch.
 describe("rule documentation URLs", () => {
   it("derives every built-in's docsUrl from its id by convention", () => {
@@ -141,7 +141,7 @@ describe("rule documentation URLs", () => {
     }
   });
 
-  // The mechanism page, not a page per user-chosen id — a custom rule's own id has none.
+  // The mechanism page, not a page per user-chosen id - a custom rule's own id has none.
   it("points a custom rule at the custom-rules page, which exists", () => {
     expect(CUSTOM_RULE_DOCS_URL).toBe(ruleDocsUrl("custom"));
     expect(
@@ -172,7 +172,7 @@ describe("rule documentation URLs", () => {
 
   it("builds those URLs against the repository the root manifest declares", () => {
     // The assertions above strip `RULE_DOCS_BASE_URL` and check the filename half on disk, so the
-    // owner/repo half of the constant was pinned by nothing — and it is a second spelling of the
+    // owner/repo half of the constant was pinned by nothing - and it is a second spelling of the
     // root manifest's `repository.url`. A rename that updates the manifest and misses the constant
     // turns every finding's `helpUri` and all README table links into 404s with the suite green,
     // which no on-disk check can see because the path half stays correct.
@@ -302,7 +302,7 @@ describe("rule aliases", () => {
   });
 });
 
-// The rules that mix in `fileScopeShape` (`engine/rules/scope.ts`) — i.e. the ones whose `exclude`
+// The rules that mix in `fileScopeShape` (`engine/rules/scope.ts`) - i.e. the ones whose `exclude`
 // means "skip this source document". Each has a three-run `exclude` matrix in its family test file.
 const FILE_SCOPED = [
   "TBL-001",
@@ -334,13 +334,13 @@ const FILE_SCOPED = [
 
 // Same key, different meaning: REF-001/REF-003 filter the *link/image target* they are about to
 // probe, not the document being scanned (`primitives/reference.ts`). Pinned separately so the two
-// meanings cannot be conflated by a future reader — or silently merged by a schema edit.
+// meanings cannot be conflated by a future reader - or silently merged by a schema edit.
 const LINK_TARGET_EXCLUDE = ["REF-001", "REF-003"].sort(compareStrings);
 
 // @boundary-guard shared-exclude
 //
 // `exclude` shipped with zero end-to-end coverage, which is how the unscoped `columnUnique`
-// ignoring it) survived. This inventory is the drift guard — a new rule that mixes in
+// ignoring it) survived. This inventory is the drift guard - a new rule that mixes in
 // `fileScopeShape` fails here until its family test file gains an `exclude` case.
 describe("file-scope option inventory", () => {
   // Read the declared option keys the same way `generateConfigSchema` does (`engine/schema.ts`), so
@@ -372,7 +372,7 @@ describe("file-scope option inventory", () => {
     ).toEqual(LINK_TARGET_EXCLUDE);
   });
 
-  // STR-001's `files` is the *required-file set* it checks for, not a scope filter — so it must
+  // STR-001's `files` is the *required-file set* it checks for, not a scope filter - so it must
   // never grow an `exclude`. LLM-001 and the remaining GRP/REF rules are whole-corpus by
   // construction and take neither key.
   it("keeps STR-001's `files` a required-file set with no `exclude` beside it", () => {

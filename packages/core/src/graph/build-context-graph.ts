@@ -14,7 +14,7 @@ import type {
 } from "./context-graph-types.js";
 
 // Semantic ContextGraph builder. It widened an earlier link-only builder (edges deduped by
-// (from,to)) into the full taxonomy — link/anchor/image/import/id-ref, one edge per source
+// (from,to)) into the full taxonomy - link/anchor/image/import/id-ref, one edge per source
 // construct, multiplicity retained. Collapsing parallel edges into one carrying a count is a
 // possible future shape, deliberately not taken: multiplicity is what lets a consumer say a
 // document references another three times. The read shape
@@ -23,14 +23,14 @@ import type {
 // Resolve a link/image/import target to a corpus node path, mirroring REF-001/002 resolution
 // exactly (relative → source dir; root-relative → site router, else strip leading `/` from root) so
 // graph edges never disagree with the REF rules on router/root-relative repos. Undefined when the
-// target is not (or does not resolve to) a node in the corpus — non-corpus and missing targets are
+// target is not (or does not resolve to) a node in the corpus - non-corpus and missing targets are
 // skipped per the taxonomy.
 //
 // **Images are deliberately excluded from routing**: the caller passes `undefined`
 // for `siteRouter` on the image loop, matching REF-003, whose documented model is that a
 // root-relative image target resolves against the repository root. A router maps a URL to *Markdown
 // source*, so routing an image would only ever yield `.md`/`.mdx` candidates for an asset. One
-// model, claimed and implemented — the mirror above holds for links and imports.
+// model, claimed and implemented - the mirror above holds for links and imports.
 function resolveTarget(
   sourcePath: string,
   target: string,
@@ -52,7 +52,7 @@ function hasScheme(target: string): boolean {
 // `[\s,]+`-splitting model as `defined-ids.ts`'s column tokenizer, applied to free text instead of a
 // table cell so a plain-text ID mention (no Markdown link) still yields a graph edge.
 //
-// KNOWN LIMITATION: this scans `document.content` — the *raw* file text — not
+// KNOWN LIMITATION: this scans `document.content` - the *raw* file text - not
 // prose-only AST nodes. `ParsedDocument` exposes no per-node text spans, and adding them would be a
 // parser-contract change, so an ID that appears only inside a fenced code block, inline
 // code, or frontmatter still produces a real id-ref edge. Accepted as honest-and-simple behavior
@@ -63,8 +63,8 @@ const PROSE_TOKEN_PATTERN = /[^\s,]+/g;
 // A prose mention routinely carries adjacent sentence punctuation a table cell never does:
 // "Blocks REQ-1.", "see REQ-1)", "(REQ-1". Trim leading/trailing non-alphanumerics before matching
 // so those still resolve; without the trim a reference written mid-sentence is silently missed and
-// the document reads as an orphan. Only the boundaries are cleaned — a real ID's internal
-// hyphen and digits survive — which makes this deliberately looser than `defined-ids.ts`'s column
+// the document reads as an orphan. Only the boundaries are cleaned - a real ID's internal
+// hyphen and digits survive - which makes this deliberately looser than `defined-ids.ts`'s column
 // tokenizer, justified because free text (not a cell) is where trailing punctuation actually occurs.
 const PROSE_TOKEN_TRIM_PATTERN = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
 
@@ -101,7 +101,7 @@ function buildIdRefEdges(
 
     for (const match of document.content.matchAll(PROSE_TOKEN_PATTERN)) {
       // Trim boundary punctuation (finding H) so "REQ-1." / "(REQ-1)" still match. The trimmed value
-      // is also what we store as `rawTarget` — a clean ID reads better downstream than "REQ-1)".
+      // is also what we store as `rawTarget` - a clean ID reads better downstream than "REQ-1)".
       const token = match[0].replace(PROSE_TOKEN_TRIM_PATTERN, "");
       if (!idPattern.test(token)) {
         continue;
@@ -158,8 +158,8 @@ function collectLinkEdges(
     }
     const hasFragment = link.anchor !== undefined && link.anchor.length > 0;
     if (hasFragment) {
-      // An `anchor` edge needs a fragment the target resolves — a heading slug, an HTML `id`/`name`
-      // anchor, `#top` or a GitHub line fragment — decided by the same `anchorResolves` REF-002
+      // An `anchor` edge needs a fragment the target resolves - a heading slug, an HTML `id`/`name`
+      // anchor, `#top` or a GitHub line fragment - decided by the same `anchorResolves` REF-002
       // uses, under its default (case-sensitive) options. An unresolved fragment is skipped
       // entirely, not downgraded to a plain `link` edge.
       const targetDocument = scope.documentsByPath.get(target)!;
@@ -189,7 +189,7 @@ function collectImageEdges(
     if (imageTarget.length === 0 || hasScheme(imageTarget)) {
       continue;
     }
-    // No router here — see the note on `resolveTarget`.
+    // No router here - see the note on `resolveTarget`.
     const target = resolveTarget(
       document.path,
       imageTarget,
@@ -202,7 +202,7 @@ function collectImageEdges(
     // Image edges deliberately carry no `text`, even though `ParsedImage.alt` is available: edge
     // labels are scoped to link/anchor edges, and giving image edges one would change the graph's
     // JSON and text output and every host payload built from it for a marginal explainability
-    // gain. Alt text is judged by its own rule instead — revisit only if some output actually
+    // gain. Alt text is judged by its own rule instead - revisit only if some output actually
     // needs per-image labels.
     edges.push({
       from: document.path,
@@ -258,7 +258,7 @@ export function buildContextGraph(
   const nodeSet = new Set(nodePaths);
   const { siteRouter } = options;
 
-  // One edge per source construct — no (from,to) dedup, so multiplicity survives into the graph.
+  // One edge per source construct - no (from,to) dedup, so multiplicity survives into the graph.
   const edges: ContextGraphEdge[] = [];
 
   const scope: EdgeScope = { documentsByPath, nodeSet, siteRouter };
@@ -304,15 +304,15 @@ export function buildContextGraph(
 // entry below, so retaining edge multiplicity does not change cycle detection.
 //
 // DEPTH BOUND: `strongConnect` recurses once per node along the current
-// DFS path, so its stack depth is the longest *simple DFS path inside one connected component* —
+// DFS path, so its stack depth is the longest *simple DFS path inside one connected component* -
 // bounded by that component's node count, not by the length of any authored chain. A densely
 // cross-linked component descends about as deep as a linear chain of the same size, so the assumption
 // v2 documents is "no single connected component of many thousands of documents". Total corpus size
 // is not itself the limit: the loop below restarts at each unvisited root, so the stack unwinds fully
-// between components. Order of magnitude only — a linear-chain probe overflowed at ~4,750 nodes on a
+// between components. Order of magnitude only - a linear-chain probe overflowed at ~4,750 nodes on a
 // cold Node 24 main thread (higher once JIT-warmed, and stack size varies by platform);
 // `build-context-graph.test.ts` pins a 1,000-deep chain as the depth v2 promises. Past the limit the
-// run raises `RangeError: Maximum call stack size exceeded` instead of a structured diagnostic —
+// run raises `RangeError: Maximum call stack size exceeded` instead of a structured diagnostic -
 // accepted for v2. Rewriting this as an explicit worklist is deliberately deferred: `cyclePath`'s
 // `walk` recurses to SCC size and would preserve the same bound, so the change would buy
 // Tarjan-regression risk without changing the guarantee.
@@ -394,7 +394,7 @@ function detectCycles(
 // (start repeated at the end).
 //
 // TIME BOUND: `walk` is a depth-first search that marks a member visited once and never unmarks it,
-// so each member is entered at most once and each adjacency list is scanned once — O(V + E) per
+// so each member is entered at most once and each adjacency list is scanned once - O(V + E) per
 // component. Unmarking on backtrack turns it into an enumeration of every simple path out of `start`
 // until one happens to close, which is factorial on a densely cross-linked component. That shape is
 // ordinary documentation: a dozen mutually linked pages sorting ahead of the one page that links back
@@ -406,14 +406,14 @@ function detectCycles(
 // different path: the two paths agree up to some member, and the first member past that point on the
 // earlier path was backtracked out of, so its walk failed with only the shared prefix blocked. The
 // re-entered member is reachable from it along the abandoned path, so a route from the re-entered
-// member back to `start` around the shared prefix would have made that walk succeed — there is none,
+// member back to `start` around the shared prefix would have made that walk succeed - there is none,
 // and the re-entry would fail as well. Skipping a visited member therefore only prunes branches that
 // exhaustive backtracking would also abandon, and the cycle returned is the same first-found one. It
 // is deliberately not the shortest: GRP-001's `minCycleLength` filters this path's length, so a
 // shortest-cycle search would silently change which components that rule reports.
 //
 // DEPTH: `walk` recurses once per member on the current path, so its stack depth is bounded by that
-// SCC's member count — a strictly smaller bound than `strongConnect`'s above, since reaching it needs
+// SCC's member count - a strictly smaller bound than `strongConnect`'s above, since reaching it needs
 // thousands of documents *mutually reachable* in one component, not merely one long cycle. Same
 // accepted v2 limitation; see the note on `detectCycles`.
 function cyclePath(

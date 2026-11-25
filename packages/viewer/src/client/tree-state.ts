@@ -33,8 +33,8 @@
     }
   });
 
-  // The switches above the list — findings only, and changed files only where the repository has a
-  // branch to review — are wired by modules that run after this script; shown only then, they would
+  // The switches above the list - findings only, and changed files only where the repository has a
+  // branch to review - are wired by modules that run after this script; shown only then, they would
   // push every row down by their height after the scroll had been restored. Showing them here leaves
   // nothing above the list to change size.
   for (const filter of tree.querySelectorAll<HTMLElement>(".tree-filter")) {
@@ -165,7 +165,7 @@
     return undefined;
   }
 
-  // Reached some other way — a link in an article, search, the graph — the document may lie outside
+  // Reached some other way - a link in an article, search, the graph - the document may lie outside
   // the restored view; then it is brought to the middle, leaving the tree alone when it is in sight.
   function centerCurrent(scroller: HTMLElement): void {
     const current = scroller.querySelector<HTMLElement>(

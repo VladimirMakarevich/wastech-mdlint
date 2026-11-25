@@ -10,7 +10,7 @@ import { Corpus } from "../src/corpus.js";
 import { findingPrompts } from "../src/prompts.js";
 
 // The viewer's part of a fix prompt: picking the findings out of a lint run and telling core about
-// this repository — its config's rule entries, where the config is, how to run the CLI. The prompt
+// this repository - its config's rule entries, where the config is, how to run the CLI. The prompt
 // text itself is core's and is tested there.
 
 const VERSION = (
@@ -86,7 +86,7 @@ describe("findingPrompts", () => {
     expect(budget.label).toBe("Raise the budget for this path");
     // The rule is configured by its alias, and its override is found all the same.
     expect(budget.text).toContain(
-      "- `lines`: warns above 6 — from the `overrides` entry with pattern `notes/**`.",
+      "- `lines`: warns above 6 - from the `overrides` entry with pattern `notes/**`.",
     );
     // Only the one finding was asked for, not the broken link beside it.
     expect(budget.text).not.toContain("REF-001");

@@ -38,7 +38,7 @@ const VIEWER_VERSION = (
 /**
  * The command a prompt tells an agent to run the CLI with, as `init`'s agent rule does: the
  * repository's installed copy through its package manager, or else the pinned release fetched on
- * demand — a bare `npx wastech-mdlint` with nothing installed would fetch an unrelated package.
+ * demand - a bare `npx wastech-mdlint` with nothing installed would fetch an unrelated package.
  */
 async function promptRunner(rootDir: string): Promise<string> {
   return cliRunner({
@@ -79,8 +79,8 @@ export async function findingPrompts(params: {
     };
   }
   const all = params.findings.get(params.filePath) ?? [];
-  // A rule can report more than one finding on a line — SIZE-001 reports each metric over budget on
-  // line 0 — and they are answered together, as the panel shows them together.
+  // A rule can report more than one finding on a line - SIZE-001 reports each metric over budget on
+  // line 0 - and they are answered together, as the panel shows them together.
   const findings =
     params.ruleId === undefined
       ? all

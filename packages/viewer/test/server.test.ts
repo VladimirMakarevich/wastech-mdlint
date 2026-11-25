@@ -116,7 +116,7 @@ beforeAll(async () => {
     portExplicit: true,
     watch: true,
     // The copy is not a repository; the ceiling keeps git from finding one around the temporary
-    // directory — a home directory kept under git — and giving these pages a Changes section.
+    // directory - a home directory kept under git - and giving these pages a Changes section.
     gitEnv: {
       ...process.env,
       GIT_CEILING_DIRECTORIES: path.dirname(workDir),
@@ -182,7 +182,7 @@ describe("pages", () => {
   });
 
   // The copy button carries the path relative to the repository and, the viewer being bound to
-  // loopback here, the absolute one in the platform's own form — for a document, a linked file and
+  // loopback here, the absolute one in the platform's own form - for a document, a linked file and
   // the config file alike.
   it("offers each shown file's relative and absolute path to copy", async () => {
     const button = (relPath: string, absolute: string): string =>

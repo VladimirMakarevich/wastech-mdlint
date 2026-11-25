@@ -4,7 +4,7 @@ import { assertionSchema } from "../engine/primitives/assert.js";
 import { regexStringSchema } from "../engine/regex.js";
 
 // Zod root schema for the v2 config. `.strict()` throughout so unknown keys become "unknown key"
-// diagnostics rather than silent no-ops — a typo'd key must not read as a disabled feature.
+// diagnostics rather than silent no-ops - a typo'd key must not read as a disabled feature.
 
 export const severityOverrideSchema = z.enum(["error", "warning", "off"]);
 
@@ -56,7 +56,7 @@ const compileSectionsSchema = z
   })
   .strict();
 
-// The strict shape for `compile`. `skill` is required — a compiled SKILL.md has no meaningful
+// The strict shape for `compile`. `skill` is required - a compiled SKILL.md has no meaningful
 // default name or description, so an absent `skill` is a config error rather than something to
 // invent. `outdir` is validated here but deliberately never read by `compileContext`: resolving an
 // output directory is a host concern, so only the CLI reads it.
@@ -77,7 +77,7 @@ export type CompileConfig = z.infer<typeof compileConfigSchema>;
 // z.union([customRuleEntrySchema, ruleEntrySchema]) (packages/mcp-server/src/tools/lint.ts).
 // It must stay permissive about `rule: "custom"` there: the MCP SDK validates tool input *before* the
 // handler runs, so a malformed custom entry rejected at the wire would come back as raw
-// InvalidParams text with no structuredContent instead of the { code, message, hint } payload —
+// InvalidParams text with no structuredContent instead of the { code, message, hint } payload -
 // it has to reach the handler to fail as INVALID_INPUT. The config-only exclusion of "custom" lives on `standardRuleEntrySchema` below
 // instead of narrowing this shared schema, keeping config load fail-closed on the same shape.
 export const ruleEntrySchema = z
@@ -98,8 +98,8 @@ export const customRuleEntrySchema = z
     severity: severityOverrideSchema.optional(),
     // Deliberately looser than `schema.json`'s `target` enum, which is generated from the same
     // `ASSERTION_TARGETS` authority. Narrowing this to a `z.enum` would preempt resolveCustomRule's
-    // check, which is *stricter* — it validates the target against the specific assert kind and says
-    // which one was expected — with a generic Zod message. It would also fire earlier on the MCP
+    // check, which is *stricter* - it validates the target against the specific assert kind and says
+    // which one was expected - with a generic Zod message. It would also fire earlier on the MCP
     // `lint` wire path (tools/lint.ts), where a pre-handler rejection escapes the
     // `{ code, message, hint }` contract entirely. Editor and linter cannot drift apart on the
     // vocabulary now that both read `ASSERTION_TARGETS`; the enum is a coarse pre-filter and this
@@ -126,11 +126,11 @@ export const customRuleEntrySchema = z
 //
 // `abort: true` is load-bearing for *rendering*. When every branch of a union fails, Zod (since 4.6)
 // emits the `invalid_union` issue `ruleEntryBranchIndex` chooses from only if zero or several
-// branches are still "non-aborted" — failed solely on continuable issues such as unrecognized keys
+// branches are still "non-aborted" - failed solely on continuable issues such as unrecognized keys
 // or refinements. If exactly one is, Zod returns that branch's issues as the union's own, and no
 // branch choice happens at all. A custom entry with a typo inside `assert` aborts the custom branch
 // (a missing required key is a type error), while the standard branch fails only on an unrecognized
-// `id` plus this refine — both continuable — so without the abort the user is told
+// `id` plus this refine - both continuable - so without the abort the user is told
 // `Unrecognized key: "id"` about the one key that is correct. Aborting here keeps the standard branch
 // out of that pick for every "custom" entry, just as the custom branch's `rule` literal mismatch
 // keeps it out for every other entry. The cost is that the config loader never renders this
@@ -148,7 +148,7 @@ const standardRuleEntrySchema = ruleEntrySchema.refine(
 // Custom entries (rule: "custom") match the custom schema; everything else is a standard entry.
 // Ordered custom-first so a custom entry's extra keys aren't rejected by the strict standard schema.
 // `standardRuleEntrySchema` also refine-rejects the literal "custom" (above), so a malformed custom
-// entry can never fall through to the permissive standard schema — it must satisfy
+// entry can never fall through to the permissive standard schema - it must satisfy
 // customRuleEntrySchema or the whole union fails as CONFIG_INVALID.
 export const ruleEntryUnionSchema = z.union([
   customRuleEntrySchema,
@@ -160,7 +160,7 @@ export const ruleEntryUnionSchema = z.union([
  *
  * Zod reports a union failure as one `invalid_union` issue carrying an already-formatted issue list
  * per branch, with no indication of which branch the author intended. A diagnostic that expands that
- * detail has to choose, and choosing by issue count picks the wrong branch for custom entries — a
+ * detail has to choose, and choosing by issue count picks the wrong branch for custom entries - a
  * typo inside an `assert` block yields two precise issues on the custom branch and one misleading
  * `Unrecognized keys: "id", "description"` on the standard branch.
  *
@@ -178,8 +178,8 @@ export function ruleEntryBranchIndex(entry: unknown): number {
 }
 
 // How a review of the work tree against git reads the repository. `base` is the branch, tag or
-// commit a change is compared with wherever none is named for the run — the viewer's Changes page,
-// `lint --since` and `impact --since` given no ref — in place of guessing it from `origin/HEAD`,
+// commit a change is compared with wherever none is named for the run - the viewer's Changes page,
+// `lint --since` and `impact --since` given no ref - in place of guessing it from `origin/HEAD`,
 // then `main`, then `master`, which picks the wrong branch wherever work starts from another one,
 // such as a `develop` branch. A ref is a positional argument to git, where one starting with `-`
 // would be read as an option, so it is refused here, naming the key, rather than at every

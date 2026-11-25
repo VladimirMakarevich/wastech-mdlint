@@ -53,7 +53,7 @@ import { extractReversedLinks } from "./reversed-links.js";
 import { extractUndefinedReferences } from "./undefined-references.js";
 
 // One shared processor: parsing is pure, so a single GFM-enabled instance is reused across every
-// document (a fresh slugger per document keeps dedupe state isolated — see parseDocument).
+// document (a fresh slugger per document keeps dedupe state isolated - see parseDocument).
 // Frontmatter is recognised here, in the same parse, because without it a YAML block between two
 // `---` fences parses as a thematic break plus a setext H2 and invents a heading. Only `yaml` is
 // enabled: a TOML `+++` line is not a setext underline, so it never caused that defect, and with
@@ -225,8 +225,8 @@ const HTML_COMMENTS_ONLY_PATTERN = /^(?:<!--[\s\S]*?-->\s*)+$/;
 // The first top-level child that renders something. Skipped: `yaml` (front matter is metadata, not
 // page content), `definition` (a link reference definition renders nothing), and an `html` block
 // that is only comments (a directive or a licence banner is invisible on the page, so it must not
-// count as prose before the title). An `html` block with real markup — a badge `<img>`, a
-// `<p align=center>` — does render, so it counts. Top level only: a heading nested in a blockquote
+// count as prose before the title). An `html` block with real markup - a badge `<img>`, a
+// `<p align=center>` - does render, so it counts. Top level only: a heading nested in a blockquote
 // or list is not a document title, so the container's own type is what is reported.
 function extractFirstBlock(tree: Root): ParsedFirstBlock | null {
   for (const node of tree.children) {
@@ -248,7 +248,7 @@ function extractFirstBlock(tree: Root): ParsedFirstBlock | null {
 // Iterating `tree.children` rather than `visit`ing the tree is what excludes list items,
 // blockquotes, footnote definitions and table cells without any ancestor tracking: their paragraphs
 // are never direct children of the root. Nested formatting (`***x***`), inline code or a link inside
-// the emphasis is not plain text, so it is not recorded — matching markdownlint MD036, which treats
+// the emphasis is not plain text, so it is not recorded - matching markdownlint MD036, which treats
 // such a run as styled prose rather than a stand-in heading. A setext-underlined `**x**` is a
 // `heading` node and so never reaches here.
 function extractEmphasisParagraphs(tree: Root): ParsedEmphasisParagraph[] {
@@ -328,7 +328,7 @@ function resolveRawLinkTarget(
 // Map a GFM table into headers + rows keyed by header text. Cells missing from a short row default
 // to "" so column-based rules (TBL-*, custom columnNotEmpty) never index past the row, and cells
 // beyond the header are dropped. remark-gfm itself keeps every cell a row was written with, so the
-// written count is recorded as `cellCount` — otherwise this mapping would hide a malformed row from
+// written count is recorded as `cellCount` - otherwise this mapping would hide a malformed row from
 // TBL-007. The cell split is micromark's, so `\|` (inside a code span too) never counts as a
 // separator.
 function extractTable(
@@ -547,8 +547,8 @@ function extractImports(node: Text): ParsedImport[] {
 // The source offsets of an inline link's fragment, or undefined when they cannot be pinned down
 // exactly. mdast gives the link node's span but not the destination's, so the destination is found
 // by walking the source after the link text: `](`, optional spaces/tabs and at most one line
-// ending, an optional `<`, then the destination itself. Every step must match byte for byte — the
-// parsed `url` equals the source only when no escape or entity was used — and any mismatch gives
+// ending, an optional `<`, then the destination itself. Every step must match byte for byte - the
+// parsed `url` equals the source only when no escape or entity was used - and any mismatch gives
 // up rather than guess, because a fix that writes to a guessed offset corrupts the file.
 function locateFragmentRange(
   node: Link,
@@ -666,7 +666,7 @@ export function parseDocument(params: {
  * The same single parse as `parseDocument`, also returning the mdast tree the facts were read from.
  *
  * For a host that renders the document rather than analyzing it. Handing out the tree from this
- * parse — instead of letting that host run its own remark pipeline — is what keeps a rendered page
+ * parse - instead of letting that host run its own remark pipeline - is what keeps a rendered page
  * and the lint findings about it in agreement: the heading at index `i` of `tree` in pre-order is
  * `document.headings[i]`, so a renderer can take its slug verbatim and an anchor REF-002 accepts
  * always lands on the page. The tree is not kept on `ParsedDocument` itself because a whole corpus
@@ -721,7 +721,7 @@ export function parseDocumentWithTree(params: {
 // Everything the single walk in `parseDocumentWithTree` collects, together with the state it
 // carries from one node to the next. It is one explicit object handed to a small handler per node
 // kind, so each kind's extraction reads on its own while all of them still fill the same facts in
-// the same pre-order pass — splitting the walk into several passes would cost a traversal each and
+// the same pre-order pass - splitting the walk into several passes would cost a traversal each and
 // lose the source-order state below.
 type DocumentWalk = {
   readonly tree: Root;

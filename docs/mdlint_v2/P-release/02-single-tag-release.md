@@ -14,7 +14,7 @@ One `vX.Y.Z` tag publishes all three npm packages and tags the skills with them,
 
 3. Replace the placeholder in `.github/workflows/publish.yml` with a real publish that runs the full gate first and publishes with provenance.
 
-4. Document the release procedure — tag, publish, skill tag — where whoever cuts the next release will find it.
+4. Document the release procedure - tag, publish, skill tag - where whoever cuts the next release will find it.
 
 5. **Add a test that ties `compatibility` to the published version.** Today the field is prose ("Version-coupled to @wastech-mdlint/cli…") with nothing checking it against the package version. That is honest at `0.0.0`, where there is no published version to be wrong about; the moment a real version is stamped, a convention that only a reviewer can enforce is the kind that silently stops being true.
 

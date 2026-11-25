@@ -36,8 +36,8 @@ describe("parseDocumentWithTree", () => {
   });
 
   // The renderer pairs heading nodes with slugs by position. That only works if a pre-order walk of
-  // the tree meets the headings in the order `headings` lists them — including headings nested in
-  // block quotes and list items, and setext headings — so the pairing is checked node by node.
+  // the tree meets the headings in the order `headings` lists them - including headings nested in
+  // block quotes and list items, and setext headings - so the pairing is checked node by node.
   it("yields heading nodes in the order and with the depths of document.headings", () => {
     const { document, tree } = parseDocumentWithTree({
       path: "docs/sample.md",

@@ -116,7 +116,7 @@ describe("classifyNodes", () => {
 
 describe("hub agreement between the graph report and the skill's roles", () => {
   // Two shipped surfaces answer "is this document a hub": the graph summary's `top hubs` list and
-  // the role this module assigns. They once answered it differently — the list ranked by
+  // the role this module assigns. They once answered it differently - the list ranked by
   // `inDegree + outDegree`, so an index referencing many documents and referenced by one led the
   // list while this classifier called it a `bridge`. Reading the list back out of the rendered text
   // (rather than re-deriving it) is what makes this a comparison of two documents instead of one

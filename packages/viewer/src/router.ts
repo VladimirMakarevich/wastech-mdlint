@@ -23,8 +23,8 @@ import {
 import type { ViewerContext } from "./viewer-context.js";
 
 // The one place every request passes through: the checks that apply to all of them, then the route
-// that answers. What each route does lives with its group — a document's page, the Changes page and
-// review marks, the config page, the corpus-wide pages, the shipped assets — over one shared
+// that answers. What each route does lives with its group - a document's page, the Changes page and
+// review marks, the config page, the corpus-wide pages, the shipped assets - over one shared
 // `ViewerContext`, so every route reads the same corpus and review.
 
 // A config change or a review mark is at most a few kilobytes of JSON; anything far beyond that is

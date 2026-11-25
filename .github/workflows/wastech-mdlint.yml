@@ -3,17 +3,17 @@ name: Markdown context
 # Lints this repository's own Markdown context with the released CLI, installed from npm the way a
 # consumer installs it. The `verify` job in ci.yml already runs the same config through the CLI built
 # from this checkout (`npm run lint:docs`), on every operating system; this workflow answers the other
-# question — whether the version people actually download still works on a real repository, this one
-# included — and leaves a report of the run in the job summary.
+# question - whether the version people actually download still works on a real repository, this one
+# included - and leaves a report of the run in the job summary.
 #
 # `@latest` rather than a pinned version, deliberately. A pin would have to move in its own commit
-# after every publish — the release commit is pushed before its tag, so the version it names is not in
-# the registry yet when CI runs on it — and a pin nobody bumps quietly turns this into a test of an
+# after every publish - the release commit is pushed before its tag, so the version it names is not in
+# the registry yet when CI runs on it - and a pin nobody bumps quietly turns this into a test of an
 # old release. The price: a rule or option added to the config before a release carries it fails
 # this workflow with exit 2 until that release ships.
 
 # `push` is limited to `main` for the same reason as in ci.yml: a branch with an open pull request
-# would otherwise run this job twice on one commit, and the push run is the weaker of the two — it
+# would otherwise run this job twice on one commit, and the push run is the weaker of the two - it
 # skips the impact step, which needs the pull request's base to diff against. `workflow_dispatch`
 # covers a branch that has no pull request yet.
 on:
@@ -51,7 +51,7 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/wastech-mdlint" --no-save --no-package-lock --no-audit --no-fund @wastech-mdlint/cli@latest
           echo "$RUNNER_TEMP/wastech-mdlint/node_modules/.bin" >> "$GITHUB_PATH"
 
-      # `--fail-on error`, so the budget rules — which report as warnings — land in the summary
+      # `--fail-on error`, so the budget rules - which report as warnings - land in the summary
       # without failing the build. The output is captured before the exit status is acted on, because
       # the summary matters most on exactly the run that fails.
       - name: Lint
@@ -61,7 +61,7 @@ jobs:
           wastech-mdlint lint . --fail-on error > "$RUNNER_TEMP/lint.txt" 2>&1 || status=$?
           cat "$RUNNER_TEMP/lint.txt"
           {
-            echo "## Markdown context — wastech-mdlint ${version}"
+            echo "## Markdown context - wastech-mdlint ${version}"
             echo
             echo '```text'
             cat "$RUNNER_TEMP/lint.txt"
@@ -73,14 +73,14 @@ jobs:
       # of an edit to a page other pages link to or a rule file `CLAUDE.md` imports.
       #
       # Only files in the lint corpus are nodes of the context graph, and `impact` exits 2 for any
-      # other path — indistinguishable from a real failure — so the changed list is intersected with
+      # other path - indistinguishable from a real failure - so the changed list is intersected with
       # the graph first. File names come from the pull request, so they travel NUL-separated and reach
       # the CLI as one argv entry each behind `--`: never through a shell word, and never parsed as a
       # flag even when one starts with a dash.
       #
       # The summary is a table rendered from the JSON report rather than the text one. A hub page such
-      # as the root README reaches most of the guide, and its full listing — every affected file, then
-      # the reading order — would bury every other row of a pull request that touches it.
+      # as the root README reaches most of the guide, and its full listing - every affected file, then
+      # the reading order - would bury every other row of a pull request that touches it.
       - name: Impact of changed Markdown
         if: github.event_name == 'pull_request'
         run: |

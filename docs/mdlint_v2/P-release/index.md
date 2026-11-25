@@ -1,10 +1,10 @@
-# Release — distribution, CI & publishing
+# Release - distribution, CI & publishing
 
 > Status **In progress**. This folder is the working checklist for the first public release. It is task documentation: it is deleted once the release has shipped, and nothing outside it may depend on it.
 
 ## Why this folder exists
 
-The workspace builds three packages and three agent skills that have never been published. Nothing here is a design document — the design lives in the code and in the user guide under [`docs/guide/`](../../guide/README.md). What this folder holds is the set of things that must be true before a `vX.Y.Z` tag can be cut, in the order they have to become true.
+The workspace builds three packages and three agent skills that have never been published. Nothing here is a design document - the design lives in the code and in the user guide under [`docs/guide/`](../../guide/README.md). What this folder holds is the set of things that must be true before a `vX.Y.Z` tag can be cut, in the order they have to become true.
 
 ## Tasks
 
@@ -25,7 +25,7 @@ Task 01 comes first because everything else publishes what it defines. Tasks 02,
 - [ ] Each skill's `compatibility` field names the published CLI version, and a test proves it rather than a convention asserting it.
 - [ ] A reusable GitHub Action exists so a consumer can run the linter in CI in one step.
 - [ ] The README documents all three install channels: CLI, MCP server, and skills.
-- [ ] The full gate is green and an end-to-end smoke — install the packed tarballs into a clean directory, run the CLI, boot the MCP server — passes.
+- [ ] The full gate is green and an end-to-end smoke - install the packed tarballs into a clean directory, run the CLI, boot the MCP server - passes.
 
 ## Deliberately not tracked here
 

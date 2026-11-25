@@ -1,4 +1,4 @@
-# Operator flow: security_audit — adapted for wastech-mdlint (npm workspaces; a local-first Markdown
+# Operator flow: security_audit - adapted for wastech-mdlint (npm workspaces; a local-first Markdown
 # analysis library, a CLI, and a stdio MCP server).
 #
 # ----------------------------------------------------------------------------------------------------
@@ -8,7 +8,7 @@
 #    One node asked to walk a whole repository self-triages: it goes deep on what it recognises and
 #    labels the rest "no findings". The packaged deep_research flow was rebuilt for exactly this
 #    reason (measured there: 18% of the in-scope files opened, 93% of the turn budget unused). A
-#    narrow mandatory remit is what forces even depth — a pass that may only report on the MCP
+#    narrow mandatory remit is what forces even depth - a pass that may only report on the MCP
 #    boundary cannot spend its budget re-reading the rule engine.
 #
 # 2. A `coverage_gate` is added. The packaged security_audit has no way to notice a shallow audit:
@@ -18,7 +18,7 @@
 #
 # 3. An `npm_audit` tool node is added. The core-owned `dependency_scan` checker runs a fixed scanner
 #    set (`pip-audit`, `osv-scanner`) that a flow cannot extend, and an uninstalled scanner
-#    contributes no findings AND does not fail — so on this repository that node reports a confident
+#    contributes no findings AND does not fail - so on this repository that node reports a confident
 #    empty result. Neither scanner is installed here today, which makes `dependency_scan` inert; it is
 #    kept because it costs nothing and starts producing OSV evidence the moment `osv-scanner` exists
 #    on PATH (`brew install osv-scanner`). `npm_audit` is the npm-ecosystem half the core set does not
@@ -27,19 +27,19 @@
 #
 #    It is a `tool` node rather than prompt text for a hard engine reason: a `tool` runs as an
 #    orchestrator child process OUTSIDE the agent sandbox, whereas every analysis node here is
-#    `read-only` — and under `read-only` the Claude adapter has no shell at all. `npm audit` cannot be
+#    `read-only` - and under `read-only` the Claude adapter has no shell at all. `npm audit` cannot be
 #    run from a role prompt on the primary provider. Scanning belongs in a node that can execute.
 #
 # 4. `git_evidence: true` on the three passes where delivery history is prime evidence (a guard that
 #    was removed, a hardening commit that did less than it claimed). Honored only while the operator's
-#    `security.allow_git_evidence` is on — it is on for this repository.
+#    `security.allow_git_evidence` is on - it is on for this repository.
 #
 # 5. `permission_ceiling` is tightened from `workspace-write` to `read-only`. No node in this flow
 #    writes: the report node returns structured output and the ORCHESTRATOR writes the file. The
 #    ceiling should state that, so a future edit cannot quietly add a writing node.
 #
 # THREAT MODEL THIS FLOW IS SHAPED AROUND. mdlint has no HTTP server, no database, no authentication,
-# no session, no PII and no cloud surface, so the web/cloud OWASP checklist does not transfer — its
+# no session, no PII and no cloud surface, so the web/cloud OWASP checklist does not transfer - its
 # categories would come back "N/A" and a page of N/A reads as a clean audit. What this product
 # actually is: a developer tool that parses UNTRUSTED CONTENT (Markdown, JSONC config, and
 # config-supplied regex and globs) and exposes it through a CLI and a stdio MCP server whose consumer
@@ -47,14 +47,14 @@
 # patterns), filesystem escape (glob/symlink/traversal, atomic writes), untrusted-input parsing, MCP
 # output flowing back into an agent's context as if it were instructions, and the npm supply chain.
 #
-# Because this product is local-first by design — no network access and no code execution anywhere
-# in its runtime — the mere PRESENCE of a network call or dynamic code evaluation in product code is a finding in
+# Because this product is local-first by design - no network access and no code execution anywhere
+# in its runtime - the mere PRESENCE of a network call or dynamic code evaluation in product code is a finding in
 # itself, not a hardening gap. Verified at authoring time: no `child_process`, no `eval`, no
 # `new Function`, no dynamic `import()` and no `fetch` anywhere under `packages/*/src`.
 #
 # ----------------------------------------------------------------------------------------------------
 # Per-node tuning: see .worc/guide/flows/reference.md for every available field. Only the fields this
-# flow actually sets are written out below — anything unset inherits (provider and model come from
+# flow actually sets are written out below - anything unset inherits (provider and model come from
 # config.yaml, where claude is primary at claude-opus-5-5).
 # ----------------------------------------------------------------------------------------------------
 flow:
@@ -66,7 +66,7 @@ flow:
   network_policy: advisories
 
   defaults:
-    # gate_severity: medium — both evaluators here are judgement lenses ("was this surface really
+    # gate_severity: medium - both evaluators here are judgement lenses ("was this surface really
     # examined", "is this threat actually reachable") with no natural way to emit `high`; at the
     # built-in default a substantive `medium` finding would be recorded and then dropped. Both are
     # `blocking: false`, so the worst case is the rework budget, then accept + a ⚠️ warning.
@@ -166,7 +166,7 @@ flow:
       blocking: false
       max_rework_per_stage: 2
       # The exploitability gate decides what reaches the report, and a wrong verdict here is the most
-      # expensive error in the flow — it either ships a false positive or drops a real vulnerability.
+      # expensive error in the flow - it either ships a false positive or drops a real vulnerability.
       reasoning: xhigh
 
     - id: report
@@ -176,7 +176,7 @@ flow:
       permission_profile: read-only
       network_access: false
       # The orchestrator captures this node's structured output into
-      # .worc/security-reports/<task_id>/report.md — the node writes nothing itself, and the report
+      # .worc/security-reports/<task_id>/report.md - the node writes nothing itself, and the report
       # never enters git (fail-closed at staging, commit and publish).
       output_artifact: report
       reasoning: high
@@ -190,7 +190,7 @@ flow:
     - { from: analysis_untrusted_input, to: analysis_filesystem_config }
     - { from: analysis_filesystem_config, to: analysis_interfaces }
     - { from: analysis_interfaces, to: npm_audit }
-    # Both evidence nodes always report `pass` by design, so neither needs a `fail` route — a genuine
+    # Both evidence nodes always report `pass` by design, so neither needs a `fail` route - a genuine
     # crash in either parks the task loudly instead of routing.
     - { from: npm_audit, to: dependency_scan, outcome: pass }
     - { from: dependency_scan, to: analysis_supply_chain, outcome: pass }

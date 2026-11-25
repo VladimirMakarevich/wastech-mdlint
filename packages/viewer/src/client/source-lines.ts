@@ -14,7 +14,7 @@ export function initSourceLines(): void {
  * The lines a `#L<n>` or `#L<n>-L<m>` fragment selects in a file of `lineCount` lines, first to last,
  * or `undefined` when it selects none. Either end may be written first, and either may name a column
  * (`#L5C3-L9C1`), which selects its whole line. The range is cut to the file, so a fragment naming
- * line 999999999 — in a link or typed into the address — costs as many steps as the file has lines,
+ * line 999999999 - in a link or typed into the address - costs as many steps as the file has lines,
  * not a billion.
  *
  * The grammar is the one core reads line fragments with (`parseLineFragment`), which a module served

@@ -19,7 +19,7 @@ import { parseDocument } from "./parse-document.js";
 export type LoadDocumentsOptions = {
   cwd: string;
   // Config `exclude`. Excluded paths win over `patterns`; excluded directories are pruned.
-  // Omitted means "exclude nothing" — the defaults live one layer up (see below).
+  // Omitted means "exclude nothing" - the defaults live one layer up (see below).
   exclude?: string[];
   // Config `respectGitignore`. When true, `.gitignore` files (root + nested) are honored.
   respectGitignore?: boolean;

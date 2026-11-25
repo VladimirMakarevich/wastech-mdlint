@@ -45,7 +45,7 @@ describe("shipped skills", () => {
     expect(result.skill.id).toBe(id);
   });
 
-  // Host-neutrality — no vendor-specific command injection, no leftover placeholders.
+  // Host-neutrality - no vendor-specific command injection, no leftover placeholders.
   describe.each(skillIds)("host-neutrality of %s", (id) => {
     const body = readSkill(id);
 
@@ -54,7 +54,7 @@ describe("shipped skills", () => {
     });
 
     it("uses no bang-command injection lines", () => {
-      // Reject any line whose first non-space character is a bang followed by a non-space token — the
+      // Reject any line whose first non-space character is a bang followed by a non-space token - the
       // Claude "run this command" injection form in general, not just a fixed runner allowlist. The
       // `(?!\[)` negative lookahead keeps markdown image syntax (`![alt](src)`) allowed.
       expect(body).not.toMatch(/^\s*!(?!\[)\S/m);
@@ -77,7 +77,7 @@ describe("shipped skills", () => {
 // CLI release it was written against. Nothing but this test connects the two: the field is free
 // prose the frontmatter schema accepts in any shape, and a version bump that misses it leaves every
 // skill confidently naming a version that was never published. That failure is invisible in the
-// repository — every command a skill names still exists here — and only shows up once an agent runs
+// repository - every command a skill names still exists here - and only shows up once an agent runs
 // the skill against a CLI whose surface has moved.
 const cliVersion = (
   JSON.parse(

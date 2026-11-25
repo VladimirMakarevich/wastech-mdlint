@@ -14,8 +14,8 @@ import type { SectionMark } from "./review-state.js";
 import { documentHref } from "./render-document.js";
 import { changesCount, type TreeMarks } from "./tree-marks.js";
 
-// Every page is assembled as a hast tree and serialized once, so text from the repository — file
-// names, headings, front matter values — is escaped by construction. The only markup inserted as a
+// Every page is assembled as a hast tree and serialized once, so text from the repository - file
+// names, headings, front matter values - is escaped by construction. The only markup inserted as a
 // string is the article itself, which `renderDocument` has already sanitized.
 
 export type PageParams = {
@@ -66,7 +66,7 @@ export type PageParams = {
   // On a document page in a git work tree: the link that shows or hides who last changed each block,
   // in the right margin, and whether it is shown now.
   blameToggle?: { href: string; on: boolean };
-  // Set on the pages that send a change — the config page, and where review marks are on, the Changes
+  // Set on the pages that send a change - the config page, and where review marks are on, the Changes
   // page and a changed document's page: the token their scripts send with it, so the server can tell
   // a request from its own page from one another page made the browser send.
   changeToken?: string;
@@ -78,7 +78,7 @@ export type PageParams = {
   // then has a Changes section and the tree a switch for changed files. The same on every page, so
   // the header still stays put between them.
   showChanges?: boolean;
-  // Whether review marks are on — a git work tree, on a loopback binding — so the tree also has a
+  // Whether review marks are on - a git work tree, on a loopback binding - so the tree also has a
   // switch for the changed files not yet reviewed. The same on every page, like `showChanges`.
   showReview?: boolean;
   // The marks beside the tree's files and on the Changes section, drawn into the page so it is whole
@@ -94,8 +94,8 @@ export type PageParams = {
   // page is drawn once that much is read. A page that sets it but has no such element, being short
   // after all, is drawn once all of it is read.
   firstScreen?: boolean;
-  // Set by a page whose script builds part of what the page is laid out around — the config page's
-  // editor, above the file — so it is not drawn before its script has run. Drawn first, the page
+  // Set by a page whose script builds part of what the page is laid out around - the config page's
+  // editor, above the file - so it is not drawn before its script has run. Drawn first, the page
   // showed without that part and then pushed everything below it down when the script added it.
   scriptFirst?: boolean;
 };
@@ -108,7 +108,7 @@ export type Section = "graph" | "dashboard" | "changes" | "config";
  *
  * Every id the viewer gives its own elements contains a `.`: author headings get core's slugs as ids,
  * verbatim so the anchors REF-002 accepts exist on the page, and a slug never contains a `.`. An id a
- * heading could also have — `content` for a heading "Content" — would send that heading's outline
+ * heading could also have - `content` for a heading "Content" - would send that heading's outline
  * entry to the first element with it, the viewer's own.
  */
 export const CONTENT_ID = "viewer.content";
@@ -246,7 +246,7 @@ function renderHead(params: PageParams): Element {
     }),
     // Nothing of the page is drawn until all of it has been read, or on a long page all of its first
     // screen. The blocking script after the tree stops the parser while it is fetched, and the
-    // browser drew what it had by then — the header and the tree over an empty article — one frame
+    // browser drew what it had by then - the header and the tree over an empty article - one frame
     // before the rest, so a navigation blinked through an empty page. Browsers that do not know this
     // link draw as before.
     h("link", {
@@ -696,7 +696,7 @@ function renderFrontmatter(
 
 function formatFrontmatterValue(value: FrontmatterValue): string {
   if (value === null) {
-    return "—";
+    return "-";
   }
   if (typeof value === "string") {
     return value;

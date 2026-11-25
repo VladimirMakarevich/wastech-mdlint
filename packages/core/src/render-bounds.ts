@@ -4,8 +4,8 @@
 // the other import across a layer boundary it otherwise never crosses.
 //
 // Everything here is a *fixed* bound, never corpus-relative. A cap derived from corpus size cannot
-// be stated in the artifact as a rule a reader can apply — "eight hops" means the same thing in
-// every repository, "one tenth of the nodes" does not — and it would let an unrelated file silently
+// be stated in the artifact as a rule a reader can apply - "eight hops" means the same thing in
+// every repository, "one tenth of the nodes" does not - and it would let an unrelated file silently
 // change how one already-elided line renders.
 
 /**
@@ -23,8 +23,8 @@ export const CYCLE_PATH_HOP_LIMIT = 8;
  * Render a closed cycle path (`[a, b, …, a]`) as `a -> b -> … -> a`, eliding the middle past
  * {@link CYCLE_PATH_HOP_LIMIT} and stating how many entries were dropped.
  *
- * The head/tail split keeps the two entries a reader actually uses — where the cycle starts and
- * that it closes on the same node — and the elision is ASCII `...`, not `…`, because this reaches a
+ * The head/tail split keeps the two entries a reader actually uses - where the cycle starts and
+ * that it closes on the same node - and the elision is ASCII `...`, not `…`, because this reaches a
  * Windows terminal whose code page may not carry the ellipsis character.
  */
 export function formatCyclePath(cycle: readonly string[]): string {

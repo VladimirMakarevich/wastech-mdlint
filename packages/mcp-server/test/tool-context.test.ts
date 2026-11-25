@@ -32,11 +32,11 @@ async function makeTempDir(prefix: string): Promise<string> {
 }
 
 // The stdio suite is the acceptance evidence (an in-process call cannot see the plausible
-// success shape being fixed); these pin the guard's own contract — code, hint, and the offending path
-// in the message — without spawning a server for each case.
+// success shape being fixed); these pin the guard's own contract - code, hint, and the offending path
+// in the message - without spawning a server for each case.
 describe("resolveToolCwd", () => {
   // The rejection messages render `/` separators on every host, so the expectation has to be built
-  // the same way — comparing against a native path would pass on POSIX and fail on Windows for a
+  // the same way - comparing against a native path would pass on POSIX and fail on Windows for a
   // message that is correct there.
   function posix(value: string): string {
     return value.split(path.sep).join("/");
@@ -85,7 +85,7 @@ describe("resolveToolCwd", () => {
 
   it("rejects a path *under* a file, which only the errno can tell it about", async () => {
     // The case above passes the file itself, which stats successfully and is caught by
-    // `!stats.isDirectory()` — so it leaves the `stat` rejection handler's own branch untested.
+    // `!stats.isDirectory()` - so it leaves the `stat` rejection handler's own branch untested.
     // Descending into a file is the only shape that makes `stat` fail with a non-`ENOENT` errno,
     // and it is the shape a client hits by joining a subdirectory onto a path that turned out to
     // be a file. Asserted on code, hint and path alone because the errno differs by host: POSIX
@@ -103,7 +103,7 @@ describe("resolveToolCwd", () => {
 
   it("rejects an explicitly empty cwd instead of silently using the process cwd", async () => {
     // `path.resolve("")` returns `process.cwd()`, so without a guard ahead of it this call would
-    // stat successfully and analyze the server's own directory — the plausible-answer-to-a-different-
+    // stat successfully and analyze the server's own directory - the plausible-answer-to-a-different-
     // question failure the whole guard exists to prevent, and the one caller mistake it could not see.
     const error = await rejectionOf("");
     expect(error.code).toBe("INVALID_INPUT");
@@ -133,7 +133,7 @@ describe("resolveToolConfiguration", () => {
   it("resolves a relative configPath against the tool cwd, not the process cwd", async () => {
     // The sixth `--config` call site: the behavior is unchanged, but the resolution moved.
     // This helper used to pre-resolve the path itself; now it forwards the caller's string verbatim
-    // and core resolves it against the validated `cwd` — the same base the CLI's five handlers get.
+    // and core resolves it against the validated `cwd` - the same base the CLI's five handlers get.
     // The test process cwd is the repo root, not this temp dir, which is the only shape in which a
     // process-cwd base could be told apart from the tool one.
     const dir = await makeTempDir("mcp-tc-relconfig-");
@@ -155,7 +155,7 @@ describe("resolveToolConfiguration", () => {
     // caller put it there: resolution and rendering share the `cwd` base, so the message quotes the
     // argument back rather than inventing a path nobody wrote. The guides state the containment
     // property as "no payload names a host path the caller did not itself supply" for exactly this
-    // reason — they said "nothing outside the analyzed directory" until this case was checked
+    // reason - they said "nothing outside the analyzed directory" until this case was checked
     // against the code, so the claim is pinned here rather than left to the next reading.
     const dir = await makeTempDir("mcp-tc-configpath-escape-");
     const cwd = path.join(dir, "proj");
@@ -237,7 +237,7 @@ describe("resolveToolContext", () => {
  * (`packages/cli/test/config-resolution-base.test.ts`); a tool module cannot be enumerated that way,
  * so this pins the property instead: one call site means one resolution base. A future file-based
  * tool that calls `loadConfiguration` directly would silently reintroduce the divergence this task
- * removed — and would pass every behavioral test in this package, because each tool is tested
+ * removed - and would pass every behavioral test in this package, because each tool is tested
  * against its own handler. Reading source from a test follows the precedent of
  * `packages/core/test/boundary-guards.test.ts`.
  */

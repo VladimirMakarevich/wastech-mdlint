@@ -11,7 +11,7 @@ import type { ContextGraph } from "./context-graph-types.js";
 // Shared doc-load + graph-build sequence for every graph-consuming host. Mirrors the
 // same steps `lint-files.ts` runs internally, but is exposed standalone here so a host can build one
 // `ContextGraph` up front, hand it to `lintFiles({ graph })` to avoid rebuilding it, and reuse it for
-// query/slice/impact — without `lint-files.ts` importing from a CLI/MCP-facing module.
+// query/slice/impact - without `lint-files.ts` importing from a CLI/MCP-facing module.
 
 export type GraphContext = {
   documents: Map<string, ParsedDocument>;
@@ -25,7 +25,7 @@ export async function loadContext(params: {
 }): Promise<GraphContext> {
   const rootDir = path.resolve(params.cwd);
   // Same resolved scope as `lintFiles`, so the graph a host queries covers exactly the
-  // corpus that host lints — a divergence here would make `impact`/`slice` answer over a wider tree.
+  // corpus that host lints - a divergence here would make `impact`/`slice` answer over a wider tree.
   const scope = resolveCorpusScope(params.config);
   const loaded = await loadDocuments(scope.include, {
     cwd: rootDir,
@@ -33,7 +33,7 @@ export async function loadContext(params: {
     respectGitignore: scope.respectGitignore,
   });
 
-  // Re-key the loader's absolute-path map to repo-relative POSIX paths — the identity rules and the
+  // Re-key the loader's absolute-path map to repo-relative POSIX paths - the identity rules and the
   // graph builder resolve link/ID targets against `document.path`, not the loader's map key.
   const documents = new Map<string, ParsedDocument>();
   for (const document of loaded.values()) {

@@ -12,7 +12,7 @@
 # The deliverable is one report the connector reads and acts on by itself. The verdict block at the
 # end of it is the only part read by a machine; everything else in the report is for the operator.
 #
-# Per-node tuning (every field is optional — omit one to inherit the default):
+# Per-node tuning (every field is optional - omit one to inherit the default):
 #   provider: codex | claude · model: <id> · reasoning: minimal|low|medium|high|xhigh|max
 #   timeout_seconds · network_access · best_effort
 # Disabling a node is PER-TASK: set `nodes.<id>.enabled: false` in the task file.
@@ -52,7 +52,7 @@ flow:
       reasoning: medium
       role_file: issue_triage/reproduction.md
       session_scope: fresh_disposable
-      # The one writing node, and it writes only inside the report directory — worc's after-stage
+      # The one writing node, and it writes only inside the report directory - worc's after-stage
       # guard enforces that, so a scratch test cannot be left in the working tree.
       permission_profile: workspace-write
       network_access: false

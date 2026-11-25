@@ -23,8 +23,8 @@ import {
   type ScopeTester,
 } from "@wastech-mdlint/core";
 
-// The viewer shows exactly the corpus the linter checks — same config, same include/exclude, same
-// gitignore handling — by loading it through core's `loadContext` rather than walking the tree
+// The viewer shows exactly the corpus the linter checks - same config, same include/exclude, same
+// gitignore handling - by loading it through core's `loadContext` rather than walking the tree
 // itself. A viewer with its own idea of which files are documents would show pages the linter never
 // looked at and hide ones it reports on.
 
@@ -46,8 +46,8 @@ type Membership = {
   // only where `respectGitignore` says so.
   scope: ScopeTester;
   // Whether a file may be handed out: the same `exclude`, with every `.gitignore` honored whatever the
-  // config lints. A `.gitignore` names what the repository does not share — a local `.env`, build
-  // output — and a document linking to such a file does not make it shareable, least of all with a
+  // config lints. A `.gitignore` names what the repository does not share - a local `.env`, build
+  // output - and a document linking to such a file does not make it shareable, least of all with a
   // reader on another machine reaching a viewer bound with `--host`.
   servable: ScopeTester;
 };
@@ -154,7 +154,7 @@ export class Corpus {
 
   /**
    * The corpus as core judges a change set against it: the documents held now, the scope a deleted
-   * document is tested with, and the config's repository-relative path — which matches no changed
+   * document is tested with, and the config's repository-relative path - which matches no changed
    * path when the config lives outside the repository.
    */
   membership(): CorpusMembership {
@@ -180,8 +180,8 @@ export class Corpus {
   /**
    * Bring the corpus up to date with a set of changed repo-relative paths.
    *
-   * A full reload costs a walk and a parse of every document — seconds on a repository with a few
-   * hundred of them — while re-parsing the one file that was saved and rebuilding the graph costs
+   * A full reload costs a walk and a parse of every document - seconds on a repository with a few
+   * hundred of them - while re-parsing the one file that was saved and rebuilding the graph costs
    * milliseconds. So an edit to a known document is applied in place, and only what can change
    * *which* files are documents pays for a full reload, because deciding membership means re-running
    * core's include/exclude/gitignore discovery: the config or a `.gitignore`, a new Markdown file the
@@ -189,7 +189,7 @@ export class Corpus {
    * reports a moved or deleted folder as that one path and nothing for the files inside it, which is
    * why folders are judged here at all.
    *
-   * A path documents link to — an image that has just been saved, a file deleted — changes those
+   * A path documents link to - an image that has just been saved, a file deleted - changes those
    * documents' pages without changing the documents, so they are reported as changed too.
    *
    * `structural` reports that the set of documents may have changed, which every open page needs to
@@ -376,7 +376,7 @@ export class Corpus {
   }
 
   /**
-   * The absolute path of the linked file at `relPath` if the viewer may hand it out now — judged
+   * The absolute path of the linked file at `relPath` if the viewer may hand it out now - judged
    * again as it is served rather than trusted from when the link was collected, since a symlink can
    * be pointed elsewhere in between and what it points at is what would be sent.
    */
@@ -389,7 +389,7 @@ export class Corpus {
    *
    * Through core's `lintContext`, which gives exactly what `wastech-mdlint lint` gives for the same
    * tree but reuses the parsed documents and graph instead of discovering and parsing everything
-   * again — a fraction of a second after an edit rather than the seconds a fresh run takes.
+   * again - a fraction of a second after an edit rather than the seconds a fresh run takes.
    */
   lint(): LintResult {
     const { loaded, documents, graph } = this.state;
@@ -405,7 +405,7 @@ export class Corpus {
    * Whether a candidate configuration selects the same documents as the loaded one.
    *
    * Parsing a document does not depend on the config, so a candidate that keeps `include`,
-   * `exclude` and `respectGitignore` is linted over the documents already parsed — new rules in a
+   * `exclude` and `respectGitignore` is linted over the documents already parsed - new rules in a
    * fraction of a second, new link settings after a rebuild of the graph. Only a new scope pays for
    * core's discovery and a parse of the corpus it selects, because that is the one change that
    * decides which files are documents.
@@ -433,8 +433,8 @@ export class Corpus {
    * Whether any of `paths`, none of them a document, can change which files are documents.
    *
    * Every judgment is core's scope: a Markdown path `include` takes in and nothing excludes, and a
-   * folder no `exclude` or `.gitignore` prunes. A folder event alone says little — some platforms
-   * report a folder whenever a file inside it is created — so a folder that still exists counts only
+   * folder no `exclude` or `.gitignore` prunes. A folder event alone says little - some platforms
+   * report a folder whenever a file inside it is created - so a folder that still exists counts only
    * when it holds a document the corpus lacks, and one that is gone only when documents lived in it.
    */
   private async changesMembership(paths: readonly string[]): Promise<boolean> {
@@ -688,21 +688,21 @@ async function servableFile(
 
 /**
  * The absolute path of the repository file at `relPath` if the viewer may hand it out as a linked
- * file: it is there, and neither the path the link names nor the file it really reaches is Markdown —
+ * file: it is there, and neither the path the link names nor the file it really reaches is Markdown -
  * a Markdown file outside the corpus is one the config keeps out of the viewer exactly as it keeps it
- * out of a lint run — or covered by an `exclude` pattern or a `.gitignore`.
+ * out of a lint run - or covered by an `exclude` pattern or a `.gitignore`.
  *
  * The patterns are tested against the real file as well as the written path because a written path
  * can miss them and still reach the file. A symlink `docs/env.txt` to `../.env` passes every pattern
  * under its own name and reads the ignored `.env`. And patterns compare letter case exactly while
- * case-insensitive file systems — the usual Windows and macOS ones, a Windows drive mounted in WSL —
+ * case-insensitive file systems - the usual Windows and macOS ones, a Windows drive mounted in WSL -
  * do not, so `.GIT/config` slips past the default `.git` exclude and opens `.git/config`; a Windows 8.3
  * short name (`SECRET~1.TXT`) is another spelling of the same kind.
  *
  * `fs.promises.realpath` follows every link and, on Windows and macOS, also returns each name as it is
  * stored (the callback `fs.realpath` keeps the spelling it was given). A path that then turns out to
- * differ from the real one only in letter case is refused outright, so a link means the same file —
- * or none — on every operating system, as on a case-sensitive one. Linux's realpath keeps the
+ * differ from the real one only in letter case is refused outright, so a link means the same file -
+ * or none - on every operating system, as on a case-sensitive one. Linux's realpath keeps the
  * spelling it was given even on a case-insensitive mount, so last, each name of the real path must be
  * listed in its folder exactly as spelled: a file reached under any other spelling is refused there
  * too.
@@ -823,8 +823,8 @@ function foldersOf(paths: Iterable<string>): Set<string> {
 }
 
 /**
- * Where a repository file really is — its absolute path and its repository-relative POSIX path, both
- * through every symlink and in the letter case stored on disk — or `undefined` if it is missing, not
+ * Where a repository file really is - its absolute path and its repository-relative POSIX path, both
+ * through every symlink and in the letter case stored on disk - or `undefined` if it is missing, not
  * a regular file, or, through a symlink, outside the repository. Core's loader applies the same
  * symlink rule to the documents it reads; this applies it to every file the viewer reads after
  * startup.

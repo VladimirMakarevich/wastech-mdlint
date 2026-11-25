@@ -141,7 +141,7 @@ describe("linked files", () => {
     expect(corpus.isLinkedFile("docs/pic.png")).toBe(true);
   });
 
-  // The same through a linked folder, which every system can create — a junction where Windows
+  // The same through a linked folder, which every system can create - a junction where Windows
   // refuses a directory symlink. Re-pointing the link after the page was built must not serve what it
   // now reaches either: the check is made again as the file is served.
   it("refuses a file reached through a linked folder that an exclude or .gitignore covers", async () => {
@@ -408,7 +408,7 @@ describe("applyChanges", () => {
 });
 
 describe("watcher filter", () => {
-  // Names alone cannot say which paths matter — a `--config` file, an image, a folder — so only git's
+  // Names alone cannot say which paths matter - a `--config` file, an image, a folder - so only git's
   // database and installed dependencies are dropped before the corpus judges the rest.
   it("passes every path but git's database and installed dependencies", () => {
     expect(isRelevantChange("lint.jsonc")).toBe(true);

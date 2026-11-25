@@ -8,11 +8,11 @@ import { registerLintFilesTool } from "./lint-files.js";
 import { registerLintTool } from "./lint.js";
 
 // Modular tool layout: the single registration seam. Each tool is its own
-// module and appends its registrar here — one module per tool, registered from this
+// module and appends its registrar here - one module per tool, registered from this
 // index, so no single mega-file.
 //
 // The list stays function-only (not `{ name, register }[]`): a parallel name list would be a second
-// hand-maintained source of truth that could drift from the real registerTool() calls — exactly the
+// hand-maintained source of truth that could drift from the real registerTool() calls - exactly the
 // "5 vs 6 tools" mismatch the generated inventory exists to prevent. Doc generation introspects the
 // live McpServer instance instead of reading a name array here.
 const TOOL_REGISTRARS: ((server: McpServer) => void)[] = [

@@ -6,8 +6,8 @@ import { gunzipSync } from "node:zlib";
 //
 // Written by hand instead of adding the `tar` package because the payload guard exists to stop a
 // packaging regression, and paying for it with a new dev dependency in the very tree it guards is
-// the wrong trade. The format read here is the fixed-width ustar header `node-tar` writes — 512-byte
-// blocks, octal fields, no extensions — which is small enough to parse correctly in one pass and
+// the wrong trade. The format read here is the fixed-width ustar header `node-tar` writes - 512-byte
+// blocks, octal fields, no extensions - which is small enough to parse correctly in one pass and
 // does not change.
 //
 // Lives in core's test support directory for the same reason `assert-built.ts` and
@@ -35,7 +35,7 @@ function readField(header: Buffer, start: number, end: number): string {
 /**
  * Read every regular file out of an `npm pack` tarball.
  *
- * Keys are the paths *inside the package* — `README.md`, `dist/index.js`, `package.json` — with the
+ * Keys are the paths *inside the package* - `README.md`, `dist/index.js`, `package.json` - with the
  * `package/` prefix npm always prepends stripped off. Tar names are `/`-separated by specification,
  * so those keys satisfy the repository's POSIX-path invariant on Windows without any normalization.
  */
@@ -57,7 +57,7 @@ export function readTarball(tgzPath: string): Map<string, Buffer> {
     const typeFlag = String.fromCharCode(header[TYPE_FLAG]!);
 
     // An unparseable size would make the next offset NaN, ending the walk quietly and returning a
-    // truncated map — the one failure a payload guard cannot afford, because every "entry missing"
+    // truncated map - the one failure a payload guard cannot afford, because every "entry missing"
     // assertion would then be reporting the reader's bug as a packaging defect.
     if (!Number.isFinite(size)) {
       throw new Error(
@@ -73,7 +73,7 @@ export function readTarball(tgzPath: string): Map<string, Buffer> {
     // extended headers, which carry metadata for the entry that follows rather than package
     // content. Skipping the pax headers rather than parsing them is correct for this payload
     // specifically: `node-tar` emits one only for a path over 100 bytes or a non-ASCII name, and
-    // the entry it describes still follows as an ordinary file block that this loop does read —
+    // the entry it describes still follows as an ordinary file block that this loop does read -
     // the only loss would be the long name, and this payload has none.
     if (typeFlag !== "0" && typeFlag !== "\0") {
       continue;

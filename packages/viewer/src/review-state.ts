@@ -364,8 +364,8 @@ export function reviewChip(
 
 /**
  * The "Viewed" checkbox, hidden until the page script that sends the mark has run: without script
- * it could only lie about being checkable. It carries what the request names — the path, the
- * hash of the text the page shows, and which comparison the page made — so the server marks exactly
+ * it could only lie about being checkable. It carries what the request names - the path, the
+ * hash of the text the page shows, and which comparison the page made - so the server marks exactly
  * the version the reader saw.
  */
 export function reviewToggle(

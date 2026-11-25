@@ -1,7 +1,7 @@
-# Operator flow: implementation_skills — the `implementation` flow plus one skill-driven step.
+# Operator flow: implementation_skills - the `implementation` flow plus one skill-driven step.
 #
 # PURPOSE: exercise the orchestrator's node-declared skills end to end on a real task. It is the
-# local `implementation` flow unchanged (same nodes, role files, budgets and supervisor prompts — the
+# local `implementation` flow unchanged (same nodes, role files, budgets and supervisor prompts - the
 # role files are read from `implementation/`) with ONE added agent node, `code_review`, between
 # `review` (accept) and `documentation`:
 #
@@ -21,21 +21,21 @@
 #
 # --- The original header of the `implementation` flow follows; it applies here unchanged. ---
 #
-# Packaged built-in flow: implementation — the executable default flow the engine drives.
+# Packaged built-in flow: implementation - the executable default flow the engine drives.
 #
 # The pipeline expressed as data: planning -> implementation -> testing(checks) -> review(evaluator)
 # -> documentation -> publish, with the two fix loops (through fixing) and decomposition. `planning`
 # is the entry node. After review accepts the code, `documentation` updates the target project's docs
 # to match the change just shipped (workspace-write, resuming the implementation session), and its edits join
 # the same diff the orchestrator commits. Any node can be disabled per task via
-# `nodes.<id>.enabled: false` — the one place a task may name a node id instead of stating a `when`
+# `nodes.<id>.enabled: false` - the one place a task may name a node id instead of stating a `when`
 # fact, deliberately bounded to this on/off switch.
 #
-# LOCAL DEVIATION 1 — the packaged `refinement` node is REMOVED (with its role prompt), so the flow
+# LOCAL DEVIATION 1 - the packaged `refinement` node is REMOVED (with its role prompt), so the flow
 # starts at `planning`. Two reasons, both structural rather than stylistic: its `when` predicate
-# (`derived.needs_refinement`) is a FORMEDNESS check — a non-empty description plus an
+# (`derived.needs_refinement`) is a FORMEDNESS check - a non-empty description plus an
 # `## Acceptance criteria` section already counts as complete, so every task authored through the
-# worc-task skill skipped it anyway — and its `enriched_spec` output is an AUDIT-ONLY slot with no
+# worc-task skill skipped it anyway - and its `enriched_spec` output is an AUDIT-ONLY slot with no
 # prompt variable and no downstream consumer, so even when it did fire the plan was never built from
 # it. The clarifying-question path it owned is not lost: `planning` carries
 # `hitl: { allow_question: true, allow_approval: true }`, and a `human_input` answer file propagates
@@ -44,16 +44,16 @@
 #
 # Two behaviors here are not visible in the YAML: `review` is an evaluator (findings gate the graph,
 # they are not advisory), and the core enforces the commit-candidate mutation guard whenever a
-# `checks` node is present — it is not declared here. An optional non-blocking `testing_quality`
+# `checks` node is present - it is not declared here. An optional non-blocking `testing_quality`
 # evaluator (the shared evaluator runner already supports its self-cap) is NOT shipped in this
-# default flow: it is a pure graph-shape choice — an operator who wants it adds the node to their
+# default flow: it is a pure graph-shape choice - an operator who wants it adds the node to their
 # own flow YAML.
 #
 # WHERE THE MARKDOWN GATE LIVES (read this before moving `documentation`): that node edits the tree
 # AFTER the last `checks` node, and the mutation guard the core enforces is the green-but-dirtying
-# one — it only catches a check command that rewrote the tree, never a later node's edits. So the
-# `prettier --check .` gate this repository requires for every committed deliverable — docs
-# included — is enforced for the documentation node's own edits by its role prompt, not by the
+# one - it only catches a check command that rewrote the tree, never a later node's edits. So the
+# `prettier --check .` gate this repository requires for every committed deliverable - docs
+# included - is enforced for the documentation node's own edits by its role prompt, not by the
 # graph. A second `checks` node after `documentation` would make it deterministic, at a real price:
 # command-set selection runs the union of sets matching the WHOLE task diff since base, so on any
 # code task it would re-run `npm ci` + typecheck + lint + test + build a second time, not just the
@@ -62,12 +62,12 @@
 #
 # NOTE: the supervisor is NOT a graph node. It is an orchestrator layer ABOVE any flow
 # (summary + per-step advisory oversight, configured in config.yaml: supervisor). There is NO
-# `summary` node here: the whole-task summary is written at close, before publish — by the
+# `summary` node here: the whole-task summary is written at close, before publish - by the
 # supervisor layer at the cadence config.yaml sets, and deterministically from the run's own
 # recorded facts when that layer is switched off (`supervisor.enabled: false`).
 #
 # ----------------------------------------------------------------------------------------------------
-# Per-node tuning (ALL fields below are OPTIONAL — omit one to inherit the default). Every
+# Per-node tuning (ALL fields below are OPTIONAL - omit one to inherit the default). Every
 # agent/evaluator node in this flow carries the provider/model/reasoning slots commented out so the
 # full configuration surface is visible; uncomment and edit to pin a single node.
 #   agent + evaluator nodes:
@@ -80,7 +80,7 @@
 #   evaluator nodes also: blocking (failing verdict blocks vs advisory), max_rework_per_stage,
 #                     gate_severity (min finding severity that gates: high|medium|low|critical|blocking; default high)
 #     (a non-blocking evaluator that spends max_rework_per_stage with a finding still open accepts +
-#      continues — never manual — and warns you via a console warning + a ⚠️ telegram trace)
+#      continues - never manual - and warns you via a console warning + a ⚠️ telegram trace)
 #   Disabling a node is PER-TASK, not here: set `nodes.<id>.enabled: false` in the task file.
 # ----------------------------------------------------------------------------------------------------
 flow:
@@ -100,7 +100,7 @@ flow:
       hitl: { allow_question: true, allow_approval: true }
       # Operator pin: planning sets the shape the rest of the flow executes, so it gets the deepest
       # reasoning tier rather than the flow-wide default. Provider/model are deliberately NOT pinned
-      # — they come from config.yaml (claude is primary at claude-opus-5-5).
+      # - they come from config.yaml (claude is primary at claude-opus-5-5).
       reasoning: medium
       # timeout_seconds: 7200
       # network_access: false
@@ -108,7 +108,7 @@ flow:
     - id: implementation
       kind: agent
       role_file: implementation/implementation.md
-      # The short text for a turn that continues this node's own session — a renewed turn
+      # The short text for a turn that continues this node's own session - a renewed turn
       # grant, a delivered human answer, a reconsider after a denial. Selected only when
       # the session is live and this node has already spoken on it.
       resume_role_file: implementation/implementation.continue.md
@@ -130,12 +130,12 @@ flow:
       permission_profile: read-only
       # Operator grant: the reviewer is told to judge only what THIS task changed, but the branch
       # diff can be cumulative (a shared branch carries earlier tasks' commits) and a read-only
-      # Claude node has no shell at all — so without this it had to guess that boundary from the
+      # Claude node has no shell at all - so without this it had to guess that boundary from the
       # diff file. `git_evidence` adds a shell scoped to the read-only verbs (log/show/diff/blame/
       # status/rev-*/ls-files/shortlog/describe/cat-file/for-each-ref) so it can resolve the
       # boundary from history instead. Honored because security.allow_git_evidence is on for this
       # repository (the same grant deep_research and security_audit already rely on); the node stays
-      # read-only either way — the sandbox write-denies the clone and denied_commands still bans
+      # read-only either way - the sandbox write-denies the clone and denied_commands still bans
       # commit/push/PR. On this host (macOS Seatbelt) the sandboxed shell is always available.
       git_evidence: true
       # optional overrides (uncomment to pin this evaluator):
@@ -146,7 +146,7 @@ flow:
       # blocking: true
       # gate_severity: high  # min finding severity that gates (high|medium|low|critical|blocking).
       #   Default high = block on high/critical/blocking; lower it (e.g. medium) to gate on nits too.
-      # NOTE: `max_rework_per_stage` is a NON-blocking-only knob (e.g. test_quality) — it has no
+      # NOTE: `max_rework_per_stage` is a NON-blocking-only knob (e.g. test_quality) - it has no
       # effect on this blocking review node. To cap the review->fixing loop deterministically, lower
       # `budgets.review_fix` below; exhausting it parks the task to `manual`.
     - id: fixing
@@ -189,16 +189,16 @@ flow:
       lineage_affinity: implementation
       permission_profile: workspace-write
       # Documentation is a mechanical write-up of what already shipped, so it runs at medium
-      # reasoning regardless of the flow-wide default — no quality loss, less wall-time on the tail.
+      # reasoning regardless of the flow-wide default - no quality loss, less wall-time on the tail.
       # No model/provider pin: it resumes the implementation editing lineage and keeps its model.
       reasoning: low
       # Explicit offline stance: doc-writing needs no network, and pinning it here keeps the node
       # offline even if this flow later gains a flow-wide network_policy. This is a hard guarantee
       # only under Codex (OS-sandbox blocks Bash network); under Claude it only disables
       # WebFetch/WebSearch, so it is defense-in-depth (the role prompt forbids installs, builds,
-      # tests and servers) — pin `provider: codex` on this node when you need the hard "no
+      # tests and servers) - pin `provider: codex` on this node when you need the hard "no
       # dependency installs" guarantee. That pin currently fails preflight: `codex` was removed
-      # from `agents.allowed` in config.yaml for a Claude-only limits test — re-add it there first.
+      # from `agents.allowed` in config.yaml for a Claude-only limits test - re-add it there first.
       # The one command the role prompt REQUIRES here is this
       # repository's own Markdown format gate (`npm run format` = `prettier --check .`, repaired with
       # a targeted `npx prettier --write <paths>`): it mutates nothing but docs, needs no network,
@@ -233,10 +233,10 @@ flow:
   # supervisor is a constant layer above the flow, not a node; this block only reshapes ITS wording
   # (the structured-output schemas stay in code). `role_file` overrides the global observe lens;
   # `finalize_role_file` is the final-summary emphasis; `emit_follow_ups` opts the finalize turn into
-  # the evidence-gated `follow_ups` array (a code-oriented capability — research/prose flows omit it).
+  # the evidence-gated `follow_ups` array (a code-oriented capability - research/prose flows omit it).
   # `observe.mode: events` is stated here rather than inherited so this flow's cadence is visible where
   # its prompts are: `emit_follow_ups: true` means the finalize turn's follow-ups and the memory delta
-  # are worth grounding in observed deviations, so `none` would starve them — but a note on every
+  # are worth grounding in observed deviations, so `none` would starve them - but a note on every
   # ordinary step bought nothing. `events` observes only a rework loop, a failed step, or a provider
   # fallback, which is exactly what a reviewer of a long implementation run needs flagged.
   supervisor:

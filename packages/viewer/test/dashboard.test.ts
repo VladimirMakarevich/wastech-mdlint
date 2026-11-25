@@ -20,7 +20,7 @@ import { renderDashboardArticle } from "../src/dashboard-article.js";
 import { graphFolders } from "../src/graph-view.js";
 
 // Rows come in code-point order, where an upper-case name sorts before a lower-case one, so
-// `README.md` leads. `big.md` is exactly 2048 bytes — two kilobytes — so the size bounds can be checked on both sides
+// `README.md` leads. `big.md` is exactly 2048 bytes - two kilobytes - so the size bounds can be checked on both sides
 // of the boundary. The rest are linked so that every link flag has a document that carries it:
 // `README.md` and `docs/a.md` link to each other (a cycle), `docs/b.md` is linked to and links
 // nowhere (a dead end), `notes/x.md` and `notes/y.md` form a group of their own (detached), and

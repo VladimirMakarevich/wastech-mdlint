@@ -3,7 +3,7 @@ import type { ToolErrorCode } from "../errors.js";
 // Config error type. It lives here, not with the loader that throws it, so hosts can catch it
 // without importing the loader. Thrown by loadConfiguration; the CLI maps it to exit code 2. Carries a
 // structured `code`/`hint` so an MCP host can render the shared error contract without a
-// separate error taxonomy — the code is always a config-family member (CONFIG_NOT_FOUND /
+// separate error taxonomy - the code is always a config-family member (CONFIG_NOT_FOUND /
 // CONFIG_INVALID) chosen at each throw site.
 export class ConfigError extends Error {
   readonly code: ToolErrorCode;

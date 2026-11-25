@@ -183,9 +183,9 @@ function initFilter(): void {
 }
 
 /**
- * Show only the changed files — or only those left to review, which are among them — and open the
- * folders on the way to them. A folder this opened is marked as the changes filters' own — apart
- * from the findings filter's — so turning them off closes exactly what they opened, whatever the
+ * Show only the changed files - or only those left to review, which are among them - and open the
+ * folders on the way to them. A folder this opened is marked as the changes filters' own - apart
+ * from the findings filter's - so turning them off closes exactly what they opened, whatever the
  * other switch is doing.
  */
 function applyFilter(): void {

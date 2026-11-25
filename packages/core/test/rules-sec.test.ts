@@ -401,7 +401,7 @@ describe("SEC-003 strict outline", () => {
   });
 
   // `strict: false` must take the presence-only path untouched, so its output is identical to
-  // omitting the option — the guarantee existing configs rely on when the option appears.
+  // omitting the option - the guarantee existing configs rely on when the option appears.
   it("leaves default results identical when `strict` is false", async () => {
     const cwd = await fixtureRepo({
       "template.md": "# T\n## Context\n## Decision\n",
@@ -697,8 +697,8 @@ describe("SEC-006 emphasis as heading", () => {
     ]);
   });
 
-  // A document opening with `**Title**` has two separate defects — no title heading, and emphasis
-  // standing in for one — so SEC-004 and SEC-006 both report line 1 by design.
+  // A document opening with `**Title**` has two separate defects - no title heading, and emphasis
+  // standing in for one - so SEC-004 and SEC-006 both report line 1 by design.
   it("co-reports with SEC-004 on an emphasis title", async () => {
     const cwd = await fixtureRepo({ "a.md": "**Title**\n\nText.\n" });
 
@@ -761,7 +761,7 @@ describe("SEC file scope (exclude)", () => {
         "docs/a.md",
         "drafts/b.md",
       ]);
-      // The unscoped shape — `exclude` with no `files` beside it to carry the filtering.
+      // The unscoped shape - `exclude` with no `files` beside it to carry the filtering.
       expect(
         await reportedFiles(
           cwd,
@@ -777,7 +777,7 @@ describe("SEC file scope (exclude)", () => {
     },
   );
 
-  // SEC-001's fix hook re-applies the gate itself because `applyFixes` has none — the pattern
+  // SEC-001's fix hook re-applies the gate itself because `applyFixes` has none - the pattern
   // TBL-002's hook was missing once. Without it, `--fix` scaffolds into files `check` skipped.
   it("SEC-001 --fix scaffolds only the in-scope document", async () => {
     const cwd = await fixtureRepo({

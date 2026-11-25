@@ -12,7 +12,7 @@ export type DetectedPackageManager =
 async function fileExists(candidatePath: string): Promise<boolean> {
   try {
     // `stat` (not `lstat`) so a symlink to a real lockfile still counts, but a directory or a
-    // symlink to one — or a dangling symlink — correctly does not.
+    // symlink to one - or a dangling symlink - correctly does not.
     const stats = await stat(candidatePath);
     return stats.isFile();
   } catch {
@@ -21,7 +21,7 @@ async function fileExists(candidatePath: string): Promise<boolean> {
 }
 
 // `.git` is a directory in a normal clone but a plain file in a worktree or submodule, so the
-// repository-root marker deliberately accepts either — unlike `fileExists` above, which must reject
+// repository-root marker deliberately accepts either - unlike `fileExists` above, which must reject
 // a directory named like a lockfile.
 async function isRepositoryRoot(directory: string): Promise<boolean> {
   try {
@@ -61,12 +61,12 @@ async function detectInDirectory(
 /**
  * Detects the package manager from the nearest lockfile at or above `cwd`. Priority order
  * bun > pnpm > yarn > npm mirrors the spec; returns `undefined` when no lockfile is found rather
- * than defaulting to `"npm"` — guessing a manager with no evidence is a UX call for the interactive
+ * than defaulting to `"npm"` - guessing a manager with no evidence is a UX call for the interactive
  * `init` layer, not core's job.
  *
  * The walk is bounded, mirroring `findConfig`'s ancestor discipline (config/find-config.ts). `cwd`
  * itself is always checked; the walk then climbs strict ancestors and stops after the first
- * directory containing a `.git` (the repository root owns the lockfile — a monorepo member has none
+ * directory containing a `.git` (the repository root owns the lockfile - a monorepo member has none
  * of its own, which is exactly why an earlier root-only check reported "not detected" for it)
  * and never reaches the user's home directory (an unrelated lockfile at `$HOME` must not be
  * attributed to the scanned project).

@@ -18,12 +18,12 @@ const KEPT_EVENTS = 64;
  * state at that moment and asks for nothing more, so an event sent between serving it and its stream
  * connecting would otherwise be lost, and the page would keep showing the state before it. The page
  * connects with that id, and the events it missed are sent to it first; when they are no longer
- * kept — a burst longer than `KEPT_EVENTS`, or a server that restarted meanwhile — it is told so
+ * kept - a burst longer than `KEPT_EVENTS`, or a server that restarted meanwhile - it is told so
  * with `missed`, and reloads.
  *
  * An id is this run's tag and the event's number (`3f9c01ab.12`). A number alone cannot tell a
  * restarted server from the one that served the page: the new one counts from zero again, and once
- * it has sent as many events as the page saw — its startup findings alone can be one — the page's
+ * it has sent as many events as the page saw - its startup findings alone can be one - the page's
  * number reads as up to date, or as an earlier point of the new run, whose events would then be sent
  * as if they followed the old ones. A page that closed its stream while hidden has no lost
  * connection to tell it the server went away, so the tag is what does.
@@ -119,8 +119,8 @@ export class EventHub {
 }
 
 // The last event a connecting page has seen: the id it was served with, or the id of the last event
-// it received when it reopens its stream or the browser reconnects it by itself. Anything else —
-// malformed, or a bare number no run of this server sends — is no position to resume from.
+// it received when it reopens its stream or the browser reconnects it by itself. Anything else -
+// malformed, or a bare number no run of this server sends - is no position to resume from.
 function seenBy(
   request: IncomingMessage,
 ): { run: string; number: number } | undefined {

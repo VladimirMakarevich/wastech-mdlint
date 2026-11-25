@@ -16,7 +16,7 @@ import {
 } from "../src/graph-view.js";
 
 // Built through core's own parser and graph builder, so the edges are the ones a real corpus would
-// produce — including the link and the anchor edge core keeps side by side for one pair.
+// produce - including the link and the anchor edge core keeps side by side for one pair.
 const documents = new Map<string, ParsedDocument>(
   Object.entries({
     "README.md":

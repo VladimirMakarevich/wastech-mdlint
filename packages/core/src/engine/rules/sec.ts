@@ -33,7 +33,7 @@ import type { RuleContext, TextEdit } from "../types.js";
 
 // Section + structure rules.
 
-// SEC-001 — required sections present. Fixable: scaffold each missing section at end of file.
+// SEC-001 - required sections present. Fixable: scaffold each missing section at end of file.
 // The fix lives on the document-scope rule because a `TextEdit` targets one document's content.
 export const sec001: RuleDefinition = defineRule({
   metadata: {
@@ -86,7 +86,7 @@ export const sec001: RuleDefinition = defineRule({
   },
 });
 
-// SEC-002 — sections appear in order. Reordering is a judgment call, so not auto-fixable.
+// SEC-002 - sections appear in order. Reordering is a judgment call, so not auto-fixable.
 export const sec002: RuleDefinition = defineRule({
   metadata: {
     id: "SEC-002",
@@ -148,10 +148,10 @@ function headingData(
     : { text: heading.text, depth: heading.depth, line: heading.line };
 }
 
-// SEC-003 — sections conform to a reference file's heading structure (project). By default only
+// SEC-003 - sections conform to a reference file's heading structure (project). By default only
 // presence of each template heading is enforced (SEC-002 handles order). With `strict`, the
-// document's heading sequence must match the template's exactly — presence, order, depth and no
-// extra headings — with `*`/`+`/`?` template headings acting as wildcards.
+// document's heading sequence must match the template's exactly - presence, order, depth and no
+// extra headings - with `*`/`+`/`?` template headings acting as wildcards.
 export const sec003: RuleDefinition = defineRule({
   metadata: {
     id: "SEC-003",
@@ -177,7 +177,7 @@ export const sec003: RuleDefinition = defineRule({
     if (resolvesOutsideRoot(rootDir, options.template)) {
       // Reject before any existsSync/readFileSync attempt: trying the read first and
       // special-casing the failure would still leak a file-existence oracle for arbitrary host
-      // paths — the failure itself is the oracle, whatever the message says.
+      // paths - the failure itself is the oracle, whatever the message says.
       context.report({
         message: `SEC-003 template "${options.template}" escapes the analyzed root; skipping conformance checks.`,
         line: 0,
@@ -272,7 +272,7 @@ function reportMissingSections(
   options: Sec003Options,
   template: ParsedDocument,
 ): void {
-  // `level` selects the *exact* heading depth to compare — `level: 2` checks only `##` headings,
+  // `level` selects the *exact* heading depth to compare - `level: 2` checks only `##` headings,
   // not "every heading up to depth 2". Exact-depth is what lets a per-document `# Title` differ
   // across files without every document being required to share it. Default: compare all depths.
   const requiredHeadings = [
@@ -304,7 +304,7 @@ function reportMissingSections(
   }
 }
 
-// SEC-004 — heading levels increment by one, with a single title at the start. Three checks, each
+// SEC-004 - heading levels increment by one, with a single title at the start. Three checks, each
 // switchable on its own because each has a legitimate exception: a docs-site page often takes its
 // title from front matter and its renderer (title off, or satisfied by `titleKey`), a changelog has
 // one top-level heading per release (singleTitle off), and generated reference pages sometimes jump
@@ -351,11 +351,11 @@ export const sec004: RuleDefinition = defineRule({
   },
 });
 
-// SEC-005 — heading text is not repeated within a document. A repeated heading makes every
+// SEC-005 - heading text is not repeated within a document. A repeated heading makes every
 // `section` option that names it ambiguous (the section primitives scope to the first match and
 // silently ignore the rest, while TBL's table filter takes every match), and turns its anchor into an order-dependent `-1` slug that breaks as soon as the
-// headings are reordered. `siblingsOnly` exists because some families repeat headings by design —
-// a changelog's `### Added` per release, an API page's `### Parameters` per function — and there the
+// headings are reordered. `siblingsOnly` exists because some families repeat headings by design -
+// a changelog's `### Added` per release, an API page's `### Parameters` per function - and there the
 // defect is only a repeat under the same parent. Its default is applied with `??` rather than a Zod
 // `.default()`, matching SEC-003 and SEC-004, so the generated schema keeps every option optional.
 // Not fixable: renaming a heading is a judgment call.
@@ -388,7 +388,7 @@ export const sec005: RuleDefinition = defineRule({
   },
 });
 
-// SEC-006 — emphasis is not used in place of a heading. A paragraph that is only `**Installation**`
+// SEC-006 - emphasis is not used in place of a heading. A paragraph that is only `**Installation**`
 // looks like a heading on the page but is a paragraph to every consumer of the outline: SEC-001 and
 // CTX-001 cannot find the section, a `section` option cannot name it, `slice` cannot cut at it, and
 // it gets no anchor to link to. The semantics follow markdownlint MD036 so a repository moving
@@ -427,11 +427,11 @@ export const sec006: RuleDefinition = defineRule({
   },
 });
 
-// STR-001 — required files exist in the project (project). `files` here is the *required* set (each
+// STR-001 - required files exist in the project (project). `files` here is the *required* set (each
 // entry is a path or glob), not file scoping.
 //
 // Satisfaction has two modes. A *literal* entry is satisfied by the corpus at
-// exactly that repo-relative path, or by anything on disk there — so a required `LICENSE` or
+// exactly that repo-relative path, or by anything on disk there - so a required `LICENSE` or
 // `package.json`, which no `**/*.md` corpus can ever contain, stops being reported missing on a
 // repository that ships it. "Corpus or disk" is the same resolution model REF-001 already uses
 // (`primitives/reference.ts`), so the two rules agree on what "exists" means. A *glob* entry stays
@@ -469,7 +469,7 @@ export const str001: RuleDefinition = defineRule({
       // Normalize once for both lookups: the corpus is keyed by repo-relative POSIX paths, and
       // `path.resolve` accepts `/` separators on Windows too, so one value keeps the membership
       // test and the disk probe talking about the same path. Unlike SEC-003's raw `template`, this
-      // cannot mask an escape — `..\x` normalizes to `../x`, which still fails containment below.
+      // cannot mask an escape - `..\x` normalizes to `../x`, which still fails containment below.
       const entry = normalizeRelativePath(required);
 
       if (isGlobPattern(entry)) {
@@ -483,7 +483,7 @@ export const str001: RuleDefinition = defineRule({
 
       if (resolvesOutsideRoot(rootDir, entry)) {
         // Rejected before the probe, at the same severity as "missing", so a required entry cannot
-        // be used to ask whether an arbitrary host path exists — the same reasoning as SEC-003's
+        // be used to ask whether an arbitrary host path exists - the same reasoning as SEC-003's
         // template check.
         context.report({
           message: `Required file "${required}" escapes the analyzed root and cannot be verified.`,

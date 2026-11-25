@@ -13,13 +13,13 @@ import type {
 } from "./types.js";
 
 // The single metadata source per rule. One object drives the registry, `schema.json`
-// generation, the README table, `describeRules`, and `init` categories —
+// generation, the README table, `describeRules`, and `init` categories -
 // so those never drift from each other.
 export type RuleMetadata = {
   id: string;
   // A human-readable second spelling of `id` (lowercase kebab-case with at least one dash, e.g.
   // `no-broken-anchors`), accepted wherever a rule id is read as input: config `rules[].rule` and
-  // inline suppression tokens. It is input only — findings, written configs and every report keep
+  // inline suppression tokens. It is input only - findings, written configs and every report keep
   // the canonical `id`, so output has one name per rule. The dash is what keeps an alias from ever
   // being read as a dash-less suppression category token.
   alias: string;
@@ -62,7 +62,7 @@ export function defineRule<TSchema extends z.ZodType>(def: {
       ...def.metadata,
       // Derived here rather than repeated in every rule file: a rule that spelled its own URL could
       // disagree with the README table's link, and a rule that forgot one would emit a finding with
-      // no `helpUri` at all — which is exactly what two rules once shipped.
+      // no `helpUri` at all - which is exactly what two rules once shipped.
       docsUrl: def.metadata.docsUrl ?? ruleDocsUrl(def.metadata.id),
       optionsSchema: def.optionsSchema,
     },
@@ -155,7 +155,7 @@ function declaredOptionKeys(schema: z.ZodType): Set<string> {
  * The two mistakes are not equally forgiving, which is why the second sentence exists. `files` is a
  * hard error and therefore safe. On the two rules whose `exclude` filters the link or image *target*
  * being probed rather than the source document, spelling `exclude` and meaning "skip these files"
- * type-checks, runs, and silently filters something else — so a user who reaches for file scope here
+ * type-checks, runs, and silently filters something else - so a user who reaches for file scope here
  * has to be told what the key beside it actually does. That pair is derived from the schema rather
  * than listed: declaring `exclude` without `files` is what makes a rule one of them, and
  * `registry-inventory.test.ts` pins which rules that currently is.
@@ -355,8 +355,8 @@ export type MixedRuleSpelling = {
 /**
  * Find built-in rule entries that name one rule by its id in one place and by its alias in another.
  *
- * Repetition itself is supported — two `REF-001` entries with different `files` scopes apply one rule
- * differently to two parts of a repository — so this compares spelling *kinds*, not counts: two `REF-002`
+ * Repetition itself is supported - two `REF-001` entries with different `files` scopes apply one rule
+ * differently to two parts of a repository - so this compares spelling *kinds*, not counts: two `REF-002`
  * entries, or two `no-broken-anchors` entries, stay valid. Mixing them is rejected because a reader
  * searching the config for one spelling misses the entry written in the other, so the rule looks
  * configured once while it runs twice.
@@ -417,5 +417,5 @@ export function mixedRuleSpellingMessage(params: {
   firstSpelling: string;
   siblingPath: string;
 }): string {
-  return `rule "${params.spelling}" names "${params.ruleId}", which ${params.siblingPath} names as "${params.firstSpelling}" — spell every entry for one rule the same way.`;
+  return `rule "${params.spelling}" names "${params.ruleId}", which ${params.siblingPath} names as "${params.firstSpelling}" - spell every entry for one rule the same way.`;
 }

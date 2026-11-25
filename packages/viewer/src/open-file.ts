@@ -7,7 +7,7 @@ import { isLoopbackHost } from "./security.js";
 
 // Opening the config file from its page: showing it in the system's file manager, or handing it to
 // whatever application the system opens such a file with. Each is one program the operating system
-// itself provides, run with the file's path as an argument list — never through a shell, where a
+// itself provides, run with the file's path as an argument list - never through a shell, where a
 // space or an ampersand in a checkout's path is the ordinary case and would become part of a command.
 
 export type OpenAction = "reveal" | "open";
@@ -16,7 +16,7 @@ export type OpenAction = "reveal" | "open";
  * Why opening a file is refused for a viewer bound to `host`, or `undefined` when it is allowed.
  *
  * Opening starts a program on the machine running the viewer. A reader on another machine, reaching
- * a viewer bound with `--host`, would make a window appear on a desktop that is not theirs — so,
+ * a viewer bound with `--host`, would make a window appear on a desktop that is not theirs - so,
  * like saving the config, it is an action for a loopback binding only.
  */
 export function openRefusal(host: string): string | undefined {
@@ -38,7 +38,7 @@ export type LaunchCommand = {
  * The program and arguments that reveal or open `absolutePath` on `platform`, or `undefined` for a
  * path that cannot be passed safely.
  *
- * - Windows: Explorer — `/select,` opens the folder with the file selected; a bare path opens the
+ * - Windows: Explorer - `/select,` opens the folder with the file selected; a bare path opens the
  *   file with its associated application, as a double click would. Quoted by hand for the verbatim
  *   command line, which is safe because a Windows path cannot contain a double quote; one that
  *   somehow does is refused rather than allowed to end the quoting early.
@@ -87,8 +87,8 @@ export type Launcher = (command: LaunchCommand) => Promise<void>;
  * exits with status 1 even when it succeeds, so an exit status says nothing either way.
  */
 export const launchDetached: Launcher = async (command) => {
-  // Never by bare name: on Windows that searches the viewer's working directory — usually the
-  // repository it serves — before `PATH`, so an `explorer.exe` committed to it would be what a click
+  // Never by bare name: on Windows that searches the viewer's working directory - usually the
+  // repository it serves - before `PATH`, so an `explorer.exe` committed to it would be what a click
   // on "Show in folder" runs. An absolute `command` is the caller's own choice and is used as given.
   const executable = path.isAbsolute(command.command)
     ? command.command

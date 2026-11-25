@@ -7,7 +7,7 @@ import { createSourceCursor } from "./source-cursor.js";
 // micromark only creates a `linkReference`/`imageReference` when the label has a definition; an
 // undefined `[text][missing]` is left as plain `text`, so the AST alone cannot show it. This module
 // recovers those attempts by scanning the source of each phrasing container (paragraph, heading,
-// table cell) the single parse already produced — it reads the existing tree plus `content` and
+// table cell) the single parse already produced - it reads the existing tree plus `content` and
 // never parses Markdown again.
 //
 // The scan reads the *source slice*, not `text` node values: by the time a value reaches the tree
@@ -151,7 +151,7 @@ function isReportableLabel(
   );
 }
 
-// A reference attempt opening at one `[`, and the index the scan resumes from after it — past the
+// A reference attempt opening at one `[`, and the index the scan resumes from after it - past the
 // whole attempt whether or not it ends up reported.
 type ReferenceAttempt = {
   readonly label: string;

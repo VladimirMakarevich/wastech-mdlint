@@ -8,8 +8,8 @@ import type {
 import { markReview, type ReviewMarksView } from "./review-state.js";
 import type { ViewerContext } from "./viewer-context.js";
 
-// The questions several pages ask of the branch review — its context, the reader's marks, the
-// review since the last one — answered in one place, so the Changes page, its JSON, the graph and
+// The questions several pages ask of the branch review - its context, the reader's marks, the
+// review since the last one - answered in one place, so the Changes page, its JSON, the graph and
 // the dashboard all read the same answer.
 
 // `compare=commits` limits a review to the branch's commits and `compare=uncommitted` to what is not
@@ -49,7 +49,7 @@ export async function contextOf(
 }
 
 /**
- * What the branch did, for the pages that show it beside everything else — the dashboard and the
+ * What the branch did, for the pages that show it beside everything else - the dashboard and the
  * graph. The work-tree review, as both show the files on disk; `undefined` outside a git work tree
  * or while there is nothing to compare.
  */
@@ -80,8 +80,8 @@ export async function marksOf(
 
 /**
  * A review with each document named as the reader's marks know it. Marks follow a rename through
- * `oldPath`, and a review that starts after the rename — the uncommitted work on a document the
- * branch renamed in an earlier commit — lists it under its new name alone. Its marks under the old
+ * `oldPath`, and a review that starts after the rename - the uncommitted work on a document the
+ * branch renamed in an earlier commit - lists it under its new name alone. Its marks under the old
  * name would then be missed: one document would read as not reviewed in that comparison and as
  * changed since review in the branch's, and resetting it there would leave the old name's marks
  * behind. For the marks only; the page still shows each document as its own comparison sees it.

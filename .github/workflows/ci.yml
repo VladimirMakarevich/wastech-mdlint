@@ -1,7 +1,7 @@
 name: CI
 
 # `push` is limited to `main` because a branch with an open pull request would otherwise run every
-# job twice on the same commit — once for the push and once for the pull request — and report each
+# job twice on the same commit - once for the push and once for the pull request - and report each
 # check twice. The `pull_request` run is the one worth keeping: it tests the merge with the base
 # branch, not the branch tip alone. `workflow_dispatch` covers a branch that has no pull request yet.
 on:
@@ -43,19 +43,19 @@ jobs:
       - run: npm run format
       - run: npm test
       - run: npm run build
-      # Run the product against this repository's own documentation and agent context — the guide,
-      # the root documents, the agent rules, the skills and each package README — so a dead link or a
+      # Run the product against this repository's own documentation and agent context - the guide,
+      # the root documents, the agent rules, the skills and each package README - so a dead link or a
       # broken heading anchor fails the build instead of surviving until someone reads the page. This
       # is the CLI built from this checkout; the Markdown context workflow runs the same config through
       # the release published to npm.
       # It must come after the build for two reasons: the script spawns the compiled entrypoint by
-      # path, and `node_modules/.bin/wastech-mdlint` does not exist to spawn instead — npm skips
+      # path, and `node_modules/.bin/wastech-mdlint` does not exist to spawn instead - npm skips
       # creating a bin link whose target file is absent at install time, and `npm ci` runs long
       # before dist/ is emitted.
       - run: npm run lint:docs
 
   audit:
-    # The production dependency tree only — the packages a consumer of the published tarballs
+    # The production dependency tree only - the packages a consumer of the published tarballs
     # actually installs. Split from the full audit deliberately, because the two answer different
     # questions and the workspace one is dominated by the toolchain that builds and tests the
     # packages and ships in nothing. Without the split the production signal is invisible: the
@@ -69,7 +69,7 @@ jobs:
     #
     # `--audit-level=high` rather than the default `low`: advisories are published on a schedule
     # nobody here controls, so a stricter gate turns a red build into a routine event on pull
-    # requests that changed nothing about dependencies — and a gate people learn to ignore protects
+    # requests that changed nothing about dependencies - and a gate people learn to ignore protects
     # less than one that fires rarely. Moderate and low findings still print in the job log for
     # anyone reading it; only high and critical stop the build.
     runs-on: ubuntu-latest

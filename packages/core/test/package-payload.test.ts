@@ -33,7 +33,7 @@ import { readTarball } from "./support/read-tarball.js";
 //
 // Extend it to the payload's *shape*: no source maps, and no top-level entry
 // outside each package's allowlist. That second half is what makes "no `docs/`" and "no `.github/`"
-// assertions unnecessary — an allowed-set check states the same property positively and catches the
+// assertions unnecessary - an allowed-set check states the same property positively and catches the
 // leak this suite has not thought of, which is the one that would actually ship.
 //
 // Living in `core`'s suite while reading the whole repository follows `docs-sync.test.ts` and
@@ -52,11 +52,11 @@ const repoRoot = path.resolve(
 // (`npm test`) and CI (`.github/workflows/ci.yml`).
 const npmExecPath = process.env["npm_execpath"];
 if (npmExecPath === undefined || npmExecPath === "") {
-  // Fail fast at module scope with the remedy, the same shape `assertBuilt()` uses — never a silent
+  // Fail fast at module scope with the remedy, the same shape `assertBuilt()` uses - never a silent
   // skip. A guard that quietly skips where nobody looks is how untested boundaries stay untested.
   throw new Error(
     "This suite packs the workspace with npm, which it locates through the `npm_execpath` " +
-      "environment variable — set by any `npm run …`, and absent under a bare `vitest run`. " +
+      "environment variable - set by any `npm run …`, and absent under a bare `vitest run`. " +
       "Run `npm test` (the documented gate) instead.",
   );
 }
@@ -67,7 +67,7 @@ type PublishedPackage = {
   /** Repository-relative POSIX subpath, which is what `repository.directory` must carry. */
   readonly directory: string;
   /**
-   * Every top-level segment the payload is allowed to contain — `files` plus the two filenames npm
+   * Every top-level segment the payload is allowed to contain - `files` plus the two filenames npm
    * force-includes. Listing it per package rather than sharing one set keeps `cli`'s `schema.json`
    * a property of `cli` alone, so a copy of it leaking into `core` fails here.
    */
@@ -76,7 +76,7 @@ type PublishedPackage = {
 
 // Adding a genuinely new payload file (a `CHANGELOG.md`, say) means one line here. That is
 // the guard working, not friction: the edit is the moment somebody confirms the new file is meant
-// to ship — the review that publishing an unexamined tarball would skip.
+// to ship - the review that publishing an unexamined tarball would skip.
 const ALWAYS_ALLOWED = ["package.json", "README.md", "LICENSE", "dist"];
 
 const PUBLISHED_PACKAGES: readonly PublishedPackage[] = [
@@ -104,11 +104,11 @@ const PUBLISHED_PACKAGES: readonly PublishedPackage[] = [
   },
 ];
 
-// The suite packs with `--workspaces`, which takes npm's no-lifecycle-script path — so nothing here
+// The suite packs with `--workspaces`, which takes npm's no-lifecycle-script path - so nothing here
 // rebuilds, and the assertions below read `dist` directly. Without this, a never-built
 // tree would fail the positive control below (`dist/index.js` present) as a packaging defect instead
-// of "you did not build". It does not catch stale `.map` output either way — `assertBuilt()` only
-// compares `dist/index.js` against `src/index.ts`, and `tsc` never deletes a `.map` on its own — so
+// of "you did not build". It does not catch stale `.map` output either way - `assertBuilt()` only
+// compares `dist/index.js` against `src/index.ts`, and `tsc` never deletes a `.map` on its own - so
 // the map assertion's own failure message is what names that remedy.
 for (const { directory } of PUBLISHED_PACKAGES) {
   assertBuilt(
@@ -119,7 +119,7 @@ for (const { directory } of PUBLISHED_PACKAGES) {
 
 /**
  * npm's own tarball filename rule: drop the leading `@`, flatten the scope separator, then the
- * version. Derived rather than hard-coded so the suite is not coupled to the current `0.0.0` —
+ * version. Derived rather than hard-coded so the suite is not coupled to the current `0.0.0` -
  * the release tool bumps every version in lockstep and this guard has to survive that.
  */
 function tarballPrefix(packageName: string): string {
@@ -138,7 +138,7 @@ const rootLicense = readFileSync(
 
 // The `…/blob/main/` prefix every in-repository link in a published README is written against,
 // taken from the constant that already spells the repository once rather than spelled a second
-// time here — `registry-inventory.test.ts` pins that constant against the root manifest, so this
+// time here - `registry-inventory.test.ts` pins that constant against the root manifest, so this
 // inherits the same anchor.
 const blobPrefix = /^https:\/\/[^/]+\/[^/]+\/[^/]+\/blob\/main\//.exec(
   RULE_DOCS_BASE_URL,
@@ -159,7 +159,7 @@ beforeAll(async () => {
   packDir = await mkdtemp(path.join(os.tmpdir(), "wastech-mdlint-pack-"));
 
   // `--workspaces` packs the four publishable packages; the root is `private: true` and is not
-  // packed. That pack path runs no lifecycle script, so nothing here rebuilds — which is why the
+  // packed. That pack path runs no lifecycle script, so nothing here rebuilds - which is why the
   // `assertBuilt()` calls above are a precondition rather than a convenience.
   const packed = spawnSync(
     process.execPath,
@@ -225,7 +225,7 @@ describe.each(PUBLISHED_PACKAGES)(
 
     it("links only to files that exist in the repository", () => {
       // The README's links to guide pages and to the sibling packages are absolute URLs, which is
-      // what makes them work on the npm page — and also what makes the REF rules skip them, so a
+      // what makes them work on the npm page - and also what makes the REF rules skip them, so a
       // renamed guide page rots them silently on the one surface this payload exists to make
       // readable. `registry-inventory.test.ts` already guards this class for rule doc pages;
       // resolving the path half back to disk is the same check for the prose half.
@@ -291,7 +291,7 @@ describe.each(PUBLISHED_PACKAGES)(
       );
       // The remedy has to name the forced build, not `npm run build`: flipping `declarationMap` /
       // `sourceMap` off does not delete already-emitted `.map` files, and `tsc -b` decides
-      // up-to-dateness from *content* — no `src` file changed, so an incremental build leaves them
+      // up-to-dateness from *content* - no `src` file changed, so an incremental build leaves them
       // in place and this stays red against a command that just exited 0. A contributor with a
       // checkout built before maps were turned off hits exactly this.
       expect(
@@ -325,7 +325,7 @@ describe.each(PUBLISHED_PACKAGES)(
 
 describe("release:check", () => {
   // The script is the only local command a maintainer runs before tagging, and it used to pack the
-  // *root* — which is `private: true` with no `files`, so it exercised none of the
+  // *root* - which is `private: true` with no `files`, so it exercised none of the
   // allowlists while being described as validating exactly those. Nothing could have
   // caught that: the payload assertions above pack the workspaces themselves, so they stay green no
   // matter what the script does. Reading the script text is the only way this property is visible.
@@ -339,7 +339,7 @@ describe("release:check", () => {
     // `--workspaces` takes the pack path that runs **no** lifecycle script, so unlike a root
     // `npm pack` this one gets no `prepack` rebuild. Every package's `files` is `dist`-first, so a
     // reordering that moved the pack ahead of the build would pack whatever `dist` happened to
-    // hold — or nothing at all — and still exit 0. The constraint is otherwise invisible in the
+    // hold - or nothing at all - and still exit 0. The constraint is otherwise invisible in the
     // one-line script.
     const build = releaseCheck!.indexOf("npm run build");
     const pack = releaseCheck!.indexOf("npm pack");
@@ -352,12 +352,12 @@ describe("release:check", () => {
   });
 });
 
-describe("published payload of @wastech-mdlint/cli — allowlist-only files", () => {
+describe("published payload of @wastech-mdlint/cli - allowlist-only files", () => {
   // Named for its subject rather than for its package: `describe.each` above generates a suite
   // called `published payload of @wastech-mdlint/cli` for the same package, and a title that is a
   // prefix of that one cannot be selected alone with `-t`.
   it("still ships schema.json", () => {
-    // The one payload file that ships *only* because `files` lists it — README and LICENSE are
+    // The one payload file that ships *only* because `files` lists it - README and LICENSE are
     // force-included by npm regardless. So this is where the suite has real allowlist sensitivity,
     // and it is what makes editor `$schema` resolution work from the installed package.
     const schema = payloads.get("@wastech-mdlint/cli")!.get("schema.json");

@@ -77,7 +77,7 @@ const PROGRAM_LEVEL_FLAGS = new Set(["-h", "--help", "-v", "--version"]);
  *
  * Commander's `_parseCommand` dispatches to a default command *before* it can reach
  * `unknownCommand()`, so with `isDefault` no operand is ever rejected: `wastech-mdlint bogus-command`
- * became lint's `[path]`, linted an empty corpus, and exited `0` — a typo'd CI step passing green
+ * became lint's `[path]`, linted an empty corpus, and exited `0` - a typo'd CI step passing green
  * Prepending the name here leaves commander's own unknown-command error (and its
  * did-you-mean suggestion) intact.
  *
@@ -101,11 +101,11 @@ function routeDefaultCommand(argv: string[]): string[] {
  * validation belongs, and return it resolved.
  *
  * Two defects in one helper. Without the existence check a nonexistent target simply globs an empty
- * corpus and reports `0 "No problems found."` — indistinguishable from a clean repository.
+ * corpus and reports `0 "No problems found."` - indistinguishable from a clean repository.
  * Without resolving against *this run's* `cwd` first the check would disagree with what core actually
  * reads: a relative directory handed to `loadConfiguration`/`lintFiles` as their own `cwd` resolves
  * against the real `process.cwd()`, which is not the injected `cwd`. (This is about the directory
- * arguments only. A relative `--config` is core's to resolve, against whatever `cwd` it is given —
+ * arguments only. A relative `--config` is core's to resolve, against whatever `cwd` it is given -
  * so it is passed through as typed.)
  */
 async function resolveDirectoryArgument(
@@ -244,7 +244,7 @@ function registerLintCommands(context: ProgramContext): void {
       .action(lintAction);
   };
 
-  // `lint` is the default command — routed in argv by `routeDefaultCommand`, not registered as
+  // `lint` is the default command - routed in argv by `routeDefaultCommand`, not registered as
   // commander's `isDefault`; `scan` is a hidden, deprecated alias for one minor version.
   addLintCommand("lint", false);
   addLintCommand("scan", true);
@@ -467,7 +467,7 @@ async function runInitAction(
   );
 
   // Construct the real prompter here (not inside commands.ts) so its `confirmDraft` writes
-  // through this run's own `stdout` seam instead of the real `process.stdout` — the same
+  // through this run's own `stdout` seam instead of the real `process.stdout` - the same
   // stream every other command already writes its output through.
   context.record(
     await executeCommand(
@@ -494,7 +494,7 @@ function registerInitCommand(context: ProgramContext): void {
     )
     // Deliberately no default value here (unlike `lint`/`graph`'s identical-looking `[path]`
     // arguments): the action callback must be able to tell "omitted" (`undefined`) apart
-    // from "typed, and happens to equal cwd" — an explicit target must not be silently re-rooted
+    // from "typed, and happens to equal cwd" - an explicit target must not be silently re-rooted
     // onto an ancestor's config.
     .argument("[path]", "directory to scan")
     .addOption(
@@ -531,7 +531,7 @@ function exitCodeForError(
   cwd: string,
 ): number {
   // Ctrl+C during any inquirer prompt (matched on `.name`, not `instanceof` a specific imported
-  // class — @inquirer/prompts' own docs recommend this as the version-stable detection) exits
+  // class - @inquirer/prompts' own docs recommend this as the version-stable detection) exits
   // gracefully rather than surfacing as an unexpected-error stack trace.
   if (error instanceof Error && error.name === "ExitPromptError") {
     return EXIT_CODE_SUCCESS;

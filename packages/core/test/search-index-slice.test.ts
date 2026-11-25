@@ -135,7 +135,7 @@ describe("resolveQuery · path", () => {
 
 describe("resolveQuery · cross-category precedence", () => {
   it("prefers path over id when a query matches both", () => {
-    // A deliberately permissive idPattern so "shared.md" itself can be an ID token — this is a
+    // A deliberately permissive idPattern so "shared.md" itself can be an ID token - this is a
     // contrived collision to prove precedence, not a realistic idPattern.
     const idRef: IdRef = {
       idPattern: "\\S+",

@@ -30,8 +30,8 @@ import type { TextDiff } from "./text-diff.js";
 // What a change does to the context, not only to the text: the findings it adds and removes, what
 // each changed document weighs, what every agent session loads, the links it makes and breaks, and
 // the unchanged documents it reaches. Pure: both versions of the corpus come in parsed, and nothing
-// here reads a file or runs git, so every host — a viewer reviewing a branch, a command linting
-// "since" a ref — gets the same answer from the same inputs.
+// here reads a file or runs git, so every host - a viewer reviewing a branch, a command linting
+// "since" a ref - gets the same answer from the same inputs.
 
 /** One changed document, parsed on each side it exists on, with its diff. */
 export type ChangedDocument = {
@@ -282,7 +282,7 @@ function affectedByChanges(params: {
     changes.flatMap((change) => (change.status === "D" ? [] : [change.path])),
   );
   // A link from an unchanged document into a changed one is in the base's graph even when the head's
-  // lost it — an anchor into a heading the change renamed no longer resolves, so it is no edge there.
+  // lost it - an anchor into a heading the change renamed no longer resolves, so it is no edge there.
   const changedBase = new Set(
     changes.flatMap((change) =>
       change.status === "A" ? [] : [change.oldPath ?? change.path],

@@ -18,8 +18,8 @@ import {
 import { largeCorpusGraph } from "./support/large-corpus-graph.js";
 
 // The fixture's stated properties, asserted in one place so the renderer suites that depend on them
-// (graph-render, compile-context, and the cli/mcp e2e suites across the workspace) fail here — with
-// the property named — rather than in a confusing downstream diff. The graph JSON contract test
+// (graph-render, compile-context, and the cli/mcp e2e suites across the workspace) fail here - with
+// the property named - rather than in a confusing downstream diff. The graph JSON contract test
 // reuses the same fixture.
 
 describe("large corpus fixture", () => {
@@ -77,7 +77,7 @@ describe("large corpus fixture", () => {
 
   it("reproduces a real corpus's collapsed role histogram", () => {
     // This exact histogram is quoted as an accepted limitation elsewhere. It is asserted, not
-    // computed into the doc, because the register's claim is about a *measured* corpus — if the
+    // computed into the doc, because the register's claim is about a *measured* corpus - if the
     // fixture drifts, the register row becomes false and this is what says so.
     const histogram: Partial<Record<NodeRole, number>> = {};
     for (const { role } of classifyNodes(largeCorpusGraph())) {
@@ -91,7 +91,7 @@ describe("large corpus fixture", () => {
       bridge: 5,
       leaf: 4,
     });
-    // 86% in two buckets, against a real corpus's 83% — that coarseness is a property of
+    // 86% in two buckets, against a real corpus's 83% - that coarseness is a property of
     // the vocabulary, not of one corpus.
     expect((73 + 46) / LARGE_CORPUS_DOCUMENT_COUNT).toBeGreaterThan(0.85);
   });

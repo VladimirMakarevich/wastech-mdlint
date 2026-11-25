@@ -15,7 +15,7 @@ const BUILTIN_SHAPE = /^([A-Z][A-Z0-9]*?)-?([0-9]+)$/;
  * - `ref-001`, `REF001`, `Ref-001` → `REF-001` (case-insensitive, dash-optional for the
  *   built-in `PREFIX-DIGITS` shape).
  * - Custom IDs that are not the built-in shape (e.g. `req-owner`) are upper-cased with their
- *   existing dashes preserved (`REQ-OWNER`) — a dash cannot be inferred between two letter runs.
+ *   existing dashes preserved (`REQ-OWNER`) - a dash cannot be inferred between two letter runs.
  */
 export function canonicalizeRuleId(raw: string): string {
   const upper = raw.trim().toUpperCase();

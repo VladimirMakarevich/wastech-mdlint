@@ -301,7 +301,7 @@ describe("ReviewStore", () => {
     );
   });
 
-  // Two viewers of one clone — two ports, or a viewer per worktree — marking at the same moment.
+  // Two viewers of one clone - two ports, or a viewer per worktree - marking at the same moment.
   // Without the lock both would read the same index and the later rename would drop the other's
   // marks; with it every mark of both survives.
   it("merges concurrent marks from two viewers of one clone", async () => {

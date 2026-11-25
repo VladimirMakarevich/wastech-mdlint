@@ -113,11 +113,11 @@ describe("handleContextGraph", () => {
   });
 
   it("names a linked-but-excluded file in coverage.filesOutsideCorpus", async () => {
-    // The coverage signal — the graph report's single best diagnostic — and the
+    // The coverage signal - the graph report's single best diagnostic - and the
     // reason for adding coverage here: an agent asking for the graph could not see that 12 linked
     // files were never linted. The shared `graph-project` fixture has no out-of-corpus file and
     // other suites assert its exact node set, so this scenario builds its own root rather than
-    // perturbing it — mirroring the CLI fixture's excluded `appendix.md`.
+    // perturbing it - mirroring the CLI fixture's excluded `appendix.md`.
     const dir = await makeTempDir("mcp-cg-coverage-");
     await writeFile(
       path.join(dir, "wastech-mdlint.config.json"),
@@ -155,7 +155,7 @@ describe("handleContextGraph", () => {
 
   it("returns the human summary as the text block on both format branches", async () => {
     // Nothing asserted the text block for a long time, yet it is the graph report a host actually
-    // renders — and it is the same `formatContextGraphSummary` output regardless of `format`.
+    // renders - and it is the same `formatContextGraphSummary` output regardless of `format`.
     const [raw, summary] = await Promise.all([
       handleContextGraph({ cwd: graphProject, format: "raw" }),
       handleContextGraph({ cwd: graphProject, format: "summary" }),
@@ -187,7 +187,7 @@ describe("handleContextGraph", () => {
 
 describe("handleContextGraph at corpus scale", () => {
   // The MCP text block is the same human report the CLI prints, so it inherits the line-shape
-  // fix — an exit criterion this suite is the only place to prove.
+  // fix - an exit criterion this suite is the only place to prove.
   let root: string;
 
   beforeAll(async () => {
@@ -219,10 +219,10 @@ describe("handleContextGraph at corpus scale", () => {
   // This tool returns two documents for one call, and they are deliberately not the
   // same view: the text block is `formatContextGraphSummary` (nodes/edges/cycles/entry points/hubs)
   // while `structuredContent` on the `summary` branch is the full `ContextGraphSummary`. What must
-  // hold is that where they overlap they agree — the narrower one being *stale* rather than narrow is
+  // hold is that where they overlap they agree - the narrower one being *stale* rather than narrow is
   // the failure, and reading the code cannot tell those apart.
   //
-  // `entry points` is the only *section* the shared reader can see — its header carries a count,
+  // `entry points` is the only *section* the shared reader can see - its header carries a count,
   // which `top hubs` deliberately does not, since the structured payload has no hub array to diff a
   // count against. The hub lines are still checkable, though, because each now prints the two degrees
   // its node carries; those are compared below. The reading order and the set a cycle excluded from
@@ -253,8 +253,8 @@ describe("handleContextGraph at corpus scale", () => {
 
     // Hub lines carry two numbers each, parsed back out of the text rather than recomputed with the
     // renderer's own helper, and checked against the node the structured payload reports. A text
-    // block that had gone stale — or that summed the degrees, which cannot distinguish the document
-    // everything depends on from the one that depends on everything — fails here.
+    // block that had gone stale - or that summed the degrees, which cannot distinguish the document
+    // everything depends on from the one that depends on everything - fails here.
     const lines = text.split("\n");
     const hubLines = lines.slice(
       lines.indexOf("top hubs:") + 1,

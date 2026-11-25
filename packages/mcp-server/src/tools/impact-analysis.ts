@@ -28,7 +28,7 @@ import {
   withErrorOutput,
 } from "../shared/tool-response.js";
 
-// `impact-analysis` — the blast radius of changing `file`: which files reference it directly, which
+// `impact-analysis` - the blast radius of changing `file`: which files reference it directly, which
 // depend on it transitively, and the reading order over that affected subgraph. Core owns the
 // classification; this handler is a thin adapter.
 
@@ -47,7 +47,7 @@ const impactAnalysisInputShape = {
 } as const;
 
 // Local mirrors of `DirectlyAffected`/`TransitivelyAffected`, matching `ImpactClassification`
-// exactly. `via` on a transitive entry is always a real predecessor path (never null) — every
+// exactly. `via` on a transitive entry is always a real predecessor path (never null) - every
 // depth≥2 visit has one, per impact-analysis.ts's own invariant.
 const directlyAffectedSchema = z.object({
   path: z.string(),
@@ -81,7 +81,7 @@ export async function handleImpactAnalysis(
     if ((input.file === undefined) === (input.since === undefined)) {
       throw new ToolInputError(
         'impact-analysis takes either "file" or "since"',
-        'Pass "file" for one changed Markdown file, or "since" (a branch, tag or commit — git.base in the config, when it sets one) for every document the work tree changed since where it left that ref.',
+        'Pass "file" for one changed Markdown file, or "since" (a branch, tag or commit - git.base in the config, when it sets one) for every document the work tree changed since where it left that ref.',
       );
     }
     if (input.since !== undefined) {
@@ -99,7 +99,7 @@ export async function handleImpactAnalysis(
 
     // `classifyImpact` throws `ImpactAnalysisError` (code `TARGET_NOT_FOUND`, already in
     // `TOOL_ERROR_CODES`) when `file` is not in the corpus, so `errorResult` passes it through with
-    // no translation wrapper — unlike `lint.ts`, whose `RuleResolutionError` codes aren't in the
+    // no translation wrapper - unlike `lint.ts`, whose `RuleResolutionError` codes aren't in the
     // taxonomy.
     const classification = classifyImpact(graph, file);
 

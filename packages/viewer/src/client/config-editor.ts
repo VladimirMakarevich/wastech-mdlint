@@ -1,5 +1,5 @@
-// The config page's editor. It builds a form from the config schema core generates — the one an
-// editor validates the file against — and turns every change into an edit of the file's text, which
+// The config page's editor. It builds a form from the config schema core generates - the one an
+// editor validates the file against - and turns every change into an edit of the file's text, which
 // the server applies with core's `editConfigText` (so comments survive) and checks with core's
 // `parseConfiguration`. Nothing here decides whether a config is valid: the preview shows core's
 // answer, and a save writes the exact text that was previewed.
@@ -53,7 +53,7 @@ export function initConfigEditor(): void {
   )?.content;
   // The page carries what the editor is built from (`CONFIG_DATA_ID` in the server's
   // `config-editor.ts`, the same data `/api/config` answers), so the form is built as the script
-  // runs, before the page is first drawn, rather than once a request comes back — which pushed the
+  // runs, before the page is first drawn, rather than once a request comes back - which pushed the
   // file below it down the page a frame or two after it was drawn.
   const data = document.getElementById(CONFIG_DATA_ID)?.textContent ?? "";
   if (root === null || token === undefined || data === "") {
@@ -355,7 +355,7 @@ class ConfigEditor {
   private set(path: Path, value: Json): void {
     this.model = setAt(this.model ?? {}, path, clone(value));
     const last = this.edits.at(-1);
-    // Typing into one field is one change, not one per keystroke — but never into an edit a save on
+    // Typing into one field is one change, not one per keystroke - but never into an edit a save on
     // its way already carries: the change made after it has to stay a change of its own.
     const saved = this.saving?.edits?.length ?? 0;
     if (
@@ -399,7 +399,7 @@ class ConfigEditor {
   private schedulePreview(delay: number): void {
     window.clearTimeout(this.previewTimer);
     // A preview still on its way describes the config before this change. Let through, it would draw
-    // that older result — and a Save button carrying its text — until the new one arrives.
+    // that older result - and a Save button carrying its text - until the new one arrives.
     this.previewController?.abort();
     this.previewBody.replaceChildren(paragraph("Checking the change…"));
     this.actions.replaceChildren();
@@ -542,7 +542,7 @@ class ConfigEditor {
     }
     this.previewBody.replaceChildren(...okPreview(preview, this.file.path));
     this.showBar(
-      `With this change: ${counts(preview.findings.after)} — ${preview.addedCount} new, ${preview.removedCount} gone.`,
+      `With this change: ${counts(preview.findings.after)} - ${preview.addedCount} new, ${preview.removedCount} gone.`,
       true,
     );
     this.renderActions(preview.text);
@@ -660,7 +660,7 @@ class ConfigEditor {
   }
 
   // The file on disk is now `saved`. A change the reader made while the save was on its way is not
-  // part of it, so it stays — as the draft and in the editor — now made to the saved file; only a
+  // part of it, so it stays - as the draft and in the editor - now made to the saved file; only a
   // draft that is exactly what was saved is dropped.
   private saved(saved: { text: string; hash: string }): void {
     const remaining = afterSave(this.currentDraft(), saved);

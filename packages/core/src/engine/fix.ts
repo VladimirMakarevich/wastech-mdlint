@@ -43,7 +43,7 @@ export type ApplyFixesResult = { fixedFiles: string[] };
  * user asked for their files to be rewritten, and silently continuing would report a clean re-lint
  * for a file that was never actually fixed.
  *
- * The message is built from the errno `code` only, never the underlying fs message — Node embeds two
+ * The message is built from the errno `code` only, never the underlying fs message - Node embeds two
  * absolute, platform-native paths (including the random temp name) in a `rename` error, which would
  * make this output both host-specific and nondeterministic. `filePath`/`fixedFiles` are
  * repo-relative POSIX paths, so a host can render them without further translation.
@@ -78,7 +78,7 @@ export class FixWriteError extends Error {
 /**
  * Apply the deterministic fixes of every enabled rule that ships a fix hook, writing changed files
  * in place, ESLint-style. A `TextEdit` targets one document's content, so each hook is called once
- * per document with that document in `context.document` — for a project-scope rule too, which reads
+ * per document with that document in `context.document` - for a project-scope rule too, which reads
  * the rest of the corpus through `documents` and contributes edits to whichever document it is
  * handed. That keeps the edit contract, the per-file atomic write and the fail-fast behaviour
  * identical for both scopes instead of adding a second "edits for many files" shape. Returns the
@@ -88,7 +88,7 @@ export async function applyFixes(
   input: LintFilesInput,
 ): Promise<ApplyFixesResult> {
   const rootDir = path.resolve(input.cwd);
-  // Same resolved scope as `lintFiles` — a file the lint pass never read must not be one
+  // Same resolved scope as `lintFiles` - a file the lint pass never read must not be one
   // `--fix` rewrites.
   const scope = resolveCorpusScope(input.config);
   const loaded = await loadDocuments(scope.include, {
@@ -125,7 +125,7 @@ export async function applyFixes(
     // Enforced once here rather than inside `applyEdits` (which stays a pure offset primitive):
     // whatever a rule hands back adopts the host document's line ending, so no rule can leave a
     // CRLF file with mixed endings. Fixable rules also do this themselves where they
-    // build multi-line content, so each is correct when called in isolation — deliberately
+    // build multi-line content, so each is correct when called in isolation - deliberately
     // belt-and-braces, since a future fix hook that forgets is the exact failure mode this class-level
     // guarantee exists to absorb.
     const newline = detectNewline(document.content);

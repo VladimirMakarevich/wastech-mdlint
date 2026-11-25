@@ -1,6 +1,6 @@
 // A one-of-few choice drawn as a segmented control: a row of buttons in a gray track, the chosen one
 // lifted onto a thumb. Semantically a radio group, because that is what it is to a screen reader and
-// to the keyboard — one tab stop on the checked segment, the arrow keys moving the choice — whereas a
+// to the keyboard - one tab stop on the checked segment, the arrow keys moving the choice - whereas a
 // row of plain toggle buttons would read as several independent switches.
 
 /** -1 or 1 for an arrow key that moves a radio group's choice back or forward, 0 for any other key. */

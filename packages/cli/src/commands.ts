@@ -53,14 +53,14 @@ const DEFAULT_COMPILE_OUTDIR = ".claude/skills/mdlint/";
 
 // The fallback up to 0.1.3. A repository that relied on it still has that release's `SKILL.md`
 // there after upgrading, and since both files carry the same configured skill `name`, an agent host
-// would load two copies of one skill — the stale one included — with nothing reporting it. So a run
+// would load two copies of one skill - the stale one included - with nothing reporting it. So a run
 // that used the default says so when the old file is present, rather than deleting a file in a
 // directory the user may have since put to other use.
 const LEGACY_DEFAULT_COMPILE_OUTDIR = ".claude/skills/wastech-mdlint/";
 
 // The whole exit-code taxonomy, in one place because the distinction is load-bearing for
 // CI: `1` means *the linter found problems*, `2` means *the command could not run*. `1` is therefore
-// reserved exclusively for findings at or above `--fail-on` — an operational failure that reuses it
+// reserved exclusively for findings at or above `--fail-on` - an operational failure that reuses it
 // leaves a CI job unable to tell a broken step from a failing document, which is
 // why the constant is named for findings rather than for a generic runtime error.
 export const EXIT_CODE_SUCCESS = 0;
@@ -83,7 +83,7 @@ export type LintCommand = {
 };
 
 /**
- * What `--since` compares with: the branch, tag or commit `ref` names, or — given without one — the
+ * What `--since` compares with: the branch, tag or commit `ref` names, or - given without one - the
  * config's `git.base`, else the detected base branch, so a repository whose work starts from a
  * branch other than `main` can say so once rather than on every command line.
  */
@@ -143,7 +143,7 @@ export type InitCommand = {
   isTty: boolean;
   withCiWorkflow?: boolean;
   withAgentRule?: boolean;
-  // Whether the CLI's `[path]` argument was actually typed (vs. omitted and defaulted to cwd) —
+  // Whether the CLI's `[path]` argument was actually typed (vs. omitted and defaulted to cwd) -
   // see `InitCommandOptions.pathWasExplicit` for why this must be known this far down.
   pathWasExplicit: boolean;
 };
@@ -192,8 +192,8 @@ export function resolveLintExitCode(params: {
 
 /**
  * The work tree's changes since the base and what they do to the context, or a usage error naming
- * why there is nothing to compare — not a git work tree, no `git`, a ref that names nothing, no
- * base to find — and how to fix it. Exit 2 rather than "no new findings": a comparison that could
+ * why there is nothing to compare - not a git work tree, no `git`, a ref that names nothing, no
+ * base to find - and how to fix it. Exit 2 rather than "no new findings": a comparison that could
  * not run must not read as a clean branch in CI.
  */
 async function analyzeSinceOrThrow(
@@ -259,7 +259,7 @@ async function handleLint(
     } catch (error) {
       // FixWriteError already names the unwritable file, the files that were fixed, and that the
       // failed one is unchanged; re-throw as CliUsageError so program.ts maps it to exit 2 (an
-      // operational failure) instead of a bare stack trace — same precedent as handleImpact/handleCompile.
+      // operational failure) instead of a bare stack trace - same precedent as handleImpact/handleCompile.
       if (error instanceof FixWriteError) {
         throw new CliUsageError(error.message);
       }
@@ -355,7 +355,7 @@ async function handleSlice(
     settings: loaded.settings,
   });
 
-  // An unresolved query is a legitimate answer, not a usage error — `getContextSlice`
+  // An unresolved query is a legitimate answer, not a usage error - `getContextSlice`
   // already returns an empty result rather than throwing, so this command always exits 0.
   const result = getContextSlice(graph, documents, command.query, {
     depth: command.depth,
@@ -446,7 +446,7 @@ async function handleImpact(
     // `file`, not a host-local synonym: this is core's `ImpactClassification` verbatim plus a `lint`
     // key, and the MCP tool returns the same record under the same name. The subject was once called
     // `changedFile` here, which read better in isolation and meant a client generated from the MCP
-    // output schema could not find its subject in this payload — a difference in spelling where the
+    // output schema could not find its subject in this payload - a difference in spelling where the
     // two hosts have no difference in meaning. The `lint` key below is the one real divergence, and
     // it adds a field rather than renaming one.
     const payload = {
@@ -534,7 +534,7 @@ async function handleSchema(
   } catch (error) {
     // An unwritable destination is an operational failure, not a crash: convert it here so the user
     // sees the path they typed plus the errno instead of a raw fs message carrying the staged temp
-    // file's random name. `command.out` is echoed as typed — matching the success line and
+    // file's random name. `command.out` is echoed as typed - matching the success line and
     // the directory guard above, and the documented exception to naming error paths relative to the
     // working directory: an argument the caller chose to spell
     // absolutely is theirs, not ours to rewrite.
@@ -595,7 +595,7 @@ async function handleCompile(
   const outputPath = path.join(resolvedOutdir, "SKILL.md");
 
   // Repository-relative POSIX path in user-visible output (invariant) while the target is inside
-  // `--cwd`, and the absolute path once it is not — an `--outdir` above the repository rendered as a
+  // `--cwd`, and the absolute path once it is not - an `--outdir` above the repository rendered as a
   // chain of `../..` hops nobody can read. Computed before the write so a failure can
   // name the same path the success line would have.
   const outputPathForUser = toWriteTargetPath(command.cwd, outputPath);
@@ -617,7 +617,7 @@ async function handleCompile(
     output +=
       `Note: ${toWriteTargetPath(command.cwd, legacyPath)} is still there from an earlier ` +
       "release, which wrote compile's output to that directory by default. An agent host loads " +
-      "both files as skills, so delete that directory — or set compile.outdir to it to keep " +
+      "both files as skills, so delete that directory - or set compile.outdir to it to keep " +
       "writing there instead.\n";
   }
 
@@ -629,7 +629,7 @@ async function handleCompile(
 // falls on. A boolean stood here once and got it wrong for
 // `invalid-existing-config` precisely because nobody had to state an answer.
 //
-// The dividing question is not "was anything written" — four of these seven write nothing. It is
+// The dividing question is not "was anything written" - four of these seven write nothing. It is
 // whether *the user asked for* no write (`skip`, declining the draft: exit 0) or the command could
 // not do what they asked (an unloadable file to merge into, a failed write: exit 2).
 function initExitCode(outcome: InitOutcome): number {
@@ -652,7 +652,7 @@ function initExitCode(outcome: InitOutcome): number {
 
 // `init`: core generates the config bytes; `runInitCommand` performs the writes. Its output is
 // informational on every path (draft / write / abort / partial-write summary) and always goes to
-// stdout, including on a failure — only the exit code, via `initExitCode` above, says which
+// stdout, including on a failure - only the exit code, via `initExitCode` above, says which
 // kind of ending it was.
 async function handleInit(
   command: InitCommand,

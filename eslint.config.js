@@ -12,8 +12,8 @@ export default tseslint.config(
   },
   js.configs.recommended,
   {
-    // Every TypeScript file, tests included. Tests belong to no tsconfig — each package's `include`
-    // is its emit contract — so the rules that need type information cannot run on them; the strict
+    // Every TypeScript file, tests included. Tests belong to no tsconfig - each package's `include`
+    // is its emit contract - so the rules that need type information cannot run on them; the strict
     // and stylistic sets without types can.
     files: ["**/*.ts"],
     extends: [...tseslint.configs.strict, ...tseslint.configs.stylistic],

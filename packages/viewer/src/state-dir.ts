@@ -1,6 +1,6 @@
 import path from "node:path";
 
-// Where the viewer keeps what it remembers for a user between runs — today, which documents they
+// Where the viewer keeps what it remembers for a user between runs - today, which documents they
 // have reviewed. Never the work tree, where it would show up as an untracked file and could be
 // committed, and never `.git`, which belongs to git and is shared by everyone with access to the
 // clone. Each platform's own place for an application's local state: what is kept there is

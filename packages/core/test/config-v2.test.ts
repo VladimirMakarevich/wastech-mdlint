@@ -260,7 +260,7 @@ describe("loadConfiguration", () => {
   // renders against. The five CLI handlers and the MCP helper all reach this line, so getting it
   // right here is what makes `--config` mean one thing across the six.
   it("resolves a relative explicit config path against params.cwd, not the process cwd", async () => {
-    // The test process runs from the repo root, which is deliberately *not* the fixture dir — the
+    // The test process runs from the repo root, which is deliberately *not* the fixture dir - the
     // only shape in which the old `path.resolve(explicitConfigPath)` and this one differ.
     const root = await writeConfig(
       JSON.stringify({ include: ["**/*.md"], rules: [] }),
@@ -284,7 +284,7 @@ describe("loadConfiguration", () => {
     const absolute = path.join(root, "custom.config.json");
 
     // `path.resolve(base, absolute)` returns `absolute`, so an absolute argument is unaffected by the
-    // base — pinned because that is the half of the change nothing else would notice breaking.
+    // base - pinned because that is the half of the change nothing else would notice breaking.
     const loaded = await loadConfiguration({
       cwd: os.tmpdir(),
       explicitConfigPath: absolute,
@@ -549,12 +549,12 @@ describe("config diagnostics", () => {
   });
 });
 
-// `selectBranch`'s two halves are reachable from very different distances. The discriminated half —
-// a `rules[]` entry, `rule: "custom"` or not — runs on every union failure the cases above produce.
+// `selectBranch`'s two halves are reachable from very different distances. The discriminated half -
+// a `rules[]` entry, `rule: "custom"` or not - runs on every union failure the cases above produce.
 // The fallback beneath it does not: the root schema's only other union is `assertionSchema`, a
 // discriminated union whose no-match issue carries `errors: []` and is short-circuited before
 // `selectBranch` is reached, so no config a user can write enters it. That makes it code the loader
-// carries and nothing exercises, which is how it would break silently under a schema edit — so it is
+// carries and nothing exercises, which is how it would break silently under a schema edit - so it is
 // driven directly, with issues shaped the way Zod reports them rather than produced by a config.
 describe("flattenConfigIssues", () => {
   // Cast because these are hand-built: constructing a genuine `$ZodIssue` would mean finding a
@@ -565,7 +565,7 @@ describe("flattenConfigIssues", () => {
 
   it("picks the fewest-issues branch where the schema offers no discriminator", () => {
     // Two branches describing the same input, at a path that is not `["rules", n]`. Every branch's
-    // issues are about the same value, so the shortest is the closest reading of what was meant —
+    // issues are about the same value, so the shortest is the closest reading of what was meant -
     // a guess, but one with a floor, and better than the union's own `Invalid input`.
     const flattened = flattenConfigIssues(
       issues({
@@ -603,7 +603,7 @@ describe("flattenConfigIssues", () => {
   });
 
   it("passes a discriminated union's no-match issue through with its own message", () => {
-    // The `errors: []` case — `assertionSchema`'s `kind`. Its message already lists the allowed
+    // The `errors: []` case - `assertionSchema`'s `kind`. Its message already lists the allowed
     // values, so there is nothing to expand; expanding it would reduce over an empty array and
     // throw, which is what the `errors.length > 0` guard is for.
     expect(
@@ -808,7 +808,7 @@ describe("findConfig", () => {
 
     const homedirSpy = vi.spyOn(os, "homedir").mockReturnValue(home);
     try {
-      // A real config sits at `outer`, above the mocked home directory — the walk must stop at
+      // A real config sits at `outer`, above the mocked home directory - the walk must stop at
       // `home` and never report it.
       expect(await findConfig(project)).toBeUndefined();
     } finally {
@@ -829,7 +829,7 @@ describe("findConfig", () => {
 
     const homedirSpy = vi.spyOn(os, "homedir").mockReturnValue(home);
     try {
-      // The boundary rejects ANCESTORS at/above $HOME, not the starting directory itself — a config
+      // The boundary rejects ANCESTORS at/above $HOME, not the starting directory itself - a config
       // living directly at cwd === $HOME must still be found.
       expect(await findConfig(home)).toBe(
         path.join(home, "wastech-mdlint.config.json"),

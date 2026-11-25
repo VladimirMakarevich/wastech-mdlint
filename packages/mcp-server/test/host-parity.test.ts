@@ -20,11 +20,11 @@ import { PARITY_LINT_FIXTURE } from "../../core/test/support/output-parity.js";
 //
 // The cross-host leg of output parity: each host's rendering against the other's.
 //
-// The two hosts are thin adapters over one core pipeline, which is exactly why nothing compared them —
+// The two hosts are thin adapters over one core pipeline, which is exactly why nothing compared them -
 // each package tests its own handler, and both pass while rendering the same run differently. Three
-// shipped defects were divergences of exactly this shape — a `hint` present in one document and not
+// shipped defects were divergences of exactly this shape - a `hint` present in one document and not
 // the other, a `--format` word that meant different things on sibling commands, a summary key one
-// format carried and the other did not — and every one was found by a person reading the two
+// format carried and the other did not - and every one was found by a person reading the two
 // outputs side by side, because no test ever put them side by side.
 //
 // Crossing a real process boundary is deliberate and is what distinguishes this from the two
@@ -32,7 +32,7 @@ import { PARITY_LINT_FIXTURE } from "../../core/test/support/output-parity.js";
 // one only as the `content`/`structuredContent` pair a client actually receives. In-process handler
 // calls compare two values that never went through either channel.
 //
-// PRECONDITION: both `dist/` trees must be built — this spawns the CLI bin and the MCP entrypoint.
+// PRECONDITION: both `dist/` trees must be built - this spawns the CLI bin and the MCP entrypoint.
 // `assertBuilt` fails fast with the remedy (see `packages/core/test/support/assert-built.ts`).
 
 const repoRoot = path.resolve(
@@ -58,8 +58,8 @@ let fixture: string;
 // One corpus for both legs, and the lint half of it is the shared one: `PARITY_LINT_FIXTURE` (beside
 // the readers in `core/test/support/output-parity.ts`) already produces every location shape and both
 // severities, so restating it here with slightly different numbers is exactly the drift the shared
-// fixture exists to prevent. What it does not carry is a graph — it is flat and its one link is
-// unresolved — so the three linked documents below are added on top for the graph leg, which is only
+// fixture exists to prevent. What it does not carry is a graph - it is flat and its one link is
+// unresolved - so the three linked documents below are added on top for the graph leg, which is only
 // meaningful over a corpus that has edges and an entry point.
 const FIXTURE_FILES: Record<string, string> = {
   ...PARITY_LINT_FIXTURE.files,
@@ -94,7 +94,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   // `client?` and try/finally, though the declaration is not optional: `beforeAll` assigns `client`
-  // last, so a failing `connect`/`listTools` leaves it genuinely `undefined` here — and a teardown that
+  // last, so a failing `connect`/`listTools` leaves it genuinely `undefined` here - and a teardown that
   // threw `Cannot read properties of undefined` would replace the real connection failure with a
   // meaningless one *and* leak the `mkdtemp` fixture. The removal is the half nothing else will do.
   try {
@@ -170,7 +170,7 @@ describe("CLI and MCP render the same lint run identically", () => {
 
     // Where the two deliberately diverge, pinned as the decision it is rather than left to be
     // rediscovered: the CLI wraps the record with a `summary` for a human reader, while MCP returns it
-    // verbatim so a typed client reads counts at the top level — deliberately different from the
+    // verbatim so a typed client reads counts at the top level - deliberately different from the
     // ad-hoc `lint` tool, which has no corpus and therefore no `files` list.
     expect(Object.keys(cliPayload).sort()).toEqual([
       "files",
@@ -212,7 +212,7 @@ describe("CLI and MCP return the same impact record", () => {
     expect(withoutLint).toEqual(mcpPayload);
 
     // Non-vacuous: the record really does describe a blast radius, and the one documented divergence
-    // — a field the CLI adds rather than one it renames — is present and shaped as the guide says.
+    // - a field the CLI adds rather than one it renames - is present and shaped as the guide says.
     expect(mcpPayload.file).toBe("docs/api.md");
     expect((mcpPayload.directlyAffected as unknown[]).length).toBeGreaterThan(
       0,
@@ -237,7 +237,7 @@ describe("CLI and MCP render the same graph consistently", () => {
     expect(cli.status).toBe(0);
     // Not equality, and the difference is the point: the CLI renders `renderContextGraphText`, which
     // *begins* with the `formatContextGraphSummary` block the MCP tool returns and then adds clusters,
-    // reading order and coverage. Prefix equality is therefore the strongest true statement — and it
+    // reading order and coverage. Prefix equality is therefore the strongest true statement - and it
     // still fails if either side reorders or reformats the shared block.
     expect(cli.stdout.startsWith(firstText(mcp))).toBe(true);
     // Non-vacuous in both directions: the shared block is substantial, and the CLI really does add to

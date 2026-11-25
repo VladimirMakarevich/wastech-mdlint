@@ -10,17 +10,17 @@ import { skillFrontmatterSchema } from "./skill-frontmatter.js";
 
 // Pure renderer: assembles the final SKILL.md text from already-computed `GraphAnalysis`,
 // `DocumentProfile`, and `RuleDescriptionGroup` data. `synthesize` never touches the filesystem or
-// `cwd` — that orchestration lives in `compile-context.ts` — so this module stays trivially
+// `cwd` - that orchestration lives in `compile-context.ts` - so this module stays trivially
 // unit-testable with hand-built fixtures.
 
 // A `SKILL.md` is loaded into an agent's context *whole*, so its byte budget is the
 // product. On a 139-document corpus the unbounded References block made the artifact 110 789 bytes,
-// 89.7% of it an edge list an agent cannot act on, while `Document Rules` and `Workflow` — the two
-// sections that say how to operate — were 0.7% between them. These caps buy that budget back.
+// 89.7% of it an edge list an agent cannot act on, while `Document Rules` and `Workflow` - the two
+// sections that say how to operate - were 0.7% between them. These caps buy that budget back.
 //
 // All three are **fixed**, not corpus-relative: none engages below its bound, and the bound the
 // artifact states means the same thing in every repository rather than varying with corpus size.
-// That is not a promise that an existing artifact is unchanged — every change to the caps or the
+// That is not a promise that an existing artifact is unchanged - every change to the caps or the
 // disclosures moves the bytes and content hash of every generated `SKILL.md`, which then has to be
 // regenerated. Nor is it independence from the rest of the corpus: both document limits are top-N
 // selections, so adding a well-referenced document elsewhere can evict an existing one's entry.
@@ -31,7 +31,7 @@ import { skillFrontmatterSchema } from "./skill-frontmatter.js";
 // entry per document; the dependency block does not grow at all past its caps. Measured on a
 // 151-document corpus, the two O(n) sections were 97% of the artifact and the bounded one was the
 // only one that said so. So every section here is either capped with its omission stated, or
-// complete and labelled as complete — a reader can always tell which kind they are holding, and
+// complete and labelled as complete - a reader can always tell which kind they are holding, and
 // nothing grows silently.
 
 /** Maximum edges listed per document per direction. The bullet's count is always the full total. */
@@ -43,7 +43,7 @@ const REFERENCE_FANOUT_LIMIT = 10;
  * through `graph --format json`, which the disclosure names.
  *
  * A References entry is up to 21 lines (two counted bullets plus their capped fan-out), against one
- * table row in `Document Architecture` — which is why this block, not the inventory, is where the
+ * table row in `Document Architecture` - which is why this block, not the inventory, is where the
  * artifact's bytes concentrate and why it was capped first.
  */
 const REFERENCE_DOCUMENT_LIMIT = 25;
@@ -57,7 +57,7 @@ const REFERENCE_DOCUMENT_LIMIT = 25;
  * that would have to be looked up separately.
  *
  * What the cap drops is columns, not documents: `Reading Order` below lists every document in the
- * corpus and is not capped, so nothing disappears from the artifact — a document past the bound
+ * corpus and is not capped, so nothing disappears from the artifact - a document past the bound
  * loses its role, type and degrees, not its existence. That is why capping here is safe while
  * capping the reading order would not be.
  */
@@ -83,7 +83,7 @@ export type CompileBudget = {
   // Whether at least one active (non-`off`) LLM-001 config entry exists, independent of whether
   // its `entrypoints` glob actually matched a corpus file. Keeping this separate from
   // `entrypointsMatched` is what lets `synthesize` tell "LLM-001 isn't configured at all" apart
-  // from "it's configured but its glob matched nothing" — both would otherwise look
+  // from "it's configured but its glob matched nothing" - both would otherwise look
   // identical (an empty `entrypointsOverBudget` array) if `entrypointsMatched` were the only signal.
   llm001Enabled: boolean;
   // Distinct entrypoints resolved from active LLM-001 entries (post-dedup); can be 0 even when
@@ -118,8 +118,8 @@ function isDefined(value: string | undefined): value is string {
   return value !== undefined;
 }
 
-// Shared Markdown-safety helpers: every free-form value rendered below — a
-// repo-relative path, an author-supplied rule description, the configured skill name — reaches a
+// Shared Markdown-safety helpers: every free-form value rendered below - a
+// repo-relative path, an author-supplied rule description, the configured skill name - reaches a
 // Markdown control position (a heading line, a table cell, or an inline code span) verbatim unless
 // normalized first. Centralizing that here keeps every render site correct on the same unusual
 // inputs (a multiline value, a path containing a backtick or `|`) instead of re-deriving it per
@@ -133,7 +133,7 @@ function toSingleLine(text: string): string {
 
 // A CommonMark-safe inline code span for arbitrary content: the fence is one backtick longer than
 // the longest backtick run already inside the text (so the content can never prematurely close the
-// span), and a padding space guards content that starts or ends with a backtick — both are
+// span), and a padding space guards content that starts or ends with a backtick - both are
 // CommonMark code-span requirements, not cosmetic choices.
 function codeSpan(text: string): string {
   const singleLine = toSingleLine(text);
@@ -185,7 +185,7 @@ function renderBudget(budget: CompileBudget): string {
     // Phrasing mirrors LLM-001's own report (engine/rules/llm.ts), with one deliberate divergence:
     // the finding appends `TOKEN_ESTIMATE_NOTE` and this line does not. The estimate is a character
     // heuristic that errs low for non-Latin scripts, so the calibration belongs with a number a
-    // reader can act on — but appending it here would move the bytes, and therefore the content
+    // reader can act on - but appending it here would move the bytes, and therefore the content
     // hash, of every generated `SKILL.md`. That hash is a contract: consumers diff and cache the
     // artifact against it. The trade taken is that the generated artifact states its token numbers
     // uncalibrated, and the calibration is disclosed in the user documentation instead. Do not
@@ -224,7 +224,7 @@ function renderArchitecture(
   documentPaths: string[],
   profiles: Map<string, DocumentProfile>,
   // Whether `Document Dependencies` renders. The disclosure below points a reader at `Reading Order`
-  // for the documents the cap dropped, and that block lives inside the dependency section — with it
+  // for the documents the cap dropped, and that block lives inside the dependency section - with it
   // gated off the pointer would name a heading that is not in the file.
   dependenciesRendered: boolean,
 ): string {
@@ -247,7 +247,7 @@ function renderArchitecture(
     const role = profile?.role ?? "isolated";
     const type =
       profile === undefined ? "narrative" : classifyDocumentType(profile);
-    // The role vocabulary is coarse by construction — on a 139-document corpus `hub` and
+    // The role vocabulary is coarse by construction - on a 139-document corpus `hub` and
     // `isolated` hold 86% of the documents and in practice read as "has edges" / "has no edges".
     // That coarseness is accepted rather than fixed: the degrees the bucket rounds off are already
     // on the profile, so the row carries them and a reader can still tell a 3-reference hub from a
@@ -257,8 +257,8 @@ function renderArchitecture(
   });
 
   // Same three-part shape as the References disclosure: the bound always stated, the omission stated
-  // only when the cap engages, and a pointer to where the rest lives. One sentence per line —
-  // soft-wrapped, still one Markdown paragraph — so the disclosure is never the artifact's longest
+  // only when the cap engages, and a pointer to where the rest lives. One sentence per line -
+  // soft-wrapped, still one Markdown paragraph - so the disclosure is never the artifact's longest
   // line.
   const disclosure = [
     `Bounded summary: at most ${ARCHITECTURE_DOCUMENT_LIMIT} documents get a row here, selected by total references and rendered in path order.`,
@@ -312,13 +312,13 @@ function renderReadingOrderBlock(
     lines.push("(no documents found)");
   } else if (analysis.readingOrder.length === 0) {
     // Honesty about truncation: an empty reading order with a non-empty corpus means every document was cycle-
-    // excluded, not that the corpus itself is empty — those are different facts and must not share
+    // excluded, not that the corpus itself is empty - those are different facts and must not share
     // the same "(no documents found)" message. The Cycles block right below names them.
     lines.push(
-      `(no reading order — all ${documentPaths.length} document(s) are excluded by cycles; see Cycles below)`,
+      `(no reading order - all ${documentPaths.length} document(s) are excluded by cycles; see Cycles below)`,
     );
   } else {
-    // Labelled complete, not bounded — the opposite disclosure to the two capped blocks, and the
+    // Labelled complete, not bounded - the opposite disclosure to the two capped blocks, and the
     // reason this one is worth stating at all: this list grows one entry per document forever, and a
     // reader deciding whether the artifact scales needs to know which sections do that. Capping it
     // instead is not an option: a document silently missing from the reading order is exactly the
@@ -348,7 +348,7 @@ function renderCyclesBlock(analysis: GraphAnalysis): string {
   }
 
   // One excluded path per bullet, uncapped: rendered as one line this measured a 3702-character single
-  // line, and unlike the fan-out it is a fact about the corpus a reader needs in full — a document
+  // line, and unlike the fan-out it is a fact about the corpus a reader needs in full - a document
   // missing from the reading order with no explanation is exactly the silence this block exists to break.
   const excluded = analysis.excludedFromReadingOrder;
   if (excluded.length === 0) {
@@ -377,7 +377,7 @@ function renderCyclesBlock(analysis: GraphAnalysis): string {
 
 // One edge per line, capped at `REFERENCE_FANOUT_LIMIT`. The parent bullet states the *full* count
 // and derives "showing N" from the same two numbers, so a truncated list can never present itself
-// as a complete one — an unmarked truncation is worse than no list at all, since a reader acts on it.
+// as a complete one - an unmarked truncation is worse than no list at all, since a reader acts on it.
 function renderEdgeBullets(
   edges: readonly ContextGraphEdge[],
   endpoint: "to" | "from",
@@ -419,7 +419,7 @@ function totalReferences(profile: DocumentProfile | undefined): number {
  *
  * Rank by total references, then by path. Both keys are load-bearing: a tie broken by the caller's
  * array order would be deterministic only by accident, and that is precisely the kind of implicit
- * ordering a two-run determinism test cannot see. Note what the ranking costs — which documents
+ * ordering a two-run determinism test cannot see. Note what the ranking costs - which documents
  * survive depends on the whole corpus, so adding a well-referenced document elsewhere can drop an
  * existing one. Each caller's disclosure is what keeps that visible.
  *
@@ -464,7 +464,7 @@ function renderReferencesBlock(
   const entries = listed.map((documentPath) => {
     const profile = profiles.get(documentPath);
     return [
-      // A code span (not bold) — consistent with every other path in this module, and a `**`
+      // A code span (not bold) - consistent with every other path in this module, and a `**`
       // sequence inside a path would otherwise prematurely close a bold span.
       codeSpan(documentPath),
       ...renderEdgeBullets(profile?.referencesTo ?? [], "to"),
@@ -476,7 +476,7 @@ function renderReferencesBlock(
   // elision that did not happen; the per-direction bound is stated always, because a reader cannot
   // tell "10 references" from "10 of many" without knowing a cap exists at all.
   //
-  // Emitted as one sentence per line — soft-wrapped, so it is still a single Markdown paragraph.
+  // Emitted as one sentence per line - soft-wrapped, so it is still a single Markdown paragraph.
   // Joining them would make the disclosure itself the longest line in an artifact whose whole point
   // is that no line is a blob.
   const disclosure = [
@@ -492,7 +492,7 @@ function renderReferencesBlock(
   return ["### References", disclosure, entries.join("\n\n")].join("\n\n");
 }
 
-// Locked verbatim — copy exactly; presets change only this block, never the computed
+// Locked verbatim - copy exactly; presets change only this block, never the computed
 // data above it.
 function renderCommandBlock(
   commandPreset: CompileCommandPreset,
@@ -547,7 +547,7 @@ function renderDependencies(
   return ["## Document Dependencies", ...blocks].join("\n\n");
 }
 
-// Fixed boilerplate — an English scaffold, deliberately not corpus-derived, since no part of it
+// Fixed boilerplate - an English scaffold, deliberately not corpus-derived, since no part of it
 // varies with the repository. Steps are still gated by `sections`, though: a step that
 // named a disabled section would make the generated SKILL.md self-contradictory, pointing readers
 // at a heading that isn't there.
@@ -585,7 +585,7 @@ export function synthesize(input: SynthesizeInput): CompileResult {
   // Validate before rendering: an empty `skill.name`/`skill.description` throws a ZodError
   // here rather than silently emitting invalid frontmatter. `compile-context.ts`'s lenient reader
   // defaults missing fields to `""`, so this is the only place a non-empty name/description is
-  // actually enforced — a load-time config diagnostic would be the better home for it. Parses
+  // actually enforced - a load-time config diagnostic would be the better home for it. Parses
   // against the schema directly, rather than through `skills/skill-model.ts`'s
   // `parseSkillFrontmatter`, so the compile path does not route its validation through the
   // static-skills layer and pick up that layer's issue-collecting semantics.
@@ -629,7 +629,7 @@ export function synthesize(input: SynthesizeInput): CompileResult {
   );
   const componentCount = input.analysis.components.length;
 
-  // Hash the provenance line's deterministic text too, not just the gated sections — a gated-off
+  // Hash the provenance line's deterministic text too, not just the gated sections - a gated-off
   // section's own `documentCount`/`ruleCount` still change the *visible* provenance text even when
   // that section itself doesn't contribute to the hash, so excluding provenance entirely let two
   // different `skillContent` bodies share one `contentHash`, which would defeat its purpose. Only the hash token

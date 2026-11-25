@@ -8,7 +8,7 @@ import { topologicalSort } from "./graph-algorithms.js";
 import { impact, type QueryVisit } from "./query.js";
 
 // Impact analysis: the blast radius of changing a file, built entirely on the shared
-// reverse traversal (`impact`) and the shared topo-sort. No new traversal is written here —
+// reverse traversal (`impact`) and the shared topo-sort. No new traversal is written here -
 // the architecture invariant is "one traversal, one topo-sort", not per-feature reimplementations.
 
 const byPath = compareStrings;
@@ -20,7 +20,7 @@ const byPath = compareStrings;
 // cuts against deterministic, reproducible diagnostics.
 export class ImpactAnalysisError extends Error {
   // TARGET_NOT_FOUND, not FILE_NOT_IN_CORPUS: the taxonomy bullet for TARGET_NOT_FOUND explicitly
-  // names an "impact... file argument" that resolved to nothing — the more direct textual match.
+  // names an "impact... file argument" that resolved to nothing - the more direct textual match.
   readonly code: ToolErrorCode = "TARGET_NOT_FOUND";
   readonly hint: string;
 
@@ -100,7 +100,7 @@ export function classifyImpact(
 
   // Reading order runs over the affected subgraph: the changed file plus everything upstream of
   // it, restricted to edges with both endpoints inside that set. `topologicalSort` reads only
-  // `nodes`/`edges` (never `cycles`), so an empty `cycles` here is safe — GRP-001 remains the sole
+  // `nodes`/`edges` (never `cycles`), so an empty `cycles` here is safe - GRP-001 remains the sole
   // owner of cycle *reporting*.
   const affectedPaths = new Set(visited.map((visit) => visit.path));
   const subgraph: ContextGraph = {
@@ -122,12 +122,12 @@ export function classifyImpact(
 }
 
 /**
- * The blast radius of changing several files at once — a branch's changed documents — as one record:
+ * The blast radius of changing several files at once - a branch's changed documents - as one record:
  * every other document that reaches any of them, at its shortest distance. Built from one `impact`
  * walk per file over the same graph, so a document reached from two changed files is the same answer
  * either walk gives, merged; ties in distance keep the predecessor the first file in path order
- * found, so the record does not depend on which walk ran first. Files not in the graph — a deleted
- * document — are left out of `files`, since nothing can reach what is no longer there.
+ * found, so the record does not depend on which walk ran first. Files not in the graph - a deleted
+ * document - are left out of `files`, since nothing can reach what is no longer there.
  */
 export type ChangeImpact = Omit<ImpactClassification, "file"> & {
   files: string[];
@@ -195,10 +195,10 @@ export function classifyChangeImpact(
 /**
  * Re-express every path in `impactResult` relative to `cwd`. `cwd` is repo-relative (a host with an
  * absolute invocation directory converts it to repo-relative before calling), so the repo root is
- * `""` and maps to an identity relativization — core stays platform-agnostic and never needs a
+ * `""` and maps to an identity relativization - core stays platform-agnostic and never needs a
  * repo-root parameter. Path-sorted arrays (`directlyAffected`, `transitivelyAffected`, `excluded`)
  * are re-sorted after relativizing because changing the path changes the sort key; `readingOrder`
- * is topological, not lexical, so it is only mapped — re-sorting it would silently replace the
+ * is topological, not lexical, so it is only mapped - re-sorting it would silently replace the
  * topo-sort's reading order with an alphabetical one.
  */
 export function relativizeImpact(

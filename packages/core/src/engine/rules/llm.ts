@@ -11,12 +11,12 @@ import { defineRule, type RuleDefinition } from "../registry.js";
 import { estimateTokens, TOKEN_ESTIMATE_NOTE } from "../tokens.js";
 import type { ReportInput, SiteRouterSettings } from "../types.js";
 
-// LLM-001 — eager-import context budget per entrypoint. Single total budget
-// (maxTokensPerEntrypoint) — parity with the legacy llm/budget; per-type limits are out of scope
-// deliberately. Traverses `ParsedDocument.imports` from the single parse pass — it does not re-parse.
+// LLM-001 - eager-import context budget per entrypoint. Single total budget
+// (maxTokensPerEntrypoint) - parity with the legacy llm/budget; per-type limits are out of scope
+// deliberately. Traverses `ParsedDocument.imports` from the single parse pass - it does not re-parse.
 
 // Resolves an eager `@target` import through the same `resolveTargetCandidates` helper the
-// ContextGraph builder and REF-001/002 already use — not an ad hoc resolver. A
+// ContextGraph builder and REF-001/002 already use - not an ad hoc resolver. A
 // root-relative import under a configured `siteRouter` must resolve identically here and in the
 // graph's "import" edges; otherwise LLM-001's own traversal and compile's context budget (which walks
 // those same edges) can silently disagree on what an entrypoint eagerly imports. Falls back to the
@@ -53,7 +53,7 @@ type EntrypointTraversal = {
 // imports, and cycles (dedup per entrypoint).
 //
 // `visit` recurses once per hop along the current DFS path through the eager-import graph, so its
-// stack depth is bounded by how many files one entrypoint transitively imports — not by any single
+// stack depth is bounded by how many files one entrypoint transitively imports - not by any single
 // authored chain, since `visited` is never unwound and a branching import tree descends just as far.
 // Both are single digits in practice: `@path` imports are hand-authored, not a corpus-wide link
 // graph. `visited`/`stack` already stop a cycle from recursing forever. The same accepted "no explicit
@@ -142,7 +142,7 @@ function totalTokens(
 
 /**
  * What an entrypoint loads into every agent session, in estimated tokens, and how many files that
- * takes — through the same traversal and the same sum the rule checks its budget with, so a host
+ * takes - through the same traversal and the same sum the rule checks its budget with, so a host
  * that shows the number never shows one the rule would not report. `undefined` for a path that is
  * not a document.
  */
@@ -164,7 +164,7 @@ export function eagerContextTokens(
 
 // Collected instead of reported inline so the rule can suppress cross-entrypoint duplicates:
 // entrypoints with overlapping import closures re-derive the same missing-import/cycle
-// diagnostic once per traversal. `filePath` is required — LLM-001 is a project rule, so every
+// diagnostic once per traversal. `filePath` is required - LLM-001 is a project rule, so every
 // finding self-attributes to the file it is about rather than inheriting a current document.
 type PendingFinding = ReportInput & { filePath: string };
 

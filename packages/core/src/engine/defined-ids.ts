@@ -3,7 +3,7 @@ import type { ParsedDocument } from "../markdown/document-types.js";
 import { compileRegex } from "./regex.js";
 
 // Column-based ID discovery. One helper defines what a "defined ID" is, shared by
-// REF-005 and the graph's id-ref edges — so there is a single notion of ID across the
+// REF-005 and the graph's id-ref edges - so there is a single notion of ID across the
 // tool, and the parser stays config-light (idPattern is config, not a parse field).
 
 export type IdOccurrence = { id: string; filePath: string; line: number };
@@ -59,7 +59,7 @@ export type IdRef = {
 
 /**
  * Defined IDs of a document: the `idColumn` tokens in tables of files matching `definitions`,
- * plus heading tokens matching `idPattern` — same file-glob
+ * plus heading tokens matching `idPattern` - same file-glob
  * gate as the column side, so a heading only counts as a definition in a file the config declares
  * as a definitions source. The signature is frozen: the graph's id-ref edges call it too, and a
  * second discovery model would let a rule and the graph disagree on what an ID is.

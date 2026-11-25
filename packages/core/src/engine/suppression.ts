@@ -9,7 +9,7 @@ import { ruleRegistry } from "./rules/index.js";
 //   - `disable [rules]` on line L opens a disabled range from L; a later `enable [rules]` closes it,
 //     otherwise it runs to EOF.
 //   - `enable [rules]` on line L re-enables from L.
-//   - `disable-file [rules]` disables for the whole file wherever it is written — it is the file's
+//   - `disable-file [rules]` disables for the whole file wherever it is written - it is the file's
 //     base state, so one placed at the end still covers every line above it. A later `enable`
 //     still re-enables from its own line: "wherever it is written" means its position does not
 //     matter, not that it is irrevocable.
@@ -61,7 +61,7 @@ type Segment = { line: number; effects: readonly Effect[] };
 // the list either, since a directive left with no selectors would mean every rule.
 //
 // The known set is the built-in reserved prefixes, never the rules a config enables, so the same
-// directive means the same thing in every run and through every entry point — including
+// directive means the same thing in every run and through every entry point - including
 // `createSuppressionChecker`, which has no config to consult.
 function selectorMatches(
   selector: string,
@@ -145,7 +145,7 @@ function buildSegments(
 ): Segment[] {
   // The effect stack only ever grows between a `capture` and its `restore`, and captures pop LIFO,
   // so truncating back to the length recorded at `capture` returns *exactly* to the captured state
-  // — nested pairs included, since an inner restore truncates to a length no shorter than any
+  // - nested pairs included, since an inner restore truncates to a length no shorter than any
   // outer capture's. That is why a length is enough and no state snapshot is copied. Each change
   // copies the array, so earlier segments keep the stack they were built with.
   let effects: readonly Effect[] = base;

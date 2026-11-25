@@ -57,7 +57,7 @@ describe("replaceGeneratedBlock", () => {
 
   it("writes every `$` sequence in the content literally", () => {
     // One row per replacement-string metacharacter: `$&` (whole match), `` $` `` (prefix), `$'`
-    // (suffix), `$1` (a real group in this pattern — the BEGIN marker), and `$$` (an escaped
+    // (suffix), `$1` (a real group in this pattern - the BEGIN marker), and `$$` (an escaped
     // dollar). Under the old interpolated form each of these expanded; `$&` alone would have
     // inlined the entire matched block, END marker included.
     const content = [
@@ -106,8 +106,8 @@ describe("generate-docs.mjs splice sites", () => {
       "scripts/generate-docs.mjs must not call .replace() directly: generated content used as a " +
         "replacement string expands `$&`, `` $` ``, `$'` and `$n`, silently corrupting it. Splice " +
         "through " +
-        "replaceGeneratedBlock(), or — for a replace that has nothing to do with generated content " +
-        "— pass a replacer function and relax this guard deliberately.",
+        "replaceGeneratedBlock(), or - for a replace that has nothing to do with generated content " +
+        "- pass a replacer function and relax this guard deliberately.",
     ).toBe(false);
   });
 });

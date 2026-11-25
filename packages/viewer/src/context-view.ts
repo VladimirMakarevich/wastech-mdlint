@@ -33,7 +33,7 @@ export function countFindings(messages: readonly LintMessage[]): FindingCounts {
 /**
  * What the change does to findings, in words: "+1 error, +2 warnings, −3 findings", or nothing when
  * it adds and removes none. The same wording on the summary and on every row, so a reader learns it
- * once — and a test reads the page's numbers back from it.
+ * once - and a test reads the page's numbers back from it.
  */
 export function findingsText(delta: FindingsDelta): string | undefined {
   const added = countFindings(delta.added);
@@ -223,8 +223,8 @@ function renderLinkList(links: {
 
 /**
  * The unchanged documents the change reaches: those with findings they did not have, those linking
- * into code lines that moved under them, and — folded, since a much-linked document would flood the
- * page — those linking to a changed document.
+ * into code lines that moved under them, and - folded, since a much-linked document would flood the
+ * page - those linking to a changed document.
  */
 export function renderAffected(delta: ContextDelta): Element | undefined {
   const { findings, codeLinks, linking } = delta.affected;

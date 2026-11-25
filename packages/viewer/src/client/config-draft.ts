@@ -1,10 +1,10 @@
 import type { Edit } from "./config-types.js";
 
-// Unsaved work, kept across a reload — live reload refreshes the page whenever a document is added
+// Unsaved work, kept across a reload - live reload refreshes the page whenever a document is added
 // or removed, and losing a half-made config change to that would be a trap. It is restored only
 // onto the same version of the file it was made to, which `base`, the file's hash, identifies.
 const DRAFT_KEY = "wastech-mdlint-viewer:config-draft";
-// A draft made to a version of the file that is no longer on disk — a pull, a checkout or an
+// A draft made to a version of the file that is no longer on disk - a pull, a checkout or an
 // editor's format-on-save changed it meanwhile. It cannot be restored as it stands, and dropping it
 // would lose the reader's work without a word, so it is kept apart from the current draft, offered
 // back until the reader applies or discards it, and never overwritten by the change they make next.
@@ -18,8 +18,8 @@ export type Draft = {
   edits: Edit[];
   mode: "form" | "text";
   // Whether `text` is the reader's and not the base file's. Once the file has changed, its old text
-  // is gone, and this is what still tells a change made in the form — edits that can be replayed onto
-  // the new text — from a text the reader wrote, which has to replace it.
+  // is gone, and this is what still tells a change made in the form - edits that can be replayed onto
+  // the new text - from a text the reader wrote, which has to replace it.
   textEdited: boolean;
   // The whole changed file, as the server last built it from `text` and `edits`, when its answer was
   // about exactly this change. Only the server can apply edits to text, so without it a change with
@@ -107,7 +107,7 @@ export function draftText(draft: Draft): string | undefined {
  *
  * A change made in the form stays one: the saved text, with the edits made after the save began.
  * It has to, because a draft whose text is taken for the reader's own replaces the file when it is
- * later set aside and applied — and the text it held was the one from before the save, so applying
+ * later set aside and applied - and the text it held was the one from before the save, so applying
  * it would put back what another program changed since. A text the reader wrote, or a draft whose
  * edits cannot be split at the save, keeps its text and edits as they are: applied to the text they
  * were made to, they give the saved text plus the later change.
@@ -120,7 +120,7 @@ export function afterSave(draft: Draft, saved: FileVersion): Draft | undefined {
     return undefined;
   }
   // Split only where the saved edits still lead the draft's, each as it was saved: one changed in
-  // place since — the editor folds a field typed into twice into one edit — would otherwise be
+  // place since - the editor folds a field typed into twice into one edit - would otherwise be
   // dropped as already saved while holding the reader's later value.
   const savedEdits = draft.saving.edits;
   if (
@@ -161,7 +161,7 @@ export function afterSave(draft: Draft, saved: FileVersion): Draft | undefined {
  * A draft whose save wrote the file the page now reads is not stale: the reload that save started
  * reached the page before the save's answer did, and the draft becomes whatever the reader changed
  * after saving. Any other draft for another version is set aside, replacing an older one set aside
- * before — that one the reader was already shown, and went on to make a new change instead.
+ * before - that one the reader was already shown, and went on to make a new change instead.
  */
 export function planDrafts(
   stored: Draft | undefined,
@@ -180,7 +180,7 @@ export function planDrafts(
       aside = stored;
     }
   }
-  // The file can come back to the version a set-aside draft was made to — a checkout undone — and
+  // The file can come back to the version a set-aside draft was made to - a checkout undone - and
   // the draft then applies as it stands.
   if (restore === undefined && aside?.base === file.hash) {
     restore = aside;

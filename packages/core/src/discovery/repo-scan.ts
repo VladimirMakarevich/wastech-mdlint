@@ -45,7 +45,7 @@ export type DocCluster = {
  *
  * Exactly one reason per directory, and the order the walk tests them is the tie-break: `"noise"`
  * first (never descended into, in either mode), then `"gitignored"`, then `"hidden"`. So a directory
- * that is both gitignored and hidden is disclosed as gitignored — the class whose remedy actually
+ * that is both gitignored and hidden is disclosed as gitignored - the class whose remedy actually
  * works, since the include pattern the hidden line suggests is defeated by the `respectGitignore:
  * true` a fresh `init` config writes.
  */
@@ -58,8 +58,8 @@ export type PrunedDirectoryReason = "hidden" | "noise" | "gitignored";
  * an omission: a hidden directory is the one class whose contents a user plausibly wants linted
  * (agent-instruction and skill trees live under dot-directories), so `init` has to be able to say
  * what is in there.
- * Listing a `"noise"` or `"gitignored"` tree would mean walking `node_modules` — the exact cost
- * pruning exists to avoid — for a number nobody acts on.
+ * Listing a `"noise"` or `"gitignored"` tree would mean walking `node_modules` - the exact cost
+ * pruning exists to avoid - for a number nobody acts on.
  *
  * The paths themselves rather than a total, because a count cannot answer the question the
  * disclosure actually has to answer: a glob proposed for an ancestor directory matches dot-segments
@@ -103,15 +103,15 @@ function dirnameOf(filePath: string): string {
 // Escapes glob-special characters in a literal repo-relative path before it is spliced into a
 // generated `includeGlob`. Without this, a real directory like `docs[x]` or `apps(web)` is
 // interpreted as glob syntax (a character class / extglob group / brace expansion) rather than
-// a literal name, so the emitted pattern can match unrelated paths (`docsx`, `appsweb`) — or, in
-// the brace-expansion case, fail to match its own literal directory at all — once fed back
+// a literal name, so the emitted pattern can match unrelated paths (`docsx`, `appsweb`) - or, in
+// the brace-expansion case, fail to match its own literal directory at all - once fed back
 // through matchesConfigGlob/loadDocuments.
 //
 // Escaping uses single-character bracket classes (`[x]`) rather than a backslash, because
 // normalizeConfigGlob (discovery/globs.ts) converts every `\` to `/` when normalizing
-// Windows-style separators — a backslash-escaped pattern would be silently unescaped before it
+// Windows-style separators - a backslash-escaped pattern would be silently unescaped before it
 // ever reaches picomatch. `]` is placed first inside its own class, the bracket-expression
-// convention for a literal `]`. `/` is left untouched — it is the path separator, not a
+// convention for a literal `]`. `/` is left untouched - it is the path separator, not a
 // wildcard.
 const GLOB_SPECIAL_CHARS = /[\\*?[\]{}()!+@|]/g;
 
@@ -124,7 +124,7 @@ function escapeGlobPath(value: string): string {
 // A workspace package's scope owns only the Markdown files not also claimed by a deeper nested
 // workspace package. Without this, a file under a nested package (e.g. a detected
 // `packages/foo/examples/bar`) would be scanned twice: once under the ancestor `packages/foo`
-// scope and again under its own — double-counting subtreeCount/scores and duplicating samples.
+// scope and again under its own - double-counting subtreeCount/scores and duplicating samples.
 function isOwnedByPackageScope(
   file: string,
   workspacePackage: string,
@@ -164,7 +164,7 @@ type WalkTarget = {
 //
 // The walk also records *what* it pruned, which is what lets `init` disclose the gap between the
 // tracked tree and the proposed corpus. `"count"` mode is the same function re-entered under
-// a pruned hidden root purely to list its contents, rather than a second traversal — so the
+// a pruned hidden root purely to list its contents, rather than a second traversal - so the
 // disclosed files are produced by the same noise, gitignore and Markdown-extension rules as the
 // corpus itself, by construction and not by two implementations agreeing.
 async function collectMarkdownFiles(
@@ -213,7 +213,7 @@ async function collectMarkdownFiles(
 
         // Before the `hidden` branch, so a directory that is *both* is disclosed as `gitignored`.
         // The other order classified it as `hidden` and offered the include pattern that fits that
-        // class — advice a fresh `init` config defeats, because it writes `respectGitignore: true`,
+        // class - advice a fresh `init` config defeats, because it writes `respectGitignore: true`,
         // and the directory was then never named on the gitignored line either, so the user was not
         // told why the pattern did nothing. It also tightens the count walk's bound: a gitignored
         // hidden tree is skipped rather than recursively sized.
@@ -283,7 +283,7 @@ type ScopeClustersParams = {
 
 // The cluster-scoring heuristic, run once per scope
 // (the repo root minus workspace-package files, or a single workspace package's own files).
-// Root never "qualifies" as a cluster itself — if it did, its subtreeCount would almost always
+// Root never "qualifies" as a cluster itself - if it did, its subtreeCount would almost always
 // clear minClusterSize and the rollup step below would collapse everything into one giant
 // cluster, defeating the heuristic. Root's own direct files instead become a low-priority
 // "root"-kind candidate.
@@ -336,7 +336,7 @@ function computeScopeClusters(params: ScopeClustersParams): DocCluster[] {
     }
   }
 
-  // Spread the tag in only when defined — the public contract has repo-root-scoped entries
+  // Spread the tag in only when defined - the public contract has repo-root-scoped entries
   // omit `workspacePackage` entirely, not carry it as an explicit `undefined` value.
   const workspacePackageTag =
     workspacePackage === undefined ? {} : { workspacePackage };
@@ -406,7 +406,7 @@ function rootDirectFilesCluster(
     kind: "root",
     score: directFiles.length,
     subtreeCount: directFiles.length,
-    // `./`-prefixed so the pattern keeps its "/" — normalizeConfigGlob (discovery/globs.ts)
+    // `./`-prefixed so the pattern keeps its "/" - normalizeConfigGlob (discovery/globs.ts)
     // rewrites any slash-free pattern to `**/${pattern}`, which would silently turn a
     // root-only proposal into a repo-wide one once `init` writes it into config.
     includeGlob:
@@ -425,7 +425,7 @@ const CLUSTER_KIND_RANK: Record<DocClusterKind, number> = {
 };
 
 // Filtering the global file list by prefix is enough to exclude a workspace package's
-// files from the root scope — no special-casing needed, they simply have zero entries in
+// files from the root scope - no special-casing needed, they simply have zero entries in
 // the root scope's dirCounts map. A package scope additionally excludes any file already
 // owned by a deeper nested workspace package (isOwnedByPackageScope), so nested packages
 // aren't scanned twice.
@@ -462,13 +462,13 @@ function compareClusters(left: DocCluster, right: DocCluster): number {
  * does not write anything.
  *
  * The walk skips noise directories, every dot-prefixed directory, and anything matched by a
- * `.gitignore` (root or nested) — always, not behind a flag. The scan exists
+ * `.gitignore` (root or nested) - always, not behind a flag. The scan exists
  * to propose a config, and the config `init` writes pins `respectGitignore: true` plus the noise
  * `exclude`, so a cluster the scan could only see by ignoring those rules would be a proposal the
  * resulting config immediately contradicts.
  *
  * The dot-prefixed prune is the one that has no lint-time counterpart: a hidden directory
- * that is not also a dependency tree stays lintable. `pruned` is what closes that gap honestly —
+ * that is not also a dependency tree stays lintable. `pruned` is what closes that gap honestly -
  * `init` reports the skipped directories and how much Markdown the hidden ones hold, rather than
  * leaving the user to infer it from a file count.
  */
@@ -534,12 +534,12 @@ export async function scanRepository(
   }
 
   // The fallback is global (not per-scope): it only fires when nothing qualified anywhere but
-  // Markdown exists somewhere. The glob is deliberately the literal `**/*.md` — the task spec's
+  // Markdown exists somewhere. The glob is deliberately the literal `**/*.md` - the task spec's
   // "give up, cover everything the normal way" safety net mirrors the tool's actual zero-config
   // default include (`DEFAULT_INCLUDE_GLOBS`, which `resolveCorpusScope` applies for
   // lintFiles/fix/loadContext alike, and which is built from `LINTED_MARKDOWN_EXTENSIONS`), not the
   // scan's own broader `MARKDOWN_EXTENSIONS` discovery criteria. In an `.mdx`-only repo this
-  // fallback's `sampleFiles` can include paths the glob itself won't match — an accepted,
+  // fallback's `sampleFiles` can include paths the glob itself won't match - an accepted,
   // documented tradeoff of proposing the tool's real default rather than a scan-specific one.
   if (clusters.length === 0 && allFiles.length > 0) {
     clusters.push({

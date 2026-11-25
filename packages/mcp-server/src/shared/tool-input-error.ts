@@ -4,7 +4,7 @@ import type { ToolErrorCode } from "@wastech-mdlint/core";
 // so this class translates a throwable that carries no `ToolErrorCode` into one `errorResult` will
 // pass through verbatim. Without it, `isStructuredError`'s allowlist rejects the throwable and it
 // degrades to a sanitized `INTERNAL_ERROR`, losing exactly the actionable text the error contract exists to preserve
-// — the "did you mean" suggestion behind `lint`'s `RuleResolutionError`, or the offending path behind
+// - the "did you mean" suggestion behind `lint`'s `RuleResolutionError`, or the offending path behind
 // a bad tool `cwd`.
 //
 // Shared *within mcp-server* (it started local to `tools/lint.ts` when there was one call site, and

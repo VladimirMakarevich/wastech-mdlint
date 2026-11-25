@@ -883,8 +883,8 @@ describe.skipIf(!hasGit)(
 
     // @boundary-guard host-parity
     // The page and `/api/changes` describe one context delta: the page's numbers are read back from
-    // its words — the findings beside each row, every session's budget line, the affected documents
-    // — and compared with the JSON, so a count worded on the page cannot drift from the data.
+    // its words - the findings beside each row, every session's budget line, the affected documents
+    // - and compared with the JSON, so a count worded on the page cannot drift from the data.
     it("shows on the page the same delta the API lists", async () => {
       const { body } = await get(port, "/changes");
       const list =
@@ -981,7 +981,7 @@ describe.skipIf(!hasGit)(
     });
 
     // Compared with the last commit, the delta is what the uncommitted edits alone do: the guide's
-    // new broken link, and none of what the branch's commits did — the heading the reader links to
+    // new broken link, and none of what the branch's commits did - the heading the reader links to
     // and the code lines a document points at both changed in a commit.
     it("counts only the uncommitted edits in the delta with uncommitted work", async () => {
       const uncommitted = JSON.parse(
@@ -1119,7 +1119,7 @@ describe.skipIf(!hasGit)(
 
 // Work that starts from `develop`: `develop` adds a document of its own, and the feature branch made
 // from it edits another. The config names `develop` as the base, so the review holds the feature's
-// edit alone, where the guess — `main` — would also count everything `develop` added.
+// edit alone, where the guess - `main` - would also count everything `develop` added.
 async function developBranch(): Promise<GitFixture> {
   const fixture = await makeRepo();
   await fixture.write(
@@ -1196,8 +1196,8 @@ describe.skipIf(!hasGit)(
 );
 
 describe.skipIf(!hasGit)("a watched repository (requires git on PATH)", () => {
-  // Every document page asked git whether `HEAD` or the base had moved — one process each, most of
-  // the time the page took — although almost always nothing had. Where git's `HEAD` and refs are
+  // Every document page asked git whether `HEAD` or the base had moved - one process each, most of
+  // the time the page took - although almost always nothing had. Where git's `HEAD` and refs are
   // watched, the kept review answers without asking, the watcher's report drops it once git really
   // moved, and a watch that is lost puts the check on every request back.
   it("keeps the review without asking git until the watcher says git moved", async () => {
@@ -1225,7 +1225,7 @@ describe.skipIf(!hasGit)("a watched repository (requires git on PATH)", () => {
 
   // A review running when a commit lands may have read the base before it and the head after it.
   // Once the watcher has reported the move it must be neither kept nor joined: kept, it would be
-  // answered without asking git again, and the uncommitted comparison — whose base is `HEAD` — would
+  // answered without asking git again, and the uncommitted comparison - whose base is `HEAD` - would
   // go on listing the edits just committed as not committed yet.
   it("keeps no review that was running when git moved", async () => {
     const fixture = await featureBranch();

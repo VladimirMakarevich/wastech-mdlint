@@ -17,8 +17,8 @@ export function resolversFor(corpus: Corpus, document: ParsedDocument) {
  * Documents rendered as plain pages. Keyed by the document object, which the corpus replaces whenever
  * the file changes, so an edit misses the cache without any explicit invalidation. Link targets also
  * depend on which other files exist, so a change to the set of documents starts a fresh cache
- * (`clear`), and a document the corpus reports changed without replacing it — a file it links to
- * appeared or went — is dropped from it (`forget`).
+ * (`clear`), and a document the corpus reports changed without replacing it - a file it links to
+ * appeared or went - is dropped from it (`forget`).
  */
 export class RenderCache {
   private rendered = new WeakMap<ParsedDocument, Promise<RenderedDocument>>();

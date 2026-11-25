@@ -13,8 +13,8 @@ import { ConfigError } from "./config-error.js";
 import { formatConfigIssue } from "./config-issues.js";
 
 // Targeted edits to the text of a JSONC config, for a host that lets a user change the config one
-// value at a time. The config carries its rationale as comments — why a glob is excluded, why a
-// budget is what it is — and a parse-and-rebuild through `JSON.stringify`, which is how `init`
+// value at a time. The config carries its rationale as comments - why a glob is excluded, why a
+// budget is what it is - and a parse-and-rebuild through `JSON.stringify`, which is how `init`
 // merges, would silently delete every one of them.
 //
 // So an edit touches only the bytes of the value, property or element it names, and the separator
@@ -318,7 +318,7 @@ function appendMember(
 
   if (members.length === 0) {
     const indent = containerIndent + unitOf(text);
-    // Whatever is already inside — a comment saying the list is empty, say — stays before the new
+    // Whatever is already inside - a comment saying the list is empty, say - stays before the new
     // member; only the blank space before the closing bracket is replaced.
     let insertAt = close;
     while (insertAt > container.offset + 1 && /\s/.test(text[insertAt - 1]!)) {
@@ -387,7 +387,7 @@ function insertBefore(
 
 /**
  * What follows a member up to the end of its line: its separating comma, if any, and the line break
- * that ends the line — known only when nothing but whitespace and comments stands between, which is
+ * that ends the line - known only when nothing but whitespace and comments stands between, which is
  * what makes that line the member's own.
  */
 function scanAfter(
@@ -493,7 +493,7 @@ function splice(
 }
 
 // Applied from the end of the text backwards, so an earlier offset is not moved by a later edit. Two
-// insertions at one offset land in the order they are listed — a member's comma before the member —
+// insertions at one offset land in the order they are listed - a member's comma before the member -
 // which means applying the later one first, since each insertion goes in front of what is there.
 function applyTextEdits(text: string, edits: TextEdit[]): string {
   return edits

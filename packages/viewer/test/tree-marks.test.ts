@@ -13,7 +13,7 @@ import * as server from "../src/tree-marks.js";
 
 // The server draws the tree's marks and the Changes count into every page, and the page script draws
 // them again from JSON when an event says they changed. Two builders of one markup drift apart
-// unseen — each looks right on its own — and a mark the script redrew would then look unlike the one
+// unseen - each looks right on its own - and a mark the script redrew would then look unlike the one
 // the server drew, which is the very change on screen these marks are drawn server-side to avoid.
 // So every mark is built both ways here and the markup compared.
 

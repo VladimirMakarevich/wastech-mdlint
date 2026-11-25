@@ -662,7 +662,7 @@ describe.skipIf(!hasGit)("openGitRepository (requires git on PATH)", () => {
       );
       await chmod(planted, 0o755);
 
-      // A `.` entry resolves against the child's working directory — the repository — so on POSIX a
+      // A `.` entry resolves against the child's working directory - the repository - so on POSIX a
       // bare `git` looked up through this `PATH` would be this file. Git is found on absolute entries
       // only and started by that path. Windows runs no extensionless file; its own lookup, which
       // tries the working directory whatever `PATH` says, is the next test's.
@@ -684,8 +684,8 @@ describe.skipIf(!hasGit)("openGitRepository (requires git on PATH)", () => {
       await fixture.write("doc.md", "text\n");
       fixture.commit("base");
       // Started by bare name, a program is looked up in the child's working directory before `PATH`
-      // unless `NoDefaultCurrentDirectoryInExePath` is set in the *parent's* environment — the
-      // lookup happens in this process — which almost no machine has, though some tool harnesses
+      // unless `NoDefaultCurrentDirectoryInExePath` is set in the *parent's* environment - the
+      // lookup happens in this process - which almost no machine has, though some tool harnesses
       // set it. It is removed for the test, so the control below shows the lookup an ordinary
       // machine does, and the variable cannot be what keeps the planted file from running.
       const variable = Object.keys(process.env).filter(
@@ -803,7 +803,7 @@ describe.skipIf(!hasGit)("openGitRepository (requires git on PATH)", () => {
         const env = gitEnvironment(source.env, overrides);
         delete env.GIT_NO_LAZY_FETCH;
         // With every transport refused, the lazy fetch fails at once, and git either reports the
-        // object missing or — when it is still writing to the fetch process that already quit —
+        // object missing or - when it is still writing to the fetch process that already quit -
         // dies of the broken pipe, which `runGit` reports as a command that did not finish. Both
         // are the outcome this proves: no object came back. Only a read that returned the blob
         // would mean a fetch ran.
@@ -935,7 +935,7 @@ describe.skipIf(!hasGit)("openGitRepository (requires git on PATH)", () => {
       await fixture.write("b.md", "b, edited\n");
       const indexPath = path.join(fixture.repo, ".git", "index");
       // Same text, an older timestamp: the content still matches the index while the stat data no
-      // longer does — what a refreshing command records by rewriting the index.
+      // longer does - what a refreshing command records by rewriting the index.
       const past = new Date(2000, 0, 1);
       await utimes(path.join(fixture.repo, "a.md"), past, past);
       const before = await readFile(indexPath);
@@ -1095,7 +1095,7 @@ describe.skipIf(!hasGit)("resolving the base (requires git on PATH)", () => {
     TIMEOUT_MS,
   );
 
-  // Work that starts from a branch other than the default one — a `develop` — is compared with
+  // Work that starts from a branch other than the default one - a `develop` - is compared with
   // the base the config names rather than the guess, while a ref named for the run still wins: a
   // reader comparing with another branch for once should not have to edit the config.
   it(

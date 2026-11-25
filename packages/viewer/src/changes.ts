@@ -21,8 +21,8 @@ import {
 import type { ReviewMarksView } from "./review-state.js";
 
 // The review of a branch's changes to the corpus: which documents changed against the base branch,
-// most influential first, each with its diff. Everything computed here comes from core — the change
-// set, the order, the diff, the context delta — and this module only keeps it between requests and
+// most influential first, each with its diff. Everything computed here comes from core - the change
+// set, the order, the diff, the context delta - and this module only keeps it between requests and
 // lays it out as data; the pages draw it from `changes-article.ts`, `change-banner.ts` and
 // `change-diff.ts`.
 
@@ -48,8 +48,8 @@ export type ReviewContext = BranchContext;
 export type ReviewResult = Review | GitUnavailable;
 
 /**
- * What a review compares. `branch` and `commits` both start where the branch left its base — the
- * merge-base, as a pull request is compared — and end at the files on disk or at `HEAD`.
+ * What a review compares. `branch` and `commits` both start where the branch left its base - the
+ * merge-base, as a pull request is compared - and end at the files on disk or at `HEAD`.
  * `uncommitted` starts at `HEAD` and ends at the files on disk: the edits `git status` lists, read
  * on their own while the rest of the branch would bury them. A start at `HEAD` ending at `HEAD`
  * would compare nothing, so it is not a mode.
@@ -67,8 +67,8 @@ type Cached = { key: string; result: Review };
 /**
  * Keeps the review between requests, for as long as the viewer runs.
  *
- * A review is stale when the work tree changed — which the corpus watcher reports, and the server
- * passes on through `invalidate` — or when `HEAD` or the base moved without the work tree changing,
+ * A review is stale when the work tree changed - which the corpus watcher reports, and the server
+ * passes on through `invalidate` - or when `HEAD` or the base moved without the work tree changing,
  * as a commit, a `reset --soft` or a fetch does. Where the repository is watched, the watcher on
  * git's `HEAD` and refs reports the second too, through `gitMoved`, and a kept review is answered
  * without asking git: that one short process was most of the time a document page took to answer,
@@ -103,7 +103,7 @@ export class ChangeTracker {
 
   /**
    * A tracker for the repository holding the corpus, or `undefined` outside any git work tree or
-   * without git — where there is no branch to review and the viewer shows no Changes section. A
+   * without git - where there is no branch to review and the viewer shows no Changes section. A
    * repository git refuses to read (owned by another user, or a git too old) still gets a tracker, so
    * the section can say why it is empty.
    */
@@ -144,7 +144,7 @@ export class ChangeTracker {
 
   /**
    * Compute the work-tree review and what it does to the context in the background, ahead of the
-   * first page that needs them. The context — the base linted beside the head — is what the Changes
+   * first page that needs them. The context - the base linted beside the head - is what the Changes
    * page, the dashboard's Branch column and a changed document's small graph wait for, a second or so
    * on a corpus of six hundred documents. Every page used to ask for the changes as it opened, which
    * computed it on the way; pages now draw the branch's marks from the review alone, so without this
@@ -180,7 +180,7 @@ export class ChangeTracker {
   async gitMoved(): Promise<boolean> {
     const before = this.cached("branch");
     // A review still running may have read the base before the move and the head after it. Kept, it
-    // would be answered without asking git, since the watcher has already reported the move — for
+    // would be answered without asking git, since the watcher has already reported the move - for
     // the uncommitted comparison, whose base is `HEAD`, that lists the edits a commit just recorded
     // as not committed yet. So, as after a save, it is neither kept nor joined.
     this.generation += 1;
@@ -310,8 +310,8 @@ export class ChangeTracker {
       membership: corpus.membership(),
     };
     // The last commit as the base: its merge-base with `HEAD` is `HEAD` itself, so core's one
-    // review sequence compares the work tree with the last commit — the same answer
-    // `lint --since HEAD` gives — and no second way of listing uncommitted changes exists here.
+    // review sequence compares the work tree with the last commit - the same answer
+    // `lint --since HEAD` gives - and no second way of listing uncommitted changes exists here.
     const base = mode === "uncommitted" ? "HEAD" : this.options.base;
     const review = await reviewBranch(repository, {
       ...(base === undefined ? {} : { base }),
@@ -325,7 +325,7 @@ export class ChangeTracker {
 /**
  * `/api/changes`: what the page lists, as data. Diffs are left to `/api/changes/diff`. With the
  * review's context, every document carries its findings, size and links, and the list is in the
- * page's order; without it — it could not be computed — those are `null`. With review marks, every
+ * page's order; without it - it could not be computed - those are `null`. With review marks, every
  * document carries its status and the hash a mark must name, and `review` counts what is left; both
  * are `null` where marks are off, and `review` says why when they could not be read. No time from the
  * marks appears here, so the payload depends only on the files and the marks.
@@ -434,7 +434,7 @@ export function documentContext(
 }
 
 /**
- * The diff of one path in the review — a document or the config — or `undefined` when the review
+ * The diff of one path in the review - a document or the config - or `undefined` when the review
  * holds no such path. The path is only ever compared with the review's own, never read from disk.
  */
 export function diffPayload(review: Review, relPath: string): unknown {

@@ -69,7 +69,7 @@ describe("declarative custom rule", () => {
       severity: "error",
       filePath: "docs/reqs.md",
       // `helpUri` used to be the rule id again. A user-chosen id has no page of its own, so a
-      // custom finding links the page documenting the mechanism — not `REQ-OWNER.md`, which is a 404.
+      // custom finding links the page documenting the mechanism - not `REQ-OWNER.md`, which is a 404.
       helpUri: CUSTOM_RULE_DOCS_URL,
     });
     expect(result.messages[0]!.helpUri).not.toBe("REQ-OWNER");
@@ -146,7 +146,7 @@ describe("declarative custom rule", () => {
 
   it("rejects a custom id that is a built-in alias, naming the rule it belongs to", async () => {
     // `NO-BROKEN-ANCHORS` fits the grammar and owns no reserved prefix, but a directive resolves
-    // that token, in any case, to REF-002 — so this rule's id would be ambiguous and the rule could
+    // that token, in any case, to REF-002 - so this rule's id would be ambiguous and the rule could
     // never be suppressed by it.
     const cwd = await repo({
       "a.md": "# A\n",
@@ -162,7 +162,7 @@ describe("declarative custom rule", () => {
     });
 
     await expect(loadConfiguration({ cwd })).rejects.toThrow(
-      /id "NO-BROKEN-ANCHORS": "no-broken-anchors" is the alias of built-in rule "REF-002" — choose another id\./,
+      /id "NO-BROKEN-ANCHORS": "no-broken-anchors" is the alias of built-in rule "REF-002" - choose another id\./,
     );
   });
 
@@ -217,7 +217,7 @@ describe("declarative custom rule", () => {
   });
 
   it("treats ids differing only in case as the same id", async () => {
-    // `canonicalizeRuleId` upper-cases, so these resolve to one rule id — the same comparison the
+    // `canonicalizeRuleId` upper-cases, so these resolve to one rule id - the same comparison the
     // reserved-prefix check makes against the registry. A case-sensitive check would let the
     // duplicate straight back in.
     const cwd = await repo({
@@ -314,7 +314,7 @@ describe("declarative custom rule", () => {
   // {"rule":"custom"} without `id` used to fall through the permissive standard
   // ruleEntrySchema and crash in resolveCustomRule's canonicalizeRuleId(undefined). These three
   // shapes must now surface as a structured CONFIG_INVALID, not a TypeError.
-  it("rejects a custom entry missing id, options, and severity — a diagnostic, not a crash", async () => {
+  it("rejects a custom entry missing id, options, and severity - a diagnostic, not a crash", async () => {
     const cwd = await repo({
       "a.md": "# A\n",
       "wastech-mdlint.config.json": JSON.stringify({
@@ -333,7 +333,7 @@ describe("declarative custom rule", () => {
     );
   });
 
-  it("rejects a custom entry with options but no id — a diagnostic, not a crash", async () => {
+  it("rejects a custom entry with options but no id - a diagnostic, not a crash", async () => {
     const cwd = await repo({
       "a.md": "# A\n",
       "wastech-mdlint.config.json": JSON.stringify({
@@ -352,7 +352,7 @@ describe("declarative custom rule", () => {
     expect((error as ConfigError).message).toMatch(/config\.rules\[0\]/);
   });
 
-  it("rejects a custom entry with severity but no id — a diagnostic, not a crash", async () => {
+  it("rejects a custom entry with severity but no id - a diagnostic, not a crash", async () => {
     const cwd = await repo({
       "a.md": "# A\n",
       "wastech-mdlint.config.json": JSON.stringify({
@@ -435,7 +435,7 @@ const IN_SCOPE_ONLY = ["docs/a.md"];
 // The `satisfies Record<Assertion["kind"], …>` below documents the intended coverage contract, but
 // it is NOT what enforces it: no tsconfig in this repo includes `test/**` (`packages/core/
 // tsconfig.json` is `include: ["src/**/*.ts", …]`), so `npm run typecheck` never reads this file and
-// a new assert kind would not fail it — the claim an earlier revision of this comment made
+// a new assert kind would not fail it - the claim an earlier revision of this comment made
 // The enforcement is the runtime key-set assertion in the describe block below; keep it
 // there, and prefer runtime assertions for any future coverage guard written in a test file.
 const CUSTOM_SCOPE_CASES = {
@@ -528,12 +528,12 @@ const CUSTOM_SCOPE_CASES = {
 } as const satisfies Record<Assertion["kind"], CustomScopeCase>;
 
 // The document kinds share one gate (`custom.ts`, before `runAssertion`) while
-// `columnUnique` has its own, threaded into the primitive as a `fileMatches` predicate — which is
+// `columnUnique` has its own, threaded into the primitive as a `fileMatches` predicate - which is
 // why the project kind is not redundant with TBL-006's coverage.
 describe("custom rule file scope (exclude)", () => {
   // The real coverage guard (see the note on CUSTOM_SCOPE_CASES): a new assert kind added to
-  // ASSERTION_TARGETS without an `exclude` case here fails this test, which — unlike the `satisfies`
-  // — actually runs. Compared against ASSERTION_TARGETS rather than a hand-copied list so there is
+  // ASSERTION_TARGETS without an `exclude` case here fails this test, which - unlike the `satisfies`
+  // - actually runs. Compared against ASSERTION_TARGETS rather than a hand-copied list so there is
   // one place to add a kind, and sorted on both sides so map-insertion order cannot affect it.
   it("covers every assert kind declared in ASSERTION_TARGETS", () => {
     expect(Object.keys(CUSTOM_SCOPE_CASES).sort(compareStrings)).toEqual(
@@ -568,7 +568,7 @@ describe("custom rule file scope (exclude)", () => {
     "%s drops an excluded document, with and without `files`",
     async (_kind, { assert, control, scoped }) => {
       expect(await reportedFiles(assert, {})).toEqual(control);
-      // The unscoped shape — `exclude` with no `files` beside it to carry the filtering.
+      // The unscoped shape - `exclude` with no `files` beside it to carry the filtering.
       expect(await reportedFiles(assert, { exclude: ["drafts/**"] })).toEqual(
         scoped,
       );
@@ -636,7 +636,7 @@ describe("custom rule file scope (exclude)", () => {
   });
 
   // The custom dispatcher hands `assert.exclude` straight to the same `linkResolves`
-  // primitive REF-001 uses, so the router branch dropping the option took this family with it —
+  // primitive REF-001 uses, so the router branch dropping the option took this family with it -
   // the family where the option is most likely hand-written, and the half no test reached.
   it("honors assert.exclude on a root-relative target when a siteRouter is configured", async () => {
     const run = async (settings: unknown) => {
@@ -665,7 +665,7 @@ describe("custom rule file scope (exclude)", () => {
 });
 
 // The three front matter kinds go through the same Zod union and target check as every other kind,
-// and share FM-001's semantics — including reporting a block they cannot read instead of passing it.
+// and share FM-001's semantics - including reporting a block they cannot read instead of passing it.
 describe("custom front matter kinds", () => {
   function configWith(entry: Record<string, unknown>): string {
     return JSON.stringify({

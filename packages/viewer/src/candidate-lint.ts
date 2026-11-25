@@ -51,8 +51,8 @@ export class CandidateLinter {
   ) {}
 
   /**
-   * Lints `job` once the jobs before it are done. A job whose `signal` has aborted by then — the
-   * page asked for a newer preview and dropped this request — is not run: the editor aborts the
+   * Lints `job` once the jobs before it are done. A job whose `signal` has aborted by then - the
+   * page asked for a newer preview and dropped this request - is not run: the editor aborts the
    * older preview on every change, and running each in turn would put the newest one behind them
    * all, up to the time limit apiece when the reader is typing into a pattern that runs away.
    */

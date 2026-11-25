@@ -179,7 +179,7 @@ describe("lintFiles orchestration", () => {
     ).toEqual(["b.md:1"]);
   });
 
-  // An unknown category or an unbalanced restore is reported, not silently ignored — including in
+  // An unknown category or an unbalanced restore is reported, not silently ignored - including in
   // a file with no other finding, and the report cannot itself be suppressed by a directive.
   it("reports malformed directives as DIRECTIVE errors that no directive can suppress", async () => {
     const cwd = await fixtureRepo({
@@ -282,7 +282,7 @@ describe("lintFiles orchestration", () => {
   // default `exclude` itself, so no host has to remember to pass one.
   // The end-to-end half of what `corpus-scope.test.ts` pins at the matcher. Both directions of the
   // default are here, because they are one decision read two ways: a dependency or build tree is
-  // pruned by *name* at any depth, and a dot-directory that is neither is linted — dot-directories
+  // pruned by *name* at any depth, and a dot-directory that is neither is linted - dot-directories
   // held 31% of a real target's tracked Markdown, which is why excluding by shape was rejected for
   // the lint corpus while the `init` scan keeps it. A matcher-level assertion cannot see the wiring
   // between `resolveCorpusScope` and the walk, so a shape-based default reintroduced there would

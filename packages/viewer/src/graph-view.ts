@@ -197,7 +197,7 @@ export function withChanges(
 
 /**
  * The small graph beside a document: the document, the documents it links to and the ones linking
- * to it, and every link among them — so two neighbors that link to each other show it too. The
+ * to it, and every link among them - so two neighbors that link to each other show it too. The
  * caller checks that `path` is a document.
  */
 export function buildNeighborhoodView(
@@ -233,7 +233,7 @@ export function documentNeighbors(graph: ContextGraph, path: string): string[] {
 /**
  * The graph page's article. The picture itself is drawn by the page script from `/api/graph`; what
  * is rendered here works without it: the folder picker as a plain GET form, and the documents in
- * view as a list of links — which is also the only form of the graph a keyboard or a screen reader
+ * view as a list of links - which is also the only form of the graph a keyboard or a screen reader
  * can use, since the picture is a canvas.
  *
  * `focus` is the document the request asked for, kept in the form even when the chosen folder leaves

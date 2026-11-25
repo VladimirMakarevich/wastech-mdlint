@@ -16,7 +16,7 @@ import { normalizeRelativePath } from "@wastech-mdlint/core";
 //
 // `toWriteTargetPath` is the one deliberate exception: a file the command *wrote*
 // outside `cwd` is named by its absolute platform-native path, because the user has to be able to
-// open it and a chain of `../` hops — or, across Windows drives, no relative form at all — is not a
+// open it and a chain of `../` hops - or, across Windows drives, no relative form at all - is not a
 // location anyone can read back. So the convention above is the rule for what a failure *blames*,
 // not for what a command reports having *produced*.
 
@@ -24,7 +24,7 @@ import { normalizeRelativePath } from "@wastech-mdlint/core";
  * A host path rendered the way the rest of the product renders paths: relative to this run's `cwd`
  * and POSIX-separated, so the same failure reads identically on Windows, macOS, and Linux.
  *
- * `"."` is the answer when the two paths are the same directory — `path.relative` returns `""`
+ * `"."` is the answer when the two paths are the same directory - `path.relative` returns `""`
  * there, which would otherwise render as a blank in the middle of a sentence.
  *
  * Not every host path *has* a readable relative form: a target outside `cwd` renders with `../`
@@ -33,8 +33,8 @@ import { normalizeRelativePath } from "@wastech-mdlint/core";
  * over, which is why the promise is relative-where-possible, not relative-always.
  * Argument diagnostics keep that behavior deliberately: a `[path]`
  * the user passed absolutely is still *reported* relatively, and an error must never print
- * an absolute host path. A file the command *wrote* is the opposite case — the user needs to be able
- * to open it — so `toWriteTargetPath` below falls back to the absolute form instead.
+ * an absolute host path. A file the command *wrote* is the opposite case - the user needs to be able
+ * to open it - so `toWriteTargetPath` below falls back to the absolute form instead.
  */
 export function toRepoRelativePosix(cwd: string, absolutePath: string): string {
   const relative = normalizeRelativePath(path.relative(cwd, absolutePath));
@@ -45,7 +45,7 @@ export function toRepoRelativePosix(cwd: string, absolutePath: string): string {
  * A write target named for a human to act on: repo-relative POSIX while it is inside `cwd`, and the
  * plain absolute path once it is not. An out-of-repo `compile --outdir` used to render
  * as a chain of `../../../../..` hops that no user can read back to a location, which is worse than
- * the absolute path it was hiding — and on a second Windows drive there is no relative form at all.
+ * the absolute path it was hiding - and on a second Windows drive there is no relative form at all.
  *
  * The absolute fallback stays **platform-native**, un-POSIX-slashed: this is a location to paste into
  * a shell, not a report path, so it should echo the separators the user typed in `--outdir`. Scoped
@@ -116,7 +116,7 @@ export function formatOperationalError(error: unknown, cwd: string): string {
 
 /**
  * A failed product-file write, named by the path the caller already computed for its *success*
- * message rather than by the errno's own path — under `writeFileAtomic` the latter is the staged
+ * message rather than by the errno's own path - under `writeFileAtomic` the latter is the staged
  * temp file, which is meaningless to the user.
  *
  * That path may be relative or absolute, which is why the parameter is not called `relativePath`:

@@ -50,7 +50,7 @@ function eagerContextEntries(
 
 /**
  * The documents loaded into every agent session: the entrypoints LLM-001 is configured with, and
- * everything they eagerly import, followed through the graph's `import` edges — the same edges the
+ * everything they eagerly import, followed through the graph's `import` edges - the same edges the
  * rule and compile's context budget walk. Empty when LLM-001 is not configured, since only that
  * rule says which files are entrypoints.
  */
@@ -129,7 +129,7 @@ export type RankedChange = GitChange & {
   /** Loaded into every agent session (see `eagerContextPaths`). */
   eager: boolean;
   /**
-   * How many documents reach this one through links and imports, directly or through others — how
+   * How many documents reach this one through links and imports, directly or through others - how
    * far a change to it travels. 0 for a deleted document, which the current graph no longer holds.
    */
   reach: number;

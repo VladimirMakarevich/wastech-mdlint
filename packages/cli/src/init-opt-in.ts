@@ -34,7 +34,7 @@ const CI_WORKFLOW_PATH_SEGMENTS = [
 const PROJECT_ROOT_MARKERS = ["package.json", "node_modules"] as const;
 
 // Walk up from `startDir` to the first ancestor for which `matches` holds; undefined at the FS root
-// or once the walk reaches `boundary` (checked, but never crossed — see findRepositoryRoot/
+// or once the walk reaches `boundary` (checked, but never crossed - see findRepositoryRoot/
 // findInstalledSchemaDir for why the caller always passes the user's home directory here).
 async function findAncestor(
   startDir: string,
@@ -61,7 +61,7 @@ async function findAncestor(
 
 /**
  * Resolve the root that anchors the CI workflow and user-visible relative paths. The repository root
- * (`.git`) wins whenever one exists — GitHub loads workflows only from the *repo* root, so a nested
+ * (`.git`) wins whenever one exists - GitHub loads workflows only from the *repo* root, so a nested
  * workspace-package run (`packages/foo`) must anchor at the repo root, never at `packages/foo`. Only
  * when there is no git root above the write dir does it fall back to the nearest `package.json`/
  * `node_modules` (a valid non-git project). Undefined outside any recognizable project.
@@ -69,8 +69,8 @@ async function findAncestor(
  * The walk stops at (and never accepts) the user's home directory: `init` bootstraps a *new* project,
  * so its target commonly has no `.git`/`package.json` of its own yet, and a great many developer
  * machines have an unrelated `.git` at `$HOME` (a dotfiles repo). Without this bound, running `init`
- * anywhere under such a home directory would silently anchor the CI-workflow write — a real file on
- * disk — at `$HOME` instead of the target project. Capping at `$HOME` trades away the rare legitimate
+ * anywhere under such a home directory would silently anchor the CI-workflow write - a real file on
+ * disk - at `$HOME` instead of the target project. Capping at `$HOME` trades away the rare legitimate
  * case of a project rooted exactly at `$HOME` for never writing outside the user's intended target.
  */
 export async function findRepositoryRoot(
@@ -101,7 +101,7 @@ export async function findRepositoryRoot(
 
 /**
  * Walk up from `startDir` for the directory whose `node_modules/@wastech-mdlint/cli/schema.json`
- * actually exists on disk — the real installed schema, wherever the package manager hoisted it.
+ * actually exists on disk - the real installed schema, wherever the package manager hoisted it.
  * Returns that directory, or undefined when the package is not installed (the ordinary `npx` case,
  * and a common one in tests / before `npm install`) or the walk reaches the user's home directory
  * (same unrelated-ancestor concern as `findRepositoryRoot`). `undefined` means "no package schema
@@ -121,7 +121,7 @@ export async function findInstalledSchemaDir(
 /**
  * Asks one opt-in question. These prompts run after the config/schema are already on disk (or after
  * a skip, when the CI workflow may already have been written before the agent-rule prompt), so a
- * Ctrl+C here must not unwind the whole command — that would exit without the summary and make an
+ * Ctrl+C here must not unwind the whole command - that would exit without the summary and make an
  * already-mutated repo look untouched. Cancellation is therefore read as "no" and the summary
  * still prints. Matched on `.name` (not `instanceof`), the version-stable @inquirer convention used
  * in program.ts.
@@ -140,7 +140,7 @@ async function askOptIn(ask: () => Promise<boolean>): Promise<boolean> {
 /**
  * Writes one opt-in file whose parent directory routinely does not exist yet (`.github/workflows`,
  * `.agents/rules`). The atomic helper deliberately leaves directory creation to its caller, so a
- * failure to create it is reported the same way a failed write is — just without an errno to
+ * failure to create it is reported the same way a failed write is - just without an errno to
  * attribute it to, since the directory, not the file, is what could not be made.
  */
 async function writeOptInFile(
@@ -165,7 +165,7 @@ async function writeOptInFile(
  * `"kept"` and `"unsafe-config-path"` are the two cases where the offer is withheld by the tool
  * rather than declined by the user: both used to return `undefined`, which the summary
  * renders as no line at all, so a run that quietly skipped the workflow looked identical to one that
- * was never eligible for it. Neither is a failure — nothing was attempted and nothing is broken — so
+ * was never eligible for it. Neither is a failure - nothing was attempted and nothing is broken - so
  * they report without affecting the exit code. A user saying "no" stays `undefined`: they already
  * know what they chose.
  */
@@ -176,7 +176,7 @@ export type CiWorkflowOutcome =
   | { kind: "unsafe-config-path"; path: string };
 
 /**
- * Offer — and, if accepted, write — the opt-in CI workflow. Reached through `offerOptInFiles` after
+ * Offer - and, if accepted, write - the opt-in CI workflow. Reached through `offerOptInFiles` after
  * either a confirmed config write or a `skip` of an existing config: the workflow depends only on
  * where the config lives, not on whether this run wrote it, so skipping the config must not also
  * silently skip the workflow `--with-ci-workflow` asked for. Never overwrites an existing workflow. Anchors at the project root (where GitHub
@@ -198,7 +198,7 @@ async function offerCiWorkflow(params: {
     return undefined;
   }
 
-  // Omit the `--config` argument when the config sits at the project root — the CLI's walk-up finds
+  // Omit the `--config` argument when the config sits at the project root - the CLI's walk-up finds
   // it there; otherwise pass its project-root-relative POSIX path.
   const configFromRoot = normalizeRelativePath(
     path.relative(repoRoot, configAbsPath),
@@ -210,7 +210,7 @@ async function offerCiWorkflow(params: {
   );
 
   // A line terminator in the path can't be represented safely in the workflow's shell command, and
-  // stripping it would mis-target the config — so decline this opt-in feature rather than emit a
+  // stripping it would mis-target the config - so decline this opt-in feature rather than emit a
   // broken/mis-pointing workflow (an extreme but legal path edge; the config itself is unaffected).
   if (/[\r\n]/.test(configFromRoot)) {
     return { kind: "unsafe-config-path", path: relativeWorkflowPath };
@@ -237,8 +237,8 @@ async function offerCiWorkflow(params: {
 }
 
 // Where the agent rule lands, as path segments joined via path.join for a Windows-correct write.
-// `.agents/rules/` is the host-neutral home for agent-operation guidance — it belongs to no single
-// agent product — and the file is named after this tool rather than after its topic, so it cannot
+// `.agents/rules/` is the host-neutral home for agent-operation guidance - it belongs to no single
+// agent product - and the file is named after this tool rather than after its topic, so it cannot
 // collide with a `markdown.md` or `docs.md` rule the repository already keeps for its own reasons.
 const AGENT_RULE_PATH_SEGMENTS = [
   ".agents",
@@ -259,11 +259,11 @@ export type AgentRuleOutcome =
   | { kind: "unsafe-config-path"; path: string };
 
 /**
- * Offer — and, if accepted, write — the opt-in agent rule. Reached through `offerOptInFiles`, after a
+ * Offer - and, if accepted, write - the opt-in agent rule. Reached through `offerOptInFiles`, after a
  * config write or a `skip` alike, for the same reason as the CI-workflow offer. Anchored at the
  * repository root for the reason the workflow is: agent context is read from the repository root,
  * not from wherever a nested config happens to sit, and the page itself names that config's
- * directory so its commands still find it. Never overwrites an existing rule — the page is meant to
+ * directory so its commands still find it. Never overwrites an existing rule - the page is meant to
  * be edited, and a re-run of `init` must not undo those edits.
  */
 async function offerAgentRule(params: {
@@ -291,7 +291,7 @@ async function offerAgentRule(params: {
   );
 
   // The page names the config's directory inside an inline code span, and no code span can carry a
-  // line terminator — so decline rather than write a page pointing agents at a directory that does
+  // line terminator - so decline rather than write a page pointing agents at a directory that does
   // not exist.
   if (/[\r\n]/.test(configFromRoot)) {
     return { kind: "unsafe-config-path", path: relativeAgentRulePath };
@@ -321,7 +321,7 @@ async function offerAgentRule(params: {
 }
 
 /**
- * Offers both opt-in files in their fixed order — the workflow, then the agent rule. The config-write
+ * Offers both opt-in files in their fixed order - the workflow, then the agent rule. The config-write
  * branch and the `skip` branch of `runInitCommand` both go through here rather than each calling the
  * two offers, because two copies of this sequence would drift: one branch would gain a new opt-in
  * file, an ordering change or a guard that the other silently lacks.
@@ -362,7 +362,7 @@ export async function offerOptInFiles(params: {
 
 /**
  * The run's outcome once the opt-in files have been offered. A requested opt-in file that failed to
- * land turns an otherwise-successful run into a failed write whichever branch it followed — the
+ * land turns an otherwise-successful run into a failed write whichever branch it followed - the
  * summary names which file it was, and names both when both failed, which is why naming the
  * workflow first here loses nothing. `onSuccess` is what the run was before the offers: `"written"`
  * after a config write, `"skipped"` after leaving an existing config untouched.

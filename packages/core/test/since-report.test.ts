@@ -108,7 +108,7 @@ describe.skipIf(!hasGit)("since a ref (requires git on PATH)", () => {
     "lints the base with the base's config when the config sits above the linted directory",
     async () => {
       // The branch turns a rule on and touches no document: every finding it brings is new, and
-      // only a base linted with the base's own config — which had no rules — can say so. A root
+      // only a base linted with the base's own config - which had no rules - can say so. A root
       // below the config that compared only its own directory would never see the config change,
       // would lint the base with the head's config, and would report nothing.
       const fixture = await makeRepo();

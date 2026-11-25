@@ -16,7 +16,7 @@ import { segmentedControl } from "./segmented.js";
 // from the right edge, where the reader sets the accent color and fonts of the whole site and the article's own fonts,
 // sizes, spacing, width and margins. Every change applies as it is made and is remembered for this
 // address, like the theme; `theme.ts` puts the stored values back before the first paint, so a page never shows the defaults
-// first and then jumps — not on the next page, not after the viewer restarts.
+// first and then jumps - not on the next page, not after the viewer restarts.
 
 type NumericKey = keyof typeof NUMBER_RANGES;
 

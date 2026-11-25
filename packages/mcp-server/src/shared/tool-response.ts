@@ -14,7 +14,7 @@ import { toOperationalErrorInfo } from "./operational-error.js";
 // Output/error/annotation conventions as reusable wrappers so every tool
 // renders the same success/error shape without re-deriving it.
 
-// The annotation every tool carries. openWorldHint/idempotentHint are intentionally omitted — they
+// The annotation every tool carries. openWorldHint/idempotentHint are intentionally omitted - they
 // are not part of the decided read-only contract, and adding them would advertise hints the shipped
 // tools never agreed to.
 export const READ_ONLY_ANNOTATIONS: ToolAnnotations = { readOnlyHint: true };
@@ -41,13 +41,13 @@ const INTERNAL_ERROR_MESSAGE = "An unexpected internal error occurred.";
 /**
  * The text block a host renders and a model reads. It carries the `hint` too: the
  * structured payload had the actionable sentence and the text did not, so a host that renders only
- * `content[].text` — the common case — saw `Unknown rule "SIZE-002".` with the did-you-mean dropped,
+ * `content[].text` - the common case - saw `Unknown rule "SIZE-002".` with the did-you-mean dropped,
  * while the CLI prints both for the same typo.
  *
  * The `includes` test is not defensive noise, it is the whole reason this is a function. Some core
- * errors already interpolate their hint INTO the message — `CompileConfigMissingError` and
+ * errors already interpolate their hint INTO the message - `CompileConfigMissingError` and
  * `ImpactAnalysisError` build theirs from it, and a `CONFIG_INVALID` `ConfigError`'s hint is the
- * first of the issue lines its message lists — so a blind concatenation would print those sentences
+ * first of the issue lines its message lists - so a blind concatenation would print those sentences
  * twice. Others do not (`CONFIG_NOT_FOUND`, `ToolInputError`), which is why the choice is per-error
  * rather than per-class. Doing it here rather than at the one offending call site is what makes a
  * newly added error path inherit the behavior.
@@ -70,15 +70,15 @@ function renderErrorText(structured: StructuredErrorInfo): string {
 // `content` message and the structured payload only ever expose vetted text.
 //
 // `cwd` is optional because the classifier needs a base to render the failing path against and
-// cannot invent one — without it the errno branch is skipped and the old INTERNAL_ERROR behavior
+// cannot invent one - without it the errno branch is skipped and the old INTERNAL_ERROR behavior
 // stands, which is the safe direction.
 //
 // For this to round-trip over the wire on the five tools that declare an `outputSchema`, each such
 // error payload may need schema-compatible placeholder success fields attached to it: a
 // spec-compliant client validates any present `structuredContent` against the advertised schema,
 // even on `isError` results. `compile-context` has no `outputSchema`, so it passes no placeholders.
-// An options object rather than positional parameters so that tool — which supplies a `cwd` and no
-// placeholders — does not have to pass a mid-list `undefined`.
+// An options object rather than positional parameters so that tool - which supplies a `cwd` and no
+// placeholders - does not have to pass a mid-list `undefined`.
 export function errorResult(
   error: unknown,
   options: {
@@ -118,7 +118,7 @@ const ERROR_OUTPUT_SHAPE = {
 
 // Extend a success output shape with the optional error fields WITHOUT weakening the success
 // contract. The pinned MCP SDK (1.29) validates any present `structuredContent` against the
-// advertised schema even on errors, but it only advertises object schemas — a Zod union / `oneOf`
+// advertised schema even on errors, but it only advertises object schemas - a Zod union / `oneOf`
 // is silently dropped. So the safe expressible shape is "success schema plus optional error
 // metadata", and each tool's error path supplies schema-compatible placeholder success fields via
 // `errorResult(..., successFields)`.

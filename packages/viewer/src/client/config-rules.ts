@@ -77,7 +77,7 @@ function rulePicker(host: RuleListHost): HTMLSelectElement {
     const group = document.createElement("optgroup");
     group.label = category;
     for (const rule of rules) {
-      const option = new Option(`${rule.id} — ${rule.description}`, rule.id);
+      const option = new Option(`${rule.id} - ${rule.description}`, rule.id);
       option.title = rule.description;
       group.append(option);
     }

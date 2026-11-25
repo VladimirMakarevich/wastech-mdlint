@@ -19,11 +19,11 @@ declare module "picomatch" {
 
   type Picomatch = {
     // Only the `returnState` form is declared, because whether a pattern subtracts is read from the
-    // parser state it attaches to the matcher — `negated` alone misses a leading `!(…)` extglob.
+    // parser state it attaches to the matcher - `negated` alone misses a leading `!(…)` extglob.
     (glob: string, options: PicomatchOptions, returnState: true): Matcher;
     // Parses a pattern the same way matching does, so "is this a glob or a literal path?" is
     // answered by the actual parser rather than a hand-rolled character check that could drift
-    // from it. Only `isGlob` is declared — `base`/`glob`/the boolean sub-flags are unused here.
+    // from it. Only `isGlob` is declared - `base`/`glob`/the boolean sub-flags are unused here.
     scan(input: string, options?: PicomatchOptions): { isGlob: boolean };
   };
 

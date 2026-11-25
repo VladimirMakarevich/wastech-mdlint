@@ -19,7 +19,7 @@ import {
   withErrorOutput,
 } from "../shared/tool-response.js";
 
-// `context-slice` — the files reachable within `depth` hops of a resolved query, following graph
+// `context-slice` - the files reachable within `depth` hops of a resolved query, following graph
 // edges forward. Query resolution is core's deterministic exact-match index; this handler is
 // a thin adapter over `getContextSlice` and does not re-implement resolution or traversal.
 
@@ -69,7 +69,7 @@ export async function handleContextSlice(
     });
 
     // An unresolved query is not an error: it returns `matchKind: null` with empty arrays. This is
-    // the honest-empty-result contract — do not throw.
+    // the honest-empty-result contract - do not throw.
     return successResult({
       summary: renderContextSliceSummary(result),
       structured: result,

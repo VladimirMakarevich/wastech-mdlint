@@ -103,7 +103,7 @@ data: {}
   // The new run counts from zero again, so by number alone that position can look up to date (the
   // new run has sent exactly as many events) or like an earlier point of the new run, whose events
   // would be sent as if they followed the old ones. Either way the page would keep showing what the
-  // old server served — its files, its config — until the reader navigated.
+  // old server served - its files, its config - until the reader navigated.
   it("tells a page served by an earlier run to reload, whatever number it holds", () => {
     hub = new EventHub();
     hub.broadcast("diagnostics", {});

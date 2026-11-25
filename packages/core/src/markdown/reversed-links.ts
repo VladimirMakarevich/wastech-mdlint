@@ -7,7 +7,7 @@ import { createSourceCursor } from "./source-cursor.js";
 // `(text)[target]` is link syntax written in the wrong order. micromark has no construct for it, so
 // it leaves no node of its own: it is spread over `text` nodes, around an autolink when the target
 // is a URL, around emphasis when the text has some. This module recovers it by scanning the source
-// of each phrasing container (paragraph, heading, table cell) the single parse already produced —
+// of each phrasing container (paragraph, heading, table cell) the single parse already produced -
 // it reads the existing tree plus `content` and never parses Markdown again.
 //
 // The AST decides what is prose; the source decides what is syntax. Only phrasing containers are
@@ -37,8 +37,8 @@ const ASCII_PUNCTUATION_PATTERN = /[!-/:-@[-`{-~]/;
 
 const WHITESPACE_PATTERN = /\s/;
 
-// Bracketed prose is common — `(see below)[1]`, `(sic)[WIP]`, a citation marker after a
-// parenthetical — and is indistinguishable from reversed syntax by shape alone. So the bracket
+// Bracketed prose is common - `(see below)[1]`, `(sic)[WIP]`, a citation marker after a
+// parenthetical - and is indistinguishable from reversed syntax by shape alone. So the bracket
 // content must look like a link target before anything is reported: a URI scheme, a leading `/`,
 // `./`, `../`, `#` or `www.`, any `/`, or a trailing file extension (optionally with a fragment).
 // Run over the extracted bracket token only, never over the document, and without the `g` flag, so
@@ -178,7 +178,7 @@ export function extractReversedLinks(
     }
   }
 
-  // Candidates are found in order of their `)`, and a nested one — `((a)[./x.md] b)[./y.md]` —
+  // Candidates are found in order of their `)`, and a nested one - `((a)[./x.md] b)[./y.md]` -
   // closes before the parenthetical around it opens, so they are put in `(` order first: that is
   // the document order the field promises, and the source cursor only moves forward.
   candidates.sort((left, right) => left.open - right.open);

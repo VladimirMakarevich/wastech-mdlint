@@ -148,7 +148,7 @@ describe("accent color", () => {
     expect(accentColor("blue")).toBe("light-dark(#0066cc, #0a84ff)");
   });
 
-  // The accent carries small text — links, rule ids — on the page's own background in each theme,
+  // The accent carries small text - links, rule ids - on the page's own background in each theme,
   // so a choice added below 4.5:1 would leave those unreadable for whoever picks it.
   it("keeps every choice readable as small text in both themes", () => {
     const luminance = (hex: string): number => {

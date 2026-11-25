@@ -20,7 +20,7 @@ import type { SchemaWriteOutcome } from "./init-schema-write.js";
 // sentence for both reasons, because the two describe different files. Under `custom-rules` the file
 // init would generate is the one this config needs, so the fix is to get out of its way. Under
 // `no-installed-package` init only wanted the *name*: the file already there is almost certainly an
-// unrelated schema, and the config's `$schema` is now pointed at it — which is the honest thing to
+// unrelated schema, and the config's `$schema` is now pointed at it - which is the honest thing to
 // say, rather than inviting a regeneration over a document init has no claim on.
 function describeKeptSchemaAdvice(reason: ProjectSchemaReason): string {
   return reason === "custom-rules"
@@ -41,7 +41,7 @@ function formatSchemaWriteLine(schema: SchemaWriteOutcome): string {
       return `Project-local schema ${schema.path} is already up to date (${why}).`;
     case "kept":
       return (
-        `Kept existing schema.json at ${schema.path} (${why}) — its contents ` +
+        `Kept existing schema.json at ${schema.path} (${why}) - its contents ` +
         `differ from what init would generate, so it was left in place. ${describeKeptSchemaAdvice(
           schema.reason,
         )}`
@@ -50,7 +50,7 @@ function formatSchemaWriteLine(schema: SchemaWriteOutcome): string {
       return `Overwrote schema.json at ${schema.path} (${why}), per --on-existing overwrite.`;
     case "unreadable":
       return (
-        `Kept existing schema.json at ${schema.path} (${why}) — it exists but could ` +
+        `Kept existing schema.json at ${schema.path} (${why}) - it exists but could ` +
         `not be read, so init cannot tell whether it matches and will not replace a file it is ` +
         `unable to inspect (check its permissions). ${describeKeptSchemaAdvice(
           schema.reason,
@@ -87,20 +87,20 @@ function formatCiWorkflowLine(
           ? "the config above was still written"
           : "the existing config was left untouched";
       return (
-        `Could not write the CI workflow ${ciWorkflow.path}${reason} — ${configNote}, and no ` +
+        `Could not write the CI workflow ${ciWorkflow.path}${reason} - ${configNote}, and no ` +
         "partial workflow file was left behind. Re-run init to retry it, or add the workflow by " +
         "hand."
       );
     }
     case "kept":
-      return `Kept the existing CI workflow ${ciWorkflow.path} — init never overwrites it. Check that ${
+      return `Kept the existing CI workflow ${ciWorkflow.path} - init never overwrites it. Check that ${
         configState === "written"
           ? "it still points at the config written above."
           : "it still points at the existing config."
       }`;
     case "unsafe-config-path":
       return (
-        `Skipped the CI workflow ${ciWorkflow.path} — the config path contains a line terminator, ` +
+        `Skipped the CI workflow ${ciWorkflow.path} - the config path contains a line terminator, ` +
         `which cannot be embedded safely in the workflow's shell command. ${
           configState === "written"
             ? "The config above was still written"
@@ -114,7 +114,7 @@ function formatCiWorkflowLine(
   }
 }
 
-// Each line says what the file is, where it went and why — the page is written into the user's
+// Each line says what the file is, where it went and why - the page is written into the user's
 // repository on their behalf, and the one thing nobody can infer from its path alone is that nothing
 // reads it yet. `init` deliberately does not edit `AGENTS.md` or `CLAUDE.md` to wire it in: those are
 // the user's own files, and whether the page is loaded every session or read on demand is a budget
@@ -130,28 +130,28 @@ function formatAgentRuleLine(
   switch (agentRule.kind) {
     case "written":
       return (
-        `Wrote agent rule ${agentRule.path} — how coding agents should lint this repository's ` +
+        `Wrote agent rule ${agentRule.path} - how coding agents should lint this repository's ` +
         "Markdown and answer a size budget: compress a document while no meaning is lost, then " +
         "split it, never cut its content. " +
-        "Nothing loads it yet: reference it from AGENTS.md or CLAUDE.md — an @ import loads it " +
+        "Nothing loads it yet: reference it from AGENTS.md or CLAUDE.md - an @ import loads it " +
         "into every session and counts toward LLM-001, an ordinary link lets an agent read it " +
         "on demand."
       );
     case "failed": {
       const reason = agentRule.code === undefined ? "" : ` (${agentRule.code})`;
       return (
-        `Could not write the agent rule ${agentRule.path}${reason} — ${configNote}, and no ` +
+        `Could not write the agent rule ${agentRule.path}${reason} - ${configNote}, and no ` +
         "partial file was left behind. Re-run init to retry it."
       );
     }
     case "kept":
       return (
-        `Kept the existing agent rule ${agentRule.path} — init never overwrites it, so edits made ` +
+        `Kept the existing agent rule ${agentRule.path} - init never overwrites it, so edits made ` +
         "to it survive. Delete it and re-run init to regenerate it."
       );
     case "unsafe-config-path":
       return (
-        `Skipped the agent rule ${agentRule.path} — the config path contains a line terminator, ` +
+        `Skipped the agent rule ${agentRule.path} - the config path contains a line terminator, ` +
         `which the page cannot name. ${
           configState === "written"
             ? "The config above was still written"
@@ -208,7 +208,7 @@ export function formatWriteSummary(params: {
   // one would look exactly like a broken install the first time `lint` reports zero files.
   if (result.wroteEmptyInclude) {
     lines.push(
-      'Note: "include" was written as an empty list, because no doc cluster was selected — ' +
+      'Note: "include" was written as an empty list, because no doc cluster was selected - ' +
         "no files will be linted until you add a pattern to it.",
     );
   }
@@ -231,14 +231,14 @@ export function formatWriteSummary(params: {
  * The summary for a `skip` of an existing config: the skip line, then one line per opt-in file that
  * was written, kept, withheld or failed. With no opt-in outcome it is exactly the single skip line
  * a plain `--yes --on-existing skip` has always printed. That line is the whole of a plain skip's
- * output, so anything that recognises a skip by comparing against it — a CI script, an agent driving
- * `init` — would misread an unchanged run if the opt-in offers added a byte to it. Pure and exported so it can be asserted directly, mirroring `formatWriteSummary`.
+ * output, so anything that recognises a skip by comparing against it - a CI script, an agent driving
+ * `init` - would misread an unchanged run if the opt-in offers added a byte to it. Pure and exported so it can be asserted directly, mirroring `formatWriteSummary`.
  */
 export function formatSkipSummary(params: {
   ciWorkflow?: CiWorkflowOutcome;
   agentRule?: AgentRuleOutcome;
 }): string {
-  const lines = ["skipped — existing config left untouched."];
+  const lines = ["skipped - existing config left untouched."];
   if (params.ciWorkflow !== undefined) {
     lines.push(formatCiWorkflowLine(params.ciWorkflow, "untouched"));
   }
@@ -294,8 +294,8 @@ export function formatWriteFailureSummary(params: {
 /**
  * The "nothing written" outcome for the one abort case: a `merge` whose existing config could not be
  * read/parsed/validated. The deliverable requires never modifying or dropping an existing entry and
- * writing only a valid config — both unprovable when the existing config can't be parsed or would be
- * rejected by the loader — so the safe answer is to write nothing.
+ * writing only a valid config - both unprovable when the existing config can't be parsed or would be
+ * rejected by the loader - so the safe answer is to write nothing.
  * `configPath` is a normalized POSIX path, relative to the same directory the draft summary's
  * existing-config line already used (the original target directory, not necessarily the repo root).
  */

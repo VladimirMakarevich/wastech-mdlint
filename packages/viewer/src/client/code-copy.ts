@@ -1,7 +1,7 @@
 import { copyText } from "./clipboard.js";
 
 // The "Copy" button in the corner of every highlighted code block: in a document, in a linked source
-// file and in the config page's current file. It copies the block's code as it stands in the file —
+// file and in the config page's current file. It copies the block's code as it stands in the file -
 // the text of the code element, which holds the lines and the line breaks between them, and none of
 // the line numbers, which the stylesheet draws as generated content.
 

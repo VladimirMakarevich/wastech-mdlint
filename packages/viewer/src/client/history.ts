@@ -32,8 +32,8 @@ export function initHistory(): void {
 
 /**
  * What `/api/history` answered: the commits, or the note shown in their place and whether it is an
- * answer (no commit yet) rather than a failure to ask about again. A refusal — git gone, the document
- * no longer in the corpus — says why, rather than reading as a document no commit has touched.
+ * answer (no commit yet) rather than a failure to ask about again. A refusal - git gone, the document
+ * no longer in the corpus - says why, rather than reading as a document no commit has touched.
  */
 export function readHistory(
   ok: boolean,

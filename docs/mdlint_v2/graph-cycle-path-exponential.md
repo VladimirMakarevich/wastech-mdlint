@@ -25,7 +25,7 @@ visited.delete(neighbor); // <- turns the search into enumeration of all simple 
 
 Because of `visited.delete`, the search tries every simple path out of `start` until one happens to close back on it. That is exponential (factorial on dense components) in the SCC size. The code comment only discusses stack depth ("bounded by that SCC's member count"), not running time.
 
-The un-marking is unnecessary. The input is a strongly connected component, so every member reaches `start`. A plain DFS with permanent `visited` marking explores every member at most once and, on reaching the member that has an edge to `start`, returns a cycle — O(V + E). A BFS from `start` would additionally return the shortest cycle, which is a nicer and still deterministic report.
+The un-marking is unnecessary. The input is a strongly connected component, so every member reaches `start`. A plain DFS with permanent `visited` marking explores every member at most once and, on reaching the member that has an edge to `start`, returns a cycle - O(V + E). A BFS from `start` would additionally return the shortest cycle, which is a nicer and still deterministic report.
 
 ### Minimal reproduction
 
