@@ -1768,6 +1768,144 @@ a:hover {
   border-radius: var(--radius-xs);
 }
 
+/* An image the page script lets the reader enlarge; one inside a link keeps the link's pointer. */
+.markdown-body img.zoomable {
+  cursor: zoom-in;
+}
+
+.markdown-body img.zoomable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The enlarged image: the whole window, dark in both themes as a photo viewer is, so the picture's own
+   colors are judged against neutral ground rather than against the page. */
+.image-zoom {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  overflow: hidden;
+}
+
+.image-zoom[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.image-zoom::backdrop {
+  background: rgb(0 0 0 / 82%);
+}
+
+.image-zoom-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  cursor: zoom-out;
+  /* The script pans and zooms; the browser's own touch scrolling and pinch would fight it. */
+  touch-action: none;
+}
+
+.image-zoom-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  transform-origin: 0 0;
+  cursor: zoom-in;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.image-zoom-stage.is-zoomed .image-zoom-image {
+  cursor: grab;
+}
+
+.image-zoom-stage.is-dragging,
+.image-zoom-stage.is-dragging .image-zoom-image {
+  cursor: grabbing;
+}
+
+.image-zoom-bar {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: var(--space-1);
+  max-width: calc(100vw - 2 * var(--space-3));
+  margin: 0 var(--space-3) var(--space-3);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+}
+
+.image-zoom-caption {
+  overflow: hidden;
+  max-width: 40ch;
+  padding: 0 var(--space-2);
+  color: var(--fg-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.image-zoom-level {
+  min-width: 5ch;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.image-zoom-bar button,
+.image-zoom-original {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--control-sm);
+  height: var(--control-sm);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.image-zoom-bar button:hover,
+.image-zoom-original:hover {
+  background: var(--fill);
+}
+
+.image-zoom-original[hidden],
+.image-zoom-caption[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .image-zoom[open],
+  .image-zoom[open]::backdrop {
+    animation: image-zoom-in 0.15s ease-out;
+  }
+
+  .image-zoom-image.is-smooth {
+    transition: transform 0.18s ease-out;
+  }
+}
+
+@keyframes image-zoom-in {
+  from {
+    opacity: 0;
+  }
+}
+
 /* A table is a rounded card: the outer edge is the table's own border, and the cells draw only the
    lines between them, since collapsed borders cannot follow a rounded corner. */
 .markdown-body table {
