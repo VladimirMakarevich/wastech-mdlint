@@ -36,7 +36,11 @@ export type ConfigReview = ReviewedConfig;
 /** The corpus as the review read it: one moment, whatever updates land while it is computed. */
 export type ReviewSnapshot = CorpusSnapshot;
 
-export type Review = BranchReview & { snapshot: ReviewSnapshot };
+export type Review = BranchReview & {
+  snapshot: ReviewSnapshot;
+  // The comparison the review was made for, which decides what a page says it compares with.
+  mode: CompareMode;
+};
 
 /** What a review's change does to the context, as core computes it. */
 export type ReviewContext = BranchContext;
@@ -175,6 +179,12 @@ export class ChangeTracker {
    */
   async gitMoved(): Promise<boolean> {
     const before = this.cached("branch");
+    // A review still running may have read the base before the move and the head after it. Kept, it
+    // would be answered without asking git, since the watcher has already reported the move — for
+    // the uncommitted comparison, whose base is `HEAD`, that lists the edits a commit just recorded
+    // as not committed yet. So, as after a save, it is neither kept nor joined.
+    this.generation += 1;
+    this.pending.clear();
     const repository = this.repository;
     if (repository.available) {
       for (const [mode, kept] of [...this.cache]) {
@@ -308,7 +318,7 @@ export class ChangeTracker {
       worktree: mode !== "commits",
       corpus: snapshot,
     });
-    return "available" in review ? review : { ...review, snapshot };
+    return "available" in review ? review : { ...review, snapshot, mode };
   }
 }
 
@@ -329,6 +339,9 @@ export function changesPayload(
   if ("available" in result) {
     return {
       status: "unavailable",
+      // Which comparison could not be made: the uncommitted one fails before the first commit while
+      // the branch's may not, and a client needs to know which of the two it asked about.
+      compare: mode,
       reason: result.reason,
       message: result.message,
       hint: result.hint,

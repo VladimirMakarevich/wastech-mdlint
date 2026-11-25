@@ -343,7 +343,12 @@ function documentCard(
     href:
       review.status === "D"
         ? undefined
-        : documentViewHref(documentHref(review.path), "rendered", baseline),
+        : documentViewHref(
+            documentHref(review.path),
+            "rendered",
+            baseline,
+            shown.mode,
+          ),
     oldPath: review.oldPath,
     eager: review.eager,
     note: diff.note,

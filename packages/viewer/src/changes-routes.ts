@@ -8,7 +8,13 @@ import {
   type Review,
 } from "./changes.js";
 import { sendHtml, sendJson } from "./http-send.js";
-import { compareOf, contextOf, marksOf, sinceOf } from "./review-queries.js";
+import {
+  asMarked,
+  compareOf,
+  contextOf,
+  marksOf,
+  sinceOf,
+} from "./review-queries.js";
 import {
   baselineOf,
   markOf,
@@ -185,11 +191,14 @@ export class ChangesRoutes {
       sendJson(response, { status: "refused", error: parsed.message }, 400);
       return;
     }
-    const review = await changes.review(parsed.request.compare);
-    if ("available" in review) {
-      sendJson(response, { status: "refused", error: review.message }, 409);
+    const shown = await changes.review(parsed.request.compare);
+    if ("available" in shown) {
+      sendJson(response, { status: "refused", error: shown.message }, 409);
       return;
     }
+    // Named as the marks know them, so a reset or an unmark also reaches the marks a document kept
+    // under the name it had before the branch renamed it.
+    const review = await asMarked(this.ctx, shown);
     const matched = listedEntries(review, parsed.request);
     if (!matched.ok) {
       sendJson(response, { status: "conflict", error: matched.message }, 409);

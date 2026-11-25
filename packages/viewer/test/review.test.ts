@@ -384,6 +384,67 @@ describe.skipIf(!hasGit)("review marks (requires git on PATH)", () => {
     });
   });
 
+  // The uncommitted comparison starts after the commit that renamed a document, so it lists the
+  // document under its new name alone. Its marks under the old name must still count there, or one
+  // document reads as not reviewed in one comparison and as changed since review in the other — and
+  // a reset from there must forget them too, as the branch's own reset does.
+  it("finds and resets a renamed document's marks from the uncommitted comparison", async () => {
+    const own = await makeRepo();
+    const lines = (edits: Record<number, string>) =>
+      `${[
+        "# Alpha",
+        "",
+        ...Array.from(
+          { length: 12 },
+          (_, index) => edits[index] ?? `Line ${String(index)} stays.`,
+        ),
+      ].join("\n")}\n`;
+    await own.write("docs/a.md", lines({}));
+    own.commit("base");
+    own.git("checkout", "-q", "-b", "feature");
+    const reviewedText = lines({ 0: "Line 0 was edited." });
+    await own.write("docs/a.md", reviewedText);
+    own.commit("edit a");
+
+    const dir = await stateDir();
+    const before = await start(own.repo, dir, own.env);
+    try {
+      const marked = await post(before, "mark", {
+        path: "docs/a.md",
+        hash: contentHash(reviewedText),
+        reviewed: true,
+        compare: "branch",
+      });
+      expect(marked.status).toBe(200);
+    } finally {
+      await before.viewer.close();
+    }
+
+    own.git("mv", "docs/a.md", "docs/b.md");
+    await own.write("docs/b.md", lines({ 0: "Line 0 was edited.", 1: "1!" }));
+    own.commit("rename a to b");
+    const onDisk = lines({ 0: "Line 0 was edited.", 1: "1!", 2: "2!" });
+    await own.write("docs/b.md", onDisk);
+
+    const target = await start(own.repo, dir, own.env);
+    running.push(target);
+    const branch = await changes(target);
+    expect(branch.documents).toMatchObject([
+      { path: "docs/b.md", status: "R", review: { status: "changed" } },
+    ]);
+    const uncommitted = await changes(target, "?compare=uncommitted");
+    expect(uncommitted.documents).toMatchObject([
+      { path: "docs/b.md", status: "M", review: { status: "changed" } },
+    ]);
+
+    const reset = await post(target, "reset", {
+      compare: "uncommitted",
+      documents: [{ path: "docs/b.md", hash: contentHash(onDisk) }],
+    });
+    expect(reset.status).toBe(200);
+    expect(await statuses(target)).toEqual({ "docs/b.md": "unreviewed" });
+  });
+
   it("refuses a mark from another origin, without the page's token, or not sent as JSON", async () => {
     const dir = await stateDir();
     const target = await open(dir);

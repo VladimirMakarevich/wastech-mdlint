@@ -75,7 +75,45 @@ export async function marksOf(
   if (ctx.reviewStore === undefined || "available" in review) {
     return undefined;
   }
-  return markReview(review, await ctx.reviewStore.read());
+  return markReview(await asMarked(ctx, review), await ctx.reviewStore.read());
+}
+
+/**
+ * A review with each document named as the reader's marks know it. Marks follow a rename through
+ * `oldPath`, and a review that starts after the rename — the uncommitted work on a document the
+ * branch renamed in an earlier commit — lists it under its new name alone. Its marks under the old
+ * name would then be missed: one document would read as not reviewed in that comparison and as
+ * changed since review in the branch's, and resetting it there would leave the old name's marks
+ * behind. For the marks only; the page still shows each document as its own comparison sees it.
+ */
+export async function asMarked(
+  ctx: ViewerContext,
+  review: Review,
+): Promise<Review> {
+  if (review.mode === "branch" || ctx.changes === undefined) {
+    return review;
+  }
+  const branch = await ctx.changes.review("branch");
+  if ("available" in branch) {
+    return review;
+  }
+  const renamed = new Map(
+    branch.documents.flatMap((entry) =>
+      entry.oldPath === undefined ? [] : [[entry.path, entry.oldPath] as const],
+    ),
+  );
+  if (renamed.size === 0) {
+    return review;
+  }
+  return {
+    ...review,
+    documents: review.documents.map((entry) => {
+      const oldPath = renamed.get(entry.path);
+      return entry.oldPath !== undefined || oldPath === undefined
+        ? entry
+        : { ...entry, oldPath };
+    }),
+  };
 }
 
 /**

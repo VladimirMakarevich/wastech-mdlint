@@ -463,9 +463,15 @@ async function goToDocument(
   documentPath: string,
   step: 1 | -1,
 ): Promise<void> {
+  // The Changes page's comparison this document was opened from, kept in its address: stepping walks
+  // that list in its order — only the documents with uncommitted edits, say — rather than the whole
+  // branch's, and a deleted document's card is shown in it.
+  const compare = new URLSearchParams(location.search).get("compare");
+  const query =
+    compare === null ? "" : `?${new URLSearchParams({ compare }).toString()}`;
   let documents: ChangedDocument[];
   try {
-    const data = (await (await fetch("/api/changes")).json()) as {
+    const data = (await (await fetch(`/api/changes${query}`)).json()) as {
       documents?: ChangedDocument[];
     };
     documents = data.documents ?? [];
@@ -484,7 +490,7 @@ async function goToDocument(
       // page's own way of showing changes goes along, so stepping through keeps the same view.
       location.href =
         entry.status === "D"
-          ? `/changes#${entry.anchor}`
+          ? `/changes${query}#${entry.anchor}`
           : `/doc/${entry.path.split("/").map(encodeURIComponent).join("/")}${location.search}`;
       return;
     }

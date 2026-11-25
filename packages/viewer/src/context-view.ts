@@ -70,10 +70,10 @@ export function renderContextSummary(context: ReviewContext): Element[] {
  */
 export function contextNotes(context: ReviewContext): string[] {
   return [
-    "Links to files other than documents are checked against the files as they are now on both sides, so a link to a file the branch deleted reads as fine at the base.",
+    "Links to files other than documents are checked against the files as they are now on both sides, so a link to a file the change deleted still reads as fine on the side before it.",
     ...(context.delta.scopeChanged
       ? [
-          "The config's include, exclude or respectGitignore changed; the base is still read as the documents the current config selects.",
+          "The config's include, exclude or respectGitignore changed; the side before the change is still read as the documents the current config selects.",
         ]
       : []),
     ...context.configProblems,
@@ -235,7 +235,7 @@ export function renderAffected(delta: ContextDelta): Element | undefined {
     h("h2", "Affected documents"),
     h(
       "p.changes-note",
-      "Documents this branch did not change, which the change still reaches.",
+      "Documents the change left as they were, which it still reaches.",
     ),
     findings.length === 0
       ? undefined

@@ -17,8 +17,9 @@ import {
 } from "./review-state.js";
 
 // The line a changed document's page carries above its text, and the addresses both it and the
-// Changes page build: which view of the changes, and which baseline they compare with, live in the
-// address, so a reload and a shared link show the same thing.
+// Changes page build: which view of the changes, which baseline they compare with and which
+// comparison the Changes page shows live in the address, so a reload and a shared link show the
+// same thing.
 
 /**
  * How a changed document's page shows its changes: marked on the rendered text, as its source diff
@@ -63,10 +64,15 @@ export const BASELINES: readonly (readonly [Baseline, string])[] = [
  * "Viewed" mark stay in reach on a long document. The commits that last touched the document are
  * therefore not part of it: opened inside a pinned line, their list would cover the text it was
  * meant to sit above. The page renders them below the line instead, as it does for any document.
+ *
+ * `compare` is the Changes page's comparison the reader came from. The page shows the branch's
+ * changes whichever it is, but keeps it in every link it draws, so the way back to the Changes page
+ * returns to the list the reader was working through rather than to the whole branch.
  */
 export function renderChangeBanner(
   review: DocumentReview,
   view: DiffView,
+  compare: CompareMode,
   reviewed?: BannerReview,
 ): Element {
   const page = documentHref(review.path);
@@ -78,7 +84,9 @@ export function renderChangeBanner(
     reviewed === undefined
       ? undefined
       : reviewToggle(review, reviewed.mark, "branch"),
-    baselineSwitch(page, view, baseline, reviewed),
+    baselineSwitch(baseline, reviewed, (value) =>
+      documentViewHref(page, view, value, compare),
+    ),
     h(
       "nav.changes-view.segmented.is-compact.is-even",
       { ariaLabel: "Show the changes" },
@@ -86,7 +94,7 @@ export function renderChangeBanner(
         h(
           "a.segment",
           {
-            href: documentViewHref(page, value, baseline),
+            href: documentViewHref(page, value, baseline, compare),
             ariaCurrent: value === view ? "page" : undefined,
           },
           label,
@@ -96,7 +104,7 @@ export function renderChangeBanner(
     h(
       "a.changes-banner-link",
       {
-        href: `${changesHref("branch", baseline)}#${changeCardId(review.path)}`,
+        href: `${changesHref(compare, baseline)}#${changeCardId(review.path)}`,
       },
       "Changes page",
     ),
@@ -122,12 +130,12 @@ function bannerText(
 }
 
 // Offered where an earlier version was reviewed, and kept on a reviewed document while it is in use,
-// so the way back is there. A document never reviewed has nothing to compare with.
+// so the way back is there. A document never reviewed has nothing to compare with. `hrefOf` is this
+// page's address with a baseline in place of the current one, every other choice in it kept.
 function baselineSwitch(
-  page: string,
-  view: DiffView,
   baseline: Baseline,
   reviewed: BannerReview | undefined,
+  hrefOf: (baseline: Baseline) => string,
 ): Element | undefined {
   if (
     reviewed === undefined ||
@@ -145,7 +153,7 @@ function baselineSwitch(
       h(
         "a.segment",
         {
-          href: documentViewHref(page, view, value),
+          href: hrefOf(value),
           ariaCurrent: value === baseline ? "page" : undefined,
         },
         label,
@@ -170,6 +178,7 @@ export function documentViewHref(
   page: string,
   view: DiffView,
   baseline: Baseline,
+  compare: CompareMode,
 ): string {
   const params = new URLSearchParams();
   if (view !== "rendered") {
@@ -177,6 +186,9 @@ export function documentViewHref(
   }
   if (baseline === "review") {
     params.set("since", "review");
+  }
+  if (compare !== "branch") {
+    params.set("compare", compare);
   }
   const query = params.toString();
   return query === "" ? page : `${page}?${query}`;

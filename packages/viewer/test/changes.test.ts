@@ -448,6 +448,28 @@ describe.skipIf(!hasGit)("the Changes section (requires git on PATH)", () => {
     }
   });
 
+  // A document opened from the uncommitted comparison still shows the branch's changes, but keeps
+  // the comparison in its address and every link it draws, so the way back is to the same list.
+  it("keeps the comparison in a document page's links, and leads back to it", async () => {
+    const changes = (await get(port, "/changes?compare=uncommitted")).body;
+    expect(changes).toContain(
+      '<a class="change-path" href="/doc/docs/new.md?compare=uncommitted">docs/new.md</a>',
+    );
+    const page = (await get(port, "/doc/docs/new.md?compare=uncommitted")).body;
+    expect(page).toContain(
+      '<a class="changes-banner-link" href="/changes?compare=uncommitted#change.docs%2Fnew.md">Changes page</a>',
+    );
+    expect(page).toContain(
+      '<a class="segment" href="/doc/docs/new.md?diff=source&#x26;compare=uncommitted">Source</a>',
+    );
+    // Opened from the whole branch, the same page adds nothing to its links.
+    const plain = (await get(port, "/doc/docs/new.md")).body;
+    expect(plain).toContain(
+      '<a class="changes-banner-link" href="/changes#change.docs%2Fnew.md">Changes page</a>',
+    );
+    expect(plain).not.toMatch(/(\?|&#x26;)compare=/);
+  });
+
   it("notices a new commit without the work tree changing", async () => {
     fixture.git("add", "docs/new.md");
     fixture.git("commit", "-q", "-m", "add new");
@@ -1060,7 +1082,18 @@ describe.skipIf(!hasGit)(
         );
         expect(
           JSON.parse((await get(port, "/api/changes")).body),
-        ).toMatchObject({ status: "unavailable", reason: "base-not-found" });
+        ).toMatchObject({
+          status: "unavailable",
+          compare: "branch",
+          reason: "base-not-found",
+        });
+        // The uncommitted comparison starts at the last commit, not at `--base`, so it still works,
+        // and each answer names the comparison it is about.
+        expect(
+          JSON.parse(
+            (await get(port, "/api/changes?compare=uncommitted")).body,
+          ),
+        ).toMatchObject({ status: "ready", compare: "uncommitted" });
         expect((await get(port, "/doc/README.md")).status).toBe(200);
         // A filter that cannot apply says so rather than showing every document, or none.
         const dashboard = await get(port, "/api/dashboard?changed=1");
@@ -1106,6 +1139,29 @@ describe.skipIf(!hasGit)("a watched repository (requires git on PATH)", () => {
     tracker.watchLost();
     fixture.git("commit", "-q", "--allow-empty", "-m", "unwatched");
     expect(await tracker.review("branch")).not.toBe(second);
+  }, 60_000);
+
+  // A review running when a commit lands may have read the base before it and the head after it.
+  // Once the watcher has reported the move it must be neither kept nor joined: kept, it would be
+  // answered without asking git again, and the uncommitted comparison — whose base is `HEAD` — would
+  // go on listing the edits just committed as not committed yet.
+  it("keeps no review that was running when git moved", async () => {
+    const fixture = await featureBranch();
+    const corpus = await Corpus.load({ cwd: fixture.repo });
+    const tracker = (await ChangeTracker.open(corpus, {
+      env: fixture.env,
+      watched: true,
+    }))!;
+    const overtaken = tracker.review("uncommitted");
+    fixture.commit("commit the work");
+    await tracker.gitMoved();
+    const fresh = await tracker.review("uncommitted");
+    expect(fresh).not.toBe(await overtaken);
+    expect(fresh).toMatchObject({ documents: [] });
+    if ("set" in fresh) {
+      expect(fresh.set.head).toBe(fresh.set.base.commit);
+      expect(fresh.config).toBeUndefined();
+    }
   }, 60_000);
 });
 
