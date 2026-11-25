@@ -388,13 +388,23 @@ export class GitRepository {
         );
       }
       const commit = await this.resolveCommit(ref);
-      return commit === undefined
+      if (commit !== undefined) {
+        return { ref, commit };
+      }
+      // `HEAD` names no commit only before the first one is made, and comparing with the last
+      // commit is an ordinary request there — "fetch the branch first" would send the reader the
+      // wrong way.
+      return ref === "HEAD"
         ? unavailable(
+            "base-not-found",
+            "HEAD has no commits yet.",
+            "Make a first commit to compare with it.",
+          )
+        : unavailable(
             "base-not-found",
             `"${ref}" does not name a commit in this repository.`,
             "Check the name, or fetch the branch first.",
-          )
-        : { ref, commit };
+          );
     }
 
     const candidates: { ref: string; fullRef: string }[] = [];

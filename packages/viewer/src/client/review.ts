@@ -80,7 +80,7 @@ async function mark(
     path: toggle.dataset.path,
     hash: toggle.dataset.hash,
     reviewed,
-    worktree: toggle.dataset.worktree === "1",
+    compare: toggle.dataset.compare,
   });
   input.disabled = false;
   if (answer.status !== "saved") {
@@ -275,7 +275,7 @@ async function resetReview(
   }
   button.disabled = true;
   const answer = await post(token, "/api/review/reset", {
-    worktree: toggles[0]?.dataset.worktree === "1",
+    compare: toggles[0]?.dataset.compare,
     documents: toggles.map((toggle) => ({
       path: toggle.dataset.path,
       hash: toggle.dataset.hash,

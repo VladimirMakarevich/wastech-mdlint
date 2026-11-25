@@ -81,7 +81,7 @@ export async function startViewer(
   if (changes !== undefined) {
     // Computed once now: a `--base` that names nothing is reported where it was typed, and the first
     // visit to the Changes section finds the review ready.
-    const first = await changes.review(true);
+    const first = await changes.review("branch");
     if ("available" in first) {
       notices.push(`changes: ${first.message} ${first.hint}`);
     }

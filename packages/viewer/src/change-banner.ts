@@ -2,7 +2,11 @@ import type { Element } from "hast";
 import { h } from "hastscript";
 
 import { stats, statusBadge, statusName } from "./change-diff.js";
-import { changeCardId, type DocumentReview } from "./changes.js";
+import {
+  changeCardId,
+  type CompareMode,
+  type DocumentReview,
+} from "./changes.js";
 import { documentHref } from "./render-document.js";
 import {
   type Baseline,
@@ -73,7 +77,7 @@ export function renderChangeBanner(
     reviewChip(reviewed?.mark),
     reviewed === undefined
       ? undefined
-      : reviewToggle(review, reviewed.mark, true),
+      : reviewToggle(review, reviewed.mark, "branch"),
     baselineSwitch(page, view, baseline, reviewed),
     h(
       "nav.changes-view.segmented.is-compact.is-even",
@@ -92,7 +96,7 @@ export function renderChangeBanner(
     h(
       "a.changes-banner-link",
       {
-        href: `${changesHref(true, baseline)}#${changeCardId(review.path)}`,
+        href: `${changesHref("branch", baseline)}#${changeCardId(review.path)}`,
       },
       "Changes page",
     ),
@@ -178,10 +182,10 @@ export function documentViewHref(
   return query === "" ? page : `${page}?${query}`;
 }
 
-export function changesHref(worktree: boolean, baseline: Baseline): string {
+export function changesHref(mode: CompareMode, baseline: Baseline): string {
   const params = new URLSearchParams();
-  if (!worktree) {
-    params.set("worktree", "0");
+  if (mode !== "branch") {
+    params.set("compare", mode);
   }
   if (baseline === "review") {
     params.set("since", "review");

@@ -50,6 +50,25 @@ function get(port: number, rawPath: string): Promise<Response> {
 
 const portOf = (viewer: RunningViewer) => Number(new URL(viewer.url).port);
 
+// The Changes page's list, read back from its text rather than recomputed with the renderer's own
+// helpers: letter, path and line counts of each row, in the page's order.
+function listedRows(
+  body: string,
+): { status: string; path: string; added: number; removed: number }[] {
+  const list =
+    /<nav class="changes-files"[\s\S]*?<\/nav>/.exec(body)?.[0] ?? "";
+  return [
+    ...list.matchAll(
+      /<li[^>]*><span class="change-status[^"]*"[^>]*>([AMDR])<\/span> <a href="[^"]*">([^<]+)<\/a> <span class="change-stats">\+(\d+) −(\d+)<\/span>/g,
+    ),
+  ].map((match) => ({
+    status: match[1]!,
+    path: match[2]!,
+    added: Number(match[3]),
+    removed: Number(match[4]),
+  }));
+}
+
 type ChangedDocument = {
   path: string;
   oldPath?: string;
@@ -65,6 +84,8 @@ type ChangesPayload = {
   status: string;
   base: { ref: string; commit: string };
   mergeBase: string;
+  head: string;
+  compare: string;
   worktree: boolean;
   added: number;
   removed: number;
@@ -230,21 +251,10 @@ describe.skipIf(!hasGit)("the Changes section (requires git on PATH)", () => {
     ) as ChangesPayload;
     expect(api.status).toBe("ready");
     expect(api.base.ref).toBe("main");
+    expect(api.compare).toBe("branch");
     expect(api.worktree).toBe(true);
 
-    // The page's list, read back from its text rather than recomputed: letter, path, counts.
-    const list =
-      /<nav class="changes-files"[\s\S]*?<\/nav>/.exec(body)?.[0] ?? "";
-    const rows = [
-      ...list.matchAll(
-        /<li[^>]*><span class="change-status[^"]*"[^>]*>([AMDR])<\/span> <a href="[^"]*">([^<]+)<\/a> <span class="change-stats">\+(\d+) −(\d+)<\/span>/g,
-      ),
-    ].map((match) => ({
-      status: match[1],
-      path: match[2],
-      added: Number(match[3]),
-      removed: Number(match[4]),
-    }));
+    const rows = listedRows(body);
     expect(rows).toEqual(
       api.documents.map(({ status, path, added, removed }) => ({
         status,
@@ -322,8 +332,9 @@ describe.skipIf(!hasGit)("the Changes section (requires git on PATH)", () => {
 
   it("leaves uncommitted work out when asked for commits only", async () => {
     const api = JSON.parse(
-      (await get(port, "/api/changes?worktree=0")).body,
+      (await get(port, "/api/changes?compare=commits")).body,
     ) as ChangesPayload;
+    expect(api.compare).toBe("commits");
     expect(api.worktree).toBe(false);
     expect(api.config).toBeNull();
     expect(api.outsideCorpus).toEqual([]);
@@ -332,17 +343,116 @@ describe.skipIf(!hasGit)("the Changes section (requires git on PATH)", () => {
       "docs/hub.md",
       "docs/old.md",
     ]);
+    const { body } = await get(port, "/changes?compare=commits");
+    expect(body).toContain(
+      '<a class="segment" href="/changes?compare=commits" aria-current="page">Commits only</a>',
+    );
+    expect(body).toContain(", up to the last commit.");
+  });
+
+  // Commits-only was asked for as `worktree=0` before there were three modes; a bookmark made then
+  // must still open that comparison, not quietly the whole branch.
+  it("still reads the commits-only address from before there were three modes", async () => {
+    const api = JSON.parse(
+      (await get(port, "/api/changes?worktree=0")).body,
+    ) as ChangesPayload;
+    expect(api.compare).toBe("commits");
     const { body } = await get(port, "/changes?worktree=0");
     expect(body).toContain(
-      '<a class="segment" href="/changes?worktree=0" aria-current="page">Commits only</a>',
+      '<a class="segment" href="/changes?compare=commits" aria-current="page">Commits only</a>',
     );
+  });
+
+  // The page's list is read back from its text and compared with the JSON of the same mode, as for
+  // the whole branch, so the uncommitted review cannot be listed one way and served another.
+  it("shows only what is not committed yet when asked for uncommitted work", async () => {
+    const api = JSON.parse(
+      (await get(port, "/api/changes?compare=uncommitted")).body,
+    ) as ChangesPayload;
+    expect(api.status).toBe("ready");
+    expect(api.compare).toBe("uncommitted");
+    expect(api.worktree).toBe(true);
+    // Compared with the last commit: the merge-base is HEAD itself.
+    expect(api.base.ref).toBe("HEAD");
+    expect(api.mergeBase).toBe(api.head);
+    // The branch's committed edits are gone; the new document, the config edit and the excluded
+    // draft are what the work tree holds beyond the last commit.
+    expect(
+      api.documents.map((entry) => `${entry.status} ${entry.path}`),
+    ).toEqual(["A docs/new.md"]);
+    expect(api.config).toMatchObject({
+      path: "wastech-mdlint.config.json",
+      status: "M",
+    });
+    expect(api.outsideCorpus).toEqual([
+      { status: "M", path: "drafts/idea.md" },
+    ]);
+
+    const { body } = await get(port, "/changes?compare=uncommitted");
+    expect(listedRows(body)).toEqual(
+      api.documents.map(({ status, path, added, removed }) => ({
+        status,
+        path,
+        added,
+        removed,
+      })),
+    );
+    expect(body).toContain(
+      '<a class="segment" href="/changes?compare=uncommitted" aria-current="page">Uncommitted</a>',
+    );
+    expect(body).toContain(
+      `Compared with the last commit, <code>${api.head.slice(0, 7)}</code>: only what is not committed yet, untracked files included.`,
+    );
+    expect(body).not.toContain('id="change.rules%2Fstyle.md"');
+
+    const diff = JSON.parse(
+      (
+        await get(
+          port,
+          "/api/changes/diff?compare=uncommitted&path=docs%2Fnew.md",
+        )
+      ).body,
+    ) as { status: string };
+    expect(diff.status).toBe("A");
+    expect(
+      (
+        await get(
+          port,
+          "/api/changes/diff?compare=uncommitted&path=rules%2Fstyle.md",
+        )
+      ).status,
+    ).toBe(404);
+  });
+
+  it("offers the three comparisons on every mode's page, the current one marked", async () => {
+    for (const [query, current] of [
+      ["", "Branch"],
+      ["?compare=commits", "Commits only"],
+      ["?compare=uncommitted", "Uncommitted"],
+    ] as const) {
+      const { body } = await get(port, `/changes${query}`);
+      const nav =
+        /<nav class="changes-mode segmented"[\s\S]*?<\/nav>/.exec(body)?.[0] ??
+        "";
+      expect(
+        [
+          ...nav.matchAll(/<a class="segment" href="([^"]+)"[^>]*>([^<]+)</g),
+        ].map((match) => `${match[2]} ${match[1]}`),
+        query,
+      ).toEqual([
+        "Branch /changes",
+        "Commits only /changes?compare=commits",
+        "Uncommitted /changes?compare=uncommitted",
+      ]);
+      expect(nav, query).toContain(`aria-current="page">${current}</a>`);
+    }
   });
 
   it("notices a new commit without the work tree changing", async () => {
     fixture.git("add", "docs/new.md");
     fixture.git("commit", "-q", "-m", "add new");
     const api = JSON.parse(
-      (await get(port, "/api/changes?worktree=0")).body,
+      (await get(port, "/api/changes?compare=commits")).body,
     ) as ChangesPayload;
     expect(api.documents.map((entry) => entry.path)).toContain("docs/new.md");
   });
@@ -513,17 +623,17 @@ describe.skipIf(!hasGit)(
         env: fixture.env,
       }))!;
       const [first, second] = await Promise.all([
-        tracker.review(true),
-        tracker.review(true),
+        tracker.review("branch"),
+        tracker.review("branch"),
       ]);
       expect(second).toBe(first);
 
       tracker.invalidate();
-      const overtaken = tracker.review(true);
+      const overtaken = tracker.review("branch");
       tracker.invalidate();
-      const fresh = tracker.review(true);
+      const fresh = tracker.review("branch");
       expect(await fresh).not.toBe(await overtaken);
-      expect(await tracker.review(true)).toBe(await fresh);
+      expect(await tracker.review("branch")).toBe(await fresh);
     });
 
     // Pages draw the branch's marks from the review alone, so the context the Changes page and a
@@ -534,10 +644,10 @@ describe.skipIf(!hasGit)(
       const tracker = (await ChangeTracker.open(corpus, {
         env: fixture.env,
       }))!;
-      expect(tracker.cached(true)).toBeUndefined();
+      expect(tracker.cached("branch")).toBeUndefined();
       tracker.warm();
       await tracker.idle();
-      const review = tracker.cached(true);
+      const review = tracker.cached("branch");
       expect(review).toBeDefined();
       expect(await tracker.context(review!)).toBeDefined();
     });
@@ -831,7 +941,7 @@ describe.skipIf(!hasGit)(
 
     it("leaves uncommitted work out of the delta with commits only", async () => {
       const commits = JSON.parse(
-        (await get(port, "/api/changes?worktree=0")).body,
+        (await get(port, "/api/changes?compare=commits")).body,
       ) as ContextPayload;
       const guide = commits.documents.find(
         (entry) => entry.path === "docs/guide.md",
@@ -842,6 +952,31 @@ describe.skipIf(!hasGit)(
         maxTokens: 40,
       });
       expect(commits.config).toBeNull();
+    });
+
+    // Compared with the last commit, the delta is what the uncommitted edits alone do: the guide's
+    // new broken link, and none of what the branch's commits did — the heading the reader links to
+    // and the code lines a document points at both changed in a commit.
+    it("counts only the uncommitted edits in the delta with uncommitted work", async () => {
+      const uncommitted = JSON.parse(
+        (await get(port, "/api/changes?compare=uncommitted")).body,
+      ) as ContextPayload;
+      expect(uncommitted.documents.map((entry) => entry.path)).toEqual([
+        "docs/guide.md",
+      ]);
+      expect(
+        uncommitted.documents[0]?.context?.findings.added.map(
+          (finding) => `${finding.ruleId} ${finding.line}`,
+        ),
+      ).toEqual(["REF-001 7"]);
+      expect(
+        uncommitted.context!.affected.findings.map((entry) => entry.path),
+      ).not.toContain("docs/reader.md");
+      expect(uncommitted.context!.affected.codeLinks).toEqual([]);
+      expect(uncommitted.config).toMatchObject({
+        path: "wastech-mdlint.config.json",
+        status: "M",
+      });
     });
 
     it("marks the change on the graph when asked, and only then", async () => {
@@ -957,20 +1092,20 @@ describe.skipIf(!hasGit)("a watched repository (requires git on PATH)", () => {
       env: fixture.env,
       watched: true,
     }))!;
-    const first = await tracker.review(true);
+    const first = await tracker.review("branch");
     fixture.git("commit", "-q", "--allow-empty", "-m", "nothing changed");
-    expect(await tracker.review(true)).toBe(first);
+    expect(await tracker.review("branch")).toBe(first);
 
     expect(await tracker.gitMoved()).toBe(true);
-    const second = await tracker.review(true);
+    const second = await tracker.review("branch");
     expect(second).not.toBe(first);
     // Nothing moved since: a report from the watcher, such as another branch's ref, changes nothing.
     expect(await tracker.gitMoved()).toBe(false);
-    expect(await tracker.review(true)).toBe(second);
+    expect(await tracker.review("branch")).toBe(second);
 
     tracker.watchLost();
     fixture.git("commit", "-q", "--allow-empty", "-m", "unwatched");
-    expect(await tracker.review(true)).not.toBe(second);
+    expect(await tracker.review("branch")).not.toBe(second);
   }, 60_000);
 });
 

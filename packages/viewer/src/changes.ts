@@ -43,6 +43,21 @@ export type ReviewContext = BranchContext;
 
 export type ReviewResult = Review | GitUnavailable;
 
+/**
+ * What a review compares. `branch` and `commits` both start where the branch left its base — the
+ * merge-base, as a pull request is compared — and end at the files on disk or at `HEAD`.
+ * `uncommitted` starts at `HEAD` and ends at the files on disk: the edits `git status` lists, read
+ * on their own while the rest of the branch would bury them. A start at `HEAD` ending at `HEAD`
+ * would compare nothing, so it is not a mode.
+ */
+export type CompareMode = "branch" | "commits" | "uncommitted";
+
+export const COMPARE_MODES: readonly CompareMode[] = [
+  "branch",
+  "commits",
+  "uncommitted",
+];
+
 type Cached = { key: string; result: Review };
 
 /**
@@ -61,8 +76,8 @@ type Cached = { key: string; result: Review };
  * all ask at once, and each would otherwise run the whole review again.
  */
 export class ChangeTracker {
-  private readonly cache = new Map<boolean, Cached>();
-  private readonly pending = new Map<boolean, Promise<ReviewResult>>();
+  private readonly cache = new Map<CompareMode, Cached>();
+  private readonly pending = new Map<CompareMode, Promise<ReviewResult>>();
   // Bumped by `invalidate`, so a review that was already running when the work tree changed is
   // neither cached nor joined: it describes the files as they were before.
   private generation = 0;
@@ -119,8 +134,8 @@ export class ChangeTracker {
   }
 
   /** The review kept for a mode, without asking git whether it is still current. */
-  cached(worktree: boolean): Review | undefined {
-    return this.cache.get(worktree)?.result;
+  cached(mode: CompareMode): Review | undefined {
+    return this.cache.get(mode)?.result;
   }
 
   /**
@@ -132,7 +147,7 @@ export class ChangeTracker {
    * the first of those pages waited for all of it.
    */
   warm(): void {
-    const run = this.review(true)
+    const run = this.review("branch")
       .then((review) =>
         "available" in review ? undefined : this.context(review),
       )
@@ -159,17 +174,17 @@ export class ChangeTracker {
    * of some other branch moving changes nothing they show, and answers false.
    */
   async gitMoved(): Promise<boolean> {
-    const before = this.cached(true);
+    const before = this.cached("branch");
     const repository = this.repository;
     if (repository.available) {
-      for (const [worktree, kept] of [...this.cache]) {
+      for (const [mode, kept] of [...this.cache]) {
         const key = await repository.revisionKey(kept.result.set.base);
-        if (key !== kept.key && this.cache.get(worktree) === kept) {
-          this.cache.delete(worktree);
+        if (key !== kept.key && this.cache.get(mode) === kept) {
+          this.cache.delete(mode);
         }
       }
     }
-    const after = await this.review(true).catch(() => undefined);
+    const after = await this.review("branch").catch(() => undefined);
     return after !== undefined && after !== before;
   }
 
@@ -188,12 +203,12 @@ export class ChangeTracker {
     this.pending.clear();
   }
 
-  async review(worktree: boolean): Promise<ReviewResult> {
+  async review(mode: CompareMode): Promise<ReviewResult> {
     const repository = this.repository;
     if (!repository.available) {
       return repository;
     }
-    const cached = this.cache.get(worktree);
+    const cached = this.cache.get(mode);
     if (
       cached !== undefined &&
       (this.watched ||
@@ -201,17 +216,17 @@ export class ChangeTracker {
     ) {
       return cached.result;
     }
-    const running = this.pending.get(worktree);
+    const running = this.pending.get(mode);
     if (running !== undefined) {
       return running;
     }
     const generation = this.generation;
-    const computing: Promise<ReviewResult> = this.compute(repository, worktree)
+    const computing: Promise<ReviewResult> = this.compute(repository, mode)
       .then((result) => {
         // A problem such as a missing base is not kept, and is asked again every time: a fetch or
         // a new branch may have solved it, and nothing on disk the watcher sees would say so.
         if (!("available" in result) && generation === this.generation) {
-          this.cache.set(worktree, {
+          this.cache.set(mode, {
             key: `${result.set.head}:${result.set.base.commit}`,
             result,
           });
@@ -219,11 +234,11 @@ export class ChangeTracker {
         return result;
       })
       .finally(() => {
-        if (this.pending.get(worktree) === computing) {
-          this.pending.delete(worktree);
+        if (this.pending.get(mode) === computing) {
+          this.pending.delete(mode);
         }
       });
-    this.pending.set(worktree, computing);
+    this.pending.set(mode, computing);
     return computing;
   }
 
@@ -248,7 +263,9 @@ export class ChangeTracker {
     review: Review,
   ): Promise<ReviewContext | undefined> {
     const repository = this.repository;
-    const worktree = review.set.worktree ? review : await this.review(true);
+    // An uncommitted review is a work-tree review of its own merge-base, `HEAD`, so it serves as
+    // both; only a commits-only review needs the branch's work-tree review beside it.
+    const worktree = review.set.worktree ? review : await this.review("branch");
     if (
       !repository.available ||
       "available" in worktree ||
@@ -271,7 +288,7 @@ export class ChangeTracker {
 
   private async compute(
     repository: GitRepository,
-    worktree: boolean,
+    mode: CompareMode,
   ): Promise<ReviewResult> {
     // One snapshot of the corpus for the whole computation, so the documents, the graph and the
     // config all describe the same moment even if an update lands meanwhile.
@@ -282,9 +299,13 @@ export class ChangeTracker {
       configuration: corpus.configuration,
       membership: corpus.membership(),
     };
+    // The last commit as the base: its merge-base with `HEAD` is `HEAD` itself, so core's one
+    // review sequence compares the work tree with the last commit — the same answer
+    // `lint --since HEAD` gives — and no second way of listing uncommitted changes exists here.
+    const base = mode === "uncommitted" ? "HEAD" : this.options.base;
     const review = await reviewBranch(repository, {
-      ...(this.options.base === undefined ? {} : { base: this.options.base }),
-      worktree,
+      ...(base === undefined ? {} : { base }),
+      worktree: mode !== "commits",
       corpus: snapshot,
     });
     return "available" in review ? review : { ...review, snapshot };
@@ -301,6 +322,7 @@ export class ChangeTracker {
  */
 export function changesPayload(
   result: ReviewResult,
+  mode: CompareMode,
   context?: ReviewContext,
   marks?: ReviewMarksView,
 ): unknown {
@@ -318,6 +340,7 @@ export function changesPayload(
     base: set.base,
     mergeBase: set.mergeBase,
     head: set.head,
+    compare: mode,
     worktree: set.worktree,
     added: totalOf(result, "added"),
     removed: totalOf(result, "removed"),

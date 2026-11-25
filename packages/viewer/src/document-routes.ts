@@ -167,7 +167,7 @@ export class DocumentRoutes {
     if (this.ctx.changes === undefined) {
       return undefined;
     }
-    const review = await this.ctx.changes.review(true);
+    const review = await this.ctx.changes.review("branch");
     if ("available" in review) {
       return undefined;
     }
