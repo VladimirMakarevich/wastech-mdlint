@@ -6,17 +6,28 @@ This project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0]
+
 Breaking for code that builds a `GitBase` itself: it gains a required `source` - see Changed.
 
 ### Added
 
 - The config can name the branch changes are compared with: `"git": { "base": "origin/develop" }`. It applies wherever a run names none - the viewer's Changes page, and `lint --since` / `impact --since` given no ref. Without it the base is still guessed (the branch `origin/HEAD` names, then `main`, then `master`), which is wrong wherever work starts from another branch. A ref named for the run - the viewer's `--base`, `--since <ref>`, the MCP `since` - still wins. A `git.base` that names nothing, or shares no history with `HEAD`, is reported as the config's, never replaced by the guess; one starting with `-` is refused when the config loads.
 - `lint --since` and `impact --since` take the ref as optional. Given alone, they compare with `git.base`, else the detected base branch.
+- The viewer's Changes page can compare only the uncommitted work: its switch reads **Branch**, **Commits only** and **Uncommitted** (`?compare=uncommitted`), the last comparing the files on disk with the last commit - what `git status` lists, untracked files included - with the findings and budget changes those edits alone make, the same answer as `lint --since HEAD`. The header's count, the tree's letters and a document's page still show the whole branch, and a document opened from the Changes page keeps the comparison, so its link back and `n` / `p` follow the same list.
+- A click on an image in a viewer document, or `Enter` on it, shows it enlarged over the page, fitted to the window. The wheel or a trackpad pinch zooms about the pointer, a click toggles between fitting and natural size, dragging or the arrow keys move a zoomed image, `+`, `-` and `0` zoom in, out and back to fit, and `Escape`, the close button or a click beside it closes it. An image inside a link still opens its link.
 
 ### Changed
 
 - Every comparison says where its base came from. The `since` object `lint --since`, `impact --since` and the MCP `lint-files` and `impact-analysis` return gains `source` - `given`, `config` or `detected` - and the text report's first line names a configured or guessed base (`since develop (git.base, merge-base 1a2b3c4): …`). The viewer's Changes page says it in its summary line, and `/api/changes` carries it as `base.source`.
 - In `@wastech-mdlint/core`, `GitRepository.resolveBase` takes its names as `{ given, configured }`, and the `GitBase` it returns has a required `source`. Every `GitBase` comes from `resolveBase`; code that built one by hand to pass to `mergeBase` or `revisionKey` has to add it.
+- The viewer asks for the commits-only comparison as `?compare=commits`; `?worktree=0` still opens it, so older links keep working. `/api/changes` names its comparison as `compare`, `/api/changes/diff` takes the same parameter, and a review mark is sent with `compare` in place of the `worktree` boolean, which is refused. With review marks, **Base branch** reads **Last commit** on the uncommitted comparison.
+- CLI messages, `init`'s prompts and summary, and the files `init` and `compile` write use an ASCII hyphen where they had an em dash, as does the documentation.
+
+### Fixed
+
+- Comparing with `HEAD` before the first commit says `HEAD has no commits yet.` rather than suggesting a fetch, and says so only when `HEAD`'s branch really has no commits, not when `HEAD` names a commit git cannot read.
+- The viewer's tree keeps its switches together: the "No file has findings." line no longer lands between them and pushes **Only changed files** and **Only files left to review** down.
 
 ## [0.4.1]
 
@@ -188,7 +199,8 @@ First public release. Published manually and carries no provenance attestation; 
 - Windows, macOS, and Linux are all supported: paths in public output are normalized to repository-relative POSIX form, ordering uses a code-point comparator rather than locale collation, and every product file is written through an atomic temp-and-rename path so a failed write cannot truncate an existing file.
 - All analysis is local. No external HTTP link checking, no link cache, no remote schema resolution, and no install-time file writes.
 
-[unreleased]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.4.1...HEAD
+[unreleased]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/VladimirMakarevich/wastech-mdlint/compare/v0.2.2...v0.3.0
