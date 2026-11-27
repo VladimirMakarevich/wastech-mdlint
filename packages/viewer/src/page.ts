@@ -403,22 +403,24 @@ function renderSidebar(params: PageParams): Element {
   ]);
 }
 
-// The switches that narrow the tree, each with the line it shows when nothing is left. Hidden until
-// the script that knows the findings and the changes has run, like the theme switch.
+// The switches that narrow the tree, then the lines they show when nothing is left. Hidden until
+// the script that knows the findings and the changes has run, like the theme switch. Every switch
+// comes before every empty-state line: a line placed right after its own switch would split the
+// switch group in two and push the other switches down whenever it appears.
 function renderTreeFilters(params: PageParams): (Element | undefined)[] {
   return [
     treeSwitch("findings", "Only files with findings"),
-    h(
-      "p.tree-filter-empty.tree-filter-findings-empty",
-      { hidden: true },
-      "No file has findings.",
-    ),
     params.showChanges === true
       ? treeSwitch("changes", "Only changed files")
       : undefined,
     params.showReview === true
       ? treeSwitch("unreviewed", "Only files left to review")
       : undefined,
+    h(
+      "p.tree-filter-empty.tree-filter-findings-empty",
+      { hidden: true },
+      "No file has findings.",
+    ),
     params.showChanges === true
       ? h(
           "p.tree-filter-empty.tree-filter-changes-empty",

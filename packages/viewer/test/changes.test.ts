@@ -224,6 +224,20 @@ describe.skipIf(!hasGit)("the Changes section (requires git on PATH)", () => {
     );
   });
 
+  // An empty-state line placed right after its own switch split the switch group: with the findings
+  // switch on and nothing to show, "No file has findings." pushed the changed-files switch down.
+  it("keeps every tree switch above every empty-state line", async () => {
+    const { body } = await get(port, "/doc/README.md");
+    const filters =
+      /<\/summary>([\s\S]*?)<ul class="tree">/.exec(body)?.[1] ?? "";
+    const kinds = [
+      ...filters.matchAll(/<(label|p) class="tree-filter[- ]/g),
+    ].map((match) => match[1]);
+    expect(kinds).toContain("label");
+    expect(kinds.filter((kind) => kind === "p")).toHaveLength(2);
+    expect(kinds.lastIndexOf("label")).toBeLessThan(kinds.indexOf("p"));
+  });
+
   // @boundary-guard host-parity
   // Most of the Changes page is the diffs of its cards, far below the first screen. The page is drawn
   // once the overview and the first card are read, and the rest follows out of sight.
